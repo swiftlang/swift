@@ -4182,8 +4182,8 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.wrappedVar = nullptr;
   expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
-  expression.patternBinding = nullptr;
-  expression.patternBindingIndex = 0;
+  expression.initialization.patternBinding = nullptr;
+  expression.initialization.patternBindingIndex = 0;
 }
 
 void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
@@ -4280,18 +4280,35 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     auto result = forInitialization(
         initializer, dc, patternType,
         patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
-    result.expression.patternBinding = patternBinding;
-    result.expression.patternBindingIndex = patternBindingIndex;
+    result.expression.initialization.patternBinding = patternBinding;
+    result.expression.initialization.patternBindingIndex = patternBindingIndex;
     return result;
 }
 
+SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
+    ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
+    bool bindPatternVarsOneWay) {
+  SolutionApplicationTarget target(
+      stmt->getSequence(), dc, CTP_ForEachStmt,
+      sequenceProto->getDeclaredType(), /*isDiscarded=*/false);
+  target.expression.pattern = stmt->getPattern();
+  target.expression.bindPatternVarsOneWay =
+    bindPatternVarsOneWay || (stmt->getWhere() != nullptr);
+  target.expression.forEachStmt.stmt = stmt;
+  target.expression.forEachStmt.whereExpr = stmt->getWhere();
+  return target;
+}
+
 ContextualPattern
-SolutionApplicationTarget::getInitializationContextualPattern() const {
+SolutionApplicationTarget::getContextualPattern() const {
   assert(kind == Kind::expression);
-  assert(expression.contextualPurpose == CTP_Initialization);
-  if (expression.patternBinding) {
+  assert(expression.contextualPurpose == CTP_Initialization ||
+         expression.contextualPurpose == CTP_ForEachStmt);
+  if (expression.contextualPurpose == CTP_Initialization &&
+      expression.initialization.patternBinding) {
     return ContextualPattern::forPatternBindingDecl(
-        expression.patternBinding, expression.patternBindingIndex);
+        expression.initialization.patternBinding,
+        expression.initialization.patternBindingIndex);
   }
 
   return ContextualPattern::forRawPattern(expression.pattern, expression.dc);

@@ -1141,7 +1141,6 @@ static bool debugConstraintSolverForTarget(
 
 Optional<std::vector<Solution>> ConstraintSystem::solve(
     SolutionApplicationTarget &target,
-    ExprTypeCheckListener *listener,
     FreeTypeVariableBinding allowFreeTypeVariables
 ) {
   llvm::SaveAndRestore<bool> debugForExpr(
@@ -1171,7 +1170,7 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
   // when there is an error and attempts to salvage an ill-formed program.
   for (unsigned stage = 0; stage != 2; ++stage) {
     auto solution = (stage == 0)
-        ? solveImpl(target, listener, allowFreeTypeVariables)
+        ? solveImpl(target, allowFreeTypeVariables)
         : salvage();
 
     switch (solution.getKind()) {
@@ -1237,7 +1236,6 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
 
 SolutionResult
 ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
-                            ExprTypeCheckListener *listener,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
   if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -1259,13 +1257,6 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
 
   if (generateConstraints(target, allowFreeTypeVariables))
     return SolutionResult::forError();;
-
-  // Notify the listener that we've built the constraint system.
-  if (Expr *expr = target.getAsExpr()) {
-    if (listener && listener->builtConstraints(*this, expr)) {
-      return SolutionResult::forError();
-    }
-  }
 
   // Try to solve the constraint system using computed suggestions.
   SmallVector<Solution, 4> solutions;
