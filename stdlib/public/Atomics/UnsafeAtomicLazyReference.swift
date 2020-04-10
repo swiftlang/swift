@@ -16,7 +16,7 @@ import Swift
 /// once, but read many times.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct UnsafePointerToAtomicLazyReference<Instance: AnyObject> {
+public struct UnsafeAtomicLazyReference<Instance: AnyObject> {
   public typealias Value = Instance?
   public typealias AtomicStorage = Instance?
 
@@ -30,7 +30,7 @@ public struct UnsafePointerToAtomicLazyReference<Instance: AnyObject> {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafePointerToAtomicLazyReference {
+extension UnsafeAtomicLazyReference {
   @inlinable
   public static func create() -> Self {
     let ptr = UnsafeMutablePointer<AtomicStorage>.allocate(capacity: 1)
@@ -45,7 +45,7 @@ extension UnsafePointerToAtomicLazyReference {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafePointerToAtomicLazyReference {
+extension UnsafeAtomicLazyReference {
   /// Atomically initializes this reference if its current value is nil, then
   /// returns the initialized value. If this reference is already initialized,
   /// then `initialize(to:)` discards its supplied argument and returns the
@@ -56,7 +56,7 @@ extension UnsafePointerToAtomicLazyReference {
   ///
   /// ```
   /// class Image {
-  ///   var _histogram: UnsafePointerToAtomicLazyReference<Histogram> = ...
+  ///   var _histogram: UnsafeAtomicLazyReference<Histogram> = ...
   ///
   ///   // This is safe to call concurrently from multiple threads.
   ///   var atomicLazyHistogram: Histogram {
@@ -92,7 +92,7 @@ extension UnsafePointerToAtomicLazyReference {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension UnsafePointerToAtomicLazyReference {
+extension UnsafeAtomicLazyReference {
   /// Atomically loads and returns the current value of this reference.
   ///
   /// The load operation is performed with the memory ordering

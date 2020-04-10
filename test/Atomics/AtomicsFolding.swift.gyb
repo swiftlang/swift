@@ -75,7 +75,7 @@ public struct AtomicFoldingTests {
   % for (label, type, builtin) in all_types:
   // SECTIONING-LABEL: // AtomicFoldingTests.load_${label}_relaxed(_:)
   public func load_${label}_relaxed(
-    _ value: UnsafePointerToAtomic<${type}>
+    _ value: UnsafeAtomic<${type}>
   ) -> ${type} {
     // CHECK: builtin "atomicload_monotonic_${builtin}"
     // EXCLUSIONS-NOT: builtin "atomicload_acquire_${builtin}"
@@ -86,7 +86,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.load_${label}_acquiring(_:)
   public func load_${label}_acquiring(
-    _ value: UnsafePointerToAtomic<${type}>
+    _ value: UnsafeAtomic<${type}>
   ) -> ${type} {
     // EXCLUSIONS-NOT: builtin "atomicload_monotonic_${builtin}"
     // CHECK: builtin "atomicload_acquire_${builtin}"
@@ -97,7 +97,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.load_${label}_sequential(_:)
   public func load_${label}_sequential(
-    _ value: UnsafePointerToAtomic<${type}>
+    _ value: UnsafeAtomic<${type}>
   ) -> ${type} {
     // EXCLUSIONS-NOT: builtin "atomicload_monotonic_${builtin}"
     // EXCLUSIONS-NOT: builtin "atomicload_acquire_${builtin}"
@@ -112,7 +112,7 @@ public struct AtomicFoldingTests {
   % for (label, type, builtin) in all_types:
   // SECTIONING-LABEL: // AtomicFoldingTests.store_${label}_relaxed(_:_:)
   public func store_${label}_relaxed(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ desired: ${type}
   ) {
     // CHECK: builtin "atomicstore_monotonic_${builtin}"
@@ -124,7 +124,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.store_${label}_releasing(_:_:)
   public func store_${label}_releasing(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ desired: ${type}
   ) {
     // EXCLUSIONS-NOT: builtin "atomicstore_monotonic_${builtin}"
@@ -136,7 +136,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.store_${label}_sequential(_:_:)
   public func store_${label}_sequential(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ desired: ${type}
   ) {
     // EXCLUSIONS-NOT: builtin "atomicstore_monotonic_${builtin}"
@@ -152,7 +152,7 @@ public struct AtomicFoldingTests {
   % for (label, type, builtin) in all_types:
   // SECTIONING-LABEL: // AtomicFoldingTests.exchange_${label}_relaxed(_:_:)
   public func exchange_${label}_relaxed(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ desired: ${type}
   ) -> ${type}  {
     // CHECK: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -166,7 +166,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.exchange_${label}_acquiring(_:_:)
   public func exchange_${label}_acquiring(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ desired: ${type}
   ) -> ${type}  {
     // EXCLUSIONS-NOT: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -180,7 +180,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.exchange_${label}_releasing(_:_:)
   public func exchange_${label}_releasing(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ desired: ${type}
   ) -> ${type}  {
     // EXCLUSIONS-NOT: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -194,7 +194,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.exchange_${label}_acquiringAndReleasing(_:_:)
   public func exchange_${label}_acquiringAndReleasing(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ desired: ${type}
   ) -> ${type}  {
     // EXCLUSIONS-NOT: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -208,7 +208,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.exchange_${label}_sequential(_:_:)
   public func exchange_${label}_sequential(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ desired: ${type}
   ) -> ${type}  {
     // EXCLUSIONS-NOT: builtin "atomicrmw_xchg_monotonic_${builtin}"
@@ -226,7 +226,7 @@ public struct AtomicFoldingTests {
   % for (label, type, builtin) in all_types:
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange_${label}_relaxed(_:_:_:)
   public func compareExchange_${label}_relaxed(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -244,7 +244,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange_${label}_acquiring(_:_:_:)
   public func compareExchange_${label}_acquiring(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -262,7 +262,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange_${label}_releasing(_:_:_:)
   public func compareExchange_${label}_releasing(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -280,7 +280,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange_${label}_acquiringAndReleasing(_:_:_:)
   public func compareExchange_${label}_acquiringAndReleasing(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -298,7 +298,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange_${label}_sequential(_:_:_:)
   public func compareExchange_${label}_sequential(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -324,7 +324,7 @@ public struct AtomicFoldingTests {
   %   for (label, type, builtin) in all_types:
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange2_${label}_relaxed_relaxed${modifier}(_:_:_:)
   public func compareExchange2_${label}_relaxed_relaxed${modifier}(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -344,7 +344,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange2_${label}_acquiring_relaxed${modifier}(_:_:_:)
   public func compareExchange2_${label}_acquiring_relaxed${modifier}(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -364,7 +364,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange2_${label}_acquiring_acquiring${modifier}(_:_:_:)
   public func compareExchange2_${label}_acquiring_acquiring${modifier}(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -384,7 +384,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange2_${label}_sequential_acquiring${modifier}(_:_:_:)
   public func compareExchange2_${label}_sequential_acquiring${modifier}(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -405,7 +405,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange2_${label}_releasing_acquiring${modifier}(_:_:_:)
   public func compareExchange2_${label}_releasing_acquiring${modifier}(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -429,7 +429,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.compareExchange2_${label}_relaxed_sequential${modifier}(_:_:_:)
   public func compareExchange2_${label}_relaxed_sequential${modifier}(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ expected: ${type},
     _ desired: ${type}
   ) -> (exchanged: Bool, original: ${type})  {
@@ -459,7 +459,7 @@ public struct AtomicFoldingTests {
   %   for (operation, llvmOp, argLabel) in integer_operations:
   // SECTIONING-LABEL: // AtomicFoldingTests.${operation}_${label}_relaxed(_:_:)
   public func ${operation}_${label}_relaxed(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ operand: ${type}
   ) -> ${type} {
     // CHECK: builtin "atomicrmw_${llvmOp}_monotonic_${builtin}"
@@ -473,7 +473,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.${operation}_${label}_acquiring(_:_:)
   public func ${operation}_${label}_acquiring(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ operand: ${type}
   ) -> ${type} {
     // CHECK: builtin "atomicrmw_${llvmOp}_acquire_${builtin}"
@@ -487,7 +487,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.${operation}_${label}_releasing(_:_:)
   public func ${operation}_${label}_releasing(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ operand: ${type}
   ) -> ${type} {
     // CHECK: builtin "atomicrmw_${llvmOp}_release_${builtin}"
@@ -501,7 +501,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.${operation}_${label}_acquiringAndReleasing(_:_:)
   public func ${operation}_${label}_acquiringAndReleasing(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ operand: ${type}
   ) -> ${type} {
     // CHECK: builtin "atomicrmw_${llvmOp}_acqrel_${builtin}"
@@ -517,7 +517,7 @@ public struct AtomicFoldingTests {
 
   // SECTIONING-LABEL: // AtomicFoldingTests.${operation}_${label}_sequential(_:_:)
   public func ${operation}_${label}_sequential(
-    _ value: UnsafePointerToAtomic<${type}>,
+    _ value: UnsafeAtomic<${type}>,
     _ operand: ${type}
   ) -> ${type} {
     // CHECK: builtin "atomicrmw_${llvmOp}_seqcst_${builtin}"

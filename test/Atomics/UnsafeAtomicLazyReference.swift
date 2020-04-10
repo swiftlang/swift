@@ -4,26 +4,26 @@
 import StdlibUnittest
 import Atomics
 
-let suite = TestSuite("UnsafePointerToAtomicLazyReference")
+let suite = TestSuite("UnsafeAtomicLazyReference")
 defer { runAllTests() }
 
-suite.test("UnsafePointerToAtomicLazyReference<${type}>.create-destroy") {
+suite.test("UnsafeAtomicLazyReference<${type}>.create-destroy") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
 
-  let v = UnsafePointerToAtomicLazyReference<LifetimeTracked>.create()
+  let v = UnsafeAtomicLazyReference<LifetimeTracked>.create()
   defer { v.destroy() }
   expectNil(v.load())
 }
 
-suite.test("UnsafePointerToAtomicLazyReference<${type}>.storeIfNil") {
+suite.test("UnsafeAtomicLazyReference<${type}>.storeIfNil") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
 
   do {
-    let v = UnsafePointerToAtomicLazyReference<LifetimeTracked>.create()
+    let v = UnsafeAtomicLazyReference<LifetimeTracked>.create()
     expectNil(v.load())
 
     let ref = LifetimeTracked(42)

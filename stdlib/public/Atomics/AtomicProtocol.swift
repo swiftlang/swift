@@ -33,7 +33,7 @@ public protocol AtomicProtocol {
   ///
   ///     extension AtomicProtocol {
   ///        mutating func withTemporaryAtomicValue(
-  ///           _ body: (UnsafePointerToAtomic<Self>) -> Void
+  ///           _ body: (UnsafeAtomic<Self>) -> Void
   ///        ) {
   ///           let storage =
   ///              UnsafeMutablePointer<AtomicStorage>.allocate(capacity: 1)
@@ -42,7 +42,7 @@ public protocol AtomicProtocol {
   ///              Self.disposeAtomicStorage(at: storage)
   ///              storage.deallocate()
   ///           }
-  ///           let tmp = UnsafePointerToAtomic<Self>(at: storage)
+  ///           let tmp = UnsafeAtomic<Self>(at: storage)
   ///           body(tmp)
   ///           self = tmp.load(ordering: .relaxed)
   ///        }
