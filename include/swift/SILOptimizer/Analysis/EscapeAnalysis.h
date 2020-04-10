@@ -1045,8 +1045,7 @@ private:
   /// If \p ai is an optimizable @_semantics("array.uninitialized") call, return
   /// valid call information.
   ArrayUninitCall
-  canOptimizeArrayUninitializedCall(ApplyInst *ai,
-                                    const ConnectionGraph *conGraph);
+  canOptimizeArrayUninitializedCall(ApplyInst *ai);
 
   /// Return true of this tuple_extract is the result of an optimizable
   /// @_semantics("array.uninitialized") call.

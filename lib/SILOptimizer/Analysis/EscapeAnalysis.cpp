@@ -1608,7 +1608,7 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
         continue;
 
       if (auto ai = dyn_cast<ApplyInst>(&i)) {
-        if (EA->canOptimizeArrayUninitializedCall(ai, this).isValid())
+        if (EA->canOptimizeArrayUninitializedCall(ai).isValid())
           continue;
       }
       for (auto result : i.getResults()) {
@@ -1826,8 +1826,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
 }
 
 EscapeAnalysis::ArrayUninitCall
-EscapeAnalysis::canOptimizeArrayUninitializedCall(
-    ApplyInst *ai, const ConnectionGraph *conGraph) {
+EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
   ArrayUninitCall call;
   // This must be an exact match so we don't accidentally optimize
   // "array.uninitialized_intrinsic".
@@ -1873,8 +1872,7 @@ bool EscapeAnalysis::canOptimizeArrayUninitializedResult(
   if (!ai)
     return false;
 
-  auto *conGraph = getConnectionGraph(ai->getFunction());
-  return canOptimizeArrayUninitializedCall(ai, conGraph).isValid();
+  return canOptimizeArrayUninitializedCall(ai).isValid();
 }
 
 // Handle @_semantics("array.uninitialized")
@@ -1924,7 +1922,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return;
       case ArrayCallKind::kArrayUninitialized: {
         ArrayUninitCall call = canOptimizeArrayUninitializedCall(
-            cast<ApplyInst>(FAS.getInstruction()), ConGraph);
+            cast<ApplyInst>(FAS.getInstruction()));
         if (call.isValid()) {
           createArrayUninitializedSubgraph(call, ConGraph);
           return;
