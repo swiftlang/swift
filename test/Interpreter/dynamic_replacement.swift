@@ -82,6 +82,8 @@ func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
  expectTrue(public_global_generic_func(Int.self) ==
             expectedResult(useOrig, "public_global_generic_func"))
 
+ expectTrue(PublicClass(x: 0).str ==
+            expectedResult(useOrig, "public_class_init"))
  expectTrue(PublicClass().function() ==
             expectedResult(useOrig, "public_class_func"))
  expectTrue(PublicClass().finalFunction() ==
@@ -89,6 +91,8 @@ func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
  expectTrue(PublicClass().genericFunction(Int.self) ==
             expectedResult(useOrig, "public_class_generic_func"))
 
+ expectTrue(PublicStruct(x: 0).str ==
+            expectedResult(useOrig, "public_struct_init"))
  expectTrue(PublicStruct().function() ==
             expectedResult(useOrig, "public_struct_func"))
  expectTrue(PublicStruct().genericFunction(Int.self) ==
