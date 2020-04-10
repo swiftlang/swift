@@ -50,29 +50,25 @@ bool FailureDiagnostic::diagnoseAsNote() {
   return false;
 }
 
-std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
+Expr *FailureDiagnostic::computeAnchor() const {
   auto &cs = getConstraintSystem();
 
   auto *locator = getLocator();
   // Resolve the locator to a specific expression.
   SourceRange range;
-  bool isSubscriptMember =
-      (!locator->getPath().empty() && locator->getPath().back().getKind() ==
-                                          ConstraintLocator::SubscriptMember);
-
   ConstraintLocator *resolved = simplifyLocator(cs, locator, range);
   if (!resolved || !resolved->getAnchor())
-    return {locator->getAnchor(), true};
+    return locator->getAnchor();
 
   Expr *anchor = resolved->getAnchor();
   // FIXME: Work around an odd locator representation that doesn't separate the
   // base of a subscript member from the member access.
-  if (isSubscriptMember) {
+  if (locator->isLastElement<LocatorPathElt::SubscriptMember>()) {
     if (auto subscript = dyn_cast<SubscriptExpr>(anchor))
       anchor = subscript->getBase();
   }
 
-  return {anchor, !resolved->getPath().empty()};
+  return anchor;
 }
 
 Type FailureDiagnostic::getType(Expr *expr, bool wantRValue) const {
@@ -128,11 +124,6 @@ Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
   }
 
   return nullptr;
-}
-
-Optional<SelectedOverload>
-FailureDiagnostic::getChoiceFor(ConstraintLocator *locator) const {
-  return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
 }
 
 Type FailureDiagnostic::restoreGenericParameters(
@@ -231,7 +222,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return getAffectedDeclFromType(
         getContextualType(getLocator()->getAnchor()));
 
-  if (auto overload = getChoiceFor(getLocator())) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     // If there is a declaration associated with this
     // failure e.g. an overload choice of the call
     // expression, let's see whether failure is
@@ -761,7 +752,7 @@ bool LabelingFailure::diagnoseAsNote() {
     return "(" + str + ")";
   };
 
-  auto selectedOverload = getChoiceFor(getLocator());
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!selectedOverload)
     return false;
 
@@ -874,9 +865,6 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
 }
 
 bool MissingForcedDowncastFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   auto *expr = getAnchor();
   if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
     expr = assignExpr->getSrc();
@@ -894,9 +882,6 @@ bool MissingForcedDowncastFailure::diagnoseAsError() {
 }
 
 bool MissingAddressOfFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   auto *anchor = getAnchor();
   auto argTy = getFromType();
   auto paramTy = getToType();
@@ -913,9 +898,6 @@ bool MissingAddressOfFailure::diagnoseAsError() {
 }
 
 bool MissingExplicitConversionFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   auto *DC = getDC();
   auto *anchor = getAnchor();
   if (auto *assign = dyn_cast<AssignExpr>(anchor))
@@ -976,9 +958,6 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
 }
 
 bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   auto *anchor = getAnchor();
   auto baseType = getType(anchor);
   bool resultIsOptional = ResultTypeIsOptional;
@@ -1101,9 +1080,6 @@ public:
 };
 
 bool MissingOptionalUnwrapFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
   if (!getUnwrappedType()->isBool()) {
     if (diagnoseConversionToBool())
       return true;
@@ -1261,19 +1237,41 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       subElementDiagID = diag::assignment_lhs_is_apply_expression;
     }
   } else if (auto inoutExpr = dyn_cast<InOutExpr>(diagExpr)) {
-    if (auto restriction = getRestrictionForType(getType(inoutExpr))) {
-      PointerTypeKind pointerKind;
-      if (restriction->second == ConversionRestrictionKind::ArrayToPointer &&
-          restriction->first->getAnyPointerElementType(pointerKind) &&
-          (pointerKind == PTK_UnsafePointer ||
-           pointerKind == PTK_UnsafeRawPointer)) {
-        // If we're converting to an UnsafePointer, then the programmer
-        // specified an & unnecessarily. Produce a fixit hint to remove it.
-        emitDiagnostic(inoutExpr->getLoc(),
-                       diag::extra_address_of_unsafepointer, restriction->first)
-            .highlight(inoutExpr->getSourceRange())
-            .fixItRemove(inoutExpr->getStartLoc());
-        return true;
+    if (auto *parentExpr = findParentExpr(inoutExpr)) {
+      if (auto *call =
+              dyn_cast_or_null<ApplyExpr>(findParentExpr(parentExpr))) {
+        // Since this `inout` expression is an argument to a call/operator
+        // let's figure out whether this is an impliict conversion from
+        // array to an unsafe pointer type and diagnose it.
+        unsigned argIdx = 0;
+        if (auto *TE = dyn_cast<TupleExpr>(parentExpr)) {
+          for (unsigned n = TE->getNumElements(); argIdx != n; ++argIdx) {
+            if (TE->getElement(argIdx) == inoutExpr)
+              break;
+          }
+        }
+
+        auto *argLoc = getConstraintLocator(
+            call, {ConstraintLocator::ApplyArgument,
+                   LocatorPathElt::ApplyArgToParam(argIdx, argIdx,
+                                                   ParameterTypeFlags())});
+
+        if (auto info = getFunctionArgApplyInfo(argLoc)) {
+          auto &cs = getConstraintSystem();
+          auto paramType = info->getParamType();
+          auto argType = getType(inoutExpr)->getWithoutSpecifierType();
+
+          PointerTypeKind ptr;
+          if (cs.isArrayType(argType) &&
+              paramType->getAnyPointerElementType(ptr) &&
+              (ptr == PTK_UnsafePointer || ptr == PTK_UnsafeRawPointer)) {
+            emitDiagnostic(inoutExpr->getLoc(),
+                           diag::extra_address_of_unsafepointer, paramType)
+                .highlight(inoutExpr->getSourceRange())
+                .fixItRemove(inoutExpr->getStartLoc());
+            return true;
+          }
+        }
       }
     }
 
@@ -1296,8 +1294,10 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
             ConstructorDecl::BodyInitKind::Delegating) {
           emitDiagnostic(loc, diag::assignment_let_property_delegating_init,
                       member->getName());
-          if (auto *ref = getResolvedMemberRef(member)) {
-            emitDiagnostic(ref, diag::decl_declared_here, ref->getFullName());
+          if (auto overload = getOverloadChoiceIfAvailable(
+                  getConstraintLocator(member, ConstraintLocator::Member))) {
+            if (auto *ref = overload->choice.getDeclOrNull())
+              emitDiagnostic(ref, diag::decl_declared_here, ref->getFullName());
           }
           return true;
         }
@@ -1328,7 +1328,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
-  auto overload = getChoiceFor(getLocator());
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!(overload && overload->choice.isDecl()))
     return false;
 
@@ -2020,8 +2020,8 @@ bool ContextualFailure::diagnoseAsError() {
   case ConstraintLocator::RValueAdjustment: {
     auto &cs = getConstraintSystem();
 
-    auto overload = getChoiceFor(
-        cs.getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember));
+    auto overload = getOverloadChoiceIfAvailable(
+        getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember));
     if (!(overload && overload->choice.isDecl()))
       return false;
 
@@ -2084,7 +2084,7 @@ bool ContextualFailure::diagnoseAsError() {
 }
 
 bool ContextualFailure::diagnoseAsNote() {
-  auto overload = getChoiceFor(getLocator());
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!(overload && overload->choice.isDecl()))
     return false;
 
@@ -3512,7 +3512,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       };
 
       auto *baseLoc = cs.getConstraintLocator(ctorRef->getBase());
-      if (auto selection = getChoiceFor(baseLoc)) {
+      if (auto selection = getCalleeOverloadChoiceIfAvailable(baseLoc)) {
         OverloadChoice choice = selection->choice;
         if (choice.isDecl() && isMutable(choice.getDecl()) &&
             !isCallArgument(initCall) &&
@@ -3923,7 +3923,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 
   diag.flush();
 
-  if (auto selectedOverload = getChoiceFor(locator)) {
+  if (auto selectedOverload = getCalleeOverloadChoiceIfAvailable(locator)) {
     if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
       emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
     }
@@ -3934,7 +3934,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 
 bool MissingArgumentsFailure::diagnoseAsNote() {
   auto *locator = getLocator();
-  if (auto overload = getChoiceFor(locator)) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(locator)) {
     auto *fn = resolveType(overload->openedType)->getAs<AnyFunctionType>();
     auto loc = overload->choice.getDecl()->getLoc();
     if (loc.isInvalid())
@@ -4055,7 +4055,8 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
         .fixItInsert(insertLoc, insertText.str());
   }
 
-  if (auto selectedOverload = getChoiceFor(getLocator())) {
+  if (auto selectedOverload =
+          getCalleeOverloadChoiceIfAvailable(getLocator())) {
     if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
       emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
     }
@@ -4175,7 +4176,7 @@ bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
   if (!(argExpr && getType(argExpr)->getRValueType()->is<TupleType>()))
     return false;
 
-  auto selectedOverload = getChoiceFor(locator);
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(locator);
   if (!selectedOverload)
     return false;
 
@@ -4603,7 +4604,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
 
   emitDiagnostic(anchor->getLoc(), diag::extra_arguments_in_call, OS.str());
 
-  if (auto overload = getChoiceFor(getLocator())) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
     }
@@ -4613,7 +4614,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
 }
 
 bool ExtraneousArgumentsFailure::diagnoseAsNote() {
-  auto overload = getChoiceFor(getLocator());
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!(overload && overload->choice.isDecl()))
     return false;
 
@@ -5251,7 +5252,7 @@ bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
 }
 
 bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
-  auto selectedOverload = getChoiceFor(getLocator());
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!selectedOverload || !selectedOverload->choice.isDecl())
     return false;
 
@@ -5750,7 +5751,7 @@ bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
 }
 
 bool ExpandArrayIntoVarargsFailure::diagnoseAsNote() {
-  auto overload = getChoiceFor(getLocator());
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
   auto anchor = getAnchor();
   if (!overload || !anchor)
     return false;
@@ -5784,7 +5785,7 @@ bool ExtraneousCallFailure::diagnoseAsError() {
     }
   };
 
-  if (auto overload = getChoiceFor(cs.getCalleeLocator(locator))) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(locator)) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       if (auto *enumCase = dyn_cast<EnumElementDecl>(decl)) {
         auto diagnostic = emitDiagnostic(
@@ -5817,13 +5818,12 @@ bool ExtraneousCallFailure::diagnoseAsError() {
 
 bool InvalidUseOfTrailingClosure::diagnoseAsError() {
   auto *anchor = getAnchor();
-  auto &cs = getConstraintSystem();
 
   emitDiagnostic(anchor->getLoc(), diag::trailing_closure_bad_param,
                  getToType())
       .highlight(anchor->getSourceRange());
 
-  if (auto overload = getChoiceFor(cs.getCalleeLocator(getLocator()))) {
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
     }
@@ -6076,9 +6076,9 @@ bool AssignmentTypeMismatchFailure::diagnoseAsError() {
 
 bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
   auto *anchor = getAnchor();
-  auto &cs = getConstraintSystem();
 
-  if (auto overload = getChoiceFor(cs.getConstraintLocator(anchor))) {
+  if (auto overload =
+          getCalleeOverloadChoiceIfAvailable(getConstraintLocator(anchor))) {
     if (auto *decl = overload->choice.getDeclOrNull()) {
       emitDiagnostic(decl,
                      diag::cannot_convert_candidate_result_to_contextual_type,
