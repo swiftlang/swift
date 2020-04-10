@@ -485,3 +485,60 @@ bb3:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// ============================================================================
+// Test SemanticARC phi optimization. canEliminatePhi must recognize
+// terminators with multiple operands.
+
+// CHECK-LABEL: sil [ossa] @testTypeDependentCheckCast : $@convention(thin) (@guaranteed Klass, @thick @dynamic_self Klass.Type) -> () {
+// CHECK: bb0(%0 : @guaranteed $Klass, %1 : $@thick @dynamic_self Klass.Type):
+// CHECK:   checked_cast_br %0 : $Klass to @dynamic_self Klass, bb1, bb2 // type-defs: %1; id: %2
+//
+// CHECK: bb1([[CAST:%.*]] : @guaranteed $Klass):
+// CHECK:   [[SOME:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[CAST]] : $Klass
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[SOME]] : $FakeOptional<Klass>
+// CHECK:   br bb3([[BORROW]] : $FakeOptional<Klass>)
+//
+// CHECK: bb2([[FAIL:%.*]] : @guaranteed $Klass):
+// CHECK-NEXT: [[NONE:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+// CHECK-NEXT: br bb3([[NONE]] : $FakeOptional<Klass>)
+//
+// CHECK: bb3([[PHI:%.*]] : @guaranteed $FakeOptional<Klass>):
+// CHECK:   switch_enum [[PHI]] : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb5, case #FakeOptional.none!enumelt: bb4
+//
+// CHECK: bb4:
+// CHECK-NEXT: end_borrow [[PHI]] : $FakeOptional<Klass>
+// CHECK-NEXT: br bb6
+//
+// CHECK: bb5(%{{.*}} : @guaranteed $Klass):
+// CHECK-NEXT:   end_borrow [[PHI]] : $FakeOptional<Klass>
+// CHECK-NEXT:   br bb6
+// CHECK-LABEL: } // end sil function 'testTypeDependentCheckCast'
+sil [ossa] @testTypeDependentCheckCast : $@convention(thin) (@guaranteed Klass, @thick @dynamic_self Klass.Type) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : $@thick @dynamic_self Klass.Type):
+  %2 = copy_value %0 : $Klass
+  checked_cast_br %2 : $Klass to @dynamic_self Klass, bb1, bb2
+
+bb1(%4 : @owned $Klass):
+  %5 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %4 : $Klass
+  br bb3(%5 : $FakeOptional<Klass>)
+
+bb2(%7 : @owned $Klass):
+  destroy_value %7 : $Klass
+  %9 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%9 : $FakeOptional<Klass>)
+
+bb3(%11 : @owned $FakeOptional<Klass>):
+  switch_enum %11 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb5, case #FakeOptional.none!enumelt: bb4
+
+bb4:
+  br bb6
+
+bb5(%14 : @owned $Klass):
+  destroy_value %14 : $Klass
+  br bb6
+
+bb6:
+  %17 = tuple ()
+  return %17 : $()
+}
