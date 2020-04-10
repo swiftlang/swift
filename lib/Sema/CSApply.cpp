@@ -5971,7 +5971,7 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
         semanticExpr = capture->getClosureBody();
       if (isa<ClosureExpr>(semanticExpr)) return;
       if (auto *declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
-        if (isa<FuncDecl>(declRef->getDecl())) return;
+        if (isa<AbstractFunctionDecl>(declRef->getDecl())) return;
         // If the referenced decl is a function parameter, the user may want
         // to change the declaration to be a '@differentiable' closure. Emit a
         // note with a fix-it.
@@ -6001,13 +6001,16 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
         if (isa<FuncDecl>(memberRef->getMember().getDecl())) return;
       } else if (auto *dotSyntaxCall =
                      dyn_cast<DotSyntaxCallExpr>(semanticExpr)) {
-        Expr *fnExpr = dotSyntaxCall->getFn()->getSemanticsProvidingExpr();
-        while (auto *autoclosureExpr = dyn_cast<AutoClosureExpr>(fnExpr))
-          if (auto *unwrappedFnExpr = autoclosureExpr->getUnwrappedCurryThunkExpr())
-            fnExpr = unwrappedFnExpr;
         // Recurse on the function expression.
+        auto *fnExpr = dotSyntaxCall->getFn()->getSemanticsProvidingExpr();
         maybeDiagnoseFunctionRef(fnExpr);
         return;
+      } else if (auto *autoclosureExpr = dyn_cast<AutoClosureExpr>(semanticExpr)) {
+        // Peer through curry thunks.
+        if (auto *unwrappedFnExpr = autoclosureExpr->getUnwrappedCurryThunkExpr()) {
+          maybeDiagnoseFunctionRef(unwrappedFnExpr);
+          return;
+        }
       }
       ctx.Diags.diagnose(expr->getLoc(),
                          diag::invalid_differentiable_function_conversion_expr,
