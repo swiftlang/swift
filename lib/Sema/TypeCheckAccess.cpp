@@ -1639,6 +1639,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
   // diag::conformance_from_implementation_only_module.
   enum class Reason : unsigned {
     General,
+    PropertyWrapper,
     ExtensionWithPublicMembers,
     ExtensionWithConditionalConformances
   };
@@ -1836,6 +1837,11 @@ public:
       return;
 
     checkType(TP->getTypeLoc(), anyVar, getDiagnoser(anyVar));
+
+    // Check the property wrapper types.
+    for (auto attr : anyVar->getAttachedPropertyWrappers())
+      checkType(attr->getTypeLoc(), anyVar,
+                getDiagnoser(anyVar, Reason::PropertyWrapper));
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
