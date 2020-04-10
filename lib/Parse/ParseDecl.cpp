@@ -626,7 +626,11 @@ bool Parser::parseSpecializeAttributeArguments(
                  ParamLabel);
       }
       if (ParamLabel == "exported") {
+        auto trueLoc = Tok.getLoc();
         bool isTrue = consumeIf(tok::kw_true);
+        if (isTrue) {
+          diagnose(trueLoc, diag::attr_specialize_export_true_no_op);
+        }
         bool isFalse = consumeIf(tok::kw_false);
         if (!isTrue && !isFalse) {
           diagnose(Tok.getLoc(), diag::attr_specialize_expected_bool_value);
