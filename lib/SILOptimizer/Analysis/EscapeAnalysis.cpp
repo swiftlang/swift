@@ -403,6 +403,7 @@ void EscapeAnalysis::ConnectionGraph::clear() {
   UsePoints.clear();
   UsePointTable.clear();
   NodeAllocator.DestroyAll();
+  valid = true;
   assert(ToMerge.empty());
 }
 
@@ -416,6 +417,9 @@ void EscapeAnalysis::ConnectionGraph::clear() {
 // it's interior property.
 EscapeAnalysis::CGNode *
 EscapeAnalysis::ConnectionGraph::getNode(SILValue V) {
+  if (!isValid())
+    return nullptr;
+
   // Early filter obvious non-pointer opcodes.
   if (isa<FunctionRefInst>(V) || isa<DynamicFunctionRefInst>(V) ||
       isa<PreviousDynamicFunctionRefInst>(V))
@@ -1028,6 +1032,9 @@ CGNode *EscapeAnalysis::ConnectionGraph::getReturnNode() {
 
 bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
                                                 CGNodeMap &Mapping) {
+  assert(isValid());
+  assert(SourceGraph->isValid());
+
   // The main point of the merging algorithm is to map each content node in the
   // source graph to a content node in this (destination) graph. This may
   // require creating new nodes or merging existing nodes in this graph.
@@ -1492,6 +1499,11 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
 #ifndef NDEBUG
   OS << "CG of " << F->getName() << '\n';
 
+  if (!isValid()) {
+    OS << "  invalid\n";
+    return;
+  }
+
   // Assign the same IDs to SILValues as the SILPrinter does.
   llvm::DenseMap<const SILNode *, unsigned> InstToIDMap;
   InstToIDMap[nullptr] = (unsigned)-1;
@@ -1595,6 +1607,7 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
   // Invalidating EscapeAnalysis clears the connection graph.
   if (isEmpty())
     return;
+  assert(isValid());
 
   verifyStructure();
 
@@ -1728,9 +1741,20 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
     // Create edges for the instructions.
     for (auto &i : *bb) {
       analyzeInstruction(&i, FInfo, BottomUpOrder, RecursionDepth);
+      
+      // Bail if the graph gets too big. The node merging algorithm has
+      // quadratic complexity and we want to avoid this.
+      // TODO: fix the quadratic complexity (if possible) and remove this limit.
+      if (ConGraph->Nodes.size() > 10000) {
+        ConGraph->invalidate();
+        return false;
+      }
     }
     return true;
   });
+
+  if (!ConGraph->isValid())
+    return;
 
   // Second step: create defer-edges for block arguments.
   for (SILBasicBlock &BB : *ConGraph->F) {
@@ -2478,6 +2502,16 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
 bool EscapeAnalysis::mergeCalleeGraph(SILInstruction *AS,
                                       ConnectionGraph *CallerGraph,
                                       ConnectionGraph *CalleeGraph) {
+  if (!CallerGraph->isValid())
+    return false;
+    
+  if (!CalleeGraph->isValid()) {
+    setAllEscaping(AS, CallerGraph);
+    // Conservatively assume that setting that setAllEscaping(AS) did change the
+    // graph.
+    return true;
+  }
+                                      
   // This CGNodeMap uses an intrusive worklist to keep track of Mapped nodes
   // from the CalleeGraph. Meanwhile, mergeFrom uses separate intrusive
   // worklists to update nodes in the CallerGraph.
@@ -2536,6 +2570,11 @@ bool EscapeAnalysis::mergeCalleeGraph(SILInstruction *AS,
 
 bool EscapeAnalysis::mergeSummaryGraph(ConnectionGraph *SummaryGraph,
                                         ConnectionGraph *Graph) {
+  if (!Graph->isValid()) {
+    bool changed = SummaryGraph->isValid();
+    SummaryGraph->invalidate();
+    return changed;
+  }
 
   // Make a 1-to-1 mapping of all arguments and the return value. This CGNodeMap
   // node map uses an intrusive worklist to keep track of Mapped nodes from the
