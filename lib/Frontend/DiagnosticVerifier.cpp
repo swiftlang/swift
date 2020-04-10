@@ -644,10 +644,10 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         -> ActualFixitsPhrase {
       std::string actualFixitsStr = renderFixits(actualFixits, InputFile);
 
-      auto phrase = Twine("actual fix-it") +
-                    (actualFixits.size() >= 2 ? "s" : "") +
-                    " seen: " + actualFixitsStr;
-      return ActualFixitsPhrase{phrase.str(), actualFixitsStr};
+      return ActualFixitsPhrase{(Twine("actual fix-it") +
+                                 (actualFixits.size() >= 2 ? "s" : "") +
+                                 " seen: " + actualFixitsStr).str(),
+                                actualFixitsStr};
     };
 
     auto emitFixItsError = [&](const char *location, const Twine &message,
