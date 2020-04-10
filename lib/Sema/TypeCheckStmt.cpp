@@ -1072,40 +1072,28 @@ public:
     }
   }
 
-  Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
-    // Type-check the subject expression.
-    Expr *subjectExpr = switchStmt->getSubjectExpr();
-    auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
-    auto limitExhaustivityChecks = !resultTy;
-    if (Expr *newSubjectExpr =
-            TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
-      subjectExpr = newSubjectExpr;
-    switchStmt->setSubjectExpr(subjectExpr);
-    Type subjectType = switchStmt->getSubjectExpr()->getType();
-
-    // Type-check the case blocks.
-    AddSwitchNest switchNest(*this);
-    AddLabeledStmt labelNest(*this, switchStmt);
-
-    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
-    // the list of raw cases.
-    for (auto &node : switchStmt->getRawCases()) {
-      if (!node.is<Decl *>())
-        continue;
-      TypeChecker::typeCheckDecl(node.get<Decl *>());
-    }
+  template <typename Iterator>
+  void checkSiblingCaseStmts(Iterator casesBegin, Iterator casesEnd,
+                             CaseParentKind parentKind,
+                             bool &limitExhaustivityChecks, Type subjectType) {
+    static_assert(
+        std::is_same<typename std::iterator_traits<Iterator>::value_type,
+                     CaseStmt *>::value,
+        "Expected an iterator over CaseStmt *");
 
     SmallVector<VarDecl *, 8> scratchMemory1;
     SmallVector<VarDecl *, 8> scratchMemory2;
-
-    auto cases = switchStmt->getCases();
     CaseStmt *previousBlock = nullptr;
-    for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
+
+    for (auto i = casesBegin; i != casesEnd; ++i) {
       auto *caseBlock = *i;
-      // Fallthrough transfers control to the next case block. In the
-      // final case block, it is invalid.
-      FallthroughSource = caseBlock;
-      FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
+
+      if (parentKind == CaseParentKind::Switch) {
+        // Fallthrough transfers control to the next case block. In the
+        // final case block, it is invalid. Only switch supports fallthrough.
+        FallthroughSource = caseBlock;
+        FallthroughDest = std::next(i) == casesEnd ? nullptr : *std::next(i);
+      }
 
       scratchMemory1.clear();
       scratchMemory2.clear();
@@ -1193,24 +1181,57 @@ public:
 
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
+        assert(parentKind == CaseParentKind::Switch &&
+               "'@unknown' can only appear on switch cases");
         checkUnknownAttrRestrictions(
             getASTContext(), caseBlock, FallthroughDest,
             limitExhaustivityChecks);
       }
 
-      // If the previous case fellthrough, similarly check that that case's
-      // bindings includes our first label item's pattern bindings and types.
-      if (PreviousFallthrough && previousBlock) {
-        checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
+      if (parentKind == CaseParentKind::Switch) {
+        // If the previous case fellthrough, similarly check that that case's
+        // bindings includes our first label item's pattern bindings and types.
+        // Only switch statements support fallthrough.
+        if (PreviousFallthrough && previousBlock) {
+          checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
+        }
+        PreviousFallthrough = nullptr;
       }
 
       // Type-check the body statements.
-      PreviousFallthrough = nullptr;
       Stmt *body = caseBlock->getBody();
       limitExhaustivityChecks |= typeCheckStmt(body);
       caseBlock->setBody(body);
       previousBlock = caseBlock;
     }
+  }
+
+  Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
+    // Type-check the subject expression.
+    Expr *subjectExpr = switchStmt->getSubjectExpr();
+    auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
+    auto limitExhaustivityChecks = !resultTy;
+    if (Expr *newSubjectExpr =
+            TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
+      subjectExpr = newSubjectExpr;
+    switchStmt->setSubjectExpr(subjectExpr);
+    Type subjectType = switchStmt->getSubjectExpr()->getType();
+
+    // Type-check the case blocks.
+    AddSwitchNest switchNest(*this);
+    AddLabeledStmt labelNest(*this, switchStmt);
+
+    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
+    // the list of raw cases.
+    for (auto &node : switchStmt->getRawCases()) {
+      if (!node.is<Decl *>())
+        continue;
+      TypeChecker::typeCheckDecl(node.get<Decl *>());
+    }
+
+    auto cases = switchStmt->getCases();
+    checkSiblingCaseStmts(cases.begin(), cases.end(), CaseParentKind::Switch,
+                          limitExhaustivityChecks, subjectType);
 
     if (!switchStmt->isImplicit()) {
       TypeChecker::checkSwitchExhaustiveness(switchStmt, DC,
@@ -1225,27 +1246,6 @@ public:
     llvm_unreachable("case stmt outside of switch?!");
   }
 
-  Stmt *visitCatchStmt(CatchStmt *S) {
-    // Catches are handled in visitDoCatchStmt.
-    llvm_unreachable("catch stmt outside of do-catch?!");
-  }
-
-  void checkCatchStmt(CatchStmt *S) {
-    // Check the catch pattern.
-    TypeChecker::typeCheckCatchPattern(S, DC);
-
-    // Check the guard expression, if present.
-    if (Expr *guard = S->getGuardExpr()) {
-      TypeChecker::typeCheckCondition(guard, DC);
-      S->setGuardExpr(guard);
-    }
-      
-    // Type-check the clause body.
-    Stmt *body = S->getBody();
-    typeCheckStmt(body);
-    S->setBody(body);
-  }
-
   Stmt *visitDoCatchStmt(DoCatchStmt *S) {
     // The labels are in scope for both the 'do' and all of the catch
     // clauses.  This allows the user to break out of (or restart) the
@@ -1258,11 +1258,14 @@ public:
     typeCheckStmt(newBody);
     S->setBody(newBody);
 
-    // Check all the catch clauses independently.
-    for (auto clause : S->getCatches()) {
-      checkCatchStmt(clause);
-    }
-    
+    // Do-catch statements always limit exhaustivity checks.
+    bool limitExhaustivityChecks = true;
+
+    auto catches = S->getCatches();
+    checkSiblingCaseStmts(catches.begin(), catches.end(),
+                          CaseParentKind::DoCatch, limitExhaustivityChecks,
+                          getASTContext().getExceptionType());
+
     return S;
   }
 
@@ -1274,42 +1277,6 @@ public:
 
 };
 } // end anonymous namespace
-
-bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
-  // Grab the standard exception type.
-  Type exnType = DC->getASTContext().getErrorDecl()->getDeclaredType();
-
-  Pattern *pattern = S->getErrorPattern();
-  if (Pattern *newPattern = TypeChecker::resolvePattern(pattern, DC,
-                                           /*isStmtCondition*/false)) {
-    pattern = newPattern;
-
-    // Coerce the pattern to the exception type.
-    bool coercionError = false;
-    if (exnType) {
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
-      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-      auto coercedPattern = coercePatternToType(
-          contextualPattern, exnType, patternOptions);
-      if (coercedPattern)
-        pattern = coercedPattern;
-      else
-        coercionError = true;
-    }
-
-    if (!exnType || coercionError) {
-      // If that failed, be sure to give the variables error types
-      // before we type-check the guard.  (This will probably kill
-      // most of the type-checking, but maybe not.)
-      pattern->forEachVariable([&](VarDecl *var) {
-        var->setInvalid();
-      });
-    }
-
-    S->setErrorPattern(pattern);
-  }
-  return false;
-}
 
 static bool isDiscardableType(Type type) {
   return (type->hasError() ||

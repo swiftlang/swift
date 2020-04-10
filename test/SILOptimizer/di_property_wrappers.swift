@@ -219,8 +219,8 @@ func testRefStruct() {
     // CHECK-NEXT:   + payload alloc 42
     // CHECK-NEXT:   .. init value = 42
     // CHECK-NEXT:   + payload alloc 27
-    // CHECK-NEXT:   .. set value = 27
     // CHECK-NEXT:   - payload free 42
+    // CHECK-NEXT:   .. set value = 27
     let t1 = RefStruct()
     // CHECK-NEXT: value = 27
     print(t1.wrapped)
@@ -271,8 +271,8 @@ func testGenericClass() {
     // CHECK-NEXT:   + payload alloc 42
     // CHECK-NEXT:   .. init value = 42
     // CHECK-NEXT:   + payload alloc 27
-    // CHECK-NEXT:   .. set value = 27
     // CHECK-NEXT:   - payload free 42
+    // CHECK-NEXT:   .. set value = 27
     let t1 = GenericClass<Payload>()
     // CHECK-NEXT: value = 27
     print(t1.wrapped)

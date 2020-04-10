@@ -728,17 +728,22 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     SILModule &module = builder.getModule();
     SymbolicClosure *closure = symVal.getClosure();
     SILValue resultVal;
-    if (!closure->hasOnlyConstantCaptures()) {
-      // If the closure captures a value that is not a constant, it should only
-      // come from the caller of the log call. Therefore, assert this and reuse
-      // the closure value.
-      SingleValueInstruction *originalClosureInst = closure->getClosureInst();
-      SILFunction &fun = builder.getFunction();
-      assert(originalClosureInst->getFunction() == &fun &&
-             "closure with non-constant captures not defined in this function");
-      // Copy the closure, since the returned value must be owned.
+
+    // If the closure was created in the context of this function where the code
+    // is generated, reuse the original closure value (after extending its
+    // lifetime by copying).
+    SingleValueInstruction *originalClosureInst = closure->getClosureInst();
+    SILFunction &fun = builder.getFunction();
+    if (originalClosureInst->getFunction() == &fun) {
+      // Copy the closure, since the returned value must be owned and the
+      // closure's lifetime must be extended until this point.
       resultVal = makeOwnedCopyOfSILValue(originalClosureInst, fun);
     } else {
+      // If the closure captures a value that is not a constant, it should only
+      // come from the caller of the log call. It should be handled by the then
+      // case and we should never reach here. Assert this.
+      assert(closure->hasOnlyConstantCaptures() &&
+             "closure with non-constant captures not defined in this function");
       SubstitutionMap callSubstMap = closure->getCallSubstitutionMap();
       ArrayRef<SymbolicClosureArgument> captures = closure->getCaptures();
       // Recursively emit code for all captured values which must be mapped to a

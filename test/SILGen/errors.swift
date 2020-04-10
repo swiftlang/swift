@@ -8,6 +8,7 @@ enum HomeworkError : Error {
   case TooHard
   case TooMuch
   case CatAteIt(Cat)
+  case CatHidIt(Cat)
 }
 
 func someValidPointer<T>() -> UnsafePointer<T> { fatalError() }
@@ -238,6 +239,134 @@ func all_together_now_three(_ flag: Bool) throws -> Cat? {
     return nil
   } catch HomeworkError.TooMuch {
     return nil
+  }
+}
+
+// Same as the previous test, but with a multi-pattern catch instead of two separate ones.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s6errors21all_together_now_fouryAA3CatCSgSbKF : $@convention(thin) (Bool) -> (@owned Optional<Cat>, @error Error) {
+// CHECK: bb0(
+// CHECK-NOT: bb1
+// CHECK:   try_apply {{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+//
+// CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+// CHECK:   [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
+// CHECK:   [[COPIED_ERROR:%.*]] = copy_value [[BORROWED_ERROR]]
+// CHECK:   store [[COPIED_ERROR]] to [init] [[CAST_INPUT_MEM:%.*]] : $*Error
+// CHECK:   checked_cast_addr_br copy_on_success Error in [[CAST_INPUT_MEM]] : $*Error to HomeworkError in [[CAST_OUTPUT_MEM:%.*]] : $*HomeworkError, [[CAST_YES_BB:bb[0-9]+]], [[CAST_NO_BB:bb[0-9]+]],
+//
+// CHECK: [[CAST_YES_BB]]:
+// CHECK:   [[SUBERROR:%.*]] = load [take] [[CAST_OUTPUT_MEM]]
+// CHECK:   switch_enum [[SUBERROR]] : $HomeworkError, case #HomeworkError.TooHard!enumelt: [[TOO_HARD_BB:bb[0-9]+]], case #HomeworkError.TooMuch!enumelt: [[TOO_MUCH_BB:bb[0-9]+]], default [[SWITCH_MATCH_FAIL_BB:bb[0-9]+]],
+//
+// CHECK: [[TOO_HARD_BB]]:
+// CHECK:   br [[CASE_BODY_BB:bb[0-9]+]]
+//
+// CHECK: [[TOO_MUCH_BB]]:
+// CHECK:   br [[CASE_BODY_BB]]
+//
+// CHECK: [[CASE_BODY_BB]]
+// CHECK:   [[RETVAL:%.*]] = enum $Optional<Cat>
+// CHECK:   destroy_value [[ERROR]]
+// CHECK:   br bb2([[RETVAL]] : $Optional<Cat>)
+//
+// CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
+// CHECK:   destroy_value [[SUBERROR]]
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $Error)
+//
+// CHECK: [[CAST_NO_BB]]:
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $Error)
+//
+// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $Error):
+// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: } // end sil function '$s6errors21all_together_now_fouryAA3CatCSgSbKF'
+func all_together_now_four(_ flag: Bool) throws -> Cat? {
+  do {
+    return try dont_return(Cat())
+  } catch HomeworkError.TooHard, HomeworkError.TooMuch {
+    return nil
+  }
+}
+
+// A multi-pattern catch with associated value bindings.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s6errors21all_together_now_fiveyAA3CatCSbKF : $@convention(thin) (Bool) -> (@owned Cat, @error Error) {
+
+// Return block.
+// CHECK:    [[RETURN:bb[0-9]+]]([[RETVAL:%.*]] : @owned $Cat):
+// CHECK-NEXT: return [[RETVAL]] : $Cat
+
+//   Catch dispatch block.
+// CHECK:    [[CATCH:bb[0-9]+]]([[ERROR:%.*]] : @owned $Error):
+// CHECK:    [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
+// CHECK-NEXT: [[SRC_TEMP:%.*]] = alloc_stack $Error
+// CHECK-NEXT: [[COPIED_BORROWED_ERROR:%.*]] = copy_value [[BORROWED_ERROR]]
+// CHECK-NEXT: store [[COPIED_BORROWED_ERROR]] to [init] [[SRC_TEMP]]
+// CHECK-NEXT: [[DEST_TEMP:%.*]] = alloc_stack $HomeworkError
+// CHECK-NEXT: checked_cast_addr_br copy_on_success Error in [[SRC_TEMP]] : $*Error to HomeworkError in [[DEST_TEMP]] : $*HomeworkError, [[IS_HWE:bb[0-9]+]], [[NOT_HWE:bb[0-9]+]]
+
+//   Catch HomeworkError.
+// CHECK:    [[IS_HWE]]:
+// CHECK-NEXT: [[T0_ORIG:%.*]] = load [take] [[DEST_TEMP]] : $*HomeworkError
+// CHECK-NEXT: switch_enum [[T0_ORIG]] : $HomeworkError, case #HomeworkError.CatAteIt!enumelt: [[MATCH_ATE:bb[0-9]+]], case #HomeworkError.CatHidIt!enumelt: [[MATCH_HID:bb[0-9]+]], default [[NO_MATCH:bb[0-9]+]]
+
+//   Catch HomeworkError.CatAteIt.
+// CHECK:    [[MATCH_ATE]]([[T0:%.*]] : @owned $Cat):
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0]]
+// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
+// CHECK-NEXT: destroy_addr [[SRC_TEMP]]
+// CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
+// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
+// CHECK-NEXT: br [[EXTRACT:bb[0-9]+]]([[T0_COPY]] : $Cat)
+
+//   Catch HomeworkError.CatHidIt.
+// CHECK:    [[MATCH_HID]]([[T0:%.*]] : @owned $Cat):
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0]]
+// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
+// CHECK-NEXT: destroy_addr [[SRC_TEMP]]
+// CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
+// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
+// CHECK-NEXT: br [[EXTRACT]]([[T0_COPY]] : $Cat)
+
+// CHECK:    [[EXTRACT]]([[CAT:%.*]] : @owned $Cat):
+// CHECK-NEXT: [[BORROWED_CAT:%.*]] = begin_borrow [[CAT]] : $Cat
+// CHECK-NEXT: [[COPIED_CAT:%.*]] = copy_value [[BORROWED_CAT]] : $Cat
+// CHECK-NEXT: end_borrow [[BORROWED_CAT]] : $Cat
+// CHECK-NEXT: destroy_value [[CAT]] : $Cat
+// CHECK-NEXT: destroy_value [[ERROR]] : $Error
+// CHECK-NEXT: br [[RETURN]]([[COPIED_CAT]] : $Cat)
+
+//   Catch other HomeworkErrors.
+// CHECK:    [[NO_MATCH]]([[CATCHALL_ERROR:%.*]] : @owned $HomeworkError):
+// CHECK-NEXT: destroy_value [[CATCHALL_ERROR]]
+// CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
+// CHECK-NEXT: destroy_addr [[SRC_TEMP]]
+// CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
+// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
+// CHECK-NEXT: br [[RETHROW:bb[0-9]+]]
+
+//   Catch other types.
+// CHECK:    [[NOT_HWE]]:
+// CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
+// CHECK-NEXT: destroy_addr [[SRC_TEMP]]
+// CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
+// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
+// CHECK-NEXT: br [[RETHROW]]
+
+// Rethrow
+// CHECK: [[RETHROW]]([[ERROR:%.*]] : @owned $Error):
+// CHECK-NEXT: throw [[ERROR]] : $Error
+func all_together_now_five(_ flag: Bool) throws -> Cat {
+  do {
+    return try dont_return(Cat())
+  } catch HomeworkError.CatAteIt(let theCat), HomeworkError.CatHidIt(let theCat) {
+    return theCat
   }
 }
 

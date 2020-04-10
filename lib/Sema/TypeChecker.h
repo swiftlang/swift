@@ -896,7 +896,7 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 /// unbound generic types.
 Type typeCheckPattern(ContextualPattern pattern);
 
-bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
+bool typeCheckCatchPattern(CaseStmt *S, DeclContext *dc);
 
 /// Coerce a pattern to the given type.
 ///
@@ -1519,9 +1519,6 @@ bool isMemberOperator(FuncDecl *decl, Type type);
 
 /// Complain if @objc or dynamic is used without importing Foundation.
 void diagnoseAttrsRequiringFoundation(SourceFile &SF);
-
-/// Returns `true` iff differentiable programming is enabled.
-bool isDifferentiableProgrammingEnabled(SourceFile &SF);
 
 /// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
 bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);

@@ -235,15 +235,17 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'CustomAttribute': 231,
     'GenericRequirement': 232,
     'DifferentiableAttributeArguments': 233,
-    'DifferentiationParamsClause': 234,
-    'DifferentiationParams': 235,
-    'DifferentiationParamList': 236,
-    'DifferentiationParam': 237,
-    'DifferentiableAttributeFuncSpecifier': 238,
+    'DifferentiabilityParamsClause': 234,
+    'DifferentiabilityParams': 235,
+    'DifferentiabilityParamList': 236,
+    'DifferentiabilityParam': 237,
+    # removed: 'DifferentiableAttributeFuncSpecifier': 238,
     'FunctionDeclName': 239,
     'PoundFilePathExpr': 240,
     'DerivativeRegistrationAttributeArguments': 241,
     'QualifiedDeclName': 242,
+    'CatchItem': 243,
+    'CatchItemList': 244,
 }
 
 

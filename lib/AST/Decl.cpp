@@ -639,6 +639,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
     return getSerializedLocs()->Loc;
   }
   case FileUnitKind::Builtin:
+  case FileUnitKind::Synthesized:
   case FileUnitKind::ClangModule:
   case FileUnitKind::DWARFModule:
     return SourceLoc();
@@ -2093,6 +2094,16 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadWriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
+  case ReadWriteImplKind::StoredWithSimpleDidSet:
+  case ReadWriteImplKind::InheritedWithSimpleDidSet:
+    if (storage->requiresOpaqueModifyCoroutine()) {
+      return AccessStrategy::getAccessor(AccessorKind::Modify,
+                                         /*dispatch*/ false);
+    } else {
+      return AccessStrategy::getMaterializeToTemporary(
+          getDirectReadAccessStrategy(storage),
+          getDirectWriteAccessStrategy(storage));
+    }
   case ReadWriteImplKind::MaterializeToTemporary:
     return AccessStrategy::getMaterializeToTemporary(
                                        getDirectReadAccessStrategy(storage),
@@ -5622,9 +5633,6 @@ Pattern *VarDecl::getParentPattern() const {
   if (auto *stmt = getParentPatternStmt()) {
     if (auto *FES = dyn_cast<ForEachStmt>(stmt))
       return FES->getPattern();
-    
-    if (auto *CS = dyn_cast<CatchStmt>(stmt))
-      return CS->getErrorPattern();
 
     if (auto *cs = dyn_cast<CaseStmt>(stmt)) {
       // In a case statement, search for the pattern that contains it.  This is
@@ -7328,6 +7336,12 @@ bool AccessorDecl::isExplicitNonMutating() const {
     !isAssumedNonMutating() &&
     isInstanceMember() &&
     !getDeclContext()->getDeclaredInterfaceType()->hasReferenceSemantics();
+}
+
+bool AccessorDecl::isSimpleDidSet() const {
+  auto mutableThis = const_cast<AccessorDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SimpleDidSetRequest{mutableThis}, false);
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {

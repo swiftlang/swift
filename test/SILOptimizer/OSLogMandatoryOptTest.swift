@@ -597,7 +597,8 @@ protocol Proto {
   var property: String { get set }
 }
 
-// Test capturing of address-only types in autoclosures.
+// Test capturing of address-only types in autoclosures. The following tests check that
+// there are no crashes in these cases.
 
 // CHECK-LABEL: @${{.*}}testInterpolationOfExistentials1pyAA5Proto_p_tF
 func testInterpolationOfExistentials(p: Proto) {
@@ -607,5 +608,30 @@ func testInterpolationOfExistentials(p: Proto) {
 // CHECK-LABEL: @${{.*}}testInterpolationOfGenerics1pyx_tAA5ProtoRzlF
 func testInterpolationOfGenerics<T : Proto>(p: T) {
   _osLogTestHelper("A generic argument's property \(p.property)")
+}
+
+class TestClassSelfTypeCapture {
+  // CHECK-LABEL: @${{.*}}TestClassSelfTypeCaptureC04testdeF0yyF
+  func testSelfTypeCapture() {
+    _osLogTestHelper("Self type of a class \(String(describing: Self.self))")
+  }
+}
+
+struct TestStructSelfTypeCapture {
+  // CHECK-LABEL: @${{.*}}TestStructSelfTypeCaptureV04testdeF0yyF
+  func testSelfTypeCapture() {
+    _osLogTestHelper("Self type of a struct \(String(describing: Self.self))")
+  }
+}
+
+protocol TestProtocolSelfTypeCapture {
+  func testSelfTypeCapture()
+}
+
+extension TestProtocolSelfTypeCapture {
+  // CHECK-LABEL: @${{.*}}TestProtocolSelfTypeCapturePAAE04testdeF0yyF
+  func testSelfTypeCapture() {
+    _osLogTestHelper("Self type of a protocol \(String(describing: Self.self))")
+  }
 }
 

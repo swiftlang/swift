@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+# Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -14,6 +14,23 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   Differentiable.swift
   DifferentialOperators.swift
   DifferentiationUtilities.swift
+  ArrayDifferentiation.swift
+
+  GYB_SOURCES
+    FloatingPointDifferentiation.swift.gyb
+    TgmathDerivatives.swift.gyb
+    SIMDDifferentiation.swift.gyb
+
+  SWIFT_MODULE_DEPENDS_OSX Darwin
+  SWIFT_MODULE_DEPENDS_IOS Darwin
+  SWIFT_MODULE_DEPENDS_TVOS Darwin
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin
+  SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
+  SWIFT_MODULE_DEPENDS_HAIKU Glibc
+  SWIFT_MODULE_DEPENDS_WASI Glibc
+  SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

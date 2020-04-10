@@ -54,13 +54,11 @@ func dummy(x: ) {
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=track-compiles == \
 // RUN:   -req=complete -pos=7:21 -name file.swift -text-input %t/State1.swift -- file.swift == \
 // RUN:   -req=complete -pos=9:25 -name file.swift -text-input %t/State2.swift -- file.swift == \
 // RUN:   -req=complete -pos=10:27 -name file.swift -text-input %t/State3.swift -- file.swift == \
 // RUN:   -req=complete -pos=10:15 -name file.swift -text-input %t/State4.swift -- file.swift > %t.response
 // RUN: %FileCheck --check-prefix=RESULT %s < %t.response
-// RUN: %FileCheck --check-prefix=TRACE %s < %t.response
 
 // RESULT-LABEL: key.results: [
 // RESULT-NOT: key.description: "fooMethod()"
@@ -68,6 +66,7 @@ func dummy(x: ) {
 // RESULT-NOT: key.description: "y"
 // RESULT-DAG: key.description: "(x: Int, y: Int)",
 // RESULT: ]
+// RESULT-NOT: key.reusingastcontext: 1
 
 // RESULT-LABEL: key.results: [
 // RESULT-NOT: key.description: "z"
@@ -76,6 +75,7 @@ func dummy(x: ) {
 // RESULT-DAG: key.description: "x"
 // RESULT-DAG: key.description: "y"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
 
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.description: "fooMethod()"
@@ -84,17 +84,10 @@ func dummy(x: ) {
 // RESULT-DAG: key.description: "y"
 // RESULT-DAG: key.description: "z"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
 
 // RESULT-LABEL: key.results: [
 // RESULT-NOT: key.description: "globalFoo"
 // RESULT-DAG: key.description: "Foo"
 // RESULT: ]
-
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE-NOT: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE-LABEL: key.notification: source.notification.compile-did-finish,
-// TRACE: key.description: "completion reusing previous ASTContext (benign diagnostic)"
+// RESULT: key.reusingastcontext: 1

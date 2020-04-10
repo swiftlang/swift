@@ -2483,6 +2483,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             collectAccessorCaptures(AccessorKind::MutableAddress);
             break;
           case ReadWriteImplKind::Modify:
+          case ReadWriteImplKind::StoredWithSimpleDidSet:
+          case ReadWriteImplKind::InheritedWithSimpleDidSet:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
           }

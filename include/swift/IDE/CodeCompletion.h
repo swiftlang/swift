@@ -84,8 +84,17 @@ public:
     /// The keyword part of a declaration before the name, like "func".
     DeclIntroducer,
 
+    /// Other generic keyword.
+    Keyword,
+
+    /// Other generic attributes.
+    Attribute,
+
     /// Normal text chunk.
     Text,
+
+    /// Base name of the result.
+    BaseName,
 
     /// The first chunk of an optional substring that continues until
     /// \c NestingLevel decreases.
@@ -133,6 +142,16 @@ public:
 
     /// Required parameter type.
     CallParameterType,
+
+    /// Parameter type tag for annotated results.
+    CallParameterTypeBegin,
+
+    /// System type name.
+    TypeIdSystem,
+
+    /// Non-system type name.
+    TypeIdUser,
+
     /// Desugared closure parameter type. This can be used to get the
     /// closure type if CallParameterType is a TypeAliasType.
     CallParameterClosureType,
@@ -169,7 +188,8 @@ public:
   static bool chunkStartsNestedGroup(ChunkKind Kind) {
     return Kind == ChunkKind::CallParameterBegin ||
            Kind == ChunkKind::GenericParameterBegin ||
-           Kind == ChunkKind::OptionalBegin;
+           Kind == ChunkKind::OptionalBegin ||
+           Kind == ChunkKind::CallParameterTypeBegin;
   }
 
   static bool chunkHasText(ChunkKind Kind) {
@@ -179,6 +199,9 @@ public:
            Kind == ChunkKind::RethrowsKeyword ||
            Kind == ChunkKind::DeclAttrKeyword ||
            Kind == ChunkKind::DeclIntroducer ||
+           Kind == ChunkKind::Keyword ||
+           Kind == ChunkKind::Attribute ||
+           Kind == ChunkKind::BaseName ||
            Kind == ChunkKind::Text ||
            Kind == ChunkKind::LeftParen ||
            Kind == ChunkKind::RightParen ||
@@ -205,7 +228,9 @@ public:
            Kind == ChunkKind::DynamicLookupMethodCallTail ||
            Kind == ChunkKind::OptionalMethodCallTail ||
            Kind == ChunkKind::TypeAnnotation ||
-           Kind == ChunkKind::BraceStmtWithCursor;
+           Kind == ChunkKind::BraceStmtWithCursor ||
+           Kind == ChunkKind::TypeIdSystem ||
+           Kind == ChunkKind::TypeIdUser;
   }
 
 private:
@@ -768,7 +793,7 @@ public:
   }
 
   /// Print a debug representation of the code completion result to \p OS.
-  void print(raw_ostream &OS) const;
+  void printPrefix(raw_ostream &OS) const;
   SWIFT_DEBUG_DUMP;
 
   static CodeCompletionDeclKind getCodeCompletionDeclKind(const Decl *D);
@@ -787,6 +812,9 @@ struct CodeCompletionResultSink {
   /// Allocators that keep alive "foreign" results imported into this sink from
   /// other sinks.
   std::vector<AllocatorPtr> ForeignAllocators;
+
+  /// Whether to annotate the results with XML.
+  bool annotateResult = false;
 
   std::vector<CodeCompletionResult *> Results;
 
@@ -828,8 +856,16 @@ public:
   /// e.g. `x = .foo`.
   bool MayUseImplicitMemberExpr = false;
 
+  /// Flag to indicate that the completion is happening reusing ASTContext
+  /// from the previous completion.
+  /// NOTE: Do not use this to change the behavior. This is only for debugging.
+  bool ReusingASTContext = false;
+
   CodeCompletionContext(CodeCompletionCache &Cache)
       : Cache(Cache) {}
+
+  void setAnnotateResult(bool flag) { CurrentResults.annotateResult = flag; }
+  bool getAnnnoateResult() { return CurrentResults.annotateResult; }
 
   /// Allocate a string owned by the code completion context.
   StringRef copyString(StringRef Str);
@@ -880,14 +916,17 @@ class PrintingCodeCompletionConsumer
   llvm::raw_ostream &OS;
   bool IncludeKeywords;
   bool IncludeComments;
+  bool PrintAnnotatedDescription;
 
 public:
  PrintingCodeCompletionConsumer(llvm::raw_ostream &OS,
                                 bool IncludeKeywords = true,
-                                bool IncludeComments = true)
+                                bool IncludeComments = true,
+                                bool PrintAnnotatedDescription = false)
      : OS(OS),
        IncludeKeywords(IncludeKeywords),
-       IncludeComments(IncludeComments) {}
+       IncludeComments(IncludeComments),
+       PrintAnnotatedDescription(PrintAnnotatedDescription) {}
 
  void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override;
 };
