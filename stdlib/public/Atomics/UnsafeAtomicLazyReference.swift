@@ -46,10 +46,13 @@ extension UnsafeAtomicLazyReference {
       _word = 0._builtinWordValue
     }
 
-    public func dispose() -> Value {
+    @inlinable @inline(__always)
+    @discardableResult
+    public mutating func dispose() -> Value {
       guard let ptr = UnsafeRawPointer(bitPattern: Int(_word)) else {
         return nil
       }
+      self = Self.init()
       return Unmanaged.fromOpaque(ptr).takeRetainedValue()
     }
   }

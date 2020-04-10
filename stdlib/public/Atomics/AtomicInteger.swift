@@ -110,7 +110,7 @@ extension AtomicInteger {
     value
   }
   @_transparent @_alwaysEmitIntoClient
-  public static func _disposeAtomicStorage(_ storage: __owned Self) -> Self {
+  public static func _disposeAtomicStorage(_ storage: inout Self) -> Self {
     storage
   }
 

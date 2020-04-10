@@ -88,7 +88,9 @@ extension ${swiftType}: AtomicProtocol {
   }
 
   @inlinable @inline(__always)
-  public static func _disposeAtomicStorage(_ storage: _AtomicStorage) -> Self {
+  public static func _disposeAtomicStorage(
+    _ storage: inout _AtomicStorage
+  ) -> Self {
     return _decodeAtomicStorage(storage)
   }
 

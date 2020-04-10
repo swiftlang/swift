@@ -41,10 +41,10 @@ public struct UnsafeAtomic<Value: AtomicProtocol> {
   @frozen
   public struct Storage {
     @usableFromInline
-    internal let _value: Value._AtomicStorage
+    internal var _value: Value._AtomicStorage
 
     @inlinable @inline(__always)
-    internal init(_value: Value._AtomicStorage) {
+    internal init(_value: __owned Value._AtomicStorage) {
       self._value = _value
     }
 
@@ -53,8 +53,10 @@ public struct UnsafeAtomic<Value: AtomicProtocol> {
       self._value = Value._prepareAtomicStorage(for: value)
     }
 
-    public func dispose() -> Value {
-      return Value._disposeAtomicStorage(_value)
+    @inlinable @inline(__always)
+    @discardableResult
+    public mutating func dispose() -> Value {
+      return Value._disposeAtomicStorage(&_value)
     }
   }
 

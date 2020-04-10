@@ -34,10 +34,10 @@ where Wrapped: AtomicProtocol, Wrapped._AtomicStorage: _PrimitiveAtomicOptional
 
   @_transparent @_alwaysEmitIntoClient
   public static func _disposeAtomicStorage(
-    _ storage: __owned _AtomicStorage
+    _ storage: inout _AtomicStorage
   ) -> Self {
     guard !storage._isNil else { return nil }
-    return Wrapped._disposeAtomicStorage(storage)
+    return Wrapped._disposeAtomicStorage(&storage)
   }
 
   @_transparent @_alwaysEmitIntoClient

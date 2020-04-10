@@ -64,7 +64,7 @@ public protocol AtomicProtocol {
   ///
   /// - Parameter storage: A storage value previously initialized with a value
   ///   returned by `prepareAtomicStorage(for:)`.
-  static func _disposeAtomicStorage(_ storage: __owned _AtomicStorage) -> Self
+  static func _disposeAtomicStorage(_ storage: inout _AtomicStorage) -> Self
 
   static func _encodeAtomicStorage(for value: __owned Self) -> _AtomicStorage
   static func _decodeAtomicStorage(_ storage: __owned _AtomicStorage) -> Self
@@ -86,9 +86,9 @@ extension AtomicProtocol where
 
   @inlinable
   public static func _disposeAtomicStorage(
-    _ storage: __owned _AtomicStorage
+    _ storage: inout RawValue._AtomicStorage
   ) -> Self {
-    return Self(rawValue: RawValue._disposeAtomicStorage(storage))!
+    return Self(rawValue: RawValue._disposeAtomicStorage(&storage))!
   }
 
   @inlinable
