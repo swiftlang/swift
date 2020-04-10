@@ -1,0 +1,23 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-ir
+
+// This is a compile-only test. It checks that the compiler does not crash
+// when partially applying a witness method with generic parameters to an empty
+// list of concrete arguments: TF-917.
+
+sil_stage canonical
+
+import Builtin
+
+public protocol P {
+  func req<A>(_ a: A)
+}
+
+public struct S {}
+
+sil @f : $@convention(thin) <T where T : P> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %req = witness_method $T, #P.req : <Self where Self : P><A> (Self) -> (A) -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P><τ_1_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
+  %partially_applied = partial_apply %req<T, S>() : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P><τ_1_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}

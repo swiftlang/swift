@@ -765,6 +765,13 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Create a new explosion for potentially reabstracted parameters.
   Explosion args;
 
+  // Witness method calls expect self, followed by the self type followed by,
+  // the witness table at the end of the parameter list. But polymorphic
+  // arguments come before this.
+  bool isWitnessMethodCallee = origType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod;
+  Explosion witnessMethodSelfValue;
+
   Address resultValueAddr;
 
   {
@@ -802,14 +809,16 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
           addr, IGM.getStoragePointerType(resultType));
       args.add(addr);
     }
-    
+
     // Reemit the parameters as unsubstituted.
     for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
       auto origParamInfo = origType->getParameters()[i];
       auto &ti = IGM.getTypeInfoForLowered(
                    origParamInfo.getArgumentType(IGM.getSILModule(), origType));
       auto schema = ti.getSchema();
-      
+      bool isWitnessMethodCalleeSelf = (isWitnessMethodCallee &&
+          i + 1 == origType->getParameters().size());
+
       auto origParamSILType = IGM.silConv.getSILType(origParamInfo, origType);
       // Forward the address of indirect value params.
       auto &nativeSchemaOrigParam = ti.nativeParameterValueSchema(IGM);
@@ -819,7 +828,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         if (addr->getType() != ti.getStorageType()->getPointerTo())
           addr = subIGF.Builder.CreateBitCast(addr,
                                            ti.getStorageType()->getPointerTo());
-        args.add(addr);
+        (isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args).add(addr);
         continue;
       }
 
@@ -832,7 +841,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                           origParamInfo,
                           outType,
                           outTypeParamInfo,
-                          origParams, args);
+                          origParams,
+                          isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args);
         continue;
       }
 
@@ -862,7 +872,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       Explosion nativeApplyArg = nativeSchemaOrigParam.mapIntoNative(
           subIGF.IGM, subIGF, nonNativeApplyArg, origParamSILType, false);
       assert(nonNativeApplyArg.empty());
-      nativeApplyArg.transferInto(args, nativeApplyArg.size());
+      nativeApplyArg.transferInto(
+        isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args,
+        nativeApplyArg.size());
     }
   }
 
@@ -972,13 +984,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   auto haveContextArgument =
       calleeHasContext || hasSelfContextParameter(origType);
-
-  // Witness method calls expect self, followed by the self type followed by,
-  // the witness table at the end of the parameter list. But polymorphic
-  // arguments come before this.
-  bool isWitnessMethodCallee = origType->getRepresentation() ==
-      SILFunctionTypeRepresentation::WitnessMethod;
-  Explosion witnessMethodSelfValue;
 
   llvm::Value *lastCapturedFieldPtr = nullptr;
 
