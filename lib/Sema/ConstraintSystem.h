@@ -1613,8 +1613,6 @@ public:
 
   class SolverScope;
 
-  Constraint *failedConstraint = nullptr;
-
   /// Expressions that are known to be unevaluated.
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
@@ -1623,6 +1621,10 @@ public:
   unsigned CountDisjunctions = 0;
 
 private:
+  /// A constraint that has failed along the current solver path.
+  /// Do not set directly, call \c recordFailedConstraint instead.
+  Constraint *failedConstraint = nullptr;
+
   /// Current phase of the constraint system lifetime.
   ConstraintSystemPhase Phase = ConstraintSystemPhase::ConstraintGeneration;
 
@@ -2098,6 +2100,10 @@ private:
   };
 
 public:
+  /// Retrieve the first constraint that has failed along the solver's path, or
+  /// \c nullptr if no constraint has failed.
+  Constraint *getFailedConstraint() const { return failedConstraint; }
+
   ConstraintSystemPhase getPhase() const { return Phase; }
 
   /// Move constraint system to a new phase of its lifetime.
