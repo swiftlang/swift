@@ -1,0 +1,275 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-expand-all %s -lower-aggregate-instrs | %FileCheck %s
+
+// This file makes sure that the mechanics of expanding aggregate instructions
+// work. With that in mind, we expand all structs here ignoring code-size
+// trade-offs.
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+class C1 {
+  var data : Builtin.Int64
+  init()
+}
+
+class C2 {
+  var data : Builtin.FPIEEE32
+  init()
+}
+
+class C3 {
+  var data : Builtin.FPIEEE64
+  init()
+}
+
+struct S2 {
+  var cls1 : C1
+  var cls2 : C2
+  var trivial : Builtin.FPIEEE32
+}
+
+struct S {
+  var trivial : Builtin.Int64
+  var cls : C3
+  var inner_struct : S2
+}
+
+enum E {
+  case NoElement(Void)
+  case TrivialElement(Builtin.Int64)
+  case ReferenceElement(C1)
+  case StructNonTrivialElt(S)
+  case TupleNonTrivialElt((Builtin.Int64, S, C3))
+}
+
+// A struct for testing that aggregate rebuilding works.
+struct S3 {
+  var trivial1 : Builtin.Int64
+  var cls : S
+  var trivial2 : Builtin.Int64
+  var e : E
+  var trivial3 : Builtin.Int64
+}
+
+//////////////////
+// Destroy Addr //
+//////////////////
+
+// CHECK-LABEL: sil [ossa] @expand_destroy_addr_trivial
+// CHECK: bb0
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil [ossa] @expand_destroy_addr_trivial : $@convention(thin) (@inout Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  destroy_addr %0 : $*Builtin.Int64
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_destroy_addr_aggstructnontrivial
+// CHECK: bb0([[INPTR:%[0-9]+]] : $*S):
+
+// CHECK-NEXT: [[LOADED:%.*]] = load [take] [[INPTR]] : $*S
+// CHECK-NEXT: ([[A:%.*]], [[B:%.*]], [[C:%.*]]) = destructure_struct %1 : $S
+// CHECK-NEXT: destroy_value [[B]] : $C3
+
+// CHECK-NEXT: ([[A1:%.*]], [[B1:%.*]], [[C1:%.*]]) = destructure_struct [[C]] : $S2
+// CHECK-NEXT: destroy_value [[A1]] : $C1
+// CHECK-NEXT: destroy_value [[B1]] : $C2
+
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @expand_destroy_addr_aggstructnontrivial : $@convention(thin) (@in S) -> () {
+bb0(%0 : $*S):
+  destroy_addr %0 : $*S
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_destroy_addr_aggtuplenontrivial
+// CHECK: bb0([[INPTR:%[0-9]+]] : $*(S, S2, C1)):
+
+// CHECK-NEXT: [[LOADED:%.*]] = load [take] [[INPTR]] : $*(S, S2, C1)
+// CHECK-NEXT: ([[A:%.*]], [[B:%.*]], [[C:%.*]]) = destructure_tuple [[LOADED]] : $(S, S2, C1)
+// CHECK-NEXT: ([[A1:%.*]], [[B1:%.*]], [[C1:%.*]]) = destructure_struct [[A]] : $S
+// CHECK-NEXT: destroy_value [[B1]] : $C3
+
+// CHECK-NEXT: ([[A2:%.*]], [[B2:%.*]], [[C2:%.*]]) = destructure_struct [[C1]] : $S2
+// CHECK-NEXT: destroy_value [[A2]] : $C1
+// CHECK-NEXT: destroy_value [[B2]] : $C2
+
+// CHECK-NEXT: ([[A3:%.*]], [[B3:%.*]], [[C3:%.*]]) = destructure_struct [[B]] : $S2
+// CHECK-NEXT: destroy_value [[A3]] : $C1
+// CHECK-NEXT: destroy_value [[B3]] : $C2
+// CHECK-NEXT: destroy_value [[C]] : $C1
+
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @expand_destroy_addr_aggtuplenontrivial : $@convention(thin) (@in (S, S2, C1)) -> () {
+bb0(%0 : $*(S, S2, C1)):
+  destroy_addr %0 : $*(S, S2, C1)
+  %1 = tuple()
+  return %1 : $()
+}
+
+// Do not do anything.
+/*
+sil @expand_destroy_addr_addressonly : $@convention(thin) <T> (@inout T) -> () {
+bb0(%0 : $*T):
+  destroy_addr %0 : $*T
+  %1 = tuple()
+  return %1 : $()
+}
+*/
+
+// CHECK-LABEL: sil [ossa] @expand_destroy_addr_reference
+// CHECK: bb0
+// CHECK: load [take]
+// CHECK: destroy_value
+// CHECK: tuple
+// CHECK: return
+sil [ossa] @expand_destroy_addr_reference : $@convention(thin) (@in C1) -> () {
+bb0(%0 : $*C1):
+  destroy_addr %0 : $*C1
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_destroy_addr_enum
+// CHECK: bb0
+// CHECK: load [take]
+// CHECK: destroy_value
+// CHECK: tuple
+// CHECK: return
+sil [ossa] @expand_destroy_addr_enum : $@convention(thin) (@in E) -> () {
+bb0(%0 : $*E):
+  destroy_addr %0 : $*E
+  %1 = tuple()
+  return %1 : $()
+}
+
+///////////////
+// Copy Addr //
+///////////////
+
+// CHECK-LABEL: sil [ossa] @expand_copy_addr_takeinit
+// CHECK: bb0([[IN1:%[0-9]+]] : $*S, [[IN2:%[0-9]+]] : $*S):
+// CHECK: [[LOAD1:%[0-9]+]] = load [take] [[IN1]] : $*S
+// CHECK: store [[LOAD1]] to [init] [[IN2]]
+// CHECK: tuple
+// CHECK: return
+sil [ossa] @expand_copy_addr_takeinit : $@convention(thin) (@in S, @inout S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  destroy_addr %1 : $*S
+  copy_addr [take] %0 to [initialization] %1 : $*S
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_copy_addr_init
+// CHECK: bb0([[IN1PTR:%[0-9]+]] : $*S, [[IN2PTR:%[0-9]+]] : $*S):
+// CHECK: [[IN1:%[0-9]+]] = load [copy] [[IN1PTR]] : $*S
+// CHECK: store [[IN1]] to [init] [[IN2PTR]]
+// CHECK: tuple
+// CHECK: return
+sil [ossa] @expand_copy_addr_init : $@convention(thin) (@inout S, @inout S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  destroy_addr %1 : $*S
+  copy_addr %0 to [initialization] %1 : $*S
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_copy_addr_take
+// CHECK: bb0([[IN1PTR:%[0-9]+]] : $*S, [[IN2PTR:%[0-9]+]] : $*S):
+// CHECK: [[IN1:%[0-9]+]] = load [take] [[IN1PTR]] : $*S
+// CHECK: store [[IN1]] to [assign] [[IN2PTR]]
+// CHECK: tuple
+// CHECK: return
+sil [ossa] @expand_copy_addr_take : $@convention(thin) (@in S, @inout S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  copy_addr [take] %0 to %1 : $*S
+  %2 = tuple()
+  return %2 : $()
+}
+
+// Test expansions for various types (these will become more
+// interesting when I introduce the actual chopping work).
+
+// CHECK-LABEL: sil [ossa] @expand_copy_addr_trivial
+// CHECK: bb0
+// CHECK: load [trivial]
+// CHECK: store
+// CHECK: tuple
+// CHECK: return
+sil [ossa] @expand_copy_addr_trivial : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  copy_addr %0 to %1 : $*Builtin.Int64
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_copy_addr_aggstructnontrivial
+// CHECK: bb0([[IN1PTR:%[0-9]+]] : $*S, [[IN2PTR:%[0-9]+]] : $*S):
+// CHECK: [[IN1:%[0-9]+]] = load [copy] [[IN1PTR]] : $*S
+// CHECK: store [[IN1]] to [assign] [[IN2PTR]]
+// CHECK: tuple
+// CHECK: return
+sil [ossa] @expand_copy_addr_aggstructnontrivial : $@convention(thin) (@inout S, @inout S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  copy_addr %0 to %1 : $*S
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_copy_addr_aggtuplenontrivial
+// CHECK: bb0([[IN1PTR:%[0-9]+]] : $*(S, S2, C1, E), [[IN2PTR:%[0-9]+]] : $*(S, S2, C1, E)):
+// CHECK: [[IN1:%[0-9]+]] = load [copy] [[IN1PTR]] : $*(S, S2, C1, E)
+// CHECK: store [[IN1]] to [assign] [[IN2PTR]] : $*(S, S2, C1, E)
+// CHECK: tuple ()
+// CHECK: return
+sil [ossa] @expand_copy_addr_aggtuplenontrivial : $@convention(thin) (@inout (S, S2, C1, E), @inout (S, S2, C1, E)) -> () {
+bb0(%0 : $*(S, S2, C1, E), %1 : $*(S, S2, C1, E)):
+  copy_addr %0 to %1 : $*(S, S2, C1, E)
+  %2 = tuple()
+  return %2 : $()
+}
+
+// Do not do anything.
+/*
+sil @expand_copy_addr_addressonly : $@convention(thin) <T> (@inout T) -> () {
+bb0(%0 : $*T):
+  copy_addr %0 : $*T
+  %1 = tuple()
+  return %1 : $()
+}
+*/
+
+// Just turn into a load + strong_release.
+// CHECK-LABEL: sil [ossa] @expand_copy_addr_reference
+// CHECK: bb0([[IN1:%[0-9]+]] : $*C1, [[IN2:%[0-9]+]] : $*C1):
+// CHECK: [[LOAD1:%[0-9]+]] = load [copy] [[IN1]] : $*C1
+// CHECK: store [[LOAD1]] to [assign] [[IN2]]
+// CHECK: tuple
+// CHECK: return
+sil [ossa] @expand_copy_addr_reference : $@convention(thin) (@inout C1, @inout C1) -> () {
+bb0(%0 : $*C1, %1 : $*C1):
+  copy_addr %0 to %1 : $*C1
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_copy_addr_enum
+// CHECK: bb0([[IN1:%[0-9]+]] : $*E, [[IN2:%[0-9]+]] : $*E):
+// CHECK: [[LOAD1:%[0-9]+]] = load [copy] [[IN1]] : $*E
+// CHECK: store [[LOAD1]] to [assign] [[IN2]]
+// CHECK: tuple
+// CHECK: return
+sil [ossa] @expand_copy_addr_enum : $@convention(thin) (@inout E, @inout E) -> () {
+bb0(%0 : $*E, %1 : $*E):
+  copy_addr %0 to %1 : $*E
+  %2 = tuple()
+  return %2 : $()
+}

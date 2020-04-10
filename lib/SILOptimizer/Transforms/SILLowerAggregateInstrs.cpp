@@ -39,7 +39,7 @@ STATISTIC(NumExpand, "Number of instructions expanded");
 /// non-address only type. We do this here so we can process the resulting
 /// loads/stores.
 ///
-/// This peephole implements the following optimizations:
+/// This peephole implements the following optimizations (no ownership):
 ///
 /// copy_addr %0 to %1 : $*T
 /// ->
@@ -70,6 +70,13 @@ STATISTIC(NumExpand, "Number of instructions expanded");
 ///     // no retain of %new!
 ///     // no load/release of %old!
 ///     store %new to %1 : $*T
+///
+/// This peephole implements the following optimizations (with ownership):
+///
+/// copy_addr [take?] %0 to [initialization?] %1 : $*T
+/// ->
+///     %new = load [take?] %0 : $*T
+///     store %new to [init?] %1 : $*T
 static bool expandCopyAddr(CopyAddrInst *CA) {
   SILModule &M = CA->getModule();
   SILFunction *F = CA->getFunction();
@@ -87,19 +94,30 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
 
   SILBuilderWithScope Builder(CA);
 
-  // %new = load %0 : $*T
-  LoadInst *New = Builder.createLoad(CA->getLoc(), Source,
-                                     LoadOwnershipQualifier::Unqualified);
+  LoadOwnershipQualifier loadQual = LoadOwnershipQualifier::Unqualified;
+  if (F->hasOwnership()) {
+    if (Source->getType().isTrivial(*Source->getFunction())) {
+      loadQual = LoadOwnershipQualifier::Trivial;
+    } else if (CA->isTakeOfSrc()) {
+      loadQual = LoadOwnershipQualifier::Take;
+    } else {
+      loadQual = LoadOwnershipQualifier::Copy;
+    }
+  }
+
+  // %new = load [take]? %0 : $*T
+  LoadInst *New = Builder.createLoad(CA->getLoc(), Source, loadQual);
 
   SILValue Destination = CA->getDest();
 
-  // If our object type is not trivial, we may need to release the old value and
-  // retain the new one.
+  // If our object type is not trivial and we aren't in ownership mode, we may
+  // need to release the old value and retain the new one. In OSSA we've already
+  // emitted a load [take] in this case so, we don't need to do anything.
 
   auto &TL = F->getTypeLowering(SrcType);
 
   // If we have a non-trivial type...
-  if (!TL.isTrivial()) {
+  if (!TL.isTrivial() && !Source->getFunction()->hasOwnership()) {
 
     // If we are not initializing:
     // %old = load %1 : $*T
@@ -128,9 +146,20 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     }
   }
 
+  StoreOwnershipQualifier storeQual = StoreOwnershipQualifier::Unqualified;
+  if (F->hasOwnership()) {
+    if (TL.isTrivial()) {
+      storeQual = StoreOwnershipQualifier::Trivial;
+    } else {
+      storeQual =
+          IsInitialization_t::IsInitialization == CA->isInitializationOfDest()
+              ? StoreOwnershipQualifier::Init
+              : StoreOwnershipQualifier::Assign;
+    }
+  }
+
   // Create the store.
-  Builder.createStore(CA->getLoc(), New, Destination,
-                      StoreOwnershipQualifier::Unqualified);
+  Builder.createStore(CA->getLoc(), New, Destination, storeQual);
 
   ++NumExpand;
   return true;
@@ -155,8 +184,10 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
   // If we have a non-trivial type...
   if (!Type.isTrivial(*F)) {
     // If we have a type with reference semantics, emit a load/strong release.
-    LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr,
-                                      LoadOwnershipQualifier::Unqualified);
+    // In OSSA we can just use load [take].
+    auto loadQual = F->hasOwnership() ? LoadOwnershipQualifier::Take
+                                      : LoadOwnershipQualifier::Unqualified;
+    LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr, loadQual);
     auto &TL = F->getTypeLowering(Type);
     using TypeExpansionKind = Lowering::TypeLowering::TypeExpansionKind;
     auto expansionKind = expand ? TypeExpansionKind::MostDerivedDescendents
@@ -280,9 +311,6 @@ class SILLowerAggregate : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    // FIXME: Can we support ownership?
-    if (F->hasOwnership())
-      return;
     LLVM_DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
           F->getName() << " *****\n");
     bool Changed = processFunction(*F);
