@@ -10,9 +10,103 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines `AnyDerivative`, a type-erased wrapper for
-// `Differentiable.TangentVector` associated type implementations.
+// This file defines type-erased wrappers for `Differentiable`-conforming types
+// and `Differentiable.TangentVector` associated type implementations.
 //
+//===----------------------------------------------------------------------===//
+
+import Swift
+
+//===----------------------------------------------------------------------===//
+// `AnyDifferentiable`
+//===----------------------------------------------------------------------===//
+
+internal protocol _AnyDifferentiableBox {
+  // `Differentiable` requirements.
+  mutating func _move(along direction: AnyDerivative)
+
+  /// The underlying base value, type-erased to `Any`.
+  var _typeErasedBase: Any { get }
+
+  /// Returns the underlying value unboxed to the given type, if possible.
+  func _unboxed<U: Differentiable>(to type: U.Type) -> U?
+}
+
+internal struct _ConcreteDifferentiableBox<T: Differentiable>: _AnyDifferentiableBox
+{
+  /// The underlying base value.
+  var _base: T
+
+  init(_ base: T) {
+    self._base = base
+  }
+
+  /// The underlying base value, type-erased to `Any`.
+  var _typeErasedBase: Any {
+    return _base
+  }
+
+  func _unboxed<U: Differentiable>(to type: U.Type) -> U? {
+    return (self as? _ConcreteDifferentiableBox<U>)?._base
+  }
+
+  mutating func _move(along direction: AnyDerivative) {
+    guard
+      let directionBase =
+        direction.base as? T.TangentVector
+    else {
+      _derivativeTypeMismatch(T.self, type(of: direction.base))
+    }
+    _base.move(along: directionBase)
+  }
+}
+
+public struct AnyDifferentiable: Differentiable {
+  internal var _box: _AnyDifferentiableBox
+
+  internal init(_box: _AnyDifferentiableBox) {
+    self._box = _box
+  }
+
+  /// The underlying base value.
+  public var base: Any {
+    return _box._typeErasedBase
+  }
+
+  /// Creates a type-erased derivative from the given derivative.
+  @differentiable
+  public init<T: Differentiable>(_ base: T) {
+    self._box = _ConcreteDifferentiableBox<T>(base)
+  }
+
+  @inlinable
+  @derivative(of: init)
+  internal static func _vjpInit<T: Differentiable>(
+    _ base: T
+  ) -> (value: AnyDifferentiable, pullback: (AnyDerivative) -> T.TangentVector)
+  {
+    return (AnyDifferentiable(base), { v in v.base as! T.TangentVector })
+  }
+
+  @inlinable
+  @derivative(of: init)
+  internal static func _jvpInit<T: Differentiable>(
+    _ base: T
+  ) -> (
+    value: AnyDifferentiable, differential: (T.TangentVector) -> AnyDerivative
+  ) {
+    return (AnyDifferentiable(base), { dbase in AnyDerivative(dbase) })
+  }
+
+  public typealias TangentVector = AnyDerivative
+
+  public mutating func move(along direction: TangentVector) {
+    _box._move(along: direction)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// `AnyDerivative`
 //===----------------------------------------------------------------------===//
 
 @usableFromInline
@@ -43,18 +137,6 @@ extension _AnyDerivativeBox {
   func _isOpaqueZero() -> Bool {
     return _unboxed(to: AnyDerivative.OpaqueZero.self) != nil
   }
-}
-
-@inline(never)
-@usableFromInline
-internal func _derivativeTypeMismatch(
-  _ x: Any.Type, _ y: Any.Type, file: StaticString = #file, line: UInt = #line
-) -> Never {
-  preconditionFailure(
-    """
-    Derivative type mismatch: \
-    \(String(reflecting: x)) and \(String(reflecting: y))
-    """, file: file, line: line)
 }
 
 @frozen
@@ -287,4 +369,20 @@ public struct AnyDerivative: Differentiable & AdditiveArithmetic {
     }
     _box._move(along: direction._box)
   }
+}
+
+//===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
+
+@inline(never)
+@usableFromInline
+internal func _derivativeTypeMismatch(
+  _ x: Any.Type, _ y: Any.Type, file: StaticString = #file, line: UInt = #line
+) -> Never {
+  preconditionFailure(
+    """
+    Derivative type mismatch: \
+    \(String(reflecting: x)) and \(String(reflecting: y))
+    """, file: file, line: line)
 }
