@@ -2838,8 +2838,8 @@ public:
       break;
 
     case SolutionKind::Error:
-      if (shouldAddNewFailingConstraint()) {
-        addNewFailingConstraint(Constraint::createMemberOrOuterDisjunction(
+      if (shouldRecordFailedConstraint()) {
+        recordFailedConstraint(Constraint::createMemberOrOuterDisjunction(
             *this, ConstraintKind::ValueMember, baseTy, memberTy, name, useDC,
             functionRefKind, outerAlternatives, getConstraintLocator(locator)));
       }
@@ -2869,8 +2869,8 @@ public:
       break;
 
     case SolutionKind::Error:
-      if (shouldAddNewFailingConstraint()) {
-        addNewFailingConstraint(
+      if (shouldRecordFailedConstraint()) {
+        recordFailedConstraint(
           Constraint::createMember(*this, ConstraintKind::UnresolvedValueMember,
                                    baseTy, memberTy, name,
                                    useDC, functionRefKind,
@@ -2927,17 +2927,34 @@ public:
     addUnsolvedConstraint(constraint);
   }
 
-  /// Whether we should add a new constraint to capture a failure.
-  bool shouldAddNewFailingConstraint() const {
-    // Only do this at the top level.
+  /// Whether we should record the failure of a constraint.
+  bool shouldRecordFailedConstraint() const {
+    // Only record it if we don't already have a failed constraint. This avoids
+    // allocating unnecessary constraints.
     return !failedConstraint;
   }
 
-  /// Add a new constraint that we know fails.
-  void addNewFailingConstraint(Constraint *constraint) {
-    assert(shouldAddNewFailingConstraint());
+  /// Note that a particular constraint has failed, setting \c failedConstraint
+  /// if necessary.
+  void recordFailedConstraint(Constraint *constraint) {
     assert(!constraint->isActive());
-    failedConstraint = constraint;
+    if (!failedConstraint)
+      failedConstraint = constraint;
+
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState ? solverState->depth * 2 : 0)
+          << "(failed constraint ";
+      constraint->print(log, &getASTContext().SourceMgr);
+      log << ")\n";
+    }
+  }
+
+  /// Remove a constraint from the system that has failed, setting
+  /// \c failedConstraint if necessary.
+  void retireFailedConstraint(Constraint *constraint) {
+    retireConstraint(constraint);
+    recordFailedConstraint(constraint);
   }
 
   /// Add a newly-generated constraint that is known not to be solvable

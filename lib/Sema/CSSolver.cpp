@@ -290,19 +290,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
     // Simplify this constraint.
     switch (simplifyConstraint(*constraint)) {
     case SolutionKind::Error:
-      if (!failedConstraint) {
-        failedConstraint = constraint;
-      }
-
-      if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
-        log.indent(solverState ? solverState->depth * 2 : 0)
-            << "(failed constraint ";
-        constraint->print(log, &getASTContext().SourceMgr);
-        log << ")\n";
-      }
-
-      retireConstraint(constraint);
+      retireFailedConstraint(constraint);
       break;
 
     case SolutionKind::Solved:
