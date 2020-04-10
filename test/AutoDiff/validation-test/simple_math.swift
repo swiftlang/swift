@@ -202,6 +202,9 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
     }
   }
 
+  // Test direct `init` reference.
+  expectEqual(10, pullback(at: 4, in: Foo.init)(.init(stored: 10)))
+
   let 𝛁foo = pullback(at: Float(4), in: { input -> Foo in
     let foo = Foo(stored: input)
     let foo2 = foo + foo
