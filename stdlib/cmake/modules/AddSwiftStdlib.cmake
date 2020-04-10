@@ -981,9 +981,6 @@ endfunction()
 # SWIFT_MODULE_DEPENDS
 #   Swift modules this library depends on.
 #
-# SWIFT_MODULE_DEPENDS_OSX
-#   Swift modules this library depends on when built for OS X.
-#
 # SWIFT_MODULE_DEPENDS_MACCATALYST
 #   Zippered Swift modules this library depends on when built for macCatalyst.
 #   For example, Foundation.
@@ -991,27 +988,6 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED
 #   Unzippered Swift modules this library depends on when built for macCatalyst.
 #   For example, UIKit
-#
-# SWIFT_MODULE_DEPENDS_IOS
-#   Swift modules this library depends on when built for iOS.
-#
-# SWIFT_MODULE_DEPENDS_TVOS
-#   Swift modules this library depends on when built for tvOS.
-#
-# SWIFT_MODULE_DEPENDS_WATCHOS
-#   Swift modules this library depends on when built for watchOS.
-#
-# SWIFT_MODULE_DEPENDS_FREEBSD
-#   Swift modules this library depends on when built for FreeBSD.
-#
-# SWIFT_MODULE_DEPENDS_LINUX
-#   Swift modules this library depends on when built for Linux.
-#
-# SWIFT_MODULE_DEPENDS_CYGWIN
-#   Swift modules this library depends on when built for Cygwin.
-#
-# SWIFT_MODULE_DEPENDS_HAIKU
-#   Swift modules this library depends on when built for Haiku.
 #
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
@@ -1121,15 +1097,18 @@ function(add_swift_target_library_single_sdk name)
         SWIFT_COMPILE_FLAGS_WATCHOS
         SWIFT_COMPILE_FLAGS_LINUX
         SWIFT_MODULE_DEPENDS
+# TODO: katei
+# Remove from here to
         SWIFT_MODULE_DEPENDS_CYGWIN
         SWIFT_MODULE_DEPENDS_FREEBSD
         SWIFT_MODULE_DEPENDS_HAIKU
-        SWIFT_MODULE_DEPENDS_IOS
         SWIFT_MODULE_DEPENDS_LINUX
+        SWIFT_MODULE_DEPENDS_IOS
         SWIFT_MODULE_DEPENDS_OSX
         SWIFT_MODULE_DEPENDS_TVOS
         SWIFT_MODULE_DEPENDS_WATCHOS
         SWIFT_MODULE_DEPENDS_WINDOWS
+# here
         SWIFT_MODULE_DEPENDS_FROM_SDK
         TARGET_SDKS
         SWIFT_COMPILE_FLAGS_MACCATALYST
@@ -1257,6 +1236,8 @@ function(add_swift_target_library_single_sdk name)
         endif()
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OSX})
+# TODO: katei
+# Remove from here to
     elseif(${SWIFTLIB_SDK} STREQUAL IOS OR ${SWIFTLIB_SDK} STREQUAL IOS_SIMULATOR)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_IOS})
@@ -1281,6 +1262,7 @@ function(add_swift_target_library_single_sdk name)
     elseif(${SWIFTLIB_SDK} STREQUAL WINDOWS)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WINDOWS})
+# here
     endif()
 
     # Collect architecture agnostic SDK framework dependencies

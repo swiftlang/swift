@@ -3,7 +3,20 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
 set(DISABLE_APPLICATION_EXTENSION ON)
 
-add_swift_target_library(swiftXCTest ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+foreach(sdk ${SWIFT_SDKS})
+
+set(module_depends)
+if(${sdk} STREQUAL OSX)
+  list(APPEND module_depends AppKit)
+elseif(${sdk} STREQUAL IOS OR ${sdk} STREQUAL IOS_SIMULATOR)
+  list(APPEND module_depends CoreMedia UIKit)
+elseif(${sdk} STREQUAL TVOS OR ${sdk} STREQUAL TVOS_SIMULATOR)
+  list(APPEND module_depends UIKit)
+else()
+  continue()
+endif()
+
+add_swift_target_library_single_sdk(swiftXCTest ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   XCTestCaseAdditions.mm
   XCTest.swift
 
@@ -15,12 +28,10 @@ add_swift_target_library(swiftXCTest ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS
     # rdar://48445154
     -Xfrontend -module-interface-preserve-types-as-written
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
+  SDK ${sdk}
   SWIFT_MODULE_DEPENDS ObjectiveC Foundation
   FRAMEWORK_DEPENDS Foundation XCTest
-  SWIFT_MODULE_DEPENDS_OSX AppKit
-  SWIFT_MODULE_DEPENDS_IOS CoreMedia UIKit
-  SWIFT_MODULE_DEPENDS_TVOS UIKit
+  SWIFT_MODULE_DEPENDS ${module_depends}
   DONT_EMBED_BITCODE
 
   DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_XCTEST_OSX}
@@ -28,3 +39,5 @@ add_swift_target_library(swiftXCTest ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS
   DEPLOYMENT_VERSION_TVOS ${SWIFTLIB_DEPLOYMENT_VERSION_XCTEST_TVOS}
   INSTALL_IN_COMPONENT sdk-overlay
 )
+
+endforeach()

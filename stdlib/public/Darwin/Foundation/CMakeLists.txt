@@ -1,7 +1,19 @@
 cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
-add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+foreach(sdk ${SWIFT_SDKS})
+
+select_swift_overlay_dependenies(module_depends
+  SDK ${sdk}
+  SWIFT_MODULE_DEPENDS_OSX Darwin CoreGraphics Dispatch IOKit XPC CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+)
+
+list(APPEND module_depends CoreGraphics) # imported in Swift
+
+add_swift_target_library_single_sdk(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   AffineTransform.swift
   Boxing.swift
   BundleLookup.mm
@@ -83,14 +95,8 @@ add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xllvm" "-sil-inline-generics" "-Xllvm" "-sil-partial-specialization" "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
-  SWIFT_MODULE_DEPENDS_OSX Darwin CoreGraphics Dispatch IOKit XPC CoreFoundation ObjectiveC # auto-updated
-    CoreGraphics # imported in Swift
-  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
-    CoreGraphics # imported in Swift
-  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
-    CoreGraphics # imported in Swift
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
-    CoreGraphics # imported in Swift
+  SDK ${sdk}
+  SWIFT_MODULE_DEPENDS ${module_depends}
   FRAMEWORK_DEPENDS Foundation
   FRAMEWORK_DEPENDS_WEAK Combine
 
@@ -100,3 +106,5 @@ add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   DEPLOYMENT_VERSION_WATCHOS ${SWIFTLIB_DEPLOYMENT_VERSION_FOUNDATION_WATCHOS}
   INSTALL_IN_COMPONENT sdk-overlay
 )
+
+endforeach()

@@ -1,4 +1,9 @@
-add_swift_target_library(swiftOSLogTestHelper
+foreach(sdk ${SWIFT_SDKS})
+if(NOT ${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
+  continue()
+endif()
+
+add_swift_target_library_single_sdk(swiftOSLogTestHelper
   IS_SDK_OVERLAY
   SHARED
 
@@ -11,11 +16,9 @@ add_swift_target_library(swiftOSLogTestHelper
   OSLogNSObjectType.swift
   OSLogFloatingPointTypes.swift
 
-  SWIFT_MODULE_DEPENDS_IOS Darwin ObjectiveC
-  SWIFT_MODULE_DEPENDS_OSX Darwin ObjectiveC
-  SWIFT_MODULE_DEPENDS_TVOS Darwin ObjectiveC
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin ObjectiveC
-  TARGET_SDKS ALL_APPLE_PLATFORMS
+  SWIFT_MODULE_DEPENDS Darwin ObjectiveC
+  SDK ${sdk}
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install
   DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}")
+endforeach()

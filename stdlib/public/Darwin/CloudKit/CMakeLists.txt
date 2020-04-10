@@ -1,6 +1,20 @@
 cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
+foreach(sdk ${SWIFT_SDKS})
+
+if(NOT ${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
+  continue()
+endif()
+
+select_swift_overlay_dependenies(module_depends
+  SDK ${sdk}
+  SWIFT_MODULE_DEPENDS_OSX Darwin CoreGraphics Dispatch IOKit Foundation CoreLocation XPC CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch Foundation CoreLocation CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch Foundation CoreLocation CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin Dispatch Foundation CoreLocation CoreFoundation ObjectiveC # auto-updated
+)
+
 add_swift_target_library(swiftCloudKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   NestedNames.swift
   TypealiasStrings.swift
@@ -18,16 +32,9 @@ add_swift_target_library(swiftCloudKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} 
 
   SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR
+  SDK ${sdk}
 
-  SWIFT_MODULE_DEPENDS_OSX Darwin CoreGraphics Dispatch IOKit Foundation CoreLocation XPC CoreFoundation ObjectiveC # auto-updated
-    os XPC
-  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch Foundation CoreLocation CoreFoundation ObjectiveC # auto-updated
-    os
-  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch Foundation CoreLocation CoreFoundation ObjectiveC # auto-updated
-    os
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin Dispatch Foundation CoreLocation CoreFoundation ObjectiveC # auto-updated
-    os
+  SWIFT_MODULE_DEPENDS ${module_depends}
   FRAMEWORK_DEPENDS_WEAK CloudKit
 
   DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_CLOUDKIT_OSX}
@@ -36,3 +43,5 @@ add_swift_target_library(swiftCloudKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} 
   DEPLOYMENT_VERSION_WATCHOS ${SWIFTLIB_DEPLOYMENT_VERSION_CLOUDKIT_WATCHOS}
   INSTALL_IN_COMPONENT sdk-overlay
 )
+
+endforeach()

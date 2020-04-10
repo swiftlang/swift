@@ -1,7 +1,17 @@
 cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
-add_swift_target_library(swiftObjectiveC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+foreach(sdk ${SWIFT_SDKS})
+
+select_swift_overlay_dependenies(module_depends
+  SDK ${sdk}
+  SWIFT_MODULE_DEPENDS_OSX Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin # auto-updated
+)
+
+add_swift_target_library_single_sdk(swiftObjectiveC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   ObjectiveC.swift
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
@@ -10,10 +20,8 @@ add_swift_target_library(swiftObjectiveC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
                       "-disable-objc-attr-requires-foundation-module" "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
-  SWIFT_MODULE_DEPENDS_OSX Darwin # auto-updated
-  SWIFT_MODULE_DEPENDS_IOS Darwin # auto-updated
-  SWIFT_MODULE_DEPENDS_TVOS Darwin # auto-updated
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin # auto-updated
+  SDK ${sdk}
+  SWIFT_MODULE_DEPENDS ${module_depends}
 
   DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_OBJECTIVEC_OSX}
   DEPLOYMENT_VERSION_IOS ${SWIFTLIB_DEPLOYMENT_VERSION_OBJECTIVEC_IOS}
@@ -21,3 +29,5 @@ add_swift_target_library(swiftObjectiveC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   DEPLOYMENT_VERSION_WATCHOS ${SWIFTLIB_DEPLOYMENT_VERSION_OBJECTIVEC_WATCHOS}
   INSTALL_IN_COMPONENT sdk-overlay
 )
+
+endforeach()
