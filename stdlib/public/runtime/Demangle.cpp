@@ -700,7 +700,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 //// define what these will be.
 /// \returns the demangled name. Returns nullptr if the input String is not a
 /// Swift mangled name.
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
 char *swift_demangle(const char *mangledName,
                      size_t mangledNameLength,
                      char *outputBuffer,
