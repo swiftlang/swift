@@ -2389,6 +2389,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
         nominalWrapper->diagnose(diag::property_wrapper_declared_here,
                                  nominalWrapper->getFullName());
       }
+      return PropertyWrapperBackingPropertyInfo();
     }
   }
 
