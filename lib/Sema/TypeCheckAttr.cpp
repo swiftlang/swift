@@ -3160,20 +3160,43 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
-/// Returns true if the given type conforms to `Differentiable` in the given
-/// module.
-static bool conformsToDifferentiable(Type type, DeclContext *DC) {
+/// If the given type conforms to `Differentiable` in the given context, returns
+/// the `ProtocolConformanceRef`. Otherwise, returns an invalid
+/// `ProtocolConformanceRef`.
+///
+/// This helper verifies that the `TangentVector` type witness is valid, in case
+/// the conformance has not been fully checked and the type witness cannot be
+/// resolved.
+static ProtocolConformanceRef getDifferentiableConformance(Type type,
+                                                           DeclContext *DC) {
   auto &ctx = type->getASTContext();
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto conf = TypeChecker::conformsToProtocol(
-      type, differentiableProto, DC, ConformanceCheckFlags::InExpression);
+  auto conf =
+      TypeChecker::conformsToProtocol(type, differentiableProto, DC, None);
   if (!conf)
-    return false;
+    return ProtocolConformanceRef();
   // Try to get the `TangentVector` type witness, in case the conformance has
-  // not been fully checked and the type witness cannot be resolved.
+  // not been fully checked.
   Type tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
-  return !tanType.isNull() && !tanType->hasError();
+  if (tanType.isNull() || tanType->hasError())
+    return ProtocolConformanceRef();
+  return conf;
+};
+
+/// Returns true if the given type conforms to `Differentiable` in the given
+/// contxt. If `tangentVectorEqualsSelf` is true, also check whether the given
+/// type satisfies `TangentVector == Self`.
+static bool conformsToDifferentiable(Type type, DeclContext *DC,
+                                     bool tangentVectorEqualsSelf = false) {
+  auto conf = getDifferentiableConformance(type, DC);
+  if (conf.isInvalid())
+    return false;
+  if (!tangentVectorEqualsSelf)
+    return true;
+  auto &ctx = type->getASTContext();
+  Type tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
+  return type->isEqual(tanType);
 };
 
 IndexSubset *TypeChecker::inferDifferentiabilityParameters(
@@ -4366,9 +4389,8 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   auto originalResult = originalResults.front();
   auto originalResultType = originalResult.type;
   // Check that the original semantic result conforms to `Differentiable`.
-  auto *diffableProto = Ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultConf = TypeChecker::conformsToProtocol(
-      originalResultType, diffableProto, derivative->getDeclContext(), None);
+  auto valueResultConf = getDifferentiableConformance(
+      originalResultType, derivative->getDeclContext());
   if (!valueResultConf) {
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_result_value_not_differentiable,
@@ -4479,21 +4501,6 @@ DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
 
   return nullptr;
 }
-
-/// Returns true if the given type's `TangentVector` is equal to itself in the
-/// given module.
-static bool tangentVectorEqualsSelf(Type type, DeclContext *DC) {
-  assert(conformsToDifferentiable(type, DC));
-  auto &ctx = type->getASTContext();
-  auto *differentiableProto =
-      ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto conf = TypeChecker::conformsToProtocol(
-                  type, differentiableProto, DC,
-                  ConformanceCheckFlags::InExpression);
-  auto tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
-  return type->getCanonicalType() == tanType->getCanonicalType();
-};
-
 
 // Computes the linearity parameter indices from the given parsed linearity
 // parameters for the given transpose function. On error, emits diagnostics and
@@ -4613,8 +4620,8 @@ static bool checkLinearityParameters(
         parsedLinearParams.empty() ? attrLoc : parsedLinearParams[i].getLoc();
     // Parameter must conform to `Differentiable` and satisfy
     // `Self == Self.TangentVector`.
-    if (!conformsToDifferentiable(linearParamType, originalAFD) ||
-        !tangentVectorEqualsSelf(linearParamType, originalAFD)) {
+    if (!conformsToDifferentiable(linearParamType, originalAFD,
+                                  /*tangentVectorEqualsSelf*/ true)) {
       diags.diagnose(loc,
                      diag::transpose_attr_invalid_linearity_parameter_or_result,
                      linearParamType.getString(), /*isParameter*/ true);
@@ -4726,8 +4733,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   if (expectedOriginalResultType->hasTypeParameter())
     expectedOriginalResultType = transpose->mapTypeIntoContext(
         expectedOriginalResultType);
-  if (!conformsToDifferentiable(expectedOriginalResultType, transpose) ||
-      !tangentVectorEqualsSelf(expectedOriginalResultType, transpose)) {
+  if (!conformsToDifferentiable(expectedOriginalResultType, transpose,
+                                /*tangentVectorEqualsSelf*/ true)) {
     diagnoseAndRemoveAttr(
         attr, diag::transpose_attr_invalid_linearity_parameter_or_result,
         expectedOriginalResultType.getString(), /*isParameter*/ false);
