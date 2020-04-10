@@ -3,7 +3,7 @@
 protocol HasSelfRequirements {
   func foo(_ x: Self)
 
-  func returnsOwnProtocol() -> HasSelfRequirements // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}}
+  func returnsOwnProtocol() -> HasSelfRequirements // expected-error{{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}} {{educational-notes=associated-type-requirements}}
 }
 protocol Bar {
   // init() methods should not prevent use as an existential.
@@ -68,7 +68,7 @@ protocol HasAssoc {
 }
 
 func testHasAssoc(_ x: Any) {
-  if let p = x as? HasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint}}
+  if let p = x as? HasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint}} {{educational-notes=associated-type-requirements}}
     p.foo() // don't crash here.
   }
 }
