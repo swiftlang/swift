@@ -46,6 +46,58 @@
 // RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 // RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 
+///////////////////////////////////////////////////////////////////////////////
+// Now repeat all of the same tests, but with library evolution enabled:
+///////////////////////////////////////////////////////////////////////////////
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -DEVOLUTION
+// RUN: %target-build-swift -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5 -DEVOLUTION
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+
+// Now the same in optimized mode.
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -O -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -O -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -DEVOLUTION
+// RUN: %target-build-swift -O -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5 -DEVOLUTION
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+
+// Now the same in size mode.
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -Osize -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -Osize -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -DEVOLUTION
+// RUN: %target-build-swift -Osize -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5 -DEVOLUTION
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+
+// Now the same in optimized wholemodule mode.
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -O -wmo -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -O -wmo -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -DEVOLUTION
+// RUN: %target-build-swift -O -wmo -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5 -DEVOLUTION
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+
+// Test the -enable-implicit-dynamic flag.
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -DMODULENODYNAMIC -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -Xfrontend -enable-implicit-dynamic -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -DEVOLUTION
+// RUN: %target-build-swift -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5 -DEVOLUTION
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+
+// Test the -enable-implicit-dynamic flag in optimized wholemodule mode.
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -O -wmo -DMODULENODYNAMIC -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -Xfrontend -enable-implicit-dynamic -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -O -wmo -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -DEVOLUTION
+// RUN: %target-build-swift -O -wmo -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5 -DEVOLUTION
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+
 
 // REQUIRES: executable_test
 
@@ -82,8 +134,13 @@ func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
   expectTrue(public_global_generic_func(Int.self) ==
              expectedResult(useOrig, "public_global_generic_func"))
 
+  // Designated initializers of resilient classes cannot be
+  // dynamically replaced.
+#if !EVOLUTION
   expectTrue(PublicClass(x: 0).str ==
              expectedResult(useOrig, "public_class_init"))
+#endif
+
   expectTrue(PublicClass().function() ==
              expectedResult(useOrig, "public_class_func"))
   expectTrue(PublicClass().finalFunction() ==
