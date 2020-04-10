@@ -220,6 +220,17 @@ void printDifferentiabilityWitnessDescription(
     llvm::raw_ostream &out, const SILDifferentiabilityWitnessKey key,
     bool addNewline = true);
 
+/// PrettyStackTraceDeclContext - Observe that we are processing a
+/// specific decl context.
+class PrettyStackTraceDeclContext : public llvm::PrettyStackTraceEntry {
+  const DeclContext *DC;
+  const char *Action;
+public:
+  PrettyStackTraceDeclContext(const char *action, const DeclContext *DC)
+    : DC(DC), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
 } // end namespace swift
 
 #endif
