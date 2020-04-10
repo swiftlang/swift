@@ -144,7 +144,7 @@ func implicit_iuo_unwrap(_ value: Int!) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8optional34implicit_iuo_unwrap_sourceLocation{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "custom.swuft"
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "optional/custom.swuft"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 2000

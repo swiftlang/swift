@@ -107,7 +107,7 @@ namespace swift {
 
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
-    bool EnableConcisePoundFile = false;
+    bool EnableConcisePoundFile = true;
 
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;

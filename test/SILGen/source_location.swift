@@ -1,23 +1,29 @@
 
 // RUN: %target-swift-emit-silgen -module-name source_location -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo %s | %FileCheck %s
 
-func printSourceLocation(file: String = #file, line: Int = #line) {}
+func printSourceLocation(file: String = #file, path: String = #filePath, line: Int = #line) {}
 
 #sourceLocation(file: "caller.swift", line: 10000)
 _ = printSourceLocation()
-// CHECK: [[CALLER_FILE_VAL:%.*]] = string_literal utf8 "caller.swift",
+// CHECK: [[CALLER_FILE_VAL:%.*]] = string_literal utf8 "source_location/caller.swift",
 // CHECK: [[CALLER_FILE:%.*]] = apply {{.*}}([[CALLER_FILE_VAL]],
+// CHECK: [[CALLER_FILEPATH_VAL:%.*]] = string_literal utf8 "caller.swift",
+// CHECK: [[CALLER_FILEPATH:%.*]] = apply {{.*}}([[CALLER_FILEPATH_VAL]],
 // CHECK: [[CALLER_LINE_VAL:%.*]] = integer_literal $Builtin.IntLiteral, 10000,
 // CHECK: [[CALLER_LINE:%.*]] = apply {{.*}}([[CALLER_LINE_VAL]],
-// CHECK: [[PRINT_SOURCE_LOCATION:%.*]] = function_ref @$s15source_location19printSourceLocation4file4lineySS_SitF
-// CHECK: apply [[PRINT_SOURCE_LOCATION]]([[CALLER_FILE]], [[CALLER_LINE]])
+// CHECK: [[PRINT_SOURCE_LOCATION:%.*]] = function_ref @$s15source_location19printSourceLocation4file4path4lineySS_SSSitF
+// CHECK: apply [[PRINT_SOURCE_LOCATION]]([[CALLER_FILE]], [[CALLER_FILEPATH]], [[CALLER_LINE]])
 
 #sourceLocation(file: "inplace.swift", line: 20000)
-let FILE = #file, LINE = #line
+let FILE = #file, PATH = #filePath, LINE = #line
 // CHECK: [[FILE_ADDR:%.*]] = global_addr @$s15source_location4FILESSv
-// CHECK: [[INPLACE_FILE_VAL:%.*]] = string_literal utf8 "inplace.swift",
+// CHECK: [[INPLACE_FILE_VAL:%.*]] = string_literal utf8 "source_location/inplace.swift",
 // CHECK: [[INPLACE_FILE:%.*]] = apply {{.*}}([[INPLACE_FILE_VAL]],
 // CHECK: store [[INPLACE_FILE]] to [init] [[FILE_ADDR]]
+// CHECK: [[FILEPATH_ADDR:%.*]] = global_addr @$s15source_location4PATHSSv
+// CHECK: [[INPLACE_FILEPATH_VAL:%.*]] = string_literal utf8 "inplace.swift",
+// CHECK: [[INPLACE_FILEPATH:%.*]] = apply {{.*}}([[INPLACE_FILEPATH_VAL]],
+// CHECK: store [[INPLACE_FILEPATH]] to [init] [[FILEPATH_ADDR]]
 // CHECK: [[LINE_ADDR:%.*]] = global_addr @$s15source_location4LINESiv
 // CHECK: [[INPLACE_LINE_VAL:%.*]] = integer_literal $Builtin.IntLiteral, 20000,
 // CHECK: [[INPLACE_LINE:%.*]] = apply {{.*}}([[INPLACE_LINE_VAL]],

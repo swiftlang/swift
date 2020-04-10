@@ -6,7 +6,7 @@
 // RUN: %target-swift-emit-silgen -disable-concise-pound-file -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,ABSOLUTE %s
 
 // Test default behavior:
-// RUN: %target-swift-emit-silgen -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,ABSOLUTE %s
+// RUN: %target-swift-emit-silgen -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,CONCISE %s
 
 func directUse() {
 // BOTH-LABEL: sil {{.*}} @$s3Foo9directUseyyF
