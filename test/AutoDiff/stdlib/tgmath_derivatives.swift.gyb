@@ -11,7 +11,7 @@
 #error("Unsupported platform")
 #endif
 
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   typealias TestLiteralType = Float80
 #else
   typealias TestLiteralType = Double
