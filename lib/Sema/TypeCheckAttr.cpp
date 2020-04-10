@@ -4142,197 +4142,42 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   auto *derivative = cast<FuncDecl>(D);
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
-  auto originalName = attr->getOriginalFunctionName();
+
+  // Resolve the referenced original function declaration.
+  auto *originalAFD = evaluateOrDefault(
+      Ctx.evaluator, DerivativeAttrOriginalDeclRequest{attr, derivative},
+      nullptr);
+  if (!originalAFD)
+    return true;
 
   auto *derivativeInterfaceType =
       derivative->getInterfaceType()->castTo<AnyFunctionType>();
-
-  // Perform preliminary `@derivative` declaration checks.
-  // The result type should be a two-element tuple.
-  // Either a value and pullback:
-  //     (value: R, pullback: (R.TangentVector) -> (T.TangentVector...)
-  // Or a value and differential:
-  //     (value: R, differential: (T.TangentVector...) -> (R.TangentVector)
-  auto derivativeResultType = derivative->getResultInterfaceType();
+  auto *originalFnType =
+      originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
+  auto derivativeResultType =
+      evaluateOrDefault(Ctx.evaluator, ResultTypeRequest{derivative}, Type());
   auto derivativeResultTupleType = derivativeResultType->getAs<TupleType>();
-  if (!derivativeResultTupleType ||
-      derivativeResultTupleType->getNumElements() != 2) {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_expected_result_tuple);
-    return true;
-  }
+  assert(derivativeResultTupleType->getNumElements() == 2);
   auto valueResultElt = derivativeResultTupleType->getElement(0);
   auto funcResultElt = derivativeResultTupleType->getElement(1);
-  // Get derivative kind and derivative function identifier.
-  AutoDiffDerivativeFunctionKind kind;
+
+  // Resolve the derivative function kind;
+  AutoDiffDerivativeFunctionKind derivativeKind;
   if (valueResultElt.getName().str() != "value") {
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_invalid_result_tuple_value_label);
     return true;
   }
   if (funcResultElt.getName().str() == "differential") {
-    kind = AutoDiffDerivativeFunctionKind::JVP;
+    derivativeKind = AutoDiffDerivativeFunctionKind::JVP;
   } else if (funcResultElt.getName().str() == "pullback") {
-    kind = AutoDiffDerivativeFunctionKind::VJP;
+    derivativeKind = AutoDiffDerivativeFunctionKind::VJP;
   } else {
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_invalid_result_tuple_func_label);
     return true;
   }
-  attr->setDerivativeKind(kind);
-
-  // Compute expected original function type and look up original function.
-  auto *originalFnType =
-      getDerivativeOriginalFunctionType(derivativeInterfaceType);
-
-  // Returns true if the generic parameters in `source` satisfy the generic
-  // requirements in `target`.
-  std::function<bool(GenericSignature, GenericSignature)>
-      checkGenericSignatureSatisfied = [&](GenericSignature source,
-                                           GenericSignature target) {
-        // If target is null, then its requirements are satisfied.
-        if (!target)
-          return true;
-        // If source is null but target is not null, then target's
-        // requirements are not satisfied.
-        if (!source)
-          return false;
-        // Check if target's requirements are satisfied by source.
-        // Cancel diagnostics using `DiagnosticTransaction`.
-        // Diagnostics should not be emitted because this function is used to
-        // check candidates; if no candidates match, a separate diagnostic will
-        // be produced.
-        DiagnosticTransaction transaction(Ctx.Diags);
-        SWIFT_DEFER { transaction.abort(); };
-        return TypeChecker::checkGenericArguments(
-                   derivative, originalName.Loc.getBaseNameLoc(),
-                   originalName.Loc.getBaseNameLoc(), Type(),
-                   source->getGenericParams(), target->getRequirements(),
-                   [](SubstitutableType *dependentType) {
-                     return Type(dependentType);
-                   },
-                   lookupConformance, None) == RequirementCheckResult::Success;
-      };
-
-  auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
-    // TODO(TF-982): Allow derivatives on protocol requirements.
-    if (isa<ProtocolDecl>(originalCandidate->getDeclContext()))
-      return false;
-    return checkFunctionSignature(
-        cast<AnyFunctionType>(originalFnType->getCanonicalType()),
-        originalCandidate->getInterfaceType()->getCanonicalType(),
-        checkGenericSignatureSatisfied);
-  };
-
-  auto noneValidDiagnostic = [&]() {
-    diags.diagnose(originalName.Loc,
-                   diag::autodiff_attr_original_decl_none_valid_found,
-                   originalName.Name, originalFnType);
-  };
-  auto ambiguousDiagnostic = [&]() {
-    diags.diagnose(originalName.Loc, diag::attr_ambiguous_reference_to_decl,
-                   originalName.Name, attr->getAttrName());
-  };
-  auto notFunctionDiagnostic = [&]() {
-    diags.diagnose(originalName.Loc,
-                   diag::autodiff_attr_original_decl_invalid_kind,
-                   originalName.Name);
-  };
-  std::function<void()> invalidTypeContextDiagnostic = [&]() {
-    diags.diagnose(originalName.Loc,
-                   diag::autodiff_attr_original_decl_not_same_type_context,
-                   originalName.Name);
-  };
-
-  // Returns true if the derivative function and original function candidate are
-  // defined in compatible type contexts. If the derivative function and the
-  // original function candidate have different parents, return false.
-  std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
-      [&](AbstractFunctionDecl *func) {
-        // Check if both functions are top-level.
-        if (!derivative->getInnermostTypeContext() &&
-            !func->getInnermostTypeContext())
-          return true;
-        // Check if both functions are defined in the same type context.
-        if (auto typeCtx1 = derivative->getInnermostTypeContext())
-          if (auto typeCtx2 = func->getInnermostTypeContext()) {
-            return typeCtx1->getSelfNominalTypeDecl() ==
-                   typeCtx2->getSelfNominalTypeDecl();
-          }
-        return derivative->getParent() == func->getParent();
-      };
-
-  auto resolution = TypeResolution::forContextual(derivative->getDeclContext());
-  Type baseType;
-  if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
-    TypeResolutionOptions options = None;
-    options |= TypeResolutionFlags::AllowModule;
-    baseType = resolution.resolveType(baseTypeRepr, options);
-  }
-  if (baseType && baseType->hasError())
-    return true;
-  auto lookupOptions = attr->getBaseTypeRepr()
-                           ? defaultMemberLookupOptions
-                           : defaultUnqualifiedLookupOptions;
-  auto derivativeTypeCtx = derivative->getInnermostTypeContext();
-  if (!derivativeTypeCtx)
-    derivativeTypeCtx = derivative->getParent();
-  assert(derivativeTypeCtx);
-
-  // Look up original function.
-  auto *originalAFD = findAbstractFunctionDecl(
-      originalName.Name, originalName.Loc.getBaseNameLoc(), baseType,
-      derivativeTypeCtx, isValidOriginal, noneValidDiagnostic,
-      ambiguousDiagnostic, notFunctionDiagnostic, lookupOptions,
-      hasValidTypeContext, invalidTypeContextDiagnostic);
-  if (!originalAFD)
-    return true;
-  // Diagnose original stored properties. Stored properties cannot have custom
-  // registered derivatives.
-  if (auto *accessorDecl = dyn_cast<AccessorDecl>(originalAFD)) {
-    auto *asd = accessorDecl->getStorage();
-    if (asd->hasStorage()) {
-      diags.diagnose(originalName.Loc,
-                     diag::derivative_attr_original_stored_property_unsupported,
-                     originalName.Name);
-      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here,
-                     asd->getFullName());
-      return true;
-    }
-  }
-  // Diagnose if original function is an invalid class member.
-  bool isOriginalClassMember =
-      originalAFD->getDeclContext() &&
-      originalAFD->getDeclContext()->getSelfClassDecl();
-  if (isOriginalClassMember) {
-    auto *classDecl = originalAFD->getDeclContext()->getSelfClassDecl();
-    assert(classDecl);
-    // Class members returning dynamic `Self` are not supported.
-    // Dynamic `Self` is supported only as a single top-level result for class
-    // members. JVP/VJP functions returning `(Self, ...)` tuples would not
-    // type-check.
-    bool diagnoseDynamicSelfResult = originalAFD->hasDynamicSelfResult();
-    if (diagnoseDynamicSelfResult) {
-      // Diagnose class initializers in non-final classes.
-      if (isa<ConstructorDecl>(originalAFD)) {
-        if (!classDecl->isFinal()) {
-          diags.diagnose(attr->getLocation(),
-                         diag::derivative_attr_nonfinal_class_init_unsupported,
-                         classDecl->getDeclaredInterfaceType());
-          return true;
-        }
-      }
-      // Diagnose all other declarations returning dynamic `Self`.
-      else {
-        diags.diagnose(
-            attr->getLocation(),
-            diag::derivative_attr_class_member_dynamic_self_result_unsupported,
-            DeclNameRef(originalAFD->getFullName()));
-        return true;
-      }
-    }
-  }
-  attr->setOriginalFunction(originalAFD);
+  attr->setDerivativeKind(derivativeKind);
 
   // Get the resolved differentiability parameter indices.
   auto *resolvedDiffParamIndices = attr->getParameterIndices();
@@ -4412,7 +4257,8 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   // Compute expected differential/pullback type.
   Type expectedFuncEltType =
       originalFnType->getAutoDiffDerivativeFunctionLinearMapType(
-          resolvedDiffParamIndices, kind.getLinearMapKind(), lookupConformance,
+          resolvedDiffParamIndices, derivativeKind.getLinearMapKind(),
+          lookupConformance,
           /*makeSelfParamFirst*/ true);
   if (expectedFuncEltType->hasTypeParameter())
     expectedFuncEltType = derivative->mapTypeIntoContext(expectedFuncEltType);
@@ -4445,7 +4291,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Reject duplicate `@derivative` attributes.
   auto &derivativeAttrs = Ctx.DerivativeAttrs[std::make_tuple(
-      originalAFD, resolvedDiffParamIndices, kind)];
+      originalAFD, resolvedDiffParamIndices, derivativeKind)];
   derivativeAttrs.insert(attr);
   if (derivativeAttrs.size() > 1) {
     diags.diagnose(attr->getLocation(),
@@ -4474,19 +4320,195 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     attr->setInvalid();
 }
 
-AbstractFunctionDecl *
-DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
-                                            DerivativeAttr *attr) const {
-  // If the typechecker has resolved the original function, return it.
-  if (auto *FD = attr->OriginalFunction.dyn_cast<AbstractFunctionDecl *>())
-    return FD;
-
-  // If the function can be lazily resolved, do so now.
-  if (auto *Resolver = attr->OriginalFunction.dyn_cast<LazyMemberLoader *>())
+AbstractFunctionDecl *DerivativeAttrOriginalDeclRequest::evaluate(
+    Evaluator &evaluator, DerivativeAttr *attr,
+    AbstractFunctionDecl *derivative) const {
+  // If the referenced function can be lazily resolved, do so now.
+  if (auto *Resolver = attr->Resolver)
     return Resolver->loadReferencedFunctionDecl(attr,
                                                 attr->ResolverContextData);
 
-  return nullptr;
+  // Otherwise, resolve the referenced function via name lookup.
+  auto &ctx = derivative->getASTContext();
+  auto &diags = ctx.Diags;
+  LookUpConformanceInModule lookupConformance(
+      derivative->getDeclContext()->getParentModule());
+  auto originalName = attr->getOriginalFunctionName();
+
+  auto *derivativeInterfaceType =
+      derivative->getInterfaceType()->castTo<AnyFunctionType>();
+
+  // Perform preliminary derivative declaration checks.
+  // The result type should be a two-element tuple.
+  // Either a value and pullback:
+  //     (value: R, pullback: (R.TangentVector) -> (T.TangentVector...)
+  // Or a value and differential:
+  //     (value: R, differential: (T.TangentVector...) -> (R.TangentVector)
+  auto derivativeResultType =
+      evaluateOrDefault(ctx.evaluator, ResultTypeRequest{derivative}, Type());
+  auto derivativeResultTupleType = derivativeResultType->getAs<TupleType>();
+  if (!derivativeResultTupleType ||
+      derivativeResultTupleType->getNumElements() != 2) {
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_expected_result_tuple);
+    return nullptr;
+  }
+
+  // Compute expected original function type from derivative function type.
+  auto *originalFnType =
+      getDerivativeOriginalFunctionType(derivativeInterfaceType);
+
+  // Returns true if the generic parameters in `source` satisfy the generic
+  // requirements in `target`.
+  std::function<bool(GenericSignature, GenericSignature)>
+      checkGenericSignatureSatisfied = [&](GenericSignature source,
+                                           GenericSignature target) {
+        // If target is null, then its requirements are satisfied.
+        if (!target)
+          return true;
+        // If source is null but target is not null, then target's
+        // requirements are not satisfied.
+        if (!source)
+          return false;
+        // Check if target's requirements are satisfied by source.
+        // Cancel diagnostics using `DiagnosticTransaction`.
+        // Diagnostics should not be emitted because this function is used to
+        // check candidates; if no candidates match, a separate diagnostic will
+        // be produced.
+        DiagnosticTransaction transaction(diags);
+        SWIFT_DEFER { transaction.abort(); };
+        return TypeChecker::checkGenericArguments(
+                   derivative, originalName.Loc.getBaseNameLoc(),
+                   originalName.Loc.getBaseNameLoc(), Type(),
+                   source->getGenericParams(), target->getRequirements(),
+                   [](SubstitutableType *dependentType) {
+                     return Type(dependentType);
+                   },
+                   lookupConformance, None) == RequirementCheckResult::Success;
+      };
+
+  auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
+    // TODO(TF-982): Allow derivatives on protocol requirements.
+    if (isa<ProtocolDecl>(originalCandidate->getDeclContext()))
+      return false;
+    return checkFunctionSignature(
+        cast<AnyFunctionType>(originalFnType->getCanonicalType()),
+        originalCandidate->getInterfaceType()->getCanonicalType(),
+        checkGenericSignatureSatisfied);
+  };
+
+  auto noneValidDiagnostic = [&]() {
+    diags.diagnose(originalName.Loc,
+                   diag::autodiff_attr_original_decl_none_valid_found,
+                   originalName.Name, originalFnType);
+  };
+  auto ambiguousDiagnostic = [&]() {
+    diags.diagnose(originalName.Loc, diag::attr_ambiguous_reference_to_decl,
+                   originalName.Name, attr->getAttrName());
+  };
+  auto notFunctionDiagnostic = [&]() {
+    diags.diagnose(originalName.Loc,
+                   diag::autodiff_attr_original_decl_invalid_kind,
+                   originalName.Name);
+  };
+  std::function<void()> invalidTypeContextDiagnostic = [&]() {
+    diags.diagnose(originalName.Loc,
+                   diag::autodiff_attr_original_decl_not_same_type_context,
+                   originalName.Name);
+  };
+
+  // Returns true if the derivative function and original function candidate are
+  // defined in compatible type contexts. If the derivative function and the
+  // original function candidate have different parents, return false.
+  std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
+      [&](AbstractFunctionDecl *func) {
+        // Check if both functions are top-level.
+        if (!derivative->getInnermostTypeContext() &&
+            !func->getInnermostTypeContext())
+          return true;
+        // Check if both functions are defined in the same type context.
+        if (auto typeCtx1 = derivative->getInnermostTypeContext())
+          if (auto typeCtx2 = func->getInnermostTypeContext()) {
+            return typeCtx1->getSelfNominalTypeDecl() ==
+                   typeCtx2->getSelfNominalTypeDecl();
+          }
+        return derivative->getParent() == func->getParent();
+      };
+
+  auto resolution = TypeResolution::forContextual(derivative->getDeclContext());
+  Type baseType;
+  if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
+    TypeResolutionOptions options = None;
+    options |= TypeResolutionFlags::AllowModule;
+    baseType = resolution.resolveType(baseTypeRepr, options);
+  }
+  if (baseType && baseType->hasError())
+    return nullptr;
+  auto lookupOptions = attr->getBaseTypeRepr()
+                           ? defaultMemberLookupOptions
+                           : defaultUnqualifiedLookupOptions;
+  auto derivativeTypeCtx = derivative->getInnermostTypeContext();
+  if (!derivativeTypeCtx)
+    derivativeTypeCtx = derivative->getParent();
+  assert(derivativeTypeCtx);
+
+  // Look up original function.
+  auto *originalAFD = findAbstractFunctionDecl(
+      originalName.Name, originalName.Loc.getBaseNameLoc(), baseType,
+      derivativeTypeCtx, isValidOriginal, noneValidDiagnostic,
+      ambiguousDiagnostic, notFunctionDiagnostic, lookupOptions,
+      hasValidTypeContext, invalidTypeContextDiagnostic);
+  if (!originalAFD)
+    return nullptr;
+
+  // Diagnose original stored properties. Stored properties cannot have custom
+  // registered derivatives.
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(originalAFD)) {
+    auto *asd = accessorDecl->getStorage();
+    if (asd->hasStorage()) {
+      diags.diagnose(originalName.Loc,
+                     diag::derivative_attr_original_stored_property_unsupported,
+                     originalName.Name);
+      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here,
+                     asd->getFullName());
+      return nullptr;
+    }
+  }
+
+  // Diagnose if original function is an invalid class member.
+  bool isOriginalClassMember =
+      originalAFD->getDeclContext() &&
+      originalAFD->getDeclContext()->getSelfClassDecl();
+  if (isOriginalClassMember) {
+    auto *classDecl = originalAFD->getDeclContext()->getSelfClassDecl();
+    assert(classDecl);
+    // Class members returning dynamic `Self` are not supported.
+    // Dynamic `Self` is supported only as a single top-level result for class
+    // members. JVP/VJP functions returning `(Self, ...)` tuples would not
+    // type-check.
+    bool diagnoseDynamicSelfResult = originalAFD->hasDynamicSelfResult();
+    if (diagnoseDynamicSelfResult) {
+      // Diagnose class initializers in non-final classes.
+      if (isa<ConstructorDecl>(originalAFD)) {
+        if (!classDecl->isFinal()) {
+          diags.diagnose(attr->getLocation(),
+                         diag::derivative_attr_nonfinal_class_init_unsupported,
+                         classDecl->getDeclaredInterfaceType());
+          return nullptr;
+        }
+      }
+      // Diagnose all other declarations returning dynamic `Self`.
+      else {
+        diags.diagnose(
+            attr->getLocation(),
+            diag::derivative_attr_class_member_dynamic_self_result_unsupported,
+            DeclNameRef(originalAFD->getFullName()));
+        return nullptr;
+      }
+    }
+  }
+
+  return originalAFD;
 }
 
 // Computes the linearity parameter indices from the given parsed linearity
@@ -4654,8 +4676,8 @@ doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
 
 void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto *transpose = cast<FuncDecl>(D);
-  auto lookupConformance =
-      LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+  LookUpConformanceInModule lookupConformance(
+      D->getDeclContext()->getParentModule());
   auto originalName = attr->getOriginalFunctionName();
   auto *transposeInterfaceType =
       transpose->getInterfaceType()->castTo<AnyFunctionType>();

@@ -4390,10 +4390,9 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
           parametersBitVector[i] = parameters[i];
         auto *indices = IndexSubset::get(ctx, parametersBitVector);
 
-        auto *derivativeAttr =
-            DerivativeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
-                                   /*baseType*/ nullptr, origName, indices);
-        derivativeAttr->setOriginalFunctionResolver(&MF, origDeclId);
+        auto *derivativeAttr = DerivativeAttr::create(
+            ctx, isImplicit, SourceLoc(), SourceRange(),
+            /*baseType*/ nullptr, origName, indices, &MF, origDeclId);
         derivativeAttr->setDerivativeKind(*derivativeKind);
         Attr = derivativeAttr;
         break;

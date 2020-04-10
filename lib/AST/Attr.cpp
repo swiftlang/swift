@@ -1725,9 +1725,12 @@ DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
                                SourceRange baseRange, TypeRepr *baseTypeRepr,
                                DeclNameRefWithLoc originalName,
-                               IndexSubset *parameterIndices)
+                               IndexSubset *parameterIndices,
+                               LazyMemberLoader *resolver,
+                               uint64_t resolverContextData)
     : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
+      Resolver(resolver), ResolverContextData(resolverContextData),
       ParameterIndices(parameterIndices) {}
 
 DerivativeAttr *
@@ -1745,30 +1748,23 @@ DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        TypeRepr *baseTypeRepr,
                                        DeclNameRefWithLoc originalName,
-                                       IndexSubset *parameterIndices) {
+                                       IndexSubset *parameterIndices,
+                                       LazyMemberLoader *resolver,
+                                       uint64_t resolverContextData) {
   void *mem = context.Allocate(sizeof(DerivativeAttr), alignof(DerivativeAttr));
   return new (mem) DerivativeAttr(implicit, atLoc, baseRange, baseTypeRepr,
-                                  std::move(originalName), parameterIndices);
+                                  std::move(originalName), parameterIndices,
+                                  resolver, resolverContextData);
 }
 
-AbstractFunctionDecl *
-DerivativeAttr::getOriginalFunction(ASTContext &context) const {
-  return evaluateOrDefault(
-      context.evaluator,
-      DerivativeAttrOriginalDeclRequest{const_cast<DerivativeAttr *>(this)},
-      nullptr);
-}
-
-void DerivativeAttr::setOriginalFunction(AbstractFunctionDecl *decl) {
-  assert(!OriginalFunction && "cannot overwrite original function");
-  OriginalFunction = decl;
-}
-
-void DerivativeAttr::setOriginalFunctionResolver(
-    LazyMemberLoader *resolver, uint64_t resolverContextData) {
-  assert(!OriginalFunction && "cannot overwrite original function");
-  OriginalFunction = resolver;
-  ResolverContextData = resolverContextData;
+AbstractFunctionDecl *DerivativeAttr::getOriginalFunction(
+    const AbstractFunctionDecl *derivative) const {
+  auto &ctx = derivative->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           DerivativeAttrOriginalDeclRequest{
+                               const_cast<DerivativeAttr *>(this),
+                               const_cast<AbstractFunctionDecl *>(derivative)},
+                           nullptr);
 }
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,

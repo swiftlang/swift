@@ -1874,23 +1874,10 @@ class DerivativeAttr final
   TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameRefWithLoc OriginalFunctionName;
-  /// The original function.
-  ///
-  /// The states are:
-  /// - nullptr:
-  ///   The original function is unknown. The typechecker is responsible for
-  ///   eventually resolving it.
-  /// - AbstractFunctionDecl:
-  ///   The original function is known to be this `AbstractFunctionDecl`.
-  /// - LazyMemberLoader:
-  ///   This `LazyMemberLoader` knows how to resolve the original function.
-  ///   `ResolverContextData` is an additional piece of data that the
-  ///   `LazyMemberLoader` needs.
-  // TODO(TF-1235): Making `DerivativeAttr` immutable will simplify this by
-  // removing the `AbstractFunctionDecl` state.
-  llvm::PointerUnion<AbstractFunctionDecl *, LazyMemberLoader *> OriginalFunction;
-  /// Data representing the original function declaration. See doc comment for
-  /// `OriginalFunction`.
+  /// Auxiliary lazy member loader, used to resolve the original function
+  /// declaration.
+  LazyMemberLoader *Resolver = nullptr;
+  /// Data representing the original function declaration.
   uint64_t ResolverContextData = 0;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
@@ -1905,7 +1892,8 @@ class DerivativeAttr final
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
                           TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
-                          IndexSubset *parameterIndices);
+                          IndexSubset *parameterIndices,
+                          LazyMemberLoader *resolver, uint64_t data);
 
 public:
   static DerivativeAttr *create(ASTContext &context, bool implicit,
@@ -1918,17 +1906,20 @@ public:
                                 SourceLoc atLoc, SourceRange baseRange,
                                 TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
-                                IndexSubset *parameterIndices);
+                                IndexSubset *parameterIndices,
+                                LazyMemberLoader *resolver, uint64_t data);
 
   TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }
-  AbstractFunctionDecl *getOriginalFunction(ASTContext &context) const;
-  void setOriginalFunction(AbstractFunctionDecl *decl);
-  void setOriginalFunctionResolver(LazyMemberLoader *resolver,
-                                   uint64_t resolverContextData);
 
+  /// Retrieves the referenced original function declaration. Returns \c nullptr
+  /// and emits diagnostics on error.
+  AbstractFunctionDecl *
+  getOriginalFunction(const AbstractFunctionDecl *derivative) const;
+
+  /// Returns the derivative function kind.
   AutoDiffDerivativeFunctionKind getDerivativeKind() const {
     assert(Kind && "Derivative function kind has not yet been resolved");
     return *Kind;
