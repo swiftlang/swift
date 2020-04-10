@@ -864,12 +864,17 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
   return true;
 }
 
-bool MissingForcedDowncastFailure::diagnoseAsError() {
-  auto *expr = getAnchor();
-  if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
-    expr = assignExpr->getSrc();
+Expr *MissingForcedDowncastFailure::getAnchor() const {
+  auto *expr = FailureDiagnostic::getAnchor();
 
-  auto *coerceExpr = cast<CoerceExpr>(expr);
+  if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
+    return assignExpr->getSrc();
+
+  return expr;
+}
+
+bool MissingForcedDowncastFailure::diagnoseAsError() {
+  auto *coerceExpr = cast<CoerceExpr>(getAnchor());
 
   auto fromType = getFromType();
   auto toType = getToType();
@@ -897,13 +902,21 @@ bool MissingAddressOfFailure::diagnoseAsError() {
   return true;
 }
 
+Expr *MissingExplicitConversionFailure::getAnchor() const {
+  auto *anchor = FailureDiagnostic::getAnchor();
+
+  if (auto *assign = dyn_cast<AssignExpr>(anchor))
+    return assign->getSrc();
+
+  if (auto *paren = dyn_cast<ParenExpr>(anchor))
+    return paren->getSubExpr();
+
+  return anchor;
+}
+
 bool MissingExplicitConversionFailure::diagnoseAsError() {
   auto *DC = getDC();
   auto *anchor = getAnchor();
-  if (auto *assign = dyn_cast<AssignExpr>(anchor))
-    anchor = assign->getSrc();
-  if (auto *paren = dyn_cast<ParenExpr>(anchor))
-    anchor = paren->getSubExpr();
 
   auto fromType = getFromType();
   auto toType = getToType();
@@ -915,9 +928,9 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (!useAs && !TypeChecker::checkedCastMaySucceed(fromType, toType, DC))
     return false;
 
-  auto *expr = findParentExpr(getAnchor());
+  auto *expr = findParentExpr(anchor);
   if (!expr)
-    expr = getAnchor();
+    expr = anchor;
 
   // If we're performing pattern matching,
   // "as" means something completely different...
@@ -3027,12 +3040,16 @@ bool NonOptionalUnwrapFailure::diagnoseAsError() {
   return true;
 }
 
+Expr *MissingCallFailure::getAnchor() const {
+  auto *anchor = FailureDiagnostic::getAnchor();
+  if (auto *FVE = dyn_cast<ForceValueExpr>(anchor))
+    return FVE->getSubExpr();
+  return anchor;
+}
+
 bool MissingCallFailure::diagnoseAsError() {
   auto *baseExpr = getAnchor();
   SourceLoc insertLoc = baseExpr->getEndLoc();
-
-  if (auto *FVE = dyn_cast<ForceValueExpr>(baseExpr))
-    baseExpr = FVE->getSubExpr();
 
   // Calls are not yet supported by key path, but it
   // is useful to record this fix to diagnose chaining
@@ -3811,6 +3828,13 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
   return true;
 }
 
+Expr *MissingArgumentsFailure::getAnchor() const {
+  auto *anchor = FailureDiagnostic::getAnchor();
+  if (auto *captureList = dyn_cast<CaptureListExpr>(anchor))
+    return captureList->getClosureBody();
+  return anchor;
+}
+
 bool MissingArgumentsFailure::diagnoseAsError() {
   auto *locator = getLocator();
 
@@ -3827,8 +3851,6 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     return false;
 
   auto *anchor = getAnchor();
-  if (auto *captureList = dyn_cast<CaptureListExpr>(anchor))
-    anchor = captureList->getClosureBody();
 
   if (auto *closure = dyn_cast<ClosureExpr>(anchor))
     return diagnoseClosure(closure);

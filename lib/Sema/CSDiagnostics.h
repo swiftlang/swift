@@ -81,7 +81,7 @@ public:
 
   Expr *getRawAnchor() const { return RawAnchor; }
 
-  Expr *getAnchor() const { return Anchor; }
+  virtual Expr *getAnchor() const { return Anchor; }
 
   ConstraintLocator *getLocator() const { return Locator; }
 
@@ -779,6 +779,8 @@ public:
                                    Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
 
+  Expr *getAnchor() const override;
+
   bool diagnoseAsError() override;
 
 private:
@@ -935,6 +937,8 @@ class MissingCallFailure final : public FailureDiagnostic {
 public:
   MissingCallFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
+
+  Expr *getAnchor() const override;
 
   bool diagnoseAsError() override;
 };
@@ -1213,6 +1217,8 @@ public:
         SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {
     assert(!SynthesizedArgs.empty() && "No missing arguments?!");
   }
+
+  Expr *getAnchor() const override;
 
   bool diagnoseAsError() override;
 
@@ -1829,6 +1835,8 @@ public:
   MissingForcedDowncastFailure(const Solution &solution, Type fromType,
                                Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
+
+  Expr *getAnchor() const override;
 
   bool diagnoseAsError() override;
 };
