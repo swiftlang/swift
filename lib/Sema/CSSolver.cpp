@@ -1424,7 +1424,7 @@ ConstraintSystem::filterDisjunction(
 
     if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+      log.indent(solverState ? solverState->depth * 2 : 0)
         << "(disabled disjunction term ";
       constraint->print(log, &ctx.SourceMgr);
       log << ")\n";
@@ -1485,7 +1485,7 @@ ConstraintSystem::filterDisjunction(
 
     if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+      log.indent(solverState ? solverState->depth * 2 : 0)
         << "(introducing single enabled disjunction term ";
       choice->print(log, &ctx.SourceMgr);
       log << ")\n";

@@ -8049,7 +8049,7 @@ retry_after_fail:
     ASTContext &ctx = getASTContext();
     if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+      log.indent(solverState ? solverState->depth * 2 : 0)
         << "(common result type for $T" << fnTypeVar->getID() << " is "
         << commonResultType.getString()
         << ")\n";
@@ -9191,7 +9191,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   auto &ctx = getASTContext();
   if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
-    log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+    log.indent(solverState ? solverState->depth * 2 : 0)
       << "(attempting fix ";
     fix->print(log);
     log << ")\n";
