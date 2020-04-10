@@ -3875,7 +3875,7 @@ public:
     addFromProto("#file", CodeCompletionKeywordKind::pound_file,
                  CodeCompletionLiteralKind::StringLiteral, "String");
     if (Ctx.LangOpts.EnableConcisePoundFile) {
-      addFromProto("#filePath", CodeCompletionKeywordKind::pound_file,
+      addFromProto("#filePath", CodeCompletionKeywordKind::pound_filePath,
                    CodeCompletionLiteralKind::StringLiteral, "String");
     }
     addFromProto("#line", CodeCompletionKeywordKind::pound_line,
