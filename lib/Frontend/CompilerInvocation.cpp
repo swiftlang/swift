@@ -542,7 +542,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         generateOptimizationRemarkRegex(Diags, Args, A);
 
   Opts.EnableConcisePoundFile =
-      Args.hasArg(OPT_enable_experimental_concise_pound_file);
+      Args.hasFlag(OPT_enable_concise_pound_file,
+                   OPT_disable_concise_pound_file,
+                   Opts.EnableConcisePoundFile);
 
   Opts.EnableCrossImportOverlays =
       Args.hasFlag(OPT_enable_cross_import_overlays,

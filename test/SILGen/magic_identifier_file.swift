@@ -1,8 +1,12 @@
-// RUN: %target-swift-emit-silgen -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,ABSOLUTE %s
-// RUN: %target-swift-emit-silgen -enable-experimental-concise-pound-file -DNEEDS_CONCISE -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,CONCISE %s
+// Test with concise #file explicitly enabled:
+// RUN: %target-swift-emit-silgen -enable-concise-pound-file -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,CONCISE %s
+// RUN: %target-swift-emit-silgen -enable-experimental-concise-pound-file -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,CONCISE %s
 
-// FIXME: Once this feature becomes non-experimental, we should update existing
-// tests and delete this file.
+// Test with concise #file explicitly disabled:
+// RUN: %target-swift-emit-silgen -disable-concise-pound-file -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,ABSOLUTE %s
+
+// Test default behavior:
+// RUN: %target-swift-emit-silgen -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,ABSOLUTE %s
 
 func directUse() {
 // BOTH-LABEL: sil {{.*}} @$s3Foo9directUseyyF

@@ -135,6 +135,19 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
+def enable_concise_pound_file :
+  Flag<["-"], "enable-concise-pound-file">, Flags<[FrontendOption]>,
+  HelpText<"Use concise (module and file) '#file' strings (default)">;
+
+def disable_concise_pound_file :
+  Flag<["-"], "disable-concise-pound-file">, Flags<[FrontendOption]>,
+  HelpText<"Use legacy (full path) '#file' strings">;
+
+def enable_experimental_concise_pound_file : Flag<["-"],
+    "enable-experimental-concise-pound-file">,
+  Flags<[FrontendOption]>,
+  Alias<enable_concise_pound_file>;
+
 def enable_fine_grained_dependencies :
 Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Be more selective about incremental recompilation">;
@@ -513,11 +526,6 @@ def enable_experimental_additive_arithmetic_derivation :
   Flag<["-"], "enable-experimental-additive-arithmetic-derivation">,
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental 'AdditiveArithmetic' derived conformances">;
-
-def enable_experimental_concise_pound_file : Flag<["-"],
-    "enable-experimental-concise-pound-file">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable experimental concise '#file' identifier">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
