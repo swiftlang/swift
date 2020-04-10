@@ -5811,31 +5811,6 @@ In raw SIL, the ``with_derivative`` clause is optional. In canonical SIL, the
 ``with_derivative`` clause is mandatory.
 
 
-differentiable_function_extract
-```````````````````````````````
-::
-
-  sil-instruction ::= 'differentiable_function_extract'
-                      '[' sil-differentiable-function-extractee ']'
-                      sil-value ':' sil-type
-                      ('as' sil-type)?
-
-  sil-differentiable-function-extractee ::= 'original' | 'jvp' | 'vjp'
-
-  differentiable_function_extract [original] %0 : $@differentiable (T) -> T
-  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
-  differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
-  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T \
-    as $(@in_constant T) -> (T, (T.TangentVector) -> T.TangentVector)
-
-Extracts the original function or a derivative function from the given
-``@differentiable`` function. The extractee is one of the following:
-``[original]``, ``[jvp]``, or ``[vjp]``.
-
-In lowered SIL, an explicit extractee type may be provided. This is currently
-used by the LoadableByAddress transformation, which rewrites function types.
-
-
 linear_function
 ```````````````
 ::
@@ -5865,6 +5840,31 @@ the instruction.
 
 In raw SIL, the ``with_transpose`` clause is optional. In canonical SIL,
 the ``with_transpose`` clause is mandatory.
+
+
+differentiable_function_extract
+```````````````````````````````
+::
+
+  sil-instruction ::= 'differentiable_function_extract'
+                      '[' sil-differentiable-function-extractee ']'
+                      sil-value ':' sil-type
+                      ('as' sil-type)?
+
+  sil-differentiable-function-extractee ::= 'original' | 'jvp' | 'vjp'
+
+  differentiable_function_extract [original] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T \
+    as $(@in_constant T) -> (T, (T.TangentVector) -> T.TangentVector)
+
+Extracts the original function or a derivative function from the given
+``@differentiable`` function. The extractee is one of the following:
+``[original]``, ``[jvp]``, or ``[vjp]``.
+
+In lowered SIL, an explicit extractee type may be provided. This is currently
+used by the LoadableByAddress transformation, which rewrites function types.
 
 
 linear_function_extract

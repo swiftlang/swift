@@ -15,9 +15,6 @@
 #include "Linker.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/ASTMangler.h"
-// SWIFT_ENABLE_TENSORFLOW_END
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"

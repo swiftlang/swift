@@ -202,10 +202,8 @@ void SerializedSILLoader::getAllProperties() {
     Des->getAllProperties();
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Deserialize all DifferentiabilityWitnesses in all SILModules.
 void SerializedSILLoader::getAllDifferentiabilityWitnesses() {
   for (auto &Des : LoadedSILSections)
     Des->getAllDifferentiabilityWitnesses();
 }
-// SWIFT_ENABLE_TENSORFLOW END

@@ -415,10 +415,6 @@ public:
 
   void eraseInstructions();
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Get estimated code size, for debugging only.
-  unsigned codeSize() const { return InstList.size(); }
-
 private:
   friend class SILArgument;
 

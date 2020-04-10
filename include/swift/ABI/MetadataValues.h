@@ -841,7 +841,7 @@ public:
     return TargetFunctionTypeFlags<int_type>((Data & ~EscapingMask) |
                                              (isEscaping ? EscapingMask : 0));
   }
-  
+
   unsigned getNumParameters() const { return Data & NumParametersMask; }
 
   FunctionMetadataConvention getConvention() const {

@@ -103,4 +103,3 @@ public:
 } // end namespace swift
 
 #endif
-
