@@ -31,8 +31,6 @@
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/AutoDiff.h"
 
 namespace llvm {
   struct fltSemantics;

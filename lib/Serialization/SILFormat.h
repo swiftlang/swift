@@ -293,8 +293,6 @@ namespace sil_block {
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize attributes
-                     // SWIFT_ENABLE_TENSORFLOW
-                     // followed by reverse differentiable attributes
                      // followed by generic param list, if any
                      >;
 
@@ -377,39 +375,6 @@ namespace sil_block {
     ValueIDField,         // callee value
     BCArray<ValueIDField> // a list of arguments
   >;
-
-  // SWIFT_ENABLE_TENSORFLOW
-  using SILInstDifferentiableFunctionLayout = BCRecordLayout<
-    SIL_INST_DIFFERENTIABLE_FUNCTION,
-    BCVBR<8>,             // number of function parameters
-    BCFixed<1>,           // has derivative functions?
-    BCArray<ValueIDField> // parameter indices and operands
-  >;
-
-  using SILInstLinearFunctionLayout = BCRecordLayout<
-    SIL_INST_LINEAR_FUNCTION,
-    BCVBR<8>,             // number of function parameters
-    BCFixed<1>,           // has transpose function?
-    BCArray<ValueIDField> // parameter indices and operands
-  >;
-
-  using SILInstDifferentiableFunctionExtractLayout = BCRecordLayout<
-    SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
-    TypeIDField,
-    SILTypeCategoryField,
-    ValueIDField,
-    BCFixed<2>, // extractee
-    BCFixed<1>  // has explicit extractee type?
-  >;
-
-  using SILInstLinearFunctionExtractLayout = BCRecordLayout<
-    SIL_INST_LINEAR_FUNCTION_EXTRACT,
-    TypeIDField,
-    SILTypeCategoryField,
-    ValueIDField,
-    BCFixed<1> // extractee
-  >;
-  // SWIFT_ENABLE_TENSORFLOW END
 
   // SIL instructions with one type. (alloc_stack)
   using SILOneTypeLayout = BCRecordLayout<

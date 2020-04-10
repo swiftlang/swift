@@ -13,8 +13,6 @@
 // This file defines types for representing the abstract layout of a
 // protocol.
 //
-// SWIFT_ENABLE_TENSORFLOW (this whole file has been significantly modified)
-//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_IRGEN_PROTOCOLINFO_H

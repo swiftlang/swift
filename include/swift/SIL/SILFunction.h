@@ -542,7 +542,7 @@ public:
   }
 
   /// Returns true if the function has parameters that are consumed by the
-  /// callee.
+  // callee.
   bool hasOwnedParameters() const {
     for (auto &ParamInfo : getLoweredFunctionType()->getParameters()) {
       if (ParamInfo.isConsumed())
@@ -712,6 +712,7 @@ public:
   void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
 
   void addSpecializeAttr(SILSpecializeAttr *Attr);
+
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is
   /// not set for this specific function.
@@ -1099,9 +1100,6 @@ public:
   /// Like ViewCFG, but the graph does not show the contents of basic blocks.
   void viewCFGOnly() const;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Get estimated code size, for debugging only.
-  unsigned codeSize() const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

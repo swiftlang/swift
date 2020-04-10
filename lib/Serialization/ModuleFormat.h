@@ -266,6 +266,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
+  
   FirstSIL = 8,
   Method = FirstSIL,
   ObjCMethod,
@@ -935,6 +936,7 @@ namespace decls_block {
     BCFixed<1>,  // noescape?
     BCFixed<1>,   // throws?
     DifferentiabilityKindField // differentiability kind
+
     // trailed by parameters
   >;
 
@@ -1863,6 +1865,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     TypeIDField // type referenced by this custom attribute
   >;
+
 }
 
 /// Returns the encoding kind for the given decl.

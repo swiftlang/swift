@@ -5441,7 +5441,6 @@ public:
     };
 
     // Bounds check.  FIXME: overflow
-    // SWIFT_ENABLE_TENSORFLOW
     unsigned entriesPerParam =
         diffKind != DifferentiabilityKind::NonDifferentiable ? 3 : 2;
     if (entriesPerParam * numParams + 2 * numResults +

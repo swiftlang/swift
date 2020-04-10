@@ -90,13 +90,6 @@ class ModuleType;
 class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
-// SWIFT_ENABLE_TENSORFLOW
-struct SILAutoDiffConfig;
-
-namespace Lowering {
-class TypeConverter;
-} // namespace Lowering
-// SWIFT_ENABLE_TENSORFLOW END
 
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -296,7 +289,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   TypeBase(const TypeBase&) = delete;
   void operator=(const TypeBase&) = delete;
   
-  /// This union contains the ASTContext for canonical types, and is
+  /// This union contains to the ASTContext for canonical types, and is
   /// otherwise lazily populated by ASTContext when the canonical form of a
   /// non-canonical type is requested. The disposition of the union is stored
   /// outside of the union for performance. See Bits.TypeBase.IsCanonical.
@@ -1868,7 +1861,6 @@ public:
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
-  // SWIFT_ENABLE_TENSORFLOW
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ValueOwnership ownership,
                     bool isNoDerivative);
@@ -1913,8 +1905,8 @@ public:
 
   ParameterTypeFlags withAutoClosure(bool isAutoClosure) const {
     return ParameterTypeFlags(isAutoClosure
-                              ? value | ParameterTypeFlags::AutoClosure
-                              : value - ParameterTypeFlags::AutoClosure);
+                                  ? value | ParameterTypeFlags::AutoClosure
+                                  : value - ParameterTypeFlags::AutoClosure);
   }
 
   ParameterTypeFlags withNonEphemeral(bool isNonEphemeral) const {
@@ -2706,7 +2698,7 @@ enum class FunctionTypeRepresentation : uint8_t {
   /// A C function pointer, which is thin and also uses the C calling
   /// convention.
   CFunctionPointer,
-
+  
   /// The value of the greatest AST function representation.
   Last = CFunctionPointer,
 };
@@ -2733,7 +2725,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   /// A C function pointer, which is thin and also uses the C calling
   /// convention.
   CFunctionPointer = uint8_t(FunctionTypeRepresentation::CFunctionPointer),
-
+  
   /// The value of the greatest AST function representation.
   LastAST = CFunctionPointer,
 
@@ -2969,15 +2961,12 @@ public:
     //   |    0 .. 3    |    4   |   5  |      6 .. 7     |
     //
     enum : unsigned {
-      RepresentationMask           = 0xF << 0,
-      NoEscapeMask                 = 1 << 4,
-      ThrowsMask                   = 1 << 5,
-      DifferentiabilityMaskOffset  = 6,
-      DifferentiabilityMask        = 0x3 << DifferentiabilityMaskOffset,
-      // SWIFT_ENABLE_TENSORFLOW
-      NumDifferentiabilityMaskBits = 2,
-      // SWIFT_ENABLE_TENSORFLOW END
-      NumMaskBits                  = 8
+      RepresentationMask          = 0xF << 0,
+      NoEscapeMask                = 1 << 4,
+      ThrowsMask                  = 1 << 5,
+      DifferentiabilityMaskOffset = 6,
+      DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
+      NumMaskBits                 = 8
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -4172,11 +4161,9 @@ public:
       NoEscapeMask       = 1 << 5,
       DifferentiabilityMaskOffset = 6,
       DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
-      // SWIFT_ENABLE_TENSORFLOW
-      NumDifferentiabilityMaskBits = 2,
-      // SWIFT_ENABLE_TENSORFLOW END
       NumMaskBits                 = 8
     };
+
     unsigned Bits; // Naturally sized for speed.
 
     class Uncommon {
@@ -4693,6 +4680,20 @@ public:
 
   CanType getSelfInstanceType(SILModule &M) const;
 
+  /// If this is a @convention(witness_method) function with a class
+  /// constrained self parameter, return the class constraint for the
+  /// Self type.
+  ClassDecl *getWitnessMethodClass(SILModule &M) const;
+
+  /// If this is a @convention(witness_method) function, return the conformance
+  /// for which the method is a witness. If it isn't that convention, return
+  /// an invalid conformance.
+  ProtocolConformanceRef getWitnessMethodConformanceOrInvalid() const {
+    return WitnessMethodConformance;
+  }
+
+  const clang::FunctionType *getClangFunctionType() const;
+
   /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
   /// function type, returns an `IndexSubset` corresponding to the
   /// differentiability/linearity parameters (e.g. all parameters except the
@@ -4837,20 +4838,6 @@ public:
       LookupConformanceFn lookupConformance,
       CanGenericSignature transposeFunctionGenericSignature = nullptr);
 
-  /// If this is a @convention(witness_method) function with a class
-  /// constrained self parameter, return the class constraint for the
-  /// Self type.
-  ClassDecl *getWitnessMethodClass(SILModule &M) const;
-
-  /// If this is a @convention(witness_method) function, return the conformance
-  /// for which the method is a witness. If it isn't that convention, return
-  /// an invalid conformance.
-  ProtocolConformanceRef getWitnessMethodConformanceOrInvalid() const {
-    return WitnessMethodConformance;
-  }
-
-  const clang::FunctionType *getClangFunctionType() const;
-
   ExtInfo getExtInfo() const {
     return ExtInfo(Bits.SILFunctionType.ExtInfoBits, getClangFunctionType());
   }
@@ -4884,7 +4871,6 @@ public:
   }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
-
   DifferentiabilityKind getDifferentiabilityKind() const {
     return getExtInfo().getDifferentiabilityKind();
   }

@@ -436,8 +436,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
-      (unsigned)numSpecAttrs,
-      (unsigned)F.hasOwnership(),
+      (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
       (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(),
@@ -2323,7 +2322,7 @@ void SILSerializer::writeIndexTables() {
     Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
                 PropertyOffset);
   }
-
+  
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
