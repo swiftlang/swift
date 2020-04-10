@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name specialize_inherited_multifile -primary-file %s %S/Inputs/specialize_inherited_multifile.swift -O -emit-sil -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -module-name specialize_inherited_multifile -primary-file %s %S/Inputs/specialize_inherited_multifile_other.swift -O -emit-sil -sil-verify-all | %FileCheck %s
 
 @_optimize(none) func takesBase<T : Base>(t: T) {}
 

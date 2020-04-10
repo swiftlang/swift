@@ -2363,7 +2363,14 @@ resolveMagicNameConflicts(const ModuleDecl *module, StringRef fileString,
 
     // Don't diagnose #sourceLocations that match the physical file.
     if (pathPair.second.physicalFileLoc.isValid()) {
-      assert(isWinner && "physical files should always win; duplicate name?");
+      if (!isWinner) {
+        // The driver is responsible for diagnosing this, but naughty people who
+        // have directly invoked the frontend could make it happen here instead.
+        StringRef filename = llvm::sys::path::filename(winner);
+        diags.diagnose(SourceLoc(), diag::error_two_files_same_name,
+                       filename, winner, pathPair.first());
+        diags.diagnose(SourceLoc(), diag::note_explain_two_files_same_name);
+      }
       continue;
     }
 

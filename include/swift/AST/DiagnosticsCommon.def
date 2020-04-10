@@ -147,6 +147,14 @@ WARNING(pound_source_location_creates_pound_file_conflicts,none,
 NOTE(fixit_correct_source_location_file,none,
      "change file in '#sourceLocation' to '%0'", (StringRef))
 
+// Usually, but not always, emitted from the driver
+ERROR(error_two_files_same_name,none,
+      "filename \"%0\" used twice: '%1' and '%2'",
+      (StringRef, StringRef, StringRef))
+NOTE(note_explain_two_files_same_name,none,
+     "filenames are used to distinguish private declarations with the same "
+     "name", ())
+
 //------------------------------------------------------------------------------
 // MARK: Circular reference diagnostics
 //------------------------------------------------------------------------------
