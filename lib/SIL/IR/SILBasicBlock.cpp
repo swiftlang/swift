@@ -142,6 +142,13 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
   }
 }
 
+void SILBasicBlock::moveArgumentList(SILBasicBlock *from) {
+  ArgumentList = std::move(from->ArgumentList);
+  for (SILArgument *arg : getArguments()) {
+    arg->parentBlock = this;
+  }
+}
+
 SILFunctionArgument *
 SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
                                       bool disableEntryBlockVerification) {
