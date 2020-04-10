@@ -67,8 +67,6 @@ public:
 private:
   SILValue createAgg(SILBuilder &B, SILLocation Loc, SILType Ty,
                      ArrayRef<SILValue> Elements);
-  SILValue createAggProjection(SILBuilder &B, SILLocation Loc,
-                               SILValue Operand, unsigned EltNo);
   unsigned getEltNoForProjection(SILInstruction *Inst);
   void createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations);
 };
@@ -85,24 +83,6 @@ SROAMemoryUseAnalyzer::createAgg(SILBuilder &B, SILLocation Loc,
   assert(SD && "SD must not be null here since it or TT must be set to call"
          " this method.");
   return B.createStruct(Loc, Ty, Elements);
-}
-
-SILValue
-SROAMemoryUseAnalyzer::createAggProjection(SILBuilder &B, SILLocation Loc,
-                                           SILValue Operand,
-                                           unsigned EltNo) {
-  if (TT)
-    return B.createTupleExtract(Loc, Operand, EltNo);
-
-  assert(SD && "SD should not be null since either it or TT must be set at "
-         "this point.");
-
-  auto Properties = SD->getStoredProperties();
-  unsigned Counter = 0;
-  for (auto *D : Properties)
-    if (Counter++ == EltNo)
-      return B.createStructExtract(Loc, Operand, D);
-  llvm_unreachable("Unknown field.");
 }
 
 unsigned SROAMemoryUseAnalyzer::getEltNoForProjection(SILInstruction *Inst) {
@@ -249,9 +229,10 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   for (auto *LI : Loads) {
     SILBuilderWithScope B(LI);
     llvm::SmallVector<SILValue, 4> Elements;
-    for (auto *NewAI : NewAllocations)
-      Elements.push_back(B.createLoad(LI->getLoc(), NewAI,
-                                      LoadOwnershipQualifier::Unqualified));
+    for (auto *NewAI : NewAllocations) {
+      Elements.push_back(B.emitLoadValueOperation(LI->getLoc(), NewAI,
+                                                  LI->getOwnershipQualifier()));
+    }
     SILValue Agg = createAgg(B, LI->getLoc(), LI->getType().getObjectType(),
                              Elements);
     LI->replaceAllUsesWith(Agg);
@@ -260,12 +241,15 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Change any aggregate stores into extracts + field stores.
   for (auto *SI : Stores) {
-    SILBuilderWithScope B(SI);
-    for (unsigned EltNo : indices(NewAllocations))
-      B.createStore(SI->getLoc(),
-                    createAggProjection(B, SI->getLoc(), SI->getSrc(), EltNo),
-                    NewAllocations[EltNo],
-                    StoreOwnershipQualifier::Unqualified);
+    SILBuilderWithScope builder(SI);
+    SmallVector<SILValue, 8> destructured;
+    builder.emitDestructureValueOperation(SI->getLoc(), SI->getSrc(),
+                                          destructured);
+    for (unsigned eltNo : indices(NewAllocations)) {
+      builder.emitStoreValueOperation(SI->getLoc(), destructured[eltNo],
+                                      NewAllocations[eltNo],
+                                      StoreOwnershipQualifier::Init);
+    }
     SI->eraseFromParent();
   }
 
@@ -335,10 +319,6 @@ class SILSROA : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-
-    // FIXME: We should be able to handle ownership.
-    if (F->hasOwnership())
-      return;
 
     LLVM_DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName()
                             << " *****\n");

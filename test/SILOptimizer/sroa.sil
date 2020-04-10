@@ -23,10 +23,10 @@ sil @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int64
 // CHECK:   [[VAR_4:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #S1.x
-// CHECK:   store [[VAR_4]] to [[VAR_1]] : $*Builtin.Int1
 // CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #S1.y
-// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.Int32
 // CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #S1.z
+// CHECK:   store [[VAR_4]] to [[VAR_1]] : $*Builtin.Int1
+// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.Int32
 // CHECK:   store [[VAR_8]] to [[VAR_3]] : $*Builtin.Int64
 // CHECK:   [[VAR_10:%[0-9]+]] = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_11:%[0-9]+]] = load [[VAR_2]] : $*Builtin.Int32
@@ -91,13 +91,13 @@ struct S2 {
 // CHECK:   [[VAR_4:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:   [[VAR_5:%[0-9]+]] = alloc_stack $Builtin.Int64
 // CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_0]] : $S2, #S2.alpha
-// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.FPIEEE32
 // CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_0]] : $S2, #S2.beta
+// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.FPIEEE32
 // CHECK:   [[VAR_9:%[0-9]+]] = struct_extract [[VAR_8]] : $S1, #S1.x
-// CHECK:   store [[VAR_9]] to [[VAR_3]] : $*Builtin.Int1
 // CHECK:   [[VAR_11:%[0-9]+]] = struct_extract [[VAR_8]] : $S1, #S1.y
-// CHECK:   store [[VAR_11]] to [[VAR_4]] : $*Builtin.Int32
 // CHECK:   [[VAR_13:%[0-9]+]] = struct_extract [[VAR_8]] : $S1, #S1.z
+// CHECK:   store [[VAR_9]] to [[VAR_3]] : $*Builtin.Int1
+// CHECK:   store [[VAR_11]] to [[VAR_4]] : $*Builtin.Int32
 // CHECK:   store [[VAR_13]] to [[VAR_5]] : $*Builtin.Int64
 // CHECK:   [[VAR_15:%[0-9]+]] = load [[VAR_3]] : $*Builtin.Int1
 // CHECK:   [[VAR_16:%[0-9]+]] = load [[VAR_4]] : $*Builtin.Int32
@@ -159,13 +159,13 @@ struct S3 {
 // CHECK:   [[VAR_4:%[0-9]+]] = alloc_stack $Builtin.Int16
 // CHECK:   [[VAR_5:%[0-9]+]] = alloc_stack $Builtin.FPIEEE32
 // CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_0]] : $S3, #S3.gamma
-// CHECK:   [[VAR_7:%[0-9]+]] = tuple_extract [[VAR_6]] : $(Builtin.Int32, Builtin.Int64, Builtin.Int16), 0
-// CHECK:   store [[VAR_7]] to [[VAR_2]] : $*Builtin.Int32
-// CHECK:   [[VAR_9:%[0-9]+]] = tuple_extract [[VAR_6]] : $(Builtin.Int32, Builtin.Int64, Builtin.Int16), 1
-// CHECK:   store [[VAR_9]] to [[VAR_3]] : $*Builtin.Int64
-// CHECK:   [[VAR_11:%[0-9]+]] = tuple_extract [[VAR_6]] : $(Builtin.Int32, Builtin.Int64, Builtin.Int16), 2
-// CHECK:   store [[VAR_11]] to [[VAR_4]] : $*Builtin.Int16
 // CHECK:   [[VAR_13:%[0-9]+]] = struct_extract [[VAR_0]] : $S3, #S3.delta
+// CHECK:   [[VAR_7:%[0-9]+]] = tuple_extract [[VAR_6]] : $(Builtin.Int32, Builtin.Int64, Builtin.Int16), 0
+// CHECK:   [[VAR_9:%[0-9]+]] = tuple_extract [[VAR_6]] : $(Builtin.Int32, Builtin.Int64, Builtin.Int16), 1
+// CHECK:   [[VAR_11:%[0-9]+]] = tuple_extract [[VAR_6]] : $(Builtin.Int32, Builtin.Int64, Builtin.Int16), 2
+// CHECK:   store [[VAR_7]] to [[VAR_2]] : $*Builtin.Int32
+// CHECK:   store [[VAR_9]] to [[VAR_3]] : $*Builtin.Int64
+// CHECK:   store [[VAR_11]] to [[VAR_4]] : $*Builtin.Int16
 // CHECK:   store [[VAR_13]] to [[VAR_5]] : $*Builtin.FPIEEE32
 // CHECK:   [[VAR_15:%[0-9]+]] = function_ref @use_tup : $@convention(thin) ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
 // CHECK:   [[VAR_16:%[0-9]+]] = load [[VAR_2]] : $*Builtin.Int32
@@ -219,10 +219,10 @@ bb0(%0 : $S3, %1 : $Builtin.Int64):
 // CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int64
 // CHECK:   [[VAR_4:%[0-9]+]] = tuple_extract [[VAR_0]] : $(Builtin.Int1, Builtin.Int32, Builtin.Int64), 0
-// CHECK:   store [[VAR_4]] to [[VAR_1]] : $*Builtin.Int1
 // CHECK:   [[VAR_6:%[0-9]+]] = tuple_extract [[VAR_0]] : $(Builtin.Int1, Builtin.Int32, Builtin.Int64), 1
-// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.Int32
 // CHECK:   [[VAR_8:%[0-9]+]] = tuple_extract [[VAR_0]] : $(Builtin.Int1, Builtin.Int32, Builtin.Int64), 2
+// CHECK:   store [[VAR_4]] to [[VAR_1]] : $*Builtin.Int1
+// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.Int32
 // CHECK:   store [[VAR_8]] to [[VAR_3]] : $*Builtin.Int64
 // CHECK:   [[VAR_10:%[0-9]+]] = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_11:%[0-9]+]] = load [[VAR_2]] : $*Builtin.Int32
@@ -267,11 +267,11 @@ sil @use_str4 : $@convention(thin) (S4) -> ()
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:   [[VAR_4:%[0-9]+]] = alloc_stack $Builtin.Int16
 // CHECK:   [[VAR_5:%[0-9]+]] = tuple_extract [[VAR_0]] : $(S4, Builtin.Int16), 0
-// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_5]] : $S4, #S4.aleph
-// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.Int64
-// CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_5]] : $S4, #S4.bet
-// CHECK:   store [[VAR_8]] to [[VAR_3]] : $*Builtin.Int32
 // CHECK:   [[VAR_10:%[0-9]+]] = tuple_extract [[VAR_0]] : $(S4, Builtin.Int16), 1
+// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_5]] : $S4, #S4.aleph
+// CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_5]] : $S4, #S4.bet
+// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.Int64
+// CHECK:   store [[VAR_8]] to [[VAR_3]] : $*Builtin.Int32
 // CHECK:   store [[VAR_10]] to [[VAR_4]] : $*Builtin.Int16
 // CHECK:   [[VAR_12:%[0-9]+]] = function_ref @use_str4 : $@convention(thin) (S4) -> ()
 // CHECK:   [[VAR_13:%[0-9]+]] = load [[VAR_2]] : $*Builtin.Int64
@@ -325,11 +325,11 @@ sil @use_int16 : $@convention(thin) (Builtin.Int16) -> ()
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:   [[VAR_4:%[0-9]+]] = alloc_stack $Builtin.Int16
 // CHECK:   [[VAR_5:%[0-9]+]] = tuple_extract [[VAR_0]] : $((Builtin.Int64, Builtin.Int32), Builtin.Int16), 0
-// CHECK:   [[VAR_6:%[0-9]+]] = tuple_extract [[VAR_5]] : $(Builtin.Int64, Builtin.Int32), 0
-// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.Int64
-// CHECK:   [[VAR_8:%[0-9]+]] = tuple_extract [[VAR_5]] : $(Builtin.Int64, Builtin.Int32), 1
-// CHECK:   store [[VAR_8]] to [[VAR_3]] : $*Builtin.Int32
 // CHECK:   [[VAR_10:%[0-9]+]] = tuple_extract [[VAR_0]] : $((Builtin.Int64, Builtin.Int32), Builtin.Int16), 1
+// CHECK:   [[VAR_6:%[0-9]+]] = tuple_extract [[VAR_5]] : $(Builtin.Int64, Builtin.Int32), 0
+// CHECK:   [[VAR_8:%[0-9]+]] = tuple_extract [[VAR_5]] : $(Builtin.Int64, Builtin.Int32), 1
+// CHECK:   store [[VAR_6]] to [[VAR_2]] : $*Builtin.Int64
+// CHECK:   store [[VAR_8]] to [[VAR_3]] : $*Builtin.Int32
 // CHECK:   store [[VAR_10]] to [[VAR_4]] : $*Builtin.Int16
 // CHECK:   [[VAR_12:%[0-9]+]] = load [[VAR_2]] : $*Builtin.Int64
 // CHECK:   [[VAR_13:%[0-9]+]] = load [[VAR_3]] : $*Builtin.Int32
