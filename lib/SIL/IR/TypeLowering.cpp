@@ -817,15 +817,32 @@ namespace {
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 const T &operation) const {
+      // In ownership we can use destructure to lower destruction of aggValue.
+      MultipleValueInstruction *destructured = nullptr;
+      if (aggValue->getFunction()->hasOwnership()) {
+        if (aggValue->getType().is<TupleType>()) {
+          destructured = B.createDestructureTuple(loc, aggValue);
+        } else {
+          destructured = B.createDestructureStruct(loc, aggValue);
+        }
+      }
+      unsigned plainIndex = 0;
       for (auto &child : getChildren(B.getModule().Types)) {
         auto &childLowering = child.getLowering();
         // Skip trivial children.
-        if (childLowering.isTrivial())
+        if (childLowering.isTrivial()) {
+          (void)++plainIndex;
           continue;
+        }
         auto childIndex = child.getIndex();
-        auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
-                                                   childIndex, childLowering);
-        operation(B, loc, childIndex, childValue, childLowering);
+        if (destructured) {
+          operation(B, loc, childIndex, destructured->getResult(plainIndex++),
+                    childLowering);
+        } else {
+          auto childValue = asImpl().emitRValueProject(
+              B, loc, aggValue, childIndex, childLowering);
+          operation(B, loc, childIndex, childValue, childLowering);
+        }
       }
     }
 
