@@ -38,32 +38,63 @@ import Swift
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
 public struct UnsafeAtomic<Value: AtomicProtocol> {
+  @frozen
+  public struct Storage {
+    @usableFromInline
+    internal let _value: Value._AtomicStorage
+
+    @inlinable @inline(__always)
+    internal init(_value: Value._AtomicStorage) {
+      self._value = _value
+    }
+
+    @inlinable @inline(__always)
+    public init(_ value: __owned Value) {
+      self._value = Value._prepareAtomicStorage(for: value)
+    }
+
+    public func dispose() -> Value {
+      return Value._disposeAtomicStorage(_value)
+    }
+  }
+
   @usableFromInline
-  internal let _ptr: UnsafeMutablePointer<Value.AtomicStorage>
+  internal let _storage: UnsafeMutablePointer<Storage>
 
   @_transparent // Debug performance
   public init(
-    @_nonEphemeral at pointer: UnsafeMutablePointer<Value.AtomicStorage>
+    @_nonEphemeral at pointer: UnsafeMutablePointer<Storage>
   ) {
-    self._ptr = pointer
+    self._storage = pointer
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomic {
+  @_transparent @_alwaysEmitIntoClient
+  internal var _ptr: UnsafeMutablePointer<Value._AtomicStorage> {
+    // As a single-element struct, `Storage` is layout-compatible with its
+    // stored property.
+    return UnsafeMutableRawPointer(_storage)
+      .assumingMemoryBound(to: Value._AtomicStorage.self)
   }
 
   @inlinable
   public static func create(initialValue: __owned Value) -> Self {
-    let ptr = UnsafeMutablePointer<Value.AtomicStorage>.allocate(capacity: 1)
-    ptr.initialize(to: Value.prepareAtomicStorage(for: initialValue))
+    let ptr = UnsafeMutablePointer<Storage>.allocate(capacity: 1)
+    ptr.initialize(to: Storage(initialValue))
     return Self(at: ptr)
   }
 
   @discardableResult
   @inlinable
   public func destroy() -> Value {
-    let result = Value.disposeAtomicStorage(_ptr.pointee)
-    _ptr.deinitialize(count: 1)
-    _ptr.deallocate()
+    let result = _storage.pointee.dispose()
+    _storage.deallocate()
     return result
   }
 }
+
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeAtomic {
@@ -77,7 +108,8 @@ extension UnsafeAtomic {
   public func load(
     ordering: AtomicLoadOrdering
   ) -> Value {
-    Value.atomicLoad(at: _ptr, ordering: ordering)
+    let encoded = Value._AtomicStorage._atomicLoad(at: _ptr, ordering: ordering)
+    return Value._decodeAtomicStorage(encoded)
   }
 
   /// Atomically sets the current value to `desired`, applying the specified
@@ -91,7 +123,10 @@ extension UnsafeAtomic {
     _ desired: __owned Value,
     ordering: AtomicStoreOrdering
   ) {
-    Value.atomicStore(desired, at: _ptr, ordering: ordering)
+    Value._AtomicStorage._atomicStore(
+      Value._encodeAtomicStorage(for: desired),
+      at: _ptr,
+      ordering: ordering)
   }
 
   /// Atomically sets the current value to `desired` and returns the original
@@ -106,7 +141,11 @@ extension UnsafeAtomic {
     _ desired: __owned Value,
     ordering: AtomicUpdateOrdering
   ) -> Value {
-    Value.atomicExchange(desired, at: _ptr, ordering: ordering)
+    let encoded = Value._AtomicStorage._atomicExchange(
+      Value._encodeAtomicStorage(for: desired),
+      at: _ptr,
+      ordering: ordering)
+    return Value._decodeAtomicStorage(encoded)
   }
 
   /// Perform an atomic compare and exchange operation on the current value,
@@ -139,11 +178,12 @@ extension UnsafeAtomic {
     desired: __owned Value,
     ordering: AtomicUpdateOrdering
   ) -> (exchanged: Bool, original: Value) {
-    Value.atomicCompareExchange(
-      expected: expected,
-      desired: desired,
+    let (exchanged, original) = Value._AtomicStorage._atomicCompareExchange(
+      expected: Value._encodeAtomicStorage(for: expected),
+      desired: Value._encodeAtomicStorage(for: desired),
       at: _ptr,
       ordering: ordering)
+    return (exchanged, Value._decodeAtomicStorage(original))
   }
 
   /// Perform an atomic compare and exchange operation on the current value,
@@ -181,12 +221,13 @@ extension UnsafeAtomic {
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {
-    Value.atomicCompareExchange(
-      expected: expected,
-      desired: desired,
+    let (exchanged, original) = Value._AtomicStorage._atomicCompareExchange(
+      expected: Value._encodeAtomicStorage(for: expected),
+      desired: Value._encodeAtomicStorage(for: desired),
       at: _ptr,
       ordering: ordering,
       failureOrdering: failureOrdering)
+    return (exchanged, Value._decodeAtomicStorage(original))
   }
 
   /// Perform an atomic weak compare and exchange operation on the current
@@ -227,12 +268,13 @@ extension UnsafeAtomic {
     ordering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {
-    Value.atomicWeakCompareExchange(
-      expected: expected,
-      desired: desired,
+    let (exchanged, original) = Value._AtomicStorage._atomicWeakCompareExchange(
+      expected: Value._encodeAtomicStorage(for: expected),
+      desired: Value._encodeAtomicStorage(for: desired),
       at: _ptr,
       ordering: ordering,
       failureOrdering: failureOrdering)
+    return (exchanged, Value._decodeAtomicStorage(original))
   }
 }
 
@@ -256,10 +298,11 @@ extension UnsafeAtomic where Value: AtomicInteger {
     ${label} operand: Value${defaultValue(name)},
     ordering: AtomicUpdateOrdering
   ) -> Value {
-    Value.atomicLoadThen${name}(
+    let encoded = Value._AtomicStorage._atomicLoadThen${name}(
       ${argLabel(label)}operand,
       at: _ptr,
       ordering: ordering)
+    return Value._decodeAtomicStorage(encoded)
   }
   % end
 
@@ -281,10 +324,11 @@ extension UnsafeAtomic where Value: AtomicInteger {
     ${label} operand: Value${defaultValue(name)},
     ordering: AtomicUpdateOrdering
   ) -> Value {
-    Value.atomicLoadThen${name}(
+    let encoded = Value._AtomicStorage._atomicLoadThen${name}(
       ${argLabel(label)}operand,
       at: _ptr,
-      ordering: ordering) ${op} operand
+      ordering: ordering)
+    return Value._decodeAtomicStorage(encoded ${op} operand)
   }
   % end
 
@@ -302,7 +346,7 @@ extension UnsafeAtomic where Value: AtomicInteger {
     by operand: Value = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    _ = Value.atomicLoadThenWrappingIncrement(
+    _ = Value._AtomicStorage._atomicLoadThenWrappingIncrement(
       by: operand,
       at: _ptr,
       ordering: ordering)
@@ -322,7 +366,7 @@ extension UnsafeAtomic where Value: AtomicInteger {
     by operand: Value = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    _ = Value.atomicLoadThenWrappingDecrement(
+    _ = Value._AtomicStorage._atomicLoadThenWrappingDecrement(
       by: operand,
       at: _ptr,
       ordering: ordering)

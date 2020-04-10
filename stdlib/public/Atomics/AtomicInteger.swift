@@ -13,7 +13,9 @@
 import Swift
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
+public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger
+where _AtomicStorage == Self
+{
   /// Perform an atomic wrapping increment operation on the value referenced by
   /// `pointer` and return the original value, applying the specified memory
   /// ordering.
@@ -27,9 +29,9 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")
-  static func atomicLoadThenWrappingIncrement(
+  static func _atomicLoadThenWrappingIncrement(
     by operand: Self,
-    at pointer: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<Self>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 
@@ -46,9 +48,9 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")
-  static func atomicLoadThenWrappingDecrement(
+  static func _atomicLoadThenWrappingDecrement(
     by operand: Self,
-    at pointer: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<Self>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 
@@ -62,9 +64,9 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")
-  static func atomicLoadThenBitwiseAnd(
+  static func _atomicLoadThenBitwiseAnd(
     with operand: Self,
-    at pointer: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<Self>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 
@@ -78,9 +80,9 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")
-  static func atomicLoadThenBitwiseOr(
+  static func _atomicLoadThenBitwiseOr(
     with operand: Self,
-    at pointer: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<Self>,
     ordering: AtomicUpdateOrdering
   ) -> Self
 
@@ -94,9 +96,30 @@ public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value before the operation.
   @_semantics("atomics.requires_constant_orderings")
-  static func atomicLoadThenBitwiseXor(
+  static func _atomicLoadThenBitwiseXor(
     with operand: Self,
-    at pointer: UnsafeMutablePointer<AtomicStorage>,
+    at pointer: UnsafeMutablePointer<Self>,
     ordering: AtomicUpdateOrdering
   ) -> Self
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicInteger {
+  @_transparent @_alwaysEmitIntoClient
+  public static func _prepareAtomicStorage(for value: __owned Self) -> Self {
+    value
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func _disposeAtomicStorage(_ storage: __owned Self) -> Self {
+    storage
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  public static func _encodeAtomicStorage(for value: __owned Self) -> Self {
+    value
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func _decodeAtomicStorage(_ storage: __owned Self) -> Self {
+    storage
+  }
 }

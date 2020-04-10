@@ -4,31 +4,31 @@
 
 %{
   types = [
-    # id        type     storage   initial
-    ("Int",     "Int",    "Int",    "0"),
-    ("Int64",   "Int64",  "Int64",  "0"),
-    ("Int32",   "Int32",  "Int32",  "0"),
-    ("Int16",   "Int16",  "Int16",  "0"),
-    ("Int8",    "Int8",   "Int8",   "0"),
-    ("UInt",    "UInt",   "UInt",   "0"),
-    ("UInt64",  "UInt64", "UInt64", "0"),
-    ("UInt32",  "UInt32", "UInt32", "0"),
-    ("UInt16",  "UInt16", "UInt16", "0"),
-    ("UInt8",   "UInt8",  "UInt8",  "0"),
+    # id        type      initial
+    ("Int",     "Int",    "0"),
+    ("Int64",   "Int64",  "0"),
+    ("Int32",   "Int32",  "0"),
+    ("Int16",   "Int16",  "0"),
+    ("Int8",    "Int8",   "0"),
+    ("UInt",    "UInt",   "0"),
+    ("UInt64",  "UInt64", "0"),
+    ("UInt32",  "UInt32", "0"),
+    ("UInt16",  "UInt16", "0"),
+    ("UInt8",   "UInt8",  "0"),
 
-    # id             type                          storage                      initial
-    ("URP",          "UnsafeRawPointer",           "UnsafeRawPointer",          "UnsafeRawPointer(UnsafeMutableRawPointer.allocate(byteCount: 8, alignment: 8))"),
-    ("UP",           "UnsafePointer<Bar>",         "UnsafePointer<Bar>",        "UnsafePointer(UnsafeMutablePointer<Bar>.allocate(capacity: 1))"),
-    ("UMRP",         "UnsafeMutableRawPointer",    "UnsafeMutableRawPointer",   ".allocate(byteCount: 8, alignment: 8)"),
-    ("UMP",          "UnsafeMutablePointer<Bar>",  "UnsafeMutablePointer<Bar>", ".allocate(capacity: 1)"),
-    ("Unmanaged",    "Unmanaged<Foo>",             "UnsafeMutableRawPointer",   "Unmanaged.passRetained(Foo()).toOpaque()"),
+    # id             type                          initial
+    ("URP",          "UnsafeRawPointer",           "UnsafeRawPointer(UnsafeMutableRawPointer.allocate(byteCount: 8, alignment: 8))"),
+    ("UP",           "UnsafePointer<Bar>",         "UnsafePointer(UnsafeMutablePointer<Bar>.allocate(capacity: 1))"),
+    ("UMRP",         "UnsafeMutableRawPointer",    ".allocate(byteCount: 8, alignment: 8)"),
+    ("UMP",          "UnsafeMutablePointer<Bar>",  ".allocate(capacity: 1)"),
+    ("Unmanaged",    "Unmanaged<Foo>",             "Unmanaged.passRetained(Foo())"),
 
-    # id             type                                   storage                                initial
-    ("URPOpt",       "Optional<UnsafeRawPointer>",          "Optional<UnsafeRawPointer>",          "nil"),
-    ("UPOpt",        "Optional<UnsafePointer<Bar>>",        "Optional<UnsafePointer<Bar>>",        "nil"),
-    ("UMRPOpt",      "Optional<UnsafeMutableRawPointer>",   "Optional<UnsafeMutableRawPointer>",   "nil"),
-    ("UMPOpt",       "Optional<UnsafeMutablePointer<Bar>>", "Optional<UnsafeMutablePointer<Bar>>", "nil"),
-    ("UnmanagedOpt", "Optional<Unmanaged<Foo>>",            "Optional<UnsafeMutableRawPointer>",   "nil"),
+    # id             type                          initial
+    ("URPOpt",       "UnsafeRawPointer?",          "nil"),
+    ("UPOpt",        "UnsafePointer<Bar>?",        "nil"),
+    ("UMRPOpt",      "UnsafeMutableRawPointer?",   "nil"),
+    ("UMPOpt",       "UnsafeMutablePointer<Bar>?", "nil"),
+    ("UnmanagedOpt", "Unmanaged<Foo>?",            "nil"),
   ]
 }%
 
@@ -41,12 +41,12 @@ struct Bar {
   var value = 0
 }
 
-% for (id, type, storage, initial) in types:
+% for (id, type, initial) in types:
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_${id}() -> UnsafeAtomic<${type}> {
-  var storage: ${storage} = ${initial}
+  var storage = UnsafeAtomic<${type}>.Storage(${initial})
   let atomic = UnsafeAtomic<${type}>(at: &storage) // expected-warning {{inout expression creates a temporary pointer, but argument 'at' should be a pointer that outlives the call to 'init(at:)'}}
-  // expected-note@-1 {{implicit argument conversion from '${storage}' to 'UnsafeMutablePointer<${type}.AtomicStorage>' (aka 'UnsafeMutablePointer<${storage}>') produces a pointer valid only for the duration of the call to 'init(at:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'UnsafeAtomic<${type}>.Storage' to 'UnsafeMutablePointer<UnsafeAtomic<${type}>.Storage>' produces a pointer valid only for the duration of the call to 'init(at:)'}}
   // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
   return atomic
 }
@@ -54,16 +54,16 @@ func test_${id}() -> UnsafeAtomic<${type}> {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_UnsafeAtomicLazyReference() -> UnsafeAtomicLazyReference<Foo> {
-  var value: Foo? = nil
+  var value = UnsafeAtomicLazyReference<Foo>.Storage()
   let atomic = UnsafeAtomicLazyReference(at: &value) // expected-warning {{inout expression creates a temporary pointer, but argument 'at' should be a pointer that outlives the call to 'init(at:)'}}
-  // expected-note@-1 {{implicit argument conversion from 'Foo?' to 'UnsafeMutablePointer<Foo?>' produces a pointer valid only for the duration of the call to 'init(at:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'UnsafeAtomicLazyReference<Foo>.Storage' to 'UnsafeMutablePointer<UnsafeAtomicLazyReference<Foo>.Storage>' produces a pointer valid only for the duration of the call to 'init(at:)'}}
   // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
   return atomic
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 class BrokenAtomicCounter { // THIS IS BROKEN; DO NOT USE
-  private var _storage = 0
+  private var _storage = UnsafeAtomic<Int>.Storage(0)
   private var _value: UnsafeAtomic<Int>?
 
   init() {
@@ -71,7 +71,7 @@ class BrokenAtomicCounter { // THIS IS BROKEN; DO NOT USE
     // so it leads to undefined behavior when the pointer gets dereferenced
     // in the atomic operations below. DO NOT DO THIS.
     _value = UnsafeAtomic(at: &_storage) // expected-warning {{inout expression creates a temporary pointer, but argument 'at' should be a pointer that outlives the call to 'init(at:)'}}
-    // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutablePointer<Int.AtomicStorage>' (aka 'UnsafeMutablePointer<Int>') produces a pointer valid only for the duration of the call to 'init(at:)'}}
+    // expected-note@-1 {{implicit argument conversion from 'UnsafeAtomic<Int>.Storage' to 'UnsafeMutablePointer<UnsafeAtomic<Int>.Storage>' produces a pointer valid only for the duration of the call to 'init(at:)'}}
     // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
   }
 
@@ -86,10 +86,13 @@ class BrokenAtomicCounter { // THIS IS BROKEN; DO NOT USE
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 struct AtomicCounter {
-  class Buffer: ManagedBuffer<Int.AtomicStorage, Void> {
+  typealias Value = Int
+  typealias Header = UnsafeAtomic<Value>.Storage
+
+  class Buffer: ManagedBuffer<Header, Void> {
     deinit {
       withUnsafeMutablePointerToHeader { header in
-        _ = Int.disposeAtomicStorage(header.pointee)
+        _ = header.pointee.dispose()
       }
     }
   }
@@ -98,7 +101,7 @@ struct AtomicCounter {
 
   init() {
     buffer = Buffer.create(minimumCapacity: 0) { _ in
-      Int.prepareAtomicStorage(for: 0)
+      Header(0)
     } as! Buffer
   }
 
@@ -121,37 +124,38 @@ struct AtomicCounter {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 struct AtomicUnmanagedRef<Instance: AnyObject> {
-  typealias AtomicValue = Optional<Unmanaged<Instance>>
+  typealias Value = Unmanaged<Instance>?
+  typealias Header = UnsafeAtomic<Value>.Storage
 
-  class Buffer<Instance>: ManagedBuffer<AtomicValue.AtomicStorage, Void> {
+  class Buffer: ManagedBuffer<Header, Void> {
     deinit {
       withUnsafeMutablePointerToHeader { header in
-        _ = AtomicValue.disposeAtomicStorage(header.pointee)
+        _ = header.pointee.dispose()
       }
     }
   }
 
-  let buffer: Buffer<Instance>
+  let buffer: Buffer
 
   init() {
-    buffer = Buffer<Instance>.create(minimumCapacity: 0) { _ in
-      AtomicValue.prepareAtomicStorage(for: nil)
-    } as! Buffer<Instance>
+    buffer = Buffer.create(minimumCapacity: 0) { _ in
+      Header(nil)
+    } as! Buffer
   }
 
   private func _withAtomicPointer<R>(
-    _ body: (UnsafeAtomic<AtomicValue>) throws -> R
+    _ body: (UnsafeAtomic<Value>) throws -> R
   ) rethrows -> R {
     try buffer.withUnsafeMutablePointerToHeader { header in
-      try body(UnsafeAtomic<AtomicValue>(at: header))
+      try body(UnsafeAtomic<Value>(at: header))
     }
   }
 
-  func store(_ desired: AtomicValue) {
+  func store(_ desired: Value) {
     _withAtomicPointer { $0.store(desired, ordering: .sequentiallyConsistent) }
   }
 
-  func load() -> AtomicValue {
+  func load() -> Value {
     _withAtomicPointer { $0.load(ordering: .sequentiallyConsistent) }
   }
 }

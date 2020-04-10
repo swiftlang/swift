@@ -34,16 +34,16 @@
 
   pointer_types = [
     # Label                             Type                                   Builtin
-    ("UnsafeRawPointer",                "UnsafeRawPointer",                    "RawPointer"),
-    ("UnsafeMutableRawPointer",         "UnsafeMutableRawPointer",             "RawPointer"),
-    ("UnsafePointer",                   "UnsafePointer<Foo>",                  "RawPointer"),
-    ("UnsafeMutablePointer",            "UnsafeMutablePointer<Foo>",           "RawPointer"),
-    ("Unmanaged",                       "Unmanaged<Bar>",                      "RawPointer"),
-    ("OptionalUnsafeRawPointer",        "Optional<UnsafeRawPointer>",          "RawPointer"),
-    ("OptionalUnsafeMutableRawPointer", "Optional<UnsafeMutableRawPointer>",   "RawPointer"),
-    ("OptionalUnsafePointer",           "Optional<UnsafePointer<Foo>>",        "RawPointer"),
-    ("OptionalUnsafeMutablePointer",    "Optional<UnsafeMutablePointer<Foo>>", "RawPointer"),
-    ("OptionalUnmanaged",               "Optional<Unmanaged<Bar>>",            "RawPointer"),
+    ("UnsafeRawPointer",                "UnsafeRawPointer",                    "Word"),
+    ("UnsafeMutableRawPointer",         "UnsafeMutableRawPointer",             "Word"),
+    ("UnsafePointer",                   "UnsafePointer<Foo>",                  "Word"),
+    ("UnsafeMutablePointer",            "UnsafeMutablePointer<Foo>",           "Word"),
+    ("Unmanaged",                       "Unmanaged<Bar>",                      "Word"),
+    ("OptionalUnsafeRawPointer",        "Optional<UnsafeRawPointer>",          "Word"),
+    ("OptionalUnsafeMutableRawPointer", "Optional<UnsafeMutableRawPointer>",   "Word"),
+    ("OptionalUnsafePointer",           "Optional<UnsafePointer<Foo>>",        "Word"),
+    ("OptionalUnsafeMutablePointer",    "Optional<UnsafeMutablePointer<Foo>>", "Word"),
+    ("OptionalUnmanaged",               "Optional<Unmanaged<Bar>>",            "Word"),
   ]
 
   all_types = integer_types + pointer_types

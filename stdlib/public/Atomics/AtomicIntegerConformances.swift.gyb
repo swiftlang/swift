@@ -88,12 +88,10 @@ import Swift
 
 % for (swiftType, builtinType, getter) in atomicTypes():
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension ${swiftType}: AtomicProtocol {
-  public typealias AtomicStorage = ${swiftType}
-
+extension ${swiftType}: _PrimitiveAtomic {
   @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
-  public static func atomicLoad(
+  public static func _atomicLoad(
     at pointer: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicLoadOrdering
   ) -> ${swiftType} {
@@ -110,7 +108,7 @@ extension ${swiftType}: AtomicProtocol {
 
   @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
-  public static func atomicStore(
+  public static func _atomicStore(
     _ desired: ${swiftType},
     at pointer: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicStoreOrdering
@@ -129,7 +127,7 @@ extension ${swiftType}: AtomicProtocol {
 
   @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
-  public static func atomicExchange(
+  public static func _atomicExchange(
     _ desired: ${swiftType},
     at pointer: UnsafeMutablePointer<${swiftType}>,
     ordering: AtomicUpdateOrdering
@@ -147,7 +145,7 @@ extension ${swiftType}: AtomicProtocol {
 
   @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
-  public static func atomicCompareExchange(
+  public static func _atomicCompareExchange(
     expected: ${swiftType},
     desired: ${swiftType},
     at pointer: UnsafeMutablePointer<${swiftType}>,
@@ -167,7 +165,7 @@ extension ${swiftType}: AtomicProtocol {
 
   @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
-  public static func atomicCompareExchange(
+  public static func _atomicCompareExchange(
     expected: ${swiftType},
     desired: ${swiftType},
     at pointer: UnsafeMutablePointer<${swiftType}>,
@@ -190,7 +188,7 @@ extension ${swiftType}: AtomicProtocol {
 
   @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
-  public static func atomicWeakCompareExchange(
+  public static func _atomicWeakCompareExchange(
     expected: ${swiftType},
     desired: ${swiftType},
     at pointer: UnsafeMutablePointer<${swiftType}>,
@@ -213,13 +211,18 @@ extension ${swiftType}: AtomicProtocol {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension ${swiftType}: AtomicProtocol {
+    public typealias _AtomicStorage = ${swiftType}
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension ${swiftType}: AtomicInteger {
-  % for (name, llvmop, op, label, doc) in integerOperations:
-  % defaultValue = " = 1" if label <> "" else ""
+% for (name, llvmop, op, label, doc) in integerOperations:
+% defaultValue = " = 1" if label <> "" else ""
   @_semantics("atomics.requires_constant_orderings")
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
-  public static func atomicLoadThen${name}(
+  public static func _atomicLoadThen${name}(
     ${label} operand: Self${defaultValue},
     at pointer: UnsafeMutablePointer<Self>,
     ordering: AtomicUpdateOrdering
@@ -234,5 +237,5 @@ extension ${swiftType}: AtomicInteger {
       Builtin.unreachable()
     }
   }
-  % end
+% end
 }
