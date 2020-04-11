@@ -827,8 +827,6 @@ function(_add_swift_host_executable_single name)
     ARCHITECTURE
     SDK)
   set(multiple_parameter_options
-    COMPILE_FLAGS
-    DEPENDS
     LLVM_LINK_COMPONENTS)
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "${options}"
@@ -876,10 +874,8 @@ function(_add_swift_host_executable_single name)
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
 
   add_dependencies_multiple_targets(
-      TARGETS "${name}"
-      DEPENDS
-        ${LLVM_COMMON_DEPENDS}
-        ${SWIFTEXE_SINGLE_DEPENDS})
+      TARGETS ${name}
+      DEPENDS ${LLVM_COMMON_DEPENDS})
   llvm_update_compile_flags("${name}")
 
   if(SWIFTEXE_SINGLE_SDK STREQUAL WINDOWS)
