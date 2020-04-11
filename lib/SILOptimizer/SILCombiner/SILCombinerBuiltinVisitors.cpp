@@ -534,9 +534,6 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
 }
 
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
-  if (I->getFunction()->hasOwnership())
-    return nullptr;
-
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)
