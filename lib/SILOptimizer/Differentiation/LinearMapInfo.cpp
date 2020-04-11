@@ -16,13 +16,14 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SILOptimizer/Utils/Differentiation/LinearMapInfo.h"
+#include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
+#include "swift/SILOptimizer/Differentiation/ADContext.h"
+
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
-#include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 
 namespace swift {
 namespace autodiff {

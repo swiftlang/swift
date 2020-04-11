@@ -16,7 +16,7 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
+#include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
