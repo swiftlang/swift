@@ -16,4 +16,4 @@ def watchdog(command, timeout=None):
 
 
 if __name__ == '__main__':
-    watchdog(sys.argv[2:], timeout=sys.argv[1])
+    watchdog(sys.argv[2:], timeout=float(sys.argv[1]))
