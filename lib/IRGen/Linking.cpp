@@ -629,6 +629,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Private;
 
   case Kind::DynamicallyReplaceableFunctionKey:
+    return getSILFunction()->getLinkage();
+
   case Kind::SILFunction:
     return getSILFunction()->getEffectiveSymbolLinkage();
 
