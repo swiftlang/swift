@@ -5067,8 +5067,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     for (auto OTD : opaqueReturnTypeDecls) {
       hasOpaqueReturnTypes = true;
       Mangle::ASTMangler Mangler;
-      auto MangledName = Mangler.mangleDeclAsUSR(OTD->getNamingDecl(),
-                                                 MANGLING_PREFIX_STR);
+      auto MangledName = Mangler.mangleOpaqueTypeDecl(OTD);
       opaqueReturnTypeGenerator.insert(MangledName, addDeclRef(OTD));
     }
   }
