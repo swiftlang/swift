@@ -16,8 +16,10 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -167,6 +169,8 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+  llvm::PrettyStackTraceString trace(
+      "While performing cached completion if possible");
 
   if (!CachedCI)
     return false;
@@ -218,7 +222,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
 
   auto &newInfo = newState->getCodeCompletionDelayedDeclState();
   unsigned newBufferID;
-
+  DeclContext *traceDC = nullptr;
   switch (newInfo.Kind) {
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     // If the interface has changed, AST must be refreshed.
@@ -285,6 +289,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     if (AFD->isBodySkipped())
       AFD->setBodyDelayed(AFD->getBodySourceRange());
 
+    traceDC = AFD;
     break;
   }
   case CodeCompletionDelayedDeclKind::Decl:
@@ -329,6 +334,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     performImportResolution(*newSF);
     bindExtensions(*newSF);
 
+    traceDC = newM;
 #ifndef NDEBUG
     const auto *reparsedState = newSF->getDelayedParserState();
     assert(reparsedState->hasCodeCompletionDelayedDeclState() &&
@@ -341,13 +347,17 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   }
   }
 
-  if (DiagC)
-    CI.addDiagnosticConsumer(DiagC);
+  {
+    PrettyStackTraceDeclContext trace("performing cached completion", traceDC);
 
-  Callback(CI, /*reusingASTContext=*/true);
+    if (DiagC)
+      CI.addDiagnosticConsumer(DiagC);
 
-  if (DiagC)
-    CI.removeDiagnosticConsumer(DiagC);
+    Callback(CI, /*reusingASTContext=*/true);
+
+    if (DiagC)
+      CI.removeDiagnosticConsumer(DiagC);
+  }
 
   CachedReuseCount += 1;
 
@@ -360,6 +370,7 @@ bool CompletionInstance::performNewOperation(
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+  llvm::PrettyStackTraceString trace("While performing new completion");
 
   auto TheInstance = std::make_unique<CompilerInstance>();
   {

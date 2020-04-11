@@ -3314,7 +3314,7 @@ ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
     clangModule(clangModule) {
   // Capture the file metadata before it goes away.
   if (clangModule)
-    ASTSourceDescriptor = {*clangModule};
+    ASTSourceDescriptor = {*const_cast<clang::Module *>(clangModule)};
 }
 
 StringRef ClangModuleUnit::getModuleDefiningPath() const {

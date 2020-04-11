@@ -60,19 +60,19 @@ func fakeGradient<T, U: FloatingPoint>(of f: @differentiable (T) -> U) {}
 
 func takesOpaqueClosure(f: @escaping (Float) -> Float) {
   // expected-note @-1 {{did you mean to take a '@differentiable' closure?}} {{38-38=@differentiable }}
-  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   fakeGradient(of: f)
 }
 
 let globalAddOne: (Float) -> Float = { $0 + 1 }
-// expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+// expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
 fakeGradient(of: globalAddOne)
 
 func someScope() {
   let localAddOne: (Float) -> Float = { $0 + 1 }
-  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   fakeGradient(of: globalAddOne)
-  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   fakeGradient(of: localAddOne)
   // The following case is okay during type checking, but will fail in the AD transform.
   fakeGradient { localAddOne($0) }
@@ -95,9 +95,14 @@ func linearToDifferentiable(_ f: @escaping @differentiable(linear) (Float) -> Fl
 }
 
 func differentiableToLinear(_ f: @escaping @differentiable (Float) -> Float) {
-  // expected-error @+1 {{a '@differentiable(linear)' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable(linear)' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   _ = f as @differentiable(linear) (Float) -> Float
 }
+
+struct Struct: Differentiable {
+  var x: Float
+}
+let _: @differentiable (Float) -> Struct = Struct.init
 
 //===----------------------------------------------------------------------===//
 // Parameter selection (@noDerivative)

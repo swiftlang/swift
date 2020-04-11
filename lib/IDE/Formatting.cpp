@@ -1809,9 +1809,6 @@ private:
 
     auto *CS = dyn_cast<CaseStmt>(S);
     if (CS && CS->getParentKind() == CaseParentKind::Switch) {
-      if (TrailingTarget && !TrailingTarget->isEmpty())
-        return None;
-
       SourceLoc CaseLoc = CS->getLoc();
       if (!SM.isBeforeInBuffer(CaseLoc, TargetLocation))
         return None;
@@ -1819,28 +1816,20 @@ private:
       SourceRange LabelItemsRange = CS->getLabelItemsRange();
       SourceLoc ColonLoc = getLocIfKind(SM, LabelItemsRange.End, tok::colon);
 
-      if (isTargetContext(CaseLoc, ColonLoc)) {
-        ListAligner Aligner(SM, TargetLocation, CaseLoc, CaseLoc, ColonLoc);
-        for (auto &Elem: CS->getCaseLabelItems()) {
-          SourceRange ElemRange = Elem.getSourceRange();
-          Aligner.updateAlignment(ElemRange, CS);
-          if (isTargetContext(ElemRange)) {
-            Aligner.setAlignmentIfNeeded(CtxOverride);
-            return IndentContext {
-              ElemRange.Start,
-              !OutdentChecker::hasOutdent(SM, ElemRange, CS)
-            };
-          }
-        }
-        return Aligner.getContextAndSetAlignment(CtxOverride);
-      }
-      if (ColonLoc.isValid() && isTargetContext(ColonLoc, SourceLoc())) {
+      if (auto Ctx = getIndentContextFromCaseItems(CS, /*CloseLoc=*/ColonLoc))
+        return Ctx;
+
+      if (ColonLoc.isValid() && isTargetContext(ColonLoc, SourceLoc()) &&
+          (!TrailingTarget || TrailingTarget->isEmpty())) {
         SourceRange ColonToEnd = SourceRange(ColonLoc, CS->getEndLoc());
         return IndentContext {
           CaseLoc,
           !OutdentChecker::hasOutdent(SM, ColonToEnd, CS)
         };
       }
+
+      if (TrailingTarget)
+        return None;
       return IndentContext {CaseLoc, false};
     }
 
@@ -1858,13 +1847,21 @@ private:
     }
 
     if (CS && CS->getParentKind() == CaseParentKind::DoCatch) {
-      if (auto *BS = dyn_cast<BraceStmt>(CS->getBody())) {
-        if (auto Ctx = getIndentContextFrom(BS, CS->getStartLoc()))
-          return Ctx;
-      }
+      SourceLoc CatchLoc = CS->getLoc();
+      SourceLoc L;
+
+      auto *BS = dyn_cast<BraceStmt>(CS->getBody());
+      if (BS) L = getLocIfKind(SM, BS->getLBraceLoc(), tok::l_brace);
+
+      if (auto Ctx = getIndentContextFromCaseItems(CS, /*CloseLoc=*/L))
+        return Ctx;
+
+      if (auto Ctx = getIndentContextFrom(BS, CS->getStartLoc()))
+        return Ctx;
+
       if (TrailingTarget)
         return None;
-      return IndentContext {CS->getStartLoc(), true};
+      return IndentContext {CatchLoc, false};
     }
 
     if (auto *IS = dyn_cast<IfStmt>(S)) {
@@ -2084,6 +2081,33 @@ private:
         Bounds.widen(Next->getLoc());
     }
     return Bounds;
+  }
+
+  Optional<IndentContext>
+  getIndentContextFromCaseItems(CaseStmt *CS, SourceLoc CloseLoc) {
+    SourceLoc IntroducerLoc = CS->getLoc();
+    if (!isTargetContext(IntroducerLoc, CloseLoc))
+      return None;
+
+    ListAligner Aligner(SM, TargetLocation, IntroducerLoc, IntroducerLoc,
+                        CloseLoc);
+    for (auto &Elem: CS->getCaseLabelItems()) {
+      // Skip the implicit 'error' pattern for empty catch CaseStmts.
+      if ((!Elem.getPattern() || Elem.getPattern()->isImplicit()) &&
+          Elem.getWhereLoc().isInvalid())
+        continue;
+
+      SourceRange ElemRange = Elem.getSourceRange();
+      Aligner.updateAlignment(ElemRange, CS);
+      if (isTargetContext(ElemRange)) {
+        Aligner.setAlignmentIfNeeded(CtxOverride);
+        return IndentContext {
+          ElemRange.Start,
+          !OutdentChecker::hasOutdent(SM, ElemRange, CS)
+        };
+      }
+    }
+    return Aligner.getContextAndSetAlignment(CtxOverride);
   }
 
 #pragma mark Expression indent contexts

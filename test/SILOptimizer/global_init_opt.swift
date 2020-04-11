@@ -20,7 +20,7 @@ public func cse() -> Int {
 // CHECK-LABEL: sil @$s4test4licmSiyF
 // CHECK: bb0:
 // CHECK:   builtin "once"
-// CHECK: bb1:
+// CHECK: bb1{{.*}}:
 // CHECK-NOT:   builtin "once"
 // CHECK: } // end sil function '$s4test4licmSiyF'
 public func licm() -> Int {

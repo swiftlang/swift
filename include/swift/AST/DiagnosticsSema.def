@@ -1068,6 +1068,10 @@ ERROR(missing_unwrap_optional_try,none,
 ERROR(missing_forced_downcast,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
+WARNING(coercion_may_fail_warning,none,
+        "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
+        (Type, Type))
+
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
       "did you mean to use 'as' to explicitly convert?", (Type, Type))
@@ -1221,7 +1225,7 @@ ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
 ERROR(invalid_differentiable_function_conversion_expr,none,
       "a '@differentiable%select{|(linear)}0' function can only be formed from "
-      "a reference to a 'func' or a literal closure", (bool))
+      "a reference to a 'func' or 'init' or a literal closure", (bool))
 NOTE(invalid_differentiable_function_conversion_parameter,none,
      "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_pointer_conversion,none,
@@ -2651,14 +2655,14 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 ERROR(decl_from_hidden_module,none,
-      "cannot use %0 %1 %select{here|"
+      "cannot use %0 %1 %select{here|as property wrapper here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
       "it is an SPI imported from %3}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
-      "cannot use conformance of %0 to %1 %select{here|"
+      "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; %3 has been imported "
       "as implementation-only",
@@ -4455,11 +4459,6 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 ERROR(dynamic_with_transparent,none,
       "a declaration cannot be both '@_tranparent' and 'dynamic'",
       ())
-
-ERROR(dynamic_and_library_evolution_not_supported,none,
-      "marking non-'@objc' Swift declaration 'dynamic' in library evolution mode is not supported",
-      ())
-
 
 //------------------------------------------------------------------------------
 // MARK: @_dynamicReplacement(for:)
