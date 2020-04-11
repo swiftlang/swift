@@ -58,6 +58,10 @@ public:
 
   virtual SourceLoc getLoc() const { return getAnchor()->getLoc(); }
 
+  virtual SourceRange getSourceRange() const {
+    return getAnchor()->getSourceRange();
+  }
+
   /// Try to diagnose a problem given affected expression,
   /// failure location, types and declarations deduced by
   /// constraint system, and other auxiliary information.
@@ -109,6 +113,9 @@ public:
 
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
+
+  template <typename... ArgTypes>
+  InFlightDiagnostic emitDiagnosticAt(ArgTypes &&... Args) const;
 
 protected:
   const Solution &getSolution() const { return S; }
@@ -356,7 +363,7 @@ protected:
   }
 
 private:
-  bool diagnoseTypeCannotConform(Expr *anchor, Type nonConformingType,
+  bool diagnoseTypeCannotConform(Type nonConformingType,
                                  Type protocolType) const;
 };
 
@@ -644,7 +651,7 @@ private:
 
   /// Try to add a fix-it to convert a stored property into a computed
   /// property
-  void tryComputedPropertyFixIts(Expr *expr) const;
+  void tryComputedPropertyFixIts() const;
 
   bool isIntegerType(Type type) const {
     return conformsToKnownProtocol(
@@ -1034,6 +1041,11 @@ public:
                        DeclNameRef memberName, ConstraintLocator *locator)
       : InvalidMemberRefFailure(solution, baseType, memberName, locator) {}
 
+  SourceLoc getLoc() const override {
+    // Diagnostic should point to the member instead of its base expression.
+    return getRawAnchor()->getLoc();
+  }
+
   bool diagnoseAsError() override;
 
 private:
@@ -1201,6 +1213,8 @@ public:
                                         ConstraintLocator *locator)
       : InvalidInitRefFailure(solution, baseTy, init, SourceRange(), locator) {}
 
+  SourceLoc getLoc() const override;
+
   bool diagnoseAsError() override;
 };
 
@@ -1330,6 +1344,9 @@ public:
                                    ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), ContextualType(contextualType) {}
 
+  SourceLoc getLoc() const override;
+  SourceRange getSourceRange() const override;
+
   bool diagnoseAsError() override;
 
 private:
@@ -1398,6 +1415,9 @@ public:
                               ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
+  SourceLoc getLoc() const override;
+  SourceRange getSourceRange() const override;
+
   bool diagnoseAsError() override;
 };
 
@@ -1425,6 +1445,8 @@ public:
     assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
            locator->isKeyPathSubscriptComponent());
   }
+
+  SourceLoc getLoc() const override;
 
   bool diagnoseAsError() override;
 };
@@ -1658,6 +1680,8 @@ public:
                                                  ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), unhandled(unhandled),
         builder(builder) {}
+
+  SourceLoc getLoc() const override;
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -1935,7 +1959,9 @@ public:
                                    ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  SourceLoc getLoc() const override;
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose an attempt to reference a top-level name shadowed by a local
