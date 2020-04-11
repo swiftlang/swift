@@ -768,11 +768,6 @@ void EagerSpecializerTransform::run() {
       auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
 
       SpecializedFuncs.push_back(NewFunc);
-
-      if (SA->isExported()) {
-        NewFunc->setLinkage(SILLinkage::Public);
-        continue;
-      }
     }
 
     // TODO: Optimize the dispatch code to minimize the amount
