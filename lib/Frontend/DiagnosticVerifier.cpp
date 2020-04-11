@@ -740,7 +740,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       // Verify educational notes
       for (auto &foundName : FoundDiagnostic.EducationalNotes) {
         llvm::erase_if(expectedNotes->Names,
-                       [&](std::string item) { return item == foundName; });
+                       [&](StringRef item) { return item.equals(foundName); });
       }
 
       if (!expectedNotes->Names.empty()) {
@@ -950,7 +950,7 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
 
   llvm::SmallVector<std::string, 1> eduNotes;
   for (auto &notePath : Info.EducationalNotePaths) {
-    eduNotes.push_back(llvm::sys::path::stem(notePath));
+    eduNotes.push_back(llvm::sys::path::stem(notePath).str());
   }
 
   llvm::SmallString<128> message;
