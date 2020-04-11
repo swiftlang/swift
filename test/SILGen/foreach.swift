@@ -603,3 +603,144 @@ func genericFuncWithConversion<T: C>(list : [T]) {
     print(item)
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Shared
+//===----------------------------------------------------------------------===//
+
+class Obj { }
+
+struct Foo {
+  let dummy = Obj()
+  let x = 0
+}
+
+struct Bar {
+  let arr = [Foo]()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s7foreach19sharedElementSimple3barSiAA3BarV_tF
+
+// CHECK: bb1:
+// CHECK: [[SA:%[0-9]+]] = alloc_stack $Optional<Foo>
+// CHECK: [[VAL:%[0-9]+]] = load [take] [[SA]]
+// CHECK: [[BORROWED:%[0-9]+]] = begin_borrow [[VAL]]
+// CHECK-NEXT: switch_enum [[BORROWED]] : $Optional<Foo>, case #Optional.some!enumelt: [[BB2:bb[0-9]]], case #Optional.none!enumelt: [[BB3:bb[0-9]]]
+
+// Make sure that a) we have a guaranteed arg and b) we destroy/end the value/borrow.
+// CHECK: [[BB2]]([[ARG0:%[0-9]+]] : @guaranteed $Foo):
+// CHECK: end_borrow [[BORROWED]]
+// CHECK: destroy_value [[VAL]]
+
+// Make sure that we also destroy/end here.
+// CHECK: [[BB3]]:
+// CHECK: end_borrow [[BORROWED]]
+// CHECK: destroy_value [[VAL]]
+
+// CHECK-LABEL: end sil function '$s7foreach19sharedElementSimple3barSiAA3BarV_tF'
+func sharedElementSimple(bar : Bar) -> Int {
+  var sum = 0
+  for __shared e in bar.arr {
+      sum += e.x
+  }
+  return sum
+}
+
+// This will be an address so nothing's different.
+// CHECK-LABEL: sil hidden [ossa] @$s7foreach20genericSharedElement3arrySayxG_tlF
+
+// CHECK: bb1:
+// CHECK: switch_enum_addr {{%[0-9]+}} : $*Optional<T>, case #Optional.some!enumelt: [[BB2:bb[0-9]]], case #Optional.none!enumelt: [[BB3:bb[0-9]]]
+
+// Make sure that a) we have a guaranteed arg and b) we destroy/end the value/borrow.
+// CHECK: [[BB2]]:
+// CHECK: [[SA:%[0-9]+]] = alloc_stack $T
+// CHECK: dealloc_stack [[SA]]
+
+// Make sure that we also destroy/end here.
+// CHECK: [[BB3]]:
+// CHECK: return
+
+// CHECK-LABEL: end sil function '$s7foreach20genericSharedElement3arrySayxG_tlF'
+func genericSharedElement<T>(arr : [T]) {
+  for __shared e in arr { _ = e }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s7foreach19nestedSharedElement0B3ArrSiSaySayAA3FooVGG_tF
+
+// CHECK: bb1:
+// CHECK: [[SA:%[0-9]+]] = alloc_stack $Optional<Array<Foo>>
+// CHECK: [[VAL:%[0-9]+]] = load [take] [[SA]]
+// CHECK: [[BORROWED:%[0-9]+]] = begin_borrow [[VAL]]
+// CHECK-NEXT: switch_enum [[BORROWED]] : $Optional<Array<Foo>>, case #Optional.some!enumelt: [[BB2:bb[0-9]]], case #Optional.none!enumelt: [[BB6:bb[0-9]]]
+
+// Make sure that a) we have a guaranteed arg and b) we destroy/end the value/borrow.
+// CHECK: [[BB2]]([[ARG0:%[0-9]+]] : @guaranteed $Array<Foo>):
+// CHECK: br [[BB3:bb[0-9]]]
+
+// CHECK: [[BB3]]:
+// CHECK: [[SA2:%[0-9]+]] = alloc_stack $Optional<Foo>
+// CHECK: [[VAL2:%[0-9]+]] = load [take] [[SA2]]
+// CHECK: [[BORROWED2:%[0-9]+]] = begin_borrow [[VAL2]]
+// CHECK: switch_enum [[BORROWED2]] : $Optional<Foo>, case #Optional.some!enumelt: [[BB4:bb[0-9]]], case #Optional.none!enumelt: [[BB5:bb[0-9]]]
+
+// Make sure that a) we have a guaranteed arg and b) we destroy/end the value/borrow.
+// CHECK: [[BB4]]([[ARG0:%[0-9]+]] : @guaranteed $Foo):
+// CHECK: end_borrow [[BORROWED2]]
+// CHECK: destroy_value [[VAL2]]
+// CHECK: br [[BB3]]
+
+// CHECK: [[BB5]]:
+// CHECK: end_borrow [[BORROWED2]]
+// CHECK: destroy_value [[VAL2]]
+// CHECK: end_borrow [[BORROWED]]
+// CHECK: destroy_value [[VAL]]
+
+// Make sure that we also destroy/end here.
+// CHECK: [[BB6]]:
+// CHECK: end_borrow [[BORROWED]]
+// CHECK: destroy_value [[VAL]]
+
+// CHECK-LABEL: end sil function '$s7foreach19nestedSharedElement0B3ArrSiSaySayAA3FooVGG_tF'
+func nestedSharedElement(nestedArr : [[Foo]]) -> Int {
+  var sum = 0
+  for __shared arr in nestedArr {
+    for __shared e in arr {
+      sum += e.x
+    }
+  }
+  return sum
+}
+
+func ownedCallMe(_ x : __owned Foo) { }
+
+// We know all the other stuff works so, for this test, just look at the call to ownedCallMe.
+// CHECK-LABEL: sil hidden [ossa] @$s7foreach22callOwnedSharedElement3arrySayAA3FooVG_tF
+
+// CHECK: bb2([[ARG0:%[0-9]+]] : @guaranteed $Foo):
+// CHECK: [[COPY:%[0-9]+]] = copy_value [[ARG0]]
+// Make sure this function gets an owned value and ARG0 is guaranteed.
+// CHECK: apply {{%[0-9]+}}([[COPY]]) : $@convention(thin) (@owned Foo) -> ()
+
+// CHECK-LABEL: end sil function '$s7foreach22callOwnedSharedElement3arrySayAA3FooVG_tF'
+func callOwnedSharedElement(arr : [Foo]) {
+  for __shared e in arr {
+    ownedCallMe(e)
+  }
+}
+
+func sharedCallMe(_ x : __shared Foo) { }
+
+// We know all the other stuff works so, for this test, just look at the call to ownedCallMe.
+// CHECK-LABEL: sil hidden [ossa] @$s7foreach010callSharedC7Element3arrySayAA3FooVG_tF
+
+// CHECK: bb2([[ARG0:%[0-9]+]] : @guaranteed $Foo):
+// Make sure this function gets the borrowed value.
+// CHECK: apply {{%[0-9]+}}([[ARG0]]) : $@convention(thin) (@guaranteed Foo) -> ()
+
+// CHECK-LABEL: end sil function '$s7foreach010callSharedC7Element3arrySayAA3FooVG_tF'
+func callSharedSharedElement(arr : [Foo]) {
+  for __shared e in arr {
+    sharedCallMe(e)
+  }
+}

@@ -911,6 +911,10 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   auto sequenceSubs = SubstitutionMap::getProtocolSubstitutions(
       sequenceProto, sequenceType, sequenceConformance);
 
+  bool isShared;
+  if (auto var = dyn_cast<VarPattern>(S->getPattern()))
+    isShared = var->isShared();
+
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
   {
@@ -1037,6 +1041,10 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     nextBufOrValue = innerForScope.popPreservingValue(
         buildElementRValue(SILLocation(S), SGFContext())
             .getAsSingleValue(SGF, SILLocation(S)));
+    if (isShared)
+      nextBufOrValue = SGF.emitManagedBorrowedRValueWithCleanup(
+          SGF.B.emitBeginBorrowOperation(SILLocation(S),
+                                         nextBufOrValue.getValue()));
   }
 
   SILBasicBlock *failExitingBlock = createBasicBlock();
@@ -1059,7 +1067,6 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           // the code should jump to the continue block.
           InitializationPtr initLoopVars =
               SGF.emitPatternBindingInitialization(S->getPattern(), loopDest);
-
           // If we had a loadable "next" generator value, we know it is present.
           // Get the value out of the optional, and wrap it up with a cleanup so
           // that any exits out of this scope properly clean it up.
@@ -1071,9 +1078,10 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
                 S, inputValue, optTL, SGFContext(initLoopVars.get()));
           }
 
-          if (!inputValue.isInContext())
+          if (!inputValue.isInContext()) {
             RValue(SGF, S, optTy.getOptionalObjectType(), inputValue)
                 .forwardInto(SGF, S, initLoopVars.get());
+          }
 
           // Now that the pattern has been initialized, check any where
           // condition.
@@ -1088,6 +1096,18 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           }
 
           visit(S->getBody());
+        }
+
+        // If the pattern is shared, create a guarenteed argument / switch by
+        // emitting a borrow. Because it's not owned, we also have to emit a
+        // destroy_value.
+        if (isShared && !nextBufOrValue.getType().isAddress()) {
+          SGF.B.emitEndBorrowOperation(SILLocation(S),
+                                       nextBufOrValue.getValue());
+          SGF.B.emitDestroyValue(
+              SILLocation(S),
+              nextBufOrValue.getValue().getDefiningInstruction()->getOperand(
+                  0));
         }
 
         // If we emitted an unreachable in the body, we will not have a valid

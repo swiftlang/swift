@@ -416,8 +416,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
 
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
-    auto result = new (getContext()) VarPattern(SourceLoc(), isLet, subPattern,
-                                                isImplicit);
+    auto result = new (getContext()) VarPattern(
+        SourceLoc(), isLet, /*isShared*/ false, subPattern, isImplicit);
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
       result->setDelayedInterfaceType(interfaceType, owningDC);
     else

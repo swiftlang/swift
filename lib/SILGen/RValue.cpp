@@ -529,7 +529,6 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &SGF,
 void RValue::forwardInto(SILGenFunction &SGF, SILLocation loc, 
                          Initialization *I) && {
   assert(isComplete() && "rvalue is not complete");
-  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
   ArrayRef<ManagedValue> elts = values;
   copyOrInitValuesInto<ImplodeKind::Forward>(I, elts, type, loc, SGF);
 }

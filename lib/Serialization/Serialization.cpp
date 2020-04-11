@@ -2718,6 +2718,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto var = cast<VarPattern>(pattern);
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[VarPatternLayout::Code];
+      // This is semi-arbitrary and can/should be changed in the future if
+      // needed.
+      assert(var->isShared() == false &&
+             "A var pattern should never be shared during serialization.");
       VarPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                    var->isLet(), var->isImplicit());
       writePattern(var->getSubPattern());

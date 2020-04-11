@@ -1078,8 +1078,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                        P.CurDeclContext);
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
-    auto varPattern = new (P.Context) VarPattern(loc, /*isLet*/true,
-                                                 namePattern, /*implicit*/true);
+    auto varPattern =
+        new (P.Context) VarPattern(loc, /*isLet*/ true,
+                                   /*isShared*/ false, namePattern,
+                                   /*implicit*/ true);
     patternResult = makeParserResult(varPattern);
   }
 
@@ -1469,7 +1471,8 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     
     if (ThePattern.isNonNull()) {
       auto *P = new (Context) VarPattern(IntroducerLoc, wasLet,
-                                          ThePattern.get(), /*impl*/false);
+                                         /*isShared*/ false, ThePattern.get(),
+                                         /*impl*/ false);
       ThePattern = makeParserResult(Status, P);
     }
 
@@ -2103,6 +2106,12 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
       T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
     pattern = parseMatchingPattern(/*isExprBasic*/true);
     pattern = parseOptionalPatternTypeAnnotation(pattern, /*isOptional*/false);
+  } else if (Tok.is(tok::identifier) && Tok.getRawText().equals("__shared")) {
+    consumeToken();
+    pattern = makeParserResult(new (Context) VarPattern(Tok.getLoc(),
+                                                        /*isLet*/ true,
+                                                        /*isShared*/ true,
+                                                        parsePattern().get()));
   } else if (!IsCStyleFor || Tok.is(tok::kw_var)) {
     // Change the parser state to know that the pattern we're about to parse is
     // implicitly mutable.  Bound variables can be changed to mutable explicitly
@@ -2114,7 +2123,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     assert(InVarOrLetPattern == IVOLP_ImplicitlyImmutable);
     InVarOrLetPattern = IVOLP_NotInVarOrLet;
   }
-  
+
   SourceLoc InLoc;
   if (pattern.isNull()) {
     // Recover by creating a "_" pattern.

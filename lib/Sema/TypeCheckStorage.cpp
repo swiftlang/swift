@@ -1200,8 +1200,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
 
   auto *Named = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
   Named->setType(Tmp1VD->getType());
-  auto *Let = new (Ctx) VarPattern(SourceLoc(), /*let*/true, Named,
-                                   /*implict*/true);
+  auto *Let = new (Ctx) VarPattern(SourceLoc(), /*let*/ true,
+                                   /*isShared*/ false, Named, /*implict*/ true);
   Let->setType(Named->getType());
   auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc(),
                                              /*implicit*/true);

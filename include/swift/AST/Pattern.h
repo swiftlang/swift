@@ -72,10 +72,10 @@ protected:
     Value : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarPattern, Pattern, 1,
-    /// True if this is a let pattern, false if a var pattern.
-    IsLet : 1
-  );
+  SWIFT_INLINE_BITFIELD(
+      VarPattern, Pattern, 1 + 1,
+      /// True if this is a let pattern, false if a var pattern.
+      IsLet : 1, IsShared : 1);
 
   } Bits;
 
@@ -719,16 +719,18 @@ class VarPattern : public Pattern {
   SourceLoc VarLoc;
   Pattern *SubPattern;
 public:
-  VarPattern(SourceLoc loc, bool isLet, Pattern *sub,
+  VarPattern(SourceLoc loc, bool isLet, bool isShared, Pattern *sub,
              Optional<bool> implicit = None)
       : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub) {
     Bits.VarPattern.IsLet = isLet;
+    Bits.VarPattern.IsShared = isShared;
     if (implicit.hasValue() ? *implicit : !loc.isValid())
       setImplicit();
   }
 
   bool isLet() const { return Bits.VarPattern.IsLet; }
-  
+  bool isShared() const { return Bits.VarPattern.IsShared; }
+
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {
     SourceLoc EndLoc = SubPattern->getSourceRange().End;

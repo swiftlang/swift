@@ -653,7 +653,7 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
       auto namedPattern = new (C) NamedPattern(payloadVar);
       namedPattern->setImplicit();
       auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                           namedPattern);
+                                           /*isShared*/ false, namedPattern);
       elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
                                                 SourceLoc(), letPattern));
     }
@@ -674,7 +674,7 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
   auto namedPattern = new (C) NamedPattern(payloadVar);
   namedPattern->setImplicit();
   auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                       namedPattern);
+                                       /*isShared*/ false, namedPattern);
   auto pat = new (C) ParenPattern(SourceLoc(), letPattern, SourceLoc());
   pat->setImplicit();
   return pat;

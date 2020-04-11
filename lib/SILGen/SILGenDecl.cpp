@@ -296,6 +296,11 @@ public:
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
+    // We don't need to destroy shared values.
+    if (auto *varPattern = dyn_cast<VarPattern>(Var->getParentPattern())) {
+      if (varPattern->isShared())
+        return;
+    }
     SGF.destroyLocalVariable(l, Var);
   }
 

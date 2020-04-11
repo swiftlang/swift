@@ -148,7 +148,11 @@ void SwitchEnumBuilder::emit() && {
           decl, builder.getModule(), builder.getFunction());
       input = optional;
       if (!isAddressOnly) {
-        input = builder.createOwnedPhiArgument(inputType);
+        if (optional.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+          input =
+              builder.createGuaranteedTransformingTerminatorArgument(inputType);
+        else
+          input = builder.createOwnedPhiArgument(inputType);
       }
     }
     handler(input, std::move(presentScope));

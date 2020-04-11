@@ -1018,6 +1018,7 @@ ParserResult<Pattern> Parser::parsePattern() {
     if (subPattern.isNull())
       return nullptr;
     return makeParserResult(new (Context) VarPattern(varLoc, isLet,
+                                                     /*isShared*/ false,
                                                      subPattern.get()));
   }
       
@@ -1234,7 +1235,8 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
   if (subPattern.isNull())
     return nullptr;
-  auto *varP = new (Context) VarPattern(varLoc, isLet, subPattern.get());
+  auto *varP = new (Context)
+      VarPattern(varLoc, isLet, /*isShared*/ false, subPattern.get());
   return makeParserResult(ParserStatus(subPattern), varP);
 }
 
