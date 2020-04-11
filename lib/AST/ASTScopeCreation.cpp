@@ -658,9 +658,10 @@ public:
     ASTScopeAssert(!n.isDecl(DeclKind::Accessor),
                    "Should not see accessors here");
     // Can occur in illegal code
+    // non-empty brace stmt could define a new insertion point
     if (auto *const s = n.dyn_cast<Stmt *>()) {
       if (auto *const bs = dyn_cast<BraceStmt>(s))
-        ASTScopeAssert(bs->empty(), "Might mess up insertion point");
+        return !bs->empty();
     }
     return !n.isDecl(DeclKind::Var);
   }
