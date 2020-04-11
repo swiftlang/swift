@@ -597,6 +597,10 @@ public:
     return ID;
   }
 
+  external_key_type GetExternalKey(internal_key_type ID) {
+    return ID;
+  }
+
   hash_value_type ComputeHash(internal_key_type key) {
     return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
   }

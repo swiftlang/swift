@@ -40,7 +40,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   } else {
     assert(SF);
     out << "IR Generation for file ";
-    out << '\"' << cast<LoadedFile>(SF)->getFilename() << '\"';
+    out << '\"' << SF->getFilename() << '\"';
   }
 }
 
