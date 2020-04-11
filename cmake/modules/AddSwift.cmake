@@ -548,10 +548,6 @@ function(_add_swift_host_library_single target)
     message(FATAL_ERROR "Either SHARED or STATIC must be specified")
   endif()
 
-  # Determine the subdirectory where this library will be installed.
-  set(ASHLS_SUBDIR
-    "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
-
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
   if(SWIFT_EMBED_BITCODE_SECTION)
@@ -656,19 +652,7 @@ function(_add_swift_host_library_single target)
   set(c_compile_flags ${ASHLS_C_COMPILE_FLAGS})
   set(link_flags)
 
-  set(library_search_subdir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-  set(library_search_directories
-    "${SWIFTLIB_DIR}/${ASHLS_SUBDIR}"
-    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${ASHLS_SUBDIR}"
-    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-
-  # In certain cases when building, the environment variable SDKROOT is set to override
-  # where the sdk root is located in the system. If that environment variable has been
-  # set by the user, respect it and add the specified SDKROOT directory to the
-  # library_search_directories so we are able to link against those libraries
-  if(DEFINED ENV{SDKROOT} AND EXISTS "$ENV{SDKROOT}/usr/lib/swift")
-      list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
-  endif()
+  set(library_search_directories)
 
   _add_variant_c_compile_flags(
     SDK "${SWIFT_HOST_VARIANT_SDK}"
