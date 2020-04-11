@@ -53,11 +53,6 @@ namespace constraints {
   class SolutionResult;
 }
 
-/// A mapping from substitutable types to the protocol-conformance
-/// mappings for those types.
-using ConformanceMap =
-    llvm::DenseMap<SubstitutableType *, SmallVector<ProtocolConformance *, 2>>;
-
 /// Special-case type checking semantics for certain declarations.
 enum class DeclTypeCheckingSemantics {
   /// A normal declaration.
