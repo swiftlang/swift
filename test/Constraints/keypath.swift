@@ -130,3 +130,28 @@ func test_mismatch_with_contextual_optional_result() {
   let _ = A(B(), keyPath: \.arr)
   // expected-error@-1 {{key path value type '[Int]' cannot be converted to contextual type '[Int]?'}}
 }
+
+struct SR12390 {
+  let value: Int
+}
+
+struct SR12390_1 {
+  let value: String
+}
+
+struct SR12390_2 {
+  let outter: SR12390
+}
+
+func funcSR12390(with keyPath: PartialKeyPath<SR12390>) {}
+func funcSR12390_1(with keyPath: PartialKeyPath<SR12390_1>) {}
+func funcSR12390_2(with keyPath: PartialKeyPath<SR12390_2>) {}
+
+func test_arg_conversion_inference() {
+  
+  funcSR12390(with: \.value) // OK
+  funcSR12390_1(with: \.value) // OK
+  funcSR12390_2(with: \.outter.value) // OK
+
+  let _: PartialKeyPath<SR12390> = \.value // OK
+}
