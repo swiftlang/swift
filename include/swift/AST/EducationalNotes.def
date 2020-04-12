@@ -66,4 +66,7 @@ EDUCATIONAL_NOTES(append_interpolation_static,
 EDUCATIONAL_NOTES(append_interpolation_void_or_discardable,
                   "string-interpolation-conformance.md")
 
+EDUCATIONAL_NOTES(expression_too_complex,
+                  "expression-too-complex.md")
+
 #undef EDUCATIONAL_NOTES
