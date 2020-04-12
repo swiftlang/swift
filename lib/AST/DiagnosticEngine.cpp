@@ -590,7 +590,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
         << FormatOpts.ClosingQuotationMark;
     break;
 
-case DiagnosticArgumentKind::PatternKind:
+ case DiagnosticArgumentKind::PatternKind:
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();
     break;
