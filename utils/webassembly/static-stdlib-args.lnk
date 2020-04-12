@@ -1,0 +1,14 @@
+-ldl
+-latomic
+-lswiftWasiPthread
+-lswiftCore
+-latomic
+-lswiftImageInspectionShared
+-licuuc
+-licudata
+-lstdc++
+-lm
+-Xlinker
+--exclude-libs
+-Xlinker
+ALL

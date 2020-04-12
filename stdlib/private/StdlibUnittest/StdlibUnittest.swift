@@ -12,7 +12,9 @@
 
 
 import SwiftPrivate
+#if !os(WASI)
 import SwiftPrivateThreadExtras
+#endif
 import SwiftPrivateLibcExtras
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -809,8 +811,10 @@ var _testSuiteNameToIndex: [String : Int] = [:]
 let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
 let _crashedPrefix = "CRASHED:"
 
+#if !os(WASI)
 @_silgen_name("installTrapInterceptor")
 func _installTrapInterceptor()
+#endif
 
 #if _runtime(_ObjC)
 @objc protocol _StdlibUnittestNSException {
@@ -821,7 +825,9 @@ func _installTrapInterceptor()
 // Avoid serializing references to objc_setUncaughtExceptionHandler in SIL.
 @inline(never)
 func _childProcess() {
+#if !os(WASI)
   _installTrapInterceptor()
+#endif
 
 #if _runtime(_ObjC)
   objc_setUncaughtExceptionHandler {
@@ -1450,7 +1456,12 @@ public func runAllTests() {
   if _isChildProcess {
     _childProcess()
   } else {
+    #if os(WASI)
+    // WASI doesn't support child process
+    var runTestsInProcess: Bool = true
+    #else
     var runTestsInProcess: Bool = false
+    #endif
     var filter: String?
     var args = [String]()
     var i = 0

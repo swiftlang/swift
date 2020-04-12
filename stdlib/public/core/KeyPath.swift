@@ -2683,9 +2683,19 @@ internal protocol KeyPathPatternVisitor {
 
 internal func _resolveRelativeAddress(_ base: UnsafeRawPointer,
                                       _ offset: Int32) -> UnsafeRawPointer {
+  #if arch(wasm32)
+  // FIXME: If offset is 0, it means the pointer is null.
+  // For real relative pointer, it always calculates valid non-null address
+  // because the base address is always valid.
+  // But hacked absolute pointer can be null pointer.
+  // The return type doesn't allow nil, so return given base temporarily.
+  if offset == 0 { return base }
+  return UnsafeRawPointer(bitPattern: Int(offset)).unsafelyUnwrapped
+  #else
   // Sign-extend the offset to pointer width and add with wrap on overflow.
   return UnsafeRawPointer(bitPattern: Int(bitPattern: base) &+ Int(offset))
     .unsafelyUnwrapped
+  #endif
 }
 internal func _resolveRelativeIndirectableAddress(_ base: UnsafeRawPointer,
                                                   _ offset: Int32)
@@ -3355,7 +3365,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
 
     case .pointer:
       // Resolve the sign-extended relative reference.
-      var absoluteID: UnsafeRawPointer? = idValueBase + Int(idValue)
+      var absoluteID: UnsafeRawPointer? = _resolveRelativeAddress(idValueBase, idValue)
 
       // If the pointer ID is unresolved, then it needs work to get to
       // the final value.
@@ -3460,7 +3470,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       for i in externalArgs.indices {
         let base = externalArgs.baseAddress.unsafelyUnwrapped + i
         let offset = base.pointee
-        let metadataRef = UnsafeRawPointer(base) + Int(offset)
+        let metadataRef = _resolveRelativeAddress(UnsafeRawPointer(base), offset)
         let result = _resolveKeyPathGenericArgReference(
                        metadataRef,
                        genericEnvironment: genericEnvironment,

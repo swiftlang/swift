@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - swiftwasm
+  pull_request:
+    branches:
+      - swiftwasm
+
+jobs:
+  linux_build:
+    timeout-minutes: 0
+    runs-on: ubuntu-18.04
+
+    steps:
+      - name: Free disk space
+        run: |
+          df -h
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+      - uses: actions/checkout@v1
+        with:
+          path: swift
+      - uses: actions/cache@v1
+        with:
+          path: ../build-cache
+          key: ${{ runner.os }}-sccache-v4
+      - name: Build Linux installable archive
+        run: |
+          ./utils/webassembly/ci.sh
+          echo "Cleanup build directory to free disk space"
+          rm -rf ../build
+      - name: Upload Linux installable archive
+        uses: actions/upload-artifact@v1
+        with:
+          name: linux-installable
+          path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-linux.tar.gz
+#      - name: Pack test results
+#        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
+#      - name: Upload test results
+#        uses: actions/upload-artifact@v1
+#        with:
+#          name: linux-test-results
+#          path: ./swift-test-results.tar.gz
+
+  macos_build:
+    timeout-minutes: 0
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          path: swift
+      - uses: actions/cache@v1
+        with:
+          path: ../build-cache
+          key: ${{ runner.os }}-sccache-v4
+      - name: Build macOS installable archive
+        run: ./utils/webassembly/ci.sh
+      - name: Upload macOS installable archive
+        uses: actions/upload-artifact@v1
+        with:
+          name: macos-installable
+          path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-osx.tar.gz
+      - name: Upload packaging scripts
+        uses: actions/upload-artifact@v1
+        with:
+          name: packaging-scripts
+          path: utils/webassembly
+      - name: Pack test results
+        run: tar cJf swift-test-results.tar.gz ../build/*/swift-macosx-x86_64/swift-test-results
+      - name: Upload test results
+        uses: actions/upload-artifact@v1
+        with:
+          name: macos-test-results
+          path: ./swift-test-results.tar.gz
+  macos_smoke_test:
+    name: Compile hello.swift on macOS
+    runs-on: macos-latest
+    needs: macos_build
+    steps:
+      - name: Download installable macOS archive
+        uses: actions/download-artifact@v1
+        with:
+          name: macos-installable
+      - name: Build hello.wasm
+        shell: bash
+        run: |
+          set -x
+          tar xf $(find . -name "swift-wasm-*.tar.gz" -type f)
+          TOOLCHAIN_PATH=$(find . -name "swift-wasm-*" -type d)
+          echo 'print("Hello, world!")' > hello.swift
+          $TOOLCHAIN_PATH/usr/bin/swiftc \
+                -target wasm32-unknown-wasi \
+                -sdk $TOOLCHAIN_PATH/usr/share/wasi-sysroot \
+                hello.swift -o hello.wasm && \
+                echo "Successfully linked hello.wasm"
+
+      - name: Upload hello.wasm compiled with macOS package
+        uses: actions/upload-artifact@v1
+        with:
+          name: macos-hello.wasm
+          path: hello.wasm

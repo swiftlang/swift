@@ -2708,12 +2708,21 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     }
   }
 
+  auto Target = SGM.getASTContext().LangOpts.Target;
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
   if (genericSig && genericSig->areAllParamsConcrete()) {
     genericSig = nullptr;
     genericEnv = nullptr;
+  }
+
+  // Add empty generic type parameter to match function signature on WebAssembly
+  if (!genericSig && Target.isOSBinFormatWasm()) {
+    auto param = GenericTypeParamType::get(0, 0, SGM.getASTContext());
+    auto sig = GenericSignature::get(param, { });
+    genericSig = CanGenericSignature(sig);
+    genericEnv = sig->getGenericEnvironment();
   }
 
   // Build the signature of the thunk as expected by the keypath runtime.
@@ -2731,7 +2740,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     SmallVector<SILParameterInfo, 2> params;
     params.push_back({loweredBaseTy, paramConvention});
     auto &C = SGM.getASTContext();
-    if (!indexes.empty())
+    // Always take indexes parameter to match callee and caller signature on WebAssembly
+    if (!indexes.empty() || C.LangOpts.Target.isOSBinFormatWasm())
       params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
                                                    ->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
@@ -2787,7 +2797,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto resultArg = entry->createFunctionArgument(resultArgTy);
   auto baseArg = entry->createFunctionArgument(baseArgTy);
   SILValue indexPtrArg;
-  if (!indexes.empty()) {
+  // Always take indexes parameter to match callee and caller signature on WebAssembly
+  if (!indexes.empty() || Target.isOSBinFormatWasm()) {
     auto indexArgTy = signature->getParameters()[1].getSILStorageType(
         SGM.M, signature);
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
@@ -2849,12 +2860,21 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     }
   }
 
+  auto Target = SGM.getASTContext().LangOpts.Target;
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
   if (genericSig && genericSig->areAllParamsConcrete()) {
     genericSig = nullptr;
     genericEnv = nullptr;
+  }
+
+  // Add empty generic type parameter to match function signature on WebAssembly
+  if (!genericSig && Target.isOSBinFormatWasm()) {
+    auto param = GenericTypeParamType::get(0, 0, SGM.getASTContext());
+    auto sig = GenericSignature::get(param, { });
+    genericSig = CanGenericSignature(sig);
+    genericEnv = sig->getGenericEnvironment();
   }
 
   // Build the signature of the thunk as expected by the keypath runtime.
@@ -2882,7 +2902,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                         ? ParameterConvention::Indirect_Inout
                         : paramConvention});
     // indexes
-    if (!indexes.empty())
+    // Always take indexes parameter to match callee and caller signature on WebAssembly
+    if (!indexes.empty() || C.LangOpts.Target.isOSBinFormatWasm())
       params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
                                                    ->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
@@ -2938,7 +2959,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   auto baseArg = entry->createFunctionArgument(baseArgTy);
   SILValue indexPtrArg;
   
-  if (!indexes.empty()) {
+  // Always take indexes parameter to match callee and caller signature on WebAssembly
+  if (!indexes.empty() || Target.isOSBinFormatWasm()) {
     auto indexArgTy = signature->getParameters()[2].getSILStorageType(
         SGM.M, signature);
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
@@ -3020,6 +3042,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     return;
   }
 
+  auto Target = SGM.getASTContext().LangOpts.Target;
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
@@ -3027,6 +3050,14 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   if (genericSig && genericSig->areAllParamsConcrete()) {
     genericSig = nullptr;
     genericEnv = nullptr;
+  }
+
+  // Add empty generic type parameter to match function signature on WebAssembly
+  if (!genericSig && Target.isOSBinFormatWasm()) {
+    auto param = GenericTypeParamType::get(0, 0, SGM.getASTContext());
+    auto sig = GenericSignature::get(param, { });
+    genericSig = CanGenericSignature(sig);
+    genericEnv = sig->getGenericEnvironment();
   }
 
   auto &C = SGM.getASTContext();
