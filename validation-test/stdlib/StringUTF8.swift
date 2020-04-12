@@ -67,8 +67,11 @@ private func testForeignContiguous(slowString: NSSlowString, string: String) {
       CFStringCreateWithCString(nil, $0, kCFStringEncodingASCII)!
       } as String
     expectTrue(cfString.isFastUTF8)
-    expectEqualSequence(
-      string.utf8, cfString.withFastUTF8IfAvailable(Array.init)!)
+    let cfStringFastUTF8OrNone = cfString.withFastUTF8IfAvailable(Array.init)
+    if let cfStringFastUTF8 = expectNotNil(cfStringFastUTF8OrNone) {
+      expectEqualSequence(
+        string.utf8, cfStringFastUTF8)
+    }
   }
 }
 
