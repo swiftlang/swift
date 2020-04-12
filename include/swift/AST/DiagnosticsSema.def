@@ -904,6 +904,9 @@ ERROR(nonstatic_operator_in_nominal,none,
 ERROR(nonstatic_operator_in_extension,none,
       "operator %0 declared in extension of %1 must be 'static'",
       (Identifier, TypeRepr*))
+ERROR(nonstatic_operator_in_extension_no_type,none,
+"operator %0 declared in extension must be 'static'",
+(Identifier))
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
