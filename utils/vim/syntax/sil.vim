@@ -31,6 +31,7 @@ syn keyword silConventions
       \ c
       \ method
       \ objc_method
+      \ sil_differentiability_witness
       \ thick
       \ thin
       \ witness_method

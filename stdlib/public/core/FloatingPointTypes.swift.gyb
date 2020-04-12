@@ -903,7 +903,7 @@ extension ${Self}: _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLite
 }
 
 % if bits != 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
 
 % builtinFloatLiteralBits = 80
