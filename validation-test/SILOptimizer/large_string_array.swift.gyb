@@ -11,6 +11,10 @@
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: long_test
 
+// Android-ARMv7 takes more  than 5 minutes. Mark it as unsupported to avoid
+// wasting 5 minutes until timing out.
+// UNSUPPORTED: CPU=armv7 && OS=linux-androideabi
+
 // Check if the optimizer can optimize the whole array into a statically
 // initialized global
 
