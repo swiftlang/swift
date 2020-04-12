@@ -2,6 +2,7 @@
 
 sil_stage raw
 
+import _Differentiation
 import Swift
 import Builtin
 
