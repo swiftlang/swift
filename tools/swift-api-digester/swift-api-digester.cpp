@@ -1112,6 +1112,28 @@ public:
     UpdateMap(Ctx.getNodeUpdateMap()),
     ProtocolReqWhitelist(std::move(prWhitelist)) {}
 
+  void diagnoseMissingAvailable(SDKNodeDecl *D) {
+    // For extensions of external types, we diagnose individual member's missing
+    // available attribute instead of the extension itself.
+    // The reason is we may merge several extensions into a single one; some
+    // attributes are missing.
+    if (auto *DT = dyn_cast<SDKNodeDeclType>(D)) {
+      if (DT->isExtension()) {
+        for(auto MD: DT->getChildren()) {
+          diagnoseMissingAvailable(cast<SDKNodeDecl>(MD));
+        }
+        return;
+      }
+    }
+    // Diagnose the missing of @available attributes.
+    // Decls with @_alwaysEmitIntoClient aren't required to have an
+    // @available attribute.
+    if (!Ctx.getOpts().SkipOSCheck &&
+        !D->getIntroducingVersion().hasOSAvailability() &&
+        !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
+      D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
+    }
+  }
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
     if (options::DebugMapping)
       debugMatch(Left, Right, Reason, llvm::errs());
@@ -1125,14 +1147,7 @@ public:
           if (D->hasFixedBinaryOrder()) {
             D->emitDiag(D->getLoc(), diag::decl_added);
           }
-          // Diagnose the missing of @available attributes.
-          // Decls with @_alwaysEmitIntoClient aren't required to have an
-          // @available attribute.
-          if (!Ctx.getOpts().SkipOSCheck &&
-              !D->getIntroducingVersion().hasOSAvailability() &&
-              !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
-            D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
-          }
+          diagnoseMissingAvailable(D);
         }
       }
       // Complain about added protocol requirements
