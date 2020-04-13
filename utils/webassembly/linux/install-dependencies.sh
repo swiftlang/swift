@@ -23,7 +23,7 @@ curl https://get.wasmer.io -sSfL | sh
 
 cd $SOURCE_PATH
 
-wget -O install_cmake.sh "https://github.com/Kitware/CMake/releases/download/v3.15.3/cmake-3.15.3-Linux-x86_64.sh"
+wget -O install_cmake.sh "https://github.com/Kitware/CMake/releases/download/v3.17.1/cmake-3.17.1-Linux-x86_64.sh"
 chmod +x install_cmake.sh
 sudo mkdir -p /opt/cmake
 sudo ./install_cmake.sh --skip-license --prefix=/opt/cmake
