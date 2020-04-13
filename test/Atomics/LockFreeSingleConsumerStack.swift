@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s %import-libdispatch -o %t/LockFreeSingleConsumerStack
+// RUN: %target-codesign %t/LockFreeSingleConsumerStack
+// RUN: %target-run %t/LockFreeSingleConsumerStack
 // REQUIRES: executable_test
 // REQUIRES: libdispatch
 
