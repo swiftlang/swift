@@ -83,6 +83,27 @@ bax(34949494949)
     .baz
 
 
+// Enum element parameters should be aligned, and raw values should be indented.
+
+enum TestEnum {
+    case first(x: Int,
+               y: Int,
+               z: Int),
+         second(
+            x: Int,
+            y: Int
+         )
+    case third
+}
+
+enum RawEnum: String {
+    case aCaseWithAParticularlyLongNameSoTheValueIsWrapped =
+            "a long message here",
+         aNotherCaseWithAParticularlyLongNameSoTheValueIsWrapped =
+            "a long message here"
+}
+
+
 // Condition elements should align with each other.
 //
 guard let x = Optional.some(10), x > 100,

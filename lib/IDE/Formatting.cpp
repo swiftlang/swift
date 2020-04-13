@@ -1499,6 +1499,34 @@ private:
       return IndentContext {ContextLoc, false};
     }
 
+    if (auto *ECD = dyn_cast<EnumCaseDecl>(D)) {
+      SourceLoc CaseLoc = ECD->getLoc();
+
+      if (TrailingTarget)
+        return None;
+
+      ListAligner Aligner(SM, TargetLocation, CaseLoc, CaseLoc);
+      for (auto *Elem: ECD->getElements()) {
+        SourceRange ElemRange = Elem->getSourceRange();
+        Aligner.updateAlignment(ElemRange, Elem);
+      }
+      return Aligner.getContextAndSetAlignment(CtxOverride);
+    }
+
+    if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+      SourceLoc ContextLoc = EED->getStartLoc();
+      if (auto Ctx = getIndentContextFrom(EED->getParameterList()))
+        return Ctx;
+
+      if (TrailingTarget)
+        return None;
+
+      return IndentContext {
+        ContextLoc,
+        !OutdentChecker::hasOutdent(SM, EED)
+      };
+    }
+
     if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
       SourceLoc ContextLoc = SD->getStartLoc();
 
