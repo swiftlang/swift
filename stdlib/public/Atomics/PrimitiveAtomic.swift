@@ -104,8 +104,8 @@ public protocol _PrimitiveAtomic {
   /// }
   /// ```
   ///
-  /// The `ordering` argument specifies the memory ordering to use when the
-  /// operation manages to update the current value, while `failureOrdering`
+  /// The `successOrdering` argument specifies the memory ordering to use when
+  /// the operation manages to update the current value, while `failureOrdering`
   /// will be used when the operation leaves the value intact.
   ///
   /// This method implements a "strong" compare and exchange operation
@@ -115,7 +115,10 @@ public protocol _PrimitiveAtomic {
   /// - Parameter desired: The desired new value.
   /// - Parameter pointer: A memory location previously initialized with a value
   ///   returned by `prepareSelf(for:)`.
-  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Parameter successOrdering: The memory ordering to apply if this
+  ///    operation performs the exchange.
+  /// - Parameter failureOrdering: The memory ordering to apply on this
+  ///    operation does not perform the exchange.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
   @_semantics("atomics.requires_constant_orderings")
@@ -123,7 +126,7 @@ public protocol _PrimitiveAtomic {
     expected: Self,
     desired: __owned Self,
     at pointer: UnsafeMutablePointer<Self>,
-    ordering: AtomicUpdateOrdering,
+    successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self)
 
@@ -149,7 +152,7 @@ public protocol _PrimitiveAtomic {
   /// expected` check to sometimes return false when the two values are in fact
   /// the same.)
   ///
-  /// The `ordering` argument specifies the memory ordering to use when the
+  /// The `successOrdering` argument specifies the memory ordering to use when the
   /// operation manages to update the current value, while `failureOrdering`
   /// will be used when the operation leaves the value intact.
   ///
@@ -157,7 +160,10 @@ public protocol _PrimitiveAtomic {
   /// - Parameter desired: The desired new value.
   /// - Parameter pointer: A memory location previously initialized with a value
   ///   returned by `prepareAtomicStorage(for:)`.
-  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Parameter successOrdering: The memory ordering to apply if this
+  ///    operation performs the exchange.
+  /// - Parameter failureOrdering: The memory ordering to apply on this
+  ///    operation does not perform the exchange.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
   @_semantics("atomics.requires_constant_orderings")
@@ -165,7 +171,7 @@ public protocol _PrimitiveAtomic {
     expected: Self,
     desired: __owned Self,
     at pointer: UnsafeMutablePointer<Self>,
-    ordering: AtomicUpdateOrdering,
+    successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self)
 }

@@ -203,8 +203,8 @@ extension UnsafeAtomic {
   /// }
   /// ```
   ///
-  /// The `ordering` argument specifies the memory ordering to use when the
-  /// operation manages to update the current value, while `failureOrdering`
+  /// The `succesOrdering` argument specifies the memory ordering to use when
+  /// the operation manages to update the current value, while `failureOrdering`
   /// will be used when the operation leaves the value intact.
   ///
   /// This method implements a "strong" compare and exchange operation
@@ -212,7 +212,10 @@ extension UnsafeAtomic {
   ///
   /// - Parameter expected: The expected current value.
   /// - Parameter desired: The desired new value.
-  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Parameter successOrdering: The memory ordering to apply if this
+  ///    operation performs the exchange.
+  /// - Parameter failureOrdering: The memory ordering to apply on this
+  ///    operation does not perform the exchange.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
   @_semantics("atomics.requires_constant_orderings")
@@ -220,14 +223,14 @@ extension UnsafeAtomic {
   public func compareExchange(
     expected: Value,
     desired: __owned Value,
-    ordering: AtomicUpdateOrdering,
+    successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {
     let (exchanged, original) = Value._AtomicStorage._atomicCompareExchange(
       expected: Value._encodeAtomicStorage(for: expected),
       desired: Value._encodeAtomicStorage(for: desired),
       at: _ptr,
-      ordering: ordering,
+      successOrdering: successOrdering,
       failureOrdering: failureOrdering)
     return (exchanged, Value._decodeAtomicStorage(original))
   }
@@ -259,7 +262,10 @@ extension UnsafeAtomic {
   ///
   /// - Parameter expected: The expected current value.
   /// - Parameter desired: The desired new value.
-  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Parameter successOrdering: The memory ordering to apply if this
+  ///    operation performs the exchange.
+  /// - Parameter failureOrdering: The memory ordering to apply on this
+  ///    operation does not perform the exchange.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
   @_semantics("atomics.requires_constant_orderings")
@@ -267,14 +273,14 @@ extension UnsafeAtomic {
   public func weakCompareExchange(
     expected: Value,
     desired: __owned Value,
-    ordering: AtomicUpdateOrdering,
+    successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {
     let (exchanged, original) = Value._AtomicStorage._atomicWeakCompareExchange(
       expected: Value._encodeAtomicStorage(for: expected),
       desired: Value._encodeAtomicStorage(for: desired),
       at: _ptr,
-      ordering: ordering,
+      successOrdering: successOrdering,
       failureOrdering: failureOrdering)
     return (exchanged, Value._decodeAtomicStorage(original))
   }

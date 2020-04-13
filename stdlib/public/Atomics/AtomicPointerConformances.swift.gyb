@@ -213,12 +213,12 @@ extension ${swiftType}._AtomicStorage: _PrimitiveAtomicOptional {
     expected: Self,
     desired: Self,
     at pointer: UnsafeMutablePointer<Self>,
-    ordering: AtomicUpdateOrdering,
+    successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
     let old: Builtin.Word
     let won: Builtin.Int1
-    switch (ordering, failureOrdering) {
+    switch (successOrdering, failureOrdering) {
 % for (swiftSuccess, llvmSuccess, _) in rmwOrderings():
 %   for (swiftFailure, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):
@@ -242,12 +242,12 @@ extension ${swiftType}._AtomicStorage: _PrimitiveAtomicOptional {
     expected: Self,
     desired: Self,
     at pointer: UnsafeMutablePointer<Self>,
-    ordering: AtomicUpdateOrdering,
+    successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Self) {
     let old: Builtin.Word
     let won: Builtin.Int1
-    switch (ordering, failureOrdering) {
+    switch (successOrdering, failureOrdering) {
 % for (swiftSuccess, llvmSuccess, _) in rmwOrderings():
 %   for (swiftFailure, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):

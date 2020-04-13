@@ -169,10 +169,10 @@ extension ${swiftType}: _PrimitiveAtomic {
     expected: ${swiftType},
     desired: ${swiftType},
     at pointer: UnsafeMutablePointer<${swiftType}>,
-    ordering: AtomicUpdateOrdering,
+    successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: ${swiftType}) {
-    switch (ordering, failureOrdering) {
+    switch (successOrdering, failureOrdering) {
 % for (swiftSuccess, llvmSuccess, _) in rmwOrderings():
 %   for (swiftFailure, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):
@@ -192,10 +192,10 @@ extension ${swiftType}: _PrimitiveAtomic {
     expected: ${swiftType},
     desired: ${swiftType},
     at pointer: UnsafeMutablePointer<${swiftType}>,
-    ordering: AtomicUpdateOrdering,
+    successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: ${swiftType}) {
-    switch (ordering, failureOrdering) {
+    switch (successOrdering, failureOrdering) {
 % for (swiftSuccess, llvmSuccess, _) in rmwOrderings():
 %   for (swiftFailure, llvmFailure) in loadOrderings():
     case (.${swiftSuccess}, .${swiftFailure}):

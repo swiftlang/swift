@@ -337,7 +337,7 @@ public struct AtomicFoldingTests {
     return value.${operation}(
       expected: expected,
       desired: desired,
-      ordering: .relaxed,
+      successOrdering: .relaxed,
       failureOrdering: .relaxed)
   }
   // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
@@ -357,7 +357,7 @@ public struct AtomicFoldingTests {
     return value.${operation}(
       expected: expected,
       desired: desired,
-      ordering: .acquiring,
+      successOrdering: .acquiring,
       failureOrdering: .relaxed)
   }
   // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
@@ -377,7 +377,7 @@ public struct AtomicFoldingTests {
     return value.${operation}(
       expected: expected,
       desired: desired,
-      ordering: .acquiring,
+      successOrdering: .acquiring,
       failureOrdering: .acquiring)
   }
   // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
@@ -397,7 +397,7 @@ public struct AtomicFoldingTests {
     return value.${operation}(
       expected: expected,
       desired: desired,
-      ordering: .sequentiallyConsistent,
+      successOrdering: .sequentiallyConsistent,
       failureOrdering: .acquiring)
   }
   // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
@@ -422,7 +422,7 @@ public struct AtomicFoldingTests {
     return value.${operation}(
       expected: expected,
       desired: desired,
-      ordering: .releasing,
+      successOrdering: .releasing,
       failureOrdering: .acquiring)
   }
   // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
@@ -446,7 +446,7 @@ public struct AtomicFoldingTests {
     return value.${operation}(
       expected: expected,
       desired: desired,
-      ordering: .relaxed,
+      successOrdering: .relaxed,
       failureOrdering: .sequentiallyConsistent)
   }
   // SECTIONING-LABEL: } // end sil function '$s14AtomicsFolding
