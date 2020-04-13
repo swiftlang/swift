@@ -3940,8 +3940,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
   // Retrieve the set of requirements that a given associated type declaration
   // produces, in the form that would be seen in the where clause.
-  auto getAssociatedTypeReqs = [&](AssociatedTypeDecl *assocType,
-                                   const char *start) {
+  const auto getAssociatedTypeReqs = [&](const AssociatedTypeDecl *assocType,
+                                         const char *start) {
     std::string result;
     {
       llvm::raw_string_ostream out(result);
@@ -3955,6 +3955,13 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       }, [&] {
         out << ", ";
       });
+
+      if (const auto whereClause = assocType->getTrailingWhereClause()) {
+        if (!assocType->getInherited().empty())
+          out << ", ";
+
+        whereClause->print(out, /*printWhereKeyword*/false);
+      }
     }
     return result;
   };
