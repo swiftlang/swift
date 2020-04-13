@@ -1579,6 +1579,7 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
   assert(accessor->isCoroutine());
 
   auto storage = accessor->getStorage();
+  auto storageReadWriteImpl = storage->getReadWriteImpl();
   auto target = (accessor->hasForcedStaticDispatch()
                    ? TargetImpl::Ordinary
                    : TargetImpl::Implementation);
