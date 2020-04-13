@@ -131,7 +131,9 @@ public:
   }
 
   void notifyHasNewUsers(SILValue value) override {
-    Worklist.addUsersToWorklist(value);
+    if (Worklist.size() < 10000) {
+      Worklist.addUsersToWorklist(value);
+    }
     changed = true;
   }
 

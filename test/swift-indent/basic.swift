@@ -945,3 +945,36 @@ IncrementedFirst++
     }++
     .baz()
 
+
+// Multiple patterns in catch should align exactly.
+
+do {
+    print("hello")
+} catch MyErr.a(let code, let message),
+        MyErr.b(
+            let code,
+            let message
+        ),
+        MyErr.c(let code, let message) {
+    print("ahhh!")
+}
+
+do {
+    throw MyErr.a
+} catch where foo == 0,
+        where bar == 1 {
+}
+
+do
+{
+    print("hello")
+}
+catch MyErr.a(let code, let message),
+      MyErr.b(
+        let code,
+        let message
+      ),
+      MyErr.c(let code, let message)
+{
+    print("ahhh!")
+}

@@ -5591,10 +5591,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         }
 
         // KeyPath can be used as a function that receives its root type.
-        if (T->is<AnyFunctionType>() &&
-            T->castTo<AnyFunctionType>()->getNumParams() == 1) {
-          baseType = T->castTo<AnyFunctionType>()->getParams()[0].getOldType();
-          break;
+        if (T->is<AnyFunctionType>()) {
+          auto *fnType = T->castTo<AnyFunctionType>();
+          if (fnType->getNumParams() == 1) {
+            const AnyFunctionType::Param &param = fnType->getParams()[0];
+            baseType = param.getParameterType();
+            break;
+          }
         }
       }
     }

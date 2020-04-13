@@ -176,15 +176,18 @@ struct ExpressionTypeArrayBuilder::Implementation {
     return reader.count();
   }
 
-  std::unique_ptr<llvm::MemoryBuffer> createBuffer() {
+  std::unique_ptr<llvm::MemoryBuffer> createBuffer(CustomBufferKind Kind) {
     std::array<CompactArrayBuilderImpl*, 3> builders =
       {&builder, &strBuilder, &protoBuilder};
+    auto kindSize = sizeof(uint64_t);
     size_t headerSize = sizeof(uint64_t) * builders.size();
-    auto allSize = headerSize;
+    auto allSize = kindSize + headerSize;
     for (auto *b: builders)
       allSize += b->sizeInBytes();
     auto result = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(allSize);
-    char *start = result->getBufferStart();
+    *reinterpret_cast<uint64_t*>(result->getBufferStart()) = (uint64_t)Kind;
+
+    char *start = result->getBufferStart() + kindSize;
     char *headerPtr = start;
     char *ptr = start + headerSize;
     auto addBuilder = [&](CompactArrayBuilderImpl& buffer) {
@@ -223,7 +226,7 @@ void ExpressionTypeArrayBuilder::add(const ExpressionType &expType) {
 
 std::unique_ptr<llvm::MemoryBuffer>
 ExpressionTypeArrayBuilder::createBuffer() {
-  return Impl.createBuffer();
+  return Impl.createBuffer(CustomBufferKind::ExpressionTypeArray);
 }
 
 VariantFunctions ExpressionTypeArrayBuilder::Funcs = {

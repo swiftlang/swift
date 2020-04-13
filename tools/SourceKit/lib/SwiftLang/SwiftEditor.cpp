@@ -1190,8 +1190,7 @@ static bool inferIsSettableSyntactically(const AbstractStorageDecl *D) {
   }
   if (D->hasParsedAccessors()) {
     return D->getParsedAccessor(AccessorKind::Set) != nullptr ||
-           D->getParsedAccessor(AccessorKind::WillSet) != nullptr ||
-           D->getParsedAccessor(AccessorKind::DidSet) != nullptr;
+           D->hasObservers();
   } else {
     return true;
   }

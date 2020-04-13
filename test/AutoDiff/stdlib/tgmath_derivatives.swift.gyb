@@ -54,6 +54,10 @@ where T == T.TangentVector {
 %for op in ['derivative', 'gradient']:
 %for T in ['Float', 'Float80']:
 
+%if T == 'Float80':
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%end
+
 DerivativeTests.test("${op}_${T}") {
   expectEqualWithTolerance(7.3890560989306502274, ${op}(at: 2 as ${T}, in: exp))
   expectEqualWithTolerance(2.772588722239781145, ${op}(at: 2 as ${T}, in: exp2))
@@ -111,6 +115,11 @@ DerivativeTests.test("${op}_${T}") {
     }
   }
 }
+
+%if T == 'Float80':
+#endif
+%end
+
 %end # for T in ['Float', 'Float80']:
 %end # for op in ['derivative', 'gradient']:
 

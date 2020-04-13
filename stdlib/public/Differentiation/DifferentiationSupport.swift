@@ -188,25 +188,6 @@ public extension EuclideanDifferentiable where TangentVector == Self {
 // Functional utilities
 //===----------------------------------------------------------------------===//
 
-public extension Differentiable {
-  @differentiable(wrt: self)
-  func withDerivative(_ body: @escaping (inout TangentVector) -> Void) -> Self {
-    return self
-  }
-
-  @inlinable
-  @derivative(of: withDerivative)
-  internal func _vjpWithDerivative(
-    _ body: @escaping (inout TangentVector) -> Void
-  ) -> (value: Self, pullback: (TangentVector) -> TangentVector) {
-    return (self, { grad in
-      var grad = grad
-      body(&grad)
-      return grad
-    })
-  }
-}
-
 /// Make a function be recomputed in its pullback, known as "checkpointing" in
 /// traditional automatic differentiation.
 @inlinable

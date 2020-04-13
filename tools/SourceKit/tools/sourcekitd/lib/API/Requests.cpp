@@ -1428,9 +1428,7 @@ public:
   }
 
   sourcekitd_response_t createResponse() {
-    TopDict.setCustomBuffer(KeyAnnotations,
-        CustomBufferKind::DocSupportAnnotationArray,
-        AnnotationsBuilder.createBuffer());
+    TopDict.setCustomBuffer(KeyAnnotations, AnnotationsBuilder.createBuffer());
     return RespBuilder.createResponse();
   }
 
@@ -1872,8 +1870,7 @@ static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> 
   for (auto &R: Info.Results) {
     ArrBuilder.add(R);
   }
-  Dict.setCustomBuffer(KeyExpressionTypeList, CustomBufferKind::ExpressionTypeArray,
-                       ArrBuilder.createBuffer());
+  Dict.setCustomBuffer(KeyExpressionTypeList, ArrBuilder.createBuffer());
   Rec(Builder.createResponse());
 }
 
@@ -1930,8 +1927,7 @@ public:
       return createErrorRequestFailed(ErrorDescription.c_str());
 
     RespBuilder.getDictionary().setCustomBuffer(KeyResults,
-        CustomBufferKind::CodeCompletionResultsArray,
-        ResultsBuilder.createBuffer());
+                                                ResultsBuilder.createBuffer());
     return RespBuilder.createResponse();
   }
 
@@ -2564,18 +2560,13 @@ sourcekitd_response_t SKEditorConsumer::createResponse() {
     return Error;
 
   if (Opts.EnableSyntaxMap) {
-    Dict.setCustomBuffer(KeySyntaxMap,
-        CustomBufferKind::TokenAnnotationsArray,
-        SyntaxMap.createBuffer());
+    Dict.setCustomBuffer(KeySyntaxMap, SyntaxMap.createBuffer());
   }
   if (!SemanticAnnotations.empty()) {
-    Dict.setCustomBuffer(KeyAnnotations,
-        CustomBufferKind::TokenAnnotationsArray,
-        SemanticAnnotations.createBuffer());
+    Dict.setCustomBuffer(KeyAnnotations, SemanticAnnotations.createBuffer());
   }
   if (Opts.EnableStructure) {
-    Dict.setCustomBuffer(KeySubStructure, CustomBufferKind::DocStructureArray,
-                         DocStructure.createBuffer());
+    Dict.setCustomBuffer(KeySubStructure, DocStructure.createBuffer());
   }
 
 
@@ -2762,11 +2753,13 @@ void serializeSyntaxTreeAsByteTree(
                                          *SyntaxTree.getRaw(), UserInfo);
 
   std::unique_ptr<llvm::WritableMemoryBuffer> Buf =
-      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(Stream.data().size());
-  memcpy(Buf->getBufferStart(), Stream.data().data(), Stream.data().size());
+      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(sizeof(uint64_t) + Stream.data().size());
+  *reinterpret_cast<uint64_t*>(Buf->getBufferStart()) =
+      (uint64_t)CustomBufferKind::RawData;
+  memcpy(Buf->getBufferStart() + sizeof(uint64_t),
+         Stream.data().data(), Stream.data().size());
 
-  Dict.setCustomBuffer(KeySerializedSyntaxTree, CustomBufferKind::RawData,
-                       std::move(Buf));
+  Dict.setCustomBuffer(KeySerializedSyntaxTree, std::move(Buf));
 
   auto EndClock = clock();
   LOG_SECTION("incrParse Performance", InfoLowPrio) {

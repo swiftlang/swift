@@ -55,7 +55,7 @@ bool TokenAnnotationsArrayBuilder::empty() const {
 
 std::unique_ptr<llvm::MemoryBuffer>
 TokenAnnotationsArrayBuilder::createBuffer() {
-  return Impl.Builder.createBuffer();
+  return Impl.Builder.createBuffer(CustomBufferKind::TokenAnnotationsArray);
 }
 
 namespace {

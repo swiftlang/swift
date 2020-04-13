@@ -38,19 +38,19 @@ let _: @differentiable(linear) (Float) -> Float
 
 func takesOpaqueClosure(f: @escaping (Float) -> Float) {
   // expected-note @-1 {{did you mean to take a '@differentiable' closure?}} {{38-38=@differentiable }}
-  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   _ = gradient(of: f)
 }
 
 let globalAddOne: (Float) -> Float = { $0 + 1 }
-// expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+// expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
 _ = gradient(of: globalAddOne)
 
 func someScope() {
   let localAddOne: (Float) -> Float = { $0 + 1 }
-  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   _ = gradient(of: globalAddOne)
-  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   _ = gradient(of: localAddOne)
   // The following case is okay during type checking, but will fail in the AD transform.
   _ = gradient { localAddOne($0) }
@@ -73,7 +73,7 @@ func linearToDifferentiable(_ f: @escaping @differentiable(linear) (Float) -> Fl
 }
 
 func differentiableToLinear(_ f: @escaping @differentiable (Float) -> Float) {
-  // expected-error @+1 {{a '@differentiable(linear)' function can only be formed from a reference to a 'func' or a literal closure}}
+  // expected-error @+1 {{a '@differentiable(linear)' function can only be formed from a reference to a 'func' or 'init' or a literal closure}}
   _ = f as @differentiable(linear) (Float) -> Float
 }
 

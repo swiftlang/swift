@@ -7140,7 +7140,7 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
   {
     llvm::raw_svector_ostream os(mangleBuf);
     Mangle::ASTMangler mangler;
-    os << mangler.mangleDeclAsUSR(getNamingDecl(), MANGLING_PREFIX_STR);
+    os << mangler.mangleOpaqueTypeDecl(this);
   }
 
   OpaqueReturnTypeIdentifier = getASTContext().getIdentifier(mangleBuf);
