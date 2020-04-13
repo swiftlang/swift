@@ -248,6 +248,9 @@ enum class FixKind : uint8_t {
   /// Member shadows a top-level name, such a name could only be accessed by
   /// prefixing it with a module name.
   AddQualifierToAccessTopLevelName,
+
+  /// A warning fix that allows a coercion to perform a force-cast.
+  AllowCoercionToForceCast,
 };
 
 class ConstraintFix {
@@ -1735,6 +1738,34 @@ public:
 
   static AllowNonClassTypeToConvertToAnyObject *
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
+};
+
+/// A warning fix to maintain compatibility with the following:
+///
+/// \code
+/// func foo(_ arr: [Any]?) {
+///  _ = (arr ?? []) as [NSObject]
+/// }
+/// \endcode
+///
+/// which performs a force-cast of the array's elements, despite being spelled
+/// as a coercion.
+class AllowCoercionToForceCast final : public ContextualMismatch {
+  AllowCoercionToForceCast(ConstraintSystem &cs, Type fromType, Type toType,
+                           ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowCoercionToForceCast, fromType,
+                           toType, locator, /*warning*/ true) {}
+
+public:
+  std::string getName() const {
+    return "allow coercion to be treated as a force-cast";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const;
+
+  static AllowCoercionToForceCast *create(ConstraintSystem &cs, Type fromType,
+                                          Type toType,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -1068,6 +1068,10 @@ ERROR(missing_unwrap_optional_try,none,
 ERROR(missing_forced_downcast,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
+WARNING(coercion_may_fail_warning,none,
+        "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
+        (Type, Type))
+
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
       "did you mean to use 'as' to explicitly convert?", (Type, Type))
@@ -1222,7 +1226,7 @@ ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
 ERROR(invalid_differentiable_function_conversion_expr,none,
       "a '@differentiable%select{|(linear)}0' function can only be formed from "
-      "a reference to a 'func' or a literal closure", (bool))
+      "a reference to a 'func' or 'init' or a literal closure", (bool))
 NOTE(invalid_differentiable_function_conversion_parameter,none,
      "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_pointer_conversion,none,
