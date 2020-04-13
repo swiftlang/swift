@@ -17,7 +17,7 @@ suite.test("UnsafeAtomicLazyReference<${type}>.create-destroy") {
   expectNil(v.load())
 }
 
-suite.test("UnsafeAtomicLazyReference<${type}>.storeIfNil") {
+suite.test("UnsafeAtomicLazyReference<${type}>.storeIfNilThenLoad") {
   guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
     return
   }
@@ -27,11 +27,11 @@ suite.test("UnsafeAtomicLazyReference<${type}>.storeIfNil") {
     expectNil(v.load())
 
     let ref = LifetimeTracked(42)
-    expectTrue(v.storeIfNil(ref) === ref)
+    expectTrue(v.storeIfNilThenLoad(ref) === ref)
     expectTrue(v.load() === ref)
 
     let ref2 = LifetimeTracked(23)
-    expectTrue(v.storeIfNil(ref2) === ref)
+    expectTrue(v.storeIfNilThenLoad(ref2) === ref)
     expectTrue(v.load() === ref)
 
     v.destroy()
