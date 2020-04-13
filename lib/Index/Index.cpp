@@ -301,8 +301,8 @@ private:
   bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod);
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    // Do not handle unavailable decls.
-    if (AvailableAttr::isUnavailable(D))
+    // Do not handle unavailable decls from other modules.
+    if (IsModuleFile && AvailableAttr::isUnavailable(D))
       return false;
 
     if (!handleCustomAttrInitRefs(D))

@@ -1522,6 +1522,27 @@
     },
     {
       key.kind: source.lang.swift.decl.class,
+      key.name: "AlwaysUnavailableClass",
+      key.usr: <usr>,
+      key.line: 184,
+      key.column: 7,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: <usr>,
+          key.line: 184,
+          key.column: 7,
+          key.is_implicit: 1
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.available
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
       key.name: "ConditionalUnavailableClass1",
       key.usr: <usr>,
       key.line: 188,
