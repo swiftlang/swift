@@ -172,7 +172,7 @@ function(_add_extra_swift_flags_for_module module_name result_var_name)
   set("${result_var_name}" ${result_list} PARENT_SCOPE)
 endfunction()
 
-function(_add_variant_swift_compile_flags
+function(_add_target_variant_swift_compile_flags
     sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
 
@@ -352,7 +352,7 @@ function(_compile_swift_files
   set(swift_flags)
   set(swift_module_flags)
 
-  _add_variant_swift_compile_flags(
+  _add_target_variant_swift_compile_flags(
       "${SWIFTFILE_SDK}"
       "${SWIFTFILE_ARCHITECTURE}"
       "${SWIFT_STDLIB_BUILD_TYPE}"
