@@ -164,7 +164,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
 
 } // namespace
 
-bool CompletionInstance::performCachedOperaitonIfPossible(
+bool CompletionInstance::performCachedOperationIfPossible(
     const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
@@ -454,7 +454,7 @@ bool swift::ide::CompletionInstance::performOperation(
     // the cached completion instance.
     std::lock_guard<std::mutex> lock(mtx);
 
-    if (performCachedOperaitonIfPossible(Invocation, ArgsHash, completionBuffer,
+    if (performCachedOperationIfPossible(Invocation, ArgsHash, completionBuffer,
                                          Offset, DiagC, Callback))
       return true;
 
