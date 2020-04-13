@@ -38,6 +38,7 @@ class raw_ostream;
 namespace swift {
 
 class ProtocolDecl;
+class AssociatedTypeDecl;
 class SourceManager;
 class TypeVariableType;
 
@@ -112,6 +113,9 @@ enum class ConstraintKind : char {
   /// The first type has a member with the given name, and the
   /// type of that member, when referenced as a value, is the second type.
   ValueMember,
+  /// The first type has a type member with the given name, and the
+  /// type of that member is the second type.
+  TypeMember,
   /// The first type (which is implicit) has a member with the given
   /// name, and the type of that member, when referenced as a value, is the
   /// second type.
@@ -346,6 +350,12 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       DeclContext *UseDC;
     } Member;
 
+    struct {
+      Type First;
+      Type Second;
+      AssociatedTypeDecl *AssocType;
+    } TypeMember;
+
     /// The set of constraints for a disjunction.
     ArrayRef<Constraint *> Nested;
 
@@ -408,6 +418,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   Constraint(ConstraintKind kind, ConstraintFix *fix, Type first, Type second,
              ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
+  Constraint(ConstraintKind kind, Type baseType, Type memberType,
+             AssociatedTypeDecl *assocType, ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
+
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
     return { getTrailingObjects<TypeVariableType *>(), NumTypeVariables };
@@ -438,6 +452,11 @@ public:
                                   DeclContext *useDC,
                                   FunctionRefKind functionRefKind,
                                   ConstraintLocator *locator);
+
+  static Constraint *createTypeMember(ConstraintSystem &cs, Type first,
+                                      Type second,
+                                      AssociatedTypeDecl *assocType,
+                                      ConstraintLocator *locator);
 
   /// Create a new value witness constraint.
   static Constraint *createValueWitness(
@@ -555,6 +574,7 @@ public:
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
+    case ConstraintKind::TypeMember:
       return ConstraintClassification::Member;
 
     case ConstraintKind::DynamicTypeOf:
@@ -588,6 +608,9 @@ public:
     case ConstraintKind::ValueWitness:
       return Member.First;
 
+    case ConstraintKind::TypeMember:
+      return TypeMember.First;
+
     default:
       return Types.First;
     }
@@ -604,6 +627,9 @@ public:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
       return Member.Second;
+
+    case ConstraintKind::TypeMember:
+      return TypeMember.Second;
 
     default:
       return Types.Second;
@@ -690,6 +716,11 @@ public:
            Kind == ConstraintKind::UnresolvedValueMember ||
            Kind == ConstraintKind::ValueWitness);
     return Member.UseDC;
+  }
+
+  AssociatedTypeDecl *getAssociatedType() const {
+    assert(Kind == ConstraintKind::TypeMember);
+    return TypeMember.AssocType;
   }
 
   /// Retrieve the locator for this constraint.

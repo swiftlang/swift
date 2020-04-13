@@ -1317,6 +1317,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::TypeMember:
   case ConstraintKind::ValueWitness:
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::FunctionInput:
@@ -1383,6 +1384,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::TypeMember:
   case ConstraintKind::ValueWitness:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
@@ -1694,6 +1696,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::TypeMember:
   case ConstraintKind::ValueWitness:
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::FunctionInput:
@@ -2468,8 +2471,8 @@ static void enumerateOptionalConversionRestrictions(
 /// Determine whether we can bind the given type variable to the given
 /// fixed type.
 static bool isBindable(TypeVariableType *typeVar, Type type) {
-  return !ConstraintSystem::typeVarOccursInType(typeVar, type) &&
-         !type->is<DependentMemberType>();
+  assert(!type->is<DependentMemberType>());
+  return !ConstraintSystem::typeVarOccursInType(typeVar, type);
 }
 
 ConstraintSystem::TypeMatchResult
@@ -2490,15 +2493,6 @@ ConstraintSystem::matchTypesBindTypeVar(
       // instead of re-trying it and failing later.
       if (typeVar->getImpl().canBindToHole() && !type->hasTypeVariable())
         return getTypeMatchSuccess();
-
-      // Just like in cases where both sides are dependent member types
-      // with resolved base that can't be simplified to a concrete type
-      // let's ignore this mismatch and mark affected type variable as a hole
-      // because something else has to be fixed already for this to happen.
-      if (type->is<DependentMemberType>() && !type->hasTypeVariable()) {
-        recordPotentialHole(typeVar);
-        return getTypeMatchSuccess();
-      }
     }
 
     return formUnsolvedResult();
@@ -4152,17 +4146,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
 
-  // If both sides are dependent members without type variables, it's
-  // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
-  // is a concrete type substituted for generic generic parameter,
-  // so checking equality here would lead to incorrect behavior,
-  // let's defer it until later proper check.
-  if (!(desugar1->is<DependentMemberType>() &&
-        desugar2->is<DependentMemberType>())) {
-    // If the types are obviously equivalent, we're done.
-    if (desugar1->isEqual(desugar2) && !isa<InOutType>(desugar2)) {
-      return getTypeMatchSuccess();
-    }
+  // If the types are obviously equivalent, we're done.
+  if (desugar1->isEqual(desugar2) && !isa<InOutType>(desugar2)) {
+    return getTypeMatchSuccess();
   }
 
   // Local function that should be used to produce the return value whenever
@@ -4299,24 +4285,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
 
-      // If the left-hand side of a 'sequence element' constraint
-      // is a dependent member type without any type variables it
-      // means that conformance check has been "fixed".
-      // Let's record other side of the conversion as a "hole"
-      // to give the solver a chance to continue and avoid
-      // producing diagnostics for both missing conformance and
-      // invalid element type.
-      if (shouldAttemptFixes()) {
-        if (auto last = locator.last()) {
-          if (last->is<LocatorPathElt::SequenceElementType>() &&
-              desugar1->is<DependentMemberType>() &&
-              !desugar1->hasTypeVariable()) {
-            recordPotentialHole(typeVar2);
-            return getTypeMatchSuccess();
-          }
-        }
-      }
-
       return formUnsolvedResult();
     }
 
@@ -4339,6 +4307,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
+    case ConstraintKind::TypeMember:
     case ConstraintKind::ValueWitness:
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
@@ -4386,20 +4355,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::TypeVariable:
       llvm_unreachable("type variables should have already been handled by now");
 
-    case TypeKind::DependentMember: {
-      // If one of the dependent member types has no type variables,
-      // this comparison is effectively illformed, because dependent
-      // member couldn't be simplified down to the actual type, and
-      // we wouldn't be able to solve this constraint, so let's just fail.
-      // This should only happen outside of diagnostic mode, as otherwise the
-      // member is replaced by a hole in simplifyType.
-      if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable())
-        return getTypeMatchFailure(locator);
-
-      // Nothing we can solve yet, since we need to wait until
-      // type variables will get resolved.
-      return formUnsolvedResult();
-    }
+    case TypeKind::DependentMember:
+      llvm_unreachable(
+          "dependent member types should have already been handled");
 
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
@@ -5058,6 +5016,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     
   case TypeKind::Unresolved:
   case TypeKind::Error:
+  case TypeKind::DependentMember:
     return SolutionKind::Error;
 
   case TypeKind::GenericFunction:
@@ -5065,7 +5024,6 @@ ConstraintSystem::simplifyConstructionConstraint(
     llvm_unreachable("unmapped dependent type");
 
   case TypeKind::TypeVariable:
-  case TypeKind::DependentMember:
     return SolutionKind::Unsolved;
 
   case TypeKind::Tuple: {
@@ -6923,6 +6881,60 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   return SolutionKind::Error;
 }
 
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyTypeMemberConstraint(
+    Type origBaseType, AssociatedTypeDecl *assocType, Type memberType,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&] {
+    // If requested, generate a constraint.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *member = Constraint::createTypeMember(
+          *this, origBaseType, memberType, assocType,
+          getConstraintLocator(locator));
+
+      addUnsolvedConstraint(member);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  // FIXME: It's kind of weird in general that we have to look
+  // through lvalue, inout and IUO types here
+  auto baseTy = getFixedTypeRecursive(origBaseType, flags, /*wantRValue=*/true)
+                    ->getWithoutSpecifierType();
+
+  if (baseTy->is<TypeVariableType>())
+    return formUnsolved();
+
+  auto result = resolveAssociatedType(baseTy, assocType, DC);
+  if (!result) {
+    if (auto selfType = baseTy->getAs<DynamicSelfType>())
+      baseTy = selfType->getSelfType();
+
+    if (!baseTy->mayHaveMembers())
+      return SolutionKind::Error;
+
+    if (shouldAttemptFixes()) {
+      auto conformance = DC->getParentModule()->lookupConformance(
+          baseTy, assocType->getProtocol());
+
+      if (!conformance) {
+        // If the base type doesn't conform to the associatedtype's protocol,
+        // there will be a missing conformance fix applied in diagnostic mode,
+        // so the concrete dependent member type is considered a "hole" in
+        // order to continue solving.
+        recordPotentialHole(memberType->castTo<TypeVariableType>());
+        return SolutionKind::Solved;
+      }
+    }
+
+    return SolutionKind::Error;
+  }
+
+  addConstraint(ConstraintKind::Bind, memberType, result, locator);
+  return SolutionKind::Solved;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyValueWitnessConstraint(
     ConstraintKind kind, Type baseType, ValueDecl *requirement, Type memberType,
@@ -8722,7 +8734,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
                 funcType, tv, locator);
 
   // Get argument type for the `dynamicallyCall` method.
-  Type argumentType;
+  auto argumentType = createTypeVariable(loc, TVO_CanBindToNoEscape);
   if (!useKwargsMethod) {
     auto arrayLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
@@ -8730,14 +8742,14 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
                   arrayLitProto->getDeclaredType(), locator);
     auto elementAssocType = arrayLitProto->getAssociatedType(
         ctx.Id_ArrayLiteralElement);
-    argumentType = DependentMemberType::get(tvParam, elementAssocType);
+    addTypeMemberConstraint(tvParam, elementAssocType, argumentType, locator);
   } else {
     auto dictLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     addConstraint(ConstraintKind::ConformsTo, tvParam,
                   dictLitProto->getDeclaredType(), locator);
     auto valueAssocType = dictLitProto->getAssociatedType(ctx.Id_Value);
-    argumentType = DependentMemberType::get(tvParam, valueAssocType);
+    addTypeMemberConstraint(tvParam, valueAssocType, argumentType, locator);
   }
 
   // Argument type can default to `Any`.
@@ -9702,6 +9714,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
+  case ConstraintKind::TypeMember:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Disjunction:
   case ConstraintKind::KeyPath:
@@ -10172,6 +10185,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                     /*outerAlternatives=*/{},
                                     TMF_GenerateConstraints,
                                     constraint.getLocator());
+
+  case ConstraintKind::TypeMember:
+    return simplifyTypeMemberConstraint(
+        constraint.getFirstType(), constraint.getAssociatedType(),
+        constraint.getSecondType(), TMF_GenerateConstraints,
+        constraint.getLocator());
 
   case ConstraintKind::ValueWitness:
     return simplifyValueWitnessConstraint(constraint.getKind(),

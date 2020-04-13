@@ -786,6 +786,19 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
   return type.transform([&](Type type) -> Type {
       assert(!type->is<GenericFunctionType>());
 
+      if (auto *DP = type->getAs<DependentMemberType>()) {
+        assert(DP->getAssocType() && "Expected an associated type");
+
+        // FIXME: Need a special locator element to represent
+        // this associated type.
+        auto *locator = getConstraintLocator(nullptr);
+
+        auto *memberType = createTypeVariable(locator, TVO_CanBindToNoEscape);
+        addTypeMemberConstraint(openType(DP->getBase(), replacements),
+                                DP->getAssocType(), memberType, locator);
+        return memberType;
+      }
+
       // Replace a generic type parameter with its corresponding type variable.
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(
@@ -881,16 +894,11 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
     type = type->getRValueType();
 
   if (auto depMemType = type->getAs<DependentMemberType>()) {
-    if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
-
-    // FIXME: Perform a more limited simplification?
-    Type newType = simplifyType(type);
-    if (newType.getPointer() == type.getPointer()) return type;
-
-    // Once we've simplified a dependent member type, we need to generate a
-    // new constraint.
+    assert(!depMemType->getBase()->hasTypeVariable());
+    auto newType = simplifyType(type);
     flags |= TMF_GenerateConstraints;
 
+    assert(!newType->is<DependentMemberType>());
     return getFixedTypeRecursive(newType, flags, wantRValue);
   }
 
@@ -2469,20 +2477,16 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
     // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
-      // Simplify the base.
-      Type newBase = simplifyTypeImpl(depMemTy->getBase(), getFixedTypeFn);
+      assert(!depMemTy->getBase()->hasTypeVariable());
 
-      // If nothing changed, we're done.
-      if (newBase.getPointer() == depMemTy->getBase().getPointer())
-        return type;
-
+      auto baseType = depMemTy->getBase();
       // Dependent member types should only be created for associated types.
       auto assocType = depMemTy->getAssocType();
       assert(depMemTy->getAssocType() && "Expected associated type!");
 
       // FIXME: It's kind of weird in general that we have to look
       // through lvalue, inout and IUO types here
-      Type lookupBaseType = newBase->getWithoutSpecifierType();
+      Type lookupBaseType = baseType->getWithoutSpecifierType();
       if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
         lookupBaseType = selfType->getSelfType();
 
@@ -3936,6 +3940,27 @@ bool constraints::hasExplicitResult(ClosureExpr *closure) {
   auto &ctx = closure->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
                            ClosureHasExplicitResultRequest{closure}, false);
+}
+
+Type constraints::resolveAssociatedType(Type baseType,
+                                        AssociatedTypeDecl *assocType,
+                                        DeclContext *DC) {
+  assert(!baseType->hasTypeVariable());
+
+  if (auto selfType = baseType->getAs<DynamicSelfType>())
+    baseType = selfType->getSelfType();
+
+  if (!baseType->mayHaveMembers())
+    return Type();
+
+  auto conformance = DC->getParentModule()->lookupConformance(
+      baseType, assocType->getProtocol());
+
+  auto subs = SubstitutionMap::getProtocolSubstitutions(
+      assocType->getProtocol(), baseType, conformance);
+
+  auto result = assocType->getDeclaredInterfaceType().subst(subs);
+  return result->hasError() ? Type() : result;
 }
 
 static bool isOperator(Expr *expr, StringRef expectedName) {

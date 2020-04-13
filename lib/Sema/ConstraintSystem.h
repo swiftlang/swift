@@ -2876,6 +2876,31 @@ public:
   }
 
   /// Add a value member constraint to the constraint system.
+  void addTypeMemberConstraint(Type baseTy, AssociatedTypeDecl *assocType,
+                               Type memberTy,
+                               ConstraintLocatorBuilder locator) {
+    assert(baseTy);
+    assert(memberTy);
+    assert(assocType);
+
+    switch (simplifyTypeMemberConstraint(baseTy, assocType, memberTy,
+                                         TMF_GenerateConstraints, locator)) {
+    case SolutionKind::Unsolved:
+      llvm_unreachable("Unsolved result when generating constraints!");
+
+    case SolutionKind::Solved:
+      break;
+
+    case SolutionKind::Error:
+      if (shouldAddNewFailingConstraint()) {
+        addNewFailingConstraint(Constraint::createTypeMember(
+            *this, baseTy, memberTy, assocType, getConstraintLocator(locator)));
+      }
+      break;
+    }
+  }
+
+  /// Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclNameRef name, Type memberTy,
                                 DeclContext *useDC,
                                 FunctionRefKind functionRefKind,
@@ -4030,6 +4055,12 @@ private:
       DeclContext *useDC, FunctionRefKind functionRefKind,
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
+
+  SolutionKind simplifyTypeMemberConstraint(Type baseType,
+                                            AssociatedTypeDecl *assocType,
+                                            Type memberType,
+                                            TypeMatchOptions flags,
+                                            ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given value witness constraint.
   SolutionKind simplifyValueWitnessConstraint(
@@ -5344,6 +5375,12 @@ bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 /// Determine whether givne closure has any explicit `return`
 /// statements that could produce non-void result.
 bool hasExplicitResult(ClosureExpr *closure);
+
+/// Given a resolved base type lookup associated type and return
+/// a resolved concrete type or null-type if base didn't conform
+/// expected protocol.
+Type resolveAssociatedType(Type baseType, AssociatedTypeDecl *assocType,
+                           DeclContext *DC);
 
 } // end namespace constraints
 

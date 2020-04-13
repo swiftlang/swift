@@ -689,6 +689,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     }
 
     case ConstraintKind::ValueMember:
+    case ConstraintKind::TypeMember:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
       // If our type variable shows up in the base type, there's

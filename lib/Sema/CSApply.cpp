@@ -2469,8 +2469,9 @@ namespace {
                            diag::interpolation_broken_proto);
         return nullptr;
       }
-      auto interpolationType =
-        simplifyType(DependentMemberType::get(openedType, associatedTypeDecl));
+
+      auto interpolationType = resolveAssociatedType(simplifyType(openedType),
+                                                     associatedTypeDecl, cs.DC);
 
       // Fetch needed witnesses.
       ConcreteDeclRef builderInit = fetchProtocolInitWitness(

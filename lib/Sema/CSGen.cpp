@@ -1295,7 +1295,10 @@ namespace {
           return nullptr;
         }
 
-        auto interpolationTV = DependentMemberType::get(tv, associatedTypeDecl);
+        auto interpolationTV =
+            CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+        CS.addTypeMemberConstraint(tv, associatedTypeDecl, interpolationTV,
+                                   locator);
 
         auto appendingExprType = CS.getType(appendingExpr);
         auto appendingLocator = CS.getConstraintLocator(appendingExpr);
@@ -1963,13 +1966,16 @@ namespace {
                                            TVO_PrefersSubtypeBinding |
                                            TVO_CanBindToNoEscape);
 
+      auto arrayElementTy =
+          CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+
       // The array must be an array literal type.
       CS.addConstraint(ConstraintKind::LiteralConformsTo, arrayTy,
                        arrayProto->getDeclaredType(),
                        locator);
-      
       // Its subexpression should be convertible to a tuple (T.Element...).
-      Type arrayElementTy = DependentMemberType::get(arrayTy, elementAssocTy);
+      CS.addTypeMemberConstraint(arrayTy, elementAssocTy, arrayElementTy,
+                                 locator);
 
       // Introduce conversions from each element to the element type of the
       // array.
@@ -2057,10 +2063,19 @@ namespace {
 
       // Its subexpression should be convertible to a tuple ((T.Key,T.Value)...).
       ConstraintLocatorBuilder locatorBuilder(locator);
-      auto dictionaryKeyTy = DependentMemberType::get(dictionaryTy,
-                                                      keyAssocTy);
-      auto dictionaryValueTy = DependentMemberType::get(dictionaryTy,
-                                                        valueAssocTy);
+
+      // TODO(diagnostics): Add new locator path elements to cover key/value
+      // types.
+      auto dictionaryKeyTy =
+          CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+      auto dictionaryValueTy =
+          CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+
+      CS.addTypeMemberConstraint(dictionaryTy, keyAssocTy, dictionaryKeyTy,
+                                 locator);
+      CS.addTypeMemberConstraint(dictionaryTy, valueAssocTy, dictionaryValueTy,
+                                 locator);
+
       TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),
                                     TupleTypeElt(dictionaryValueTy) };
       Type elementTy = TupleType::get(tupleElts, C);
@@ -4283,14 +4298,20 @@ generateForEachStmtConstraints(
   // and the type of the element pattern.
   auto elementAssocType =
       sequenceProto->getAssociatedType(cs.getASTContext().Id_Element);
-  Type elementType = DependentMemberType::get(sequenceType, elementAssocType);
+  Type elementType =
+      cs.createTypeVariable(elementLocator, TVO_CanBindToNoEscape);
+  cs.addTypeMemberConstraint(sequenceType, elementAssocType, elementType,
+                             elementLocator);
   cs.addConstraint(ConstraintKind::Conversion, elementType, initType,
                    elementLocator);
 
   // Determine the iterator type.
   auto iteratorAssocType =
       sequenceProto->getAssociatedType(cs.getASTContext().Id_Iterator);
-  Type iteratorType = DependentMemberType::get(sequenceType, iteratorAssocType);
+  Type iteratorType =
+      cs.createTypeVariable(contextualLocator, TVO_CanBindToNoEscape);
+  cs.addTypeMemberConstraint(sequenceType, iteratorAssocType, iteratorType,
+                             contextualLocator);
 
   // The iterator type must conform to IteratorProtocol.
   ProtocolDecl *iteratorProto = TypeChecker::getProtocol(

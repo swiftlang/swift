@@ -78,6 +78,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
+  case ConstraintKind::TypeMember:
     llvm_unreachable("Wrong constructor for member constraint");
 
   case ConstraintKind::Defaultable:
@@ -129,6 +130,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::TypeMember:
   case ConstraintKind::ValueWitness:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
@@ -231,6 +233,22 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
+Constraint::Constraint(ConstraintKind kind, Type baseType, Type memberType,
+                       AssociatedTypeDecl *assocType,
+                       ConstraintLocator *locator,
+                       ArrayRef<TypeVariableType *> typeVars)
+    : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
+      RememberChoice(false), IsFavored(false),
+      NumTypeVariables(typeVars.size()), Locator(locator) {
+  TypeMember.First = baseType;
+  TypeMember.Second = memberType;
+  TypeMember.AssocType = assocType;
+
+  assert(kind == ConstraintKind::TypeMember);
+
+  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+}
+
 ProtocolDecl *Constraint::getProtocol() const {
   assert((Kind == ConstraintKind::ConformsTo ||
           Kind == ConstraintKind::LiteralConformsTo ||
@@ -277,6 +295,10 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
     return createMember(cs, getKind(), getFirstType(), getSecondType(),
                         getMember(), getMemberUseDC(), getFunctionRefKind(),
                         getLocator());
+
+  case ConstraintKind::TypeMember:
+    return createTypeMember(cs, getFirstType(), getSecondType(),
+                            getAssociatedType(), getLocator());
 
   case ConstraintKind::ValueWitness:
     return createValueWitness(
@@ -424,6 +446,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     Out << "[(implicit) ." << getMember() << ": value] == ";
     break;
 
+  case ConstraintKind::TypeMember:
+    Out << "[." << getAssociatedType()->getName() << ": type] == ";
+    break;
+
   case ConstraintKind::ValueWitness: {
     auto requirement = getRequirement();
     auto selfNominal = requirement->getDeclContext()->getSelfNominalTypeDecl();
@@ -551,6 +577,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Subtype:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::TypeMember:
   case ConstraintKind::ValueWitness:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
@@ -690,6 +717,24 @@ Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, member, useDC,
                               functionRefKind, locator, typeVars);
+}
+
+Constraint *Constraint::createTypeMember(ConstraintSystem &cs, Type baseType,
+                                         Type memberType,
+                                         AssociatedTypeDecl *assocType,
+                                         ConstraintLocator *locator) {
+  SmallVector<TypeVariableType *, 4> typeVars;
+  if (baseType->hasTypeVariable())
+    baseType->getTypeVariables(typeVars);
+  if (memberType->hasTypeVariable())
+    memberType->getTypeVariables(typeVars);
+  uniqueTypeVariables(typeVars);
+
+  // Create the constraint.
+  unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  return new (mem) Constraint(ConstraintKind::TypeMember, baseType, memberType,
+                              assocType, locator, typeVars);
 }
 
 Constraint *Constraint::createValueWitness(
