@@ -391,6 +391,12 @@ internal func _print_unlocked<T, TargetStream: TextOutputStream>(
     debugPrintable.debugDescription.write(to: &target)
     return
   }
+
+  if let string = value as? String {
+    target.write(string)
+    return
+  }
+
   if case let streamableObject as TextOutputStreamable = value {
     streamableObject.write(to: &target)
     return

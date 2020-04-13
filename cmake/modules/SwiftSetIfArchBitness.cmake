@@ -16,6 +16,7 @@ function(set_if_arch_bitness var_name)
      "${SIA_ARCH}" STREQUAL "wasm32")
     set("${var_name}" "${SIA_CASE_32_BIT}" PARENT_SCOPE)
   elseif("${SIA_ARCH}" STREQUAL "x86_64" OR
+         "${SIA_ARCH}" STREQUAL "amd64" OR
          "${SIA_ARCH}" STREQUAL "arm64" OR
          "${SIA_ARCH}" STREQUAL "arm64e" OR
          "${SIA_ARCH}" STREQUAL "aarch64" OR
