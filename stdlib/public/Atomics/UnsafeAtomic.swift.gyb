@@ -307,7 +307,7 @@ extension UnsafeAtomic where Value: AtomicInteger {
     ordering: AtomicUpdateOrdering
   ) -> Value {
     let encoded = Value._AtomicStorage._atomicLoadThen${name}(
-      ${argLabel(label)}operand,
+      ${argLabel(label)}Value._encodeAtomicStorage(for: operand),
       at: _ptr,
       ordering: ordering)
     return Value._decodeAtomicStorage(encoded)
@@ -333,10 +333,10 @@ extension UnsafeAtomic where Value: AtomicInteger {
     ordering: AtomicUpdateOrdering
   ) -> Value {
     let encoded = Value._AtomicStorage._atomicLoadThen${name}(
-      ${argLabel(label)}operand,
+      ${argLabel(label)}Value._encodeAtomicStorage(for: operand),
       at: _ptr,
       ordering: ordering)
-    return Value._decodeAtomicStorage(encoded ${op} operand)
+    return Value._decodeAtomicStorage(encoded) ${op} operand
   }
   % end
 
@@ -355,7 +355,7 @@ extension UnsafeAtomic where Value: AtomicInteger {
     ordering: AtomicUpdateOrdering
   ) {
     _ = Value._AtomicStorage._atomicLoadThenWrappingIncrement(
-      by: operand,
+      by: Value._encodeAtomicStorage(for: operand),
       at: _ptr,
       ordering: ordering)
   }
@@ -375,7 +375,7 @@ extension UnsafeAtomic where Value: AtomicInteger {
     ordering: AtomicUpdateOrdering
   ) {
     _ = Value._AtomicStorage._atomicLoadThenWrappingDecrement(
-      by: operand,
+      by: Value._encodeAtomicStorage(for: operand),
       at: _ptr,
       ordering: ordering)
   }

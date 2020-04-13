@@ -14,8 +14,10 @@ import Swift
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger
-where _AtomicStorage == Self
-{
+where _AtomicStorage: _PrimitiveAtomicInteger {}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public protocol _PrimitiveAtomicInteger: _PrimitiveAtomic {
   /// Perform an atomic wrapping increment operation on the value referenced by
   /// `pointer` and return the original value, applying the specified memory
   /// ordering.
@@ -101,25 +103,4 @@ where _AtomicStorage == Self
     at pointer: UnsafeMutablePointer<Self>,
     ordering: AtomicUpdateOrdering
   ) -> Self
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicInteger {
-  @_transparent @_alwaysEmitIntoClient
-  public static func _prepareAtomicStorage(for value: __owned Self) -> Self {
-    value
-  }
-  @_transparent @_alwaysEmitIntoClient
-  public static func _disposeAtomicStorage(_ storage: inout Self) -> Self {
-    storage
-  }
-
-  @_transparent @_alwaysEmitIntoClient
-  public static func _encodeAtomicStorage(for value: __owned Self) -> Self {
-    value
-  }
-  @_transparent @_alwaysEmitIntoClient
-  public static func _decodeAtomicStorage(_ storage: __owned Self) -> Self {
-    storage
-  }
 }

@@ -105,3 +105,24 @@ extension AtomicProtocol where
     return Self(rawValue: RawValue._decodeAtomicStorage(storage))!
   }
 }
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicProtocol where _AtomicStorage == Self {
+  @_transparent @_alwaysEmitIntoClient
+  public static func _prepareAtomicStorage(for value: __owned Self) -> Self {
+    value
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func _disposeAtomicStorage(_ storage: inout Self) -> Self {
+    storage
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  public static func _encodeAtomicStorage(for value: __owned Self) -> Self {
+    value
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func _decodeAtomicStorage(_ storage: __owned Self) -> Self {
+    storage
+  }
+}
