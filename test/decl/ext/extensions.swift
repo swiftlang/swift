@@ -38,7 +38,7 @@ func nestingTest6() {
   extension Foo {} // expected-error {{declaration is only valid at file scope}}
 }
 
-//===--- Test extensions without type and a member that should be static.
+//===--- Test that we don't crash when validating members inside an extension with no type name.
 extension { // expected-error {{expected type name in extension declaration}}
   func ==(lhs: Foo, rhs: Foo) -> Bool {} // expected-error {{operator '==' declared in extension must be 'static'}}
 }
