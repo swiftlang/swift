@@ -38,6 +38,11 @@ func nestingTest6() {
   extension Foo {} // expected-error {{declaration is only valid at file scope}}
 }
 
+//===--- Test extensions without type and a member that should be static.
+extension { // expected-error {{expected type name in extension declaration}}
+  func ==(lhs: Foo, rhs: Foo) -> Bool {} // expected-error {{operator '==' declared in extension must be 'static'}}
+}
+
 //===--- Test that we only allow extensions only for nominal types.
 
 struct S1 {
