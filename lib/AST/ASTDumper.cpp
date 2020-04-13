@@ -164,6 +164,23 @@ void RequirementRepr::print(ASTPrinter &out) const {
   printImpl(out, /*AsWritten=*/true);
 }
 
+static void printTrailingRequirements(ASTPrinter &Printer,
+                                      ArrayRef<RequirementRepr> Reqs,
+                                      bool printWhereKeyword) {
+  if (Reqs.empty()) return;
+
+  if (printWhereKeyword)
+    Printer << " where ";
+  interleave(
+      Reqs,
+      [&](const RequirementRepr &req) {
+        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
+        req.print(Printer);
+        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
+      },
+      [&] { Printer << ", "; });
+}
+
 void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '<';
   interleave(*this,
@@ -176,20 +193,22 @@ void GenericParamList::print(llvm::raw_ostream &OS) const {
              },
              [&] { OS << ", "; });
 
-  if (!getRequirements().empty()) {
-    OS << " where ";
-    interleave(getRequirements(),
-               [&](const RequirementRepr &req) {
-                 req.print(OS);
-               },
-               [&] { OS << ", "; });
-  }
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(),
+                            /*printWhereKeyword*/true);
   OS << '>';
 }
 
 void GenericParamList::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
+}
+
+void TrailingWhereClause::print(llvm::raw_ostream &OS,
+                                bool printWhereKeyword) const {
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(),
+                            printWhereKeyword);
 }
 
 static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
@@ -664,9 +683,7 @@ namespace {
       }
       if (auto whereClause = decl->getTrailingWhereClause()) {
         OS << " where requirements: ";
-        interleave(whereClause->getRequirements(),
-                   [&](const RequirementRepr &req) { req.print(OS); },
-                   [&] { OS << ", "; });
+        whereClause->print(OS, /*printWhereKeyword*/false);
       }
       if (decl->overriddenDeclsComputed()) {
         OS << " overridden=";
