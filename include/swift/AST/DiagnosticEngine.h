@@ -18,9 +18,10 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/TypeLoc.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/VersionTuple.h"
@@ -69,27 +70,6 @@ namespace swift {
       typedef T type;
     };
   }
-    
-  /// Describes the kind of diagnostic argument we're storing.
-  ///
-  enum class DiagnosticArgumentKind {
-    String,
-    Integer,
-    Unsigned,
-    Identifier,
-    ObjCSelector,
-    ValueDecl,
-    Type,
-    TypeRepr,
-    PatternKind,
-    SelfAccessKind,
-    ReferenceOwnership,
-    StaticSpellingKind,
-    DescriptiveDeclKind,
-    DeclAttribute,
-    VersionTuple,
-    LayoutConstraint,
-  };
 
   namespace diag {
     enum class RequirementKind : uint8_t;
@@ -100,111 +80,61 @@ namespace swift {
   ///
   /// All diagnostic arguments are converted to an instance of this class.
   class DiagnosticArgument {
-    DiagnosticArgumentKind Kind;
-    union {
-      int IntegerVal;
-      unsigned UnsignedVal;
-      StringRef StringVal;
-      DeclNameRef IdentifierVal;
-      ObjCSelector ObjCSelectorVal;
-      ValueDecl *TheValueDecl;
-      Type TypeVal;
-      TypeRepr *TyR;
-      PatternKind PatternKindVal;
-      SelfAccessKind SelfAccessKindVal;
-      ReferenceOwnership ReferenceOwnershipVal;
-      StaticSpellingKind StaticSpellingKindVal;
-      DescriptiveDeclKind DescriptiveDeclKindVal;
-      const DeclAttribute *DeclAttributeVal;
-      llvm::VersionTuple VersionVal;
-      LayoutConstraint LayoutConstraintVal;
-    };
-    
+    using UnionType =
+        TaggedUnion<void, int, unsigned, StringRef, DeclNameRef, ObjCSelector,
+                    ValueDecl *, Type, TypeRepr *, PatternKind, SelfAccessKind,
+                    ReferenceOwnership, StaticSpellingKind, DescriptiveDeclKind,
+                    const DeclAttribute *, llvm::VersionTuple,
+                    LayoutConstraint>;
+    UnionType Union;
+
   public:
-    DiagnosticArgument(StringRef S)
-      : Kind(DiagnosticArgumentKind::String), StringVal(S) {
-    }
+    DiagnosticArgument(StringRef S) : Union(S) {}
 
-    DiagnosticArgument(int I) 
-      : Kind(DiagnosticArgumentKind::Integer), IntegerVal(I) {
-    }
+    DiagnosticArgument(int I) : Union(I) {}
 
-    DiagnosticArgument(unsigned I) 
-      : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
-    }
+    DiagnosticArgument(unsigned I) : Union(I) {}
 
-    DiagnosticArgument(DeclNameRef R)
-        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(R) {}
+    DiagnosticArgument(DeclNameRef R) : Union(R) {}
 
-    DiagnosticArgument(DeclName D)
-        : Kind(DiagnosticArgumentKind::Identifier),
-          IdentifierVal(DeclNameRef(D)) {}
+    DiagnosticArgument(DeclName D) : Union(DeclNameRef(D)) {}
 
-    DiagnosticArgument(DeclBaseName D)
-        : Kind(DiagnosticArgumentKind::Identifier),
-          IdentifierVal(DeclNameRef(D)) {}
+    DiagnosticArgument(DeclBaseName D) : Union(DeclNameRef(D)) {}
 
-    DiagnosticArgument(Identifier I)
-      : Kind(DiagnosticArgumentKind::Identifier),
-        IdentifierVal(DeclNameRef(I)) {
-    }
+    DiagnosticArgument(Identifier I) : Union(DeclNameRef(I)) {}
 
-    DiagnosticArgument(ObjCSelector S)
-      : Kind(DiagnosticArgumentKind::ObjCSelector), ObjCSelectorVal(S) {
-    }
+    DiagnosticArgument(ObjCSelector S) : Union(S) {}
 
-    DiagnosticArgument(ValueDecl *VD)
-      : Kind(DiagnosticArgumentKind::ValueDecl), TheValueDecl(VD) {
-    }
+    DiagnosticArgument(ValueDecl *VD) : Union(VD) {}
 
-    DiagnosticArgument(Type T)
-      : Kind(DiagnosticArgumentKind::Type), TypeVal(T) {
-    }
+    DiagnosticArgument(Type T) : Union(T) {}
 
-    DiagnosticArgument(TypeRepr *T)
-      : Kind(DiagnosticArgumentKind::TypeRepr), TyR(T) {
-    }
+    DiagnosticArgument(TypeRepr *T) : Union(T) {}
 
     DiagnosticArgument(const TypeLoc &TL) {
       if (TypeRepr *tyR = TL.getTypeRepr()) {
-        Kind = DiagnosticArgumentKind::TypeRepr;
-        TyR = tyR;
+        Union = UnionType(tyR);
       } else {
-        Kind = DiagnosticArgumentKind::Type;
-        TypeVal = TL.getType();
+        Union = UnionType(TL.getType());
       }
     }
 
-    DiagnosticArgument(PatternKind K)
-        : Kind(DiagnosticArgumentKind::PatternKind), PatternKindVal(K) {}
+    DiagnosticArgument(PatternKind K) : Union(K) {}
 
-    DiagnosticArgument(ReferenceOwnership RO)
-        : Kind(DiagnosticArgumentKind::ReferenceOwnership),
-          ReferenceOwnershipVal(RO) {}
+    DiagnosticArgument(ReferenceOwnership RO) : Union(RO) {}
 
-    DiagnosticArgument(SelfAccessKind SAK)
-        : Kind(DiagnosticArgumentKind::SelfAccessKind),
-          SelfAccessKindVal(SAK) {}
+    DiagnosticArgument(SelfAccessKind SAK) : Union(SAK) {}
 
-    DiagnosticArgument(StaticSpellingKind SSK)
-        : Kind(DiagnosticArgumentKind::StaticSpellingKind),
-          StaticSpellingKindVal(SSK) {}
+    DiagnosticArgument(StaticSpellingKind SSK) : Union(SSK) {}
 
-    DiagnosticArgument(DescriptiveDeclKind DDK)
-        : Kind(DiagnosticArgumentKind::DescriptiveDeclKind),
-          DescriptiveDeclKindVal(DDK) {}
+    DiagnosticArgument(DescriptiveDeclKind DDK) : Union(DDK) {}
 
-    DiagnosticArgument(const DeclAttribute *attr)
-        : Kind(DiagnosticArgumentKind::DeclAttribute),
-          DeclAttributeVal(attr) {}
+    DiagnosticArgument(const DeclAttribute *attr) : Union(attr) {}
 
-    DiagnosticArgument(llvm::VersionTuple version)
-      : Kind(DiagnosticArgumentKind::VersionTuple),
-        VersionVal(version) { }
+    DiagnosticArgument(llvm::VersionTuple version) : Union(version) {}
 
-    DiagnosticArgument(LayoutConstraint L)
-      : Kind(DiagnosticArgumentKind::LayoutConstraint), LayoutConstraintVal(L) {
-    }
+    DiagnosticArgument(LayoutConstraint L) : Union(L) {}
+
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
     template<
@@ -214,86 +144,86 @@ namespace swift {
       : DiagnosticArgument(
           static_cast<typename std::underlying_type<EnumType>::type>(value)) {}
 
-    DiagnosticArgumentKind getKind() const { return Kind; }
+    template <typename T> bool isa() const { return Union.isa<T>(); }
 
     StringRef getAsString() const {
-      assert(Kind == DiagnosticArgumentKind::String);
-      return StringVal;
+      assert(isa<StringRef>());
+      return Union.get<StringRef>();
     }
 
     int getAsInteger() const {
-      assert(Kind == DiagnosticArgumentKind::Integer);
-      return IntegerVal;
+      assert(isa<int>());
+      return Union.get<int>();
     }
 
     unsigned getAsUnsigned() const {
-      assert(Kind == DiagnosticArgumentKind::Unsigned);
-      return UnsignedVal;
+      assert(isa<unsigned>());
+      return Union.get<unsigned>();
     }
 
     DeclNameRef getAsIdentifier() const {
-      assert(Kind == DiagnosticArgumentKind::Identifier);
-      return IdentifierVal;
+      assert(isa<DeclNameRef>());
+      return Union.get<DeclNameRef>();
     }
 
     ObjCSelector getAsObjCSelector() const {
-      assert(Kind == DiagnosticArgumentKind::ObjCSelector);
-      return ObjCSelectorVal;
+      assert(isa<ObjCSelector>());
+      return Union.get<ObjCSelector>();
     }
 
     ValueDecl *getAsValueDecl() const {
-      assert(Kind == DiagnosticArgumentKind::ValueDecl);
-      return TheValueDecl;
+      assert(isa<ValueDecl *>());
+      return Union.get<ValueDecl *>();
     }
 
     Type getAsType() const {
-      assert(Kind == DiagnosticArgumentKind::Type);
-      return TypeVal;
+      assert(isa<Type>());
+      return Union.get<Type>();
     }
 
     TypeRepr *getAsTypeRepr() const {
-      assert(Kind == DiagnosticArgumentKind::TypeRepr);
-      return TyR;
+      assert(isa<TypeRepr *>());
+      return Union.get<TypeRepr *>();
     }
     
     PatternKind getAsPatternKind() const {
-      assert(Kind == DiagnosticArgumentKind::PatternKind);
-      return PatternKindVal;
+      assert(isa<PatternKind>());
+      return Union.get<PatternKind>();
     }
 
     ReferenceOwnership getAsReferenceOwnership() const {
-      assert(Kind == DiagnosticArgumentKind::ReferenceOwnership);
-      return ReferenceOwnershipVal;
+      assert(isa<ReferenceOwnership>());
+      return Union.get<ReferenceOwnership>();
     }
 
     SelfAccessKind getAsSelfAccessKind() const {
-      assert(Kind == DiagnosticArgumentKind::SelfAccessKind);
-      return SelfAccessKindVal;
+      assert(isa<SelfAccessKind>());
+      return Union.get<SelfAccessKind>();
     }
 
     StaticSpellingKind getAsStaticSpellingKind() const {
-      assert(Kind == DiagnosticArgumentKind::StaticSpellingKind);
-      return StaticSpellingKindVal;
+      assert(isa<StaticSpellingKind>());
+      return Union.get<StaticSpellingKind>();
     }
 
     DescriptiveDeclKind getAsDescriptiveDeclKind() const {
-      assert(Kind == DiagnosticArgumentKind::DescriptiveDeclKind);
-      return DescriptiveDeclKindVal;
+      assert(isa<DescriptiveDeclKind>());
+      return Union.get<DescriptiveDeclKind>();
     }
 
     const DeclAttribute *getAsDeclAttribute() const {
-      assert(Kind == DiagnosticArgumentKind::DeclAttribute);
-      return DeclAttributeVal;
+      assert(isa<const DeclAttribute *>());
+      return Union.get<const DeclAttribute *>();
     }
 
     llvm::VersionTuple getAsVersionTuple() const {
-      assert(Kind == DiagnosticArgumentKind::VersionTuple);
-      return VersionVal;
+      assert(isa<llvm::VersionTuple>());
+      return Union.get<llvm::VersionTuple>();
     }
 
     LayoutConstraint getAsLayoutConstraint() const {
-      assert(Kind == DiagnosticArgumentKind::LayoutConstraint);
-      return LayoutConstraintVal;
+      assert(isa<LayoutConstraint>());
+      return Union.get<LayoutConstraint>();
     }
   };
   

@@ -453,7 +453,7 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
 static bool typeSpellingIsAmbiguous(Type type,
                                     ArrayRef<DiagnosticArgument> Args) {
   for (auto arg : Args) {
-    if (arg.getKind() == DiagnosticArgumentKind::Type) {
+    if (arg.isa<Type>()) {
       auto argType = arg.getAsType();
       if (argType && !argType->isEqual(type) &&
           argType->getWithoutParens().getString() == type.getString()) {
@@ -473,8 +473,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
                                      DiagnosticFormatOptions FormatOpts,
                                      llvm::raw_ostream &Out) {
   const DiagnosticArgument &Arg = Args[ArgIndex];
-  switch (Arg.getKind()) {
-  case DiagnosticArgumentKind::Integer:
+  if (Arg.isa<int>()) {
     if (Modifier == "select") {
       assert(Arg.getAsInteger() >= 0 && "Negative selection index");
       formatSelectionArgument(ModifierArguments, Args, Arg.getAsInteger(),
@@ -486,9 +485,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Modifier.empty() && "Improper modifier for integer argument");
       Out << Arg.getAsInteger();
     }
-    break;
-
-  case DiagnosticArgumentKind::Unsigned:
+  } else if (Arg.isa<unsigned>()) {
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args, Arg.getAsUnsigned(),
                               FormatOpts, Out);
@@ -499,9 +496,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Modifier.empty() && "Improper modifier for unsigned argument");
       Out << Arg.getAsUnsigned();
     }
-    break;
-
-  case DiagnosticArgumentKind::String:
+  } else if (Arg.isa<StringRef>()) {
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args,
                               Arg.getAsString().empty() ? 0 : 1, FormatOpts,
@@ -510,28 +505,20 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Modifier.empty() && "Improper modifier for string argument");
       Out << Arg.getAsString();
     }
-    break;
-
-  case DiagnosticArgumentKind::Identifier:
+  } else if (Arg.isa<DeclNameRef>()) {
     assert(Modifier.empty() && "Improper modifier for identifier argument");
     Out << FormatOpts.OpeningQuotationMark;
     Arg.getAsIdentifier().printPretty(Out);
     Out << FormatOpts.ClosingQuotationMark;
-    break;
-
-  case DiagnosticArgumentKind::ObjCSelector:
+  } else if (Arg.isa<ObjCSelector>()) {
     assert(Modifier.empty() && "Improper modifier for selector argument");
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsObjCSelector()
         << FormatOpts.ClosingQuotationMark;
-    break;
-
-  case DiagnosticArgumentKind::ValueDecl:
+  } else if (Arg.isa<ValueDecl *>()) {
     Out << FormatOpts.OpeningQuotationMark;
     Arg.getAsValueDecl()->getFullName().printPretty(Out);
     Out << FormatOpts.ClosingQuotationMark;
-    break;
-
-  case DiagnosticArgumentKind::Type: {
+  } else if (Arg.isa<Type>()) {
     assert(Modifier.empty() && "Improper modifier for Type argument");
     
     // Strip extraneous parentheses; they add no value.
@@ -581,19 +568,14 @@ static void formatDiagnosticArgument(StringRef Modifier,
             << FormatOpts.ClosingQuotationMark;
       }
     }
-    break;
-  }
-  case DiagnosticArgumentKind::TypeRepr:
+  } else if (Arg.isa<TypeRepr *>()) {
     assert(Modifier.empty() && "Improper modifier for TypeRepr argument");
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsTypeRepr()
         << FormatOpts.ClosingQuotationMark;
-    break;
-  case DiagnosticArgumentKind::PatternKind:
+  } else if (Arg.isa<PatternKind>()) {
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();
-    break;
-
-  case DiagnosticArgumentKind::SelfAccessKind:
+  } else if (Arg.isa<SelfAccessKind>()) {
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args,
                               unsigned(Arg.getAsSelfAccessKind()),
@@ -603,9 +585,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
              "Improper modifier for SelfAccessKind argument");
       Out << Arg.getAsSelfAccessKind();
     }
-    break;
-
-  case DiagnosticArgumentKind::ReferenceOwnership:
+  } else if (Arg.isa<ReferenceOwnership>()) {
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args,
                               unsigned(Arg.getAsReferenceOwnership()),
@@ -615,9 +595,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
              "Improper modifier for ReferenceOwnership argument");
       Out << Arg.getAsReferenceOwnership();
     }
-    break;
-
-  case DiagnosticArgumentKind::StaticSpellingKind:
+  } else if (Arg.isa<StaticSpellingKind>()) {
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args,
                               unsigned(Arg.getAsStaticSpellingKind()),
@@ -627,15 +605,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
              "Improper modifier for StaticSpellingKind argument");
       Out << Arg.getAsStaticSpellingKind();
     }
-    break;
-
-  case DiagnosticArgumentKind::DescriptiveDeclKind:
+  } else if (Arg.isa<DescriptiveDeclKind>()) {
     assert(Modifier.empty() &&
            "Improper modifier for DescriptiveDeclKind argument");
     Out << Decl::getDescriptiveKindName(Arg.getAsDescriptiveDeclKind());
-    break;
-
-  case DiagnosticArgumentKind::DeclAttribute:
+  } else if (Arg.isa<const DeclAttribute *>()) {
     assert(Modifier.empty() &&
            "Improper modifier for DeclAttribute argument");
     if (Arg.getAsDeclAttribute()->isDeclModifier())
@@ -644,18 +618,16 @@ static void formatDiagnosticArgument(StringRef Modifier,
           << FormatOpts.ClosingQuotationMark;
     else
       Out << '@' << Arg.getAsDeclAttribute()->getAttrName();
-    break;
-
-  case DiagnosticArgumentKind::VersionTuple:
+  } else if (Arg.isa<llvm::VersionTuple>()) {
     assert(Modifier.empty() &&
            "Improper modifier for VersionTuple argument");
     Out << Arg.getAsVersionTuple().getAsString();
-    break;
-  case DiagnosticArgumentKind::LayoutConstraint:
+  } else if (Arg.isa<LayoutConstraint>()) {
     assert(Modifier.empty() && "Improper modifier for LayoutConstraint argument");
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsLayoutConstraint()
         << FormatOpts.ClosingQuotationMark;
-    break;
+  } else {
+    llvm_unreachable("unhandled argument kind");
   }
 }
 
@@ -1062,7 +1034,7 @@ BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
 
 void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
   for (auto &argument : diagnostic.Args) {
-    if (argument.getKind() != DiagnosticArgumentKind::String)
+    if (!argument.isa<StringRef>())
       continue;
 
     auto content = argument.getAsString();
