@@ -50,7 +50,7 @@ class CompletionInstance {
   /// Returns \c if the callback was called. Returns \c false if the compiler
   /// argument has changed, primary file is not the same, the \c Offset is not
   /// in function bodies, or the interface hash of the file has changed.
-  bool performCachedOperaitonIfPossible(
+  bool performCachedOperationIfPossible(
       const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
