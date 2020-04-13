@@ -5255,6 +5255,29 @@ void swift::serializeToBuffers(
   }
 }
 
+void swift::serializeToMemory(
+    ModuleOrSourceFile DC, const SerializationOptions &options,
+    std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer, const SILModule *M) {
+  if (moduleBuffer) {
+    SharedTimer timer("Serialization, swiftmodule, to memory");
+    llvm::SmallString<1024> buf;
+    llvm::raw_svector_ostream stream(buf);
+    Serializer::writeToStream(stream, DC, M, options);
+    *moduleBuffer =
+        std::make_unique<llvm::SmallVectorMemoryBuffer>(std::move(buf));
+  }
+
+  if (moduleDocBuffer) {
+    SharedTimer timer("Serialization, swiftdoc, to memory");
+    llvm::SmallString<1024> buf;
+    llvm::raw_svector_ostream stream(buf);
+    writeDocToStream(stream, DC, options.GroupInfoPath);
+    *moduleDocBuffer =
+        std::make_unique<llvm::SmallVectorMemoryBuffer>(std::move(buf));
+  }
+}
+
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {

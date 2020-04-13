@@ -57,3 +57,5 @@ if(SWIFT_HOST_VARIANT STREQUAL "macosx")
 endif()
 
 add_swift_tool_subdirectory(swift-reflection-dump)
+
+add_swift_tool_subdirectory(libInMemoryFrontend)
