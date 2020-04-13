@@ -1083,6 +1083,7 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
                             FrontendObserver *observer) {
   auto mod = Instance.getMainModule();
   if (auto SM = Instance.takeSILModule()) {
+    resetGlobalLLVMContext();
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForAtMostOnePrimary();
     return performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
@@ -1101,6 +1102,7 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.
+    resetGlobalLLVMContext();
     auto SM = performSILGeneration(mod, Instance.getSILTypes(), SILOpts);
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
@@ -1117,6 +1119,7 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
   if (!Instance.getPrimarySourceFiles().empty()) {
     bool result = false;
     for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
+      resetGlobalLLVMContext();
       auto SM = performSILGeneration(*PrimaryFile, Instance.getSILTypes(), SILOpts);
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
@@ -1133,6 +1136,7 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
   // a primary serialized input.
   bool result = false;
   for (FileUnit *fileUnit : mod->getFiles()) {
+    resetGlobalLLVMContext();
     if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit))
       if (Invocation.getFrontendOptions().InputsAndOutputs.isInputPrimary(
               SASTF->getFilename())) {

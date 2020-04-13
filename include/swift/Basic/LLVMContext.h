@@ -25,6 +25,8 @@ namespace swift {
 /// operating on a single thread.
 llvm::LLVMContext &getGlobalLLVMContext();
 
+void resetGlobalLLVMContext();
+
 } // end swift namespace
 
 #endif

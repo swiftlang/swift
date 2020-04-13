@@ -14,8 +14,14 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/IR/LLVMContext.h"
 
-static llvm::ManagedStatic<llvm::LLVMContext> GlobalContext;
+/// Hack: because of \c IntrinsicInfo::hasAttribute in Builtins.cpp
+/// SIL construction goes into the LLVM, so initialize it here, but really should not be inited
+static std::unique_ptr<llvm::LLVMContext> GlobalContext(new llvm::LLVMContext);
 
 llvm::LLVMContext& swift::getGlobalLLVMContext() {
-  return *GlobalContext;
+  return *GlobalContext.get();
+}
+
+void swift::resetGlobalLLVMContext() {
+  GlobalContext.reset(new llvm::LLVMContext);
 }
