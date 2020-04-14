@@ -284,6 +284,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "WASI")
+    list(APPEND result "-D_WASI_EMULATED_MMAN")
+  endif()
+
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
     if(${CFLAGS_ARCH} STREQUAL x86_64)
       # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
