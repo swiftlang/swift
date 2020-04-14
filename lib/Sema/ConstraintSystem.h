@@ -2932,14 +2932,8 @@ public:
   /// Add a new constraint that we know fails.
   void addNewFailingConstraint(Constraint *constraint) {
     assert(shouldAddNewFailingConstraint());
+    assert(!constraint->isActive());
     failedConstraint = constraint;
-    failedConstraint->setActive(false);
-
-    // Record this as a newly-generated constraint.
-    if (solverState) {
-      solverState->addGeneratedConstraint(constraint);
-      solverState->retireConstraint(constraint);
-    }
   }
 
   /// Add a newly-generated constraint that is known not to be solvable
