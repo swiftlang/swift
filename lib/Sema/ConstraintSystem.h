@@ -4513,8 +4513,6 @@ private:
   Optional<ConstraintSystem::PotentialBinding>
   getPotentialBindingForRelationalConstraint(
       PotentialBindings &result, Constraint *constraint,
-      bool &hasDependentMemberRelationalConstraints,
-      bool &hasNonDependentMemberRelationalConstraints,
       bool &addOptionalSupertypeBindings) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 

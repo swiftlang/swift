@@ -280,8 +280,6 @@ static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
 Optional<ConstraintSystem::PotentialBinding>
 ConstraintSystem::getPotentialBindingForRelationalConstraint(
     PotentialBindings &result, Constraint *constraint,
-    bool &hasDependentMemberRelationalConstraints,
-    bool &hasNonDependentMemberRelationalConstraints,
     bool &addOptionalSupertypeBindings) const {
   assert(constraint->getClassification() ==
              ConstraintClassification::Relational &&
@@ -359,17 +357,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       kind == AllowedBindingKind::Subtypes) {
     type = OptionalType::get(type);
   }
-
-  // If the type we'd be binding to is a dependent member, don't try to
-  // resolve this type variable yet.
-  if (type->is<DependentMemberType>()) {
-    if (!ConstraintSystem::typeVarOccursInType(typeVar, type,
-                                               &result.InvolvesTypeVariables)) {
-      hasDependentMemberRelationalConstraints = true;
-    }
-    return None;
-  }
-  hasNonDependentMemberRelationalConstraints = true;
 
   // If our binding choice is a function type and we're attempting
   // to bind to a type variable that is the result of opening a
@@ -474,8 +461,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   SmallVector<Constraint *, 2> defaultableConstraints;
   SmallVector<PotentialBinding, 4> literalBindings;
   bool addOptionalSupertypeBindings = false;
-  bool hasNonDependentMemberRelationalConstraints = false;
-  bool hasDependentMemberRelationalConstraints = false;
   for (auto constraint : constraints) {
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
@@ -502,9 +487,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
         result.PotentiallyIncomplete = true;
 
       auto binding = getPotentialBindingForRelationalConstraint(
-          result, constraint, hasDependentMemberRelationalConstraints,
-          hasNonDependentMemberRelationalConstraints,
-          addOptionalSupertypeBindings);
+          result, constraint, addOptionalSupertypeBindings);
       if (!binding)
         break;
 
@@ -579,7 +562,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       if (getFixedTypeRecursive(constraint->getFirstType(), true)
               ->getAs<TypeVariableType>() == typeVar) {
         defaultableConstraints.push_back(constraint);
-        hasNonDependentMemberRelationalConstraints = true;
       }
       break;
 
@@ -622,8 +604,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       auto defaultType = TypeChecker::getDefaultType(constraint->getProtocol(), DC);
       if (!defaultType)
         continue;
-
-      hasNonDependentMemberRelationalConstraints = true;
 
       // Handle unspecialized types directly.
       if (!defaultType->hasUnboundGenericType()) {
@@ -876,15 +856,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     }
   }
 
-  // If there were both dependent-member and non-dependent-member relational
-  // constraints, consider this "fully bound"; we don't want to touch it.
-  if (hasDependentMemberRelationalConstraints) {
-    if (hasNonDependentMemberRelationalConstraints)
-      result.FullyBound = true;
-    else
-      result.Bindings.clear();
-  }
-
   return result;
 }
 
@@ -896,6 +867,8 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
                                                     Type type) const {
   // Simplify the type.
   type = simplifyType(type);
+
+  assert(!type->lookThroughAllOptionalTypes()->is<DependentMemberType>());
 
   // If the type references the type variable, don't permit the binding.
   SmallVector<TypeVariableType *, 4> referencedTypeVars;
@@ -916,12 +889,6 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
 
   // If the type is a type variable itself, don't permit the binding.
   if (type->getRValueType()->is<TypeVariableType>())
-    return None;
-
-  // Don't bind to a dependent member type, even if it's currently
-  // wrapped in any number of optionals, because binding producer
-  // might unwrap and try to attempt it directly later.
-  if (type->lookThroughAllOptionalTypes()->is<DependentMemberType>())
     return None;
 
   // Okay, allow the binding (with the simplified type).
