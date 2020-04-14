@@ -342,6 +342,13 @@ public:
   /// content. Delegates to clang for everything except construction of the
   /// replica.
   ///
+  /// Due to instability in the module cache during highly-concurrent
+  /// compilation sessions, this function will not report a fatal error
+  /// if the bridging header fails to build. It is the responsibility of
+  /// the client to call \c retryEmittingBridgingPCHWithFreshModuleCache
+  /// if this function returns \c true to signal errors have been emitted and
+  /// properly abort compilation.
+  ///
   /// \sa clang::GeneratePCHAction
   bool emitBridgingPCH(StringRef headerPath,
                        StringRef outputPCHPath);
@@ -438,6 +445,36 @@ public:
 
   bool isSerializable(const clang::Type *type,
                       bool checkCanonical) const override;
+
+public:
+  /// Rebuild a previously-failed bridging header PCH job under the assumption
+  /// a fresh module cache has been installed by the client.
+  ///
+  /// Bridging header emission can be an unstable process that relies on very
+  /// precise (file-)locking conditions. In the presence of submodules, these
+  /// conditions are insufficiently conservative. That is, suppose a header
+  /// imports module \c SuperiorModule which itself imports a module \c
+  /// InferiorModule. Clang will spawn module building jobs to populate the
+  /// module cache for both modules. If another independent compiler process
+  /// also builds the module \c InferiorModule, and that process is able to
+  /// write its PCM before our header has finished building its PCMs, then the
+  /// \c SuperiorModule job can fail because one of its dependencies has
+  /// unexpectedly changed out from under it.
+  ///
+  /// We make one more effort to emit the bridging header, this time with a
+  /// new unique module cache. This will ultimately force the rebuild of PCMs
+  /// for every dependency of the bridging header, which may take a long time
+  /// but is ultimately better than failing with some opaque module generation
+  /// error that will just go away when DerivedData is nuked and the racing
+  /// processes happen to race in the user's favor.
+  ///
+  /// This is to say, we should move to explicit module builds ASAP.
+  /// rdar://45500340
+  ///
+  /// This function will emit a fatal error and return \c true if the
+  /// attempt to rebuild the PCH fails.
+  bool retryEmittingBridgingPCHWithFreshModuleCache(StringRef headerPath,
+                                                    StringRef outputPCHPath);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

@@ -717,6 +717,50 @@ static void countStatsPostSILGen(UnifiedStatsReporter &Stats,
   C.NumSILGenGlobalVariables += Module.getSILGlobalList().size();
 }
 
+// An unfortunate hack to work around the module cache not being completely
+// concurrency-safe. In an environment where many independent compiler processes
+// are fighting over the same shared module cache, submodules often get left
+// defenseless and can be recompiled behind our back. When this happens, PCH
+// generation falls over with an opaque error about module building and
+// the module cache often remains in a corrupted or inconsistent state. We
+// recover from this by explicitly retrying with a fresh module cache. This
+// cache ought to be unique by virtue of being composed of the module name
+// and the hash of the compile job's options.
+//
+// If this attempt fails, we are well and truly done for.
+static bool retryPrecompileBridgingHeaderWithFreshModuleCache(
+    const CompilerInvocation &Invocation, CompilerInstance &Instance) {
+  // Take the existing module cache path and append enough data to get a new
+  // unique cache path:
+  //
+  // <Cache-Path>/<Module-Name>-Retry-Bridging-Header-<SwiftModule-Hash>
+  llvm::SmallString<256> OutPath = Invocation.getClangModuleCachePath();
+  llvm::sys::path::append(OutPath, Invocation.getModuleName());
+  OutPath.append("-Retry-Bridging-Header-");
+  OutPath.append(Invocation.getSwiftModuleCacheHash(
+      Invocation.getClangModuleCachePath().str()));
+  if (!OutPath.empty())
+    (void)llvm::sys::fs::create_directories(OutPath);
+
+  // Clone the Clang Importer just to set a new module cache path because
+  // this is supposed to hurt.
+  CompilerInvocation subInvocation(Invocation);
+  subInvocation.setClangModuleCachePath(OutPath);
+  std::unique_ptr<ClangImporter> clangImporter = ClangImporter::create(
+      Instance.getASTContext(), subInvocation.getClangImporterOptions(),
+      subInvocation.getPCHHash(), Instance.getDependencyTracker());
+  if (!clangImporter) {
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::error_clang_importer_create_fail);
+    return true;
+  }
+  return clangImporter->retryEmittingBridgingPCHWithFreshModuleCache(
+      subInvocation.getFrontendOptions()
+          .InputsAndOutputs.getFilenameOfFirstInput(),
+      subInvocation.getFrontendOptions()
+          .InputsAndOutputs.getSingleOutputFilename());
+}
+
 static bool precompileBridgingHeader(const CompilerInvocation &Invocation,
                                      const CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
@@ -734,6 +778,15 @@ static bool precompileBridgingHeader(const CompilerInvocation &Invocation,
           .InputsAndOutputs.getFilenameOfFirstInput(),
       Invocation.getFrontendOptions()
           .InputsAndOutputs.getSingleOutputFilename());
+}
+
+static bool precompileBridgingHeaderRetryingIfNecessary(
+    const CompilerInvocation &Invocation, CompilerInstance &Instance) {
+  if (precompileBridgingHeader(Invocation, Instance)) {
+    return retryPrecompileBridgingHeaderWithFreshModuleCache(Invocation,
+                                                             Instance);
+  }
+  return false;
 }
 
 static bool precompileClangModule(const CompilerInvocation &Invocation,
@@ -1245,7 +1298,7 @@ static bool performCompile(CompilerInstance &Instance,
   // We've been asked to precompile a bridging header or module; we want to
   // avoid touching any other inputs and just parse, emit and exit.
   if (Action == FrontendOptions::ActionType::EmitPCH)
-    return precompileBridgingHeader(Invocation, Instance);
+    return precompileBridgingHeaderRetryingIfNecessary(Invocation, Instance);
   if (Action == FrontendOptions::ActionType::EmitPCM)
     return precompileClangModule(Invocation, Instance);
   if (Action == FrontendOptions::ActionType::DumpPCM)

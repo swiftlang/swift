@@ -54,7 +54,6 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   // Create the includes.
   std::string include = createFilename(temp, "include");
   ASSERT_FALSE(llvm::sys::fs::create_directory(include));
-  options.ExtraArgs.emplace_back("-nosysteminc");
   options.ExtraArgs.emplace_back((llvm::Twine("-I") + include).str());
   ASSERT_FALSE(emitFileWithContents(include, "module.modulemap",
                                     "module A {\n"
@@ -87,4 +86,87 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   // the in-memory cache.
   ASSERT_FALSE(emitFileWithContents(PCH, "garbage"));
   ASSERT_TRUE(importer->canReadPCH(PCH));
+}
+
+TEST(ClangImporterTest, retryInvalidPCH) {
+  // Create a temporary cache on disk and clean it up at the end.
+  ClangImporterOptions options;
+  SmallString<256> temp;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
+      "ClangImporterTest.retryInvalidPCH", temp));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(temp); };
+
+  // Create a cache subdirectory for the modules and PCH.
+  std::string cache = createFilename(temp, "cache");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(cache));
+  options.ModuleCachePath = cache;
+  options.PrecompiledHeaderOutputDir = cache;
+
+  // Create the includes.
+  std::string include = createFilename(temp, "include");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(include));
+  options.ExtraArgs.emplace_back((llvm::Twine("-I") + include).str());
+  ASSERT_FALSE(emitFileWithContents(include, "module.modulemap",
+                                    "module A {\n"
+                                    "  header \"A.h\"\n"
+                                    "}\n"));
+  ASSERT_FALSE(emitFileWithContents(include, "A.h", "int foo(void);\n"));
+
+  // Create a bridging header.
+  ASSERT_FALSE(emitFileWithContents(temp, "bridging.h", "#import <A.h>\n",
+                                    &options.BridgingHeader));
+
+  // Set up the importer and emit a bridging PCH.
+  swift::LangOptions langOpts;
+  langOpts.Target = llvm::Triple("x86_64", "apple", "darwin");
+  swift::TypeCheckerOptions typeckOpts;
+  INITIALIZE_LLVM();
+  swift::SearchPathOptions searchPathOpts;
+  swift::SourceManager sourceMgr;
+  swift::DiagnosticEngine diags(sourceMgr);
+
+  // Emit the bridging PCH normally.
+  std::string PCH = createFilename(cache, "bridging.h.pch");
+  {
+    std::unique_ptr<ASTContext> context(ASTContext::get(
+        langOpts, typeckOpts, searchPathOpts, sourceMgr, diags));
+    auto importer = ClangImporter::create(*context, options);
+    ASSERT_FALSE(importer->emitBridgingPCH(options.BridgingHeader, PCH));
+  }
+
+  // Now corrupt the module cache
+  {
+    std::error_code errorCode;
+    llvm::sys::fs::recursive_directory_iterator DI(cache, errorCode);
+    llvm::sys::fs::recursive_directory_iterator endIterator;
+    for (; DI != endIterator; DI.increment(errorCode)) {
+      auto entry = *DI;
+      auto path = entry.path();
+      if (!llvm::sys::fs::is_directory(path) &&
+          StringRef(path).endswith(".pcm")) {
+        ASSERT_FALSE(emitFileWithContents(path, "garbage"));
+      }
+    }
+  }
+
+  // And try again - expecting we'll fail because the cache is frelled.
+  {
+    std::unique_ptr<ASTContext> context(ASTContext::get(
+        langOpts, typeckOpts, searchPathOpts, sourceMgr, diags));
+    auto importer = ClangImporter::create(*context, options);
+    ASSERT_TRUE(importer->emitBridgingPCH(options.BridgingHeader, PCH));
+  }
+
+  // Now that we've failed, reset the module cache path and try again
+  {
+    std::string retryCache = createFilename(temp, "retry-cache");
+    ASSERT_FALSE(llvm::sys::fs::create_directory(retryCache));
+    options.ModuleCachePath = retryCache;
+
+    std::unique_ptr<ASTContext> context(ASTContext::get(
+        langOpts, typeckOpts, searchPathOpts, sourceMgr, diags));
+    auto importer = ClangImporter::create(*context, options);
+    ASSERT_FALSE(importer->retryEmittingBridgingPCHWithFreshModuleCache(
+        options.BridgingHeader, PCH));
+  }
 }

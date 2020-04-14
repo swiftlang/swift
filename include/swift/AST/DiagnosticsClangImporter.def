@@ -61,8 +61,12 @@ WARNING(could_not_rewrite_bridging_header,none,
   "failed to serialize bridging header; "
   "target may not be debuggable outside of its original project", ())
 ERROR(bridging_header_pch_error,Fatal,
-   "failed to emit precompiled header '%0' for bridging header '%1'",
-   (StringRef, StringRef))
+      "failed to emit precompiled header '%0' for bridging header '%1'",
+      (StringRef, StringRef))
+REMARK(rebuilding_bridging_header_pch_remark,none,
+      "retrying build of precompiled header '%0' for bridging header '%1'; "
+      "errors from the prior build are being ignored",
+      (StringRef, StringRef))
 
 ERROR(emit_pcm_error,Fatal,
    "failed to emit precompiled module '%0' for module map '%1'",

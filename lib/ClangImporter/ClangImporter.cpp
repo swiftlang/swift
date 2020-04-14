@@ -890,6 +890,10 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
                                         PCHFilename.getValue());
     if (FailedToEmit) {
+      Impl.SwiftContext.Diags.diagnose({},
+                                       diag::bridging_header_pch_error,
+                                       ImporterOptions.BridgingHeader,
+                                       PCHFilename.getValue());
       return None;
     }
   }
@@ -1541,12 +1545,21 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
       FrontendOpts, std::make_unique<clang::GeneratePCHAction>());
   emitInstance->ExecuteAction(*action);
 
-  if (emitInstance->getDiagnostics().hasErrorOccurred()) {
+  return emitInstance->getDiagnostics().hasErrorOccurred();
+}
+
+bool ClangImporter::retryEmittingBridgingPCHWithFreshModuleCache(
+    StringRef headerPath, StringRef outputPCHPath) {
+  Impl.SwiftContext.Diags.diagnose({},
+                                   diag::rebuilding_bridging_header_pch_remark,
+                                   outputPCHPath, headerPath);
+  if (emitBridgingPCH(headerPath, outputPCHPath)) {
     Impl.SwiftContext.Diags.diagnose({},
                                      diag::bridging_header_pch_error,
                                      outputPCHPath, headerPath);
     return true;
   }
+
   return false;
 }
 
