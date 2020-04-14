@@ -31,7 +31,7 @@ func getSingleSourceLibraries(subDirectory: String) -> [String] {
     let name = String(path.lastPathComponent.prefix(upTo: lastDot))
 
     // Test names must have a single component.
-    guard name.contains(".") else { return nil }
+    if name.contains(".") { return nil }
 
     if unsupportedTests.contains(name) {
       // We do not support this test.
