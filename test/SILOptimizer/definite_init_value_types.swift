@@ -35,7 +35,6 @@ enum ValueEnum {
   // CHECK:        [[BOOL:%.*]] = struct_extract %0 : $Bool, #Bool._value
   // CHECK-NEXT:   cond_br [[BOOL]], bb1, bb2
   // CHECK:      bb1:
-  // CHECK-NEXT:   [[METATYPE:%.*]] = metatype $@thin ValueEnum.Type
   // CHECK-NEXT:   [[NEW_SELF:%.*]] = enum $ValueEnum, #ValueEnum.b!enumelt
   // CHECK-NEXT:   [[SELF_ACCESS:%.*]] = begin_access [modify] [static] [[SELF_BOX]]
   // CHECK-NEXT:   [[NEW_STATE:%.*]] = integer_literal $Builtin.Int1, -1
@@ -46,7 +45,6 @@ enum ValueEnum {
   // CHECK:      bb2:
   // CHECK-NEXT:   br bb3
   // CHECK:      bb3:
-  // CHECK-NEXT:   [[METATYPE:%.*]] = metatype $@thin ValueEnum.Type
   // CHECK-NEXT:   [[NEW_SELF:%.*]] = enum $ValueEnum, #ValueEnum.c!enumelt
   // CHECK-NEXT:   [[SELF_ACCESS:%.*]] = begin_access [modify] [static] [[SELF_BOX]]
   // CHECK-NEXT:   [[STATE_VALUE:%.*]] = load [[STATE]]

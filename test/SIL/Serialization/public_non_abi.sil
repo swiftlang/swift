@@ -15,6 +15,7 @@ import Swift
 sil @top_level_code : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @public_non_abi_function : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
   %1 = tuple ()
   return %1 : $()
 }

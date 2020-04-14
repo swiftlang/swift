@@ -92,6 +92,8 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
 sil @invoke_trivial : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> () {
 entry(%0 : $*@block_storage Builtin.RawPointer):
   %c = project_block_storage %0 : $*@block_storage Builtin.RawPointer
+  // Use %c so it's not optimized away.
+  copy_addr %c to undef : $*Builtin.RawPointer
   return undef : $()
 }
 
