@@ -58,7 +58,7 @@ extension TypeIndexed where Value : Strideable {
     _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = #file, line: UInt = #line,
+    file: String = #filePath, line: UInt = #line,
     invoking body: () -> R
   ) -> R {
     let expected = self[t].advanced(by: 1)
@@ -76,7 +76,7 @@ extension TypeIndexed where Value : Equatable {
     _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = #file, line: UInt = #line,
+    file: String = #filePath, line: UInt = #line,
     invoking body: () -> R
   ) -> R {
     let expected = self[t]
@@ -102,7 +102,7 @@ public func expectEqual<V: Comparable>(
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   expectEqualsUnordered(
     expected.map { (key: TypeIdentifier($0.0), value: $0.1) },

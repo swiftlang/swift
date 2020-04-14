@@ -54,7 +54,7 @@ public struct SourceLoc {
   }
 
   public func withCurrentLoc(
-    _ file: String = #file, line: UInt = #line
+    _ file: String = #filePath, line: UInt = #line
   ) -> SourceLocStack {
     return SourceLocStack(self).with(SourceLoc(file, line))
   }
@@ -92,7 +92,7 @@ public struct SourceLocStack {
   }
 
   public func withCurrentLoc(
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) -> SourceLocStack {
     return with(SourceLoc(file, line))
   }
@@ -143,7 +143,7 @@ public func expectFailure(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line, invoking body: () -> Void) {
+  file: String = #filePath, line: UInt = #line, invoking body: () -> Void) {
   let startAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   body()
   let endAnyExpectFailed = _anyExpectFailed.fetchAndClear()
@@ -179,7 +179,7 @@ public func expectEqual<T : Equatable>(_ expected: T, _ actual: T,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   expectEqualTest(expected, actual, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
 }
@@ -189,7 +189,7 @@ public func expectEqual<T : Equatable, U : Equatable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   expectEqualTest(expected.0, actual.0, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
   expectEqualTest(expected.1, actual.1, message(),
@@ -201,7 +201,7 @@ public func expectEqual<T : Equatable, U : Equatable, V : Equatable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   expectEqualTest(expected.0, actual.0, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
   expectEqualTest(expected.1, actual.1, message(),
@@ -215,7 +215,7 @@ public func expectEqual<T : Equatable, U : Equatable, V : Equatable, W : Equatab
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   expectEqualTest(expected.0, actual.0, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
   expectEqualTest(expected.1, actual.1, message(),
@@ -230,7 +230,7 @@ public func expectEqual(_ expected: String, _ actual: Substring,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if !(expected == actual) {
     expectationFailure(
       "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
@@ -244,7 +244,7 @@ public func expectEqual(_ expected: Substring, _ actual: String,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if !(expected == actual) {
     expectationFailure(
       "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
@@ -258,7 +258,7 @@ public func expectEqual(_ expected: String, _ actual: String,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if !(expected == actual) {
     expectationFailure(
       "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
@@ -273,7 +273,7 @@ public func expectEqualReference(_ expected: AnyObject?, _ actual: AnyObject?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   expectEqualTest(expected, actual, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 === $1}
 }
@@ -296,7 +296,7 @@ public func expectEqualTest<T>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line, sameValue equal: (T, T) -> Bool
+  file: String = #filePath, line: UInt = #line, sameValue equal: (T, T) -> Bool
 ) {
   if !equal(expected, actual) {
     expectationFailure(
@@ -312,7 +312,7 @@ public func expectNotEqual<T : Equatable>(_ expected: T, _ actual: T,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if expected == actual {
     expectationFailure(
       "unexpected value: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
@@ -327,7 +327,7 @@ public func expectOptionalEqual<T>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line, sameValue equal: (T, T) -> Bool
+  file: String = #filePath, line: UInt = #line, sameValue equal: (T, T) -> Bool
 ) {
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
@@ -343,7 +343,7 @@ public func expectEqual(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   expectEqualTest(expected, actual, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
@@ -353,7 +353,7 @@ public func expectLT<T : Comparable>(_ lhs: T, _ rhs: T,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if !(lhs < rhs) {
     expectationFailure("\(lhs) < \(rhs)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -367,7 +367,7 @@ public func expectLE<T : Comparable>(_ lhs: T, _ rhs: T,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if !(lhs <= rhs) {
     expectationFailure("\(lhs) <= \(rhs)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -381,7 +381,7 @@ public func expectGT<T : Comparable>(_ lhs: T, _ rhs: T,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if !(lhs > rhs) {
     expectationFailure("\(lhs) > \(rhs)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -395,7 +395,7 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if !(lhs >= rhs) {
     expectationFailure("\(lhs) >= \(rhs)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -425,7 +425,7 @@ public func expectTrapping<Bound>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   if !range.contains(point) {
     expectationFailure("\(point) in \(range)", trace: message(),
@@ -439,7 +439,7 @@ public func expectTrapping<Bound>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   if !range._contains(subRange) {
     expectationFailure("\(subRange) in \(range)", trace: message(),
@@ -452,7 +452,7 @@ public func expectTrapping<Bound>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   if !range.contains(point) {
     expectationFailure("\(point) in \(range)", trace: message(),
@@ -466,7 +466,7 @@ public func expectTrapping<Bound>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   if !range._contains(subRange) {
     expectationFailure("\(subRange) in \(range)", trace: message(),
@@ -488,7 +488,7 @@ public func expectTrapping<Bound>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   if !range._contains(subRange) {
     expectationFailure("\(subRange) in \(range)", trace: message(),
@@ -588,7 +588,7 @@ public func expectUnreachable(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   expectationFailure("this code should not be executed", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
@@ -597,7 +597,7 @@ public func expectUnreachableCatch(_ error: Error,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   expectationFailure(
     "error should not be thrown: \"\(error)\"", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -607,7 +607,7 @@ public func expectTrue(_ actual: AssertionResult,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if !actual._isPass {
     expectationFailure(
       "expected: passed assertion\n\(actual.description)", trace: message(),
@@ -619,7 +619,7 @@ public func expectFalse(_ actual: AssertionResult,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if actual._isPass {
     expectationFailure(
       "expected: failed assertion\n\(actual.description)", trace: message(),
@@ -631,7 +631,7 @@ public func expectTrue(_ actual: Bool,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if !actual {
     expectationFailure("expected: true", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -642,7 +642,7 @@ public func expectFalse(_ actual: Bool,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if actual {
     expectationFailure("expected: false", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -654,7 +654,7 @@ public func expectThrows<ErrorType: Error & Equatable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   do {
     try test()
   } catch let error as ErrorType {
@@ -671,7 +671,7 @@ public func expectDoesNotThrow(_ test: () throws -> Void,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   do {
     try test()
   } catch {
@@ -684,7 +684,7 @@ public func expectNil<T>(_ value: T?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   if value != nil {
     expectationFailure(
       "expected optional to be nil\nactual: \"\(value!)\"", trace: message(),
@@ -697,7 +697,7 @@ public func expectNotNil<T>(_ value: T?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) -> T? {
+  file: String = #filePath, line: UInt = #line) -> T? {
   if value == nil {
     expectationFailure("expected optional to be non-nil", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -1520,7 +1520,7 @@ public final class TestSuite {
   @inline(never)
   public func test(
     _ name: String,
-    file: String = #file, line: UInt = #line,
+    file: String = #filePath, line: UInt = #line,
     _ testFunction: @escaping () -> Void
   ) {
     _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
@@ -1534,7 +1534,7 @@ public final class TestSuite {
   // severely affects the compile time of the test code.
   @inline(never)
   public func test(
-    _ name: String, file: String = #file, line: UInt = #line
+    _ name: String, file: String = #filePath, line: UInt = #line
   ) -> _TestBuilder {
     return _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
   }
@@ -2339,7 +2339,7 @@ public func checkEquatable<Instances : Collection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances.Element : Equatable
 {
@@ -2360,7 +2360,7 @@ internal func _checkEquatableImpl<Instance : Equatable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   // For each index (which corresponds to an instance being tested) track the
   // set of equal instances.
@@ -2432,7 +2432,7 @@ public func checkEquatable<T : Equatable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   checkEquatable(
     [lhs, rhs],
@@ -2463,7 +2463,7 @@ public func checkHashableGroups<Groups: Collection>(
   allowIncompleteHashing: Bool = false,
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where Groups.Element: Collection, Groups.Element.Element: Hashable {
   let instances = groups.flatMap { $0 }
   // groupIndices[i] is the index of the element in groups that contains
@@ -2494,7 +2494,7 @@ public func checkHashable<Instances: Collection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where Instances.Element: Hashable {
   checkHashable(
     instances,
@@ -2519,7 +2519,7 @@ public func checkHashable<Instances: Collection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances.Element: Hashable {
   checkEquatable(
@@ -2606,7 +2606,7 @@ public func checkHashable<T : Hashable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   checkHashable(
     [lhs, rhs], equalityOracle: { expectedEqual || $0 == $1 }, message(),
@@ -2678,7 +2678,7 @@ public func checkComparable<Instances : Collection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances.Element : Comparable {
 
@@ -2766,7 +2766,7 @@ public func checkComparable<T : Comparable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   checkComparable(
     [lhs, rhs],
@@ -2794,7 +2794,7 @@ public func checkStrideable<Instances : Collection, Strides : Collection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances.Element : Strideable,
   Instances.Element.Stride == Strides.Element {
@@ -2846,7 +2846,7 @@ public func expectEqualSequence<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Expected.Element == Actual.Element,
   Expected.Element : Equatable {
@@ -2865,7 +2865,7 @@ public func expectEqualSequence<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Expected.Element == Actual.Element,
   Expected.Element == (T, U) {
@@ -2886,7 +2886,7 @@ public func expectEqualSequence<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
   Expected.Element == Actual.Element {
@@ -2907,7 +2907,7 @@ public func expectEqualsUnordered<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   compare: @escaping (Expected.Element, Expected.Element)
     -> ExpectedComparisonResult
 ) where
@@ -2930,7 +2930,7 @@ public func expectEqualsUnordered<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Expected.Element == Actual.Element,
   Expected.Element : Comparable {
@@ -2946,7 +2946,7 @@ public func expectEqualsUnordered<T : Comparable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   let x = expected.sorted()
   let y = actual.sorted()
@@ -2959,7 +2959,7 @@ public func expectEqualsUnordered<T : Strideable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where T.Stride: SignedInteger {
   if expected.count != actual.count {
     expectationFailure("expected elements: \"\(expected)\"\n"
@@ -3009,7 +3009,7 @@ public func expectEqualsUnordered<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Actual.Element == (key: T, value: T),
   Expected.Element == (T, T) {
@@ -3067,7 +3067,7 @@ public func expectEqualUnicodeScalars<S: StringProtocol>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #filePath, line: UInt = #line) {
   let actualUnicodeScalars = Array(
     actual.unicodeScalars.lazy.map { $0.value })
 

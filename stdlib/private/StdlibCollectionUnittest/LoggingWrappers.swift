@@ -647,7 +647,7 @@ public func expectCustomizable<T : LoggingType>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   T.Base : LoggingType,
   T.Log == T.Base.Log {
@@ -662,7 +662,7 @@ public func expectNotCustomizable<T : LoggingType>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   T.Base : LoggingType,
   T.Log == T.Base.Log {

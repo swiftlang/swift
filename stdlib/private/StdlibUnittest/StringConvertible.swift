@@ -115,7 +115,7 @@ public func expectPrinted<T>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   let actual = String(describing: object)
   if !patterns.contains(actual) {
@@ -132,7 +132,7 @@ public func expectPrinted<T>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   expectPrinted(expectedOneOf: [expected], object, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -143,7 +143,7 @@ public func expectDebugPrinted<T>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   expectPrinted(expectedOneOf: patterns, String(reflecting: object), message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -154,7 +154,7 @@ public func expectDebugPrinted<T>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   expectDebugPrinted(expectedOneOf: [expected], object, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -165,7 +165,7 @@ public func expectDumped<T>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   var actual = ""
   dump(object, to: &actual)

@@ -32,7 +32,7 @@ public struct SubscriptRangeTest {
   public init(
     expected: [Int], collection: [Int], bounds: Range<Int>,
     count: Int,
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.expected = expected.map(OpaqueValue.init)
     self.collection = collection.map(OpaqueValue.init)
@@ -50,7 +50,7 @@ public struct PrefixThroughTest {
 
   init(
     collection: [Int], position: Int, expected: [Int],
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.collection = collection
     self.position = position
@@ -67,7 +67,7 @@ public struct PrefixUpToTest {
 
   public init(
     collection: [Int], end: Int, expected: [Int],
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.collection = collection
     self.end = end
@@ -84,7 +84,7 @@ internal struct RemoveFirstNTest {
 
   init(
     collection: [Int], numberToRemove: Int, expectedCollection: [Int],
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.collection = collection
     self.numberToRemove = numberToRemove
@@ -101,7 +101,7 @@ public struct SuffixFromTest {
 
   init(
     collection: [Int], start: Int, expected: [Int],
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.collection = collection
     self.start = start
@@ -119,7 +119,7 @@ public struct FindLastTest {
   
   public init(
     expected: Int?, comparisons: Int, element: Int, sequence: [Int],
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
     ) {
     self.expected = expected
     self.comparisons = comparisons
@@ -402,7 +402,7 @@ public struct DistanceFromToTest {
 
   public init(
     start: Int, end: Int,
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.startOffset = start
     self.endOffset = end
@@ -421,7 +421,7 @@ public struct IndexOffsetByTest {
   public init(
     startOffset: Int, distance: Int, expectedOffset: Int?,
     limitedBy limit: Int? = nil,
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.startOffset = startOffset
     self.distance = distance
@@ -484,7 +484,7 @@ public struct IndexAfterTest {
   public let end: Int
   public let loc: SourceLoc
 
-  public init(start: Int, end: Int, file: String = #file, line: UInt = #line) {
+  public init(start: Int, end: Int, file: String = #filePath, line: UInt = #line) {
     self.start = start
     self.end = end
     self.loc = SourceLoc(file, line,

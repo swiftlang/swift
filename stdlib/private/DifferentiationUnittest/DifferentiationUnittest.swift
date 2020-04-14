@@ -19,7 +19,7 @@ public enum _GlobalLeakCount {
 
 /// Execute body and check expected leak count.
 public func withLeakChecking(
-  expectedLeakCount: Int = 0, file: String = #file, line: UInt = #line,
+  expectedLeakCount: Int = 0, file: String = #filePath, line: UInt = #line,
   _ body: () -> Void
 ) {
   // Note: compare expected leak count with relative leak count after
@@ -39,7 +39,7 @@ public extension TestSuite {
   func testWithLeakChecking(
     _ name: String,
     expectedLeakCount: Int = 0,
-    file: String = #file, line: UInt = #line,
+    file: String = #filePath, line: UInt = #line,
     _ testFunction: @escaping () -> Void
   ) {
     test(name, file: file, line: line) {

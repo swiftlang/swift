@@ -221,7 +221,7 @@ public struct StringComparisonTest {
   public init(
     _ string: String,
     inferCollationElements: Void,
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.string = string
     self.collationElements = string._collationElements
@@ -241,7 +241,7 @@ public struct StringComparisonTest {
   public init(
     _ string: String,
     _ collationElements: [UInt64],
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.init(
       string,

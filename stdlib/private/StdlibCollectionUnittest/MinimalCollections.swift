@@ -378,7 +378,7 @@ internal func _expectCompatibleIndices(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   if first._collectionState._id == second._collectionState._id {
     // Fast path: the indices are derived from the same state.
@@ -477,7 +477,7 @@ internal func _expectCompatibleIndices(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   if first._collectionState._id == second._collectionState._id {
     // Fast path: the indices are derived from the same state.

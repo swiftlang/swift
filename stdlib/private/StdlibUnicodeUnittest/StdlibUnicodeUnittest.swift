@@ -149,7 +149,7 @@ public struct UTFTest {
     scalars: [UInt32],
     scalarsRepairedTail: [UInt32] = [],
     flags: Flags = [],
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.string = string
     self.utf8 = utf8
@@ -534,7 +534,7 @@ public struct UTF16Test {
   public init(
     _ scalarsHead: [UInt32], _ scalarsRepairedTail: [UInt32],
     _ encoded: [UInt16],
-    file: String = #file, line: UInt = #line
+    file: String = #filePath, line: UInt = #line
   ) {
     self.scalarsHead = scalarsHead
     self.scalarsRepairedTail = scalarsRepairedTail

@@ -25,7 +25,7 @@ public func checkIterator<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where I.Element == Expected.Element {
@@ -55,7 +55,7 @@ public func checkIterator<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where I.Element == Expected.Element, Expected.Element : Equatable {
   checkIterator(
@@ -73,7 +73,7 @@ public func checkSequence<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where S.Element == Expected.Element {
@@ -97,7 +97,7 @@ public func checkSequence<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   S.Element == Expected.Element,
@@ -118,7 +118,7 @@ public func checkIterator<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where I.Element == Element {
@@ -148,7 +148,7 @@ public func checkIterator<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where I.Element == Element, Element : Equatable {
   checkIterator(
@@ -166,7 +166,7 @@ public func checkSequence<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where S.Element == Element {
@@ -190,7 +190,7 @@ public func checkSequence<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   S.Element == Element,

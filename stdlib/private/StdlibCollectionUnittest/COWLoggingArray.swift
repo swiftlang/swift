@@ -7,7 +7,7 @@ public func expectNoCopyOnWrite<T>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file,
+  file: String = #filePath,
   line: UInt = #line,
   _ body: (inout COWLoggingArray<T>) -> Void
 ) {

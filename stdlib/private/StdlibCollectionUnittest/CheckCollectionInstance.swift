@@ -51,7 +51,7 @@ public func checkIncrementable<Instances, BaseCollection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances : Collection,
   BaseCollection : Collection,
@@ -91,7 +91,7 @@ public func checkDecrementable<Instances, BaseCollection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances : Collection,
   BaseCollection : BidirectionalCollection,
@@ -126,7 +126,7 @@ internal func _checkIncrementalAdvance<Instances, BaseCollection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances : Collection,
   BaseCollection : Collection,
@@ -166,7 +166,7 @@ public func checkForwardIndex<Instances, BaseCollection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances : Collection,
   BaseCollection : Collection,
@@ -199,7 +199,7 @@ public func checkBidirectionalIndex<Instances, BaseCollection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances: Collection,
   BaseCollection : BidirectionalCollection,
@@ -240,7 +240,7 @@ public func checkRandomAccessIndex<Instances, Distances, BaseCollection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances : Collection,
   Distances : Collection,
@@ -275,7 +275,7 @@ public func checkAdvancesAndDistances<Instances, Distances, BaseCollection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) where
   Instances : Collection,
   Distances : Collection,
@@ -321,7 +321,7 @@ public func checkCollection<Expected: Collection, C : Collection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where C.Element == Expected.Element {
@@ -342,7 +342,7 @@ public func checkForwardCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Element == Expected.Element,
@@ -366,7 +366,7 @@ public func checkForwardCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
@@ -401,7 +401,7 @@ public func checkOneLevelOfForwardCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where C.Element == Expected.Element {
@@ -520,7 +520,7 @@ Expected: Collection, S : Collection
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
@@ -566,7 +566,7 @@ public func checkBidirectionalCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Element == Expected.Element,
@@ -590,7 +590,7 @@ public func checkBidirectionalCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
@@ -625,7 +625,7 @@ public func checkOneLevelOfBidirectionalCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where C.Element == Expected.Element {
@@ -770,7 +770,7 @@ Expected: Collection, S : BidirectionalCollection
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
@@ -829,7 +829,7 @@ public func checkRandomAccessCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Element == Expected.Element,
@@ -853,7 +853,7 @@ public func checkRandomAccessCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
@@ -888,7 +888,7 @@ public func checkOneLevelOfRandomAccessCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where C.Element == Expected.Element {
@@ -1029,7 +1029,7 @@ Expected: Collection, S : RandomAccessCollection
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
@@ -1089,7 +1089,7 @@ public func checkCollection<Element, C : Collection>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where C.Element == Element {
@@ -1110,7 +1110,7 @@ public func checkForwardCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Element == Element,
@@ -1134,7 +1134,7 @@ public func checkForwardCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where
@@ -1169,7 +1169,7 @@ public func checkOneLevelOfForwardCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where C.Element == Element {
@@ -1288,7 +1288,7 @@ Element, S : Collection
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where
@@ -1334,7 +1334,7 @@ public func checkBidirectionalCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Element == Element,
@@ -1358,7 +1358,7 @@ public func checkBidirectionalCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where
@@ -1393,7 +1393,7 @@ public func checkOneLevelOfBidirectionalCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where C.Element == Element {
@@ -1538,7 +1538,7 @@ Element, S : BidirectionalCollection
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where
@@ -1597,7 +1597,7 @@ public func checkRandomAccessCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Element == Element,
@@ -1621,7 +1621,7 @@ public func checkRandomAccessCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where
@@ -1656,7 +1656,7 @@ public func checkOneLevelOfRandomAccessCollection<
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where C.Element == Element {
@@ -1797,7 +1797,7 @@ Element, S : RandomAccessCollection
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line,
+  file: String = #filePath, line: UInt = #line,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (Element, Element) -> Bool
 ) where

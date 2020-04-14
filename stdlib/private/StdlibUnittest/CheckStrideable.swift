@@ -18,7 +18,7 @@ public func checkStrideable<S : Strideable>(
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
+  file: String = #filePath, line: UInt = #line
 ) {
   for i in instances.indices {
     let first = instances[i]
