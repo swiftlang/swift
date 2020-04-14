@@ -2843,6 +2843,11 @@ namespace {
       return expr->getType();
     }
 
+    Type visitPropertyWrapperValuePlaceholderExpr(
+        PropertyWrapperValuePlaceholderExpr *expr) {
+      return expr->getType();
+    }
+
     Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
       return expr->getType();
     }
