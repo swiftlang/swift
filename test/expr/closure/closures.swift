@@ -483,3 +483,24 @@ let closure = { // expected-error {{unable to infer complex closure return type;
   var helper = true
   return helper
 }
+
+// SR-9839
+func SR9839(_ x: @escaping @convention(block) () -> Void) {}
+
+func id<T>(_ x: T) -> T {
+  return x
+}
+
+var qux: () -> Void = {}
+
+SR9839(qux)
+SR9839(id(qux)) // expected-error {{conflicting arguments to generic parameter 'T' ('() -> Void' vs. '@convention(block) () -> Void')}}
+
+func forceUnwrap<T>(_ x: T?) -> T {
+  return x!
+}
+
+var qux1: (() -> Void)? = {}
+
+SR9839(qux1!)
+SR9839(forceUnwrap(qux1))

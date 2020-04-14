@@ -428,16 +428,15 @@ protected:
     HasTopLevelLocalContextCaptures : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+1+1,
-    /// The kind of accessor this is.
-    AccessorKind : 4,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4 + 1 + 1,
+                        /// The kind of accessor this is.
+                        AccessorKind : 4,
 
-    /// Whether the accessor is transparent.
-    IsTransparent : 1,
+                        /// Whether the accessor is transparent.
+                        IsTransparent : 1,
 
-    /// Whether we have computed the above.
-    IsTransparentComputed : 1
-  );
+                        /// Whether we have computed the above.
+                        IsTransparentComputed : 1);
 
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+1+1,
     /// The body initialization kind (+1), or zero if not yet computed.
@@ -1435,6 +1434,8 @@ public:
     return SourceRange(WhereLoc,
                        getRequirements().back().getSourceRange().End);
   }
+
+  void print(llvm::raw_ostream &OS, bool printWhereKeyword) const;
 };
 
 // A private class for forcing exact field layout.
@@ -2186,6 +2187,9 @@ public:
   /// Can the pattern at index i be default initialized?
   bool isDefaultInitializable(unsigned i) const;
 
+  /// Can the property wrapper be used to provide default initialization?
+  bool isDefaultInitializableViaPropertyWrapper(unsigned i) const;
+
   /// Does this pattern have a user-provided initializer expression?
   bool isExplicitlyInitialized(unsigned i) const;
 
@@ -2433,6 +2437,7 @@ class ValueDecl : public Decl {
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
+  friend class CheckRedeclarationRequest;
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
 protected:
@@ -2454,23 +2459,23 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = value;
   }
 
-public:
-  /// Return true if this protocol member is a protocol requirement.
-  ///
-  /// Asserts if this is not a member of a protocol.
-  bool isProtocolRequirement() const;
-
   /// Determine whether we have already checked whether this
   /// declaration is a redeclaration.
-  bool alreadyCheckedRedeclaration() const { 
+  bool alreadyCheckedRedeclaration() const {
     return Bits.ValueDecl.CheckedRedeclaration;
   }
 
   /// Set whether we have already checked this declaration as a
   /// redeclaration.
-  void setCheckedRedeclaration(bool checked) {
-    Bits.ValueDecl.CheckedRedeclaration = checked;
+  void setCheckedRedeclaration() {
+    Bits.ValueDecl.CheckedRedeclaration = true;
   }
+
+public:
+  /// Return true if this protocol member is a protocol requirement.
+  ///
+  /// Asserts if this is not a member of a protocol.
+  bool isProtocolRequirement() const;
 
   void setUserAccessible(bool Accessible) {
     Bits.ValueDecl.IsUserAccessible = Accessible;
@@ -2491,6 +2496,10 @@ public:
   /// Retrieve the base name of the declaration, ignoring any argument
   /// names.
   DeclBaseName getBaseName() const { return Name.getBaseName(); }
+
+  Identifier getBaseIdentifier() const {
+    return Name.getBaseIdentifier();
+  }
 
   /// Generates a DeclNameRef referring to this declaration with as much
   /// specificity as possible.
@@ -2820,12 +2829,12 @@ protected:
     ValueDecl(K, context, name, NameLoc), Inherited(inherited) {}
 
 public:
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+  Identifier getName() const { return getBaseIdentifier(); }
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
-    return hasName() ? getBaseName().getIdentifier().str() : "_";
+    return hasName() ? getBaseIdentifier().str() : "_";
   }
 
   /// The type of this declaration's values. For the type of the
@@ -3516,6 +3525,27 @@ public:
   /// or \c nullptr if it does not have one.
   ConstructorDecl *getMemberwiseInitializer() const;
 
+  /// Retrieves the effective memberwise initializer for this declaration, or
+  /// \c nullptr if it does not have one.
+  ///
+  /// An effective memberwise initializer is either a synthesized memberwise
+  /// initializer or a user-defined initializer with the same type.
+  ///
+  /// The access level of the memberwise initializer is set to the minimum of:
+  /// - Public, by default. This enables public nominal types to have public
+  ///   memberwise initializers.
+  ///   - The `public` default is important for synthesized member types, e.g.
+  ///     `TangentVector` structs synthesized during `Differentiable` derived
+  ///     conformances. Manually extending these types to define a public
+  ///     memberwise initializer causes a redeclaration error.
+  /// - The minimum access level of memberwise-initialized properties in the
+  ///   nominal type declaration.
+  ///
+  /// Effective memberwise initializers are used only by derived conformances
+  /// for `Self`-returning protocol requirements like `AdditiveArithmetic.+`.
+  /// Such derived conformances require memberwise initialization.
+  ConstructorDecl *getEffectiveMemberwiseInitializer();
+
   /// Whether this declaration has a synthesized zero parameter default
   /// initializer.
   bool hasDefaultInitializer() const;
@@ -4172,6 +4202,22 @@ private:
       other(other) { }
 };
 
+/// The set of known protocols for which derived conformances are supported.
+enum class KnownDerivableProtocolKind : uint8_t {
+  RawRepresentable,
+  OptionSet,
+  CaseIterable,
+  Comparable,
+  Equatable,
+  Hashable,
+  BridgedNSError,
+  CodingKey,
+  Encodable,
+  Decodable,
+  AdditiveArithmetic,
+  Differentiable,
+};
+
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
@@ -4249,8 +4295,6 @@ class ProtocolDecl final : public NominalTypeDecl {
     Bits.ProtocolDecl.ExistentialTypeSupported = supported;
   }
 
-  ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
-
   bool hasLazyRequirementSignature() const {
     return Bits.ProtocolDecl.HasLazyRequirementSignature;
   }
@@ -4261,7 +4305,8 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class ExistentialTypeSupportedRequest;
-
+  friend class InheritedProtocolsRequest;
+  
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<TypeLoc> Inherited,
@@ -4270,12 +4315,7 @@ public:
   using Decl::getASTContext;
 
   /// Retrieve the set of protocols inherited from this protocol.
-  ArrayRef<ProtocolDecl *> getInheritedProtocols() const {
-    if (Bits.ProtocolDecl.InheritedProtocolsValid)
-      return InheritedProtocols;
-
-    return const_cast<ProtocolDecl *>(this)->getInheritedProtocolsSlow();
-  }
+  ArrayRef<ProtocolDecl *> getInheritedProtocols() const;
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
@@ -4370,6 +4410,13 @@ public:
 private:
   void computeKnownProtocolKind() const;
 
+  bool areInheritedProtocolsValid() const {
+    return Bits.ProtocolDecl.InheritedProtocolsValid;
+  }
+  void setInheritedProtocolsValid() {
+    Bits.ProtocolDecl.InheritedProtocolsValid = true;
+  }
+
 public:
   /// If this is known to be a compiler-known protocol, returns the kind.
   /// Otherwise returns None.
@@ -4382,6 +4429,8 @@ public:
     
     return static_cast<KnownProtocolKind>(Bits.ProtocolDecl.KnownProtocol - 2);
   }
+
+  Optional<KnownDerivableProtocolKind> getKnownDerivableProtocolKind() const;
 
   /// Check whether this protocol is of a specific, known protocol kind.
   bool isSpecificProtocol(KnownProtocolKind kind) const {
@@ -4759,6 +4808,13 @@ public:
   /// Does this storage require a 'modify' accessor in its opaque-accessors set?
   bool requiresOpaqueModifyCoroutine() const;
 
+  /// Does this storage have any explicit observers (willSet or didSet) attached
+  /// to it?
+  bool hasObservers() const {
+    return getParsedAccessor(AccessorKind::WillSet) ||
+           getParsedAccessor(AccessorKind::DidSet);
+  }
+
   SourceRange getBracesRange() const {
     if (auto info = Accessors.getPointer())
       return info->getBracesRange();
@@ -4885,12 +4941,12 @@ public:
 
   SourceRange getSourceRange() const;
 
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+  Identifier getName() const { return getBaseIdentifier(); }
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
-    return hasName() ? getBaseName().getIdentifier().str() : "_";
+    return hasName() ? getBaseIdentifier().str() : "_";
   }
 
   /// Get the type of the variable within its context. If the context is generic,
@@ -5116,15 +5172,17 @@ public:
   void setTopLevelGlobal(bool b) { Bits.VarDecl.IsTopLevelGlobal = b; }
   
   /// Retrieve the custom attributes that attach property wrappers to this
-  /// property. The returned list contains all of the attached property wrapper attributes in source order,
-  /// which means the outermost wrapper attribute is provided first.
+  /// property. The returned list contains all of the attached property wrapper
+  /// attributes in source order, which means the outermost wrapper attribute
+  /// is provided first.
   llvm::TinyPtrVector<CustomAttr *> getAttachedPropertyWrappers() const;
 
   /// Whether this property has any attached property wrappers.
   bool hasAttachedPropertyWrapper() const;
   
-  /// Whether all of the attached property wrappers have an init(initialValue:) initializer.
-  bool allAttachedPropertyWrappersHaveInitialValueInit() const;
+  /// Whether all of the attached property wrappers have an init(wrappedValue:)
+  /// initializer.
+  bool allAttachedPropertyWrappersHaveWrappedValueInit() const;
   
   /// Retrieve the type of the attached property wrapper as a contextual
   /// type.
@@ -5188,7 +5246,7 @@ public:
   /// \end
   ///
   /// Or when there is no initializer but each composed property wrapper has
-  /// a suitable `init(initialValue:)`.
+  /// a suitable `init(wrappedValue:)`.
   bool isPropertyMemberwiseInitializedWithWrappedType() const;
 
   /// Whether the innermost property wrapper's initializer's 'wrappedValue' parameter
@@ -5774,6 +5832,7 @@ public:
 private:
   ParameterList *Params;
 
+private:
   /// The generation at which we last loaded derivative function configurations.
   unsigned DerivativeFunctionConfigGeneration = 0;
   /// Prepare to traverse the list of derivative function configurations.
@@ -5787,6 +5846,13 @@ private:
   ///   configurations from imported modules.
   struct DerivativeFunctionConfigurationList;
   DerivativeFunctionConfigurationList *DerivativeFunctionConfigs = nullptr;
+
+public:
+  /// Get all derivative function configurations.
+  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
+
+  /// Add the given derivative function configuration.
+  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
@@ -5855,7 +5921,7 @@ public:
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
-    return hasName() ? getBaseName().getIdentifier().str() : "_";
+    return hasName() ? getBaseIdentifier().str() : "_";
   }
 
   /// Should this declaration be treated as if annotated with transparent
@@ -6107,12 +6173,6 @@ public:
   /// constructor.
   bool hasDynamicSelfResult() const;
 
-  /// Get all derivative function configurations.
-  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
-
-  /// Add the given derivative function configuration.
-  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
-
   using DeclContext::operator new;
   using Decl::getASTContext;
 };
@@ -6208,8 +6268,6 @@ public:
                           ParameterList *ParameterList,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
-
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
   bool isStatic() const;
 
@@ -6452,6 +6510,11 @@ public:
     return isGetter() && getAccessorKeywordLoc().isInvalid();
   }
 
+  /// Is this accessor a "simple" didSet? A "simple" didSet does not
+  /// use the implicit oldValue parameter in its body or does not have
+  /// an explicit parameter in its parameter list.
+  bool isSimpleDidSet() const;
+
   void setIsTransparent(bool transparent) {
     Bits.AccessorDecl.IsTransparent = transparent;
     Bits.AccessorDecl.IsTransparentComputed = 1;
@@ -6553,12 +6616,10 @@ public:
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC);
 
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
-
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
-    return hasName() ? getBaseName().getIdentifier().str() : "_";
+    return hasName() ? getBaseIdentifier().str() : "_";
   }
 
   Type getArgumentInterfaceType() const;

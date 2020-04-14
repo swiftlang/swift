@@ -2932,9 +2932,15 @@ substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
 static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
                                   OpaqueSubstitutionKind kind,
                                   bool isContextWholeModule) {
-  auto nominal = ty->getAnyNominal();
-  if (!nominal)
+  TypeDecl *typeDecl = ty->getAnyNominal();
+  if (!typeDecl) {
+    // We also need to check that the opaque type descriptor is accessible.
+    if (auto opaqueTy = ty->getAs<OpaqueTypeArchetypeType>())
+      typeDecl = opaqueTy->getDecl();
+  }
+  if (!typeDecl) {
     return true;
+  }
 
   switch (kind) {
   case OpaqueSubstitutionKind::DontSubstitute:
@@ -2950,14 +2956,18 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
 
     // In the same file any visibility is okay.
     if (!dc->isModuleContext() &&
-        nominal->getDeclContext()->getParentSourceFile() ==
+        typeDecl->getDeclContext()->getParentSourceFile() ==
         dc->getParentSourceFile())
       return true;
-    return nominal->getEffectiveAccess() > AccessLevel::FilePrivate;
+
+    return typeDecl->getEffectiveAccess() > AccessLevel::FilePrivate;
 
   case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
-    return nominal->getEffectiveAccess() > AccessLevel::Internal;
+    if (dc->getParentModule() == typeDecl->getDeclContext()->getParentModule())
+      return true;
+
+    return typeDecl->getEffectiveAccess() > AccessLevel::Internal;
   }
 }
 
@@ -4018,14 +4028,15 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
       isa<SubscriptDecl>(member)) {
     auto *innerDC = member->getInnermostDeclContext();
     if (innerDC->isInnermostContextGeneric()) {
-      auto sig = innerDC->getGenericSignatureOfContext();
-      for (auto param : sig->getInnermostGenericParams()) {
-        auto *genericParam = param->getCanonicalType()
-            ->castTo<GenericTypeParamType>();
-        substitutions[genericParam] =
-          (genericEnv
-           ? genericEnv->mapTypeIntoContext(param)
-           : param);
+      if (auto sig = innerDC->getGenericSignatureOfContext()) {
+        for (auto param : sig->getInnermostGenericParams()) {
+          auto *genericParam = param->getCanonicalType()
+              ->castTo<GenericTypeParamType>();
+          substitutions[genericParam] =
+            (genericEnv
+             ? genericEnv->mapTypeIntoContext(param)
+             : param);
+        }
       }
     }
   }
@@ -5012,6 +5023,22 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
+AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
+  SmallVector<Param, 8> newParams;
+  for (auto &param : getParams()) {
+    Param newParam(param.getPlainType(), param.getLabel(),
+                   param.getParameterFlags().withNoDerivative(false));
+    newParams.push_back(newParam);
+  }
+  auto nonDiffExtInfo = getExtInfo()
+      .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+  if (isa<FunctionType>(this))
+    return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
+  assert(isa<GenericFunctionType>(this));
+  return GenericFunctionType::get(getOptGenericSignature(), newParams,
+                                  getResult(), nonDiffExtInfo);
+}
+
 Optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   assert(lookupConformance);
@@ -5049,7 +5076,8 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   // `TangentVector` associated type.
   auto *differentiableProtocol =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  assert(differentiableProtocol && "`Differentiable` protocol not found");
+  if (!differentiableProtocol)
+    return cache(None);
   auto associatedTypeLookup =
       differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);

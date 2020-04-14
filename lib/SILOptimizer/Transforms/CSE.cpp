@@ -241,6 +241,13 @@ public:
     return llvm::hash_combine(X->getKind(), X->getType());
   }
 
+  hash_code visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *X) {
+    return llvm::hash_combine(
+        X->getKind(), X->getType(), X->getOperand(),
+        llvm::hash_combine_range(X->getConformances().begin(),
+                                 X->getConformances().end()));
+  }
+
   hash_code visitObjCProtocolInst(ObjCProtocolInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(), X->getProtocol());
   }
@@ -965,6 +972,11 @@ bool CSE::canHandle(SILInstruction *Inst) {
     
     if (isLazyPropertyGetter(AI))
       return true;
+      
+    if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
+      if (callee->isGlobalInit())
+        return true;
+    }
     
     return false;
   }
@@ -1027,6 +1039,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::InitExistentialMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
     // Intentionally we don't handle (prev_)dynamic_function_ref.
     // They change at runtime.

@@ -73,6 +73,9 @@ public:
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
+  /// If true, no SIL verification is done at all.
+  bool VerifyNone = false;
+
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;
 

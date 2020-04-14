@@ -86,10 +86,15 @@ private:
   bool shouldIgnore(Decl *D, bool &ShouldVisitChildren);
 
   ValueDecl *extractDecl(Expr *Fn) const {
+    Fn = Fn->getSemanticsProvidingExpr();
     if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
       return DRE->getDecl();
     if (auto ApplyE = dyn_cast<ApplyExpr>(Fn))
       return extractDecl(ApplyE->getFn());
+    if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
+      if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
+        return extractDecl(Unwrapped);
+    }
     return nullptr;
   }
 };

@@ -288,3 +288,10 @@ void swift::printDifferentiabilityWitnessDescription(
   if (addNewline)
     out << '\n';
 }
+
+void PrettyStackTraceDeclContext::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << " in decl context:\n";
+  out << "    ---\n";
+  DC->printContext(out, /*indent=*/4);
+  out << "    ---\n";
+}

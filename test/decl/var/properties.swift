@@ -930,7 +930,7 @@ class ObservingPropertiesNotMutableInWillSet {
   }
 
   func localCase() {
-    var localProperty: Int = 42 {
+    var localProperty: Int = 42 { // expected-warning {{variable 'localProperty' was written to, but never read}}
       willSet {
         localProperty = 19   // expected-warning {{attempting to store to property 'localProperty' within its own willSet}}
       }

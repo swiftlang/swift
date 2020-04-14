@@ -66,13 +66,21 @@ void swift::symbolgraphgen::serialize(const ExtensionDecl *Extension,
         OS.attribute("extendedModule", ExtendedModule->getNameStr());
       }
     }
-    auto Generics = Extension->getGenericSignature();
-    if (Generics && !Generics->getRequirements().empty()) {
-      OS.attributeArray("constraints", [&](){
-        for (const auto &Requirement : Generics->getRequirements()) {
-          serialize(Requirement, OS);
-        }
-      }); // end constraints:
+    if (const auto Generics = Extension->getAsGenericContext()) {
+      SmallVector<Requirement, 4> FilteredRequirements;
+
+      filterGenericRequirements(Generics->getGenericRequirements(),
+          Extension->getExtendedNominal()
+              ->getDeclContext()->getSelfNominalTypeDecl(),
+                                FilteredRequirements);
+
+      if (!FilteredRequirements.empty()) {
+        OS.attributeArray("constraints", [&](){
+          for (const auto &Requirement : FilteredRequirements) {
+            serialize(Requirement, OS);
+          }
+        }); // end constraints:
+      }
     }
   }); // end swiftExtension:
 }
@@ -81,16 +89,16 @@ void swift::symbolgraphgen::serialize(const Requirement &Req,
                                       llvm::json::OStream &OS) {
   StringRef Kind;
   switch (Req.getKind()) {
-    case swift::RequirementKind::Conformance:
+    case RequirementKind::Conformance:
       Kind = "conformance";
       break;
-    case swift::RequirementKind::Superclass:
+    case RequirementKind::Superclass:
       Kind = "superclass";
       break;
-    case swift::RequirementKind::SameType:
+    case RequirementKind::SameType:
       Kind = "sameType";
       break;
-    case swift::RequirementKind::Layout:
+    case RequirementKind::Layout:
       return;
   }
 
@@ -99,5 +107,42 @@ void swift::symbolgraphgen::serialize(const Requirement &Req,
     OS.attribute("lhs", Req.getFirstType()->getString());
     OS.attribute("rhs", Req.getSecondType()->getString());
   });
+}
 
+void swift::symbolgraphgen::serialize(const swift::GenericTypeParamType *Param,
+                                      llvm::json::OStream &OS) {
+  OS.object([&](){
+    OS.attribute("name", Param->getName().str());
+    OS.attribute("index", Param->getIndex());
+    OS.attribute("depth", Param->getDepth());
+  });
+}
+
+void swift::symbolgraphgen::filterGenericRequirements(
+    ArrayRef<Requirement> Requirements,
+    const NominalTypeDecl *Self,
+    SmallVectorImpl<Requirement> &FilteredRequirements) {
+  for (const auto &Req : Requirements) {
+      if (Req.getKind() == RequirementKind::Layout) {
+        continue;
+      }
+    /*
+     Don't serialize constraints that aren't applicable for display.
+
+     For example:
+
+     extension Equatable {
+       func foo(_ thing: Self) {}
+     }
+
+     `foo` includes a constraint `Self: Equatable` for the compiler's purposes,
+     but that's redundant for the purposes of documentation.
+     This is extending Equatable, after all!
+    */
+    if (Req.getFirstType()->getString() == "Self" &&
+        Req.getSecondType()->getAnyNominal() == Self) {
+      continue;
+    }
+    FilteredRequirements.push_back(Req);
+  }
 }

@@ -86,7 +86,7 @@ public:
     void setBool(SourceKit::UIdent Key, bool val);
     Array setArray(SourceKit::UIdent Key);
     Dictionary setDictionary(SourceKit::UIdent Key);
-    void setCustomBuffer(SourceKit::UIdent Key, CustomBufferKind Kind,
+    void setCustomBuffer(SourceKit::UIdent Key,
                          std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 
   private:

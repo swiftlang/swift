@@ -387,11 +387,25 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
-    auto reqAccessor = dyn_cast<AccessorDecl>(requirementRef.getDecl());
+    auto reqDecl = requirementRef.getDecl();
+
+    // Static functions can be witnessed by enum cases with payload
+    if (!(isa<AccessorDecl>(reqDecl) || isa<ConstructorDecl>(reqDecl))) {
+      auto FD = cast<FuncDecl>(reqDecl);
+      if (auto witness = asDerived().getWitness(FD)) {
+        if (auto EED = dyn_cast<EnumElementDecl>(witness.getDecl())) {
+          return addMethodImplementation(
+              requirementRef, SILDeclRef(EED, SILDeclRef::Kind::EnumElement),
+              witness);
+        }
+      }
+    }
+
+    auto reqAccessor = dyn_cast<AccessorDecl>(reqDecl);
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
+      if (auto witness = asDerived().getWitness(reqDecl)) {
         return addMethodImplementation(
             requirementRef, requirementRef.withDecl(witness.getDecl()),
             witness);
@@ -405,6 +419,13 @@ public:
     auto witness = asDerived().getWitness(reqAccessor->getStorage());
     if (!witness)
       return asDerived().addMissingMethod(requirementRef);
+
+    // Static properties can be witnessed by enum cases without payload
+    if (auto EED = dyn_cast<EnumElementDecl>(witness.getDecl())) {
+      return addMethodImplementation(
+          requirementRef, SILDeclRef(EED, SILDeclRef::Kind::EnumElement),
+          witness);
+    }
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
     if (reqAccessor->isSetter() && !witnessStorage->supportsMutation())
@@ -564,6 +585,10 @@ public:
       // conformance in which case it can be emitted multiple times.
       if (Linkage == SILLinkage::Shared)
         witnessLinkage = SILLinkage::Shared;
+    }
+
+    if (isa<EnumElementDecl>(witnessRef.getDecl())) {
+      assert(witnessRef.isEnumElement() && "Witness decl, but different kind?");
     }
 
     SILFunction *witnessFn = SGM.emitProtocolWitness(
@@ -1028,7 +1053,7 @@ public:
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
-                               ConformanceLookupKind::NonInherited, nullptr)) {
+                               ConformanceLookupKind::NonInherited)) {
       if (conformance->isComplete()) {
         if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(normal);
@@ -1152,8 +1177,7 @@ public:
       // Emit witness tables for protocol conformances introduced by the
       // extension.
       for (auto *conformance : e->getLocalConformances(
-                                 ConformanceLookupKind::All,
-                                 nullptr)) {
+                                 ConformanceLookupKind::All)) {
         if (conformance->isComplete()) {
           if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
             SGM.getWitnessTable(normal);

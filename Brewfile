@@ -1,0 +1,2 @@
+brew "cmake"
+brew "ninja"

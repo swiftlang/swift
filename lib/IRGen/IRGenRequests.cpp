@@ -40,12 +40,21 @@ void swift::simple_display(llvm::raw_ostream &out,
   } else {
     assert(SF);
     out << "IR Generation for file ";
-    out << '\"' << cast<LoadedFile>(SF)->getFilename() << '\"';
+    out << '\"' << SF->getFilename() << '\"';
   }
 }
 
 SourceLoc swift::extractNearestSourceLoc(const IRGenDescriptor &desc) {
   return SourceLoc();
+}
+
+evaluator::DependencySource
+IRGenSourceFileRequest::readDependencySource(Evaluator &e) const {
+  auto &desc = std::get<0>(getStorage());
+  return {
+    desc.Ctx.dyn_cast<SourceFile *>(),
+    evaluator::DependencyScope::Cascading
+  };
 }
 
 // Define request evaluation functions for each of the IRGen requests.

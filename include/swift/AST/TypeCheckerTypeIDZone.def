@@ -29,6 +29,9 @@ SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CallerSideDefaultArgExprRequest,
               Expr *(DefaultArgumentExpr *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
+              evaluator::SideEffect(ValueDecl *),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
@@ -46,6 +49,9 @@ SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
 SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
               IndexSubset *(DifferentiableAttr *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DerivativeAttrOriginalDeclRequest,
+              AbstractFunctionDecl *(DerivativeAttr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
               bool(TypeEraserAttr *, ProtocolDecl *),
               Cached, NoLocationInfo)
@@ -55,8 +61,8 @@ SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
 SWIFT_REQUEST(TypeChecker, EmittedMembersRequest, DeclRange(ClassDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
-              bool (EnumDecl *, TypeResolutionStage), SeparatelyCached,
-              NoLocationInfo)
+              evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest,
               Type(EnumDecl *, TypeResolutionStage), SeparatelyCached,
               NoLocationInfo)
@@ -182,7 +188,8 @@ SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
               AccessorDecl *(AbstractStorageDecl *, AccessorKind),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyUntilRequest,
-              bool(AbstractFunctionDecl *, SourceLoc), Cached, NoLocationInfo)
+              bool(AbstractFunctionDecl *, SourceLoc),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, USRGenerationRequest, std::string(const ValueDecl *),
@@ -207,12 +214,17 @@ SWIFT_REQUEST(TypeChecker, PreCheckFunctionBuilderRequest,
               FunctionBuilderClosurePreCheck(AnyFunctionRef),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
-              bool(NominalTypeDecl *, ImplicitMemberAction), Uncached,
-              NoLocationInfo)
+              evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
+              Type(ProtocolDecl *, TypeEraserAttr *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
+              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveEffectiveMemberwiseInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
@@ -234,3 +246,8 @@ SWIFT_REQUEST(TypeChecker, ScopedImportLookupRequest,
               ArrayRef<ValueDecl *>(ImportDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureHasExplicitResultRequest,
               bool(ClosureExpr *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LookupAllConformancesInContextRequest,
+              ProtocolConformanceLookupResult(const DeclContext *),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest, 
+              bool(AccessorDecl *), Cached, NoLocationInfo)

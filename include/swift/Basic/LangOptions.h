@@ -112,6 +112,10 @@ namespace swift {
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
+    /// Emit a remark when import resolution implicitly adds a cross-import
+    /// overlay.
+    bool EnableCrossImportRemarks = false;
+
     ///
     /// Support for alternate usage modes
     ///
@@ -327,8 +331,18 @@ namespace swift {
     /// `@differentiable` declaration attribute, etc.
     bool EnableExperimentalDifferentiableProgramming = false;
 
+    /// Whether to enable forward mode differentiation.
+    bool EnableExperimentalForwardModeDifferentiation = false;
+
+    /// Whether to enable experimental `AdditiveArithmetic` derived
+    /// conformances.
+    bool EnableExperimentalAdditiveArithmeticDerivedConformances = false;
+
     /// Enable verification when every SubstitutionMap is constructed.
     bool VerifyAllSubstitutionMaps = false;
+
+    /// If set to \c false, fall back to the legacy manual reference name tracking code.
+    bool EnableRequestBasedIncrementalDependencies = true;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

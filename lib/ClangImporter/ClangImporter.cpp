@@ -1860,8 +1860,13 @@ ModuleDecl *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 
-ModuleDecl *ClangImporter::getWrapperForModule(const clang::Module *mod) const {
-  return Impl.getWrapperForModule(mod)->getParentModule();
+ModuleDecl *
+ClangImporter::getWrapperForModule(const clang::Module *mod,
+                                   bool returnOverlayIfPossible) const {
+  auto clangUnit = Impl.getWrapperForModule(mod);
+  if (returnOverlayIfPossible && clangUnit->getOverlayModule())
+    return clangUnit->getOverlayModule();
+  return clangUnit->getParentModule();
 }
 
 PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
@@ -2414,7 +2419,7 @@ class DarwinLegacyFilterDeclConsumer : public swift::VisibleDeclConsumer {
     if (clangModule->Name == "MacTypes") {
       if (!VD->hasName() || VD->getBaseName().isSpecial())
         return true;
-      return llvm::StringSwitch<bool>(VD->getBaseName().getIdentifier().str())
+      return llvm::StringSwitch<bool>(VD->getBaseIdentifier().str())
           .Cases("OSErr", "OSStatus", "OptionBits", false)
           .Cases("FourCharCode", "OSType", false)
           .Case("Boolean", false)
@@ -3305,7 +3310,7 @@ ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
     clangModule(clangModule) {
   // Capture the file metadata before it goes away.
   if (clangModule)
-    ASTSourceDescriptor = {*clangModule};
+    ASTSourceDescriptor = {*const_cast<clang::Module *>(clangModule)};
 }
 
 StringRef ClangModuleUnit::getModuleDefiningPath() const {

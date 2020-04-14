@@ -993,6 +993,17 @@ void SerializedModuleLoaderBase::loadObjCMethods(
   }
 }
 
+void SerializedModuleLoaderBase::loadDerivativeFunctionConfigurations(
+    AbstractFunctionDecl *originalAFD, unsigned int previousGeneration,
+    llvm::SetVector<AutoDiffConfig> &results) {
+  for (auto &modulePair : LoadedModuleFiles) {
+    if (modulePair.second <= previousGeneration)
+      continue;
+    modulePair.first->loadDerivativeFunctionConfigurations(originalAFD,
+                                                           results);
+  }
+}
+
 std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,
@@ -1171,6 +1182,11 @@ void SerializedASTFile::getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
   File.getTopLevelDecls(results, matchAttributes);
+}
+
+void SerializedASTFile::getOperatorDecls(
+    SmallVectorImpl<OperatorDecl *> &results) const {
+  File.getOperatorDecls(results);
 }
 
 void SerializedASTFile::getPrecedenceGroups(

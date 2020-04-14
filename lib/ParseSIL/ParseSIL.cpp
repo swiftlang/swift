@@ -1093,7 +1093,6 @@ static bool parseDeclSILOptional(bool *isTransparent,
 bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
                                        GenericEnvironment *GenericEnv,
                                        DeclContext *DC) {
-  // Do some type checking / name binding for the parsed type.
   if (GenericEnv == nullptr)
     GenericEnv = ContextGenericEnv;
 
@@ -5072,6 +5071,41 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           InstLoc, parameterIndicesSubset, original, derivativeFunctions);
       break;
     }
+    case SILInstructionKind::LinearFunctionInst: {
+      // e.g. linear_function [parameters 0 1 2] %0 : $T
+      // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
+      // Parse `[parameters <integer_literal>...]`.
+      SmallVector<unsigned, 8> parameterIndices;
+      if (parseIndexList(P, "parameters", parameterIndices,
+                         diag::sil_autodiff_expected_parameter_index))
+        return true;
+      // Parse the original function value.
+      SILValue original;
+      SourceLoc originalOperandLoc;
+      if (parseTypedValueRef(original, originalOperandLoc, B))
+        return true;
+      auto fnType = original->getType().getAs<SILFunctionType>();
+      if (!fnType) {
+        P.diagnose(originalOperandLoc,
+                   diag::sil_inst_autodiff_expected_function_type_operand);
+        return true;
+      }
+      // Parse an optional transpose function.
+      Optional<SILValue> transpose = None;
+      if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_transpose") {
+        P.consumeToken(tok::identifier);
+        transpose = SILValue();
+        if (parseTypedValueRef(*transpose, B))
+          return true;
+      }
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      auto *parameterIndicesSubset = IndexSubset::get(
+          P.Context, fnType->getNumParameters(), parameterIndices);
+      ResultVal = B.createLinearFunction(
+          InstLoc, parameterIndicesSubset, original, transpose);
+      break;
+    }
     case SILInstructionKind::DifferentiableFunctionExtractInst: {
       // Parse the rest of the instruction: an extractee, a differentiable
       // function operand, an optional explicit extractee type, and a debug
@@ -5102,6 +5136,27 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
       ResultVal = B.createDifferentiableFunctionExtract(
           InstLoc, extractee, functionOperand, extracteeType);
+      break;
+    }
+    case SILInstructionKind::LinearFunctionExtractInst: {
+      // Parse the rest of the instruction: an extractee, a linear function
+      // operand, and a debug location.
+      LinearDifferentiableFunctionTypeComponent extractee;
+      StringRef extracteeNames[2] = {"original", "transpose"};
+      SILValue functionOperand;
+      SourceLoc lastLoc;
+      if (P.parseToken(tok::l_square,
+              diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
+          parseSILIdentifierSwitch(extractee, extracteeNames,
+              diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
+          P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "extractee kind"))
+        return true;
+      if (parseTypedValueRef(functionOperand, B) ||
+          parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createLinearFunctionExtract(
+          InstLoc, extractee, functionOperand);
       break;
     }
     case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {

@@ -960,9 +960,8 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
   if (!targetMachine) return nullptr;
 
   // Create the IR emitter.
-  IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
-                  ModuleName, PSPs.OutputFilename,
-                  PSPs.MainInputFilenameForDebugInfo,
+  IRGenModule IGM(irgen, std::move(targetMachine), SF, LLVMContext, ModuleName,
+                  PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
                   PrivateDiscriminator);
 
   initLLVMModule(IGM, *SILMod->getSwiftModule());
@@ -990,6 +989,11 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
         }
       }
     }
+
+    // Emit synthesized file units.
+    for (auto *File : M->getFiles())
+      if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File))
+        IGM.emitSynthesizedFileUnit(*nextSFU);
 
     // Okay, emit any definitions that we suddenly need.
     irgen.emitLazyDefinitions();
@@ -1236,6 +1240,9 @@ static void performParallelIRGeneration(
     if (auto *SF = dyn_cast<SourceFile>(File)) {
       CurrentIGMPtr IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF);
+    } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
+      CurrentIGMPtr IGM = irgen.getGenModule(nextSFU);
+      IGM->emitSynthesizedFileUnit(*nextSFU);
     } else {
       File->collectLinkLibraries([&](LinkLibrary LinkLib) {
         irgen.getPrimaryIGM()->addLinkLibrary(LinkLib);
@@ -1366,7 +1373,7 @@ std::unique_ptr<llvm::Module> swift::performIRGeneration(
       M->getASTContext().evaluator(IRGenWholeModuleRequest{desc}));
 }
 
-llvm::Expected<std::unique_ptr<llvm::Module>>
+std::unique_ptr<llvm::Module>
 IRGenWholeModuleRequest::evaluate(Evaluator &evaluator,
                                   IRGenDescriptor desc) const {
   auto *M = desc.Ctx.get<ModuleDecl *>();
@@ -1401,7 +1408,7 @@ performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
       SF.getASTContext().evaluator(IRGenSourceFileRequest{desc}));
 }
 
-llvm::Expected<std::unique_ptr<llvm::Module>>
+std::unique_ptr<llvm::Module>
 IRGenSourceFileRequest::evaluate(Evaluator &evaluator,
                                  IRGenDescriptor desc) const {
   auto *SF = desc.Ctx.get<SourceFile *>();

@@ -339,7 +339,7 @@ public:
 
   /// Resolves a TypeRepr to a type.
   ///
-  /// Performs name binding, checking of generic arguments, and so on in order
+  /// Performs name lookup, checking of generic arguments, and so on in order
   /// to create a well-formed type.
   ///
   /// \param TyR The type representation to check.

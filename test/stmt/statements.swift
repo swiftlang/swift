@@ -15,6 +15,7 @@ func invalid_semi() {
 
 func nested1(_ x: Int) {
   var y : Int
+  // expected-warning@-1 {{variable 'y' was never mutated; consider changing to 'let' constant}}
   
   func nested2(_ z: Int) -> Int {
     return x+y+z
@@ -716,6 +717,6 @@ outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=out
 
 // Errors in case syntax
 class
-case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected identifier after comma in enum 'case' declaration}}
+case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
 case  // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser

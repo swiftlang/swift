@@ -444,7 +444,7 @@ public:
       ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       bool EnableASTCaching, std::string &Error,
-      llvm::function_ref<void(swift::CompilerInstance &)> Callback);
+      llvm::function_ref<void(swift::CompilerInstance &, bool)> Callback);
 
   //==========================================================================//
   // LangSupport Interface

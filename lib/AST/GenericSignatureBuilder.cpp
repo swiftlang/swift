@@ -3659,8 +3659,14 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
       // Check whether this associated type references a protocol to which
       // the base conforms. If not, it's unresolved.
       if (baseEquivClass->conformsTo.find(assocType->getProtocol())
-            == baseEquivClass->conformsTo.end())
-        return ResolvedType::forUnresolved(baseEquivClass);
+          == baseEquivClass->conformsTo.end()) {
+        if (!baseEquivClass->concreteType ||
+            !lookupConformance(type->getCanonicalType(),
+                               baseEquivClass->concreteType,
+                               assocType->getProtocol())) {
+          return ResolvedType::forUnresolved(baseEquivClass);
+        }
+      }
 
       nestedTypeDecl = assocType;
     } else {
@@ -3934,8 +3940,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
   // Retrieve the set of requirements that a given associated type declaration
   // produces, in the form that would be seen in the where clause.
-  auto getAssociatedTypeReqs = [&](AssociatedTypeDecl *assocType,
-                                   const char *start) {
+  const auto getAssociatedTypeReqs = [&](const AssociatedTypeDecl *assocType,
+                                         const char *start) {
     std::string result;
     {
       llvm::raw_string_ostream out(result);
@@ -3949,6 +3955,13 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       }, [&] {
         out << ", ";
       });
+
+      if (const auto whereClause = assocType->getTrailingWhereClause()) {
+        if (!assocType->getInherited().empty())
+          out << ", ";
+
+        whereClause->print(out, /*printWhereKeyword*/false);
+      }
     }
     return result;
   };
@@ -5062,6 +5075,50 @@ public:
       }
 
       return Action::Continue;
+    }
+
+    // Infer requirements from `@differentiable` or `@differentiable(linear)`
+    // function types.
+    // For all non-`@noDerivative` parameter and result types:
+    // - `@differentiable`: add `T: Differentiable` requirement.
+    // - `@differentiable(linear)`: add
+    //   `T: Differentiable`, `T == T.TangentVector` requirements.
+    if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+      auto &ctx = Builder.getASTContext();
+      auto *differentiableProtocol =
+          ctx.getProtocol(KnownProtocolKind::Differentiable);
+      if (differentiableProtocol && fnTy->isDifferentiable()) {
+        auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
+          Requirement req(RequirementKind::Conformance, type,
+                          protocol->getDeclaredType());
+          Builder.addRequirement(req, source, nullptr);
+        };
+        auto addSameTypeConstraint = [&](Type firstType,
+                                         AssociatedTypeDecl *assocType) {
+          auto *protocol = assocType->getProtocol();
+          auto conf = Builder.lookupConformance(CanType(), firstType, protocol);
+          auto secondType = conf.getAssociatedType(
+              firstType, assocType->getDeclaredInterfaceType());
+          Requirement req(RequirementKind::SameType, firstType, secondType);
+          Builder.addRequirement(req, source, nullptr);
+        };
+        auto *tangentVectorAssocType =
+            differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
+        auto addRequirements = [&](Type type, bool isLinear) {
+          addConformanceConstraint(type, differentiableProtocol);
+          if (isLinear)
+            addSameTypeConstraint(type, tangentVectorAssocType);
+        };
+        auto constrainParametersAndResult = [&](bool isLinear) {
+          for (auto &param : fnTy->getParams())
+            if (!param.isNoDerivative())
+              addRequirements(param.getPlainType(), isLinear);
+          addRequirements(fnTy->getResult(), isLinear);
+        };
+        // Add requirements.
+        constrainParametersAndResult(fnTy->getDifferentiabilityKind() ==
+                                     DifferentiabilityKind::Linear);
+      }
     }
 
     if (!ty->isSpecialized())
@@ -7342,7 +7399,7 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
   return true;
 }
 
-llvm::Expected<GenericSignature>
+GenericSignature
 AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
          GenericSignatureImpl *baseSignature,
@@ -7400,7 +7457,7 @@ AbstractGenericSignatureRequest::evaluate(
           canBaseSignature.getPointer(), std::move(canAddedParameters),
           std::move(canAddedRequirements)});
     if (!canSignatureResult || !*canSignatureResult)
-      return canSignatureResult;
+      return GenericSignature();
 
     // Substitute in the original generic parameters to form a more-sugared
     // result closer to what the original request wanted. Note that this
@@ -7455,7 +7512,7 @@ AbstractGenericSignatureRequest::evaluate(
       SourceLoc(), /*allowConcreteGenericParams=*/true);
 }
 
-llvm::Expected<GenericSignature>
+GenericSignature
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator, ModuleDecl *parentModule,
         GenericSignatureImpl *parentSig,

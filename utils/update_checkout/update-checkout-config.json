@@ -71,7 +71,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "cmake": "v3.15.1",
+                "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master",
@@ -99,7 +99,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "cmake": "v3.15.1",
+                "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master",
@@ -279,6 +279,32 @@
                 "swift-format": "master"
             }
         },
+       "release/5.3": {
+            "aliases": ["release/5.3", "swift/release/5.3"],
+            "repos": {
+                "llvm-project": "swift/master",
+                "swift": "master",
+                "cmark": "master",
+                "llbuild": "release/5.3",
+                "swift-tools-support-core": "release/5.3",
+                "swiftpm": "release/5.3",
+                "swift-syntax": "master",
+                "swift-stress-tester": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "cmake": "v3.16.5",
+                "indexstore-db": "release/5.3",
+                "sourcekit-lsp": "release/5.3",
+                "swift-format": "master",
+                "pythonkit": "master",
+                "tensorflow-swift-apis": "master"
+            }
+        },
        "master-rebranch": {
             "aliases": ["master-rebranch", "swift/master-rebranch"],
             "repos": {
@@ -297,7 +323,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "cmake": "v3.15.1",
+                "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
                 "swift-format": "master"

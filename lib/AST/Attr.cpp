@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IndexSubset.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -526,12 +527,9 @@ static std::string getDifferentiationParametersClauseString(
 /// Print the arguments of the given `@differentiable` attribute.
 /// - If `omitWrtClause` is true, omit printing the `wrt:` differentiation
 ///   parameters clause.
-/// - If `omitDerivativeFunctions` is true, omit printing the JVP/VJP derivative
-///   functions.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D, bool omitWrtClause = false,
-    bool omitDerivativeFunctions = false) {
+    const Decl *D, bool omitWrtClause = false) {
   assert(D);
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
@@ -572,19 +570,6 @@ static void printDifferentiableAttrArguments(
     if (!diffParamsString.empty()) {
       printCommaIfNecessary();
       stream << diffParamsString;
-    }
-  }
-  // Print derivative function names, unless they are to be omitted.
-  if (!omitDerivativeFunctions) {
-    // Print jvp function name, if specified.
-    if (auto jvp = attr->getJVP()) {
-      printCommaIfNecessary();
-      stream << "jvp: " << jvp->Name;
-    }
-    // Print vjp function name, if specified.
-    if (auto vjp = attr->getVJP()) {
-      printCommaIfNecessary();
-      stream << "vjp: " << vjp->Name;
     }
   }
   // Print 'where' clause, if any.
@@ -1022,11 +1007,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_typeEraser");
     Printer << "(";
     Printer.callPrintNamePre(PrintNameContext::Attribute);
-    auto typeLoc = cast<TypeEraserAttr>(this)->getTypeEraserLoc();
-    if (auto type = typeLoc.getType())
-      type->print(Printer, Options);
+    auto *attr = cast<TypeEraserAttr>(this);
+    if (auto *repr = attr->getParsedTypeEraserTypeRepr())
+      repr->print(Printer, Options);
     else
-      typeLoc.getTypeRepr()->print(Printer, Options);
+      attr->getTypeWithoutResolving()->print(Printer, Options);
     Printer.printNamePost(PrintNameContext::Attribute);
     Printer << ")";
     break;
@@ -1397,12 +1382,34 @@ SourceLoc DynamicReplacementAttr::getRParenLoc() const {
   return getTrailingLocations()[1];
 }
 
+TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
+                                       SourceLoc atLoc, SourceRange range,
+                                       TypeLoc typeEraserLoc) {
+  return new (ctx) TypeEraserAttr(atLoc, range, typeEraserLoc, nullptr, 0);
+}
+
+TypeEraserAttr *TypeEraserAttr::create(ASTContext &ctx,
+                                       LazyMemberLoader *Resolver,
+                                       uint64_t Data) {
+  return new (ctx) TypeEraserAttr(SourceLoc(), SourceRange(),
+                                  TypeLoc(), Resolver, Data);
+}
+
 bool
 TypeEraserAttr::hasViableTypeEraserInit(ProtocolDecl *protocol) const {
   return evaluateOrDefault(protocol->getASTContext().evaluator,
                            TypeEraserHasViableInitRequest{
                                const_cast<TypeEraserAttr *>(this), protocol},
                            false);
+}
+
+Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
+  auto &ctx = PD->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveTypeEraserTypeRequest{
+                               const_cast<ProtocolDecl *>(PD),
+                               const_cast<TypeEraserAttr *>(this)},
+                           ErrorType::get(ctx));
 }
 
 AvailableAttr *
@@ -1616,12 +1623,9 @@ SPIAccessControlAttr::create(ASTContext &context,
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
                                        SourceRange baseRange, bool linear,
                                        ArrayRef<ParsedAutoDiffParameter> params,
-                                       Optional<DeclNameRefWithLoc> jvp,
-                                       Optional<DeclNameRefWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-    Linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
-    VJP(std::move(vjp)), WhereClause(clause) {
+    Linear(linear), NumParsedParameters(params.size()), WhereClause(clause) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
@@ -1630,12 +1634,9 @@ DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        bool linear,
                                        IndexSubset *parameterIndices,
-                                       Optional<DeclNameRefWithLoc> jvp,
-                                       Optional<DeclNameRefWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      OriginalDeclaration(original), Linear(linear), JVP(std::move(jvp)),
-      VJP(std::move(vjp)) {
+      OriginalDeclaration(original), Linear(linear) {
   setParameterIndices(parameterIndices);
   setDerivativeGenericSignature(derivativeGenSig);
 }
@@ -1645,29 +1646,23 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
                            bool linear,
                            ArrayRef<ParsedAutoDiffParameter> parameters,
-                           Optional<DeclNameRefWithLoc> jvp,
-                           Optional<DeclNameRefWithLoc> vjp,
                            TrailingWhereClause *clause) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(parameters.size());
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(implicit, atLoc, baseRange, linear,
-                                      parameters, std::move(jvp),
-                                      std::move(vjp), clause);
+                                      parameters, clause);
 }
 
 DifferentiableAttr *
 DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange, bool linear,
                            IndexSubset *parameterIndices,
-                           Optional<DeclNameRefWithLoc> jvp,
-                           Optional<DeclNameRefWithLoc> vjp,
                            GenericSignature derivativeGenSig) {
   auto &ctx = original->getASTContext();
   void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
                            alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
-                                      linear, parameterIndices, std::move(jvp),
-                                      std::move(vjp), derivativeGenSig);
+                                      linear, parameterIndices, derivativeGenSig);
 }
 
 void DifferentiableAttr::setOriginalDeclaration(Decl *originalDeclaration) {
@@ -1701,18 +1696,6 @@ void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
       std::move(paramIndices));
 }
 
-void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
-  JVPFunction = decl;
-  if (decl && !JVP)
-    JVP = {decl->createNameRef(), DeclNameLoc(decl->getNameLoc())};
-}
-
-void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
-  VJPFunction = decl;
-  if (decl && !VJP)
-    VJP = {decl->createNameRef(), DeclNameLoc(decl->getNameLoc())};
-}
-
 GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
     AbstractFunctionDecl *original) const {
   GenericEnvironment *derivativeGenEnv = original->getGenericEnvironment();
@@ -1722,12 +1705,10 @@ GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
 }
 
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
-                               bool omitWrtClause,
-                               bool omitDerivativeFunctions) const {
+                               bool omitWrtClause) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
-  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
-                                   omitDerivativeFunctions);
+  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause);
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
@@ -1768,6 +1749,26 @@ DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
   void *mem = context.Allocate(sizeof(DerivativeAttr), alignof(DerivativeAttr));
   return new (mem) DerivativeAttr(implicit, atLoc, baseRange, baseTypeRepr,
                                   std::move(originalName), parameterIndices);
+}
+
+AbstractFunctionDecl *
+DerivativeAttr::getOriginalFunction(ASTContext &context) const {
+  return evaluateOrDefault(
+      context.evaluator,
+      DerivativeAttrOriginalDeclRequest{const_cast<DerivativeAttr *>(this)},
+      nullptr);
+}
+
+void DerivativeAttr::setOriginalFunction(AbstractFunctionDecl *decl) {
+  assert(!OriginalFunction && "cannot overwrite original function");
+  OriginalFunction = decl;
+}
+
+void DerivativeAttr::setOriginalFunctionResolver(
+    LazyMemberLoader *resolver, uint64_t resolverContextData) {
+  assert(!OriginalFunction && "cannot overwrite original function");
+  OriginalFunction = resolver;
+  ResolverContextData = resolverContextData;
 }
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,

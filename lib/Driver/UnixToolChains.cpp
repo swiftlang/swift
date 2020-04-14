@@ -211,8 +211,10 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(A->getValue()));
   }
 
-  if (getTriple().getOS() == llvm::Triple::Linux &&
-      job.getKind() == LinkKind::Executable) {
+  if (getTriple().getObjectFormat() == llvm::Triple::ELF &&
+      job.getKind() == LinkKind::Executable &&
+      !context.Args.hasFlag(options::OPT_static_executable,
+                            options::OPT_no_static_executable, false)) {
     Arguments.push_back("-pie");
   }
 

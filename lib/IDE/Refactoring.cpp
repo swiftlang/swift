@@ -316,21 +316,35 @@ public:
     // FIXME: handle escaped keyword names `init`
     bool IsSubscript = Old.base() == "subscript" && Config.IsFunctionLike;
     bool IsInit = Old.base() == "init" && Config.IsFunctionLike;
-    bool IsKeywordBase = IsInit || IsSubscript;
+
+    // FIXME: this should only be treated specially for instance methods.
+    bool IsCallAsFunction = Old.base() == "callAsFunction" &&
+        Config.IsFunctionLike;
+
+    bool IsSpecialBase = IsInit || IsSubscript || IsCallAsFunction;
     
-    // Filter out non-semantic keyword basename locations with no labels.
+    // Filter out non-semantic special basename locations with no labels.
     // We've already filtered out those in active code, so these are
-    // any appearance of just 'init' or 'subscript' in strings, comments, and
-    // inactive code.
-    if (IsKeywordBase && (Config.Usage == NameUsage::Unknown &&
-                           Resolved.LabelType == LabelRangeType::None))
+    // any appearance of just 'init', 'subscript', or 'callAsFunction' in
+    // strings, comments, and inactive code.
+    if (IsSpecialBase && (Config.Usage == NameUsage::Unknown &&
+                          Resolved.LabelType == LabelRangeType::None))
       return RegionType::Unmatched;
 
-    if (!Config.IsFunctionLike || !IsKeywordBase) {
+    if (!Config.IsFunctionLike || !IsSpecialBase) {
       if (renameBase(Resolved.Range, RefactoringRangeKind::BaseName))
         return RegionType::Mismatch;
 
-    } else if (IsKeywordBase && Config.Usage == NameUsage::Definition) {
+    } else if (IsInit || IsCallAsFunction) {
+      if (renameBase(Resolved.Range, RefactoringRangeKind::KeywordBaseName)) {
+        // The base name doesn't need to match (but may) for calls, but
+        // it should for definitions and references.
+        if (Config.Usage == NameUsage::Definition ||
+            Config.Usage == NameUsage::Reference) {
+          return RegionType::Mismatch;
+        }
+      }
+    } else if (IsSubscript && Config.Usage == NameUsage::Definition) {
       if (renameBase(Resolved.Range, RefactoringRangeKind::KeywordBaseName))
         return RegionType::Mismatch;
     }
@@ -528,9 +542,11 @@ static const ValueDecl *getRelatedSystemDecl(const ValueDecl *VD) {
   return nullptr;
 }
 
-static Optional<RefactoringKind> getAvailableRenameForDecl(const ValueDecl *VD) {
+static Optional<RefactoringKind>
+getAvailableRenameForDecl(const ValueDecl *VD,
+                          Optional<RenameRefInfo> RefInfo) {
   std::vector<RenameAvailabiliyInfo> Scratch;
-  for (auto &Info : collectRenameAvailabilityInfo(VD, Scratch)) {
+  for (auto &Info : collectRenameAvailabilityInfo(VD, RefInfo, Scratch)) {
     if (Info.AvailableKind == RenameAvailableKind::Available)
       return Info.Kind;
   }
@@ -744,15 +760,21 @@ bool RefactoringActionLocalRename::
 isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
   if (CursorInfo.Kind != CursorInfoKind::ValueRef)
     return false;
-  auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD);
+
+  Optional<RenameRefInfo> RefInfo;
+  if (CursorInfo.IsRef)
+    RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+
+  auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD, RefInfo);
   return RenameOp.hasValue() &&
     RenameOp.getValue() == RefactoringKind::LocalRename;
 }
 
-static void analyzeRenameScope(ValueDecl *VD, DiagnosticEngine &Diags,
+static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
+                               DiagnosticEngine &Diags,
                                llvm::SmallVectorImpl<DeclContext *> &Scopes) {
   Scopes.clear();
-  if (!getAvailableRenameForDecl(VD).hasValue()) {
+  if (!getAvailableRenameForDecl(VD, RefInfo).hasValue()) {
     Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getFullName());
     return;
   }
@@ -786,7 +808,12 @@ bool RefactoringActionLocalRename::performChange() {
   if (CursorInfo.isValid() && CursorInfo.ValueD) {
     ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
     llvm::SmallVector<DeclContext *, 8> Scopes;
-    analyzeRenameScope(VD, DiagEngine, Scopes);
+
+    Optional<RenameRefInfo> RefInfo;
+    if (CursorInfo.IsRef)
+      RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+
+    analyzeRenameScope(VD, RefInfo, DiagEngine, Scopes);
     if (Scopes.empty())
       return true;
     RenameRangeCollector rangeCollector(VD, PreferredName);
@@ -914,7 +941,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
     Stmt *S = RangeInfo.ContainedNodes[0].get<Stmt *>();
 
     // These aren't independent statement.
-    if (isa<BraceStmt>(S) || isa<CatchStmt>(S) || isa<CaseStmt>(S))
+    if (isa<BraceStmt>(S) || isa<CaseStmt>(S))
       return ExtractCheckResult();
   }
 
@@ -2278,7 +2305,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     }
 
     bool checkName(FuncDecl *FD) {
-      auto Name = FD->getName().str();
+      const auto Name = FD->getBaseIdentifier().str();
       return Name == "~="
       || Name == "=="
       || Name == "__derived_enum_equals"
@@ -2391,7 +2418,8 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
     bool isFunctionNameAllowed(BinaryExpr *E) {
       auto FunctionBody = dyn_cast<DotSyntaxCallExpr>(E->getFn())->getFn();
       auto FunctionDeclaration = dyn_cast<DeclRefExpr>(FunctionBody)->getDecl();
-      auto FunctionName = dyn_cast<FuncDecl>(FunctionDeclaration)->getName().str();
+      const auto FunctionName = dyn_cast<FuncDecl>(FunctionDeclaration)
+          ->getBaseIdentifier().str();
       return FunctionName == "~="
       || FunctionName == "=="
       || FunctionName == "__derived_enum_equals"
@@ -3622,9 +3650,11 @@ accept(SourceManager &SM, RegionType RegionType,
     Impl.accept(SM, Range);
   }
 }
+
 ArrayRef<RenameAvailabiliyInfo>
 swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
-                                std::vector<RenameAvailabiliyInfo> &Scratch) {
+                                          Optional<RenameRefInfo> RefInfo,
+                                  std::vector<RenameAvailabiliyInfo> &Scratch) {
   RenameAvailableKind AvailKind = RenameAvailableKind::Available;
   if (getRelatedSystemDecl(VD)){
     AvailKind = RenameAvailableKind::Unavailable_system_symbol;
@@ -3649,6 +3679,30 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
     if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
       if (!CD->getParameters()->size())
         return Scratch;
+
+      if (RefInfo && !RefInfo->IsArgLabel) {
+        NameMatcher Matcher(*(RefInfo->SF));
+        auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
+        if (Resolved.LabelRanges.empty())
+          return Scratch;
+      }
+    }
+
+    // Disallow renaming 'callAsFunction' method with no arguments.
+    if (auto FD = dyn_cast<FuncDecl>(VD)) {
+      // FIXME: syntactic rename can only decide by checking the spelling, not
+      // whether it's an instance method, so we do the same here for now.
+      if (FD->getBaseIdentifier() == FD->getASTContext().Id_callAsFunction) {
+        if (!FD->getParameters()->size())
+          return Scratch;
+
+        if (RefInfo && !RefInfo->IsArgLabel) {
+          NameMatcher Matcher(*(RefInfo->SF));
+          auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
+          if (Resolved.LabelRanges.empty())
+            return Scratch;
+        }
+      }
     }
   }
 
@@ -3681,7 +3735,10 @@ collectAvailableRefactorings(SourceFile *SF,
   case CursorInfoKind::ExprStart:
     break;
   case CursorInfoKind::ValueRef: {
-    auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD);
+    Optional<RenameRefInfo> RefInfo;
+    if (CursorInfo.IsRef)
+      RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+    auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD, RefInfo);
     if (RenameOp.hasValue() &&
         RenameOp.getValue() == RefactoringKind::GlobalRename)
       AllKinds.push_back(RenameOp.getValue());
@@ -3918,8 +3975,12 @@ int swift::ide::findLocalRenameRanges(
     return true;
   }
   ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
+  Optional<RenameRefInfo> RefInfo;
+  if (CursorInfo.IsRef)
+    RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+
   llvm::SmallVector<DeclContext *, 8> Scopes;
-  analyzeRenameScope(VD, Diags, Scopes);
+  analyzeRenameScope(VD, RefInfo, Diags, Scopes);
   if (Scopes.empty())
     return true;
   RenameRangeCollector RangeCollector(VD, StringRef());

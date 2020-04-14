@@ -131,7 +131,9 @@ public:
   }
 
   void notifyHasNewUsers(SILValue value) override {
-    Worklist.addUsersToWorklist(value);
+    if (Worklist.size() < 10000) {
+      Worklist.addUsersToWorklist(value);
+    }
     changed = true;
   }
 
@@ -250,10 +252,6 @@ class SILCombine : public SILFunctionTransform {
   
   /// The entry point to the transformation.
   void run() override {
-    // FIXME: We should be able to handle ownership.
-    if (getFunction()->hasOwnership())
-      return;
-
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
     auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();

@@ -78,7 +78,7 @@ SingleValueInstruction *isAccessProjection(SILValue v);
 /// findAccessedStorage() on either \p v or the returned address.
 SILValue getAddressAccess(SILValue v);
 
-/// Convenience for stripAccessMarkers(getAddressAccess(V)).
+/// Convenience for stripAccessMarkers(getAddressAccess(v)).
 SILValue getAccessedAddress(SILValue v);
 
 /// Return true if \p accessedAddress points to a let-variable.

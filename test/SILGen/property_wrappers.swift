@@ -510,6 +510,8 @@ public protocol TestProtocol {}
 public class TestClass<T> {
   @WrapperWithInitialValue var value: T
 
+  // CHECK-LABEL: sil [ossa] @$s17property_wrappers9TestClassC5valuexvpfP : $@convention(thin) <T> (@in T) -> @out WrapperWithInitialValue<T>
+
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers9TestClassC5value8protocolACyxGx_qd__tcAA0C8ProtocolRd__lufc
   // CHECK: [[BACKING_INIT:%.*]] = function_ref @$s17property_wrappers9TestClassC5valuexvpfP : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out WrapperWithInitialValue<τ_0_0>
   // CHECK-NEXT: partial_apply [callee_guaranteed] [[BACKING_INIT]]<T>()
@@ -648,6 +650,32 @@ struct ObservedObject<ObjectType : AnyObject > {
 
   init(defaulted: Int = 17, wrappedValue: ObjectType) {
     self.wrappedValue = wrappedValue
+  }
+}
+
+// SR-12443: Crash on property with wrapper override that adds observer.
+@propertyWrapper
+struct BasicIntWrapper {
+  var wrappedValue: Int
+}
+
+class Someclass {
+  @BasicIntWrapper var property: Int = 0
+}
+
+class Somesubclass : Someclass {
+  override var property: Int {
+    // Make sure we don't interact with the property wrapper, we just delegate
+    // to the superclass' accessors.
+    // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12SomesubclassC0A0Sivs : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
+    // CHECK: bb0([[NEW:%.+]] : $Int, {{%.+}} : @guaranteed $Somesubclass):
+    // CHECK:   [[SETTER:%.+]] = function_ref @$s17property_wrappers9SomeclassC0A0Sivs : $@convention(method) (Int, @guaranteed Someclass) -> ()
+    // CHECK:   apply [[SETTER]]([[NEW]], {{%.+}}) : $@convention(method) (Int, @guaranteed Someclass) -> ()
+    // CHECK:   [[DIDSET:%.+]] = function_ref @$s17property_wrappers12SomesubclassC0A0SivW : $@convention(method) (@guaranteed Somesubclass) -> ()
+    // CHECK:   apply [[DIDSET]]({{%.+}}) : $@convention(method) (@guaranteed Somesubclass) -> ()
+    didSet {
+      print("Subclass")
+    }
   }
 }
 

@@ -432,6 +432,11 @@ struct PrintOptions {
   /// The information for converting archetypes to specialized types.
   llvm::Optional<TypeTransformContext> TransformContext;
 
+  /// Whether cross-import overlay modules are printed with their own name (e.g.
+  /// _MyFrameworkYourFrameworkAdditions) or that of their underlying module
+  /// (e.g.  MyFramework).
+  bool MapCrossImportOverlaysToDeclaringModule = false;
+
   bool PrintAsMember = false;
   
   /// Whether to print parameter specifiers as 'let' and 'var'.
@@ -518,6 +523,7 @@ struct PrintOptions {
     result.PrintDocumentationComments = true;
     result.SkipUnderscoredKeywords = true;
     result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
+    result.MapCrossImportOverlaysToDeclaringModule = true;
     return result;
   }
 

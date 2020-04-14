@@ -13,6 +13,7 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -122,6 +123,23 @@ void AutoDiffConfig::print(llvm::raw_ostream &s) const {
     derivativeGenericSignature->print(s);
   }
   s << ')';
+}
+
+bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
+  auto &ctx = SF.getASTContext();
+  // Return true if differentiable programming is explicitly enabled.
+  if (ctx.LangOpts.EnableExperimentalDifferentiableProgramming)
+    return true;
+  // Otherwise, return true iff the `_Differentiation` module is imported in
+  // the given source file.
+  bool importsDifferentiationModule = false;
+  for (auto import : namelookup::getAllImports(&SF)) {
+    if (import.second->getName() == ctx.Id_Differentiation) {
+      importsDifferentiationModule = true;
+      break;
+    }
+  }
+  return importsDifferentiationModule;
 }
 
 // TODO(TF-874): This helper is inefficient and should be removed. Unwrapping at
@@ -277,6 +295,77 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
                                       /*addedGenericParams*/ {},
                                       std::move(requirements)},
       nullptr);
+}
+
+// Given the rest of a `Builtin.applyDerivative_{jvp|vjp}` or
+// `Builtin.applyTranspose` operation name, attempts to parse the arity and
+// throwing-ness from the operation name. Modifies the operation name argument
+// in place as substrings get dropped.
+static void parseAutoDiffBuiltinCommonConfig(
+    StringRef &operationName, unsigned &arity, bool &throws) {
+  // Parse '_arity'.
+  constexpr char arityPrefix[] = "_arity";
+  if (operationName.startswith(arityPrefix)) {
+    operationName = operationName.drop_front(sizeof(arityPrefix) - 1);
+    auto arityStr = operationName.take_while(llvm::isDigit);
+    operationName = operationName.drop_front(arityStr.size());
+    auto converted = llvm::to_integer(arityStr, arity);
+    assert(converted); (void)converted;
+    assert(arity > 0);
+  } else {
+    arity = 1;
+  }
+  // Parse '_throws'.
+  constexpr char throwsPrefix[] = "_throws";
+  if (operationName.startswith(throwsPrefix)) {
+    operationName = operationName.drop_front(sizeof(throwsPrefix) - 1);
+    throws = true;
+  } else {
+    throws = false;
+  }
+}
+
+bool autodiff::getBuiltinApplyDerivativeConfig(
+    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
+    unsigned &arity, bool &throws) {
+  constexpr char prefix[] = "applyDerivative";
+  if (!operationName.startswith(prefix))
+    return false;
+  operationName = operationName.drop_front(sizeof(prefix) - 1);
+  // Parse 'jvp' or 'vjp'.
+  constexpr char jvpPrefix[] = "_jvp";
+  constexpr char vjpPrefix[] = "_vjp";
+  if (operationName.startswith(jvpPrefix))
+    kind = AutoDiffDerivativeFunctionKind::JVP;
+  else if (operationName.startswith(vjpPrefix))
+    kind = AutoDiffDerivativeFunctionKind::VJP;
+  operationName = operationName.drop_front(sizeof(jvpPrefix) - 1);
+  parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
+  return operationName.empty();
+}
+
+bool autodiff::getBuiltinApplyTransposeConfig(
+    StringRef operationName, unsigned &arity, bool &throws) {
+  constexpr char prefix[] = "applyTranspose";
+  if (!operationName.startswith(prefix))
+    return false;
+  operationName = operationName.drop_front(sizeof(prefix) - 1);
+  parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
+  return operationName.empty();
+}
+
+bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws) {
+  constexpr char differentiablePrefix[] = "differentiableFunction";
+  constexpr char linearPrefix[] = "linearFunction";
+  if (operationName.startswith(differentiablePrefix))
+    operationName = operationName.drop_front(sizeof(differentiablePrefix) - 1);
+  else if (operationName.startswith(linearPrefix))
+    operationName = operationName.drop_front(sizeof(linearPrefix) - 1);
+  else
+    return false;
+  parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
+  return operationName.empty();
 }
 
 Type TangentSpace::getType() const {

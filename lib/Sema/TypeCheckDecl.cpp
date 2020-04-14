@@ -231,7 +231,7 @@ static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
   return decl->hasClangNode() || decl->wasDeserialized();
 }
 
-llvm::Expected<bool>
+bool
 HasCircularInheritanceRequest::evaluate(Evaluator &evaluator,
                                         ClassDecl *decl) const {
   if (canSkipCircularityCheck(decl) || !decl->hasSuperclass())
@@ -246,10 +246,10 @@ HasCircularInheritanceRequest::evaluate(Evaluator &evaluator,
     llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
     return true;
   }
-  return result;
+  return result.get();
 }
 
-llvm::Expected<bool>
+bool
 HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                                ProtocolDecl *decl) const {
   if (canSkipCircularityCheck(decl))
@@ -277,7 +277,7 @@ HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-llvm::Expected<bool>
+bool
 HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
                                      EnumDecl *decl) const {
   if (canSkipCircularityCheck(decl) || !decl->hasRawType())
@@ -294,7 +294,7 @@ HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
     llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
     return true;
   }
-  return result;
+  return result.get();
 }
 
 namespace {
@@ -399,7 +399,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   llvm_unreachable("covered switch");
 }
 
-llvm::Expected<CtorInitializerKind>
+CtorInitializerKind
 InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
   auto &diags = decl->getASTContext().Diags;
 
@@ -470,7 +470,7 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
   return CtorInitializerKind::Designated;
 }
 
-llvm::Expected<bool>
+bool
 ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *decl) const {
   // Quick check: @objc protocols require a class.
@@ -503,7 +503,7 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-llvm::Expected<bool>
+bool
 ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
                                            ProtocolDecl *decl) const {
   // If it's not @objc, it conforms to itself only if it has a self-conformance
@@ -531,7 +531,7 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-llvm::Expected<bool>
+bool
 ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
                                           ProtocolDecl *decl) const {
   // ObjC protocols can always be existential.
@@ -559,7 +559,7 @@ ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-llvm::Expected<bool>
+bool
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<ClassDecl>(decl))
     return decl->getAttrs().hasAttribute<FinalAttr>();
@@ -577,6 +577,14 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       if (VD->isLazyStorageProperty() ||
           VD->getOriginalWrappedProperty(PropertyWrapperSynthesizedPropertyKind::Backing))
         return true;
+
+      // Property wrapper storage wrappers are final if the original property
+      // is final.
+      if (auto *original = VD->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+        if (original->isFinal())
+          return true;
+      }
 
       if (VD->getDeclContext()->getSelfClassDecl()) {
         // If this variable is a class member, mark it final if the
@@ -655,7 +663,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return false;
 }
 
-llvm::Expected<bool>
+bool
 IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(decl))
     return accessor->getStorage()->isStatic();
@@ -666,7 +674,7 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   if (!result &&
       decl->isOperator() &&
       dc->isTypeContext()) {
-    auto operatorName = decl->getFullName().getBaseIdentifier();
+    const auto operatorName = decl->getBaseIdentifier();
     if (auto ED = dyn_cast<ExtensionDecl>(dc->getAsDecl())) {
       decl->diagnose(diag::nonstatic_operator_in_extension,
                      operatorName, ED->getExtendedTypeRepr())
@@ -685,7 +693,7 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   return result;
 }
 
-llvm::Expected<bool>
+bool
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
@@ -745,7 +753,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return false;
 }
 
-llvm::Expected<ArrayRef<Requirement>>
+ArrayRef<Requirement>
 RequirementSignatureRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
   ASTContext &ctx = proto->getASTContext();
@@ -794,7 +802,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   return reqSignature->getRequirements();
 }
 
-llvm::Expected<Type>
+Type
 DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
                                        AssociatedTypeDecl *assocType) const {
   if (assocType->Resolver) {
@@ -813,7 +821,7 @@ DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
   return Type();
 }
 
-llvm::Expected<bool>
+bool
 NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
                                      AbstractFunctionDecl *decl) const {
   auto *dc = decl->getDeclContext();
@@ -973,22 +981,22 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   }
 }
 
-llvm::Expected<bool>
+evaluator::SideEffect
 EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
                                TypeResolutionStage stage) const {
   Type rawTy = ED->getRawType();
   if (!rawTy) {
-    return true;
+    return std::make_tuple<>();
   }
 
   if (!computeAutomaticEnumValueKind(ED)) {
-    return true;
+    return std::make_tuple<>();
   }
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoContext(rawTy);
   if (rawTy->hasError())
-    return true;
+    return std::make_tuple<>();
 
   // Check the raw values of the cases.
   LiteralExpr *prevValue = nullptr;
@@ -1017,7 +1025,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
         valueKind = computeAutomaticEnumValueKind(ED);
         if (!valueKind) {
           elt->setInvalid();
-          return true;
+          return std::make_tuple<>();
         }
       }
       
@@ -1107,7 +1115,70 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
                        diag::enum_raw_value_incrementing_from_zero);
     }
   }
-  return true;
+  return std::make_tuple<>();
+}
+
+bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
+                                   AccessorDecl *decl) const {
+
+  class OldValueFinder : public ASTWalker {
+    const ParamDecl *OldValueParam;
+    bool foundOldValueRef = false;
+
+  public:
+    OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E)
+        return {true, E};
+      if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (auto decl = DRE->getDecl()) {
+          if (decl == OldValueParam) {
+            foundOldValueRef = true;
+            return {false, nullptr};
+          }
+        }
+      }
+
+      return {true, E};
+    }
+
+    bool didFindOldValueRef() { return foundOldValueRef; }
+  };
+
+  // If this is not a didSet accessor, bail out.
+  if (decl->getAccessorKind() != AccessorKind::DidSet) {
+    return false;
+  }
+
+  // didSet must have a single parameter.
+  if (decl->getParameters()->size() != 1) {
+    return false;
+  }
+
+  auto param = decl->getParameters()->get(0);
+  // If this parameter is not implicit, then it means it has been explicitly
+  // provided by the user (i.e. 'didSet(oldValue)'). This means we cannot
+  // consider this a "simple" didSet because we have to fetch the oldValue
+  // regardless of whether it's referenced in the body or not.
+  if (!param->isImplicit()) {
+    return false;
+  }
+
+  // If we find a reference to the implicit 'oldValue' parameter, then it is
+  // not a "simple" didSet because we need to fetch it.
+  auto walker = OldValueFinder(param);
+  decl->getBody()->walk(walker);
+  auto hasOldValueRef = walker.didFindOldValueRef();
+  if (!hasOldValueRef) {
+    // If the body does not refer to implicit 'oldValue', it means we can
+    // consider this as a "simple" didSet. Let's also erase the implicit
+    // oldValue as it is never used.
+    auto &ctx = decl->getASTContext();
+    decl->setParameters(ParameterList::createEmpty(ctx));
+    return true;
+  }
+  return false;
 }
 
 const ConstructorDecl *
@@ -1336,7 +1407,7 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     checkPrecedenceCircularity(Diags, PGD);
 }
 
-llvm::Expected<PrecedenceGroupDecl *> ValidatePrecedenceGroupRequest::evaluate(
+PrecedenceGroupDecl * ValidatePrecedenceGroupRequest::evaluate(
     Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
   if (auto *group = lookupPrecedenceGroup(descriptor)) {
     validatePrecedenceGroup(group);
@@ -1398,7 +1469,7 @@ bool swift::checkDesignatedTypes(OperatorDecl *OD,
 /// This establishes key invariants, such as an InfixOperatorDecl's
 /// reference to its precedence group and the transitive validity of that
 /// group.
-llvm::Expected<PrecedenceGroupDecl *>
+PrecedenceGroupDecl *
 OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
                                          InfixOperatorDecl *IOD) const {
   auto enableOperatorDesignatedTypes =
@@ -1464,7 +1535,7 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
   return group;
 }
 
-llvm::Expected<SelfAccessKind>
+SelfAccessKind
 SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (FD->getAttrs().getAttribute<MutatingAttr>(true)) {
     if (!FD->isInstanceMember() || !FD->getDeclContext()->hasValueSemantics()) {
@@ -1569,6 +1640,12 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
   case AccessorKind::Set:
+    if (accessor->isSimpleDidSet()) {
+      // If this is a "simple" didSet, there won't be
+      // a parameter.
+      return nullptr;
+    }
+
     if (param == accessorParams->get(0)) {
       // This is the 'newValue' parameter.
       return nullptr;
@@ -1597,7 +1674,7 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   return subscriptParams->get(index - startIndex);
 }
 
-llvm::Expected<bool>
+bool
 IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
                                                ValueDecl *decl) const {
   TypeRepr *TyR = nullptr;
@@ -1670,7 +1747,7 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Validate the underlying type of the given typealias.
-llvm::Expected<Type>
+Type
 UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
                                 TypeAliasDecl *typeAlias) const {
   TypeResolutionOptions options((typeAlias->getGenericParams()
@@ -1702,11 +1779,11 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
 
 /// Bind the given function declaration, which declares an operator, to the
 /// corresponding operator declaration.
-llvm::Expected<OperatorDecl *>
+OperatorDecl *
 FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {  
   auto &C = FD->getASTContext();
   auto &diags = C.Diags;
-  auto operatorName = FD->getFullName().getBaseIdentifier();
+  const auto operatorName = FD->getBaseIdentifier();
 
   // Check for static/final/class when we're in a type.
   auto dc = FD->getDeclContext();
@@ -1893,7 +1970,7 @@ static Type buildAddressorResultType(AccessorDecl *addressor,
   return valueType->wrapInPointer(pointerKind);
 }
 
-llvm::Expected<Type>
+Type
 ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
@@ -1946,7 +2023,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       resultTyRepr, TypeResolverContext::FunctionResult);
 }
 
-llvm::Expected<ParamSpecifier>
+ParamSpecifier
 ParamSpecifierRequest::evaluate(Evaluator &evaluator,
                                 ParamDecl *param) const {
   auto *dc = param->getDeclContext();
@@ -2071,7 +2148,7 @@ static Type validateParameterType(ParamDecl *decl) {
   return TL.getType();
 }
 
-llvm::Expected<Type>
+Type
 InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   auto &Context = D->getASTContext();
 
@@ -2182,6 +2259,13 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Accessor:
   case DeclKind::Constructor:
   case DeclKind::Destructor: {
+    // If this is a didSet, then we need to check whether the body references
+    // the implicit 'oldValue' parameter or not, in order to correctly
+    // compute the interface type.
+    if (auto AD = dyn_cast<AccessorDecl>(D)) {
+      (void)AD->isSimpleDidSet();
+    }
+
     auto *AFD = cast<AbstractFunctionDecl>(D);
 
     auto sig = AFD->getGenericSignature();
@@ -2278,7 +2362,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   }
 }
 
-llvm::Expected<NamedPattern *>
+NamedPattern *
 NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   auto &Context = VD->getASTContext();
   auto *PBD = VD->getParentPatternBinding();
@@ -2336,7 +2420,7 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   return namingPattern;
 }
 
-llvm::Expected<DeclRange>
+DeclRange
 EmittedMembersRequest::evaluate(Evaluator &evaluator,
                                 ClassDecl *CD) const {
   if (!CD->getParentSourceFile())
@@ -2372,6 +2456,14 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
+
+  // The projected storage wrapper ($foo) might have dynamically-dispatched
+  // accessors, so force them to be synthesized.
+  for (auto *member : CD->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      if (var->hasAttachedPropertyWrapper())
+        (void) var->getPropertyWrapperBackingProperty();
+  }
 
   return CD->getMembers();
 }
@@ -2437,7 +2529,7 @@ static bool isNonGenericTypeAliasType(Type type) {
   return false;
 }
 
-llvm::Expected<Type>
+Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
     ext->setInvalid();

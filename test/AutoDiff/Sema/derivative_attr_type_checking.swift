@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend-typecheck -enable-experimental-differentiable-programming -verify %s
-// REQUIRES: differentiable_programming
+// RUN: %target-swift-frontend-typecheck -verify %s
 
 import _Differentiation
 
@@ -744,11 +743,9 @@ extension InoutParameters {
   }
 }
 
-// Test cross-file derivative registration. Currently unsupported.
-// TODO(TF-1021): Lift this restriction.
+// Test cross-file derivative registration.
 
 extension FloatingPoint where Self: Differentiable {
-  // expected-error @+1 {{derivative not in the same file as the original function}}
   @derivative(of: rounded)
   func vjpRounded() -> (
     value: Self,

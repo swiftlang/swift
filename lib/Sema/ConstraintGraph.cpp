@@ -128,74 +128,6 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-ConstraintGraphNode::Adjacency &
-ConstraintGraphNode::getAdjacency(TypeVariableType *typeVar) {
-  assert(typeVar != TypeVar && "Cannot be adjacent to oneself");
-
-  // Look for existing adjacency information.
-  auto pos = AdjacencyInfo.find(typeVar);
-
-  if (pos != AdjacencyInfo.end())
-    return pos->second;
-
-  // If we weren't already adjacent to this type variable, add it to the
-  // list of adjacencies.
-  pos = AdjacencyInfo.insert(
-          { typeVar, { static_cast<unsigned>(Adjacencies.size()), 0 } })
-         .first;
-  Adjacencies.push_back(typeVar);
-  return pos->second;
-}
-
-void ConstraintGraphNode::modifyAdjacency(
-       TypeVariableType *typeVar,
-       llvm::function_ref<void(Adjacency& adj)> modify) {
-   // Find the adjacency information.
-  auto pos = AdjacencyInfo.find(typeVar);
-  assert(pos != AdjacencyInfo.end() && "Type variables not adjacent");
-  assert(Adjacencies[pos->second.Index] == typeVar && "Mismatched adjacency");
-
-  // Perform the modification .
-  modify(pos->second);
-
-  // If the adjacency is not empty, leave the information in there.
-  if (!pos->second.empty())
-    return;
-
-  // Remove this adjacency from the mapping.
-  unsigned index = pos->second.Index;
-  AdjacencyInfo.erase(pos);
-
-  // If this adjacency is last in the vector, just pop it off.
-  unsigned lastIndex = Adjacencies.size()-1;
-  if (index == lastIndex) {
-    Adjacencies.pop_back();
-    return;
-  }
-
-  // This adjacency is somewhere in the middle; swap it with the last
-  // adjacency so we can remove the adjacency from the vector in O(1) time
-  // rather than O(n) time.
-  auto lastTypeVar = Adjacencies[lastIndex];
-  Adjacencies[index] = lastTypeVar;
-  AdjacencyInfo[lastTypeVar].Index = index;
-  Adjacencies.pop_back();
-}
-
-void ConstraintGraphNode::addAdjacency(TypeVariableType *typeVar) {
-  auto &adjacency = getAdjacency(typeVar);
-
-  // Bump the degree of the adjacency.
-  ++adjacency.NumConstraints;
-}
-
-void ConstraintGraphNode::removeAdjacency(TypeVariableType *typeVar) {
-  modifyAdjacency(typeVar, [](Adjacency &adj) {
-    assert(adj.NumConstraints > 0 && "No adjacency to remove?");
-    --adj.NumConstraints;
-  });
-}
-
 void ConstraintGraphNode::addToEquivalenceClass(
        ArrayRef<TypeVariableType *> typeVars) {
   assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
@@ -326,80 +258,52 @@ void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   TypeVariables.pop_back();
 }
 
-/// Enumerate the adjacency edges for the given constraint.
-static void enumerateAdjacencies(
-    Constraint *constraint,
-    llvm::function_ref<void(TypeVariableType *, TypeVariableType *)> visitor) {
-  // Don't record adjacencies for one-way constraints.
-  if (constraint->isOneWayConstraint())
-    return;
-
-  // O(N^2) update for all of the adjacent type variables.
+void ConstraintGraph::addConstraint(Constraint *constraint) {
+  // For the nodes corresponding to each type variable...
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
-    for (auto otherTypeVar : referencedTypeVars) {
-      if (typeVar == otherTypeVar)
-        continue;
+    // Find the node for this type variable.
+    auto &node = (*this)[typeVar];
 
-      visitor(typeVar, otherTypeVar);
-    }
-  }
-}
-
-void ConstraintGraph::addConstraint(Constraint *constraint) {
-  // Record the change, if there are active scopes.
-  if (ActiveScope) {
-    Changes.push_back(Change::addedConstraint(constraint));
+    // Note the constraint within the node for that type variable.
+    node.addConstraint(constraint);
   }
 
-  if (constraint->getTypeVariables().empty()) {
-    // A constraint that doesn't reference any type variables is orphaned;
-    // track it as such.
+  // If the constraint doesn't reference any type variables, it's orphaned;
+  // track it as such.
+  if (referencedTypeVars.empty()) {
     OrphanedConstraints.push_back(constraint);
-    return;
   }
 
-  // Record this constraint in each type variable.
-  for (auto typeVar : constraint->getTypeVariables()) {
-    (*this)[typeVar].addConstraint(constraint);
-  }
-
-  // Record adjacencies.
-  enumerateAdjacencies(constraint,
-                       [&](TypeVariableType *lhs, TypeVariableType *rhs) {
-    assert(lhs != rhs);
-    (*this)[lhs].addAdjacency(rhs);
-  });
+  // Record the change, if there are active scopes.
+  if (ActiveScope)
+    Changes.push_back(Change::addedConstraint(constraint));
 }
 
 void ConstraintGraph::removeConstraint(Constraint *constraint) {
-  // Record the change, if there are active scopes.
-  if (ActiveScope)
-    Changes.push_back(Change::removedConstraint(constraint));
+  // For the nodes corresponding to each type variable...
+  auto referencedTypeVars = constraint->getTypeVariables();
+  for (auto typeVar : referencedTypeVars) {
+    // Find the node for this type variable.
+    auto &node = (*this)[typeVar];
 
-  if (constraint->getTypeVariables().empty()) {
-    // A constraint that doesn't reference any type variables is orphaned;
-    // remove it from the list of orphaned constraints.
+    // Remove the constraint.
+    node.removeConstraint(constraint);
+  }
+
+  // If this is an orphaned constraint, remove it from the list.
+  if (referencedTypeVars.empty()) {
     auto known = std::find(OrphanedConstraints.begin(),
                            OrphanedConstraints.end(),
                            constraint);
     assert(known != OrphanedConstraints.end() && "missing orphaned constraint");
     *known = OrphanedConstraints.back();
     OrphanedConstraints.pop_back();
-    return;
   }
 
-  // Remove the constraint from each type variable.
-  for (auto typeVar : constraint->getTypeVariables()) {
-    (*this)[typeVar].removeConstraint(constraint);
-  }
-
-  // Remove all adjacencies for all type variables.
-  enumerateAdjacencies(constraint,
-                       [&](TypeVariableType *lhs, TypeVariableType *rhs) {
-    assert(lhs != rhs);
-    (*this)[lhs].removeAdjacency(rhs);
-  });
+  // Record the change, if there are active scopes.
+  if (ActiveScope)
+    Changes.push_back(Change::removedConstraint(constraint));
 }
 
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
@@ -472,105 +376,6 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
   }
 }
 
-llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
-    TypeVariableType *typeVar, GatheringKind kind,
-    llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
-  llvm::TinyPtrVector<Constraint *> constraints;
-  // Whether we should consider this constraint at all.
-  auto rep = CS.getRepresentative(typeVar);
-  auto shouldConsiderConstraint = [&](Constraint *constraint) {
-    // For a one-way constraint, only consider it when the type variable
-    // is on the right-hand side of the the binding, and the left-hand side of
-    // the binding is one of the type variables currently under consideration.
-    if (constraint->isOneWayConstraint()) {
-      auto lhsTypeVar =
-          constraint->getFirstType()->castTo<TypeVariableType>();
-      if (!CS.isActiveTypeVariable(lhsTypeVar))
-        return false;
-
-      SmallVector<TypeVariableType *, 2> rhsTypeVars;
-      constraint->getSecondType()->getTypeVariables(rhsTypeVars);
-      for (auto rhsTypeVar : rhsTypeVars) {
-        if (CS.getRepresentative(rhsTypeVar) == rep)
-          return true;
-      }
-      return false;
-    }
-
-    return true;
-  };
-
-  auto acceptConstraint = [&](Constraint *constraint) {
-    return shouldConsiderConstraint(constraint) &&
-        acceptConstraintFn(constraint);
-  };
-
-  // Add constraints for the given adjacent type variable.
-  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
-
-  // Local function to add constraints
-  llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
-  auto addConstraintsOfAdjacency = [&](TypeVariableType *adjTypeVar) {
-    ArrayRef<TypeVariableType *> adjTypeVarsToVisit;
-    switch (kind) {
-    case GatheringKind::EquivalenceClass:
-      adjTypeVarsToVisit = adjTypeVar;
-      break;
-
-    case GatheringKind::AllMentions:
-      adjTypeVarsToVisit
-        = (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
-      break;
-    }
-
-    for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
-      if (!typeVars.insert(adjTypeVarEquiv).second)
-        continue;
-
-      for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints()) {
-        if (visitedConstraints.insert(constraint).second &&
-            acceptConstraint(constraint))
-          constraints.push_back(constraint);
-      }
-    }
-  };
-
-  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
-  auto equivClass = reprNode.getEquivalenceClass();
-  for (auto typeVar : equivClass) {
-    if (!typeVars.insert(typeVar).second)
-      continue;
-
-    for (auto constraint : (*this)[typeVar].getConstraints()) {
-      if (visitedConstraints.insert(constraint).second &&
-          acceptConstraint(constraint))
-        constraints.push_back(constraint);
-    }
-
-    auto &node = (*this)[typeVar];
-
-    for (auto adjTypeVar : node.getFixedBindings()) {
-      addConstraintsOfAdjacency(adjTypeVar);
-    }
-
-    switch (kind) {
-    case GatheringKind::EquivalenceClass:
-      break;
-
-    case GatheringKind::AllMentions:
-      // Retrieve the constraints from adjacent bindings.
-      for (auto adjTypeVar : node.getAdjacencies()) {
-        addConstraintsOfAdjacency(adjTypeVar);
-      }
-
-      break;
-    }
-
-  }
-
-  return constraints;
-}
-
 #pragma mark Algorithms
 
 /// Perform a depth-first search.
@@ -630,6 +435,98 @@ static void depthFirstSearch(
 
   // Walk any type variables related via fixed bindings.
   visitAdjacencies(node.getFixedBindings());
+}
+
+llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
+    TypeVariableType *typeVar, GatheringKind kind,
+    llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
+  llvm::TinyPtrVector<Constraint *> constraints;
+  // Whether we should consider this constraint at all.
+  auto rep = CS.getRepresentative(typeVar);
+  auto shouldConsiderConstraint = [&](Constraint *constraint) {
+    // For a one-way constraint, only consider it when the type variable
+    // is on the right-hand side of the the binding, and the left-hand side of
+    // the binding is one of the type variables currently under consideration.
+    if (constraint->isOneWayConstraint()) {
+      auto lhsTypeVar =
+          constraint->getFirstType()->castTo<TypeVariableType>();
+      if (!CS.isActiveTypeVariable(lhsTypeVar))
+        return false;
+
+      SmallVector<TypeVariableType *, 2> rhsTypeVars;
+      constraint->getSecondType()->getTypeVariables(rhsTypeVars);
+      for (auto rhsTypeVar : rhsTypeVars) {
+        if (CS.getRepresentative(rhsTypeVar) == rep)
+          return true;
+      }
+      return false;
+    }
+
+    return true;
+  };
+
+  auto acceptConstraint = [&](Constraint *constraint) {
+    return shouldConsiderConstraint(constraint) &&
+        acceptConstraintFn(constraint);
+  };
+
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
+
+  if (kind == GatheringKind::AllMentions) {
+    // If we've been asked for "all mentions" of a type variable, search for
+    // constraints involving both it and its fixed bindings.
+    depthFirstSearch(
+        *this, typeVar,
+        [&](TypeVariableType *typeVar) {
+          return typeVars.insert(typeVar).second;
+        },
+        [&](Constraint *constraint) {
+          if (acceptConstraint(constraint))
+            constraints.push_back(constraint);
+
+          // Don't recurse into the constraint's type variables.
+          return false;
+        },
+        visitedConstraints);
+    return constraints;
+  }
+
+  // Otherwise only search in the type var's equivalence class and immediate
+  // fixed bindings.
+
+  // Local function to add constraints.
+  auto addTypeVarConstraints = [&](TypeVariableType *adjTypeVar) {
+    if (!typeVars.insert(adjTypeVar).second)
+      return;
+
+    for (auto constraint : (*this)[adjTypeVar].getConstraints()) {
+      if (visitedConstraints.insert(constraint).second &&
+          acceptConstraint(constraint))
+        constraints.push_back(constraint);
+    }
+  };
+
+  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
+  auto equivClass = reprNode.getEquivalenceClass();
+  for (auto typeVar : equivClass) {
+    if (!typeVars.insert(typeVar).second)
+      continue;
+
+    auto &node = (*this)[typeVar];
+
+    for (auto constraint : node.getConstraints()) {
+      if (visitedConstraints.insert(constraint).second &&
+          acceptConstraint(constraint))
+        constraints.push_back(constraint);
+    }
+
+    for (auto adjTypeVar : node.getFixedBindings()) {
+      addTypeVarConstraints(adjTypeVar);
+    }
+  }
+
+  return constraints;
 }
 
 namespace {
@@ -1343,28 +1240,6 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
     }
   }
 
- if (!Adjacencies.empty()) {
-   out.indent(indent + 2);
-   out << "Adjacencies:";
-   SmallVector<TypeVariableType *, 4> sortedAdjacencies(Adjacencies.begin(),
-                                                        Adjacencies.end());
-   std::sort(sortedAdjacencies.begin(), sortedAdjacencies.end(),
-             [](TypeVariableType *lhs, TypeVariableType *rhs) {
-               return lhs->getID() < rhs->getID();
-             });
-   for (auto adj : sortedAdjacencies) {
-     out << ' ';
-     adj->print(out, PO);
-
-     const auto info = AdjacencyInfo.lookup(adj);
-     auto degree = info.NumConstraints;
-     if (degree > 1) {
-       out << " (" << degree << ")";
-     }
-   }
-   out << "\n";
- }
-
   // Print fixed bindings.
   if (!FixedBindings.empty()) {
     out.indent(indent + 2);
@@ -1534,69 +1409,6 @@ void ConstraintGraphNode::verify(ConstraintGraph &cg) {
     requireSameValue(info.first, Constraints[info.second],
                      "constraint map provides wrong index into vector");
   }
-
-  // Verify that the adjacency map/vector haven't gotten out of sync.
-  requireSameValue(Adjacencies.size(), AdjacencyInfo.size(),
-                   "adjacency vector and map have different sizes");
-  for (auto info : AdjacencyInfo) {
-    require(info.second.Index < Adjacencies.size(),
-            "adjacency index out-of-range");
-    requireSameValue(info.first, Adjacencies[info.second.Index],
-                     "adjacency map provides wrong index into vector");
-    require(!info.second.empty(),
-            "adjacency information should have been removed");
-    require(info.second.NumConstraints <= Constraints.size(),
-            "adjacency information has higher degree than # of constraints");
-  }
-
-  // Based on the constraints we have, build up a representation of what
-  // we expect the adjacencies to look like.
-  llvm::DenseMap<TypeVariableType *, unsigned> expectedAdjacencies;
-  for (auto constraint : Constraints) {
-    if (constraint->isOneWayConstraint())
-      continue;
-
-    for (auto adjTypeVar : constraint->getTypeVariables()) {
-      if (adjTypeVar == TypeVar)
-        continue;
-
-      ++expectedAdjacencies[adjTypeVar];
-    }
-  }
-
-  // Make sure that the adjacencies we expect are the adjacencies we have.
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-  for (auto adj : expectedAdjacencies) {
-    auto knownAdj = AdjacencyInfo.find(adj.first);
-    requireWithContext(knownAdj != AdjacencyInfo.end(),
-                       "missing adjacency information for type variable",
-                       [&] {
-      llvm::dbgs() << "  type variable=" << adj.first->getString(PO) << 'n';
-    });
-
-    requireWithContext(adj.second == knownAdj->second.NumConstraints,
-                       "wrong number of adjacencies for type variable",
-                       [&] {
-       llvm::dbgs() << "  type variable=" << adj.first->getString(PO)
-                    << " (" << adj.second << " vs. "
-                    << knownAdj->second.NumConstraints
-                    << ")\n";
-     });
-  }
-
-  if (AdjacencyInfo.size() != expectedAdjacencies.size()) {
-    // The adjacency information has something extra in it. Find the
-    // extraneous type variable.
-    for (auto adj : AdjacencyInfo) {
-      requireWithContext(AdjacencyInfo.count(adj.first) > 0,
-                         "extraneous adjacency info for type variable",
-                         [&] {
-        llvm::dbgs() << "  type variable=" << adj.first->getString(PO) << '\n';
-      });
-    }
-  }
-
 #undef requireSameValue
 #undef requireWithContext
 #undef require

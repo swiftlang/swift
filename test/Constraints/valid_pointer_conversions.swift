@@ -31,6 +31,13 @@ func givesPtr(_ str: String) {
   takesDoubleOptionalPtr(i) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafeRawPointer??'}}
   takesMutableDoubleOptionalPtr(arr) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutableRawPointer??'}}
 
-  // FIXME(SR-12382): Poor diagnostic.
-  takesMutableDoubleOptionalTypedPtr(&i) // expected-error {{type of expression is ambiguous without more context}}
+  takesMutableDoubleOptionalTypedPtr(&i) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Double>??'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'Double') are expected to be equal}}
 }
+
+// SR12382
+func SR12382(_ x: UnsafeMutablePointer<Double>??) {}
+
+var i = 0
+SR12382(&i) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Double>??'}}
+// expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'Double') are expected to be equal}}

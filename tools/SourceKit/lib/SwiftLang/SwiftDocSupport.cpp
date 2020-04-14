@@ -65,6 +65,7 @@ struct TextEntity {
   const Decl *Dcl = nullptr;
   TypeOrExtensionDecl SynthesizeTarget;
   const Decl *DefaultImplementationOf = nullptr;
+  ModuleDecl *DeclaringModIfFromCrossImportOverlay = nullptr;
   StringRef Argument;
   TextRange Range;
   unsigned LocOffset = 0;
@@ -260,26 +261,34 @@ struct SourceTextInfo {
 } // end anonymous namespace
 
 static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
-  auto *DC = dyn_cast<DeclContext>(D);
-  if (DC == nullptr || !DC->isInnermostContextGeneric())
+  auto *GC = D->getAsGenericContext();
+  if (!GC)
     return;
 
-  GenericSignature GenericSig = DC->getGenericSignatureOfContext();
-
+  GenericSignature GenericSig = GC->getGenericSignatureOfContext();
   if (!GenericSig)
     return;
 
+  // The declaration may not be generic itself, but instead carry additional
+  // generic requirements in a contextual where clause, so checking !isGeneric()
+  // is insufficient.
+  const auto ParentSig = GC->getParent()->getGenericSignatureOfContext();
+  if (ParentSig && ParentSig->isEqual(GenericSig))
+    return;
+
   // FIXME: Not right for extensions of nested generic types
-  for (auto *GP : GenericSig->getInnermostGenericParams()) {
-    if (GP->getDecl()->isImplicit())
-      continue;
-    DocGenericParam Param;
-    Param.Name = std::string(GP->getName());
-    Info.GenericParams.push_back(Param);
+  if (GC->isGeneric()) {
+    for (auto *GP : GenericSig->getInnermostGenericParams()) {
+      if (GP->getDecl()->isImplicit())
+        continue;
+      DocGenericParam Param;
+      Param.Name = std::string(GP->getName());
+      Info.GenericParams.push_back(Param);
+    }
   }
 
   ProtocolDecl *proto = nullptr;
-  if (auto *typeDC = DC->getInnermostTypeContext())
+  if (auto *typeDC = GC->getInnermostTypeContext())
     proto = typeDC->getSelfProtocolDecl();
 
   for (auto &Req : GenericSig->getRequirements()) {
@@ -303,7 +312,8 @@ static bool initDocEntityInfo(const Decl *D,
                               TypeOrExtensionDecl SynthesizedTarget,
                               const Decl *DefaultImplementationOf, bool IsRef,
                               bool IsSynthesizedExtension, DocEntityInfo &Info,
-                              StringRef Arg = StringRef()) {
+                              StringRef Arg = StringRef(),
+                              ModuleDecl *DeclaringModForCrossImport = nullptr){
   if (!IsRef && D->isImplicit())
     return true;
   if (!D || isa<ParamDecl>(D) ||
@@ -409,6 +419,21 @@ static bool initDocEntityInfo(const Decl *D,
         SwiftLangSupport::printFullyAnnotatedGenericReq(Sig, OS);
       }
     }
+
+    if (DeclaringModForCrossImport) {
+      ModuleDecl *MD = D->getModuleContext();
+      SmallVector<Identifier, 1> Bystanders;
+      if (MD->getRequiredBystandersIfCrossImportOverlay(
+          DeclaringModForCrossImport, Bystanders)) {
+        std::transform(Bystanders.begin(), Bystanders.end(),
+                       std::back_inserter(Info.RequiredBystanders),
+                       [](Identifier Bystander){
+          return Bystander.str().str();
+        });
+      } else {
+        llvm_unreachable("DeclaringModForCrossImport not correct?");
+      }
+    }
   }
 
   switch(D->getDeclContext()->getContextKind()) {
@@ -446,7 +471,8 @@ static bool initDocEntityInfo(const TextEntity &Entity,
   if (initDocEntityInfo(Entity.Dcl, Entity.SynthesizeTarget,
                         Entity.DefaultImplementationOf,
                         /*IsRef=*/false, Entity.IsSynthesizedExtension,
-                        Info, Entity.Argument))
+                        Info, Entity.Argument,
+                        Entity.DeclaringModIfFromCrossImportOverlay))
     return true;
   Info.Offset = Entity.Range.Offset;
   Info.Length = Entity.Range.Length;
@@ -962,6 +988,16 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);
   Info.References = std::move(Printer.References);
+
+  // Add a reference to the main module on any entities from cross-import
+  // overlay modules (used to determine their bystanders later).
+  for (auto &Entity: Info.TopEntities) {
+    auto *EntityMod = Entity.Dcl->getModuleContext();
+    if (!EntityMod || EntityMod == M)
+      continue;
+    if (EntityMod->isCrossImportOverlayOf(M))
+      Entity.DeclaringModIfFromCrossImportOverlay = M;
+  }
   return false;
 }
 

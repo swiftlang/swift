@@ -92,6 +92,11 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
+
+  // Automatic differentiation: canonicalize all differentiability witnesses
+  // and `differentiable_function` instructions.
+  P.addDifferentiation();
+
   // Only run semantic arc opts if we are optimizing and if mandatory semantic
   // arc opts is explicitly enabled.
   //
@@ -356,6 +361,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   }
 
   P.addPerformanceConstantPropagation();
+  // Remove redundant arguments right before CSE and DCE, so that CSE and DCE
+  // can cleanup redundant and dead instructions.
+  P.addRedundantPhiElimination();
   P.addCSE();
   P.addDCE();
 
@@ -453,6 +461,9 @@ static bool addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   // for CapturePropagation.
   P.addDeadArgSignatureOpt();
 
+  // A LICM pass at mid-level is mainly needed to hoist addressors of globals.
+  // It needs to be before global_init functions are inlined.
+  P.addLICM();
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
   P.addLoopUnroll();

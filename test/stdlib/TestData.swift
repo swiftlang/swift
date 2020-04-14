@@ -16,6 +16,7 @@
 // RUN: %target-run %t/TestData
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: rdar61347106
 
 import Foundation
 import Dispatch

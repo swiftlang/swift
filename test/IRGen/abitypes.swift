@@ -543,8 +543,8 @@ class Foo {
   }
 }
 
-// armv7-ios: define internal void @makeOne(%struct.One* noalias sret %agg.result, float %f, float %s)
-// armv7s-ios: define internal void @makeOne(%struct.One* noalias sret %agg.result, float %f, float %s)
+// armv7-ios: define internal void @makeOne(%struct.One* noalias sret align 4 %agg.result, float %f, float %s)
+// armv7s-ios: define internal void @makeOne(%struct.One* noalias sret align 4 %agg.result, float %f, float %s)
 // armv7k-watchos: define internal %struct.One @makeOne(float %f, float %s)
 
 // rdar://17631440 - Expand direct arguments that are coerced to aggregates.

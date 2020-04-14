@@ -96,6 +96,32 @@ public:
   static ValueDecl *getDerivableRequirement(NominalTypeDecl *nominal,
                                             ValueDecl *requirement);
 
+  /// Determine if an AdditiveArithmetic requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveAdditiveArithmetic(NominalTypeDecl *type,
+                                          DeclContext *DC);
+
+  /// Derive an AdditiveArithmetic requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
+
+  /// Determine if a Differentiable requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveDifferentiable(NominalTypeDecl *type, DeclContext *DC);
+
+  /// Derive a Differentiable requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveDifferentiable(ValueDecl *requirement);
+
+  /// Derive a Differentiable type witness for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveDifferentiable(AssociatedTypeDecl *assocType);
+
   /// Derive a CaseIterable requirement for an enum if it has no associated
   /// values for any of its cases.
   ///

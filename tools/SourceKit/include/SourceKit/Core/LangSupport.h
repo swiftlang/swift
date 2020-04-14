@@ -145,6 +145,7 @@ public:
   virtual void failed(StringRef ErrDescription) = 0;
 
   virtual void setCompletionKind(UIdent kind) {};
+  virtual void setReusingASTContext(bool) {};
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 
@@ -485,6 +486,7 @@ struct DocEntityInfo {
   llvm::SmallString<64> LocalizationKey;
   std::vector<DocGenericParam> GenericParams;
   std::vector<std::string> GenericRequirements;
+  std::vector<std::string> RequiredBystanders;
   unsigned Offset = 0;
   unsigned Length = 0;
   bool IsUnavailable = false;

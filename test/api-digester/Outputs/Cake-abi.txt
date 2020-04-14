@@ -67,6 +67,7 @@ cake: Func C1.foo1() is now not static
 cake: Func C5.dy_foo() is now with dynamic
 cake: Func FinalFuncContainer.NewFinalFunc() is now with final
 cake: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
+cake: Func Float.floatHigher() is a new API without @available attribute
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
 cake: Func RequiementChanges.addedFunc() is a new API without @available attribute
 cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating

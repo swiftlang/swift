@@ -59,10 +59,6 @@ template <typename DeclT> static std::string getBaseName(const DeclT *decl) {
   return decl->getBaseName().userFacingName().str();
 }
 
-template <typename DeclT> static std::string getName(const DeclT *decl) {
-  return DeclBaseName(decl->getName()).userFacingName().str();
-}
-
 static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
   Mangle::ASTMangler Mangler;
   return !NTD ? "" : Mangler.mangleTypeAsContextUSR(NTD);
@@ -188,22 +184,22 @@ std::string
 DependencyKey::computeNameForProvidedEntity<NodeKind::topLevel,
                                             PrecedenceGroupDecl const *>(
     const PrecedenceGroupDecl *D) {
-  return ::getName(D);
+  return D->getName().str().str();
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
     NodeKind::topLevel, FuncDecl const *>(const FuncDecl *D) {
-  return ::getName(D);
+  return getBaseName(D);
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
     NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D) {
-  return ::getName(D);
+  return D->getName().str().str();
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
     NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D) {
-  return ::getName(D);
+  return D->getName().str().str();
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
@@ -282,7 +278,8 @@ DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
 
 bool fine_grained_dependencies::emitReferenceDependencies(
     DiagnosticEngine &diags, SourceFile *const SF,
-    const DependencyTracker &depTracker, StringRef outputPath,
+    const DependencyTracker &depTracker,
+    StringRef outputPath,
     const bool alsoEmitDotFile) {
 
   // Before writing to the dependencies file path, preserve any previous file
@@ -292,7 +289,7 @@ bool fine_grained_dependencies::emitReferenceDependencies(
 
   SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
                              SF, outputPath, depTracker, alsoEmitDotFile)
-                             .construct();
+                              .construct();
 
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
@@ -563,7 +560,7 @@ void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
       DependencyKey::createKeyForWholeSourceFile(DeclAspect::implementation,
                                                  swiftDeps);
 
-  SF->getReferencedNameTracker()->enumerateAllUses(
+  SF->getConfiguredReferencedNameTracker()->enumerateAllUses(
       includePrivateDeps, depTracker,
       [&](const fine_grained_dependencies::NodeKind kind, StringRef context,
           StringRef name, const bool isCascadingUse) {

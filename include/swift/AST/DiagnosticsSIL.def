@@ -445,6 +445,93 @@ ERROR(not_constant_evaluable, none, "not constant evaluable", ())
 ERROR(constexpr_imported_func_not_onone, none, "imported constant evaluable "
       "function '%0' must be annotated '@_optimize(none)'", (StringRef))
 
+// Differentiation transform diagnostics
+ERROR(autodiff_internal_swift_not_imported,none,
+      "Automatic differentiation internal error: the Swift module is not "
+      "imported", ())
+ERROR(autodiff_differentiation_module_not_imported,none,
+      "Automatic differentiation requires the '_Differentiation' module to be "
+      "imported", ())
+ERROR(autodiff_conversion_to_linear_function_not_supported,none,
+      "conversion to '@differentiable(linear)' function type is not yet "
+      "supported", ())
+ERROR(autodiff_function_not_differentiable_error,none,
+      "function is not differentiable", ())
+ERROR(autodiff_expression_not_differentiable_error,none,
+      "expression is not differentiable", ())
+NOTE(autodiff_expression_not_differentiable_note,none,
+     "expression is not differentiable", ())
+NOTE(autodiff_when_differentiating_function_call,none,
+     "when differentiating this function call", ())
+NOTE(autodiff_when_differentiating_function_definition,none,
+     "when differentiating this function definition", ())
+NOTE(autodiff_implicitly_inherited_differentiable_attr_here,none,
+     "differentiability required by the corresponding protocol requirement "
+     "here", ())
+NOTE(autodiff_jvp_control_flow_not_supported,none,
+     "forward-mode differentiation does not yet support control flow", ())
+NOTE(autodiff_control_flow_not_supported,none,
+     "cannot differentiate unsupported control flow", ())
+NOTE(autodiff_missing_return,none,
+     "missing return for differentiation", ())
+NOTE(autodiff_external_nondifferentiable_function,none,
+     "cannot differentiate functions that have not been marked "
+     "'@differentiable' and that are defined in other files", ())
+NOTE(autodiff_opaque_function_not_differentiable,none,
+     "opaque non-'@differentiable' function is not differentiable", ())
+NOTE(autodiff_private_derivative_from_fragile,none,
+     "differentiated functions in "
+     "%select{'@inlinable' functions|default arguments}0 must be marked "
+     "'@differentiable' or have a public '@derivative'"
+     "%select{|; this is not possible with a closure, make a top-level "
+     "function instead}1", (unsigned, bool))
+NOTE(autodiff_function_noderivative_parameter_not_differentiable,none,
+     "cannot differentiate with respect to a '@noDerivative' parameter", ())
+NOTE(autodiff_function_assoc_func_unmet_requirements,none,
+     "function call is not differentiable because generic requirements are not "
+     "met: '%0'", (/*requirements*/ StringRef))
+NOTE(autodiff_nondifferentiable_argument,none,
+     "cannot differentiate through a non-differentiable argument; do you want "
+     "to use 'withoutDerivative(at:)'?", ())
+NOTE(autodiff_nondifferentiable_result,none,
+     "cannot differentiate through a non-differentiable result; do you want to "
+     "use 'withoutDerivative(at:)'?", ())
+NOTE(autodiff_protocol_member_not_differentiable,none,
+     "member is not differentiable because the corresponding protocol "
+     "requirement is not '@differentiable'", ())
+NOTE(autodiff_class_member_not_differentiable,none,
+     "member is not differentiable because the corresponding class member "
+     "is not '@differentiable'", ())
+NOTE(autodiff_member_subset_indices_not_differentiable,none,
+     "member is differentiable only with respect to a smaller subset of "
+     "arguments", ())
+// TODO(TF-642): Remove when `partial_apply` works with `@differentiable`
+// functions.
+NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
+     "cannot convert a direct method reference to a '@differentiable' "
+     "function; use an explicit closure instead", ())
+NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
+     "cannot differentiate through multiple results", ())
+NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
+     "cannot differentiate through 'inout' arguments", ())
+// TODO(TF-1149): Remove this diagnostic.
+NOTE(autodiff_loadable_value_addressonly_tangent_unsupported,none,
+     "cannot yet differentiate value whose type %0 has a compile-time known "
+     "size, but whose 'TangentVector' contains stored properties of unknown "
+     "size; consider modifying %1 to use fewer generic parameters in stored "
+     "properties", (Type, Type))
+NOTE(autodiff_enums_unsupported,none,
+     "differentiating enum values is not yet supported", ())
+NOTE(autodiff_stored_property_no_corresponding_tangent,none,
+     "property cannot be differentiated because '%0.TangentVector' does not "
+     "have a member named '%1'", (StringRef, StringRef))
+NOTE(autodiff_coroutines_not_supported,none,
+     "differentiation of coroutine calls is not yet supported", ())
+NOTE(autodiff_cannot_differentiate_writes_to_global_variables,none,
+     "cannot differentiate writes to global variables", ())
+NOTE(autodiff_cannot_differentiate_writes_to_mutable_captures,none,
+     "cannot differentiate writes to mutable captures", ())
+
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
       "use 'withUnsafePointer' or 'withUnsafeBytes' unless you're implementing "

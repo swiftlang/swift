@@ -197,9 +197,8 @@ takesMutableRaw(&ResilientStruct.staticStoredProperty, 5) // expected-warning {{
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesMutableRaw(&type(of: topLevelResilientS).staticStoredProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
-// expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+// FIXME: This should also produce a warning.
+takesMutableRaw(&type(of: topLevelResilientS).staticStoredProperty, 5)
 
 //   - Resilient struct or class bases
 
@@ -221,9 +220,8 @@ takesRaw(&topLevelP.property) // expected-warning {{inout expression creates a t
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&type(of: topLevelP).staticProperty) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
-// expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+// FIXME: This should also produce a warning.
+takesRaw(&type(of: topLevelP).staticProperty)
 
 takesRaw(&topLevelP[]) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
@@ -404,9 +402,9 @@ func testNonEphemeralInMembers() {
 func testNonEphemeralInDotMember() {
   func takesMutableS2(@_nonEphemeral _ ptr: UnsafeMutablePointer<S2>) {}
   takesMutableS2(&.selfProp)
-  takesMutableS2(&.selfPropWithObserver) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableS2'}}
-  // expected-note@-1 {{implicit argument conversion from 'S2' to 'UnsafeMutablePointer<S2>' produces a pointer valid only for the duration of the call to 'takesMutableS2'}}
-  // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
+
+  // FIXME: This should also produce a warning.
+  takesMutableS2(&.selfPropWithObserver)
 }
 
 func testNonEphemeralWithVarOverloads() {

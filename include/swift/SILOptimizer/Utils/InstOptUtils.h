@@ -499,6 +499,10 @@ bool calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl);
 /// be reached by calling the function represented by Decl?
 bool calleesAreStaticallyKnowable(SILModule &module, AbstractFunctionDecl *afd);
 
+/// Do we have enough information to determine all callees that could
+/// be reached by calling the function represented by Decl?
+bool calleesAreStaticallyKnowable(SILModule &module, EnumElementDecl *eed);
+
 // Attempt to get the instance for , whose static type is the same as
 // its exact dynamic type, returning a null SILValue() if we cannot find it.
 // The information that a static type is the same as the exact dynamic,

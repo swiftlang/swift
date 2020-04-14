@@ -177,6 +177,8 @@ UID_KEYS = [
     KEY('VFSOptions', 'key.vfs.options'),
     KEY('Files', 'key.files'),
     KEY('OptimizeForIDE', 'key.optimize_for_ide'),
+    KEY('RequiredBystanders', 'key.required_bystanders'),
+    KEY('ReusingASTContext', 'key.reusingastcontext'),
 ]
 
 

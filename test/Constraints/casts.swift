@@ -221,7 +221,7 @@ func process(p: Any?) {
 func compare<T>(_: T, _: T) {} // expected-note {{'compare' declared here}}
 func compare<T>(_: T?, _: T?) {}
 
-_ = nil? as? Int?? // expected-error {{nil literal cannot be the source of a conditional cast}}
+_ = nil? as? Int?? // expected-error {{'nil' requires a contextual type}}
 
 func test_tuple_casts_no_warn() {
   struct Foo {}
@@ -237,4 +237,101 @@ func test_tuple_casts_no_warn() {
 
   _ = arr as! [(a: Foo, Foo)] // expected-warning {{cast from '[(Any, Any)]' to unrelated type '[(a: Foo, Foo)]' always fails}}
   _ = tup as! (a: Foo, Foo) // expected-warning {{cast from '(Any, Any)' to unrelated type '(a: Foo, Foo)' always fails}}
+}
+
+infix operator ^^^
+func ^^^ <T> (lhs: T?, rhs: @autoclosure () -> T) -> T { lhs! }
+func ^^^ <T> (lhs: T?, rhs: @autoclosure () -> T?) -> T? { lhs! }
+
+func ohno<T>(_ x: T) -> T? { nil }
+
+// SR-12369: Make sure we don't drop the coercion constraint.
+func test_coercions_with_overloaded_operator(str: String, optStr: String?, veryOptString: String????) {
+  _ = (str ?? "") as String // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}}
+  _ = (optStr ?? "") as String
+
+  _ = (str ?? "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  _ = (optStr ?? "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  _ = (optStr ?? "") as Int? // expected-error {{cannot convert value of type 'String' to type 'Int?' in coercion}}
+
+  _ = (str ^^^ "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  _ = (optStr ^^^ "") as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
+  _ = (optStr ^^^ "") as Int? // expected-error {{cannot convert value of type 'String' to type 'Int?' in coercion}}
+
+  _ = ([] ?? []) as String // expected-error {{cannot convert value of type '[Any]' to type 'String' in coercion}}
+  _ = ([""] ?? []) as [Int: Int] // expected-error {{cannot convert value of type '[String]' to type '[Int : Int]' in coercion}}
+  _ = (["": ""] ?? [:]) as [Int] // expected-error {{cannot convert value of type '[String : String]' to type '[Int]' in coercion}}
+  _ = (["": ""] ?? [:]) as Set<Int> // expected-error {{cannot convert value of type '[String : String]' to type 'Set<Int>' in coercion}}
+  _ = (["": ""] ?? [:]) as Int? // expected-error {{cannot convert value of type '[String : String]' to type 'Int?' in coercion}}
+
+  _ = ("" ?? "" ?? "") as String // expected-warning 2{{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}}
+  _ = ((veryOptString ?? "") ?? "") as String??
+  _ = ((((veryOptString ?? "") ?? "") ?? "") ?? "") as String
+
+  _ = ("" ?? "" ?? "") as Float // expected-error {{cannot convert value of type 'String' to type 'Float' in coercion}}
+  _ = ((veryOptString ?? "") ?? "") as [String] // expected-error {{cannot convert value of type 'String??' to type '[String]' in coercion}}
+  _ = ((((veryOptString ?? "") ?? "") ?? "") ?? "") as [String] // expected-error {{cannot convert value of type 'String' to type '[String]' in coercion}}
+
+  _ = ohno(ohno(ohno(str))) as String???
+  _ = ohno(ohno(ohno(str))) as Int // expected-error {{cannot convert value of type 'String???' to type 'Int' in coercion}}
+}
+
+func id<T>(_ x: T) -> T { x }
+
+func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [String: Int], _ set: Set<Int>) {
+  // Successful coercions don't raise a warning.
+  _ = arr as [Any]?
+  _ = dict as [String: Int]?
+  _ = set as Set<Int>
+
+  // Don't fix the simple case where no type variable is introduced, that was
+  // always disallowed.
+  _ = arr as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  _ = dict as [String: String] // expected-error {{cannot convert value of type '[String : Int]' to type '[String : String]' in coercion}}
+  // expected-note@-1 {{arguments to generic parameter 'Value' ('Int' and 'String') are expected to be equal}}
+  _ = dict as [String: String]? // expected-error {{cannot convert value of type '[String : Int]' to type '[String : String]?' in coercion}}
+  _ = (dict as [String: Int]?) as [String: Int] // expected-error {{value of optional type '[String : Int]?' must be unwrapped to a value of type '[String : Int]'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  _ = set as Set<String>  // expected-error {{cannot convert value of type 'Set<Int>' to type 'Set<String>' in coercion}}
+   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+
+  // Apply the compatibility logic when a type variable is introduced. It's
+  // unfortunate that this means we'll temporarily accept code we didn't before,
+  // but it at least means we shouldn't break compatibility with anything.
+  _ = id(arr) as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+
+  _ = (arr ?? []) as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type '[Int]', so the right side is never used}}
+  _ = (arr ?? [] ?? []) as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 2{{left side of nil coalescing operator '??' has non-optional type '[Int]', so the right side is never used}}
+  _ = (optArr ?? []) as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+
+  // Allow the coercion to increase optionality.
+  _ = (arr ?? []) as [String]? // expected-warning {{coercion from '[Int]' to '[String]?' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type '[Int]', so the right side is never used}}
+  _ = (arr ?? []) as [String?]? // expected-warning {{coercion from '[Int]' to '[String?]?' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type '[Int]', so the right side is never used}}
+  _ = (arr ?? []) as [String??]?? // expected-warning {{coercion from '[Int]' to '[String??]??' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type '[Int]', so the right side is never used}}
+  _ = (dict ?? [:]) as [String: String?]? // expected-warning {{coercion from '[String : Int]' to '[String : String?]?' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type '[String : Int]', so the right side is never used}}
+  _ = (set ?? []) as Set<String>?? // expected-warning {{coercion from 'Set<Int>' to 'Set<String>??' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 {{left side of nil coalescing operator '??' has non-optional type 'Set<Int>', so the right side is never used}}
+
+  // Allow the coercion to decrease optionality.
+  _ = ohno(ohno(ohno(arr))) as [String] // expected-warning {{coercion from '[Int]???' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  _ = ohno(ohno(ohno(arr))) as [Int] // expected-warning {{coercion from '[Int]???' to '[Int]' may fail; use 'as?' or 'as!' instead}}
+  _ = ohno(ohno(ohno(Set<Int>()))) as Set<String> // expected-warning {{coercion from 'Set<Int>???' to 'Set<String>' may fail; use 'as?' or 'as!' instead}}
+  _ = ohno(ohno(ohno(["": ""]))) as [Int: String] // expected-warning {{coercion from '[String : String]???' to '[Int : String]' may fail; use 'as?' or 'as!' instead}}
+  _ = ohno(ohno(ohno(dict))) as [String: Int] // expected-warning {{coercion from '[String : Int]???' to '[String : Int]' may fail; use 'as?' or 'as!' instead}}
+
+  // In this case the array literal can be inferred to be [String], so totally
+  // valid.
+  _ = ([] ?? []) as [String] // expected-warning {{left side of nil coalescing operator '??' has non-optional type '[String]', so the right side is never used}}
+  _ = (([] as Optional) ?? []) as [String]
+
+  // The array can also be inferred to be [Any].
+  _ = ([] ?? []) as Array // expected-warning {{left side of nil coalescing operator '??' has non-optional type '[Any]', so the right side is never used}}
 }

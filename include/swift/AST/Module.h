@@ -95,6 +95,8 @@ enum class FileUnitKind {
   Builtin,
   /// A serialized Swift AST.
   SerializedAST,
+  /// A synthesized file.
+  Synthesized,
   /// An imported Clang module.
   ClangModule,
   /// A Clang module imported from DWARF.
@@ -165,6 +167,9 @@ class OverlayFile;
 ///
 /// \sa FileUnit
 class ModuleDecl : public DeclContext, public TypeDecl {
+  friend class DirectOperatorLookupRequest;
+  friend class DirectPrecedenceGroupLookupRequest;
+
 public:
   typedef ArrayRef<Located<Identifier>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
@@ -335,6 +340,46 @@ public:
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
 
+private:
+  /// A cache of this module's underlying module and required bystander if it's
+  /// an underscored cross-import overlay.
+  Optional<std::pair<ModuleDecl *, Identifier>> declaringModuleAndBystander;
+
+  /// If this module is an underscored cross import overlay, gets the underlying
+  /// module that declared it (which may itself be a cross-import overlay),
+  /// along with the name of the required bystander module. Used by tooling to
+  /// present overlays as if they were part of their underlying module.
+  std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
+
+public:
+
+  /// Returns true if this module is an underscored cross import overlay
+  /// declared by \p other, either directly or transitively (via intermediate
+  /// cross-import overlays - for cross-imports involving more than two
+  /// modules).
+  bool isCrossImportOverlayOf(ModuleDecl *other);
+
+  /// If this module is an underscored cross-import overlay, returns the
+  /// non-underscored underlying module that declares it as an overlay, either
+  /// directly or transitively (via intermediate cross-import overlays - for
+  /// cross-imports involving more than two modules).
+  ModuleDecl *getDeclaringModuleIfCrossImportOverlay();
+
+  /// If this module is an underscored cross-import overlay of \p declaring
+  /// either directly or transitively, populates \p bystanderNames with the set
+  /// of bystander modules that must be present alongside \p declaring for
+  /// the overlay to be imported and returns true. Returns false otherwise.
+  bool getRequiredBystandersIfCrossImportOverlay(
+      ModuleDecl *declaring, SmallVectorImpl<Identifier> &bystanderNames);
+
+
+  /// Walks and loads the declared, underscored cross-import overlays of this
+  /// module, transitively, to find all overlays this module underlies.
+  ///
+  /// This is used by tooling to present these overlays as part of this module.
+  void findDeclaredCrossImportOverlaysTransitive(
+      SmallVectorImpl<ModuleDecl *> &overlays);
+
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
   SourceFile &getMainSourceFile(SourceFileKind expectedKind) const;
@@ -420,7 +465,7 @@ public:
   /// Retrieve the top-level module. If this module is already top-level, this
   /// returns itself. If this is a submodule such as \c Foo.Bar.Baz, this
   /// returns the module \c Foo.
-  ModuleDecl *getTopLevelModule();
+  ModuleDecl *getTopLevelModule(bool overlay = false);
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
@@ -594,6 +639,12 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const;
+
+  /// Finds all operator decls of this module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const;
 
   /// Finds all precedence group decls of this module.
   ///

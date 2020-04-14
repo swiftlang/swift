@@ -489,7 +489,7 @@ private:
       }
 
     if (FD.hasName())
-      return FD.getName().str();
+      return FD.getBaseIdentifier().str();
 
     return StringRef();
   }
@@ -798,9 +798,7 @@ private:
     std::string Result = Mangler.mangleTypeForDebugger(
         Ty, nullptr);
 
-    if (!Opts.DisableRoundTripDebugTypes
-        // FIXME: implement type reconstruction for opaque types
-        && !Ty->hasOpaqueArchetype()) {
+    if (!Opts.DisableRoundTripDebugTypes) {
       // Make sure we can reconstruct mangled types for the debugger.
 #ifndef NDEBUG
       auto &Ctx = Ty->getASTContext();
@@ -947,8 +945,8 @@ private:
                                   Alignment(1), true, false);
       }
       unsigned Offset = 0;
-      auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
-                                  Scope, File, Flags);
+      auto MTy = createMemberType(ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
+                                  Offset, Scope, File, Flags);
       Elements.push_back(MTy);
     }
     return DBuilder.getOrCreateArray(Elements);

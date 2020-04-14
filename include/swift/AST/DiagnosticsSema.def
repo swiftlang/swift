@@ -41,6 +41,11 @@
 #  define FIXIT(ID, Text, Signature)
 #endif
 
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature)   \
+DIAG(REMARK,ID,Options,Text,Signature)
+#endif
+
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
@@ -184,6 +189,9 @@ ERROR(value_type_comparison_with_nil_illegal,none,
 ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
+ERROR(cannot_match_expr_tuple_pattern_with_nontuple_value,none,
+      "tuple pattern cannot match values of non-tuple type %0",
+      (Type))
 ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
       "pattern cannot match values of type %0",
       (Type))
@@ -577,6 +585,9 @@ ERROR(expr_swift_keypath_invalid_component,none,
       "invalid component of Swift key path", ())
 ERROR(expr_swift_keypath_not_starting_with_type,none,
       "a Swift key path must begin with a type", ())
+ERROR(expr_swift_keypath_not_starting_with_dot,none,
+      "a Swift key path with contextual root must begin with a leading dot",
+      ())
 ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       "key path value type %0 cannot be converted to contextual type %1",
       (Type, Type))
@@ -661,7 +672,7 @@ NOTE(add_return_type_note,none,
      "did you mean to add a return type?", ())
 
 //------------------------------------------------------------------------------
-// MARK: Name Binding
+// MARK: Import Resolution
 //------------------------------------------------------------------------------
 
 ERROR(sema_no_import,Fatal,
@@ -861,6 +872,9 @@ WARNING(module_not_compiled_with_library_evolution,none,
         "using it means binary compatibility for %1 can't be guaranteed",
         (Identifier, Identifier))
 
+REMARK(cross_import_added,none,
+       "import of %0 and %1 triggered a cross-import of %2",
+       (Identifier, Identifier, Identifier))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -1054,6 +1068,10 @@ ERROR(missing_unwrap_optional_try,none,
 ERROR(missing_forced_downcast,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
+WARNING(coercion_may_fail_warning,none,
+        "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
+        (Type, Type))
+
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
       "did you mean to use 'as' to explicitly convert?", (Type, Type))
@@ -1200,8 +1218,16 @@ ERROR(c_function_pointer_from_method,none,
 ERROR(c_function_pointer_from_generic_function,none,
       "a C function pointer cannot be formed from a reference to a generic "
       "function", ())
+ERROR(unsupported_linear_to_differentiable_conversion,none,
+      "conversion from '@differentiable(linear)' to '@differentiable' is not "
+      "yet supported", ())
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
+ERROR(invalid_differentiable_function_conversion_expr,none,
+      "a '@differentiable%select{|(linear)}0' function can only be formed from "
+      "a reference to a 'func' or 'init' or a literal closure", (bool))
+NOTE(invalid_differentiable_function_conversion_parameter,none,
+     "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_pointer_conversion,none,
       "cannot perform pointer conversion of value of type %0 to autoclosure "
       "result type %1",
@@ -1881,8 +1907,9 @@ ERROR(requirement_restricts_self,none,
       "'Self'",
       (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
-      "%select{method|initializer}0 %1 has different argument labels from those "
-      "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
+      "%0 %1 has different argument labels "
+      "from those required by protocol %2 (%3)",
+      (DescriptiveDeclKind, DeclName, Type, DeclName))
 ERROR(witness_initializer_not_required,none,
       "initializer requirement %0 can only be satisfied by a 'required' "
       "initializer in%select{| the definition of}1 non-final class %2",
@@ -2108,6 +2135,9 @@ NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
      "candidate is explicitly '@nonobjc'", ())
+NOTE(protocol_witness_enum_case_payload, none,
+     "candidate is an enum case with associated values, "
+     "but protocol does not allow it", ())
 
 NOTE(protocol_witness_type,none,
      "possibly intended match", ())
@@ -2625,14 +2655,14 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 ERROR(decl_from_hidden_module,none,
-      "cannot use %0 %1 %select{here|"
+      "cannot use %0 %1 %select{here|as property wrapper here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
       "it is an SPI imported from %3}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
-      "cannot use conformance of %0 to %1 %select{here|"
+      "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; %3 has been imported "
       "as implementation-only",
@@ -2674,6 +2704,8 @@ ERROR(cannot_synthesize_in_crossfile_extension,none,
       "implementation of %0 cannot be automatically synthesized in an extension "
       "in a different file to the type", (Type))
 
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
 ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
@@ -2702,6 +2734,19 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
+ERROR(broken_differentiable_requirement,none,
+      "Differentiable protocol is broken: unexpected requirement", ())
+WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
+      "stored property %0 has no derivative because %1 does not conform to "
+      "'Differentiable'; add an explicit '@noDerivative' attribute"
+      "%select{|, or conform %2 to 'AdditiveArithmetic'}3",
+      (Identifier, Type, Identifier, bool))
+WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
+      "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
+      "requires all stored properties to be mutable; use 'var' instead, or add "
+      "an explicit '@noDerivative' attribute"
+      "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
+      (Identifier, Identifier, bool))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2727,6 +2772,19 @@ NOTE(decodable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)'?", ())
 NOTE(codable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
+
+WARNING(decodable_property_will_not_be_decoded, none,
+        "immutable property will not be decoded because it is declared with "
+        "an initial value which cannot be overwritten", ())
+NOTE(decodable_property_init_or_codingkeys_implicit, none,
+     "set the initial value via the initializer or explicitly define a "
+     "CodingKeys enum %select{including|without}0 a %1 case to silence "
+     "this warning", (unsigned, DeclName))
+NOTE(decodable_property_init_or_codingkeys_explicit, none,
+     "set the initial value via the initializer or remove the %0 case from "
+     "the CodingKeys enum to silence this warning", (DeclName))
+NOTE(decodable_make_property_mutable, none,
+     "make the property mutable instead", ())
 
 NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "%select{associated value|stored property}0 type %1 does not conform to "
@@ -2813,8 +2871,8 @@ ERROR(autoclosure_function_input_nonunit,none,
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
-NOTE(escaping_optional_type_argument, none,
-     "closure is already escaping in optional type argument", ())
+ERROR(escaping_optional_type_argument, none,
+      "closure is already escaping in optional type argument", ())
 
 // @_nonEphemeral attribute
 ERROR(non_ephemeral_non_pointer_type,none,
@@ -2914,6 +2972,8 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
+ERROR(differentiable_attr_void_result,none,
+      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclNameRef, Type))
 // TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
@@ -2938,12 +2998,6 @@ ERROR(differentiable_attr_result_not_differentiable,none,
 ERROR(differentiable_attr_protocol_req_where_clause,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'where' clause", ())
-ERROR(differentiable_attr_protocol_req_assoc_func,none,
-      "'@differentiable' attribute on protocol requirement cannot specify "
-      "'jvp:' or 'vjp:'", ())
-ERROR(differentiable_attr_stored_property_variable_unsupported,none,
-      "'@differentiable' attribute on stored property cannot specify "
-      "'jvp:' or 'vjp:'", ())
 ERROR(differentiable_attr_class_member_dynamic_self_result_unsupported,none,
       "'@differentiable' attribute cannot be declared on class members "
       "returning 'Self'", ())
@@ -2962,6 +3016,12 @@ ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
+NOTE(protocol_witness_missing_differentiable_attr_nonpublic_other_file,none,
+     "non-public %1 %2 must have explicit '%0' attribute to satisfy "
+     "requirement %3 %4 (in protocol %6) because it is declared in a different "
+     "file than the conformance of %5 to %6",
+     (StringRef, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
+      Type, Type))
 
 // @derivative
 ERROR(derivative_attr_expected_result_tuple,none,
@@ -2998,6 +3058,23 @@ ERROR(derivative_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 NOTE(derivative_attr_duplicate_note,none,
      "other attribute declared here", ())
+
+// @transpose
+ERROR(transpose_attr_invalid_linearity_parameter_or_result,none,
+      "cannot transpose with respect to original %select{result|parameter}1 "
+      "'%0' that does not conform to 'Differentiable' and satisfy "
+      "'%0 == %0.TangentVector'", (StringRef, /*isParameter*/ bool))
+ERROR(transpose_attr_overload_not_found,none,
+      "could not find function %0 with expected type %1", (DeclName, Type))
+ERROR(transpose_attr_cannot_use_named_wrt_params,none,
+      "cannot use named 'wrt' parameters in '@transpose(of:)' attribute, found "
+      "%0", (Identifier))
+ERROR(transpose_attr_wrt_self_must_be_static,none,
+     "the transpose of an instance method must be a 'static' method in the "
+     "same type when 'self' is a linearity parameter", ())
+NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
+     "the transpose is declared in %0 but the original function is declared in "
+     "%1", (Type, Type))
 
 // Automatic differentiation attributes
 ERROR(autodiff_attr_original_decl_invalid_kind,none,
@@ -4012,6 +4089,18 @@ ERROR(opaque_type_in_protocol_requirement,none,
 ERROR(attr_only_on_parameters_of_differentiable,none,
       "'%0' may only be used on parameters of '@differentiable' function "
       "types", (StringRef))
+ERROR(differentiable_function_type_invalid_parameter,none,
+      "parameter type '%0' does not conform to 'Differentiable'"
+      "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
+      "function type is '@differentiable%select{|(linear)}1'"
+      "%select{|; did you want to add '@noDerivative' to this parameter?}2",
+      (StringRef, /*tangentVectorEqualsSelf*/ bool,
+       /*hasValidDifferentiabilityParameter*/ bool))
+ERROR(differentiable_function_type_invalid_result,none,
+      "result type '%0' does not conform to 'Differentiable'"
+      "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
+      "function type is '@differentiable%select{|(linear)}1'",
+      (StringRef, bool))
 
 // SIL
 ERROR(opened_non_protocol,none,
@@ -4268,6 +4357,13 @@ NOTE(objc_ambiguous_inference_candidate,none,
      "%0 (in protocol %1) provides Objective-C name %2",
      (DeclName, DeclName, ObjCSelector))
 
+ERROR(objc_ambiguous_error_convention,none,
+      "%0 overrides or implements protocol requirements for Objective-C "
+      "declarations with incompatible error argument conventions",
+      (DeclName))
+NOTE(objc_ambiguous_error_convention_candidate,none,
+     "%0 provides an error argument here", (DeclName))
+
 ERROR(nonlocal_bridged_to_objc,none,
       "conformance of %0 to %1 can only be written in module %2",
       (Identifier, Identifier, Identifier))
@@ -4363,11 +4459,6 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 ERROR(dynamic_with_transparent,none,
       "a declaration cannot be both '@_tranparent' and 'dynamic'",
       ())
-
-ERROR(dynamic_and_library_evolution_not_supported,none,
-      "marking non-'@objc' Swift declaration 'dynamic' in library evolution mode is not supported",
-      ())
-
 
 //------------------------------------------------------------------------------
 // MARK: @_dynamicReplacement(for:)
@@ -4945,9 +5036,33 @@ NOTE(function_builder_remove_returns, none,
 //------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics
 //------------------------------------------------------------------------------
-ERROR(experimental_differentiable_programming_disabled, none,
-      "differentiable programming is an experimental feature that is "
-      "currently disabled", ())
+
+ERROR(differentiable_programming_attr_used_without_required_module, none,
+      "'@%0' attribute used without importing module %1",
+      (StringRef, Identifier))
+
+ERROR(oslog_arg_must_be_bool_literal, none,
+      "argument must be a bool literal", ())
+ERROR(oslog_arg_must_be_integer_literal, none,
+      "argument must be an integer literal", ())
+ERROR(oslog_arg_must_be_string_literal, none,
+      "argument must be a string literal", ())
+ERROR(oslog_arg_must_be_float_literal, none,
+      "argument must be a floating-point literal", ())
+ERROR(oslog_arg_must_be_metatype_literal, none,
+      "argument must be a <Type>.self", ())
+ERROR(oslog_arg_must_be_closure, none, "argument must be a closure", ())
+ERROR(argument_must_be_constant, none,
+      "argument must be an expression with only literals", ())
+ERROR(oslog_message_must_be_string_interpolation, none,
+      "argument must be a string interpolation", ())
+ERROR(oslog_arg_must_be_enum_case, none,
+      "argument must be a case of enum %0", (Identifier))
+ERROR(oslog_arg_must_be_type_member_access, none,
+      "argument must be a static method or property of %0", (Identifier))
+ERROR(atomics_ordering_must_be_constant, none,
+      "ordering argument must be a static method or property of %0",
+      (Identifier))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -516,8 +516,10 @@ PatternBindingDecl *ContextualPattern::getPatternBindingDecl() const {
 }
 
 bool ContextualPattern::allowsInference() const {
-  if (auto pbd = getPatternBindingDecl())
-    return pbd->isInitialized(index);
+  if (auto pbd = getPatternBindingDecl()) {
+    return pbd->isInitialized(index) ||
+        pbd->isDefaultInitializableViaPropertyWrapper(index);
+  }
 
   return true;
 }

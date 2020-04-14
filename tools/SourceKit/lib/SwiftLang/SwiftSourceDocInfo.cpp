@@ -641,11 +641,13 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
 
 static void
 collectAvailableRenameInfo(const ValueDecl *VD,
+                           Optional<RenameRefInfo> RefInfo,
                            std::vector<UIdent> &RefactoringIds,
                            DelayedStringRetriever &RefactroingNameOS,
                            DelayedStringRetriever &RefactoringReasonOS) {
   std::vector<ide::RenameAvailabiliyInfo> Scratch;
-  for (auto Info : ide::collectRenameAvailabilityInfo(VD, Scratch)) {
+  for (auto Info : ide::collectRenameAvailabilityInfo(VD, RefInfo,
+                                                      Scratch)){
     RefactoringIds.push_back(SwiftLangSupport::
       getUIDForRefactoringKind(Info.Kind));
     RefactroingNameOS.startPiece();
@@ -716,7 +718,7 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
 /// Returns true on success, false on error (and sets `Diagnostic` accordingly).
 static bool passCursorInfoForDecl(SourceFile* SF,
                                   const ValueDecl *VD,
-                                  const ModuleDecl *MainModule,
+                                  ModuleDecl *MainModule,
                                   const Type ContainerTy,
                                   bool IsRef,
                                   bool RetrieveRefactoring,
@@ -837,8 +839,13 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   std::vector<UIdent> RefactoringIds;
   DelayedStringRetriever RefactoringNameOS(SS);
   DelayedStringRetriever RefactoringReasonOS(SS);
+
   if (RetrieveRefactoring) {
-    collectAvailableRenameInfo(VD, RefactoringIds, RefactoringNameOS,
+    Optional<RenameRefInfo> RefInfo;
+    if (TheTok.IsRef)
+      RefInfo = {TheTok.SF, TheTok.Loc, TheTok.IsKeywordArgument};
+    collectAvailableRenameInfo(VD, RefInfo,
+                               RefactoringIds, RefactoringNameOS,
                                RefactoringReasonOS);
     collectAvailableRefactoringsOtherThanRename(SF, TheTok, RefactoringIds,
       RefactoringNameOS, RefactoringReasonOS);
@@ -906,7 +913,12 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     if (ClangMod)
       ModuleName = ClangMod->getFullModuleName();
   } else if (VD->getModuleContext() != MainModule) {
-    ModuleName = VD->getModuleContext()->getName().str().str();
+    ModuleDecl *MD = VD->getModuleContext();
+    // If the decl is from a cross-import overlay module, report the overlay's
+    // declaring module as the owning module.
+    if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
+      MD = Declaring;
+    ModuleName = MD->getNameStr().str();
   }
   StringRef ModuleInterfaceName;
   if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(ModuleName, Invok))
@@ -1642,10 +1654,9 @@ void SwiftLangSupport::getCursorInfo(
                                   Receiver);
         } else {
           std::string Diagnostic;  // Unused.
-          // FIXME: Should pass the main module for the interface but currently
-          // it's not necessary.
+          ModuleDecl *MainModule = IFaceGenRef->getModuleDecl();
           passCursorInfoForDecl(
-              /*SourceFile*/nullptr, Entity.Dcl, /*MainModule*/ nullptr,
+              /*SourceFile*/nullptr, Entity.Dcl, MainModule,
               Type(), Entity.IsRef, Actionables, ResolvedCursorInfo(),
               /*OrigBufferID=*/None, SourceLoc(),
               {}, *this, Invok, Diagnostic, {}, Receiver);

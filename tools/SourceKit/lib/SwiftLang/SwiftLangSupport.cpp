@@ -957,7 +957,7 @@ bool SwiftLangSupport::performCompletionLikeOperation(
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     bool EnableASTCaching, std::string &Error,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
   assert(FileSystem);
 
   // Resolve symlinks for the input file; we resolve them for the input files

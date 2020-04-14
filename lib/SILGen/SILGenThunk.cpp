@@ -194,14 +194,14 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
 
   SILGenFunctionBuilder builder(*this);
-  auto originalFn = derivativeFnDeclRef.asAutoDiffOriginalFunction();
+  auto originalFnDeclRef = derivativeFnDeclRef.asAutoDiffOriginalFunction();
   // TODO(TF-685): Use principled thunk mangling.
   // Do not simply reuse reabstraction thunk mangling.
   auto name = derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
   auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, originalFn.getLinkage(ForDefinition), constantTy,
-      IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
-      ProfileCounter(), IsThunk);
+      derivativeFnDecl, name, originalFnDeclRef.getLinkage(ForDefinition),
+      constantTy, IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(),
+      IsNotDynamic, ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
 
@@ -212,14 +212,20 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   auto loc = derivativeFnDeclRef.getAsRegularLocation();
   SGF.collectThunkParams(loc, params);
 
-  // TODO(TF-1139, TF-1140): Replace `undef` with `differentiable_function` and
-  // `differentiable_function_extract`.
-  auto derivativeSilTy = SILType::getPrimitiveObjectType(constantTy);
-  auto derivativeFn = SILUndef::get(derivativeSilTy, *thunk);
+  auto originalFn = SGF.emitGlobalFunctionRef(loc, originalFnDeclRef);
+  auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+      derivativeId->getParameterIndices(),
+      derivativeFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
+  auto diffFn =
+      SGF.B.createDifferentiableFunction(loc, loweredParamIndices, originalFn);
+  auto derivativeFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
+      diffFn);
+  auto derivativeFnSILTy = SILType::getPrimitiveObjectType(constantTy);
   SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
                                 thunk->getArguments().end());
   auto apply =
-      SGF.emitApplyWithRethrow(loc, derivativeFn, derivativeSilTy,
+      SGF.emitApplyWithRethrow(loc, derivativeFn, derivativeFnSILTy,
                                SGF.getForwardingSubstitutionMap(), args);
   SGF.B.createReturn(loc, apply);
 

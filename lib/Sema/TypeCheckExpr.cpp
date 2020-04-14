@@ -178,12 +178,12 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    Identifier name = DRE->getDecl()->getBaseName().getIdentifier();
+    Identifier name = DRE->getDecl()->getBaseIdentifier();
     return lookupPrecedenceGroupForOperator(DC, name, DRE->getLoc());
   }
 
   if (auto *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
-    Identifier name = OO->getDecls()[0]->getBaseName().getIdentifier();
+    Identifier name = OO->getDecls()[0]->getBaseIdentifier();
     return lookupPrecedenceGroupForOperator(DC, name, OO->getLoc());
   }
 
@@ -204,7 +204,7 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   }
 
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    Identifier name = MRE->getDecl().getDecl()->getBaseName().getIdentifier();
+    Identifier name = MRE->getDecl().getDecl()->getBaseIdentifier();
     return lookupPrecedenceGroupForOperator(DC, name, MRE->getLoc());
   }
 
@@ -684,7 +684,7 @@ static std::pair<const char *, bool> lookupDefaultTypeInfoForKnownProtocol(
   }
 }
 
-llvm::Expected<Type>
+Type
 swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
                                     KnownProtocolKind knownProtocolKind,
                                     const DeclContext *dc) const {
@@ -782,7 +782,7 @@ static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
   llvm_unreachable("Unhandled case in switch");
 }
 
-llvm::Expected<Expr *> CallerSideDefaultArgExprRequest::evaluate(
+Expr *CallerSideDefaultArgExprRequest::evaluate(
     Evaluator &evaluator, DefaultArgumentExpr *defaultExpr) const {
   auto *param = defaultExpr->getParamDecl();
   auto paramTy = defaultExpr->getType();
@@ -810,9 +810,8 @@ llvm::Expected<Expr *> CallerSideDefaultArgExprRequest::evaluate(
   return initExpr;
 }
 
-llvm::Expected<bool>
-ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
-                                          ClosureExpr *closure) const {
+bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
+                                               ClosureExpr *closure) const {
   // A walker that looks for 'return' statements that aren't
   // nested within closures or nested declarations.
   class FindReturns : public ASTWalker {

@@ -72,7 +72,7 @@ function(is_darwin_based_sdk sdk_name out_var)
 endfunction()
 
 # Usage:
-# _add_variant_c_compile_link_flags(
+# _add_host_variant_c_compile_link_flags(
 #   SDK sdk
 #   ARCH arch
 #   BUILD_TYPE build_type
@@ -86,7 +86,7 @@ endfunction()
 #   DEPLOYMENT_VERSION_WATCHOS version
 #
 # )
-function(_add_variant_c_compile_link_flags)
+function(_add_host_variant_c_compile_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     MACCATALYST_BUILD_FLAVOR
@@ -189,7 +189,7 @@ function(_add_variant_c_compile_link_flags)
 endfunction()
 
 
-function(_add_variant_c_compile_flags)
+function(_add_host_variant_c_compile_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     RESULT_VAR_NAME ENABLE_LTO
@@ -202,7 +202,7 @@ function(_add_variant_c_compile_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  _add_variant_c_compile_link_flags(
+  _add_host_variant_c_compile_link_flags(
     SDK "${CFLAGS_SDK}"
     ARCH "${CFLAGS_ARCH}"
     BUILD_TYPE "${CFLAGS_BUILD_TYPE}"
@@ -363,7 +363,7 @@ function(_add_variant_c_compile_flags)
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
-function(_add_variant_link_flags)
+function(_add_host_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
   DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
   RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME
@@ -382,7 +382,7 @@ function(_add_variant_link_flags)
   set(link_libraries ${${LFLAGS_LINK_LIBRARIES_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
 
-  _add_variant_c_compile_link_flags(
+  _add_host_variant_c_compile_link_flags(
     SDK "${LFLAGS_SDK}"
     ARCH "${LFLAGS_ARCH}"
     BUILD_TYPE "${LFLAGS_BUILD_TYPE}"
@@ -548,10 +548,6 @@ function(_add_swift_host_library_single target)
     message(FATAL_ERROR "Either SHARED or STATIC must be specified")
   endif()
 
-  # Determine the subdirectory where this library will be installed.
-  set(ASHLS_SUBDIR
-    "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
-
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
   if(SWIFT_EMBED_BITCODE_SECTION)
@@ -656,21 +652,9 @@ function(_add_swift_host_library_single target)
   set(c_compile_flags ${ASHLS_C_COMPILE_FLAGS})
   set(link_flags)
 
-  set(library_search_subdir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-  set(library_search_directories
-    "${SWIFTLIB_DIR}/${ASHLS_SUBDIR}"
-    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${ASHLS_SUBDIR}"
-    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+  set(library_search_directories)
 
-  # In certain cases when building, the environment variable SDKROOT is set to override
-  # where the sdk root is located in the system. If that environment variable has been
-  # set by the user, respect it and add the specified SDKROOT directory to the
-  # library_search_directories so we are able to link against those libraries
-  if(DEFINED ENV{SDKROOT} AND EXISTS "$ENV{SDKROOT}/usr/lib/swift")
-      list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
-  endif()
-
-  _add_variant_c_compile_flags(
+  _add_host_variant_c_compile_flags(
     SDK "${SWIFT_HOST_VARIANT_SDK}"
     ARCH "${SWIFT_HOST_VARIANT_ARCH}"
     BUILD_TYPE ${CMAKE_BUILD_TYPE}
@@ -685,7 +669,7 @@ function(_add_swift_host_library_single target)
       list(APPEND c_compile_flags -D_WINDLL)
     endif()
   endif()
-  _add_variant_link_flags(
+  _add_host_variant_link_flags(
     SDK "${SWIFT_HOST_VARIANT_SDK}"
     ARCH "${SWIFT_HOST_VARIANT_ARCH}"
     BUILD_TYPE ${CMAKE_BUILD_TYPE}
@@ -843,8 +827,6 @@ function(_add_swift_host_executable_single name)
     ARCHITECTURE
     SDK)
   set(multiple_parameter_options
-    COMPILE_FLAGS
-    DEPENDS
     LLVM_LINK_COMPONENTS)
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "${options}"
@@ -867,7 +849,7 @@ function(_add_swift_host_executable_single name)
         "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
 
   # Add variant-specific flags.
-  _add_variant_c_compile_flags(
+  _add_host_variant_c_compile_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
@@ -875,7 +857,7 @@ function(_add_swift_host_executable_single name)
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME c_compile_flags)
-  _add_variant_link_flags(
+  _add_host_variant_link_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
@@ -892,10 +874,8 @@ function(_add_swift_host_executable_single name)
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
 
   add_dependencies_multiple_targets(
-      TARGETS "${name}"
-      DEPENDS
-        ${LLVM_COMMON_DEPENDS}
-        ${SWIFTEXE_SINGLE_DEPENDS})
+      TARGETS ${name}
+      DEPENDS ${LLVM_COMMON_DEPENDS})
   llvm_update_compile_flags("${name}")
 
   if(SWIFTEXE_SINGLE_SDK STREQUAL WINDOWS)

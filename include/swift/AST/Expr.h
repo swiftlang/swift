@@ -1333,9 +1333,9 @@ public:
   }
 };
 
-/// A reference to a type in expression context, spelled out as a TypeLoc. Sema
-/// forms this expression as a result of name binding.  This always has
-/// MetaTypetype.
+/// A reference to a type in expression context, spelled out as a TypeLoc.
+///
+/// The type of this expression is always \c MetaTypeType.
 class TypeExpr : public Expr {
   TypeLoc Info;
   TypeExpr(Type Ty);
@@ -2965,6 +2965,61 @@ public:
     return E->getKind() == ExprKind::UnevaluatedInstance;
   }
 };
+
+class DifferentiableFunctionExpr : public ImplicitConversionExpr {
+public:
+  DifferentiableFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::DifferentiableFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DifferentiableFunction;
+  }
+};
+
+class LinearFunctionExpr : public ImplicitConversionExpr {
+public:
+  LinearFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::LinearFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LinearFunction;
+  }
+};
+
+class DifferentiableFunctionExtractOriginalExpr
+    : public ImplicitConversionExpr {
+public:
+  DifferentiableFunctionExtractOriginalExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::DifferentiableFunctionExtractOriginal,
+                               subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DifferentiableFunctionExtractOriginal;
+  }
+};
+
+class LinearFunctionExtractOriginalExpr : public ImplicitConversionExpr {
+public:
+  LinearFunctionExtractOriginalExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::LinearFunctionExtractOriginal,
+                               subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LinearFunctionExtractOriginal;
+  }
+};
+
+class LinearToDifferentiableFunctionExpr : public ImplicitConversionExpr {
+public:
+  LinearToDifferentiableFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(
+            ExprKind::LinearToDifferentiableFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LinearToDifferentiableFunction;
+  }
+};
+
 
 /// Use an opaque type to abstract a value of the underlying concrete type.
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
@@ -4776,7 +4831,7 @@ public:
 };
 
 /// A pattern production that has been parsed but hasn't been resolved
-/// into a complete pattern. Name binding converts these into standalone pattern
+/// into a complete pattern. Pattern checking converts these into standalone pattern
 /// nodes or raises an error if a pattern production appears in an invalid
 /// position.
 class UnresolvedPatternExpr : public Expr {
@@ -4979,6 +5034,10 @@ class KeyPathExpr : public Expr {
 
   // The processed/resolved type, like Foo.Bar in \Foo.Bar.?.baz.
   TypeRepr *RootType = nullptr;
+
+  /// Determines whether a key path starts with '.' which denotes necessity for
+  /// a contextual root type.
+  bool HasLeadingDot = false;
 
 public:
   /// A single stored component, which will be one of:
@@ -5341,10 +5400,11 @@ public:
               bool isImplicit = false);
 
   KeyPathExpr(SourceLoc backslashLoc, Expr *parsedRoot, Expr *parsedPath,
-              bool isImplicit = false)
+              bool hasLeadingDot, bool isImplicit = false)
       : Expr(ExprKind::KeyPath, isImplicit), StartLoc(backslashLoc),
         EndLoc(parsedPath ? parsedPath->getEndLoc() : parsedRoot->getEndLoc()),
-        ParsedRoot(parsedRoot), ParsedPath(parsedPath) {
+        ParsedRoot(parsedRoot), ParsedPath(parsedPath),
+        HasLeadingDot(hasLeadingDot) {
     assert((parsedRoot || parsedPath) &&
            "keypath must have either root or path");
     Bits.KeyPathExpr.IsObjC = false;
@@ -5407,6 +5467,9 @@ public:
 
   /// True if this is an ObjC key path expression.
   bool isObjC() const { return Bits.KeyPathExpr.IsObjC; }
+
+  /// True if this key path expression has a leading dot.
+  bool expectsContextualRoot() const { return HasLeadingDot; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPath;
