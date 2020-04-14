@@ -1140,6 +1140,8 @@ protected:
   const ConstructorDecl *Init;
   SourceRange BaseRange;
 
+  Expr *getAnchor() const override { return getRawAnchor(); }
+
   InvalidInitRefFailure(const Solution &solution, Type baseTy,
                         const ConstructorDecl *init, SourceRange baseRange,
                         ConstraintLocator *locator)
