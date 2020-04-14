@@ -1928,24 +1928,6 @@ private:
       generatedConstraints.push_back(constraint);
     }
 
-    /// Erase given constraint from the list of generated constraints
-    /// along the current solver path. Note that this operation doesn't
-    /// guarantee any ordering of the after it's application.
-    ///
-    /// \param constraint The constraint to erase.
-    void removeGeneratedConstraint(Constraint *constraint) {
-      for (auto *&generated : generatedConstraints) {
-        // When we find the constraint we're erasing, overwrite its
-        // value with the last element in the generated constraints
-        // vector and then pop that element from the vector.
-        if (generated == constraint) {
-          generated = generatedConstraints.back();
-          generatedConstraints.pop_back();
-          return;
-        }
-      }
-    }
-
     /// Register given scope to be tracked by the current solver state,
     /// this helps to make sure that all of the retired/generated constraints
     /// are dealt with correctly when the life time of the scope ends.
