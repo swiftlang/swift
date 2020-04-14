@@ -253,17 +253,27 @@ SymbolGraph::recordInheritanceRelationships(Symbol S) {
 }
 
 void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
-  const auto VD = S.getSymbolDecl();
-  if (const auto *Extension = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-    if (const auto *Protocol = Extension->getExtendedProtocolDecl()) {
-      for (const auto *Member : Protocol->getMembers()) {
-        if (const auto *MemberVD = dyn_cast<ValueDecl>(Member)) {
-          if (MemberVD->getFullName().compare(VD->getFullName()) == 0) {
-            recordEdge(Symbol(this, VD, nullptr),
-                       Symbol(this, MemberVD, nullptr),
-                       RelationshipKind::DefaultImplementationOf());
-          }
+  const auto *VD = S.getSymbolDecl();
+
+  /// Claim a protocol `P`'s members as default implementation targets
+  /// for `VD`.
+  auto HandleProtocol = [=](const ProtocolDecl *P) {
+    for (const auto *Member : P->getMembers()) {
+      if (const auto *MemberVD = dyn_cast<ValueDecl>(Member)) {
+        if (MemberVD->getFullName().compare(VD->getFullName()) == 0) {
+          recordEdge(Symbol(this, VD, nullptr),
+                     Symbol(this, MemberVD, nullptr),
+                     RelationshipKind::DefaultImplementationOf());
         }
+      }
+    }
+  };
+
+  if (const auto *Extension = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+    if (const auto *ExtendedProtocol = Extension->getExtendedProtocolDecl()) {
+      HandleProtocol(ExtendedProtocol);
+      for (const auto *Inherited : ExtendedProtocol->getInheritedProtocols()) {
+        HandleProtocol(Inherited);
       }
     }
   }
