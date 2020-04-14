@@ -72,7 +72,7 @@ function(is_darwin_based_sdk sdk_name out_var)
 endfunction()
 
 # Usage:
-# _add_variant_c_compile_link_flags(
+# _add_host_variant_c_compile_link_flags(
 #   SDK sdk
 #   ARCH arch
 #   BUILD_TYPE build_type
@@ -86,7 +86,7 @@ endfunction()
 #   DEPLOYMENT_VERSION_WATCHOS version
 #
 # )
-function(_add_variant_c_compile_link_flags)
+function(_add_host_variant_c_compile_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     MACCATALYST_BUILD_FLAVOR
@@ -189,7 +189,7 @@ function(_add_variant_c_compile_link_flags)
 endfunction()
 
 
-function(_add_variant_c_compile_flags)
+function(_add_host_variant_c_compile_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     RESULT_VAR_NAME ENABLE_LTO
@@ -202,7 +202,7 @@ function(_add_variant_c_compile_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  _add_variant_c_compile_link_flags(
+  _add_host_variant_c_compile_link_flags(
     SDK "${CFLAGS_SDK}"
     ARCH "${CFLAGS_ARCH}"
     BUILD_TYPE "${CFLAGS_BUILD_TYPE}"
@@ -351,8 +351,6 @@ function(_add_variant_c_compile_flags)
       list(APPEND result "SHELL:${CMAKE_INCLUDE_SYSTEM_FLAG_C}${path}")
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
-  elseif("${CFLAGS_SDK}" STREQUAL "WASI")
-    list(APPEND result "-D_WASI_EMULATED_MMAN")
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
@@ -365,7 +363,7 @@ function(_add_variant_c_compile_flags)
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
-function(_add_variant_link_flags)
+function(_add_host_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
   DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
   RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME
@@ -384,7 +382,7 @@ function(_add_variant_link_flags)
   set(link_libraries ${${LFLAGS_LINK_LIBRARIES_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
 
-  _add_variant_c_compile_link_flags(
+  _add_host_variant_c_compile_link_flags(
     SDK "${LFLAGS_SDK}"
     ARCH "${LFLAGS_ARCH}"
     BUILD_TYPE "${LFLAGS_BUILD_TYPE}"
@@ -658,7 +656,7 @@ function(_add_swift_host_library_single target)
 
   set(library_search_directories)
 
-  _add_variant_c_compile_flags(
+  _add_host_variant_c_compile_flags(
     SDK "${SWIFT_HOST_VARIANT_SDK}"
     ARCH "${SWIFT_HOST_VARIANT_ARCH}"
     BUILD_TYPE ${CMAKE_BUILD_TYPE}
@@ -679,7 +677,7 @@ function(_add_swift_host_library_single target)
       message(FATAL_ERROR "WASM does not support shared libraries.")
     endif()
   endif()
-  _add_variant_link_flags(
+  _add_host_variant_link_flags(
     SDK "${SWIFT_HOST_VARIANT_SDK}"
     ARCH "${SWIFT_HOST_VARIANT_ARCH}"
     BUILD_TYPE ${CMAKE_BUILD_TYPE}
@@ -859,7 +857,7 @@ function(_add_swift_host_executable_single name)
         "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
 
   # Add variant-specific flags.
-  _add_variant_c_compile_flags(
+  _add_host_variant_c_compile_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
@@ -867,7 +865,7 @@ function(_add_swift_host_executable_single name)
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME c_compile_flags)
-  _add_variant_link_flags(
+  _add_host_variant_link_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"

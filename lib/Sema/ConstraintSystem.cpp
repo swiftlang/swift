@@ -4242,6 +4242,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   // the initializer type later.
   expression.wrappedVar = singleVar;
   expression.expression = backingInitializer;
+  expression.convertType = outermostWrapperAttr->getTypeLoc();
 }
 
 SolutionApplicationTarget SolutionApplicationTarget::forInitialization(

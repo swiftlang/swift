@@ -301,8 +301,8 @@ private:
   bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod);
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    // Do not handle unavailable decls.
-    if (AvailableAttr::isUnavailable(D))
+    // Do not handle unavailable decls from other modules.
+    if (IsModuleFile && AvailableAttr::isUnavailable(D))
       return false;
 
     if (!handleCustomAttrInitRefs(D))
@@ -1346,15 +1346,36 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
   return true;
 }
 
-static bool isBeingCalled(Expr *Target, Expr *Parent, Expr *GrandParent) {
-    if (!Target || !Parent || !isa<ApplyExpr>(Parent))
-      return false;
+static Expr *getUnderlyingFunc(Expr *Fn) {
+  Fn = Fn->getSemanticsProvidingExpr();
+  if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
+    return DRE;
+  if (auto ApplyE = dyn_cast<SelfApplyExpr>(Fn))
+    return getUnderlyingFunc(ApplyE->getFn());
+  if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
+    if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
+      return getUnderlyingFunc(Unwrapped);
+  }
+  return Fn;
+}
 
-    if (!isa<SelfApplyExpr>(Parent))
-      return cast<ApplyExpr>(Parent)->getFn() == Target;
+static bool isBeingCalled(Expr *Target, ArrayRef<Expr*> ExprStack) {
+  if (!Target)
+    return false;
+  Target = getUnderlyingFunc(Target);
 
-  return GrandParent && isa<CallExpr>(GrandParent) &&
-    cast<CallExpr>(GrandParent)->getFn() == Parent;
+  for (Expr *E: reverse(ExprStack)) {
+    auto *AE = dyn_cast<ApplyExpr>(E);
+    if (!AE || AE->isImplicit())
+      continue;
+    if (isa<ConstructorRefCallExpr>(AE) && AE->getArg() == Target)
+      return true;
+    if (isa<SelfApplyExpr>(AE))
+      continue;
+    if (getUnderlyingFunc(AE->getFn()) == Target)
+      return true;
+  }
+  return false;
 }
 
 bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
@@ -1369,8 +1390,7 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   Expr *ParentE = getParentExpr();
 
-  if (!isa<AbstractStorageDecl>(D) &&
-      !isBeingCalled(CurrentE, ParentE, getContainingExpr(2)))
+  if (!isa<AbstractStorageDecl>(D) && !isBeingCalled(CurrentE, ExprStack))
     return false;
 
   Info.roles |= (unsigned)SymbolRole::Call;

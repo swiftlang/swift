@@ -67,7 +67,3 @@ import MostlyPrivate2_Private
 @objc public class TestSubclass: NSObject {
   @_implementationOnly public override func secretMethod() {}
 }
-
-extension SecretClass {
-  private func somethingThatShouldNotBeIncluded() {}
-}
