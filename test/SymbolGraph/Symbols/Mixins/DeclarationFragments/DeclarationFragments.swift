@@ -3,9 +3,9 @@
 // RUN: %target-swift-symbolgraph-extract -module-name DeclarationFragments -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/DeclarationFragments.symbols.json
 
-public func foo<S>(f: @escaping () -> (), x: Int = 2, s: S) {}
+public func foo<S>(f: @escaping () -> (), ext int: Int = 2, s: S) {}
 
-// CHECK: declarationFragments
+// CHECK-LABEL: {{^      }}"declarationFragments": 
 
 // CHECK: "kind": "keyword",
 // CHECK-NEXT: "spelling": "func"
@@ -25,14 +25,20 @@ public func foo<S>(f: @escaping () -> (), x: Int = 2, s: S) {}
 // CHECK: "kind": "text",
 // CHECK-NEXT: "spelling": ">("
 
-// CHECK: "kind": "identifier",
+// CHECK: "kind": "externalParam",
 // CHECK-NEXT: "spelling": "f"
 
 // CHECK: "kind": "text",
 // CHECK-NEXT: "spelling": ": () -> (), "
 
-// CHECK: "kind": "identifier",
-// CHECK-NEXT: "spelling": "x"
+// CHECK:"kind": "externalParam",
+// CHECK-NEXT:"spelling": "ext"
+
+// CHECK: "kind": "text",
+// CHECK-NEXT: "spelling": " "
+
+// CHECK:"kind": "internalParam",
+// CHECK-NEXT:"spelling": "int"
 
 // CHECK: "kind": "text",
 // CHECK-NEXT: "spelling": ": "
@@ -44,7 +50,7 @@ public func foo<S>(f: @escaping () -> (), x: Int = 2, s: S) {}
 // CHECK: "kind": "text",
 // CHECK-NEXT: "spelling": " = 2, "
 
-// CHECK: "kind": "identifier",
+// CHECK: "kind": "externalParam",
 // CHECK-NEXT: "spelling": "s"
 
 // CHECK: "kind": "text",
