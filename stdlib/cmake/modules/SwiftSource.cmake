@@ -702,7 +702,7 @@ function(_compile_swift_files
   add_custom_command_target(
       dependency_target
       COMMAND
-        "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+        "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
         "${swift_compiler_tool}" "${main_command}" ${swift_flags}
         ${output_option} ${embed_bitcode_option} "@${file_path}"
       ${command_touch_standard_outputs}
@@ -740,7 +740,7 @@ function(_compile_swift_files
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
           ${specific_module_dir}
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
           "-avoid-emit-module-source-info"
           ${swift_flags} ${swift_module_flags} "@${file_path}"
@@ -775,7 +775,7 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${maccatalyst_specific_module_dir}
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${maccatalyst_module_file}"
           ${maccatalyst_swift_flags} ${maccatalyst_swift_module_flags} "@${file_path}"
         ${command_touch_maccatalyst_module_outputs}
@@ -801,7 +801,7 @@ function(_compile_swift_files
     add_custom_command_target(
         sib_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sib" "-o" "${sib_file}" ${swift_flags} -Onone
           "@${file_path}"
         ${command_touch_sib_outputs}
@@ -817,7 +817,7 @@ function(_compile_swift_files
     add_custom_command_target(
         sibopt_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sib" "-o" "${sibopt_file}" ${swift_flags} -O
           "@${file_path}"
         ${command_touch_sibopt_outputs}
@@ -834,7 +834,7 @@ function(_compile_swift_files
     add_custom_command_target(
         sibgen_dependency_target
         COMMAND
-          "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
+          "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-sibgen" "-o" "${sibgen_file}" ${swift_flags}
           "@${file_path}"
         ${command_touch_sibgen_outputs}
