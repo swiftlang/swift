@@ -893,14 +893,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
   if (wantRValue)
     type = type->getRValueType();
 
-  if (auto depMemType = type->getAs<DependentMemberType>()) {
-    assert(!depMemType->getBase()->hasTypeVariable());
-    auto newType = simplifyType(type);
-    flags |= TMF_GenerateConstraints;
-
-    assert(!newType->is<DependentMemberType>());
-    return getFixedTypeRecursive(newType, flags, wantRValue);
-  }
+  assert(!type->is<DependentMemberType>());
 
   if (auto typeVar = type->getAs<TypeVariableType>()) {
     if (auto fixed = getFixedType(typeVar))
@@ -2474,48 +2467,7 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer()))
       return getFixedTypeFn(tvt);
 
-    // If this is a dependent member type for which we end up simplifying
-    // the base to a non-type-variable, perform lookup.
-    if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
-      assert(!depMemTy->getBase()->hasTypeVariable());
-
-      auto baseType = depMemTy->getBase();
-      // Dependent member types should only be created for associated types.
-      auto assocType = depMemTy->getAssocType();
-      assert(depMemTy->getAssocType() && "Expected associated type!");
-
-      // FIXME: It's kind of weird in general that we have to look
-      // through lvalue, inout and IUO types here
-      Type lookupBaseType = baseType->getWithoutSpecifierType();
-      if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
-        lookupBaseType = selfType->getSelfType();
-
-      if (lookupBaseType->mayHaveMembers()) {
-        auto *proto = assocType->getProtocol();
-        auto conformance = DC->getParentModule()->lookupConformance(
-          lookupBaseType, proto);
-        if (!conformance) {
-          // If the base type doesn't conform to the associatedtype's protocol,
-          // there will be a missing conformance fix applied in diagnostic mode,
-          // so the concrete dependent member type is considered a "hole" in
-          // order to continue solving.
-          if (shouldAttemptFixes() &&
-              getPhase() == ConstraintSystemPhase::Solving)
-            return getASTContext().TheUnresolvedType;
-
-          return DependentMemberType::get(lookupBaseType, assocType);
-        }
-
-        auto subs = SubstitutionMap::getProtocolSubstitutions(
-            proto, lookupBaseType, conformance);
-        auto result = assocType->getDeclaredInterfaceType().subst(subs);
-        if (!result->hasError())
-          return result;
-      }
-
-      return DependentMemberType::get(lookupBaseType, assocType);
-    }
-
+    assert(!type->is<DependentMemberType>());
     return type;
   });
 }
@@ -3945,7 +3897,7 @@ bool constraints::hasExplicitResult(ClosureExpr *closure) {
 Type constraints::resolveAssociatedType(Type baseType,
                                         AssociatedTypeDecl *assocType,
                                         DeclContext *DC) {
-  assert(!baseType->hasTypeVariable());
+  assert(!baseType->is<TypeVariableType>());
 
   if (auto selfType = baseType->getAs<DynamicSelfType>())
     baseType = selfType->getSelfType();
@@ -4565,4 +4517,18 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
 
 SourceRange constraints::getSourceRange(ASTNode anchor) {
   return anchor.getSourceRange();
+}
+
+Type ConstraintSystem::replaceDependentTypes(Type origType) {
+  return origType.transform([&](Type type) -> Type {
+    if (auto *DMT = type->getAs<DependentMemberType>()) {
+      auto *memberType = createTypeVariable(getConstraintLocator(nullptr),
+                                            TVO_CanBindToNoEscape);
+      addTypeMemberConstraint(DMT->getBase(), DMT->getAssocType(), memberType,
+                              getConstraintLocator(nullptr));
+      return memberType;
+    }
+
+    return type;
+  });
 }

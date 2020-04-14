@@ -2015,8 +2015,8 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
       continue;
     }
 
-    return matchTypes(super1, type2, ConstraintKind::Bind,
-                      subflags, locator);
+    return matchTypes(replaceDependentTypes(super1), type2,
+                      ConstraintKind::Bind, subflags, locator);
   }
 
   return getTypeMatchFailure(locator);
@@ -6931,7 +6931,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTypeMemberConstraint(
     return SolutionKind::Error;
   }
 
-  addConstraint(ConstraintKind::Bind, memberType, result, locator);
+  addConstraint(ConstraintKind::Bind, memberType, replaceDependentTypes(result),
+                locator);
   return SolutionKind::Solved;
 }
 
@@ -9863,10 +9864,11 @@ void ConstraintSystem::addConstraint(Requirement req,
     return;
   }
 
-  auto firstType = req.getFirstType();
+  auto firstType = replaceDependentTypes(req.getFirstType());
+
   if (kind) {
-    addConstraint(*kind, req.getFirstType(), req.getSecondType(), locator,
-                  isFavored);
+    auto secondType = replaceDependentTypes(req.getSecondType());
+    addConstraint(*kind, firstType, secondType, locator, isFavored);
   }
 
   if (conformsToAnyObject) {

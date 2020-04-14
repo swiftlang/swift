@@ -2431,6 +2431,11 @@ private:
   /// path literal to the constraint system.
   void addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator);
 
+  /// If given type contains any dependent member types, "open" them
+  /// by introducing a new `type member` constraints and replacing
+  /// original types with type variables.
+  Type replaceDependentTypes(Type type);
+
 public:
   /// Lookup for a member with the given name in the given base type.
   ///
