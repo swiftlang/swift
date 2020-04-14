@@ -134,7 +134,7 @@ void AvailabilityInference::applyInferredAvailableAttrs(
 
 Optional<AvailabilityContext>
 AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
-  Optional<AvailabilityContext> AnnotatedRange;
+  const AvailableAttr *bestAvailAttr = nullptr;
 
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
@@ -145,21 +145,19 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
       continue;
     }
 
-    AvailabilityContext AttrRange{
-        VersionRange::allGTE(AvailAttr->Introduced.getValue())};
-
-    // If we have multiple introduction versions, we will conservatively
-    // assume the worst case scenario. We may want to be more precise here
-    // in the future or emit a diagnostic.
-
-    if (AnnotatedRange.hasValue()) {
-      AnnotatedRange.getValue().intersectWith(AttrRange);
-    } else {
-      AnnotatedRange = AttrRange;
+    // Okay, we have a candidate, but is it better than one we already found?
+    if (!bestAvailAttr ||
+        inheritsAvailabilityFromPlatform(AvailAttr->Platform,
+                                         bestAvailAttr->Platform)) {
+      bestAvailAttr = AvailAttr;
     }
   }
 
-  return AnnotatedRange;
+  if (!bestAvailAttr)
+    return None;
+
+  return AvailabilityContext{
+    VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};
 }
 
 AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
