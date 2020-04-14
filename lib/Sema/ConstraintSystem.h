@@ -2929,8 +2929,12 @@ public:
 
   /// Whether we should record the failure of a constraint.
   bool shouldRecordFailedConstraint() const {
-    // Only record it if we don't already have a failed constraint. This avoids
-    // allocating unnecessary constraints.
+    // If we're debugging, always note a failure so we can print it out.
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver)
+      return true;
+
+    // Otherwise, only record it if we don't already have a failed constraint.
+    // This avoids allocating unnecessary constraints.
     return !failedConstraint;
   }
 
