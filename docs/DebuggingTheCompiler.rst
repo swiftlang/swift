@@ -80,8 +80,8 @@ where to stop in the debugger. Rather than trying to guess/check if one has an
 asserts swift compiler, one can use the following options to cause the
 diagnostic engine to assert on the first error/warning:
 
-* -Xllvm -swift-diagnostics-assert-on-error=1
-* -Xllvm -swift-diagnostics-assert-on-warning=1
+* ``-Xllvm -swift-diagnostics-assert-on-error=1``
+* ``-Xllvm -swift-diagnostics-assert-on-warning=1``
 
 These allow one to dump a stack trace of where the diagnostic is being emitted
 (if run without a debugger) or drop into the debugger if a debugger is attached.
