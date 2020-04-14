@@ -121,8 +121,8 @@ private:
 
   /// This is the list of modules that are imported by this module.
   ///
-  /// This is filled in by the import resolution phase.
-  ArrayRef<ImportedModuleDesc> Imports;
+  /// This is \c None until it is filled in by the import resolution phase.
+  Optional<ArrayRef<ImportedModuleDesc>> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -333,7 +333,9 @@ public:
 
   ~SourceFile();
 
-  void addImports(ArrayRef<ImportedModuleDesc> IM);
+  /// Set the imports for this source file. This gets called by import
+  /// resolution.
+  void setImports(ArrayRef<ImportedModuleDesc> imports);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.

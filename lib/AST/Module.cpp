@@ -1103,7 +1103,7 @@ public:
   /// Only intended for use by lookupOperatorDeclForName.
   static ArrayRef<SourceFile::ImportedModuleDesc>
   getImportsForSourceFile(const SourceFile &SF) {
-    return SF.Imports;
+    return *SF.Imports;
   }
 };
 
@@ -1408,7 +1408,10 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
   // We currently handle this for a direct import from the overlay, but not when
   // it happens through other imports.
   assert(filter && "no imports requested?");
-  for (auto desc : Imports) {
+  if (!Imports)
+    return;
+
+  for (auto desc : *Imports) {
     ModuleDecl::ImportFilter requiredFilter;
     if (desc.importOptions.contains(ImportFlags::Exported))
       requiredFilter |= ModuleDecl::ImportFilterKind::Public;
@@ -2036,23 +2039,14 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   }
 }
 
-void SourceFile::addImports(ArrayRef<ImportedModuleDesc> IM) {
-  if (IM.empty())
-    return;
-  ASTContext &ctx = getASTContext();
-  auto newBuf =
-      ctx.AllocateUninitialized<ImportedModuleDesc>(Imports.size() + IM.size());
-
-  auto iter = newBuf.begin();
-  iter = std::uninitialized_copy(Imports.begin(), Imports.end(), iter);
-  iter = std::uninitialized_copy(IM.begin(), IM.end(), iter);
-  assert(iter == newBuf.end());
-
-  Imports = newBuf;
+void SourceFile::setImports(ArrayRef<ImportedModuleDesc> imports) {
+  assert(!Imports && "Already computed imports");
+  Imports = getASTContext().AllocateCopy(imports);
 
   // Update the HasImplementationOnlyImports flag.
+  // TODO: Requestify this.
   if (!HasImplementationOnlyImports) {
-    for (auto &desc : IM) {
+    for (auto &desc : imports) {
       if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
         HasImplementationOnlyImports = true;
     }
@@ -2070,7 +2064,7 @@ bool SourceFile::hasTestableOrPrivateImport(
     // filename does not need to match (and we don't serialize it for such
     // decls).
     return std::any_of(
-        Imports.begin(), Imports.end(),
+        Imports->begin(), Imports->end(),
         [module, queryKind](ImportedModuleDesc desc) -> bool {
           if (queryKind == ImportQueryKind::TestableAndPrivate)
             return desc.module.second == module &&
@@ -2112,7 +2106,7 @@ bool SourceFile::hasTestableOrPrivateImport(
   if (filename.empty())
     return false;
 
-  return std::any_of(Imports.begin(), Imports.end(),
+  return std::any_of(Imports->begin(), Imports->end(),
                      [module, filename](ImportedModuleDesc desc) -> bool {
                        return desc.module.second == module &&
                               desc.importOptions.contains(
@@ -2130,7 +2124,7 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
 
   // Look at the imports of this source file.
-  for (auto &desc : Imports) {
+  for (auto &desc : *Imports) {
     // Ignore implementation-only imports.
     if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
       continue;
@@ -2147,7 +2141,7 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 
 void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
                                     SmallVectorImpl<Identifier> &spiGroups) const {
-  for (auto &import : Imports) {
+  for (auto &import : *Imports) {
     if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
         importedModule == std::get<ModuleDecl*>(import.module)) {
       auto importedSpis = import.spiGroups;

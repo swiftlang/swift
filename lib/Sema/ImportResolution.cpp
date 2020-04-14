@@ -288,7 +288,7 @@ void swift::performImportResolution(SourceFile &SF) {
   for (auto D : SF.getTopLevelDecls())
     resolver.visit(D);
 
-  SF.addImports(resolver.getFinishedImports());
+  SF.setImports(resolver.getFinishedImports());
 
   SF.ASTStage = SourceFile::ImportsResolved;
   verify(SF);
