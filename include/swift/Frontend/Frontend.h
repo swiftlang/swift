@@ -389,6 +389,18 @@ public:
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
                               bool moduleIsPublic) const;
+
+  /// Construct a cache key for the .swiftmodule being generated. There is a
+  /// balance to be struck here between things that go in the cache key and
+  /// things that go in the "up to date" check of the cache entry. We want to
+  /// avoid fighting over a single cache entry too much when (say) running
+  /// different compiler versions on the same machine or different inputs
+  /// that happen to have the same short module name, so we will disambiguate
+  /// those in the key. But we want to invalidate and rebuild a cache entry
+  /// -- rather than making a new one and potentially filling up the cache
+  /// with dead entries -- when other factors change, such as the contents of
+  /// the .swiftinterface input or its dependencies.
+  std::string getSwiftModuleCacheHash(const std::string interfacePath) const;
 };
 
 /// A class which manages the state and execution of the compiler.

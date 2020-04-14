@@ -24,6 +24,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -174,6 +175,42 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.SerializeOptionsForDebugging.getValueOr(!moduleIsPublic);
 
   return serializationOpts;
+}
+
+std::string CompilerInvocation::getSwiftModuleCacheHash(
+    const std::string interfacePath) const {
+  auto normalizedTargetTriple =
+      swift::getTargetSpecificModuleTriple(getLangOptions().Target);
+
+  llvm::hash_code H = hash_combine(
+      // Start with the compiler version (which will be either tag names or
+      // revs). Explicitly don't pass in the "effective" language version --
+      // this would mean modules built in different -swift-version modes would
+      // rebuild their dependencies.
+      swift::version::getSwiftFullVersion(),
+
+      // Simplest representation of input "identity" (not content) is just a
+      // pathname, and probably all we can get from the VFS in this regard
+      // anyways.
+      interfacePath,
+
+      // Include the normalized target triple. In practice, .swiftinterface
+      // files will be in target-specific subdirectories and would have
+      // target-specific pieces #if'd out. However, it doesn't hurt to include
+      // it, and it guards against mistakenly reusing cached modules across
+      // targets. Note that this normalization explicitly doesn't include the
+      // minimum deployment target (e.g. the '12.0' in 'ios12.0').
+      normalizedTargetTriple.str(),
+
+      // The SDK path is going to affect how this module is imported, so
+      // include it.
+      getSDKPath(),
+
+      // Whether or not we're tracking system dependencies affects the
+      // invalidation behavior of this cache item.
+      getFrontendOptions().TrackSystemDeps);
+
+  return llvm::APInt(64, H).toString(36, /*Signed=*/false);
 }
 
 Lowering::TypeConverter &CompilerInstance::getSILTypes() {
