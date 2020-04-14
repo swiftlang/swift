@@ -3200,6 +3200,8 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
 
   // Parse labeled trailing closures.
   while (isStartOfLabelledTrailingClosure(*this)) {
+    SyntaxParsingContext ClosureCtx(SyntaxContext,
+                                    SyntaxKind::MultipleTrailingClosureElement);
     Identifier label;
     auto labelLoc = consumeArgumentLabel(label);
     consumeToken(tok::colon);
@@ -3212,6 +3214,8 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
 
     // Don't diagnose whitespace gaps before labelled closures.
   }
+  SyntaxContext->collectNodesInPlace(
+      SyntaxKind::MultipleTrailingClosureElementList);
 
   return result;
 }
