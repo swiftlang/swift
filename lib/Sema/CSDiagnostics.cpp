@@ -3317,8 +3317,8 @@ bool MissingMemberFailure::diagnoseAsError() {
       emitBasicError(baseType);
     }
   } else if (auto moduleTy = baseType->getAs<ModuleType>()) {
-    emitDiagnostic(diag::no_member_of_module, moduleTy->getModule()->getName(),
-                   getName())
+    emitDiagnosticAt(baseExpr->getLoc(), diag::no_member_of_module,
+                     moduleTy->getModule()->getName(), getName())
         .highlight(getSourceRange())
         .highlight(nameLoc.getSourceRange());
     return true;
