@@ -158,7 +158,9 @@ First create a directory for all of the Swift sources:
 **Note:** This is important since update-checkout (see below) checks out
 repositories next to the Swift source directory. This means that if one clones
 Swift and has other unrelated repositories, update-checkout may not clone those
-repositories and will update them instead.
+repositories and will update them instead. Be aware that `update-checkout`
+currently does not support paths with non-ASCII characters. If such characters
+are present in the path to `swift-source`, `update-checkout` will fail.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
