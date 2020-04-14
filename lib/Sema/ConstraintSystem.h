@@ -4187,7 +4187,8 @@ private:
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
 
-    /// Whether this type variable is fully bound by one of its constraints.
+    /// Whether these bindings should be delayed until the rest of the
+    /// constraint system is considered "fully bound".
     bool FullyBound = false;
 
     /// Whether the bindings of this type involve other type variables.
