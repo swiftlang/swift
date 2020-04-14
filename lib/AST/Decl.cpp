@@ -6356,105 +6356,27 @@ void ParamDecl::setDefaultArgumentCaptureInfo(CaptureInfo captures) {
   DefaultValueAndFlags.getPointer()->Captures = captures;
 }
 
-/// Return nullptr if there is no property wrapper
-Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
-                                                     Expr *init) {
-  auto *PBD = var->getParentPatternBinding();
-  if (!PBD)
-    return nullptr;
-
-  // If there is no '=' on the pattern, there was no initial value.
-  if (PBD->getEqualLoc(0).isInvalid() && !PBD->isDefaultInitializable())
-    return nullptr;
-
-  ASTContext &ctx = var->getASTContext();
-  auto dc = var->getInnermostDeclContext();
-  const auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  if (wrapperAttrs.empty())
-    return nullptr;
-  auto innermostAttr = wrapperAttrs.back();
-  auto innermostNominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{innermostAttr, dc}, nullptr);
-  if (!innermostNominal)
-    return nullptr;
-
-      // Walker
+PropertyWrapperValuePlaceholderExpr *
+swift::findWrappedValuePlaceholder(Expr *init) {
   class Walker : public ASTWalker {
   public:
-    NominalTypeDecl *innermostNominal;
-    Expr *initArg = nullptr;
-
-    Walker(NominalTypeDecl *innermostNominal)
-      : innermostNominal(innermostNominal) { }
+    PropertyWrapperValuePlaceholderExpr *placeholder = nullptr;
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (initArg)
+      if (placeholder)
         return { false, E };
 
-      if (auto call = dyn_cast<CallExpr>(E)) {
-        ASTContext &ctx = innermostNominal->getASTContext();
-
-        // We're looking for an implicit call.
-        if (!call->isImplicit())
-          return { true, E };
-
-        // ... which may call the constructor of another property
-        // wrapper if there are multiple wrappers attached to the
-        // property.
-        if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
-          if (tuple->getNumElements() > 0) {
-            for (unsigned i : range(tuple->getNumElements())) {
-              if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
-                  tuple->getElementName(i) == ctx.Id_initialValue) {
-                auto elem = tuple->getElement(i)->getSemanticsProvidingExpr();
-
-                // Look through autoclosures.
-                if (auto autoclosure = dyn_cast<AutoClosureExpr>(elem))
-                  elem = autoclosure->getSingleExpressionBody();
-
-                if (elem->isImplicit() && isa<CallExpr>(elem)) {
-                  return { true, E };
-                }
-              }
-            }
-          }
-        }
-
-        // ... producing a value of the same nominal type as the
-        // innermost property wrapper.
-        if (!call->getType() ||
-            call->getType()->getAnyNominal() != innermostNominal)
-          return { false, E };
-
-        // Find the implicit initialValue/wrappedValue argument.
-        if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
-          for (unsigned i : range(tuple->getNumElements())) {
-            if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
-                tuple->getElementName(i) == ctx.Id_initialValue) {
-              initArg = tuple->getElement(i);
-              return { false, E };
-            }
-          }
-        }
+      if (auto *value = dyn_cast<PropertyWrapperValuePlaceholderExpr>(E)) {
+        placeholder = value;
+        return { false, value };
       }
 
       return { true, E };
     }
-  } walker(innermostNominal);
+  } walker;
   init->walk(walker);
 
-  Expr *initArg = walker.initArg;
-  if (initArg) {
-    initArg = initArg->getSemanticsProvidingExpr();
-    if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
-      if (!var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure()) {
-        // Remove the autoclosure part only for non-escaping autoclosures
-        initArg =
-            autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
-      }
-    }
-  }
-  return initArg;
+  return walker.placeholder;
 }
 
 /// Writes a tuple expression where each element is either `nil` or another such
@@ -6553,7 +6475,7 @@ ParamDecl::getDefaultValueStringRepresentation(
         }
 
         auto init =
-            findOriginalPropertyWrapperInitialValue(original, parentInit);
+            findWrappedValuePlaceholder(parentInit)->getOriginalWrappedValue();
         return extractInlinableText(getASTContext().SourceMgr, init, scratch);
       }
     }
