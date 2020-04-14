@@ -507,6 +507,9 @@ ERROR(expected_sil_tuple_index,none,
 ERROR(invalid_index_subset,none,
       "invalid index subset; expected '[SU]+' where 'S' represents set indices "
       "and 'U' represents unset indices", ())
+ERROR(expected_sil_result_id_to_be_integer,none,
+      "expected integer ID after '%' but did not recieve an integer while "
+      "parsing result ID of SILInstruction", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,

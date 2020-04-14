@@ -241,58 +241,6 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
   TokReceiver->finalize();
 }
 
-void Parser::parseTopLevelSIL() {
-  assert(SIL && isInSILMode());
-
-  // Prime the lexer.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  auto skipToNextSILDecl = [&]() {
-    while (!Tok.is(tok::eof) && !isStartOfSILDecl())
-      skipSingle();
-  };
-
-  while (!Tok.is(tok::eof)) {
-    // If we run into a Swift decl, skip over until we find the next SIL decl.
-    if (isStartOfSwiftDecl()) {
-      assert(!isStartOfSILDecl() && "Start of both a Swift and SIL decl?");
-      skipToNextSILDecl();
-      continue;
-    }
-
-    switch (Tok.getKind()) {
-#define CASE_SIL(KW, NAME)                                                     \
-    case tok::kw_##KW: {                                                       \
-      /* If we failed to parse a SIL decl, move onto the next SIL decl to      \
-         better help recovery. */                                              \
-      if (SIL->parse##NAME(*this)) {                                           \
-        Lexer::SILBodyRAII sbr(*L);                                            \
-        skipToNextSILDecl();                                                   \
-      }                                                                        \
-      break;                                                                   \
-    }
-    CASE_SIL(sil, DeclSIL)
-    CASE_SIL(sil_stage, DeclSILStage)
-    CASE_SIL(sil_vtable, SILVTable)
-    CASE_SIL(sil_global, SILGlobal)
-    CASE_SIL(sil_witness_table, SILWitnessTable)
-    CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
-    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
-    CASE_SIL(sil_coverage_map, SILCoverageMap)
-    CASE_SIL(sil_property, SILProperty)
-    CASE_SIL(sil_scope, SILScope)
-#undef CASE_SIL
-    default:
-      // If we reached here, we have something malformed that isn't a Swift decl
-      // or a SIL decl. Emit an error and skip ahead to the next SIL decl.
-      diagnose(Tok, diag::expected_sil_keyword);
-      skipToNextSILDecl();
-      break;
-    }
-  }
-}
-
 ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     SourceLoc AtLoc, SourceLoc AttrLoc, StringRef AttrName) {
   // Check 'Tok', return false if ':' or '=' cannot be found.

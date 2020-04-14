@@ -13,11 +13,10 @@
 #ifndef SWIFT_PARSER_PARSESILSUPPORT_H
 #define SWIFT_PARSER_PARSESILSUPPORT_H
 
+#include "swift/SIL/SILParser.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 namespace swift {
-  class Parser;
-
   /// Interface between the Parse and ParseSIL libraries, to avoid circular
   /// dependencies.
   class SILParserTUStateBase {
@@ -26,16 +25,16 @@ namespace swift {
     SILParserTUStateBase() = default;
     virtual ~SILParserTUStateBase() = default;
   public:
-    virtual bool parseDeclSIL(Parser &P) = 0;
-    virtual bool parseDeclSILStage(Parser &P) = 0;
-    virtual bool parseSILVTable(Parser &P) = 0;
-    virtual bool parseSILGlobal(Parser &P) = 0;
-    virtual bool parseSILWitnessTable(Parser &P) = 0;
-    virtual bool parseSILDefaultWitnessTable(Parser &P) = 0;
-    virtual bool parseSILDifferentiabilityWitness(Parser &P) = 0;
-    virtual bool parseSILCoverageMap(Parser &P) = 0;
-    virtual bool parseSILProperty(Parser &P) = 0;
-    virtual bool parseSILScope(Parser &P) = 0;
+    virtual bool parseDeclSIL(ReadSIL &P) = 0;
+    virtual bool parseDeclSILStage(ReadSIL &P) = 0;
+    virtual bool parseSILVTable(ReadSIL &P) = 0;
+    virtual bool parseSILGlobal(ReadSIL &P) = 0;
+    virtual bool parseSILWitnessTable(ReadSIL &P) = 0;
+    virtual bool parseSILDefaultWitnessTable(ReadSIL &P) = 0;
+    virtual bool parseSILDifferentiabilityWitness(ReadSIL &P) = 0;
+    virtual bool parseSILCoverageMap(ReadSIL &P) = 0;
+    virtual bool parseSILProperty(ReadSIL &P) = 0;
+    virtual bool parseSILScope(ReadSIL &P) = 0;
   };
 } // end namespace swift
 

@@ -887,9 +887,6 @@ public:
   /// Parse the top-level Swift decls into the provided vector.
   void parseTopLevel(SmallVectorImpl<Decl *> &decls);
 
-  /// Parse the top-level SIL decls into the SIL module.
-  void parseTopLevelSIL();
-
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {
     PD_Default              = 0,
