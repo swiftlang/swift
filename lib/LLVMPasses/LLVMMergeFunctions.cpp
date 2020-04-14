@@ -1126,7 +1126,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
                         cast<PointerType>(New->getType())->getAddressSpace());
 
     Value *Callee = ConstantExpr::getBitCast(New, FPtrType);
-    CallInst *NewCI = Builder.CreateCall(Callee, NewArgs);
+    CallInst *NewCI = Builder.CreateCall(FType, Callee, NewArgs);
     NewCI->setCallingConv(CI->getCallingConv());
     // Don't transfer attributes from the function to the callee. Function
     // attributes typically aren't relevant to the calling convention or ABI.
