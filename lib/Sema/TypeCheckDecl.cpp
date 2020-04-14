@@ -676,8 +676,9 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
       dc->isTypeContext()) {
     const auto operatorName = decl->getBaseIdentifier();
     if (auto ED = dyn_cast<ExtensionDecl>(dc->getAsDecl())) {
-      decl->diagnose(diag::nonstatic_operator_in_extension,
-                     operatorName, ED->getExtendedTypeRepr())
+      decl->diagnose(diag::nonstatic_operator_in_extension, operatorName,
+                     ED->getExtendedTypeRepr() != nullptr,
+                     ED->getExtendedTypeRepr())
           .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
                        "static ");
     } else {
