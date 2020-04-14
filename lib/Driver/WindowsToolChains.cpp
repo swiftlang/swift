@@ -85,7 +85,9 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   // Configure the toolchain.
-  const char *Clang = context.cxxInteropEnabled()? "clang++" : "clang";
+  const char *Clang =
+      context.Args.hasArg(options::OPT_enable_experimental_cxx_interop) ?
+      "clang++" : "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
@@ -141,6 +143,13 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   if (!context.OI.SDKPath.empty()) {
     Arguments.push_back("-I");
     Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
+  }
+
+  // Link against the desired C++ standard library.
+  if (const Arg *A =
+      context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-stdlib=") + A->getValue()));
   }
 
   if (job.getKind() == LinkKind::Executable) {

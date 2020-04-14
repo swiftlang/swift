@@ -207,6 +207,10 @@ ERROR(cannot_find_migration_script, none,
 ERROR(error_darwin_static_stdlib_not_supported, none,
       "-static-stdlib is no longer supported on Apple platforms", ())
 
+ERROR(error_darwin_only_supports_libcxx, none,
+      "The only C++ standard library supported on Apple platforms is libc++",
+      ())
+
 WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",
     ())

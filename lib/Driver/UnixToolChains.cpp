@@ -186,19 +186,9 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   // a C++ standard library if it's not needed, in particular because the
   // standard library that `clang++` selects by default may not be the one that
   // is desired.
-  //
-  // TODO: In principle, it should be possible to use a different C++ standard
-  // library than the one configured by default by passing a `-stdlib` option
-  // to `-Xcc` and `-Xclang-linker`, e.g.
-  // `-Xcc -stdlib=libc++ -Xclang-linker -stdlib=libc++`.
-  // Once there is a driver flag for C++ interop, we will probably also want to
-  // add a driver flag for selecting the C++ standard library.
-  //
-  // In practice, using libc++ on Linux, for example, does not work because the
-  // SwiftGlibc module definition is incompatible with libc++'s header layout.
-  // We probably need to ensure that we use libc++'s own module map instead of 
-  // the SwiftGlibc module map.
-  const char *Clang = context.cxxInteropEnabled()? "clang++" : "clang";
+  const char *Clang =
+      context.Args.hasArg(options::OPT_enable_experimental_cxx_interop) ?
+      "clang++" : "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
@@ -304,6 +294,13 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     } else {
       llvm::report_fatal_error(linkFile + " not found");
     }
+  }
+
+  // Link against the desired C++ standard library.
+  if (const Arg *A =
+      context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-stdlib=") + A->getValue()));
   }
 
   // Explicitly pass the target to the linker

@@ -101,11 +101,12 @@
 // INFERRED_NAMED_DARWIN tests above: 'libLINKER.dylib'.
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 -Xfrontend -enable-cxx-interop %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 -enable-experimental-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop %s
+// RUN: not %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 -enable-experimental-cxx-interop -experimental-cxx-stdlib libstdc++ %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libstdcxx %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Xfrontend -enable-cxx-interop %s 2>&1 | %FileCheck -check-prefix LINUX-cxx-interop %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -enable-experimental-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix LINUX-cxx-interop %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Xfrontend -enable-cxx-interop %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -enable-experimental-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop %s
 
 // Check reading the SDKSettings.json from an SDK
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
@@ -423,12 +424,15 @@
 // IOS-cxx-interop-DAG: -lc++
 // IOS-cxx-interop: -o linker
 
+// IOS-cxx-interop-libstdcxx: error: The only C++ standard library supported on Apple platforms is libc++
+
 // LINUX-cxx-interop: swift
 // LINUX-cxx-interop-DAG: -enable-cxx-interop
 // LINUX-cxx-interop-DAG: -o [[OBJECTFILE:.*]]
 
 // LINUX-cxx-interop: clang++{{(\.exe)?"? }}
-// LINUX-cxx-interop: [[OBJECTFILE]]
+// LINUX-cxx-interop-DAG: [[OBJECTFILE]]
+// LINUX-cxx-interop-DAG: -stdlib=libc++
 // LINUX-cxx-interop: -o linker
 
 // WINDOWS-cxx-interop: swift
@@ -436,7 +440,8 @@
 // WINDOWS-cxx-interop-DAG: -o [[OBJECTFILE:.*]]
 
 // WINDOWS-cxx-interop: clang++{{(\.exe)?"? }}
-// WINDOWS-cxx-interop: [[OBJECTFILE]]
+// WINDOWS-cxx-interop-DAG: [[OBJECTFILE]]
+// WINDOWS-cxx-interop-DAG: -stdlib=libc++
 // WINDOWS-cxx-interop: -o linker
 
 // Test ld detection. We use hard links to make sure

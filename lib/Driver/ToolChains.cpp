@@ -170,6 +170,17 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
     arguments.push_back("-disable-objc-interop");
   }
 
+  // Add flags for C++ interop.
+  if (inputArgs.hasArg(options::OPT_enable_experimental_cxx_interop)) {
+    arguments.push_back("-enable-cxx-interop");
+  }
+  if (const Arg *arg =
+      inputArgs.getLastArg(options::OPT_experimental_cxx_stdlib)) {
+    arguments.push_back("-Xcc");
+    arguments.push_back(inputArgs.MakeArgString(
+        Twine("-stdlib=") + arg->getValue()));
+  }
+
   // Handle the CPU and its preferences.
   inputArgs.AddLastArg(arguments, options::OPT_target_cpu);
 

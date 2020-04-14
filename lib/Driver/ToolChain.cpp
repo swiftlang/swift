@@ -67,19 +67,6 @@ ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
   return C.getArgs().MakeArgString(buffer.str());
 }
 
-bool
-ToolChain::JobContext::cxxInteropEnabled() const {
-  // TODO: Eventually, we'll want to have a driver flag to control C++ interop,
-  // but for the time being, we just query the frontend flag.
-  for (const Arg *A : Args.filtered(options::OPT_Xfrontend)) {
-    if (A->containsValue("-enable-cxx-interop")) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 Optional<Job::ResponseFileInfo>
 ToolChain::getResponseFileInfo(const Compilation &C, const char *executablePath,
                                const ToolChain::InvocationInfo &invocationInfo,
