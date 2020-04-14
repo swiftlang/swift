@@ -5936,8 +5936,9 @@ bool NonEphemeralConversionFailure::diagnosePointerInit() const {
                     ? diag::cannot_construct_dangling_pointer_warning
                     : diag::cannot_construct_dangling_pointer;
 
-  emitDiagnostic(diagID, constructedTy, constructorKind)
-      .highlight(getSourceRange());
+  auto *anchor = getRawAnchor();
+  emitDiagnosticAt(anchor->getLoc(), diagID, constructedTy, constructorKind)
+      .highlight(anchor->getSourceRange());
 
   emitSuggestionNotes();
   return true;
