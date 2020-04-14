@@ -93,7 +93,7 @@ class C {
   func implictMember() {
     _ = .foo
     _ = .foo(x: 12)
-    _ = .foo { 12 }
+    _ = .foo() { 12 }
     _ = .foo[12]
     _ = .foo.bar
   }
@@ -258,13 +258,14 @@ func postfix() {
   foo()
   foo() {}
   foo {}
-  foo() {}
+  foo { }
     arg2: {}
   foo {}
   foo.bar()
   foo.bar() {}
   foo.bar() {}
     arg2: {}
+    in: {}
   foo.bar {}
   foo[]
   foo[1]
