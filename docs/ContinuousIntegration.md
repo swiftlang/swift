@@ -12,6 +12,7 @@
     - [Source Compatibility Testing](#source-compatibility-testing)
     - [Sourcekit Stress Testing](#sourcekit-stress-testing)
     - [Specific Preset Testing](#specific-preset-testing)
+    - [Running Non-Executable Device Tests](#running-non-executable-device-tests)
     - [Build Swift Toolchain](#build-swift-toolchain)
     - [Testing Compiler Performance](#testing-compiler-performance)
     - [Swift Community Hosted CI Pull Request Testing](#swift-community-hosted-ci-pull-request-testing)
@@ -161,8 +162,18 @@ For example:
 ```
 preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
 @swift-ci Please test with preset macOS
+```
+
+### Running Non-Executable Device Tests
+
+Using the specific preset testing, one can run non-executable device tests by
+telling swift-ci:
 
 ```
+preset=buildbot,tools=RA,stdlib=RD,test=non_executable
+@swift-ci Please test with preset macOS
+```
+
 ### Build Swift Toolchain
 
 Platform       | Comment | Check Status
