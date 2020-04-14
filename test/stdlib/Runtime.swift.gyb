@@ -591,6 +591,8 @@ Runtime.test("Struct layout with reference storage types") {
   print(malkovich)
 }
 
+// WebAssembly/WASI doesn't support dynamic symbol lookup
+#if !os(WASI)
 Runtime.test("SwiftError layout constants for LLDB") {
   let offsetof_SwiftError_typeMetadata = pointerToSwiftCoreSymbol(name: "_swift_lldb_offsetof_SwiftError_typeMetadata")!
   let sizeof_SwiftError = pointerToSwiftCoreSymbol(name: "_swift_lldb_sizeof_SwiftError")!
@@ -610,6 +612,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
   _UnimplementedError()
 #endif
 }
+#endif
 
 var Reflection = TestSuite("Reflection")
 
@@ -703,7 +706,7 @@ Reflection.test("multiprotocolTypes") {
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 BitTwiddlingTestSuite.test("_pointerSize") {
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(wasm32)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(8, MemoryLayout<Optional<AnyObject>>.size)
@@ -727,7 +730,7 @@ BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
   expectTrue(_isPowerOf2(asInt(2)))
   expectFalse(_isPowerOf2(asInt(3)))
   expectTrue(_isPowerOf2(asInt(1024)))
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(wasm32)
   // Not applicable to 32-bit architectures.
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectTrue(_isPowerOf2(asInt(0x8000_0000)))

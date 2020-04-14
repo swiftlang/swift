@@ -214,6 +214,19 @@ def validate_arguments(toolchain, args):
                 "--android-icu-uc-include, --android-icu-i18n, "
                 "--android-icu-i18n-include, and --android-icu-data "
                 "must be specified")
+    if args.wasm:
+        if args.wasi_sdk is None or \
+                args.wasi_icu_uc is None or \
+                args.wasi_icu_uc_include is None or \
+                args.wasi_icu_i18n is None or \
+                args.wasi_icu_i18n_include is None or \
+                args.wasi_icu_data is None:
+            diagnostics.fatal(
+                "when building for WebAssembly, --wasi-sdk, "
+                "--wasi-icu-uc, "
+                "--wasi-icu-uc-include, --wasi-icu-i18n, "
+                "--wasi-icu-i18n-include, and --wasi-icu-data "
+                "must be specified")
 
     targets_needing_toolchain = [
         'build_indexstoredb',
@@ -230,7 +243,6 @@ def validate_arguments(toolchain, args):
         fatal_error(
             "--legacy-impl is incompatible with building packages needing "
             "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
-
 
 def default_stdlib_deployment_targets(args):
     """
@@ -316,6 +328,9 @@ def apply_default_arguments(toolchain, args):
         elif args.android_arch == "aarch64":
             args.stdlib_deployment_targets.append(
                 StdlibDeploymentTarget.Android.aarch64.name)
+    if args.wasm:
+        args.stdlib_deployment_targets.append(
+            StdlibDeploymentTarget.WASI.wasm32.name)
 
     # Infer platform flags from manually-specified configure targets.
     # This doesn't apply to Darwin platforms, as they are
@@ -355,7 +370,6 @@ def apply_default_arguments(toolchain, args):
         args.extra_cmake_options.append(
             '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
                 args.swift_darwin_module_archs))
-
 
 # -----------------------------------------------------------------------------
 # Build Script Impl Wrapping
@@ -588,6 +602,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-watchos-simulator"]
         if not args.build_android:
             impl_args += ["--skip-build-android"]
+        if not args.build_wasm:
+            impl_args += ["--skip-build-wasm"]
         if not args.build_clang_tools_extra:
             impl_args += ["--skip-build-clang-tools-extra"]
 
@@ -629,6 +645,10 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-android"]
         if not args.test_android_host:
             impl_args += ["--skip-test-android-host"]
+        if not args.test_wasm:
+            impl_args += ["--skip-test-wasm"]
+        if not args.test_wasm_host:
+            impl_args += ["--skip-test-wasm-host"]
         if args.build_runtime_with_host_compiler:
             impl_args += ["--build-runtime-with-host-compiler"]
         if args.validation_test:
@@ -671,6 +691,16 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--android-deploy-device-path",
                 args.android_deploy_device_path,
+            ]
+
+        if args.wasm:
+            impl_args += [
+                "--wasi-sdk", args.wasi_sdk,
+                "--wasi-icu-uc", args.wasi_icu_uc,
+                "--wasi-icu-uc-include", args.wasi_icu_uc_include,
+                "--wasi-icu-i18n", args.wasi_icu_i18n,
+                "--wasi-icu-i18n-include", args.wasi_icu_i18n_include,
+                "--wasi-icu-data", args.wasi_icu_data,
             ]
 
         if platform.system() == 'Darwin':

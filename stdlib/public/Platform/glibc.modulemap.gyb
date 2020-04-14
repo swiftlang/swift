@@ -383,10 +383,12 @@ module SwiftGlibc [system] {
       export *
     }
 % end
+% if CMAKE_SDK != "WASI":
     module pwd {
       header "${GLIBC_INCLUDE_PATH}/pwd.h"
       export *
     }
+% end
     module regex {
       header "${GLIBC_INCLUDE_PATH}/regex.h"
       export *
@@ -511,8 +513,8 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/wait.h"
         export *
       }
-    }
 % end
+    }
 % if CMAKE_SDK in ["LINUX", "FREEBSD"]:
     module sysexits {
       header "${GLIBC_INCLUDE_PATH}/sysexits.h"
@@ -534,8 +536,8 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/utime.h"
       export *
     }
-  }
 % end
+  }
 }
 
 % if CMAKE_SDK != "WASI":

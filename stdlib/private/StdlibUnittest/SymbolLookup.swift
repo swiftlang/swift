@@ -23,7 +23,7 @@
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(OpenBSD)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
-#elseif os(Linux)
+#elseif os(Linux) || os(WASI)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
 #elseif os(Android)
   #if arch(arm) || arch(i386)

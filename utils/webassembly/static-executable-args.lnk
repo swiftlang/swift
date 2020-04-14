@@ -1,0 +1,15 @@
+-static
+-lswiftCore
+-lswiftImageInspectionShared
+-lswiftSwiftOnoneSupport
+-lswiftWasiPthread
+-licuuc
+-licudata
+-ldl
+-lstdc++
+-lm
+-lwasi-emulated-mman
+-Xlinker --error-limit=0
+-Xlinker --no-gc-sections
+-Xlinker --no-threads
+-D_WASI_EMULATED_MMAN
