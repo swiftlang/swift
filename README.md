@@ -165,8 +165,9 @@ First, create a directory for all of the Swift sources:
 **Note:** This is important since update-checkout (see below) checks out
 repositories next to the Swift source directory. This means that if one clones
 Swift and has other unrelated repositories, update-checkout may not clone those
-repositories and will update them instead. Additionally, ensure Python 2.7 is being
-used for this step, whether via conda environment or other means.
+repositories and will update them instead. Be aware that `update-checkout`
+currently does not support paths with non-ASCII characters. If such characters
+are present in the path to `swift-source`, `update-checkout` will fail.
 
 **TensorFlow Support:** To build with TensorFlow support, the `tensorflow`
 scheme must be specified when cloning sources. The `tensorflow` scheme pins

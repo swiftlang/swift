@@ -4198,6 +4198,7 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.convertType = convertType;
   expression.pattern = nullptr;
   expression.wrappedVar = nullptr;
+  expression.innermostWrappedValueInit = nullptr;
   expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
   expression.initialization.patternBinding = nullptr;
@@ -4222,9 +4223,11 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   Expr *backingInitializer;
   if (Expr *initializer = expression.expression) {
     // Form init(wrappedValue:) call(s).
-    Expr *wrappedInitializer =
-        buildPropertyWrapperWrappedValueCall(
-            singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
+    Expr *wrappedInitializer = buildPropertyWrapperWrappedValueCall(
+        singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false,
+        [&](ApplyExpr *innermostInit) {
+          expression.innermostWrappedValueInit = innermostInit;
+        });
     if (!wrappedInitializer)
       return;
 

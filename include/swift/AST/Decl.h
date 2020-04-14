@@ -5266,7 +5266,7 @@ public:
   ///
   /// \code
   /// @Lazy var i = 17
-  /// \end
+  /// \endcode
   ///
   /// Or when there is no initializer but each composed property wrapper has
   /// a suitable `init(wrappedValue:)`.

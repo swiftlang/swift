@@ -1223,6 +1223,10 @@ class SolutionApplicationTarget {
       /// this is an initialization involving a property wrapper.
       VarDecl *wrappedVar;
 
+      /// The innermost call to \c init(wrappedValue:), if this is an
+      /// initialization involving a property wrapper.
+      ApplyExpr *innermostWrappedValueInit;
+
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
 
@@ -1412,6 +1416,20 @@ public:
   /// one-way constraints.
   bool shouldBindPatternVarsOneWay() const {
     return kind == Kind::expression && expression.bindPatternVarsOneWay;
+  }
+
+  /// Whether or not an opaque value placeholder should be injected into the
+  /// first \c wrappedValue argument of an apply expression.
+  bool shouldInjectWrappedValuePlaceholder(ApplyExpr *apply) const {
+    if (kind != Kind::expression ||
+        expression.contextualPurpose != CTP_Initialization)
+      return false;
+
+    auto *wrappedVar = expression.wrappedVar;
+    if (!wrappedVar || wrappedVar->isStatic())
+      return false;
+
+    return expression.innermostWrappedValueInit == apply;
   }
 
   /// Retrieve the wrapped variable when initializing a pattern with a

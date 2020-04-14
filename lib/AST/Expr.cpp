@@ -311,6 +311,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
 
   NO_REFERENCE(OpaqueValue);
+  NO_REFERENCE(PropertyWrapperValuePlaceholder);
   NO_REFERENCE(DefaultArgument);
 
   PASS_THROUGH_REFERENCE(BindOptional, getSubExpr);
@@ -624,6 +625,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
 
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
+  case ExprKind::PropertyWrapperValuePlaceholder:
   case ExprKind::DefaultArgument:
   case ExprKind::BindOptional:
   case ExprKind::OptionalEvaluation:
@@ -1401,6 +1403,17 @@ static ValueDecl *getCalledValue(Expr *E) {
     return getCalledValue(E2);
 
   return nullptr;
+}
+
+PropertyWrapperValuePlaceholderExpr *
+PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
+                                            Type ty, Expr *wrappedValue) {
+  auto *placeholder =
+      new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
+
+  return new (ctx) PropertyWrapperValuePlaceholderExpr(range, ty,
+                                                       placeholder,
+                                                       wrappedValue);
 }
 
 const ParamDecl *DefaultArgumentExpr::getParamDecl() const {
