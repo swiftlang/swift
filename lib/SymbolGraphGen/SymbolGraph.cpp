@@ -69,6 +69,50 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   return Opts;
 }
 
+bool
+SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
+  const auto *DC = VD->getDeclContext();
+
+  if (isa<ProtocolDecl>(DC) && VD->isProtocolRequirement()) {
+    return true;
+  }
+
+  // At this point, VD is either a default implementation of a requirement
+  // or a freestanding implementation from a protocol extension without
+  // a corresponding requirement.
+
+  auto *Proto = dyn_cast_or_null<ProtocolDecl>(DC->getSelfNominalTypeDecl());
+  if (!Proto) {
+    return false;
+  }
+
+  /// Try to find a member of the owning protocol with the same name
+  /// that is a requirement.
+  auto FoundRequirementMemberNamed = [](DeclName Name,
+                                        ProtocolDecl *Proto) -> bool {
+    for (const auto *Member : Proto->lookupDirect(Name)) {
+      if (isa<ProtocolDecl>(Member->getDeclContext()) &&
+          Member->isProtocolRequirement()) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  if (FoundRequirementMemberNamed(VD->getFullName(), Proto)) {
+    return true;
+  }
+  for (auto *Inherited : Proto->getInheritedProtocols()) {
+    if (FoundRequirementMemberNamed(VD->getFullName(), Inherited)) {
+      return true;
+    }
+  }
+
+  // Couldn't find any requirement members of a protocol by this name.
+  // It's not a requirement or default implementation of a requirement.
+  return false;
+}
+
 // MARK: - Symbols (Nodes)
 
 void SymbolGraph::recordNode(Symbol S) {
@@ -102,15 +146,26 @@ void SymbolGraph::recordEdge(Symbol Source,
 }
 
 void SymbolGraph::recordMemberRelationship(Symbol S) {
-  auto *DC = S.getSymbolDecl()->getDeclContext();
+  const auto *DC = S.getSymbolDecl()->getDeclContext();
   switch (DC->getContextKind()) {
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::ExtensionDecl:
     case swift::DeclContextKind::EnumElementDecl:
+      /*
+       If this symbol is itself a protocol requirement, or
+       is a default implementation of a protocol requirement,
+       don't record a memberOf relationship.
+
+       This is to allow distinguishing between requirements,
+       default implementations of requirements, and just other
+       things added to protocols in extensions not related to their
+       requirements.
+       */
+      if (isRequirementOrDefaultImplementation(S.getSymbolDecl())) {
+        return;
+      }
       return recordEdge(S,
-          Symbol(this,
-                 S.getSymbolDecl()->getDeclContext()->getSelfNominalTypeDecl(),
-                 nullptr),
+                        Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
     case swift::DeclContextKind::AbstractClosureExpr:
     case swift::DeclContextKind::Initializer:

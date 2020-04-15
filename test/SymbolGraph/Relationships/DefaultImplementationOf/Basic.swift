@@ -16,3 +16,6 @@ extension P {
 // CHECK: "kind": "defaultImplementationOf",
 // CHECK-NEXT: "source": "s:23DefaultImplementationOf1PPAAE1xSivp",
 // CHECK-NEXT: "target": "s:23DefaultImplementationOf1PP1xSivp"
+
+// Since x is a default implementation of a requirement, we don't consider this to be a "member".
+// CHECK-NOT: memberOf
