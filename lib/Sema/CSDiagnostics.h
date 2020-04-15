@@ -50,10 +50,10 @@ public:
 
   virtual ~FailureDiagnostic();
 
-  virtual SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+  virtual SourceLoc getLoc() const { return getLoc(getAnchor()); }
 
   virtual SourceRange getSourceRange() const {
-    return getAnchor()->getSourceRange();
+    return getSourceRange(getAnchor());
   }
 
   /// Try to diagnose a problem given affected expression,
@@ -77,9 +77,9 @@ public:
   /// e.g. ambiguity error.
   virtual bool diagnoseAsNote();
 
-  Expr *getRawAnchor() const { return Locator->getAnchor(); }
+  TypedNode getRawAnchor() const { return Locator->getAnchor(); }
 
-  virtual Expr *getAnchor() const;
+  virtual TypedNode getAnchor() const;
 
   ConstraintLocator *getLocator() const { return Locator; }
 
@@ -195,6 +195,9 @@ protected:
       Type type,
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
+
+  static SourceLoc getLoc(TypedNode node);
+  static SourceRange getSourceRange(TypedNode node);
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -241,7 +244,7 @@ public:
     assert(getGenericContext() &&
            "Affected decl not within a generic context?");
 
-    if (auto *parentExpr = findParentExpr(getRawAnchor()))
+    if (auto *parentExpr = findParentExpr(getRawAnchor().get<const Expr *>()))
       Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
@@ -776,7 +779,7 @@ public:
                                    Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
 
-  Expr *getAnchor() const override;
+  TypedNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 
@@ -935,7 +938,7 @@ public:
   MissingCallFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  Expr *getAnchor() const override;
+  TypedNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 };
@@ -1033,7 +1036,7 @@ public:
 
   SourceLoc getLoc() const override {
     // Diagnostic should point to the member instead of its base expression.
-    return getRawAnchor()->getLoc();
+    return FailureDiagnostic::getLoc(getRawAnchor());
   }
 
   bool diagnoseAsError() override;
@@ -1130,7 +1133,7 @@ protected:
   const ConstructorDecl *Init;
   SourceRange BaseRange;
 
-  Expr *getAnchor() const override { return getRawAnchor(); }
+  TypedNode getAnchor() const override { return getRawAnchor(); }
 
   InvalidInitRefFailure(const Solution &solution, Type baseTy,
                         const ConstructorDecl *init, SourceRange baseRange,
@@ -1224,7 +1227,7 @@ public:
     assert(!SynthesizedArgs.empty() && "No missing arguments?!");
   }
 
-  Expr *getAnchor() const override;
+  TypedNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 
@@ -1852,7 +1855,7 @@ public:
                                Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
 
-  Expr *getAnchor() const override;
+  TypedNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 };
