@@ -3190,13 +3190,11 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
     diagnose(braceLoc, diag::trailing_closure_after_newlines);
     diagnose(calleeRange.Start, diag::trailing_closure_callee_here);
 
-    if (closures.size() == 1) {
-      auto *CE = dyn_cast<ClosureExpr>(closures[0].ClosureExpr);
-      if (CE && CE->hasAnonymousClosureVars() &&
-          CE->getParameters()->size() == 0) {
-        diagnose(braceLoc, diag::brace_stmt_suggest_do)
-          .fixItInsert(braceLoc, "do ");
-      }
+    auto *CE = dyn_cast<ClosureExpr>(closures[0].ClosureExpr);
+    if (CE && CE->hasAnonymousClosureVars() &&
+        CE->getParameters()->size() == 0) {
+      diagnose(braceLoc, diag::brace_stmt_suggest_do)
+        .fixItInsert(braceLoc, "do ");
     }
   }
 
