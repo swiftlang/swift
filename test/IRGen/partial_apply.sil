@@ -745,7 +745,7 @@ bb0(%x : $*SwiftClassPair):
 sil public_external @closure : $@convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> ()
 
 // Make sure that we use the heap header size (16) for the initial offset.
-// CHECK: define swiftcc void @test_initial_offset(%swift.opaque* noalias nocapture %0, %T13partial_apply10SwiftClassC* %1)
+// CHECK-LABEL: define{{.*}} swiftcc void @test_initial_offset(%swift.opaque* noalias nocapture %0, %T13partial_apply10SwiftClassC* %1)
 // CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientIntVMa"
 // CHECK:   [[MD:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[MD]] to i8***
