@@ -79,9 +79,6 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
 }
 
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
-  if (PAI->getFunction()->hasOwnership())
-    return nullptr;
-
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function. thin_to_thick_function supports only thin operands.
   if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0) &&
