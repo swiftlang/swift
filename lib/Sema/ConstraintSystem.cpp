@@ -1697,7 +1697,14 @@ void ConstraintSystem::addOverloadSet(ArrayRef<Constraint *> choices,
     return;
   }
 
-  addDisjunctionConstraint(choices, locator, ForgetChoice);
+  auto *disjunction =
+      Constraint::createDisjunction(*this, choices, locator, ForgetChoice);
+  addUnsolvedConstraint(disjunction);
+  if (simplifyAppliedOverloads(disjunction, locator)) {
+    retireConstraint(disjunction);
+    if (!failedConstraint)
+      failedConstraint = disjunction;
+  }
 }
 
 /// If we're resolving an overload set with a decl that has special type
@@ -2781,14 +2788,22 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
   if (!diff.overloads.empty())
     return false;
 
-  if (!llvm::all_of(solutions, [](const Solution &solution) -> bool {
+  bool noFixes = llvm::all_of(solutions, [](const Solution &solution) -> bool {
+     const auto score = solution.getFixedScore();
+     return score.Data[SK_Fix] == 0 && solution.Fixes.empty();
+  });
+
+  bool allMismatches =
+      llvm::all_of(solutions, [](const Solution &solution) -> bool {
         return llvm::all_of(
             solution.Fixes, [](const ConstraintFix *fix) -> bool {
               return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
                      fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
                      fix->getKind() == FixKind::AllowTupleTypeMismatch;
             });
-      }))
+      });
+
+  if (!noFixes && !allMismatches)
     return false;
 
   auto &DE = cs.getASTContext().Diags;
@@ -2941,6 +2956,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   if (solutions.empty())
     return false;
 
+  SolutionDiff solutionDiff(solutions);
+
+  if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
+    return true;
+  
   if (auto bestScore = solverState->BestScore) {
     solutions.erase(llvm::remove_if(solutions,
                                     [&](const Solution &solution) {
@@ -2956,21 +2976,19 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
   }
 
-  SolutionDiff solutionDiff(solutions);
-
-  if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
-    return true;
-
   if (diagnoseAmbiguityWithEphemeralPointers(*this, solutions))
     return true;
 
   // Collect aggregated fixes from all solutions
-  llvm::SmallMapVector<std::pair<ConstraintLocator *, FixKind>,
-                       llvm::TinyPtrVector<ConstraintFix *>, 4>
+  using LocatorAndKind = std::pair<ConstraintLocator *, FixKind>;
+  using SolutionAndFix = std::pair<const Solution *, const ConstraintFix *>;
+  llvm::SmallMapVector<LocatorAndKind, llvm::SmallVector<SolutionAndFix, 4>, 4>
       aggregatedFixes;
   for (const auto &solution : solutions) {
-    for (auto *fix : solution.Fixes)
-      aggregatedFixes[{fix->getLocator(), fix->getKind()}].push_back(fix);
+    for (const auto *fix : solution.Fixes) {
+      LocatorAndKind key(fix->getLocator(), fix->getKind());
+      aggregatedFixes[key].emplace_back(&solution, fix);
+    }
   }
 
   // If there is an overload difference, let's see if there's a common callee
@@ -3001,8 +3019,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     bool diagnosed = false;
     for (auto fixes: aggregatedFixes) {
       // A common fix must appear in all solutions
-      if (fixes.second.size() < solutions.size()) continue;
-      diagnosed |= fixes.second.front()->diagnoseForAmbiguity(solutions);
+      auto &commonFixes = fixes.second;
+      if (commonFixes.size() != solutions.size()) continue;
+
+      auto *firstFix = commonFixes.front().second;
+      diagnosed |= firstFix->diagnoseForAmbiguity(commonFixes);
     }
     return diagnosed;
   }
@@ -4177,10 +4198,11 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.convertType = convertType;
   expression.pattern = nullptr;
   expression.wrappedVar = nullptr;
+  expression.innermostWrappedValueInit = nullptr;
   expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
-  expression.patternBinding = nullptr;
-  expression.patternBindingIndex = 0;
+  expression.initialization.patternBinding = nullptr;
+  expression.initialization.patternBindingIndex = 0;
 }
 
 void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
@@ -4201,9 +4223,11 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   Expr *backingInitializer;
   if (Expr *initializer = expression.expression) {
     // Form init(wrappedValue:) call(s).
-    Expr *wrappedInitializer =
-        buildPropertyWrapperWrappedValueCall(
-            singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
+    Expr *wrappedInitializer = buildPropertyWrapperWrappedValueCall(
+        singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false,
+        [&](ApplyExpr *innermostInit) {
+          expression.innermostWrappedValueInit = innermostInit;
+        });
     if (!wrappedInitializer)
       return;
 
@@ -4239,6 +4263,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
   // the initializer type later.
   expression.wrappedVar = singleVar;
   expression.expression = backingInitializer;
+  expression.convertType = outermostWrapperAttr->getTypeLoc();
 }
 
 SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
@@ -4277,18 +4302,35 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     auto result = forInitialization(
         initializer, dc, patternType,
         patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
-    result.expression.patternBinding = patternBinding;
-    result.expression.patternBindingIndex = patternBindingIndex;
+    result.expression.initialization.patternBinding = patternBinding;
+    result.expression.initialization.patternBindingIndex = patternBindingIndex;
     return result;
 }
 
+SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
+    ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
+    bool bindPatternVarsOneWay) {
+  SolutionApplicationTarget target(
+      stmt->getSequence(), dc, CTP_ForEachStmt,
+      sequenceProto->getDeclaredType(), /*isDiscarded=*/false);
+  target.expression.pattern = stmt->getPattern();
+  target.expression.bindPatternVarsOneWay =
+    bindPatternVarsOneWay || (stmt->getWhere() != nullptr);
+  target.expression.forEachStmt.stmt = stmt;
+  target.expression.forEachStmt.whereExpr = stmt->getWhere();
+  return target;
+}
+
 ContextualPattern
-SolutionApplicationTarget::getInitializationContextualPattern() const {
+SolutionApplicationTarget::getContextualPattern() const {
   assert(kind == Kind::expression);
-  assert(expression.contextualPurpose == CTP_Initialization);
-  if (expression.patternBinding) {
+  assert(expression.contextualPurpose == CTP_Initialization ||
+         expression.contextualPurpose == CTP_ForEachStmt);
+  if (expression.contextualPurpose == CTP_Initialization &&
+      expression.initialization.patternBinding) {
     return ContextualPattern::forPatternBindingDecl(
-        expression.patternBinding, expression.patternBindingIndex);
+        expression.initialization.patternBinding,
+        expression.initialization.patternBindingIndex);
   }
 
   return ContextualPattern::forRawPattern(expression.pattern, expression.dc);

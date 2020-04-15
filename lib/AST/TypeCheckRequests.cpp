@@ -913,7 +913,7 @@ void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 }
 
 void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
-
+  
 }
 
 //----------------------------------------------------------------------------//

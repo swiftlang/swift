@@ -392,16 +392,6 @@ SourceRange ForEachPatternScope::getSourceRangeOfThisASTNode(
 }
 
 SourceRange
-CatchStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  // The scope of the pattern extends from the 'where' (if present)
-  // to the end of the body.
-  if (stmt->getGuardExpr())
-    return SourceRange(stmt->getWhereLoc(), stmt->getBody()->getEndLoc());
-
-  // Otherwise, the scope of the pattern encompasses the body.
-  return stmt->getBody()->getSourceRange();
-}
-SourceRange
 CaseStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   // The scope of the case statement begins at the first guard expression,
   // if there is one, and extends to the end of the body.

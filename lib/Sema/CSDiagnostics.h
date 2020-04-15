@@ -45,15 +45,11 @@ class FailureDiagnostic {
   Expr *RawAnchor;
   /// Simplified anchor associated with the given locator.
   Expr *Anchor;
-  /// Indicates whether locator could be simplified
-  /// down to anchor expression.
-  bool HasComplexLocator;
 
 public:
   FailureDiagnostic(const Solution &solution, ConstraintLocator *locator)
-      : S(solution), Locator(locator), RawAnchor(locator->getAnchor()) {
-    std::tie(Anchor, HasComplexLocator) = computeAnchor();
-  }
+      : S(solution), Locator(locator), RawAnchor(locator->getAnchor()),
+        Anchor(computeAnchor()) {}
 
   FailureDiagnostic(const Solution &solution, Expr *anchor)
       : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
@@ -144,31 +140,18 @@ protected:
     return cs.getASTContext();
   }
 
-  Optional<std::pair<Type, ConversionRestrictionKind>>
-  getRestrictionForType(Type type) const {
-    for (auto &e : S.ConstraintRestrictions) {
-      auto &location = e.first;
-      auto &restriction = e.second;
-
-      if (std::get<0>(location)->isEqual(type))
-        return std::pair<Type, ConversionRestrictionKind>(std::get<1>(location),
-                                                          restriction);
-    }
-    return None;
-  }
-
-  ValueDecl *getResolvedMemberRef(UnresolvedDotExpr *member) const {
-    auto *locator = getConstraintLocator(member, ConstraintLocator::Member);
-    if (auto overload = getOverloadChoiceIfAvailable(locator))
-      return overload->choice.getDeclOrNull();
-    return nullptr;
-  }
-
   /// Retrieve overload choice resolved for a given locator
   /// by the constraint solver.
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return S.getOverloadChoiceIfAvailable(locator);
+  }
+
+  /// Retrieve overload choice resolved for a callee for the anchor
+  /// of a given locator.
+  Optional<SelectedOverload>
+  getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
+    return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
   }
 
   ConstraintLocator *
@@ -189,9 +172,6 @@ protected:
     return S.getFunctionArgApplyInfo(locator);
   }
 
-  /// \returns true is locator hasn't been simplified down to expression.
-  bool hasComplexLocator() const { return HasComplexLocator; }
-
   /// \returns A parent expression if sub-expression is contained anywhere
   /// in the root expression or `nullptr` otherwise.
   Expr *findParentExpr(Expr *subExpr) const;
@@ -206,10 +186,6 @@ protected:
   /// the argument list cannot be found, returns \c nullptr.
   Expr *getArgumentListExprFor(ConstraintLocator *locator) const;
 
-  /// \returns The overload choice made by the constraint system for the callee
-  /// of a given locator's anchor, or \c None if no such choice can be found.
-  Optional<SelectedOverload> getChoiceFor(ConstraintLocator *) const;
-
   /// \returns A new type with all of the type variables associated with
   /// generic parameters substituted back into being generic parameter type.
   Type restoreGenericParameters(
@@ -219,7 +195,7 @@ protected:
 
 private:
   /// Compute anchor expression associated with current diagnostic.
-  std::pair<Expr *, bool> computeAnchor() const;
+  Expr *computeAnchor() const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -1977,6 +1953,16 @@ public:
   bool diagnoseAsError();
 };
 
+/// Emits a warning about an attempt to use the 'as' operator as the 'as!'
+/// operator.
+class CoercionAsForceCastFailure final : public ContextualFailure {
+public:
+  CoercionAsForceCastFailure(const Solution &solution, Type fromType,
+                             Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+};
 } // end namespace constraints
 } // end namespace swift
 

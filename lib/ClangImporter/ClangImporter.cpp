@@ -1886,8 +1886,13 @@ ModuleDecl *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 
-ModuleDecl *ClangImporter::getWrapperForModule(const clang::Module *mod) const {
-  return Impl.getWrapperForModule(mod)->getParentModule();
+ModuleDecl *
+ClangImporter::getWrapperForModule(const clang::Module *mod,
+                                   bool returnOverlayIfPossible) const {
+  auto clangUnit = Impl.getWrapperForModule(mod);
+  if (returnOverlayIfPossible && clangUnit->getOverlayModule())
+    return clangUnit->getOverlayModule();
+  return clangUnit->getParentModule();
 }
 
 PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
@@ -3331,7 +3336,7 @@ ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
     clangModule(clangModule) {
   // Capture the file metadata before it goes away.
   if (clangModule)
-    ASTSourceDescriptor = {*clangModule};
+    ASTSourceDescriptor = {*const_cast<clang::Module *>(clangModule)};
 }
 
 StringRef ClangModuleUnit::getModuleDefiningPath() const {

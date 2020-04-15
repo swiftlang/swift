@@ -241,3 +241,7 @@ open class AddingNewDesignatedInit {
     print(foo)
   }
 }
+
+public extension Float {
+  func floatHigher() {}
+}

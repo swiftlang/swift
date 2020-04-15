@@ -36,7 +36,7 @@ bool DerivedConformance::canDeriveKeyPathIterable(NominalTypeDecl *nominal) {
   return isa<StructDecl>(nominal);
 }
 
-// Compute `PartialKeyPathType<Nominal>`, bound to the given nominal
+// Compute `PartialKeyPath<Nominal>`, bound to the given nominal
 // declaration's type.
 static Type computePartialKeyPathType(NominalTypeDecl *nominal) {
   auto &C = nominal->getASTContext();
@@ -53,6 +53,18 @@ static Type computePartialKeyPathType(NominalTypeDecl *nominal) {
 static ArraySliceType *computeAllKeyPathsType(NominalTypeDecl *nominal) {
   auto partialKeyPathType = computePartialKeyPathType(nominal);
   return ArraySliceType::get(partialKeyPathType);
+}
+
+// Compute `KeyPath<Nominal, Member>`.
+static Type computeKeyPathType(NominalTypeDecl *nominal, Type memberType) {
+  auto &C = nominal->getASTContext();
+  auto nominalType = nominal->getDeclaredInterfaceType();
+  if (!nominalType || nominalType->hasError())
+    return nullptr;
+  auto *keyPathDecl = cast<ClassDecl>(C.getKeyPathDecl());
+  return BoundGenericClassType::get(
+      keyPathDecl, /*parent*/ Type(),
+      {nominal->getDeclaredInterfaceType(), memberType});
 }
 
 // Mark the given `ValueDecl` as `@inlinable`, if the conformance context's
@@ -78,9 +90,6 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
-  auto partialKeyPathInterfaceType = computePartialKeyPathType(nominal);
-  auto partialKeyPathType =
-      parentDC->mapTypeIntoContext(partialKeyPathInterfaceType);
 
   auto *nominalTypeExpr = TypeExpr::createForDecl(DeclNameLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
@@ -101,10 +110,13 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
                           DeclNameLoc(), /*Implicit*/ true);
     Expr *keyPathExpr =
         new (C) KeyPathExpr(SourceLoc(), dotExpr, nullptr, /*Implicit*/ true);
-    // NOTE(TF-575): Adding an explicit coercion expression here is necessary
-    // due to type-checker changes.
-    keyPathExpr = new (C) CoerceExpr(
-        keyPathExpr, SourceLoc(), TypeLoc::withoutLoc(partialKeyPathType));
+    // NOTE(TF-575): Adding an explicit coercion expression to
+    // `KeyPath<Nominal, Member>` here is necessary due to type-checker changes.
+    auto keyPathInterfaceType =
+        computeKeyPathType(nominal, member->getInterfaceType());
+    auto keyPathType = parentDC->mapTypeIntoContext(keyPathInterfaceType);
+    keyPathExpr = new (C)
+        CoerceExpr(keyPathExpr, SourceLoc(), TypeLoc::withoutLoc(keyPathType));
     keyPathExprs.push_back(keyPathExpr);
   }
   // Return array of all key path expressions.

@@ -49,18 +49,13 @@ for filename in os.listdir(sdk_overlay_dir):
     else:
         continue
 
-    # SWIFT_ENABLE_TENSORFLOW
-    # TODO(TF-939): Enable this on DifferentiationUnittest, Python, and
-    # TensorFlow.
     if module_name in [
+        "_Differentiation",
+        "DifferentiationUnittest",
         "Swift",
         "SwiftLang",
-        "DifferentiationUnittest",
-        "Python",
-        "TensorFlow",
     ]:
         continue
-    # SWIFT_ENABLE_TENSORFLOW END
 
     # swift -build-module-from-parseable-interface
     output_path = os.path.join(output_dir, module_name + ".swiftmodule")

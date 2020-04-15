@@ -428,16 +428,15 @@ protected:
     HasTopLevelLocalContextCaptures : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+1+1,
-    /// The kind of accessor this is.
-    AccessorKind : 4,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4 + 1 + 1,
+                        /// The kind of accessor this is.
+                        AccessorKind : 4,
 
-    /// Whether the accessor is transparent.
-    IsTransparent : 1,
+                        /// Whether the accessor is transparent.
+                        IsTransparent : 1,
 
-    /// Whether we have computed the above.
-    IsTransparentComputed : 1
-  );
+                        /// Whether we have computed the above.
+                        IsTransparentComputed : 1);
 
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+1+1,
     /// The body initialization kind (+1), or zero if not yet computed.
@@ -1435,6 +1434,8 @@ public:
     return SourceRange(WhereLoc,
                        getRequirements().back().getSourceRange().End);
   }
+
+  void print(llvm::raw_ostream &OS, bool printWhereKeyword) const;
 };
 
 // A private class for forcing exact field layout.
@@ -4830,6 +4831,13 @@ public:
   /// Does this storage require a 'modify' accessor in its opaque-accessors set?
   bool requiresOpaqueModifyCoroutine() const;
 
+  /// Does this storage have any explicit observers (willSet or didSet) attached
+  /// to it?
+  bool hasObservers() const {
+    return getParsedAccessor(AccessorKind::WillSet) ||
+           getParsedAccessor(AccessorKind::DidSet);
+  }
+
   SourceRange getBracesRange() const {
     if (auto info = Accessors.getPointer())
       return info->getBracesRange();
@@ -5258,7 +5266,7 @@ public:
   ///
   /// \code
   /// @Lazy var i = 17
-  /// \end
+  /// \endcode
   ///
   /// Or when there is no initializer but each composed property wrapper has
   /// a suitable `init(wrappedValue:)`.
@@ -6524,6 +6532,11 @@ public:
   bool isImplicitGetter() const {
     return isGetter() && getAccessorKeywordLoc().isInvalid();
   }
+
+  /// Is this accessor a "simple" didSet? A "simple" didSet does not
+  /// use the implicit oldValue parameter in its body or does not have
+  /// an explicit parameter in its parameter list.
+  bool isSimpleDidSet() const;
 
   void setIsTransparent(bool transparent) {
     Bits.AccessorDecl.IsTransparent = transparent;

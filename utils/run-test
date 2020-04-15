@@ -126,12 +126,18 @@ def main():
                         choices=["true", "verbose", "skip"], default='true',
                         help="build test dependencies before running tests "
                              "(default: true)")
+    parser.add_argument("--build-jobs",
+                        type=int,
+                        help="The number of parallel build jobs to use")
     parser.add_argument("--target",
                         type=argparse.types.ShellSplitType(),
                         action=argparse.actions.AppendAction,
                         dest="targets",
                         help="stdlib deployment targets to test. Accept "
                              "multiple (default: " + host_target + ")")
+    parser.add_argument("--filter", type=str, metavar="REGEX",
+                        help="only run tests with paths matching the given "
+                             "regular expression")
     parser.add_argument("--mode",
                         choices=TEST_MODES, default='optimize_none',
                         help="test mode (default: optimize_none)")
@@ -229,7 +235,11 @@ def main():
         cmake_build = ['cmake', '--build', build_dir, '--']
         if args.build == 'verbose':
             cmake_build += ['-v']
-        cmake_build += ['-j%d' % multiprocessing.cpu_count()]
+
+        if args.build_jobs is not None:
+            cmake_build += ['-j%d' % args.build_jobs]
+        else:
+            cmake_build += ['-j%d' % multiprocessing.cpu_count()]
 
         print("--- Building test dependencies %s ---" %
               ', '.join(dependency_targets))
@@ -261,6 +271,9 @@ def main():
         test_args += ['--param', 'swift_test_results_dir=%s' % args.result_dir,
                       '--xunit-xml-output=%s' % os.path.join(args.result_dir,
                                                              'lit-tests.xml')]
+
+    if args.filter:
+        test_args += ['--filter', args.filter]
 
     test_cmd = [sys.executable, args.lit] + test_args + paths
 

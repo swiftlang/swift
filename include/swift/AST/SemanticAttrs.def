@@ -68,9 +68,10 @@ SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER,
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER,
           "optimize.sil.specialize.generic.size.never")
 
-SEMANTICS_ATTR(OSLOG_INTERPOLATION_INIT, "oslog.interpolation.init")
 SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_INTERPOLATION, "oslog.message.init_interpolation")
 SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_STRING_LITERAL, "oslog.message.init_stringliteral")
+SEMANTICS_ATTR(OSLOG_REQUIRES_CONSTANT_ARGUMENTS, "oslog.requires_constant_arguments")
+SEMANTICS_ATTR(ATOMICS_REQUIRES_CONSTANT_ORDERINGS, "atomics.requires_constant_orderings")
 
 SEMANTICS_ATTR(TYPE_CHECKER_OPEN_EXISTENTIAL, "typechecker._openExistential(_:do:)")
 SEMANTICS_ATTR(TYPE_CHECKER_TYPE, "typechecker.type(of:)")

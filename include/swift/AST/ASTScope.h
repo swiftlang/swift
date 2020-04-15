@@ -1781,7 +1781,7 @@ public:
 ///  The insertion point of the last statement of an active clause in an #if
 ///  must be the lookup parent
 /// of any following scopes. But the active clause may not be the last clause.
-/// In sort, this is another case where the lookup parent cannot follow the same
+/// In short, this is another case where the lookup parent cannot follow the same
 /// nesting as the source order. IfConfigUseScope implements this twist. It
 /// follows the IfConfig, wraps all subsequent scopes, and redirects the lookup.
 class LookupParentDiversionScope final : public ASTScopeImpl {
@@ -1891,29 +1891,6 @@ public:
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;
-};
-
-class CatchStmtScope final : public AbstractStmtScope {
-public:
-  CatchStmt *const stmt;
-  CatchStmtScope(CatchStmt *e) : stmt(e) {}
-  virtual ~CatchStmtScope() {}
-
-protected:
-  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
-
-public:
-  std::string getClassName() const override;
-  SourceRange
-  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
-  Stmt *getStmt() const override { return stmt; }
-
-protected:
-  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                             ASTScopeImpl::DeclConsumer) const override;
 };
 
 class CaseStmtScope final : public AbstractStmtScope {

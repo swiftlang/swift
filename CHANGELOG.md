@@ -27,6 +27,38 @@ CHANGELOG
 Swift 5.3
 ----------
 
+* [SE-0268][]:
+  
+  A `didSet` observer which does not refer to the `oldValue` in its body or does not explicitly request it by placing it in the parameter list (i.e. `didSet(oldValue)`) will no longer trigger a call to the property getter to fetch the `oldValue`.
+  
+  ```swift
+  class C {
+    var value: Int = 0 {
+      didSet { print("didSet called!") }
+    }
+  }
+  
+  let c = C()
+  // This does not trigger a call to the getter for 'value'
+  // because the 'didSet' observer on 'value' does not
+  // refer to the 'oldValue' in its body, which means
+  // the 'oldValue' does not need to be fetched.
+  c.value = 1
+  ```
+  
+* [SE-0276][]:
+
+  Catch clauses in a `do`-`catch` statement can now include multiple patterns in a comma-separated list. The body of a `catch` clause will be executed if a thrown error matches any of its patterns.
+
+  ```swift
+  do {
+    try performTask()
+  } catch TaskError.someFailure(let msg),
+          TaskError.anotherFailure(let msg) {
+    showMessage(msg)
+  }
+  ```
+
 * [SE-0280][]:
   
   Enum cases can now satisfy static protocol requirements. A static get-only property of type `Self` can be witnessed by an enum case with no associated values and a static function with arguments and returning `Self` can be witnessed by an enum case with associated values.
@@ -7969,7 +8001,9 @@ Swift 1.0
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
 [SE-0266]: <https://github.com/apple/swift-evolution/blob/master/proposals/0266-synthesized-comparable-for-enumerations.md>
 [SE-0267]: <https://github.com/apple/swift-evolution/blob/master/proposals/0267-where-on-contextually-generic.md>
+[SE-0268]: <https://github.com/apple/swift-evolution/blob/master/proposals/0268-didset-semantics.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
+[SE-0276]: <https://github.com/apple/swift-evolution/blob/master/proposals/0276-multi-pattern-catch-clauses.md>
 [SE-0280]: <https://github.com/apple/swift-evolution/blob/master/proposals/0280-enum-cases-as-protocol-witnesses.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>

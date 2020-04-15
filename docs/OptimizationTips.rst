@@ -33,8 +33,19 @@ three different optimization levels:
 
 In the Xcode UI, one can modify the current optimization level as follows:
 
-...
+In the Project Navigator, select the project icon to enter the Project Editor.
+In the project editor, select the icon under the "Project" header to enter
+the project settings editor. From there, an optimization setting can be applied
+to every target in the project by changing the "Optimization Level" field under
+the "Build Settings" header.
 
+To apply a custom optimization level to a particular target, select that target
+under the "Targets" header in the Project Editor and override the
+"Optimization Level" field under its "Build Settings" header.
+
+If a given optimization level is not available in the UI, its corresponding flag
+can be manually specified by selecting the ``Other...`` level in
+the "Optimization Level" dropdown.
 
 Whole Module Optimizations (WMO)
 ================================

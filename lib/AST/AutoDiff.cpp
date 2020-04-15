@@ -13,6 +13,7 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -122,6 +123,23 @@ void AutoDiffConfig::print(llvm::raw_ostream &s) const {
     derivativeGenericSignature->print(s);
   }
   s << ')';
+}
+
+bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
+  auto &ctx = SF.getASTContext();
+  // Return true if differentiable programming is explicitly enabled.
+  if (ctx.LangOpts.EnableExperimentalDifferentiableProgramming)
+    return true;
+  // Otherwise, return true iff the `_Differentiation` module is imported in
+  // the given source file.
+  bool importsDifferentiationModule = false;
+  for (auto import : namelookup::getAllImports(&SF)) {
+    if (import.second->getName() == ctx.Id_Differentiation) {
+      importsDifferentiationModule = true;
+      break;
+    }
+  }
+  return importsDifferentiationModule;
 }
 
 // TODO(TF-874): This helper is inefficient and should be removed. Unwrapping at

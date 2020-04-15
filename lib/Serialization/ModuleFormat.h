@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 551; // derivative function configurations
+const uint16_t SWIFTMODULE_VERSION_MINOR = 553; // change to USR mangling
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -208,6 +208,8 @@ enum class ReadWriteImplKind : uint8_t {
   MutableAddress,
   MaterializeToTemporary,
   Modify,
+  StoredWithSimpleDidSet,
+  InheritedWithSimpleDidSet,
 };
 using ReadWriteImplKindField = BCFixed<3>;
 

@@ -298,6 +298,7 @@ namespace {
     ConstraintSystem &cs;
     DeclContext *dc;
     Solution &solution;
+    Optional<SolutionApplicationTarget> target;
     bool SuppressDiagnostics;
 
     /// Coerce the given tuple to another tuple type.
@@ -1964,6 +1965,7 @@ namespace {
       auto *keyPath = new (ctx) KeyPathExpr(/*backslashLoc=*/dotLoc,
                                             /*parsedRoot=*/nullptr,
                                             /*parsedPath=*/anchor,
+                                            /*hasLeadingDot=*/false,
                                             /*isImplicit=*/true);
       // Type of the keypath expression we are forming is known
       // in advance, so let's set it right away.
@@ -2206,8 +2208,9 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, Solution &solution,
+                 Optional<SolutionApplicationTarget> target,
                  bool suppressDiagnostics)
-        : cs(cs), dc(cs.DC), solution(solution),
+        : cs(cs), dc(cs.DC), solution(solution), target(target),
           SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
@@ -3479,6 +3482,11 @@ namespace {
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
       assert(expr->isPlaceholder() && "Already type-checked");
+      return expr;
+    }
+
+    Expr *visitPropertyWrapperValuePlaceholderExpr(
+        PropertyWrapperValuePlaceholderExpr *expr) {
       return expr;
     }
 
@@ -5550,8 +5558,24 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
   SmallVector<AnyFunctionType::Param, 8> args;
   AnyFunctionType::decomposeInput(cs.getType(arg), args);
 
+  // If this application is an init(wrappedValue:) call that needs an injected
+  // wrapped value placeholder, the first non-defaulted argument must be
+  // wrapped in an OpaqueValueExpr.
+  bool shouldInjectWrappedValuePlaceholder =
+     target->shouldInjectWrappedValuePlaceholder(apply);
+
+  auto injectWrappedValuePlaceholder = [&](Expr *arg) -> Expr * {
+    auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(ctx,
+        arg->getSourceRange(), cs.getType(arg), arg);
+    cs.cacheType(placeholder);
+    cs.cacheType(placeholder->getOpaqueValuePlaceholder());
+    shouldInjectWrappedValuePlaceholder = false;
+    return placeholder;
+  };
+
   // Quickly test if any further fix-ups for the argument types are necessary.
-  if (AnyFunctionType::equalParams(args, params))
+  if (AnyFunctionType::equalParams(args, params) &&
+      !shouldInjectWrappedValuePlaceholder)
     return arg;
 
   // Apply labels to arguments.
@@ -5702,7 +5726,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
-    if (argType->isEqual(paramType)) {
+    if (argType->isEqual(paramType) && !shouldInjectWrappedValuePlaceholder) {
       newArgs.push_back(arg);
       newParams.push_back(param);
       continue;
@@ -5741,12 +5765,32 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
           arg, closureType->getResult(),
           locator.withPathElement(ConstraintLocator::AutoclosureResult));
 
+      if (shouldInjectWrappedValuePlaceholder) {
+        // If init(wrappedValue:) takes an escaping autoclosure, then we want
+        // the effect of autoclosure forwarding of the placeholder
+        // autoclosure. The only way to do this is to call the placeholder
+        // autoclosure when passing it to the init.
+        if (!closureType->isNoEscape()) {
+          auto *placeholder = injectWrappedValuePlaceholder(
+              cs.buildAutoClosureExpr(arg, closureType));
+          arg = CallExpr::createImplicit(ctx, placeholder, {}, {});
+          arg->setType(closureType->getResult());
+          cs.cacheType(arg);
+        } else {
+          arg = injectWrappedValuePlaceholder(arg);
+        }
+      }
+
       convertedArg = cs.buildAutoClosureExpr(arg, closureType);
     } else {
       convertedArg = coerceToType(
           arg, paramType,
           getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
     }
+
+    // Perform the wrapped value placeholder injection
+    if (shouldInjectWrappedValuePlaceholder)
+      convertedArg = injectWrappedValuePlaceholder(convertedArg);
 
     if (!convertedArg)
       return nullptr;
@@ -5970,7 +6014,7 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
         semanticExpr = capture->getClosureBody();
       if (isa<ClosureExpr>(semanticExpr)) return;
       if (auto *declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
-        if (isa<FuncDecl>(declRef->getDecl())) return;
+        if (isa<AbstractFunctionDecl>(declRef->getDecl())) return;
         // If the referenced decl is a function parameter, the user may want
         // to change the declaration to be a '@differentiable' closure. Emit a
         // note with a fix-it.
@@ -6000,13 +6044,16 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
         if (isa<FuncDecl>(memberRef->getMember().getDecl())) return;
       } else if (auto *dotSyntaxCall =
                      dyn_cast<DotSyntaxCallExpr>(semanticExpr)) {
-        Expr *fnExpr = dotSyntaxCall->getFn()->getSemanticsProvidingExpr();
-        while (auto *autoclosureExpr = dyn_cast<AutoClosureExpr>(fnExpr))
-          if (auto *unwrappedFnExpr = autoclosureExpr->getUnwrappedCurryThunkExpr())
-            fnExpr = unwrappedFnExpr;
         // Recurse on the function expression.
+        auto *fnExpr = dotSyntaxCall->getFn()->getSemanticsProvidingExpr();
         maybeDiagnoseFunctionRef(fnExpr);
         return;
+      } else if (auto *autoclosureExpr = dyn_cast<AutoClosureExpr>(semanticExpr)) {
+        // Peer through curry thunks.
+        if (auto *unwrappedFnExpr = autoclosureExpr->getUnwrappedCurryThunkExpr()) {
+          maybeDiagnoseFunctionRef(unwrappedFnExpr);
+          return;
+        }
       }
       ctx.Diags.diagnose(expr->getLoc(),
                          diag::invalid_differentiable_function_conversion_expr,
@@ -7087,8 +7134,9 @@ static Expr *buildCallAsFunctionMethodRef(
 
   // Create direct reference to `callAsFunction` method.
   auto *fn = apply->getFn();
+  auto *arg = apply->getArg();
   auto *declRef = rewriter.buildMemberRef(
-      fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(fn->getEndLoc()),
+      fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(arg->getStartLoc()),
       calleeLoc, calleeLoc, /*implicit*/ true,
       /*extraUncurryLevel=*/true, AccessSemantics::Ordinary);
   if (!declRef)
@@ -7886,7 +7934,7 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 
 /// Apply the given solution to the initialization target.
 ///
-/// \returns the resulting initialiation expression.
+/// \returns the resulting initialization expression.
 static Optional<SolutionApplicationTarget> applySolutionToInitialization(
     Solution &solution, SolutionApplicationTarget target,
     Expr *initializer) {
@@ -7950,13 +7998,146 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
 
   // Apply the solution to the pattern as well.
-  auto contextualPattern = target.getInitializationContextualPattern();
+  auto contextualPattern = target.getContextualPattern();
   if (auto coercedPattern = TypeChecker::coercePatternToType(
           contextualPattern, finalPatternType, options)) {
     resultTarget.setPattern(coercedPattern);
   } else {
     return None;
   }
+
+  return resultTarget;
+}
+
+/// Apply the given solution to the for-each statement target.
+///
+/// \returns the resulting initialization expression.
+static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
+    Solution &solution, SolutionApplicationTarget target, Expr *sequence) {
+  auto resultTarget = target;
+  auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
+
+  // Simplify the various types.
+  forEachStmtInfo.elementType =
+      solution.simplifyType(forEachStmtInfo.elementType);
+  forEachStmtInfo.iteratorType =
+      solution.simplifyType(forEachStmtInfo.iteratorType);
+  forEachStmtInfo.initType =
+      solution.simplifyType(forEachStmtInfo.initType);
+  forEachStmtInfo.sequenceType =
+      solution.simplifyType(forEachStmtInfo.sequenceType);
+
+  // Coerce the sequence to the sequence type.
+  auto &cs = solution.getConstraintSystem();
+  auto locator = cs.getConstraintLocator(target.getAsExpr());
+  sequence = solution.coerceToType(
+     sequence, forEachStmtInfo.sequenceType, locator);
+  if (!sequence)
+    return None;
+
+  resultTarget.setExpr(sequence);
+
+  // Get the conformance of the sequence type to the Sequence protocol.
+  auto stmt = forEachStmtInfo.stmt;
+  auto sequenceProto = TypeChecker::getProtocol(
+      cs.getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
+  auto contextualLocator = cs.getConstraintLocator(
+      target.getAsExpr(), LocatorPathElt::ContextualType());
+  auto sequenceConformance = solution.resolveConformance(
+      contextualLocator, sequenceProto);
+  assert(!sequenceConformance.isInvalid() &&
+         "Couldn't find sequence conformance");
+
+  // Coerce the pattern to the element type.
+  TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
+  options |= TypeResolutionFlags::OverrideType;
+
+  // Apply the solution to the pattern as well.
+  auto contextualPattern = target.getContextualPattern();
+  if (auto coercedPattern = TypeChecker::coercePatternToType(
+          contextualPattern, forEachStmtInfo.initType, options)) {
+    resultTarget.setPattern(coercedPattern);
+  } else {
+    return None;
+  }
+
+  // Apply the solution to the filtering condition, if there is one.
+  auto dc = target.getDeclContext();
+  if (forEachStmtInfo.whereExpr) {
+    auto *boolDecl = dc->getASTContext().getBoolDecl();
+    assert(boolDecl);
+    Type boolType = boolDecl->getDeclaredType();
+    assert(boolType);
+
+    SolutionApplicationTarget whereTarget(
+        forEachStmtInfo.whereExpr, dc, CTP_Condition, boolType,
+        /*isDiscarded=*/false);
+    auto newWhereTarget = cs.applySolution(solution, whereTarget);
+    if (!newWhereTarget)
+      return None;
+
+    forEachStmtInfo.whereExpr = newWhereTarget->getAsExpr();
+  }
+
+  // Invoke iterator() to get an iterator from the sequence.
+  ASTContext &ctx = cs.getASTContext();
+  VarDecl *iterator;
+  Type nextResultType = OptionalType::get(forEachStmtInfo.elementType);
+  {
+    // Create a local variable to capture the iterator.
+    std::string name;
+    if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+      name = "$"+np->getBoundName().str().str();
+    name += "$generator";
+
+    iterator = new (ctx) VarDecl(
+        /*IsStatic*/ false, VarDecl::Introducer::Var,
+        /*IsCaptureList*/ false, stmt->getInLoc(),
+        ctx.getIdentifier(name), dc);
+    iterator->setInterfaceType(
+        forEachStmtInfo.iteratorType->mapTypeOutOfContext());
+    iterator->setImplicit();
+
+    auto genPat = new (ctx) NamedPattern(iterator);
+    genPat->setImplicit();
+
+    // TODO: test/DebugInfo/iteration.swift requires this extra info to
+    // be around.
+    PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, genPat,
+        new (ctx) OpaqueValueExpr(stmt->getInLoc(), nextResultType),
+        dc, /*VarLoc*/ stmt->getForLoc());
+  }
+
+  // Create the iterator variable.
+  auto *varRef = TypeChecker::buildCheckedRefExpr(
+      iterator, dc, DeclNameLoc(stmt->getInLoc()), /*implicit*/ true);
+
+  // Convert that Optional<Element> value to the type of the pattern.
+  auto optPatternType = OptionalType::get(forEachStmtInfo.initType);
+  if (!optPatternType->isEqual(nextResultType)) {
+    OpaqueValueExpr *elementExpr =
+        new (ctx) OpaqueValueExpr(stmt->getInLoc(), nextResultType,
+                                  /*isPlaceholder=*/true);
+    Expr *convertElementExpr = elementExpr;
+    if (TypeChecker::typeCheckExpression(
+            convertElementExpr, dc,
+            TypeLoc::withoutLoc(optPatternType),
+            CTP_CoerceOperand).isNull()) {
+      return None;
+    }
+    elementExpr->setIsPlaceholder(false);
+    stmt->setElementExpr(elementExpr);
+    stmt->setConvertElementExpr(convertElementExpr);
+  }
+
+  // Write the result back into the AST.
+  stmt->setSequence(resultTarget.getAsExpr());
+  stmt->setPattern(resultTarget.getContextualPattern().getPattern());
+  stmt->setSequenceConformance(sequenceConformance);
+  stmt->setWhere(forEachStmtInfo.whereExpr);
+  stmt->setIteratorVar(iterator);
+  stmt->setIteratorVarRef(varRef);
 
   return resultTarget;
 }
@@ -7972,16 +8153,50 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     if (!rewrittenExpr)
       return None;
 
-    /// Handle application for initializations.
-    if (target.getExprContextualTypePurpose() == CTP_Initialization) {
+    /// Handle special cases for expressions.
+    switch (target.getExprContextualTypePurpose()) {
+    case CTP_Initialization: {
       auto initResultTarget = applySolutionToInitialization(
           solution, target, rewrittenExpr);
       if (!initResultTarget)
         return None;
 
       result = *initResultTarget;
-    } else {
+      break;
+    }
+
+    case CTP_ForEachStmt: {
+      auto forEachResultTarget = applySolutionToForEachStmt(
+          solution, target, rewrittenExpr);
+      if (!forEachResultTarget)
+        return None;
+
+      result = *forEachResultTarget;
+      break;
+    }
+
+    case CTP_Unused:
+    case CTP_ReturnStmt:
+    case swift::CTP_ReturnSingleExpr:
+    case swift::CTP_YieldByValue:
+    case swift::CTP_YieldByReference:
+    case swift::CTP_ThrowStmt:
+    case swift::CTP_EnumCaseRawValue:
+    case swift::CTP_DefaultParameter:
+    case swift::CTP_AutoclosureDefaultParameter:
+    case swift::CTP_CalleeResult:
+    case swift::CTP_CallArgument:
+    case swift::CTP_ClosureResult:
+    case swift::CTP_ArrayElement:
+    case swift::CTP_DictionaryKey:
+    case swift::CTP_DictionaryValue:
+    case swift::CTP_CoerceOperand:
+    case swift::CTP_AssignSource:
+    case swift::CTP_SubscriptAssignSource:
+    case swift::CTP_Condition:
+    case swift::CTP_CannotFail:
       result.setExpr(rewrittenExpr);
+      break;
     }
   } else if (auto stmtCondition = target.getAsStmtCondition()) {
     for (auto &condElement : *stmtCondition) {
@@ -8183,7 +8398,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     }
   }
 
-  ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
+  ExprRewriter rewriter(*this, solution, target, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
   auto resultTarget = walker.rewriteTarget(target);
   if (!resultTarget)
@@ -8215,7 +8430,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator,
                              Optional<Pattern*> typeFromPattern) {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this, /*suppressDiagnostics=*/false);
+  ExprRewriter rewriter(cs, *this, None, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator, typeFromPattern);
   if (!result)
     return nullptr;

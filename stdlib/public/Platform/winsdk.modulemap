@@ -170,6 +170,13 @@ module WinSDK [system] {
     link "ShLwApi.Lib"
   }
 
+  module ShellCore {
+    header "ShellScalingApi.h"
+    export *
+
+    link "shcore.lib"
+  }
+
   module OLE32 {
     header "oaidl.h"
     export *

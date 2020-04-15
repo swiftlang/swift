@@ -247,18 +247,18 @@ willSet {
 }
 
 var globalAccessorDidSet1: Int {
-  didSet {
+  didSet(oldValue) {
     #^GLOBAL_ACCESSOR_DIDSET_1^#
   }
 }
 var globalAccessorDidSet2: Int {
-  didSet {
+  didSet(oldValue) {
     var fs = FooStruct()
     fs.#^GLOBAL_ACCESSOR_DIDSET_2^#
   }
 }
 var globalAccessorDidSet3 = 42 {
-didSet {
+didSet(oldValue) {
   #^GLOBAL_ACCESSOR_DIDSET_3^#
 }
 }
@@ -337,18 +337,18 @@ struct MemberAccessors {
   }
 
   var memberAccessorDidSet1: Int {
-    didSet {
+    didSet(oldValue) {
       #^MEMBER_ACCESSOR_DIDSET_1^#
     }
   }
   var memberAccessorDidSet2: Int {
-    didSet {
+    didSet(oldValue) {
       var fs = FooStruct()
       fs.#^MEMBER_ACCESSOR_DIDSET_2^#
     }
   }
   var memberAccessorDidSet3 = 42 {
-    didSet {
+    didSet(oldValue) {
       #^MEMBER_ACCESSOR_DIDSET_3^#
     }
   }
@@ -424,18 +424,18 @@ func accessorsInFunction(_ functionParam: Int) {
   }
 
   var memberAccessorDidSet1: Int {
-    didSet {
+    didSet(oldValue) {
       #^LOCAL_ACCESSOR_DIDSET_1^#
     }
   }
   var memberAccessorDidSet2: Int {
-    didSet {
+    didSet(oldValue) {
       var fs = FooStruct()
       fs.#^LOCAL_ACCESSOR_DIDSET_2^#
     }
   }
   var memberAccessorDidSet3: Int {
-    didSet {
+    didSet(oldValue) {
       #^LOCAL_ACCESSOR_DIDSET_3^#
     }
   }

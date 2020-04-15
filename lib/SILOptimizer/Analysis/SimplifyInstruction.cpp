@@ -65,6 +65,7 @@ namespace {
     SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
     SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
     SILValue visitBeginAccessInst(BeginAccessInst *BAI);
+    SILValue visitMetatypeInst(MetatypeInst *MTI);
 
     SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
   };
@@ -449,6 +450,24 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
         return isIncidentalUse(operand->getUser());
       })) {
     return BAI->getOperand();
+  }
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitMetatypeInst(MetatypeInst *MI) {
+  auto metaType = MI->getType().castTo<MetatypeType>();
+  auto instanceType = metaType.getInstanceType();
+  // Tuple, Struct, and Enum MetatypeTypes have a single value.
+  // If this metatype is already passed as an argument reuse it to enable
+  // downstream CSE/SILCombine optimizations.
+  // Note: redundant metatype instructions are already handled by CSE.
+  if (isa<TupleType>(instanceType)
+      || instanceType.getStructOrBoundGenericStruct()
+      || instanceType.getEnumOrBoundGenericEnum()) {
+    for (SILArgument *argument : MI->getFunction()->getArguments()) {
+      if (argument->getType().getASTType() == metaType)
+        return argument;
+    }
   }
   return SILValue();
 }

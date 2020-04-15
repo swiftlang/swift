@@ -32,6 +32,9 @@ struct HasMemberwiseInit<T: DefaultInit> {
 
   @WrapperWithInitialValue(wrappedValue: 17)
   var z: Int
+
+  @WrapperWithInitialValue
+  private var p: Bool = true
 }
 
 func forceHasMemberwiseInit() {
@@ -76,6 +79,11 @@ func forceHasMemberwiseInit() {
 // CHECK-NOT: return
 // CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07wrappedF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
 
+// variable initialization expression of HasMemberwiseInit._p
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_p33_{{.*}}23WrapperWithInitialValueVySbGvpfi : $@convention(thin) <T where T : DefaultInit> () -> Bool {
+// CHECK: function_ref @$sSb22_builtinBooleanLiteralSbBi1__tcfC : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+// CHECK: return {{%.*}} : $Bool
+
 // default argument 0 of HasMemberwiseInit.init(x:y:z:)
 // CHECK: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA_ : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool> 
 
@@ -103,7 +111,32 @@ func forceHasMemberwiseInit() {
 // CHECK-NOT: return
 // CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> WrapperWithInitialValue<Int>
 
+// Initialization of p
+// CHECK-NOT: return
+// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_p33_{{.*}}23WrapperWithInitialValueVySbGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> Bool
+// CHECK-NOT: return
+// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV1p33_{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (Bool) -> WrapperWithInitialValue<Bool>
+
 // CHECK: return
+
+// Non-generic struct with private property wrapper
+struct HasMemberwiseInitWithPrivateWrapper {
+  @WrapperWithInitialValue
+  var z: Int = 17
+
+  @WrapperWithInitialValue
+  private var p: Bool = true
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers35HasMemberwiseInitWithPrivateWrapperV1zACSi_tcfC : $@convention(method) (Int, @thin HasMemberwiseInitWithPrivateWrapper.Type) -> HasMemberwiseInitWithPrivateWrapper {
+  // CHECK: function_ref @$s17property_wrappers35HasMemberwiseInitWithPrivateWrapperV1zSivpfP : $@convention(thin) (Int) -> WrapperWithInitialValue<Int>
+  // CHECK: function_ref @$s17property_wrappers35HasMemberwiseInitWithPrivateWrapperV1p33_{{.*}} : $@convention(thin) (Bool) -> WrapperWithInitialValue<Bool>
+  // CHECK: return {{%.*}} : $HasMemberwiseInitWithPrivateWrapper
+}
+
+func forceHasMemberwiseInitWithPrivateWrapper() {
+  _ = HasMemberwiseInitWithPrivateWrapper(z: 42)
+}
+
 
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers9HasNestedV2_y33_{{.*}}14PrivateWrapperAELLVyx_SayxGGvpfi : $@convention(thin) <T> () -> @owned Array<T> {
 // CHECK: bb0:
@@ -669,12 +702,10 @@ class Somesubclass : Someclass {
     // to the superclass' accessors.
     // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12SomesubclassC0A0Sivs : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
     // CHECK: bb0([[NEW:%.+]] : $Int, {{%.+}} : @guaranteed $Somesubclass):
-    // CHECK:   [[GETTER:%.+]] = function_ref @$s17property_wrappers9SomeclassC0A0Sivg : $@convention(method) (@guaranteed Someclass) -> Int
-    // CHECK:   [[OLD:%.+]] = apply [[GETTER]]({{%.+}}) : $@convention(method) (@guaranteed Someclass) -> Int
     // CHECK:   [[SETTER:%.+]] = function_ref @$s17property_wrappers9SomeclassC0A0Sivs : $@convention(method) (Int, @guaranteed Someclass) -> ()
     // CHECK:   apply [[SETTER]]([[NEW]], {{%.+}}) : $@convention(method) (Int, @guaranteed Someclass) -> ()
-    // CHECK:   [[DIDSET:%.+]] = function_ref @$s17property_wrappers12SomesubclassC0A0SivW : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
-    // CHECK:   apply [[DIDSET]]([[OLD]], {{%.+}}) : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
+    // CHECK:   [[DIDSET:%.+]] = function_ref @$s17property_wrappers12SomesubclassC0A0SivW : $@convention(method) (@guaranteed Somesubclass) -> ()
+    // CHECK:   apply [[DIDSET]]({{%.+}}) : $@convention(method) (@guaranteed Somesubclass) -> ()
     didSet {
       print("Subclass")
     }

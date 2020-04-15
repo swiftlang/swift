@@ -18,6 +18,7 @@
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_LINEARMAPINFO_H
 
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "llvm/ADT/DenseMap.h"
@@ -85,6 +86,9 @@ private:
   /// Mapping from linear map structs to their branching trace enum fields.
   llvm::DenseMap<StructDecl *, VarDecl *> linearMapStructEnumFields;
 
+  /// A synthesized file unit.
+  SynthesizedFileUnit &synthesizedFile;
+
   /// A type converter, used to compute struct/enum SIL types.
   Lowering::TypeConverter &typeConverter;
 
@@ -97,13 +101,8 @@ private:
   VarDecl *addVarDecl(NominalTypeDecl *nominal, StringRef name, Type type);
 
   /// Retrieves the file unit that contains implicit declarations in the
-  /// current Swift module. If it does not exist, create one.
-  ///
-  // FIXME: Currently it defaults to the file containing `original`, if it can
-  // be determined. Otherwise, it defaults to any file unit in the module. To
-  // handle this more properly, we could revive the DerivedFileUnit class to
-  // contain all synthesized implicit type declarations.
-  SourceFile &getDeclarationFileUnit();
+  /// current Swift module.
+  SynthesizedFileUnit &getSynthesizedFile() { return synthesizedFile; }
 
   /// Computes and sets the access level for the given nominal type, given the
   /// original function linkage.
@@ -113,7 +112,6 @@ private:
   /// whose cases represent the predecessors/successors of the given original
   /// block.
   EnumDecl *createBranchingTraceDecl(SILBasicBlock *originalBB,
-                                     SILAutoDiffIndices indices,
                                      CanGenericSignature genericSig,
                                      SILLoopInfo *loopInfo);
 
@@ -121,7 +119,6 @@ private:
   /// storing the linear map values and predecessor/successor basic block of the
   /// given original block.
   StructDecl *createLinearMapStruct(SILBasicBlock *originalBB,
-                                    SILAutoDiffIndices indices,
                                     CanGenericSignature genericSig);
 
   /// Adds a linear map field to the linear map struct.
@@ -129,14 +126,12 @@ private:
 
   /// Given an `apply` instruction, conditionally adds a linear map struct field
   /// for its linear map function if it is active.
-  void addLinearMapToStruct(ADContext &context, ApplyInst *ai,
-                            SILAutoDiffIndices indices);
+  void addLinearMapToStruct(ADContext &context, ApplyInst *ai);
 
   /// Generates linear map struct and branching enum declarations for the given
   /// function. Linear map structs are populated with linear map fields and a
   /// branching enum field.
   void generateDifferentiationDataStructures(ADContext &context,
-                                             SILAutoDiffIndices indices,
                                              SILFunction *derivative);
 
 public:

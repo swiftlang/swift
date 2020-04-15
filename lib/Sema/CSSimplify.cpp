@@ -4296,6 +4296,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember: {
+      // If one of the dependent member types has no type variables,
+      // this comparison is effectively illformed, because dependent
+      // member couldn't be simplified down to the actual type, and
+      // we wouldn't be able to solve this constraint, so let's just fail.
+      // This should only happen outside of diagnostic mode, as otherwise the
+      // member is replaced by a hole in simplifyType.
+      if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable())
+        return getTypeMatchFailure(locator);
+
       // Nothing we can solve yet, since we need to wait until
       // type variables will get resolved.
       return formUnsolvedResult();
@@ -4373,22 +4382,34 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto meta1 = cast<AnyMetatypeType>(desugar1);
       auto meta2 = cast<AnyMetatypeType>(desugar2);
 
-      // A.Type < B.Type if A < B and both A and B are classes.
-      // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
-      // and Q.Type are both existential metatypes
-      auto subKind = std::min(kind, ConstraintKind::Subtype);
-      // If instance types can't have a subtype relationship
-      // it means that such types can be simply equated.
       auto instanceType1 = meta1->getInstanceType();
       auto instanceType2 = meta2->getInstanceType();
-      if (isa<MetatypeType>(meta1) &&
-          !(instanceType1->mayHaveSuperclass() &&
-            instanceType2->getClassOrBoundGenericClass())) {
-        subKind = ConstraintKind::Bind;
-      }
+
+      // A.Type < B.Type if A < B and both A and B are classes.
+      // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
+      // and Q.Type are both existential metatypes.
+      auto getSubKind = [&]() -> ConstraintKind {
+        auto subKind = std::min(kind, ConstraintKind::Subtype);
+
+        // If we have existential metatypes, we need to perform subtyping.
+        if (!isa<MetatypeType>(meta1))
+          return subKind;
+
+        // If the LHS cannot be a type with a superclass, we can perform a bind.
+        if (!instanceType1->isTypeVariableOrMember() &&
+            !instanceType1->mayHaveSuperclass())
+          return ConstraintKind::Bind;
+
+        // If the RHS cannot be a class type, we can perform a bind.
+        if (!instanceType2->isTypeVariableOrMember() &&
+            !instanceType2->getClassOrBoundGenericClass())
+          return ConstraintKind::Bind;
+
+        return subKind;
+      };
 
       auto result =
-          matchTypes(instanceType1, instanceType2, subKind, subflags,
+          matchTypes(instanceType1, instanceType2, getSubKind(), subflags,
                      locator.withPathElement(ConstraintLocator::InstanceType));
 
       // If matching of the instance types resulted in the failure make sure
@@ -7048,7 +7069,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   }
 
   bool hasReturn = hasExplicitResult(closure);
-
+  auto &ctx = getASTContext();
   // If this is a multi-statement closure its body doesn't participate
   // in type-checking.
   if (closure->hasSingleExpressionBody()) {
@@ -7061,12 +7082,18 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         closureType->getResult(),
         getConstraintLocator(closure, LocatorPathElt::ClosureBody(hasReturn)));
   } else if (!hasReturn) {
-    // If multi-statement closure doesn't have an explicit result
-    // (no `return` statements) let's default it to `Void`.
-    auto &ctx = getASTContext();
+    bool hasExplicitResult = closure->hasExplicitResultType() &&
+                             closure->getExplicitResultTypeLoc().getType();
+
+    // If this closure has an empty body and no explicit result type
+    // let's bind result type to `Void` since that's the only type empty body
+    // can produce. Otherwise, if (multi-statement) closure doesn't have
+    // an explicit result (no `return` statements) let's default it to `Void`.
+    auto constraintKind = (closure->hasEmptyBody() && !hasExplicitResult)
+                              ? ConstraintKind::Bind
+                              : ConstraintKind::Defaultable;
     addConstraint(
-        ConstraintKind::Defaultable, inferredClosureType->getResult(),
-        ctx.TheEmptyTupleType,
+        constraintKind, inferredClosureType->getResult(), ctx.TheEmptyTupleType,
         getConstraintLocator(closure, ConstraintLocator::ClosureResult));
   }
 
@@ -7200,6 +7227,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
     return { type, count };
   };
 
+  const auto rawType1 = type1;
   type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
 
@@ -7238,6 +7266,85 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (unwrappedToType->isAnyObject()) {
     countOptionalInjections();
     return SolutionKind::Solved;
+  }
+
+  // In a previous version of Swift, we could accidently drop the coercion
+  // constraint in certain cases. In most cases this led to either miscompiles
+  // or crashes later down the pipeline, but for coercions between collections
+  // we generated somewhat reasonable code that performed a force cast. To
+  // maintain compatibility with that behavior, allow the coercion between
+  // two collections, but add a warning fix telling the user to use as! or as?
+  // instead.
+  //
+  // We only need to perform this compatibility logic if the LHS type is a
+  // (potentially optional) type variable, as only such a constraint could have
+  // been previously been left unsolved.
+  //
+  // FIXME: Once we get a new language version, change this condition to only
+  // preserve compatibility for Swift 5.x mode.
+  auto canUseCompatFix =
+      rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
+
+  // Unless we're allowing the collection compatibility fix, the source cannot
+  // be more optional than the destination.
+  if (!canUseCompatFix && numFromOptionals > numToOptionals)
+    return SolutionKind::Error;
+
+  auto makeCollectionResult = [&](SolutionKind result) -> SolutionKind {
+    // If we encountered an error and can use the compatibility fix, do so.
+    if (canUseCompatFix) {
+      if (numFromOptionals > numToOptionals || result == SolutionKind::Error) {
+        auto *loc = getConstraintLocator(locator);
+        auto *fix = AllowCoercionToForceCast::create(*this, type1, type2, loc);
+        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+      }
+    }
+    return result;
+  };
+
+  // Bridging the elements of an array.
+  if (auto fromElement = isArrayType(unwrappedFromType)) {
+    if (auto toElement = isArrayType(unwrappedToType)) {
+      countOptionalInjections();
+      auto result = simplifyBridgingConstraint(
+          *fromElement, *toElement, subflags,
+          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
+      return makeCollectionResult(result);
+    }
+  }
+
+  // Bridging the keys/values of a dictionary.
+  if (auto fromKeyValue = isDictionaryType(unwrappedFromType)) {
+    if (auto toKeyValue = isDictionaryType(unwrappedToType)) {
+      ConstraintFix *compatFix = nullptr;
+      if (canUseCompatFix) {
+        compatFix = AllowCoercionToForceCast::create(
+            *this, type1, type2, getConstraintLocator(locator));
+      }
+      addExplicitConversionConstraint(fromKeyValue->first, toKeyValue->first,
+                                      ForgetChoice,
+                                      locator.withPathElement(
+                                        LocatorPathElt::GenericArgument(0)),
+                                      compatFix);
+      addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
+                                      ForgetChoice,
+                                      locator.withPathElement(
+                                        LocatorPathElt::GenericArgument(1)),
+                                      compatFix);
+      countOptionalInjections();
+      return makeCollectionResult(SolutionKind::Solved);
+    }
+  }
+
+  // Bridging the elements of a set.
+  if (auto fromElement = isSetType(unwrappedFromType)) {
+    if (auto toElement = isSetType(unwrappedToType)) {
+      countOptionalInjections();
+      auto result = simplifyBridgingConstraint(
+          *fromElement, *toElement, subflags,
+          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
+      return makeCollectionResult(result);
+    }
   }
 
   // The source cannot be more optional than the destination, because bridging
@@ -7327,42 +7434,6 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       countOptionalInjections();
       return matchTypes(unwrappedFromType, objcClass, ConstraintKind::Subtype,
                         subflags, locator);
-    }
-  }
-
-  // Bridging the elements of an array.
-  if (auto fromElement = isArrayType(unwrappedFromType)) {
-    if (auto toElement = isArrayType(unwrappedToType)) {
-      countOptionalInjections();
-      return simplifyBridgingConstraint(
-          *fromElement, *toElement, subflags,
-          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
-    }
-  }
-
-  // Bridging the keys/values of a dictionary.
-  if (auto fromKeyValue = isDictionaryType(unwrappedFromType)) {
-    if (auto toKeyValue = isDictionaryType(unwrappedToType)) {
-      addExplicitConversionConstraint(fromKeyValue->first, toKeyValue->first,
-                                      ForgetChoice,
-                                      locator.withPathElement(
-                                        LocatorPathElt::GenericArgument(0)));
-      addExplicitConversionConstraint(fromKeyValue->second, toKeyValue->second,
-                                      ForgetChoice,
-                                      locator.withPathElement(
-                                        LocatorPathElt::GenericArgument(1)));
-      countOptionalInjections();
-      return SolutionKind::Solved;
-    }
-  }
-
-  // Bridging the elements of a set.
-  if (auto fromElement = isSetType(unwrappedFromType)) {
-    if (auto toElement = isSetType(unwrappedToType)) {
-      countOptionalInjections();
-      return simplifyBridgingConstraint(
-          *fromElement, *toElement, subflags,
-          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
     }
   }
 
@@ -7835,21 +7906,10 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   return unsolved();
 }
 
-Type ConstraintSystem::simplifyAppliedOverloads(
-                                TypeVariableType *fnTypeVar,
-                                const FunctionType *argFnType,
-                                ConstraintLocatorBuilder locator) {
-  Type fnType(fnTypeVar);
-
-  // Always work on the representation.
-  fnTypeVar = getRepresentative(fnTypeVar);
-
-  // Dig out the disjunction that describes this overload.
-  unsigned numOptionalUnwraps = 0;
-  auto disjunction =
-      getUnboundBindOverloadDisjunction(fnTypeVar, &numOptionalUnwraps);
-  if (!disjunction) return fnType;
-
+bool ConstraintSystem::simplifyAppliedOverloadsImpl(
+    Constraint *disjunction, TypeVariableType *fnTypeVar,
+    const FunctionType *argFnType, unsigned numOptionalUnwraps,
+    ConstraintLocatorBuilder locator) {
   if (shouldAttemptFixes()) {
     auto arguments = argFnType->getParams();
     bool allHoles =
@@ -7879,7 +7939,7 @@ Type ConstraintSystem::simplifyAppliedOverloads(
     // regardless of problems related to missing or extraneous labels
     // and/or arguments.
     if (solverState)
-      return fnTypeVar;
+      return false;
   }
 
   /// The common result type amongst all function overloads.
@@ -7966,14 +8026,8 @@ retry_after_fail:
       argumentInfo.reset();
       goto retry_after_fail;
     }
-
-    return Type();
-
+    return true;
   case SolutionKind::Solved:
-    // We should now have a type for the one remaining overload.
-    fnType = getFixedTypeRecursive(fnType, /*wantRValue=*/true);
-    break;
-
   case SolutionKind::Unsolved:
     break;
   }
@@ -7981,7 +8035,7 @@ retry_after_fail:
   // If there was a constraint that we couldn't reason about, don't use the
   // results of any common-type computations.
   if (hasUnhandledConstraints)
-    return fnType;
+    return false;
 
   // If we have a common result type, bind the expected result type to it.
   if (commonResultType && !commonResultType->is<ErrorType>()) {
@@ -7994,16 +8048,67 @@ retry_after_fail:
         << ")\n";
     }
 
-    // FIXME: Could also rewrite fnType to include this result type.
-    // Introduction of `Bind` constraint here could result in the disconnect
+    // Introduction of a `Bind` constraint here could result in the disconnect
     // in the constraint system with unintended consequences because e.g.
     // in case of key path application it could disconnect one of the
     // components like subscript from the rest of the context.
     addConstraint(ConstraintKind::Equal, argFnType->getResult(),
                   commonResultType, locator);
   }
+  return false;
+}
 
-  return fnType;
+bool ConstraintSystem::simplifyAppliedOverloads(
+    Constraint *disjunction, ConstraintLocatorBuilder locator) {
+  auto choices = disjunction->getNestedConstraints();
+  assert(choices.size() >= 2);
+  assert(choices.front()->getKind() == ConstraintKind::BindOverload);
+
+  // If we've already bound the overload type var, bail.
+  auto *typeVar = choices.front()->getFirstType()->getAs<TypeVariableType>();
+  if (!typeVar || getFixedType(typeVar))
+    return false;
+
+  // Try to find an applicable fn constraint that applies the overload choice.
+  auto result = findConstraintThroughOptionals(
+      typeVar, OptionalWrappingDirection::Unwrap,
+      [&](Constraint *match, TypeVariableType *currentRep) {
+        // Check to see if we have an applicable fn with a type var RHS that
+        // matches the disjunction.
+        if (match->getKind() != ConstraintKind::ApplicableFunction)
+          return false;
+
+        auto *rhsTyVar = match->getSecondType()->getAs<TypeVariableType>();
+        return rhsTyVar && currentRep == getRepresentative(rhsTyVar);
+      });
+
+  if (!result)
+    return false;
+
+  auto *applicableFn = result->first;
+  auto *fnTypeVar = applicableFn->getSecondType()->castTo<TypeVariableType>();
+  auto argFnType = applicableFn->getFirstType()->castTo<FunctionType>();
+  return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
+                                      /*numOptionalUnwraps*/ result->second,
+                                      locator);
+}
+
+bool ConstraintSystem::simplifyAppliedOverloads(
+    Type fnType, const FunctionType *argFnType,
+    ConstraintLocatorBuilder locator) {
+  // If we've already bound the function type, bail.
+  auto *fnTypeVar = fnType->getAs<TypeVariableType>();
+  if (!fnTypeVar || getFixedType(fnTypeVar))
+    return false;
+
+  // Try to find a corresponding bind overload disjunction.
+  unsigned numOptionalUnwraps = 0;
+  auto *disjunction =
+      getUnboundBindOverloadDisjunction(fnTypeVar, &numOptionalUnwraps);
+  if (!disjunction)
+    return false;
+  return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
+                                      numOptionalUnwraps, locator);
 }
 
 ConstraintSystem::SolutionKind
@@ -8079,16 +8184,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     return SolutionKind::Unsolved;
 
   };
-
-  // If the right-hand side is a type variable,
-  // try to simplify the overload set.
-  if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
-    Type newType2 = simplifyAppliedOverloads(typeVar, func1, locator);
-    if (!newType2)
-      return SolutionKind::Error;
-
-    desugar2 = newType2->getDesugaredType();
-  }
 
   // If right-hand side is a type variable, the constraint is unsolved.
   if (desugar2->isTypeVariableOrMember()) {
@@ -9142,16 +9237,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
 
-  // Local function to form an unsolved result.
-  auto formUnsolved = [&] {
-    if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(Constraint::createFixed(
-          *this, matchKind, fix, type1, type2, getConstraintLocator(locator)));
-      return SolutionKind::Solved;
-    }
-    return SolutionKind::Unsolved;
-  };
-
   // Try with the fix.
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
@@ -9275,13 +9360,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
         return SolutionKind::Error;
 
       return SolutionKind::Solved;
-    case ConversionEphemeralness::NonEphemeral:
-      return SolutionKind::Solved;
     case ConversionEphemeralness::Unresolved:
-      // It's possible we don't yet have enough information to know whether
-      // the conversion is ephemeral or not, for example if we're dealing with
-      // an overload that hasn't yet been resolved.
-      return formUnsolved();
+    case ConversionEphemeralness::NonEphemeral:
+      // FIXME: The unresolved case should form an unsolved constraint rather
+      // than being treated as fully solved. This will require a way to connect
+      // the unsolved constraint to the type variable for the unresolved
+      // overload such that the fix gets re-activated when the overload is
+      // bound.
+      return SolutionKind::Solved;
     }
   }
 
@@ -9298,7 +9384,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
-  case FixKind::SpecifyObjectLiteralTypeImport: {
+  case FixKind::SpecifyObjectLiteralTypeImport:
+  case FixKind::AllowCoercionToForceCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -9433,9 +9520,14 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::BridgingConversion:
     return simplifyBridgingConstraint(first, second, subflags, locator);
 
-  case ConstraintKind::ApplicableFunction:
+  case ConstraintKind::ApplicableFunction: {
+    // First try to simplify the overload set for the function being applied.
+    if (simplifyAppliedOverloads(second, first->castTo<FunctionType>(),
+                                 locator)) {
+      return SolutionKind::Error;
+    }
     return simplifyApplicableFnConstraint(first, second, subflags, locator);
-
+  }
   case ConstraintKind::DynamicCallableApplicableFunction:
     return simplifyDynamicCallableApplicableFnConstraint(first, second,
                                                          subflags, locator);
@@ -9757,7 +9849,7 @@ void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
 
 void ConstraintSystem::addExplicitConversionConstraint(
     Type fromType, Type toType, RememberChoice_t rememberChoice,
-    ConstraintLocatorBuilder locator) {
+    ConstraintLocatorBuilder locator, ConstraintFix *compatFix) {
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
@@ -9775,12 +9867,21 @@ void ConstraintSystem::addExplicitConversionConstraint(
                      fromType, toType, locatorPtr);
   constraints.push_back(bridgingConstraint);
 
+  // If we're allowed to use a compatibility fix that emits a warning on
+  // failure, add it to the disjunction so that it's recorded on failure.
+  if (compatFix) {
+    constraints.push_back(
+        Constraint::createFixed(*this, ConstraintKind::BridgingConversion,
+                                compatFix, fromType, toType, locatorPtr));
+  }
+
   addDisjunctionConstraint(constraints, locator, rememberChoice);
 }
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
-  switch (constraint.getKind()) {
+  auto matchKind = constraint.getKind();
+  switch (matchKind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
@@ -9791,7 +9892,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::OpaqueUnderlyingType: {
     // Relational constraints.
-    auto matchKind = constraint.getKind();
 
     // If there is a fix associated with this constraint, apply it.
     if (auto fix = constraint.getFix()) {
@@ -9815,6 +9915,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 
   case ConstraintKind::BridgingConversion:
+    // If there is a fix associated with this constraint, apply it.
+    if (auto fix = constraint.getFix()) {
+      return simplifyFixConstraint(fix, constraint.getFirstType(),
+                                   constraint.getSecondType(), matchKind, None,
+                                   constraint.getLocator());
+    }
+
     return simplifyBridgingConstraint(constraint.getFirstType(),
                                       constraint.getSecondType(),
                                       None, constraint.getLocator());

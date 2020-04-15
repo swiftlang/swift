@@ -331,6 +331,7 @@ func statementTests() {
   } catch (var x, let y) {
   } catch where false {
   } catch let e where e.foo == bar {
+  } catch .a(let a), .b(let b) where b == "" {
   } catch {
   }
   repeat { } while true

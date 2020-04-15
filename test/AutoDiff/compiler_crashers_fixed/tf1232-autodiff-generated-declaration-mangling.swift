@@ -1,4 +1,4 @@
-// RUN: not %target-build-swift -g %s
+// RUN: %target-build-swift -g %s
 // REQUIRES: asserts
 
 // SWIFT_ENABLE_TENSORFLOW

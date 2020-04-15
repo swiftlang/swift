@@ -10,8 +10,9 @@ class Sub : Base {}
 
 extension Sub {
   @objc override var prop: String! {
-    didSet {
-      // Ignore it.
+    didSet(oldValue) {
+      // Ignore it, but explicitly specify 'oldValue' because this test
+      // checks that its correctly fetched.
     }
 
     // Make sure that we are generating the @objc thunk and are calling the actual method.
@@ -165,7 +166,7 @@ extension SubSub {
   // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY_2]]
   // CHECK: } // end sil function '$s15objc_extensions03SubC0C9otherPropSSvs'
   @objc override var otherProp: String {
-    didSet {
+    didSet(oldValue) {
       // Ignore it.
     }
   }

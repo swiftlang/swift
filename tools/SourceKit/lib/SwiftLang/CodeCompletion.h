@@ -136,7 +136,8 @@ class CompletionBuilder {
 public:
   static void getFilterName(CodeCompletionString *str, raw_ostream &OS);
   static void getDescription(SwiftResult *result, raw_ostream &OS,
-                             bool leadingPunctuation);
+                             bool leadingPunctuation,
+                             bool annotatedDecription = false);
 
 public:
   CompletionBuilder(CompletionSink &sink, SwiftResult &base);

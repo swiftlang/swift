@@ -14,6 +14,12 @@ import UniversalExports
 import ThinLibrary
 #endif
 
+// We should have loaded the underlying clang module.
+fromUniversalExportsClang() // no-error
+
+// We should have loaded core_mi6 too.
+fromCoreMI6() // no-error
+
 // We should have loaded _AlwaysImportedOverlay.
 fromAlwaysImportedOverlay() // no-error
 

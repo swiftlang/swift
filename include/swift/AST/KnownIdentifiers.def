@@ -98,6 +98,7 @@ IDENTIFIER(objectAtIndexedSubscript)
 IDENTIFIER(objectForKeyedSubscript)
 IDENTIFIER(ObjectiveC)
 IDENTIFIER_(ObjectiveCType)
+IDENTIFIER(oldValue)
 IDENTIFIER(Optional)
 IDENTIFIER_(OptionalNilComparisonType)
 IDENTIFIER(parameter)
@@ -202,6 +203,11 @@ IDENTIFIER_(nsError)
 
 // Custom string interpolation type used by os log APIs.
 IDENTIFIER(OSLogMessage)
+
+// Atomics ordering type identifiers.
+IDENTIFIER(AtomicLoadOrdering)
+IDENTIFIER(AtomicStoreOrdering)
+IDENTIFIER(AtomicUpdateOrdering)
 
 // Differentiable programming
 IDENTIFIER(along)

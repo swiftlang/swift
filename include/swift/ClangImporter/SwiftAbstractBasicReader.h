@@ -19,6 +19,7 @@
 #ifndef SWIFT_CLANGIMPORTER_SWIFTABSTRACTBASICREADER_H
 #define SWIFT_CLANGIMPORTER_SWIFTABSTRACTBASICREADER_H
 
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/AbstractTypeReader.h"
 
 // This include is required to instantiate the template code in

@@ -1118,6 +1118,69 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   return std::make_tuple<>();
 }
 
+bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
+                                   AccessorDecl *decl) const {
+
+  class OldValueFinder : public ASTWalker {
+    const ParamDecl *OldValueParam;
+    bool foundOldValueRef = false;
+
+  public:
+    OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E)
+        return {true, E};
+      if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (auto decl = DRE->getDecl()) {
+          if (decl == OldValueParam) {
+            foundOldValueRef = true;
+            return {false, nullptr};
+          }
+        }
+      }
+
+      return {true, E};
+    }
+
+    bool didFindOldValueRef() { return foundOldValueRef; }
+  };
+
+  // If this is not a didSet accessor, bail out.
+  if (decl->getAccessorKind() != AccessorKind::DidSet) {
+    return false;
+  }
+
+  // didSet must have a single parameter.
+  if (decl->getParameters()->size() != 1) {
+    return false;
+  }
+
+  auto param = decl->getParameters()->get(0);
+  // If this parameter is not implicit, then it means it has been explicitly
+  // provided by the user (i.e. 'didSet(oldValue)'). This means we cannot
+  // consider this a "simple" didSet because we have to fetch the oldValue
+  // regardless of whether it's referenced in the body or not.
+  if (!param->isImplicit()) {
+    return false;
+  }
+
+  // If we find a reference to the implicit 'oldValue' parameter, then it is
+  // not a "simple" didSet because we need to fetch it.
+  auto walker = OldValueFinder(param);
+  decl->getBody()->walk(walker);
+  auto hasOldValueRef = walker.didFindOldValueRef();
+  if (!hasOldValueRef) {
+    // If the body does not refer to implicit 'oldValue', it means we can
+    // consider this as a "simple" didSet. Let's also erase the implicit
+    // oldValue as it is never used.
+    auto &ctx = decl->getASTContext();
+    decl->setParameters(ParameterList::createEmpty(ctx));
+    return true;
+  }
+  return false;
+}
+
 const ConstructorDecl *
 swift::findNonImplicitRequiredInit(const ConstructorDecl *CD) {
   while (CD->isImplicit()) {
@@ -1577,6 +1640,12 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
   case AccessorKind::Set:
+    if (accessor->isSimpleDidSet()) {
+      // If this is a "simple" didSet, there won't be
+      // a parameter.
+      return nullptr;
+    }
+
     if (param == accessorParams->get(0)) {
       // This is the 'newValue' parameter.
       return nullptr;
@@ -2190,6 +2259,13 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Accessor:
   case DeclKind::Constructor:
   case DeclKind::Destructor: {
+    // If this is a didSet, then we need to check whether the body references
+    // the implicit 'oldValue' parameter or not, in order to correctly
+    // compute the interface type.
+    if (auto AD = dyn_cast<AccessorDecl>(D)) {
+      (void)AD->isSimpleDidSet();
+    }
+
     auto *AFD = cast<AbstractFunctionDecl>(D);
 
     auto sig = AFD->getGenericSignature();
@@ -2380,6 +2456,14 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
+
+  // The projected storage wrapper ($foo) might have dynamically-dispatched
+  // accessors, so force them to be synthesized.
+  for (auto *member : CD->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      if (var->hasAttachedPropertyWrapper())
+        (void) var->getPropertyWrapperBackingProperty();
+  }
 
   return CD->getMembers();
 }

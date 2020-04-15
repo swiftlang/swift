@@ -95,6 +95,8 @@ enum class FileUnitKind {
   Builtin,
   /// A serialized Swift AST.
   SerializedAST,
+  /// A synthesized file.
+  Synthesized,
   /// An imported Clang module.
   ClangModule,
   /// A Clang module imported from DWARF.
@@ -463,7 +465,7 @@ public:
   /// Retrieve the top-level module. If this module is already top-level, this
   /// returns itself. If this is a submodule such as \c Foo.Bar.Baz, this
   /// returns the module \c Foo.
-  ModuleDecl *getTopLevelModule();
+  ModuleDecl *getTopLevelModule(bool overlay = false);
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;

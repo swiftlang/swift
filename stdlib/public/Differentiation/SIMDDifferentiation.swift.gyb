@@ -31,12 +31,14 @@ where
   public typealias TangentVector = SIMD${n}
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 extension SIMD${n}: EuclideanDifferentiable
 where
   Scalar: EuclideanDifferentiable & BinaryFloatingPoint,
   Scalar.TangentVector: BinaryFloatingPoint
 {
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 //===----------------------------------------------------------------------===//
 // Derivatives
@@ -44,7 +46,7 @@ where
 
 extension SIMD${n}
 where
-  Scalar: EuclideanDifferentiable & BinaryFloatingPoint,
+  Scalar: Differentiable & BinaryFloatingPoint,
   Scalar.TangentVector: BinaryFloatingPoint
 {
   // NOTE(TF-1094): serialized `@derivative` for `.swiftinterface` compilation.

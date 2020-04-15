@@ -1568,6 +1568,9 @@ ERROR(attr_specialize_unknown_parameter_name,none,
 ERROR(attr_specialize_expected_bool_value,none,
       "expected a boolean true or false value in '_specialize' attribute", ())
 
+WARNING(attr_specialize_export_true_no_op,none,
+        "'exported: true' has no effect in '_specialize' attribute", ())
+
 ERROR(attr_specialize_missing_parameter_label_or_where_clause,none,
       "expected a parameter label or a where clause in '_specialize' attribute", ())
 

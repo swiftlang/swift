@@ -92,6 +92,7 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
+     ("${SDK}" STREQUAL "OPENBSD") OR
      ("${SDK}" STREQUAL "ANDROID") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
      ("${SDK}" STREQUAL "HAIKU"))
@@ -198,7 +199,7 @@ foreach(SDK ${SWIFT_SDKS})
     foreach(BUILD_FLAVOR ${build_flavors})
     # Configure variables for this subdirectory.
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
+    get_versioned_target_triple(VARIANT_TRIPLE ${SDK} ${ARCH} "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
     set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
     set(DEFAULT_OSX_VARIANT_SUFFIX "")
 
@@ -353,7 +354,7 @@ _Block_release(void) { }\n")
       endif()
 
       execute_process(COMMAND
-          "${PYTHON_EXECUTABLE}" "-c" "import psutil"
+          $<TARGET_FILE:Python2::Interpreter> "-c" "import psutil"
           RESULT_VARIABLE python_psutil_status
           TIMEOUT 1 # second
           ERROR_QUIET)
@@ -413,7 +414,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              ${PYTHON_EXECUTABLE} "${LIT}"
+              $<TARGET_FILE:Python2::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"
@@ -432,7 +433,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              ${PYTHON_EXECUTABLE} "${LIT}"
+              $<TARGET_FILE:Python2::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"

@@ -87,6 +87,7 @@ set(SWIFTLIB_ESSENTIAL
   KeyPath.swift
   # SWIFT_ENABLE_TENSORFLOW
   KeyPathIterable.swift
+  # SWIFT_ENABLE_TENSORFLOW END
   KeyValuePairs.swift
   LazyCollection.swift
   LazySequence.swift
@@ -211,6 +212,7 @@ if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     ../Differentiation/DifferentialOperators.swift
     ../Differentiation/DifferentiationUtilities.swift
     ../Differentiation/DifferentiationSupport.swift
+    ../Differentiation/AnyDifferentiable.swift
     ../Differentiation/ArrayDifferentiation.swift)
   list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_GYB_SOURCES
     ../Differentiation/FloatingPointDifferentiation.swift.gyb

@@ -112,6 +112,10 @@ namespace swift {
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
+    /// Emit a remark when import resolution implicitly adds a cross-import
+    /// overlay.
+    bool EnableCrossImportRemarks = false;
+
     ///
     /// Support for alternate usage modes
     ///

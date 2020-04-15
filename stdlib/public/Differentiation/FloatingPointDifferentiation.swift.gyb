@@ -33,7 +33,7 @@ def Availability(bits):
 //===----------------------------------------------------------------------===//
 
 ${Availability(bits)}
-extension ${Self} : EuclideanDifferentiable {
+extension ${Self}: Differentiable {
   ${Availability(bits)}
   public typealias TangentVector = ${Self}
 
@@ -42,6 +42,13 @@ extension ${Self} : EuclideanDifferentiable {
     self += direction
   }
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+${Availability(bits)}
+extension ${Self} : EuclideanDifferentiable {}
+// SWIFT_ENABLE_TENSORFLOW END
+
+// SWIFT_ENABLE_TENSORFLOW
 
 ${Availability(bits)}
 extension ${Self} : VectorProtocol {
@@ -78,6 +85,7 @@ extension ${Self} : VectorProtocol {
     self *= scalar
   }
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 //===----------------------------------------------------------------------===//
 // Derivatives

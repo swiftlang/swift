@@ -239,6 +239,7 @@
     "DifferentialOperators.swift",
     "DifferentiationUtilities.swift",
     "DifferentiationSupport.swift",
+    "AnyDifferentiable.swift",
     "ArrayDifferentiation.swift",
     "FloatingPointDifferentiation.swift",
     "SIMDDifferentiation.swift",

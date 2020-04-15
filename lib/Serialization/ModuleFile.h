@@ -882,6 +882,10 @@ public:
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override;
 
+  virtual AbstractFunctionDecl *
+  loadReferencedFunctionDecl(const DerivativeAttr *DA,
+                             uint64_t contextData) override;
+
   virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
                                   uint64_t contextData) override;
 

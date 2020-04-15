@@ -58,7 +58,7 @@ struct WrapperAcceptingAutoclosure<T> {
 
 @propertyWrapper
 struct MissingValue<T> { }
-// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}}
+// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}
 
 @propertyWrapper
 struct StaticValue {
@@ -76,7 +76,7 @@ protocol CannotBeAWrapper {
 
 @propertyWrapper
 struct NonVisibleValueWrapper<Value> {
-  private var wrappedValue: Value // expected-error{{private property 'wrappedValue' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}}
+  private var wrappedValue: Value // expected-error{{private property 'wrappedValue' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}} {{educational-notes=property-wrapper-requirements}}
 }
 
 @propertyWrapper
@@ -92,7 +92,7 @@ struct NonVisibleInitWrapper<Value> {
 struct InitialValueTypeMismatch<Value> {
   var wrappedValue: Value // expected-note{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an @autoclosure thereof}}
+  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an @autoclosure thereof}} {{educational-notes=property-wrapper-requirements}}
     self.wrappedValue = initialValue!
   }
 }
@@ -112,7 +112,7 @@ struct MultipleInitialValues<Value> {
 struct InitialValueFailable<Value> {
   var wrappedValue: Value
 
-  init?(wrappedValue initialValue: Value) { // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}}
+  init?(wrappedValue initialValue: Value) { // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}} {{educational-notes=property-wrapper-requirements}}
     return nil
   }
 }
@@ -823,6 +823,26 @@ struct BrokenLazy { }
 struct S {
   @BrokenLazy // expected-error{{struct 'BrokenLazy' cannot be used as an attribute}}
   var wrappedValue: Int
+}
+
+// ---------------------------------------------------------------------------
+// Invalid redeclaration
+// ---------------------------------------------------------------------------
+@propertyWrapper
+struct WrapperWithProjectedValue<T> {
+  var wrappedValue: T
+  var projectedValue: T { return wrappedValue }
+}
+
+class TestInvalidRedeclaration {
+  @WrapperWithProjectedValue var i = 17
+  // expected-note@-1 {{'i' previously declared here}}
+  // expected-note@-2 {{'$i' previously declared here}}
+  // expected-note@-3 {{'_i' previously declared here}}
+  @WrapperWithProjectedValue var i = 39
+  // expected-error@-1 {{invalid redeclaration of 'i'}}
+  // expected-error@-2 {{invalid redeclaration of '$i'}}
+  // expected-error@-3 {{invalid redeclaration of '_i'}}
 }
 
 // ---------------------------------------------------------------------------

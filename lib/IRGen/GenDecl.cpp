@@ -415,6 +415,7 @@ public:
 } // end anonymous namespace
 
 namespace {
+
 class PrettySourceFileEmission : public llvm::PrettyStackTraceEntry {
   const SourceFile &SF;
 public:
@@ -424,6 +425,19 @@ public:
     os << "While emitting IR for source file " << SF.getFilename() << '\n';
   }
 };
+
+class PrettySynthesizedFileUnitEmission : public llvm::PrettyStackTraceEntry {
+  const SynthesizedFileUnit &SFU;
+
+public:
+  explicit PrettySynthesizedFileUnitEmission(const SynthesizedFileUnit &SFU)
+      : SFU(SFU) {}
+
+  void print(raw_ostream &os) const override {
+    os << "While emitting IR for synthesized file" << &SFU << "\n";
+  }
+};
+
 } // end anonymous namespace
 
 /// Emit all the top-level code in the source file.
@@ -473,6 +487,13 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
       }
     }
   }
+}
+
+/// Emit all the top-level code in the synthesized file unit.
+void IRGenModule::emitSynthesizedFileUnit(SynthesizedFileUnit &SFU) {
+  PrettySynthesizedFileUnitEmission StackEntry(SFU);
+  for (auto *decl : SFU.getTopLevelDecls())
+    emitGlobalDecl(decl);
 }
 
 /// Collect elements of an already-existing global list with the given

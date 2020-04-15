@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s --check-prefix=CHECK-SILGEN
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s | %FileCheck %s --check-prefix=CHECK-SIL
 
 // SWIFT_ENABLE_TENSORFLOW
 // Note: this test is currently for master branch. It can be enabled on

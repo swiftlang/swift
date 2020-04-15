@@ -652,6 +652,9 @@ public:
     /// True if this is a summary graph.
     bool isSummaryGraph;
 
+    /// True if the graph could be computed.
+    bool valid = true;
+
     /// Track the currently active intrusive worklist -- one at a time.
     CGNodeWorklist *activeWorklist = nullptr;
 
@@ -859,6 +862,22 @@ public:
     bool forwardTraverseDefer(CGNode *startNode, CGNodeVisitor &&visitor);
 
   public:
+  
+    /// Returns true if the graph could be computed.
+    ///
+    /// For very large functions (> 10000 nodes), graphs are not cumputed to
+    /// avoid quadratic complexity of the node merging algorithm.
+    bool isValid() const {
+      assert((valid || isEmpty()) && "invalid graph must not contain nodes");
+      return valid;
+    }
+    
+    /// Invalides the graph in case it's getting too large.
+    void invalidate() {
+      clear();
+      valid = false;
+    }
+  
     /// Get the content node pointed to by \p ptrVal.
     ///
     /// If \p ptrVal cannot be mapped to a node, return nullptr.
@@ -1045,8 +1064,7 @@ private:
   /// If \p ai is an optimizable @_semantics("array.uninitialized") call, return
   /// valid call information.
   ArrayUninitCall
-  canOptimizeArrayUninitializedCall(ApplyInst *ai,
-                                    const ConnectionGraph *conGraph);
+  canOptimizeArrayUninitializedCall(ApplyInst *ai);
 
   /// Return true of this tuple_extract is the result of an optimizable
   /// @_semantics("array.uninitialized") call.
