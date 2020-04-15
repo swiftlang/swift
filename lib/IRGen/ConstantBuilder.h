@@ -77,6 +77,8 @@ public:
     addInt(IGM().Int32Ty, value);
   }
 
+  void addInt64(uint64_t value) { addInt(IGM().Int64Ty, value); }
+
   void addRelativeAddressOrNull(llvm::Constant *target) {
     if (target) {
       addRelativeAddress(target);
