@@ -234,7 +234,6 @@ namespace swift {
   performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
-                      llvm::LLVMContext &LLVMContext,
                       ArrayRef<std::string> parallelOutputFilenames,
                       llvm::GlobalVariable **outModuleHash = nullptr,
                       llvm::StringSet<> *LinkerDirectives = nullptr);
@@ -247,7 +246,6 @@ namespace swift {
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       StringRef PrivateDiscriminator,
-                      llvm::LLVMContext &LLVMContext,
                       llvm::GlobalVariable **outModuleHash = nullptr,
                       llvm::StringSet<> *LinkerDirectives = nullptr);
 
@@ -289,9 +287,7 @@ namespace swift {
                    UnifiedStatsReporter *Stats);
 
   /// Dump YAML describing all fixed-size types imported from the given module.
-  bool performDumpTypeInfo(const IRGenOptions &Opts,
-                           SILModule &SILMod,
-                           llvm::LLVMContext &LLVMContext);
+  bool performDumpTypeInfo(const IRGenOptions &Opts, SILModule &SILMod);
 
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>

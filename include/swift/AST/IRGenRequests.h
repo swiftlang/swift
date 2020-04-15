@@ -49,7 +49,6 @@ struct IRGenDescriptor {
   StringRef ModuleName;
   const PrimarySpecificPaths &PSPs;
   StringRef PrivateDiscriminator;
-  llvm::LLVMContext &LLVMContext;
   ArrayRef<std::string> parallelOutputFilenames;
   llvm::GlobalVariable **outModuleHash;
   llvm::StringSet<> *LinkerDirectives;
@@ -73,7 +72,7 @@ public:
   forFile(const IRGenOptions &Opts, SourceFile &SF,
           std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
           const PrimarySpecificPaths &PSPs, StringRef PrivateDiscriminator,
-          llvm::LLVMContext &LLVMContext, llvm::GlobalVariable **outModuleHash,
+          llvm::GlobalVariable **outModuleHash,
           llvm::StringSet<> *LinkerDirectives) {
     return IRGenDescriptor{Opts,
                            &SF,
@@ -81,7 +80,6 @@ public:
                            ModuleName,
                            PSPs,
                            PrivateDiscriminator,
-                           LLVMContext,
                            {},
                            outModuleHash,
                            LinkerDirectives};
@@ -91,7 +89,6 @@ public:
   forWholeModule(const IRGenOptions &Opts, swift::ModuleDecl *M,
                  std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
                  const PrimarySpecificPaths &PSPs,
-                 llvm::LLVMContext &LLVMContext,
                  ArrayRef<std::string> parallelOutputFilenames,
                  llvm::GlobalVariable **outModuleHash,
                  llvm::StringSet<> *LinkerDirectives) {
@@ -101,7 +98,6 @@ public:
                            ModuleName,
                            PSPs,
                            "",
-                           LLVMContext,
                            parallelOutputFilenames,
                            outModuleHash,
                            LinkerDirectives};

@@ -246,12 +246,9 @@ int swift::RunImmediately(CompilerInstance &CI,
   // IRGen the main module.
   auto *swiftModule = CI.getMainModule();
   const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
-  // FIXME: We shouldn't need to use the global context here, but
-  // something is persisting across calls to performIRGeneration.
-  auto ModuleCtx = std::make_unique<llvm::LLVMContext>();
   auto Module = performIRGeneration(
       IRGenOpts, swiftModule, std::move(SM), swiftModule->getName().str(),
-      PSPs, *ModuleCtx, ArrayRef<std::string>());
+      PSPs, ArrayRef<std::string>());
 
   if (Context.hadError())
     return -1;
@@ -341,6 +338,7 @@ int swift::RunImmediately(CompilerInstance &CI,
              Module->dump());
 
   {
+    std::unique_ptr<llvm::LLVMContext> ModuleCtx(&Module->getContext());
     auto TSM = llvm::orc::ThreadSafeModule(std::move(Module), std::move(ModuleCtx));
     if (auto Err = JIT->addIRModule(std::move(TSM))) {
       llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");

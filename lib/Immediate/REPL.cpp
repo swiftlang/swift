@@ -891,11 +891,9 @@ private:
     DumpSource += Line;
 
     // IRGen the current line(s).
-    // FIXME: We shouldn't need to use the global context here, but
-    // something is persisting across calls to performIRGeneration.
     auto LineModule = performIRGeneration(
         IRGenOpts, M, std::move(sil), "REPLLine", PrimarySpecificPaths(),
-        getGlobalLLVMContext(), /*parallelOutputFilenames*/{});
+        /*parallelOutputFilenames*/{});
 
     if (CI.getASTContext().hadError())
       return false;
