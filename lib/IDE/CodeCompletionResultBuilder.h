@@ -25,6 +25,10 @@ namespace clang {
 class Module;
 }
 
+namespace {
+class AnnotatedTypePrinter;
+}
+
 namespace swift {
 class Decl;
 class ModuleDecl;
@@ -52,6 +56,8 @@ struct ExpectedTypeContext {
 };
 
 class CodeCompletionResultBuilder {
+  friend AnnotatedTypePrinter;
+  
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
   SemanticContextKind SemanticContext;
@@ -71,6 +77,13 @@ class CodeCompletionResultBuilder {
   bool IsNotRecommended = false;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
     CodeCompletionResult::NotRecommendedReason::NoReason;
+
+  /// Annotated results are requested by the client.
+  ///
+  /// This affects the structure of the CodeCompletionString.
+  bool shouldAnnotateResults() {
+    return Sink.annotateResult;
+  }
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -114,7 +127,7 @@ public:
     NumBytesToErase = N;
   }
 
-  void setAssociatedDecl(const Decl *D, SourceFile *SF);
+  void setAssociatedDecl(const Decl *D);
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
@@ -166,8 +179,21 @@ public:
                      Text);
   }
 
+  void addBaseName(StringRef Text) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::BaseName, Text);
+  }
+
+  void addKeyword(StringRef Text) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Keyword, Text);
+  }
+
   void addTextChunk(StringRef Text) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Text, Text);
+  }
+
+  void addAnnotatedTextChunk(StringRef Text) {
+    addTextChunk(Text);
+    getLastChunk().setIsAnnotation();
   }
 
   void addAnnotatedThrows() {
@@ -193,8 +219,7 @@ public:
 
   void addRethrows() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword,
-        " rethrows");
+        CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword, " rethrows");
   }
 
   void addAnnotatedLeftParen() {
@@ -299,6 +324,7 @@ public:
 
   StringRef escapeKeyword(StringRef Word, bool escapeAllKeywords,
                           llvm::SmallString<16> &EscapedKeyword) {
+    EscapedKeyword.clear();
     bool shouldEscape = false;
     if (escapeAllKeywords) {
 #define KEYWORD(kw) .Case(#kw, true)
@@ -345,77 +371,7 @@ public:
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
                         Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
-                        bool isAutoClosure) {
-    CurrentNestingLevel++;
-
-    addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-
-    if (!Name.empty()) {
-      llvm::SmallString<16> EscapedKeyword;
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterName,
-          escapeKeyword(Name.str(), false, EscapedKeyword));
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
-    } else if (!LocalName.empty()) {
-      // Use local (non-API) parameter name if we have nothing else.
-      llvm::SmallString<16> EscapedKeyword;
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-            escapeKeyword(LocalName.str(), false, EscapedKeyword));
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
-    }
-
-    // 'inout' arguments are printed specially.
-    if (IsInOut) {
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::Ampersand, "&");
-      Ty = Ty->getInOutObjectType();
-    }
-
-    // If the parameter is of the type @autoclosure ()->output, then the
-    // code completion should show the parameter of the output type
-    // instead of the function type ()->output.
-    if (isAutoClosure) {
-      // 'Ty' may be ErrorType.
-      if (auto funcTy = Ty->getAs<FunctionType>())
-        Ty = funcTy->getResult();
-    }
-
-    PrintOptions PO;
-    PO.SkipAttributes = true;
-    PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
-    PO.OpaqueReturnTypePrinting =
-        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-    if (ContextTy)
-      PO.setBaseType(ContextTy);
-    std::string TypeName = Ty->getString(PO);
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
-                     TypeName);
-
-    // Look through optional types and type aliases to find out if we have
-    // function type.
-    Ty = Ty->lookThroughAllOptionalTypes();
-    if (auto AFT = Ty->getAs<AnyFunctionType>()) {
-      // If this is a closure type, add ChunkKind::CallParameterClosureType.
-      PrintOptions PO;
-      PO.PrintFunctionRepresentationAttrs =
-        PrintOptions::FunctionRepresentationMode::None;
-      PO.SkipAttributes = true;
-      PO.OpaqueReturnTypePrinting =
-          PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-      if (ContextTy)
-        PO.setBaseType(ContextTy);
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
-          AFT->getString(PO));
-    }
-
-    if (IsVarArg)
-      addEllipsis();
-    CurrentNestingLevel--;
-  }
+                        bool isAutoClosure);
 
   void addCallParameter(Identifier Name, Type Ty, Type ContextTy = Type()) {
     addCallParameter(Name, Identifier(), Ty, ContextTy,
@@ -471,4 +427,3 @@ public:
 } // namespace swift
 
 #endif // SWIFT_LIB_IDE_CODE_COMPLETION_RESULT_BUILDER_H
-

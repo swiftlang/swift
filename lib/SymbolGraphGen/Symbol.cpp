@@ -236,41 +236,50 @@ void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
   }
 }
 
-void Symbol::serializeGenericParam(const swift::GenericTypeParamType &Param,
-                                   llvm::json::OStream &OS) const {
-  OS.object([&](){
-    OS.attribute("name", Param.getName().str());
-    OS.attribute("index", Param.getIndex());
-    OS.attribute("depth", Param.getDepth());
-  });
-}
-
 void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
   if (const auto *GC = VD->getAsGenericContext()) {
-      if (const auto Generics = GC->getGenericSignature()) {
+    if (const auto Generics = GC->getGenericSignature()) {
+
+      SmallVector<const GenericTypeParamType *, 4> FilteredParams;
+      SmallVector<Requirement, 4> FilteredRequirements;
+      for (const auto Param : Generics->getGenericParams()) {
+        if (const auto *D = Param->getDecl()) {
+          if (D->isImplicit()) {
+            continue;
+          }
+          FilteredParams.push_back(Param);
+        }
+      }
+
+      const auto *Self = dyn_cast<NominalTypeDecl>(VD);
+      if (!Self) {
+        Self = VD->getDeclContext()->getSelfNominalTypeDecl();
+      }
+
+      filterGenericRequirements(Generics->getRequirements(),
+                         Self,
+                         FilteredRequirements);
+
+      if (FilteredParams.empty() && FilteredRequirements.empty()) {
+        return;
+      }
 
       OS.attributeObject("swiftGenerics", [&](){
-        if (!Generics->getGenericParams().empty()) {
+        if (!FilteredParams.empty()) {
           OS.attributeArray("parameters", [&](){
-            for (const auto Param : Generics->getGenericParams()) {
-              if (const auto *D = Param->getDecl()) {
-                if (D->isImplicit()) {
-                  continue;
-                }
-              }
-              serializeGenericParam(*Param, OS);
+            for (const auto *Param : FilteredParams) {
+              ::serialize(Param, OS);
             }
           }); // end parameters:
         }
 
-        if (!Generics->getRequirements().empty()) {
+        if (!FilteredRequirements.empty()) {
           OS.attributeArray("constraints", [&](){
-            for (const auto &Requirement : Generics->getRequirements()) {
-              ::serialize(Requirement, OS);
+            for (const auto &Req : FilteredRequirements) {
+              ::serialize(Req, OS);
             }
           }); // end constraints:
         }
-
       }); // end swiftGenerics:
     }
   }

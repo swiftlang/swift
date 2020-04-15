@@ -808,7 +808,8 @@
                   key.name: "+(_:_:)",
                   key.usr: <usr>,
                   key.line: 86,
-                  key.column: 8
+                  key.column: 8,
+                  key.receiver_usr: "s:Si"
                 }
               ]
             },
@@ -1517,6 +1518,27 @@
           key.usr: <usr>,
           key.line: 176,
           key.column: 11
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "AlwaysUnavailableClass",
+      key.usr: <usr>,
+      key.line: 184,
+      key.column: 7,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: <usr>,
+          key.line: 184,
+          key.column: 7,
+          key.is_implicit: 1
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.available
         }
       ]
     },

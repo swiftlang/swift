@@ -4,6 +4,7 @@
 
 // FIXME: the test is too slow when the standard library is not optimized.
 // rdar://problem/46878013
+// REQUIRES: rdar61347183
 // REQUIRES: optimized_stdlib
 // REQUIRES: long_test
 

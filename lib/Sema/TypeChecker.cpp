@@ -306,11 +306,6 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
   } while (currentFunctionIdx < SF.DelayedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size());
 
-
-  for (AbstractFunctionDecl *FD : llvm::reverse(SF.DelayedFunctions)) {
-    TypeChecker::computeCaptures(FD);
-  }
-
   SF.DelayedFunctions.clear();
 }
 
@@ -413,23 +408,6 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
     Ctx.verifyAllLoadedModules();
   }
 #endif
-}
-
-bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
-  auto &ctx = SF.getASTContext();
-  // Return true if differentiable programming is explicitly enabled.
-  if (ctx.LangOpts.EnableExperimentalDifferentiableProgramming)
-    return true;
-  // Otherwise, return true iff the `_Differentiation` module is imported in
-  // the given source file.
-  bool importsDifferentiationModule = false;
-  for (auto import : namelookup::getAllImports(&SF)) {
-    if (import.second->getName() == ctx.Id_Differentiation) {
-      importsDifferentiationModule = true;
-      break;
-    }
-  }
-  return importsDifferentiationModule;
 }
 
 bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {

@@ -252,7 +252,11 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
     };
     return B.createTuple(I->getLoc(), Ty, Elements);
   }
-      
+
+  // Replace the type check with 'true'.
+  case BuiltinValueKind::IsSameMetatype:
+    return Builder.createIntegerLiteral(I->getLoc(), I->getType(), true);
+
   default:
     break;
   }

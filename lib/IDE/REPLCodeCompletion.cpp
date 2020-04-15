@@ -42,7 +42,10 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
+    case CodeCompletionString::Chunk::ChunkKind::Keyword:
+    case CodeCompletionString::Chunk::ChunkKind::Attribute:
     case CodeCompletionString::Chunk::ChunkKind::Text:
+    case CodeCompletionString::Chunk::ChunkKind::BaseName:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
@@ -59,6 +62,8 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::Whitespace:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail:
+    case CodeCompletionString::Chunk::ChunkKind::TypeIdSystem:
+    case CodeCompletionString::Chunk::ChunkKind::TypeIdUser:
       if (!C.isAnnotation())
         Str += C.getText();
       break;
@@ -72,6 +77,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterTypeBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:

@@ -354,6 +354,25 @@ StepResult ComponentStep::take(bool prevFailed) {
     return finalize(/*isSuccess=*/false);
   }
 
+  // If we don't have any disjunction or type variable choices left, we're done
+  // solving. Make sure we don't have any unsolved constraints left over, using
+  // report_fatal_error to make sure we trap in release builds instead of
+  // potentially miscompiling.
+  if (!CS.ActiveConstraints.empty()) {
+    CS.print(llvm::errs());
+    llvm::report_fatal_error("Active constraints left over?");
+  }
+  if (!CS.solverState->allowsFreeTypeVariables()) {
+    if (!CS.InactiveConstraints.empty()) {
+      CS.print(llvm::errs());
+      llvm::report_fatal_error("Inactive constraints left over?");
+    }
+    if (CS.hasFreeTypeVariables()) {
+      CS.print(llvm::errs());
+      llvm::report_fatal_error("Free type variables left over?");
+    }
+  }
+
   // If this solution is worse than the best solution we've seen so far,
   // skip it.
   if (CS.worseThanBestSolution())

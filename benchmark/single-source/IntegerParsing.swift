@@ -119,7 +119,7 @@ public let IntegerParsing = [
   }),
   BenchmarkInfo(name: "ParseInt.Int64.Hex",
     runFunction: run_ParseIntFromInt64Hex,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(int64ValuesSum)
       blackHole(int64HexStrings)
@@ -148,7 +148,7 @@ public let IntegerParsing = [
   }),
   BenchmarkInfo(name: "ParseInt.UInt32.Hex",
     runFunction: run_ParseIntFromUInt32Hex,
-    tags: [.validation, .api],
+    tags: [.validation, .api, .skip],
     setUpFunction: {
       blackHole(uint32ValuesSum)
       blackHole(uint32HexStrings)
@@ -163,7 +163,7 @@ public let IntegerParsing = [
   // UInt64
   BenchmarkInfo(name: "ParseInt.UInt64.Decimal",
     runFunction: run_ParseIntFromUInt64Decimal,
-    tags: [.validation, .api, .skip],
+    tags: [.validation, .api],
     setUpFunction: {
       blackHole(uint64ValuesSum)
       blackHole(uint64DecimalStrings)
@@ -177,7 +177,7 @@ public let IntegerParsing = [
   }),
   BenchmarkInfo(name: "ParseInt.UInt64.Hex",
     runFunction: run_ParseIntFromUInt64Hex,
-    tags: [.validation, .api, .skip],
+    tags: [.validation, .api],
     setUpFunction: {
       blackHole(uint64ValuesSum)
       blackHole(uint64HexStrings)

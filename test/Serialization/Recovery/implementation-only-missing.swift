@@ -74,8 +74,7 @@ public struct PublicStruct: LibProtocol {
 
   public init() { }
 
-  @IoiPropertyWrapper("some text")
-  public var wrappedVar: String
+  public var nonWrappedVar: String = "some text"
 }
 
 struct StructWithOverride: HiddenProtocolWithOverride {
@@ -87,6 +86,6 @@ struct StructWithOverride: HiddenProtocolWithOverride {
 import public_lib
 
 var s = PublicStruct()
-print(s.wrappedVar)
+print(s.nonWrappedVar)
 
 #endif

@@ -48,6 +48,7 @@ namespace swift {
   class Type;
   class Decl;
   class DeclContext;
+  class CallExpr;
   class ClangNode;
   class ClangImporter;
   class Token;
@@ -226,6 +227,12 @@ struct ResolvedLoc {
   bool IsInSelector;
 };
 
+/// Used by NameMatcher to track parent CallExprs when walking a checked AST.
+struct CallingParent {
+  Expr *ApplicableTo;
+  CallExpr *Call;
+};
+
 
 /// Finds the parse-only AST nodes and corresponding name and param/argument
 /// label ranges for a given list of input name start locations
@@ -244,6 +251,9 @@ class NameMatcher: public ASTWalker {
   unsigned InactiveConfigRegionNestings = 0;
   unsigned SelectorNestings = 0;
 
+  /// The stack of parent CallExprs and the innermost expression they apply to.
+  std::vector<CallingParent> ParentCalls;
+
   SourceManager &getSourceMgr() const;
 
   SourceLoc nextLoc() const;
@@ -256,11 +266,11 @@ class NameMatcher: public ASTWalker {
   bool shouldSkip(SourceRange Range);
   bool shouldSkip(CharSourceRange Range);
   bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc);
-  bool tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc, Expr *Arg,
-                  bool checkParentForLabels = false);
+  bool tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc, Expr *Arg);
   bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc, LabelRangeType RangeType,
                   ArrayRef<CharSourceRange> LabelLocs);
   bool handleCustomAttrs(Decl *D);
+  Expr *getApplicableArgFor(Expr* E);
 
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override;
   Expr* walkToExprPost(Expr *E) override;
@@ -281,6 +291,7 @@ class NameMatcher: public ASTWalker {
 public:
   explicit NameMatcher(SourceFile &SrcFile) : SrcFile(SrcFile) { }
   std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
+  ResolvedLoc resolve(UnresolvedLoc Loc);
 };
 
 enum class RangeKind : int8_t {

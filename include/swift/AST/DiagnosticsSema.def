@@ -41,6 +41,11 @@
 #  define FIXIT(ID, Text, Signature)
 #endif
 
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature)   \
+DIAG(REMARK,ID,Options,Text,Signature)
+#endif
+
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
@@ -580,6 +585,9 @@ ERROR(expr_swift_keypath_invalid_component,none,
       "invalid component of Swift key path", ())
 ERROR(expr_swift_keypath_not_starting_with_type,none,
       "a Swift key path must begin with a type", ())
+ERROR(expr_swift_keypath_not_starting_with_dot,none,
+      "a Swift key path with contextual root must begin with a leading dot",
+      ())
 ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       "key path value type %0 cannot be converted to contextual type %1",
       (Type, Type))
@@ -864,6 +872,9 @@ WARNING(module_not_compiled_with_library_evolution,none,
         "using it means binary compatibility for %1 can't be guaranteed",
         (Identifier, Identifier))
 
+REMARK(cross_import_added,none,
+       "import of %0 and %1 triggered a cross-import of %2",
+       (Identifier, Identifier, Identifier))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -891,8 +902,8 @@ ERROR(nonstatic_operator_in_nominal,none,
       "operator %0 declared in type %1 must be 'static'",
       (Identifier, DeclName))
 ERROR(nonstatic_operator_in_extension,none,
-      "operator %0 declared in extension of %1 must be 'static'",
-      (Identifier, TypeRepr*))
+      "operator %0 declared in extension%select{| of %2}1 must be 'static'",
+      (Identifier, bool, TypeRepr*))
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
@@ -1057,6 +1068,10 @@ ERROR(missing_unwrap_optional_try,none,
 ERROR(missing_forced_downcast,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
+WARNING(coercion_may_fail_warning,none,
+        "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
+        (Type, Type))
+
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
       "did you mean to use 'as' to explicitly convert?", (Type, Type))
@@ -1210,7 +1225,7 @@ ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
 ERROR(invalid_differentiable_function_conversion_expr,none,
       "a '@differentiable%select{|(linear)}0' function can only be formed from "
-      "a reference to a 'func' or a literal closure", (bool))
+      "a reference to a 'func' or 'init' or a literal closure", (bool))
 NOTE(invalid_differentiable_function_conversion_parameter,none,
      "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_pointer_conversion,none,
@@ -2640,14 +2655,14 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 ERROR(decl_from_hidden_module,none,
-      "cannot use %0 %1 %select{here|"
+      "cannot use %0 %1 %select{here|as property wrapper here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
       "it is an SPI imported from %3}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
-      "cannot use conformance of %0 to %1 %select{here|"
+      "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; %3 has been imported "
       "as implementation-only",
@@ -2856,8 +2871,8 @@ ERROR(autoclosure_function_input_nonunit,none,
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
-NOTE(escaping_optional_type_argument, none,
-     "closure is already escaping in optional type argument", ())
+ERROR(escaping_optional_type_argument, none,
+      "closure is already escaping in optional type argument", ())
 
 // @_nonEphemeral attribute
 ERROR(non_ephemeral_non_pointer_type,none,
@@ -4445,11 +4460,6 @@ ERROR(dynamic_with_transparent,none,
       "a declaration cannot be both '@_tranparent' and 'dynamic'",
       ())
 
-ERROR(dynamic_and_library_evolution_not_supported,none,
-      "marking non-'@objc' Swift declaration 'dynamic' in library evolution mode is not supported",
-      ())
-
-
 //------------------------------------------------------------------------------
 // MARK: @_dynamicReplacement(for:)
 //------------------------------------------------------------------------------
@@ -5030,6 +5040,29 @@ NOTE(function_builder_remove_returns, none,
 ERROR(differentiable_programming_attr_used_without_required_module, none,
       "'@%0' attribute used without importing module %1",
       (StringRef, Identifier))
+
+ERROR(oslog_arg_must_be_bool_literal, none,
+      "argument must be a bool literal", ())
+ERROR(oslog_arg_must_be_integer_literal, none,
+      "argument must be an integer literal", ())
+ERROR(oslog_arg_must_be_string_literal, none,
+      "argument must be a string literal", ())
+ERROR(oslog_arg_must_be_float_literal, none,
+      "argument must be a floating-point literal", ())
+ERROR(oslog_arg_must_be_metatype_literal, none,
+      "argument must be a <Type>.self", ())
+ERROR(oslog_arg_must_be_closure, none, "argument must be a closure", ())
+ERROR(argument_must_be_constant, none,
+      "argument must be an expression with only literals", ())
+ERROR(oslog_message_must_be_string_interpolation, none,
+      "argument must be a string interpolation", ())
+ERROR(oslog_arg_must_be_enum_case, none,
+      "argument must be a case of enum %0", (Identifier))
+ERROR(oslog_arg_must_be_type_member_access, none,
+      "argument must be a static method or property of %0", (Identifier))
+ERROR(atomics_ordering_must_be_constant, none,
+      "ordering argument must be a static method or property of %0",
+      (Identifier))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

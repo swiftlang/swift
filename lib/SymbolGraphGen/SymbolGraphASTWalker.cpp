@@ -29,7 +29,20 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
 
 /// Get a "sub" symbol graph for the parent module of a type that
 /// the main module `M` is extending.
-SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(ModuleDecl *M) {
+SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
+  auto *M = D->getModuleContext();
+  const auto *DC = D->getDeclContext();
+  while (DC) {
+    M = DC->getParentModule();
+    if (const auto *NTD = dyn_cast_or_null<NominalTypeDecl>(DC->getAsDecl())) {
+      DC = NTD->getDeclContext();
+    } else if (const auto *Ext = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
+      DC = Ext->getExtendedNominal()->getDeclContext();
+    } else {
+      DC = nullptr;
+    }
+  }
+
   if (this->M.getNameStr().equals(M->getNameStr())) {
     return &MainGraph;
   }
@@ -88,7 +101,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       return true;
   }
 
-  auto SG = getModuleSymbolGraph(D->getModuleContext());
+  auto SG = getModuleSymbolGraph(D);
 
   // If this is an extension, let's check that it implies some new conformances,
   // potentially with generic requirements.
@@ -107,7 +120,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     // grab them for some new conformsTo relationships.
     if (!Extension->getInherited().empty()) {
       auto ExtendedSG =
-          getModuleSymbolGraph(ExtendedNominal->getModuleContext());
+          getModuleSymbolGraph(ExtendedNominal);
 
       // The symbol graph to use to record these relationships.
       SmallVector<const ProtocolDecl *, 4> Protocols;
@@ -175,7 +188,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
       auto ExtendedModule = ExtendedNominal->getModuleContext();
-      auto ExtendedSG = getModuleSymbolGraph(ExtendedModule);
+      auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
       if (ExtendedModule != &M) {
         ExtendedSG->recordNode(Symbol(ExtendedSG, VD, nullptr));
         return true;

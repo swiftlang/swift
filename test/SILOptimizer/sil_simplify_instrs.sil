@@ -352,3 +352,22 @@ bb0(%0 : $A):
 // CHECK-NEXT: %{{.*}} = tuple ()
 // CHECK-NEXT: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'simplify_accesssil'
+
+// Test replacement of metatype instructions with metatype arguments.
+protocol SomeP {}
+
+public enum SpecialEnum : SomeP {}
+
+// CHECK-LABEL: sil @testSimplifyMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK-LABEL: }  // end sil function 'testSimplifyMetatype'
+sil @testSimplifyMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+bb0(%0 : $@thick SpecialEnum.Type):
+  %1 = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+  %2 = metatype $@thick SpecialEnum.Type
+  %3 = init_existential_metatype %2 : $@thick SpecialEnum.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%1 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  %5 = struct $Bool (%4 : $Builtin.Int1)
+  return %5 : $Bool
+}

@@ -519,6 +519,8 @@ namespace {
                                  MakeTemporarilyEscapableExpr *E, SGFContext C);
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
+    RValue visitPropertyWrapperValuePlaceholderExpr(
+        PropertyWrapperValuePlaceholderExpr *E, SGFContext C);
 
     RValue visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C);
     RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
@@ -2407,22 +2409,15 @@ RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   return visit(E->getClosureBody(), C);
 }
 
-static OpaqueValueExpr *opaqueValueExprToSubstituteForAutoClosure(
-    const AbstractClosureExpr *e) {
-  // When we find an autoclosure that just calls an opaque closure,
-  // this is a case where we've created the opaque closure as a
-  // stand-in for the autoclosure itself. Such an opaque closure is
-  // created when we have a property wrapper's 'init(wrappedValue:)'
-  // taking an autoclosure argument.
+/// Returns the wrapped value placeholder that is meant to be substituted
+/// in for the given autoclosure. This autoclosure placeholder is created
+/// when \c init(wrappedValue:) takes an autoclosure for the \c wrappedValue
+/// parameter.
+static PropertyWrapperValuePlaceholderExpr *
+wrappedValueAutoclosurePlaceholder(const AbstractClosureExpr *e) {
   if (auto ace = dyn_cast<AutoClosureExpr>(e)) {
     if (auto ce = dyn_cast<CallExpr>(ace->getSingleExpressionBody())) {
-      if (auto ove = dyn_cast<OpaqueValueExpr>(ce->getFn())) {
-        if (!ace->isImplicit() || !ove->isImplicit() || !ove->isPlaceholder())
-          return nullptr;
-
-        if (ace->getType()->isEqual(ove->getType()))
-          return ove;
-      }
+      return dyn_cast<PropertyWrapperValuePlaceholderExpr>(ce->getFn());
     }
   }
   return nullptr;
@@ -2430,8 +2425,8 @@ static OpaqueValueExpr *opaqueValueExprToSubstituteForAutoClosure(
 
 RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                                SGFContext C) {
-  if (auto ove = opaqueValueExprToSubstituteForAutoClosure(e))
-    return visitOpaqueValueExpr(ove, C);
+  if (auto *placeholder = wrappedValueAutoclosurePlaceholder(e))
+    return visitPropertyWrapperValuePlaceholderExpr(placeholder, C);
 
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
@@ -3352,11 +3347,15 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
     // Identify the property using its (unthunked) getter. For a
     // computed property, this should be stable ABI; for a resilient public
     // property, this should also be stable ABI across modules.
+    auto representativeDecl = getRepresentativeAccessorForKeyPath(storage);
+    // If the property came from an import-as-member function defined in C,
+    // use the original C function as the key.
+    bool isForeign = representativeDecl->isImportAsMember();
+    auto getterRef = SILDeclRef(representativeDecl,
+                                SILDeclRef::Kind::Func, isForeign);
     // TODO: If the getter has shared linkage (say it's synthesized for a
     // Clang-imported thing), we'll need some other sort of
     // stable identifier.
-    auto getterRef = SILDeclRef(getRepresentativeAccessorForKeyPath(storage),
-                                SILDeclRef::Kind::Func);
     return SGM.getFunction(getterRef, NotForDefinition);
   }
   case AccessStrategy::DispatchToAccessor: {
@@ -5135,6 +5134,11 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   assert(SGF.OpaqueValues.count(E) && "Didn't bind OpaqueValueExpr");
   auto value = SGF.OpaqueValues[E];
   return RValue(SGF, E, SGF.manageOpaqueValue(value, E, C));
+}
+
+RValue RValueEmitter::visitPropertyWrapperValuePlaceholderExpr(
+    PropertyWrapperValuePlaceholderExpr *E, SGFContext C) {
+  return visitOpaqueValueExpr(E->getOpaqueValuePlaceholder(), C);
 }
 
 ProtocolDecl *SILGenFunction::getPointerProtocol() {

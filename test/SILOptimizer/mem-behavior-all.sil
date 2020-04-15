@@ -141,3 +141,30 @@ bb0(%0 : $C):
   %8 = tuple ()
   return %8 : $()
 }
+
+// ===-----------------------------------------------------------------------===
+// Test that isLetAccess does not assert on nested access markers with
+// interprosed projections.
+
+struct Int64Wrapper {
+  var val : Int64
+}
+
+// CHECK-LABEL: @testNestedAccessWithInterposedProjection
+// CHECK: PAIR #2.
+// CHECK:     %1 = begin_access [modify] [static] %0 : $*Int64Wrapper // users: %7, %2
+// CHECK:     %3 = begin_access [read] [static] %2 : $*Int64  // users: %6, %4
+// CHECK:   r=0,w=1,se=1
+// CHECK: PAIR #3.
+sil @testNestedAccessWithInterposedProjection : $@convention(thin) (@inout Int64Wrapper) -> () {
+bb0(%0 : $*Int64Wrapper):
+  %1 = begin_access [modify] [static] %0 : $*Int64Wrapper
+  %2 = struct_element_addr %1 : $*Int64Wrapper, #Int64Wrapper.val
+  %3 = begin_access [read] [static] %2 : $*Int64
+  %4 = struct_element_addr %3 : $*Int64, #Int64._value
+  %5 = load %4 : $*Builtin.Int64
+  end_access %3 : $*Int64
+  end_access %1 : $*Int64Wrapper
+  %8 = tuple ()
+  return %8 : $()
+}

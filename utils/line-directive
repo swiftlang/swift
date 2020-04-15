@@ -700,7 +700,7 @@ def run():
             ':(?P<line>[0-9]+):(?P<column>[0-9]+):(?P<tail>.*?)\n?$')
 
         assertion_pattern = re.compile(
-            '^(?P<head>.*( file | at |#[0-9]+: |[[]))' +
+            '^(?P<head>.*( file | at |#[0-9]+: |[\[]))' +
             sources +
             '(?P<middle>, line |:)(?P<line>[0-9]+)(?P<tail>.*?)\n?$')
 

@@ -2130,6 +2130,26 @@ public:
   void cacheResult(IndexSubset *value) const;
 };
 
+/// Resolves the referenced original declaration for a `@derivative` attribute.
+class DerivativeAttrOriginalDeclRequest
+    : public SimpleRequest<DerivativeAttrOriginalDeclRequest,
+                           AbstractFunctionDecl *(DerivativeAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator,
+                                 DerivativeAttr *attr) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether a type eraser has a viable initializer.
 class TypeEraserHasViableInitRequest
     : public SimpleRequest<TypeEraserHasViableInitRequest,
@@ -2258,6 +2278,48 @@ public:
   evaluator::DependencySource readDependencySource(Evaluator &eval) const;
   void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
                            evaluator::SideEffect) const;
+};
+
+class ResolveTypeEraserTypeRequest
+    : public SimpleRequest<ResolveTypeEraserTypeRequest,
+                           Type (ProtocolDecl *, TypeEraserAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, ProtocolDecl *PD,
+                TypeEraserAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
+/// Determines whether this is a "simple" didSet i.e one that either does not
+/// use the implicit oldValue parameter in the body or does not take an explicit
+/// parameter (ex: 'didSet(oldValue)').
+class SimpleDidSetRequest
+    : public SimpleRequest<SimpleDidSetRequest, bool(AccessorDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, AccessorDecl *decl) const;
+
+public:
+  bool isCached() const {
+    return std::get<0>(getStorage())->getAccessorKind() == AccessorKind::DidSet;
+  }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

@@ -237,19 +237,15 @@ private:
 
 class SKDCustomData: public SKDObject {
 public:
-  SKDCustomData(CustomBufferKind BufferKind, 
-                std::unique_ptr<llvm::MemoryBuffer>& MemBuf)
-  : SKDObject(ObjectKind::CustomData), BufferKind(BufferKind),
-    BufferPtr(llvm::MemoryBuffer::getMemBufferCopy(
-                                                MemBuf->getBuffer(), 
-                                                MemBuf->getBufferIdentifier())) 
+  SKDCustomData(std::unique_ptr<llvm::MemoryBuffer> MemBuf)
+  : SKDObject(ObjectKind::CustomData), BufferPtr(std::move(MemBuf))
     {}
 
   SKDCustomData(SKDCustomData const&) = delete;
   SKDCustomData &operator=(SKDCustomData const&) = delete;
 
   sourcekitd_variant_type_t getVariantType() const override {
-    switch (BufferKind) {
+    switch (getBufferKind()) {
       case CustomBufferKind::TokenAnnotationsArray:
       case CustomBufferKind::DocSupportAnnotationArray:
       case CustomBufferKind::CodeCompletionResultsArray:
@@ -266,23 +262,24 @@ public:
   }
 
   CustomBufferKind getBufferKind() const {
-    return BufferKind;
+    return ((CustomBufferKind)*(const uint64_t*)_getStartPtr());
   }
 
   const void *getDataPtr() const override {
-    return BufferPtr->getBuffer().data();
+    return ((const void*)(((const uint64_t*)_getStartPtr())+1));
   }
 
   size_t getDataSize() const override {
-    return BufferPtr->getBuffer().size();
+    return BufferPtr->getBuffer().size() - sizeof(uint64_t);
   }
 
   static bool classof(const SKDObject *O) {
     return O->getKind() == ObjectKind::CustomData;
   }
 private:
-  CustomBufferKind BufferKind;
   std::unique_ptr<llvm::MemoryBuffer> BufferPtr;
+
+  const void *_getStartPtr() const { return BufferPtr->getBuffer().data(); }
 };
 
 class SKDError: public SKDObject {
@@ -675,10 +672,9 @@ ResponseBuilder::Dictionary::setDictionary(UIdent Key) {
 }
 
 void ResponseBuilder::Dictionary::setCustomBuffer(
-      SourceKit::UIdent Key,
-      CustomBufferKind Kind, std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
+      SourceKit::UIdent Key, std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
   static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), 
-                                      new SKDCustomData(Kind, MemBuf));
+                                      new SKDCustomData(std::move(MemBuf)));
 }
 
 ResponseBuilder::Array

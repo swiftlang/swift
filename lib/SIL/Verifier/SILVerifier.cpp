@@ -5232,13 +5232,20 @@ public:
 //                     Out of Line Verifier Run Functions
 //===----------------------------------------------------------------------===//
 
+static bool verificationEnabled(const SILModule &M) {
+#ifdef NDEBUG
+  if (!M.getOptions().VerifyAll)
+    return false;
+#endif
+  return !M.getOptions().VerifyNone;
+}
+
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
 void SILFunction::verify(bool SingleFunction) const {
-#ifdef NDEBUG
-  if (!getModule().getOptions().VerifyAll)
+  if (!verificationEnabled(getModule()))
     return;
-#endif
+
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
@@ -5246,19 +5253,16 @@ void SILFunction::verify(bool SingleFunction) const {
 }
 
 void SILFunction::verifyCriticalEdges() const {
-#ifdef NDEBUG
-  if (!getModule().getOptions().VerifyAll)
+  if (!verificationEnabled(getModule()))
     return;
-#endif
+
   SILVerifier(*this, /*SingleFunction=*/true).verifyBranches(this);
 }
 
 /// Verify that a property descriptor follows invariants.
 void SILProperty::verify(const SILModule &M) const {
-#ifdef NDEBUG
-  if (!M.getOptions().VerifyAll)
+  if (!verificationEnabled(M))
     return;
-#endif
 
   auto *decl = getDecl();
   auto *dc = decl->getInnermostDeclContext();
@@ -5310,10 +5314,9 @@ void SILProperty::verify(const SILModule &M) const {
 
 /// Verify that a vtable follows invariants.
 void SILVTable::verify(const SILModule &M) const {
-#ifdef NDEBUG
-  if (!M.getOptions().VerifyAll)
+  if (!verificationEnabled(M))
     return;
-#endif
+
   for (auto &entry : getEntries()) {
     // All vtable entries must be decls in a class context.
     assert(entry.Method.hasDecl() && "vtable entry is not a decl");
@@ -5361,10 +5364,9 @@ void SILVTable::verify(const SILModule &M) const {
 
 /// Verify that a witness table follows invariants.
 void SILWitnessTable::verify(const SILModule &M) const {
-#ifdef NDEBUG
-  if (!M.getOptions().VerifyAll)
+  if (!verificationEnabled(M))
     return;
-#endif
+
   if (isDeclaration())
     assert(getEntries().empty() &&
            "A witness table declaration should not have any entries.");
@@ -5414,10 +5416,9 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
 
 /// Verify that a global variable follows invariants.
 void SILGlobalVariable::verify() const {
-#ifdef NDEBUG
-  if (!getModule().getOptions().VerifyAll)
+  if (!verificationEnabled(getModule()))
     return;
-#endif
+
   assert(getLoweredType().isObject()
          && "global variable cannot have address type");
 
@@ -5439,10 +5440,9 @@ void SILGlobalVariable::verify() const {
 
 /// Verify the module.
 void SILModule::verify() const {
-#ifdef NDEBUG
-  if (!getOptions().VerifyAll)
+  if (!verificationEnabled(*this))
     return;
-#endif
+
   // Uniquing set to catch symbol name collisions.
   llvm::DenseSet<StringRef> symbolNames;
 

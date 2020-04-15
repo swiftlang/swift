@@ -708,9 +708,23 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     return false;
   }
 
-  if (nominal.getModuleContext() != IGM.getSwiftModule() ||
-      nominal.isResilient(IGM.getSwiftModule(), ResilienceExpansion::Minimal)) {
-    return false;
+  if (IGM.getSILModule().isWholeModule()) {
+    if (nominal.isResilient(IGM.getSwiftModule(),
+                            ResilienceExpansion::Maximal)) {
+      return false;
+    }
+  } else {
+    // If whole module optimization is not enabled, we can only construct a
+    // canonical prespecialization if the usage is in the same *file* as that
+    // containing the type's decl!  The reason is that the generic metadata
+    // accessor is defined in the IRGenModule corresponding to the source file
+    // containing the type's decl.
+    SourceFile *nominalFile = nominal.getDeclContext()->getParentSourceFile();
+    if (auto *moduleFile = IGM.IRGen.getSourceFile(&IGM)) {
+      if (nominalFile != moduleFile) {
+        return false;
+      }
+    }
   }
 
   if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {

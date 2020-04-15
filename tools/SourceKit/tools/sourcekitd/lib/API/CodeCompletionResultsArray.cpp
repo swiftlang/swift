@@ -75,7 +75,8 @@ void CodeCompletionResultsArrayBuilder::add(
 
 std::unique_ptr<llvm::MemoryBuffer>
 CodeCompletionResultsArrayBuilder::createBuffer() {
-  return Impl.Builder.createBuffer();
+  return Impl.Builder.createBuffer(
+      CustomBufferKind::CodeCompletionResultsArray);
 }
 
 namespace {

@@ -669,11 +669,11 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
 }
 
 static bool isOpaquePlaceholderClosure(const Expr *value) {
-  auto ove = dyn_cast<OpaqueValueExpr>(value);
-  if (!ove || !ove->isPlaceholder())
+  auto *placeholder = dyn_cast<PropertyWrapperValuePlaceholderExpr>(value);
+  if (!placeholder)
     return false;
 
-  if (auto valueFnTy = ove->getType()->getAs<FunctionType>()) {
+  if (auto valueFnTy = placeholder->getType()->getAs<FunctionType>()) {
     return (valueFnTy->getNumParams() == 0);
   }
 
@@ -681,12 +681,13 @@ static bool isOpaquePlaceholderClosure(const Expr *value) {
 }
 
 Expr *swift::buildPropertyWrapperWrappedValueCall(
-    VarDecl *var, Type backingStorageType, Expr *value,
-    bool ignoreAttributeArgs) {
+    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+    llvm::function_ref<void(ApplyExpr *)> innermostInitCallback) {
   // From the innermost wrapper type out, form init(wrapperValue:) calls.
   ASTContext &ctx = var->getASTContext();
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Expr *initializer = value;
+  ApplyExpr *innermostInit = nullptr;
   if (var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure() &&
       isOpaquePlaceholderClosure(value)) {
     // We can't pass the opaque closure directly as an autoclosure arg.
@@ -727,10 +728,14 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
       if (endLoc.isInvalid() && startLoc.isValid())
         endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
-      initializer = CallExpr::create(
+      auto *init = CallExpr::create(
          ctx, typeExpr, startLoc, {initializer}, {argName},
          {initializer->getStartLoc()}, endLoc,
          nullptr, /*implicit=*/true);
+      initializer = init;
+
+      if (!innermostInit)
+        innermostInit = init;
       continue;
     }
 
@@ -759,10 +764,17 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
     if (endLoc.isInvalid() && startLoc.isValid())
       endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
-    initializer = CallExpr::create(
+    auto *init = CallExpr::create(
         ctx, typeExpr, startLoc, elements, elementNames, elementLocs,
         endLoc, nullptr, /*implicit=*/true);
+    initializer = init;
+
+    if (!innermostInit)
+      innermostInit = init;
   }
-  
+
+  // Invoke the callback, passing in the innermost init(wrappedValue:) call
+  innermostInitCallback(innermostInit);
+
   return initializer;
 }

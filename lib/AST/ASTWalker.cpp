@@ -508,6 +508,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
 
+  Expr *visitPropertyWrapperValuePlaceholderExpr(
+      PropertyWrapperValuePlaceholderExpr *E) {
+    if (auto *placeholder = doIt(E->getOpaqueValuePlaceholder()))
+      E->setOpaqueValuePlaceholder(dyn_cast<OpaqueValueExpr>(placeholder));
+    else
+      return nullptr;
+
+    if (E->getOriginalWrappedValue()) {
+      if (auto *newValue = doIt(E->getOriginalWrappedValue()))
+        E->setOriginalWrappedValue(newValue);
+      else
+        return nullptr;
+    }
+
+    return E;
+  }
+
   Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
 
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
@@ -1491,39 +1508,12 @@ Stmt *Traversal::visitDoCatchStmt(DoCatchStmt *stmt) {
   }
 
   // Transform each of the catch clauses:
-  for (CatchStmt *&clause : stmt->getMutableCatches()) {
+  for (CaseStmt *&clause : stmt->getMutableCatches()) {
     if (auto newClause = doIt(clause)) {
-      clause = cast<CatchStmt>(newClause);
+      clause = cast<CaseStmt>(newClause);
     } else {
       return nullptr;
     }
-  }
-
-  return stmt;
-}
-
-Stmt *Traversal::visitCatchStmt(CatchStmt *stmt) {
-  // Transform the error pattern.
-  if (Pattern *newPattern = doIt(stmt->getErrorPattern())) {
-    stmt->setErrorPattern(newPattern);
-  } else {
-    return nullptr;
-  }
-
-  // Transform the guard expression if present.
-  if (Expr *oldGuardExpr = stmt->getGuardExpr()) {
-    if (Expr *newGuardExpr = doIt(oldGuardExpr)) {
-      stmt->setGuardExpr(newGuardExpr);
-    } else {
-      return nullptr;
-    }
-  }
-
-  // Transform the body of the catch clause.
-  if (Stmt *newCatchBody = doIt(stmt->getBody())) {
-    stmt->setBody(newCatchBody);
-  } else {
-    return nullptr;
   }
 
   return stmt;

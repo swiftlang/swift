@@ -19,8 +19,8 @@ import lldb
 REPO_BASE = os.path.abspath(os.path.join(__file__, os.pardir, os.pardir,
                                          os.pardir, os.pardir))
 SWIFT_REPO = os.path.join(REPO_BASE, "swift")
-LLVM_REPO = os.path.join(REPO_BASE, "llvm")
-LLVM_DATAFORMATTER_PATH = os.path.join(LLVM_REPO, "utils",
+LLVM_REPO = os.path.join(REPO_BASE, "llvm-project")
+LLVM_DATAFORMATTER_PATH = os.path.join(LLVM_REPO, "llvm", "utils",
                                        "lldbDataFormatters.py")
 SWIFT_DATAFORMATTER_PATH = os.path.join(SWIFT_REPO, "utils",
                                         "lldb", "lldbSwiftDataFormatters.py")
