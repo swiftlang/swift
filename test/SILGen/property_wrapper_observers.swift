@@ -35,8 +35,8 @@ class Bar {
 // CHECK: [[WRAPPED_VALUE_SETTER:%.*]] = function_ref @$s26property_wrapper_observers3FooV12wrappedValueSaySiGvs : $@convention(method) (@owned Array<Int>, @inout Foo) -> ()
 // CHECK-NEXT: [[RESULT_WVS:%.*]] = apply [[WRAPPED_VALUE_SETTER]](%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(method) (@owned Array<Int>, @inout Foo) -> ()
 
-// CHECK: [[DIDSET:%.*]] = function_ref @$s26property_wrapper_observers3BarC9someArraySaySiGvW : $@convention(method) (@guaranteed Bar) -> ()
-// CHECK-NEXT: [[RESULT_DS:%.*]] = apply [[DIDSET]]([[BAR]]) : $@convention(method) (@guaranteed Bar) -> ()
+// CHECK: [[DIDSET:%.*]] = function_ref @$s26property_wrapper_observers3BarC9someArraySaySiGvW : $@convention(method) (@guaranteed Array<Int>, @guaranteed Bar) -> ()
+// CHECK-NEXT: [[RESULT_DS:%.*]] = apply [[DIDSET]](%{{[0-9]+}}, [[BAR]]) : $@convention(method) (@guaranteed Array<Int>, @guaranteed Bar) -> ()
 // CHECK: }
 
 // Bar.someArray.modify
