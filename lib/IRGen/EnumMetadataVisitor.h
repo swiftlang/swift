@@ -94,12 +94,13 @@ public:
   void addGenericWitnessTable(GenericRequirement requirement) { addPointer(); }
   void addPayloadSize() { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
-  void addTrailingFlags() { addPointer(); }
+  void addTrailingFlags() { addInt64(); }
 
 private:
   void addPointer() {
     NextOffset += super::IGM.getPointerSize();
   }
+  void addInt64() { NextOffset += Size(8); }
 };
 
 } // end namespace irgen
