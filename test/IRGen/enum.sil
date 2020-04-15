@@ -254,6 +254,8 @@ entry(%u : $*Singleton):
   switch_enum_addr %u : $*Singleton, case #Singleton.value!enumelt: dest
 dest:
   %u2 = unchecked_take_enum_data_addr %u : $*Singleton, #Singleton.value!enumelt
+  // Use u2 so it's not optimized away.
+  copy_addr %u2 to undef : $*(Builtin.Int64, Builtin.Int64)
   %x = tuple ()
   return %x : $()
 }
@@ -979,6 +981,7 @@ entry(%u : $*SinglePayloadSpareBit):
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %T4enum21SinglePayloadSpareBitO* %0 to i63*
 x_dest:
   %u2 = unchecked_take_enum_data_addr %u : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt
+  copy_addr %u2 to undef : $*Builtin.Int63
   %a = function_ref @a : $@convention(thin) () -> ()
   apply %a() : $@convention(thin) () -> ()
   br end
@@ -1489,14 +1492,20 @@ entry(%u : $*MultiPayloadNoSpareBits):
 
 x_dest:
   %x = unchecked_take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt
+  // Dummy use of %x so it's not optimized away.
+  copy_addr %x to undef : $*Builtin.Int64
   br end
 
 y_dest:
   %y = unchecked_take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.y!enumelt
+  // Dummy use of %y so it's not optimized away.
+  copy_addr %y to undef : $*Builtin.Int32
   br end
 
 z_dest:
   %z = unchecked_take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.z!enumelt
+  // Dummy use of %z so it's not optimized away.
+  copy_addr %z to undef : $*Builtin.Int63
   br end
 
 a_dest:
@@ -1742,14 +1751,20 @@ entry(%u : $*MultiPayloadOneSpareBit):
 
 x_dest:
   %x = unchecked_take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt
+  // Dummy use of %x so it's not optimized away.
+  copy_addr %x to undef : $*Builtin.Int62
   br end
 
 y_dest:
   %y = unchecked_take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt
+  // Dummy use of %y so it's not optimized away.
+  copy_addr %y to undef : $*Builtin.Int63
   br end
 
 z_dest:
   %z = unchecked_take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.z!enumelt
+  // Dummy use of %z so it's not optimized away.
+  copy_addr %z to undef : $*Builtin.Int61
   br end
 
 a_dest:
@@ -2441,6 +2456,8 @@ entry(%0 : $*DynamicSingleton<T>):
 
 dest:
   %1 = unchecked_take_enum_data_addr %0 : $*DynamicSingleton<T>, #DynamicSingleton.value!enumelt
+  // Dummy use of %1 so it's not optimized away.
+  copy_addr %1 to undef : $*T
   %v = tuple ()
   return %v : $()
 }
@@ -2521,6 +2538,8 @@ entry(%x : $Int32):
   // CHECK-64: [[INT_SHR:%.*]] = lshr i64 [[INT_SHL]], 32
   // CHECK-64: [[INT:%.*]] = trunc i64 [[INT_SHR]] to i32
   %e = unchecked_enum_data %d : $Optional<(Optional<()>, Int32)>, #Optional.some!enumelt
+  // Use %e so it's not optimized away.
+  store %e to undef : $*(Optional<()>, Int32)
   return %d : $Optional<(Optional<()>, Int32)>
 }
 
