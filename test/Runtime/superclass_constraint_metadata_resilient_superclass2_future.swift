@@ -12,9 +12,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: rdar61345988
-
 // REQUIRES: OS=macosx
-// Testing runtime changes that aren't in the os stdlib.
 // UNSUPPORTED: use_os_stdlib
 
 import Swift
