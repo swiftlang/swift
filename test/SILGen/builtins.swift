@@ -808,7 +808,6 @@ func retain(ptr: Builtin.NativeObject) {
 // CANONICAL-NEXT:   debug_value
 // CANONICAL-NEXT:   strong_release [[P]]
 // CANONICAL-NEXT:   tuple
-// CANONICAL-NEXT:   tuple
 // CANONICAL-NEXT:   return
 // CANONICAL: } // end sil function '$s8builtins7release{{[_0-9a-zA-Z]*}}F'
 

@@ -39,17 +39,20 @@ var bottomRight = Point(x: 10, y: 10)
 var lens = Lens(Rectangle(topLeft: topLeft,
                           bottomRight: bottomRight))
 
+// A dummy user of variables.
+func user<T>(_ _: T) {}
+
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
 // CHECK-NEXT: apply %45<Rectangle, Point>({{.*}})
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
 // CHECK-NEXT: apply %54<Point, Int>({{.*}})
-_ = lens.topLeft.x
+user(lens.topLeft.x)
 
-// CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %69<Rectangle, Point>({{.*}})
-// CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %76<Point, Int>({{.*}})
-_ = lens.topLeft.y
+// CHECK: [[LOOKUP_REF1:%.*]] = function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
+// CHECK-NEXT: apply [[LOOKUP_REF1]]<Rectangle, Point>({{.*}})
+// CHECK: [[LOOKUP_REF2:%.*]] = function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
+// CHECK-NEXT: apply [[LOOKUP_REF2]]<Point, Int>({{.*}})
+user(lens.topLeft.y)
 
 lens.topLeft = Lens(Point(x: 1, y: 2)) // Ok
 lens.bottomRight.y = Lens(12)          // Ok
@@ -238,7 +241,7 @@ func test_recursive_dynamic_lookup(_ lens: Lens<Lens<Point>>) {
   // CHECK: [[FIRST_OBJ:%.*]] = struct_extract {{.*}} : $Lens<Lens<Point>>, #Lens.obj
   // CHECK-NEXT: [[SECOND_OBJ:%.*]] = struct_extract [[FIRST_OBJ]] : $Lens<Point>, #Lens.obj
   // CHECK-NEXT: struct_extract [[SECOND_OBJ]] : $Point, #Point.y
-  _ = lens.obj.obj.y
+  user(lens.obj.obj.y)
   // CHECK: keypath $KeyPath<Point, Int>, (root $Point; stored_property #Point.x : $Int)
   // CHECK-NEXT: keypath $KeyPath<Lens<Point>, Lens<Int>>, (root $Lens<Point>; gettable_property $Lens<Int>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})
   // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Point>>, Lens<Lens<Int>>>, (root $Lens<Lens<Point>>; gettable_property $Lens<Lens<Int>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig : {{.*}})

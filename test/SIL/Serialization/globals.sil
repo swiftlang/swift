@@ -21,6 +21,8 @@ sil_global [serialized] @serialized_global : $Int
 sil [serialized] @uses_public_global : $@convention(thin) () -> () {
 bb0:
   %1 = global_addr @public_global_used : $*Int
+  // Use %1 so that it's not optimized away.
+  copy_addr %1 to undef : $*Int
   %2 = tuple ()
   return %2 : $()
 }
