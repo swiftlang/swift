@@ -757,7 +757,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   bool isMemberLValue = isLValue;
   auto propertyWrapperMutability =
       [&](Decl *decl) -> Optional<std::pair<bool, bool>> {
-    if (accessor->isCoroutine())
+    if (target != TargetImpl::Wrapper && target != TargetImpl::WrapperStorage)
       return None;
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)
