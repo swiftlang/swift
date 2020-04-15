@@ -508,8 +508,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // If there's no suitable last parameter to accept the trailing closure,
     // notify the listener and bail if we need to.
     if (!unlabeledParamIdx) {
+      // Try to use a specialized diagnostic for an extra closure.
       bool isExtraClosure = false;
-
       if (prevParamIdx == 0) {
         isExtraClosure = true;
       } else if (unlabeledArgIdx > 0) {
@@ -534,7 +534,16 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
           return true;
       }
 
-    } else {
+      if (isExtraClosure) {
+        // Claim the unlabeled trailing closure without an associated
+        // parameter to suppress further complaints about it.
+        claim(Identifier(), unlabeledArgIdx, /*ignoreNameClash=*/true);
+      } else {
+        unlabeledParamIdx = prevParamIdx - 1;
+      }
+    }
+
+    if (unlabeledParamIdx) {
       // Claim the parameter/argument pair.
       claim(params[*unlabeledParamIdx].getLabel(), unlabeledArgIdx,
             /*ignoreNameClash=*/true);
