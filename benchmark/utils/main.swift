@@ -84,8 +84,7 @@ import FloatingPointPrinting
 import Hanoi
 import Hash
 import Histogram
-import InsertCharacter
-import IntegerParsing
+import HTTP2StateMachine
 import Integrate
 import IterateData
 import Join
@@ -268,8 +267,7 @@ registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(Histogram)
-registerBenchmark(InsertCharacter)
-registerBenchmark(IntegerParsing)
+registerBenchmark(HTTP2StateMachine)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
 registerBenchmark(Join)

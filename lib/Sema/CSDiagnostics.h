@@ -56,6 +56,12 @@ public:
 
   virtual ~FailureDiagnostic();
 
+  virtual SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+
+  virtual SourceRange getSourceRange() const {
+    return getAnchor()->getSourceRange();
+  }
+
   /// Try to diagnose a problem given affected expression,
   /// failure location, types and declarations deduced by
   /// constraint system, and other auxiliary information.
@@ -79,7 +85,7 @@ public:
 
   Expr *getRawAnchor() const { return RawAnchor; }
 
-  Expr *getAnchor() const { return Anchor; }
+  virtual Expr *getAnchor() const { return Anchor; }
 
   ConstraintLocator *getLocator() const { return Locator; }
 
@@ -107,6 +113,9 @@ public:
 
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
+
+  template <typename... ArgTypes>
+  InFlightDiagnostic emitDiagnosticAt(ArgTypes &&... Args) const;
 
 protected:
   const Solution &getSolution() const { return S; }
@@ -354,7 +363,7 @@ protected:
   }
 
 private:
-  bool diagnoseTypeCannotConform(Expr *anchor, Type nonConformingType,
+  bool diagnoseTypeCannotConform(Type nonConformingType,
                                  Type protocolType) const;
 };
 
@@ -642,7 +651,7 @@ private:
 
   /// Try to add a fix-it to convert a stored property into a computed
   /// property
-  void tryComputedPropertyFixIts(Expr *expr) const;
+  void tryComputedPropertyFixIts() const;
 
   bool isIntegerType(Type type) const {
     return conformsToKnownProtocol(
@@ -777,6 +786,8 @@ public:
                                    Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
 
+  Expr *getAnchor() const override;
+
   bool diagnoseAsError() override;
 
 private:
@@ -832,7 +843,7 @@ public:
 
 protected:
   /// Compute location of the failure for diagnostic.
-  SourceLoc getLoc() const;
+  SourceLoc getLoc() const override;
 };
 
 /// Diagnose mismatches relating to tuple destructuring.
@@ -934,6 +945,8 @@ public:
   MissingCallFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
+  Expr *getAnchor() const override;
+
   bool diagnoseAsError() override;
 };
 
@@ -1027,6 +1040,11 @@ public:
   MissingMemberFailure(const Solution &solution, Type baseType,
                        DeclNameRef memberName, ConstraintLocator *locator)
       : InvalidMemberRefFailure(solution, baseType, memberName, locator) {}
+
+  SourceLoc getLoc() const override {
+    // Diagnostic should point to the member instead of its base expression.
+    return getRawAnchor()->getLoc();
+  }
 
   bool diagnoseAsError() override;
 
@@ -1122,6 +1140,8 @@ protected:
   const ConstructorDecl *Init;
   SourceRange BaseRange;
 
+  Expr *getAnchor() const override { return getRawAnchor(); }
+
   InvalidInitRefFailure(const Solution &solution, Type baseTy,
                         const ConstructorDecl *init, SourceRange baseRange,
                         ConstraintLocator *locator)
@@ -1195,6 +1215,8 @@ public:
                                         ConstraintLocator *locator)
       : InvalidInitRefFailure(solution, baseTy, init, SourceRange(), locator) {}
 
+  SourceLoc getLoc() const override;
+
   bool diagnoseAsError() override;
 };
 
@@ -1211,6 +1233,8 @@ public:
         SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {
     assert(!SynthesizedArgs.empty() && "No missing arguments?!");
   }
+
+  Expr *getAnchor() const override;
 
   bool diagnoseAsError() override;
 
@@ -1322,6 +1346,9 @@ public:
                                    ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), ContextualType(contextualType) {}
 
+  SourceLoc getLoc() const override;
+  SourceRange getSourceRange() const override;
+
   bool diagnoseAsError() override;
 
 private:
@@ -1390,6 +1417,9 @@ public:
                               ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
+  SourceLoc getLoc() const override;
+  SourceRange getSourceRange() const override;
+
   bool diagnoseAsError() override;
 };
 
@@ -1418,6 +1448,8 @@ public:
            locator->isKeyPathSubscriptComponent());
   }
 
+  SourceLoc getLoc() const override;
+
   bool diagnoseAsError() override;
 };
 
@@ -1441,7 +1473,7 @@ public:
 
 protected:
   /// Compute location of the failure for diagnostic.
-  SourceLoc getLoc() const;
+  SourceLoc getLoc() const override;
 
   bool isForKeyPathDynamicMemberLookup() const {
     return getLocator()->isForKeyPathDynamicMemberLookup();
@@ -1651,6 +1683,8 @@ public:
       : FailureDiagnostic(solution, locator), unhandled(unhandled),
         builder(builder) {}
 
+  SourceLoc getLoc() const override;
+
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
 };
@@ -1819,8 +1853,6 @@ protected:
   /// Are currently impossible to fix correctly,
   /// so we have to attend to that in diagnostics.
   bool diagnoseMisplacedMissingArgument() const;
-
-  SourceLoc getLoc() const { return getAnchor()->getLoc(); }
 };
 
 /// Replace a coercion ('as') with a forced checked cast ('as!').
@@ -1829,6 +1861,8 @@ public:
   MissingForcedDowncastFailure(const Solution &solution, Type fromType,
                                Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
+
+  Expr *getAnchor() const override;
 
   bool diagnoseAsError() override;
 };
@@ -1927,7 +1961,9 @@ public:
                                    ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  bool diagnoseAsError();
+  SourceLoc getLoc() const override;
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose an attempt to reference a top-level name shadowed by a local

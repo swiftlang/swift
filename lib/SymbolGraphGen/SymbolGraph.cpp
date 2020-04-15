@@ -46,7 +46,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   PrintOptions Opts;
   Opts.FunctionDefinitions = false;
   Opts.ArgAndParamPrinting =
-    PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
+    PrintOptions::ArgAndParamPrintingMode::MatchSource;
   Opts.PrintGetSetOnRWProperties = false;
   Opts.PrintPropertyAccessors = false;
   Opts.PrintSubscriptAccessors = false;
@@ -422,6 +422,8 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
                                                      llvm::json::OStream &OS) {
   DeclarationFragmentPrinter Printer(OS, Key);
   auto Options = getDeclarationFragmentsPrintOptions();
+  Options.ArgAndParamPrinting =
+    PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
   Options.VarInitializers = false;
   Options.PrintDefaultArgumentValue = false;
   Options.PrintEmptyArgumentNames = false;
