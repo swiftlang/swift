@@ -80,8 +80,8 @@ where to stop in the debugger. Rather than trying to guess/check if one has an
 asserts swift compiler, one can use the following options to cause the
 diagnostic engine to assert on the first error/warning:
 
-* -Xllvm -swift-diagnostics-assert-on-error=1
-* -Xllvm -swift-diagnostics-assert-on-warning=1
+* ``-Xllvm -swift-diagnostics-assert-on-error=1``
+* ``-Xllvm -swift-diagnostics-assert-on-warning=1``
 
 These allow one to dump a stack trace of where the diagnostic is being emitted
 (if run without a debugger) or drop into the debugger if a debugger is attached.
@@ -548,10 +548,17 @@ it's quite easy to do this manually:
 
   a. Add the compiler option ``-Xllvm -sil-opt-pass-count=<n>``, where ``<n>``
      is the number of optimizations to run.
-  b. Bisect: find n where the executable crashes, but does not crash with n-1.
-     Note that n can be quite large, e.g. > 100000 (just try
-     n = 10, 100, 1000, 10000, etc. to find an upper bound).
-  c. Add another option ``-Xllvm -sil-print-pass-name``. The output can be
+
+  b. Bisect: find n where the executable crashes, but does not crash
+     with n-1. First just try n = 10, 100, 1000, 10000, etc. to find
+     an upper bound). Then can either bisect the invocation by hand or
+     place the invocation into a script and use
+     ``./llvm-project/llvm/utils/bisect`` to automatically bisect
+     based on the scripts error code. Example invocation::
+
+       bisect --start=0 --end=10000 ./invoke_swift_passing_N.sh "%(count)s"
+
+  c. Once one finds ``n``, Add another option ``-Xllvm -sil-print-pass-name``. The output can be
      large, so it's best to redirect stderr to a file (``2> output``).
      In the output search for the last pass before ``stage Address Lowering``.
      It should be the ``Run #<n-1>``. This line tells you the name of the bad
@@ -687,3 +694,65 @@ Multiple Logs at a Time
 Note, you can also turn on more than one log at a time as well, e.x.::
 
     (lldb) log enable -f /tmp/lldb-types-log.txt lldb types expression
+
+Using git-bisect in the presence of branch forwarding/feature branches
+======================================================================
+
+``git-bisect`` is a useful tool for finding where a regression was
+introduced. Sadly ``git-bisect`` does not handle long lived branches
+and will in fact choose commits from upstream branches that may be
+missing important content from the downstream branch. As an example,
+consider a situation where one has the following straw man commit flow
+graph::
+
+    github/master -> github/tensorflow
+
+In this case if one attempts to use ``git-bisect`` on
+github/tensorflow, ``git-bisect`` will sometimes choose commits from
+github/master resulting in one being unable to compile/test specific
+tensorflow code that has not been upstreamed yet. Even worse, what if
+we are trying to bisect in between two that were branched from
+github/tensorflow and have had subsequent commits cherry-picked on
+top. Without any loss of generality, lets call those two tags
+``tag-tensorflow-bad`` and ``tag-tensorflow-good``. Since both of
+these tags have had commits cherry-picked on top, they are technically
+not even on the github/tensorflow branch, but rather in a certain
+sense are a tag of a feature branch from master/tensorflow. So,
+``git-bisect`` doesn't even have a clear history to bisect on in
+multiple ways.
+
+With those constraints in mind, we can bisect! We just need to be
+careful how we do it. Lets assume that we have a test script called
+``test.sh`` that indicates error by the error code. With that in hand,
+we need to compute the least common ancestor of the good/bad
+commits. This is traditionally called the "merge base" of the
+commits. We can compute this as so::
+
+    TAG_MERGE_BASE=$(git merge-base tags/tag-tensorflow-bad tags/tag-tensorflow-good)
+
+Given that both tags were taken from the feature branch, the reader
+can prove to themselves that this commit is guaranteed to be on
+``github/tensorflow`` and not ``github/master`` since all commits from
+``github/master`` are forwarded using git merges.
+
+Then lets assume that we checked out ``$TAG_MERGE_BASE`` and then ran
+``test.sh`` and did not hit any error. Ok, we can not bisect. Sadly,
+as mentioned above if we run git-bisect in between ``$TAG_MERGE_BASE``
+and ``tags/tag-tensorflow-bad``, ``git-bisect`` will sometimes choose
+commits from ``github/master`` which would cause ``test.sh`` to fail
+if we are testing tensorflow specific code! To work around this
+problem, we need to start our bisect and then tell ``git-bisect`` to
+ignore those commits by using the skip sub command::
+
+    git bisect start tags/tag-tensorflow-bad $TAG_MERGE_BASE
+    for rev in $(git rev-list $TAG_MERGE_BASE..tags/tag-tensorflow-bad --merges --first-parent); do
+        git rev-list $rev^2 --not $rev^
+    done | xargs git bisect skip
+
+Once this has been done, one uses ``git-bisect`` normally. One thing
+to be aware of is that ``git-bisect`` will return a good/bad commits
+on the feature branch and if one of those commits is a merge from the
+upstream branch, one will need to analyze the range of commits from
+upstream for the bad commit afterwards. The commit range in the merge
+should be relatively small though compared with the large git history
+one just bisected.

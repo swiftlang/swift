@@ -298,6 +298,7 @@ namespace {
     ConstraintSystem &cs;
     DeclContext *dc;
     Solution &solution;
+    Optional<SolutionApplicationTarget> target;
     bool SuppressDiagnostics;
 
     /// Coerce the given tuple to another tuple type.
@@ -2207,8 +2208,9 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, Solution &solution,
+                 Optional<SolutionApplicationTarget> target,
                  bool suppressDiagnostics)
-        : cs(cs), dc(cs.DC), solution(solution),
+        : cs(cs), dc(cs.DC), solution(solution), target(target),
           SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
@@ -3480,6 +3482,11 @@ namespace {
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
       assert(expr->isPlaceholder() && "Already type-checked");
+      return expr;
+    }
+
+    Expr *visitPropertyWrapperValuePlaceholderExpr(
+        PropertyWrapperValuePlaceholderExpr *expr) {
       return expr;
     }
 
@@ -5551,8 +5558,24 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
   SmallVector<AnyFunctionType::Param, 8> args;
   AnyFunctionType::decomposeInput(cs.getType(arg), args);
 
+  // If this application is an init(wrappedValue:) call that needs an injected
+  // wrapped value placeholder, the first non-defaulted argument must be
+  // wrapped in an OpaqueValueExpr.
+  bool shouldInjectWrappedValuePlaceholder =
+     target->shouldInjectWrappedValuePlaceholder(apply);
+
+  auto injectWrappedValuePlaceholder = [&](Expr *arg) -> Expr * {
+    auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(ctx,
+        arg->getSourceRange(), cs.getType(arg), arg);
+    cs.cacheType(placeholder);
+    cs.cacheType(placeholder->getOpaqueValuePlaceholder());
+    shouldInjectWrappedValuePlaceholder = false;
+    return placeholder;
+  };
+
   // Quickly test if any further fix-ups for the argument types are necessary.
-  if (AnyFunctionType::equalParams(args, params))
+  if (AnyFunctionType::equalParams(args, params) &&
+      !shouldInjectWrappedValuePlaceholder)
     return arg;
 
   // Apply labels to arguments.
@@ -5703,7 +5726,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
-    if (argType->isEqual(paramType)) {
+    if (argType->isEqual(paramType) && !shouldInjectWrappedValuePlaceholder) {
       newArgs.push_back(arg);
       newParams.push_back(param);
       continue;
@@ -5742,12 +5765,32 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
           arg, closureType->getResult(),
           locator.withPathElement(ConstraintLocator::AutoclosureResult));
 
+      if (shouldInjectWrappedValuePlaceholder) {
+        // If init(wrappedValue:) takes an escaping autoclosure, then we want
+        // the effect of autoclosure forwarding of the placeholder
+        // autoclosure. The only way to do this is to call the placeholder
+        // autoclosure when passing it to the init.
+        if (!closureType->isNoEscape()) {
+          auto *placeholder = injectWrappedValuePlaceholder(
+              cs.buildAutoClosureExpr(arg, closureType));
+          arg = CallExpr::createImplicit(ctx, placeholder, {}, {});
+          arg->setType(closureType->getResult());
+          cs.cacheType(arg);
+        } else {
+          arg = injectWrappedValuePlaceholder(arg);
+        }
+      }
+
       convertedArg = cs.buildAutoClosureExpr(arg, closureType);
     } else {
       convertedArg = coerceToType(
           arg, paramType,
           getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
     }
+
+    // Perform the wrapped value placeholder injection
+    if (shouldInjectWrappedValuePlaceholder)
+      convertedArg = injectWrappedValuePlaceholder(convertedArg);
 
     if (!convertedArg)
       return nullptr;
@@ -8355,7 +8398,7 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
     }
   }
 
-  ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
+  ExprRewriter rewriter(*this, solution, target, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
   auto resultTarget = walker.rewriteTarget(target);
   if (!resultTarget)
@@ -8387,7 +8430,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator,
                              Optional<Pattern*> typeFromPattern) {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this, /*suppressDiagnostics=*/false);
+  ExprRewriter rewriter(cs, *this, None, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator, typeFromPattern);
   if (!result)
     return nullptr;

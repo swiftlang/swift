@@ -583,11 +583,14 @@ static void formatDiagnosticArgument(StringRef Modifier,
     }
     break;
   }
+
   case DiagnosticArgumentKind::TypeRepr:
     assert(Modifier.empty() && "Improper modifier for TypeRepr argument");
+    assert(Arg.getAsTypeRepr() && "TypeRepr argument is null");
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsTypeRepr()
         << FormatOpts.ClosingQuotationMark;
     break;
+
   case DiagnosticArgumentKind::PatternKind:
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();

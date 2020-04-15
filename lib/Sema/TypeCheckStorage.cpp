@@ -2476,6 +2476,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
         nominalWrapper->diagnose(diag::property_wrapper_declared_here,
                                  nominalWrapper->getFullName());
       }
+      return PropertyWrapperBackingPropertyInfo();
     }
   }
 
@@ -2524,11 +2525,13 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     TypeChecker::typeCheckPatternBinding(parentPBD, patternNumber);
   }
 
-  Expr *originalInitialValue = nullptr;
-  if (Expr *init = parentPBD->getInit(patternNumber)) {
-    pbd->setInit(0, init);
+  Expr *initializer = nullptr;
+  PropertyWrapperValuePlaceholderExpr *wrappedValue = nullptr;
+
+  if ((initializer = parentPBD->getInit(patternNumber))) {
+    pbd->setInit(0, initializer);
     pbd->setInitializerChecked(0);
-    originalInitialValue = findOriginalPropertyWrapperInitialValue(var, init);
+    wrappedValue = findWrappedValuePlaceholder(initializer);
   } else if (!parentPBD->isInitialized(patternNumber) &&
              wrapperInfo.defaultInit) {
     // FIXME: Record this expression somewhere so that DI can perform the
@@ -2548,30 +2551,37 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     storageVar = synthesizePropertyWrapperStorageWrapperProperty(
         ctx, var, storageInterfaceType, wrapperInfo.projectedValueVar);
   }
-  
-  // Get the property wrapper information.
-  if (!var->allAttachedPropertyWrappersHaveWrappedValueInit() &&
-      !originalInitialValue) {
+
+  // If no initial wrapped value was provided via '=' and either:
+  //   1. Not all of the attached property wrappers have init(wrappedValue:), or
+  //   2. An initializer has already been synthesized from arguments in the
+  //      property wrapper attribute,
+  // then this property wrapper cannot be initialized out-of-line with a wrapped
+  // value.
+  if (!wrappedValue && (!var->allAttachedPropertyWrappersHaveWrappedValueInit() ||
+                        initializer)) {
     return PropertyWrapperBackingPropertyInfo(
         backingVar, storageVar, nullptr, nullptr, nullptr);
   }
 
   // Form the initialization of the backing property from a value of the
   // original property's type.
-  Type origValueInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
-  Type origValueType =
-    var->getDeclContext()->mapTypeIntoContext(origValueInterfaceType);
-  OpaqueValueExpr *origValue =
-      new (ctx) OpaqueValueExpr(var->getSourceRange(), origValueType,
-                                /*isPlaceholder=*/true);
-  Expr *initializer = buildPropertyWrapperWrappedValueCall(
-      var, storageType, origValue,
-      /*ignoreAttributeArgs=*/!originalInitialValue);
-  typeCheckSynthesizedWrapperInitializer(
-      pbd, backingVar, parentPBD, initializer);
-  
-  return PropertyWrapperBackingPropertyInfo(
-      backingVar, storageVar, originalInitialValue, initializer, origValue);
+  if (!initializer) {
+    Type origValueInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+    Type origValueType =
+      var->getDeclContext()->mapTypeIntoContext(origValueInterfaceType);
+    wrappedValue = PropertyWrapperValuePlaceholderExpr::create(
+        ctx, var->getSourceRange(), origValueType, /*wrappedValue=*/nullptr);
+    initializer = buildPropertyWrapperWrappedValueCall(
+        var, storageType, wrappedValue, /*ignoreAttributeArgs=*/true);
+    typeCheckSynthesizedWrapperInitializer(
+        pbd, backingVar, parentPBD, initializer);
+  }
+
+  return PropertyWrapperBackingPropertyInfo(backingVar, storageVar,
+                                            wrappedValue->getOriginalWrappedValue(),
+                                            initializer,
+                                            wrappedValue->getOpaqueValuePlaceholder());
 }
 
 /// Given a storage declaration in a protocol, set it up with the right

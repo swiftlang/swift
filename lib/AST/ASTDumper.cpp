@@ -2511,6 +2511,18 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPropertyWrapperValuePlaceholderExpr(
+      PropertyWrapperValuePlaceholderExpr *E) {
+    printCommon(E, "property_wrapper_value_placeholder_expr");
+    OS << '\n';
+    printRec(E->getOpaqueValuePlaceholder());
+    if (auto *value = E->getOriginalWrappedValue()) {
+      OS << '\n';
+      printRec(value);
+    }
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitDefaultArgumentExpr(DefaultArgumentExpr *E) {
     printCommon(E, "default_argument_expr");
     OS << " default_args_owner=";

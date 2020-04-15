@@ -141,7 +141,7 @@ struct PropertyWrapperBackingPropertyInfo {
   ///
   /// \code
   /// @Lazy var i = 17
-  /// \end
+  /// \endcode
   ///
   /// This is the specified initial value (\c 17), which is suitable for
   /// embedding in the expression \c initializeFromOriginal.
@@ -190,12 +190,13 @@ void simple_display(
     llvm::raw_ostream &out,
     const PropertyWrapperBackingPropertyInfo &backingInfo);
 
-/// Given the initializer for the given property with an attached property
-/// wrapper, dig out the original initialization expression.
+/// Given the initializer for a property with an attached property wrapper,
+/// dig out the wrapped value placeholder for the original initialization
+/// expression.
 ///
-/// Cannot just dig out the getOriginalInit() value because this function checks
-/// types, etc. Erroneous code won't return a result from here.
-Expr *findOriginalPropertyWrapperInitialValue(VarDecl *var, Expr *init);
+/// \note The wrapped value placeholder is injected for properties that can
+/// be initialized out-of-line using an expression of the wrapped property type.
+PropertyWrapperValuePlaceholderExpr *findWrappedValuePlaceholder(Expr *init);
 
 } // end namespace swift
 
