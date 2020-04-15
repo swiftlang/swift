@@ -2841,10 +2841,12 @@ for host in "${ALL_HOSTS[@]}"; do
             # Run dsymutil on executables and shared libraries.
             #
             # Exclude shell scripts and static archives.
+            # Exclude swift-api-digester dSYM to reduce debug toolchain size.
             (cd "${INSTALL_SYMROOT}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v '.py$' | \
                grep -v '.a$' | \
+               grep -v 'swift-api-digester' | \
                xargs -n 1 -P ${BUILD_JOBS} ${dsymutil_path})
 
             # Strip executables, shared libraries and static libraries in
