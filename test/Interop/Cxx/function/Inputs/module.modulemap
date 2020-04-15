@@ -1,4 +1,4 @@
 module EmitCalledFunction {
-  header "EmitCalledFunction.h"
+  header "emit-called-function.h"
   export *
 }
