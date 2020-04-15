@@ -107,8 +107,9 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   // potentially with generic requirements.
   if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     const auto *ExtendedNominal = Extension->getExtendedNominal();
+    auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
     // Ignore effecively private decls.
-    if (ExtendedNominal->hasUnderscoredNaming()) {
+    if (ExtendedSG->isImplicitlyPrivate(ExtendedNominal)) {
       return false;
     }
 
@@ -119,8 +120,6 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     // If there are some protocol conformances on this extension, we'll
     // grab them for some new conformsTo relationships.
     if (!Extension->getInherited().empty()) {
-      auto ExtendedSG =
-          getModuleSymbolGraph(ExtendedNominal);
 
       // The symbol graph to use to record these relationships.
       SmallVector<const ProtocolDecl *, 4> Protocols;
