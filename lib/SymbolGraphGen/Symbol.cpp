@@ -287,7 +287,7 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
 
 void Symbol::serializeSwiftExtensionMixin(llvm::json::OStream &OS) const {
   if (const auto *Extension
-          = dyn_cast_or_null<ExtensionDecl>(VD->getInnermostDeclContext())) {
+          = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
     ::serialize(Extension, OS);
   }
 }
