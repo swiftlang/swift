@@ -192,14 +192,18 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF, llvm::LLVMContext &LLVMContext,
+                         SourceFile *SF,
                          StringRef ModuleName, StringRef OutputFilename,
                          StringRef MainInputFilenameForDebugInfo,
                          StringRef PrivateDiscriminator)
     : IRGen(irgen), Context(irgen.SIL.getASTContext()),
-      ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
+      // The LLVMContext (and the IGM itself) will get deleted by the IGMDeleter
+      // as long as the IGM is registered with the IRGenerator.
+      ClangCodeGen(createClangCodeGenerator(Context, *(new llvm::LLVMContext()),
+                                            irgen.Opts,
                                             ModuleName, PrivateDiscriminator)),
-      Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
+      Module(*ClangCodeGen->GetModule()),
+      LLVMContext(Module.getContext()),
       DataLayout(irgen.getClangDataLayout()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
       silConv(irgen.SIL), OutputFilename(OutputFilename),

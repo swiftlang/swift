@@ -1273,15 +1273,14 @@ public:
   /// The \p SF is the source file for which the llvm module is generated when
   /// doing multi-threaded whole-module compilation. Otherwise it is null.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
-              SourceFile *SF, llvm::LLVMContext &LLVMContext,
+              SourceFile *SF,
               StringRef ModuleName, StringRef OutputFilename,
               StringRef MainInputFilenameForDebugInfo,
               StringRef PrivateDiscriminator);
 
   /// The constructor used when we just need an IRGenModule for type lowering.
-  IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
-              llvm::LLVMContext &LLVMContext)
-    : IRGenModule(irgen, std::move(target), /*SF=*/nullptr, LLVMContext,
+  IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target)
+    : IRGenModule(irgen, std::move(target), /*SF=*/nullptr,
                   "<fake module name>", "<fake output filename>",
                   "<fake main input filename>", "") {}
 

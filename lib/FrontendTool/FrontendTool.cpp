@@ -1384,18 +1384,15 @@ static void generateIR(const IRGenOptions &IRGenOpts,
                        llvm::GlobalVariable *&HashGlobal,
                        ArrayRef<std::string> parallelOutputFilenames,
                        llvm::StringSet<> &LinkerDirectives) {
-  // FIXME: We shouldn't need to use the global context here, but
-  // something is persisting across calls to performIRGeneration.
-  auto &LLVMContext = getGlobalLLVMContext();
   IRModule = MSF.is<SourceFile *>()
                  ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
                                        std::move(SM), OutputFilename, PSPs,
                                        MSF.get<SourceFile *>()->getPrivateDiscriminator().str(),
-                                       LLVMContext, &HashGlobal,
+                                       &HashGlobal,
                                        &LinkerDirectives)
                  : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
                                        std::move(SM), OutputFilename, PSPs,
-                                       LLVMContext, parallelOutputFilenames,
+                                       parallelOutputFilenames,
                                        &HashGlobal, &LinkerDirectives);
 }
 
@@ -1663,7 +1660,7 @@ static bool performCompileStepsPostSILGen(
     Stats->flushTracesAndProfiles();
 
   if (Action == FrontendOptions::ActionType::DumpTypeInfo)
-    return performDumpTypeInfo(IRGenOpts, *SM, getGlobalLLVMContext());
+    return performDumpTypeInfo(IRGenOpts, *SM);
 
   if (Action == FrontendOptions::ActionType::Immediate)
     return processCommandLineAndRunImmediately(

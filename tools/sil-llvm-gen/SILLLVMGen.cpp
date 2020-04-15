@@ -204,6 +204,6 @@ int main(int argc, char **argv) {
       performIRGeneration(Opts, CI.getMainModule(), CI.takeSILModule(),
                           CI.getMainModule()->getName().str(),
                           PSPs,
-                          getGlobalLLVMContext(), ArrayRef<std::string>());
+                          ArrayRef<std::string>());
   return CI.getASTContext().hadError();
 }
