@@ -94,9 +94,6 @@ class C {
     _ = .foo
     _ = .foo(x: 12)
     _ = .foo { 12 }
-    _ = .foo {
-        arg1: { 12 }
-      }
     _ = .foo[12]
     _ = .foo.bar
   }
@@ -261,28 +258,20 @@ func postfix() {
   foo()
   foo() {}
   foo {}
-  foo {
-    arg1: {}
-  }
-  foo() {
-    arg1: {}
+  foo() {}
     arg2: {}
-  }
   foo {}
   foo.bar()
   foo.bar() {}
-  foo.bar() {
-    arg1: {}
-  }
+  foo.bar() {}
+    arg2: {}
   foo.bar {}
   foo[]
   foo[1]
   foo[] {}
   foo[1] {}
-  foo[1] {
-    arg1: {}
+  foo[1] {}
     arg2: {}
-  }
   foo[1][2,x:3]
   foo?++.bar!(baz).self
   foo().0
