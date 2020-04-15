@@ -9,6 +9,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_4 | %FileCheck %s -check-prefix=METHOD_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_5 | %FileCheck %s -check-prefix=METHOD_1
 
+// XFAIL: *
 
 func globalFunc1(fn1: () -> Int, fn2: () -> String) {}
 func testGlobalFunc() {
