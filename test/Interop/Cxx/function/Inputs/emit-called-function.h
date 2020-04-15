@@ -1,7 +1,11 @@
-inline int bar() {
+inline int notCalled() {
   return 42;
 }
 
-inline int foo() {
-  return bar();
+inline int calledIndirectly() {
+  return 42;
+}
+
+inline int calledDirectly() {
+  return calledIndirectly();
 }
