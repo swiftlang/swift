@@ -140,15 +140,6 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
   return %9 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bind_polymorphic_param_from_forwarder_parameter(%swift.opaque* noalias nocapture %0, %swift.type* %"\CF\84_0_1")
-// CHECK: entry:
-// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s23partial_apply_forwarder12BaseProducerVMa"([[INT]] 255, %swift.type* %"\CF\84_0_1")
-// CHECK:   [[BPTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s23partial_apply_forwarder7WeakBoxCMa"([[INT]] 0, %swift.type* [[BPTY]]
-// CHECK:   [[WBTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK:   call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[WBTY]]
-// CHECK:   ret void
-
 // CHECK-LABEL: define internal swiftcc void @"$s7takingQTA.1"(%T23partial_apply_forwarder7WeakBoxC* %0, %swift.refcounted* swiftself %1)
 // CHECK: entry:
 // CHECK:   [[TYADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder7WeakBoxC, %T23partial_apply_forwarder7WeakBoxC* %0

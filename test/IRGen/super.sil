@@ -222,6 +222,8 @@ sil_vtable Derived {
 sil @test_super_method_of_generic_base : $@convention(method) (@guaranteed Derived) -> () {
 bb0(%0 : $Derived):
   %4 = super_method %0 : $Derived, #Base.Method : <T where T : Proto> (Base<T>) -> () -> () , $@convention(method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed Base<τ_0_0>) -> ()
+  // Use of %4 so it's not removed.
+  store %4 to undef : $*@convention(method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed Base<τ_0_0>) -> ()
   %7 = tuple ()
   return %7 : $()
 }

@@ -153,12 +153,15 @@ func class_constrained_generic<T : C>(_ o: T) -> AnyClass? {
   return T.self
 }
 
+@inline(never)
+func blackHole<T>(_ _ : T) { }
+
 // CHECK-LABEL: sil hidden @$s18mandatory_inlining6invokeyyAA1CCF : $@convention(thin) (@guaranteed C) -> () {
 func invoke(_ c: C) {
   // CHECK-NOT: function_ref @$s18mandatory_inlining25class_constrained_generic{{[_0-9a-zA-Z]*}}F
   // CHECK-NOT: apply
   // CHECK: init_existential_metatype
-  _ = class_constrained_generic(c)
+  blackHole(class_constrained_generic(c))
   // CHECK: return
 }
 

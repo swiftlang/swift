@@ -55,6 +55,8 @@ entry:
   // CHECK-V5-32: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 40, [[WORD]] 7)
   // CHECK-V5-64: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 56, [[WORD]] 7)
   %y = alloc_ref $SubButtHolder
+  // Use %y so it's not removed.
+  store %y to undef : $*SubButtHolder
   // CHECK-V4: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s4main03SubB10ButtHolderCMa"([[WORD]] 0)
   // CHECK-V4: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
   // CHECK-V4: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] %{{.*}}, [[WORD]] %{{.*}})
@@ -64,5 +66,7 @@ entry:
   // CHECK-V5-32: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 48, [[WORD]] 7)
   // CHECK-V5-64: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 64, [[WORD]] 7)
   %z = alloc_ref $SubSubButtHolder
+  // Use %z so it's not removed.
+  store %z to undef : $*SubSubButtHolder
   return %x : $ButtHolder
 }
