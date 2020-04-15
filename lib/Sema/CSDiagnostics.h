@@ -41,15 +41,9 @@ class FailureDiagnostic {
   const Solution &S;
   ConstraintLocator *Locator;
 
-  /// The original anchor before any simplification.
-  Expr *RawAnchor;
-  /// Simplified anchor associated with the given locator.
-  Expr *Anchor;
-
 public:
   FailureDiagnostic(const Solution &solution, ConstraintLocator *locator)
-      : S(solution), Locator(locator), RawAnchor(locator->getAnchor()),
-        Anchor(computeAnchor()) {}
+      : S(solution), Locator(locator) {}
 
   FailureDiagnostic(const Solution &solution, Expr *anchor)
       : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
@@ -83,9 +77,9 @@ public:
   /// e.g. ambiguity error.
   virtual bool diagnoseAsNote();
 
-  Expr *getRawAnchor() const { return RawAnchor; }
+  Expr *getRawAnchor() const { return Locator->getAnchor(); }
 
-  virtual Expr *getAnchor() const { return Anchor; }
+  virtual Expr *getAnchor() const;
 
   ConstraintLocator *getLocator() const { return Locator; }
 
@@ -201,10 +195,6 @@ protected:
       Type type,
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
-
-private:
-  /// Compute anchor expression associated with current diagnostic.
-  Expr *computeAnchor() const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement

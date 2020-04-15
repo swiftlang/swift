@@ -50,7 +50,7 @@ bool FailureDiagnostic::diagnoseAsNote() {
   return false;
 }
 
-Expr *FailureDiagnostic::computeAnchor() const {
+Expr *FailureDiagnostic::getAnchor() const {
   auto &cs = getConstraintSystem();
 
   auto *locator = getLocator();
