@@ -617,7 +617,10 @@ initializeValueMetadataFromPattern(ValueMetadata *metadata,
     auto extraDataPattern = pattern->getExtraDataPattern();
 
     // Zero memory up to the offset.
-    memset(metadataExtraData, 0, size_t(extraDataPattern->OffsetInWords));
+    // [pre-5.3-extra-data-zeroing] Before Swift 5.3, the runtime did not
+    // correctly zero the zero-prefix of the extra-data pattern.
+    memset(metadataExtraData, 0,
+           size_t(extraDataPattern->OffsetInWords) * sizeof(void *));
 
     // Copy the pattern into the rest of the extra data.
     copyMetadataPattern(metadataExtraData, extraDataPattern);
