@@ -1,6 +1,8 @@
 // RUN: %swift-indent %s >%t.response
 // RUN: diff -u %s %t.response
 
+// XFAIL: *
+
 foo(c: 12, d: 34) {
     a: { print("foo") }
 }
