@@ -41,7 +41,6 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
   if (!valueDecl || valueDecl->isExternallyVisible()) {
     ClangCodeGen->HandleTopLevelDecl(
                           clang::DeclGroupRef(const_cast<clang::Decl*>(decl)));
-    return;
   }
 
   if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)

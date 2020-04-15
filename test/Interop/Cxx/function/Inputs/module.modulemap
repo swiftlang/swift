@@ -1,0 +1,4 @@
+module EmitCalledFunction {
+  header "EmitCalledFunction.h"
+  export *
+}
