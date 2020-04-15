@@ -436,6 +436,18 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 extern "C" void *_objc_empty_cache;
 #endif
 
+template <>
+bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
+  if (auto *metadata = dyn_cast<StructMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<EnumMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<ClassMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+
+  return false;
+}
+
 static void copyMetadataPattern(void **section,
                                 const GenericMetadataPartialPattern *pattern) {
   memcpy(section + pattern->OffsetInWords,
@@ -671,6 +683,9 @@ swift::swift_getGenericMetadata(MetadataRequest request,
   auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
                               arguments);
   auto result = cache.getOrInsert(key, request, description, arguments);
+
+  assert(
+      !result.second.Value->isCanonicalStaticallySpecializedGenericMetadata());
 
   return result.second;
 }
@@ -5519,18 +5534,6 @@ bool Metadata::satisfiesClassConstraint() const {
 
   // or it's a class.
   return isAnyClass();
-}
-
-template <>
-bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
-  if (auto *metadata = dyn_cast<StructMetadata>(this))
-    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-  if (auto *metadata = dyn_cast<EnumMetadata>(this))
-    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-  if (auto *metadata = dyn_cast<ClassMetadata>(this))
-    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-
-  return false;
 }
 
 #if !NDEBUG
