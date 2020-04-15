@@ -1,9 +1,12 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -I %t -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
 import Builtin
 import Swift
+import resilient_struct
 
 class SwiftClass {}
 sil_vtable SwiftClass {}
@@ -735,6 +738,32 @@ bb0(%x : $*SwiftClassPair):
   %r = apply %u(%p) : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> ()
   dealloc_stack %p : $@noescape @callee_guaranteed (Int) ->(Int)
   destroy_addr %x: $*SwiftClassPair
+  %t = tuple()
+  return %t : $()
+}
+
+sil public_external @closure : $@convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> ()
+
+// Make sure that we use the heap header size (16) for the initial offset.
+// CHECK: define swiftcc void @test_initial_offset(%swift.opaque* noalias nocapture %0, %T13partial_apply10SwiftClassC* %1)
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientIntVMa"
+// CHECK:   [[MD:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[MD]] to i8***
+// CHECK:   [[VWT_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], i64 -1
+// CHECK:   [[VWT_TMP:%.*]] = load i8**, i8*** [[VWT_PTR]]
+// CHECK:   [[VWT:%.*]] = bitcast i8** [[VWT_TMP]] to %swift.vwtable*
+// CHECK:   [[FLAGS_PTR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT]], i32 0, i32 10
+// CHECK:   [[FLAGS:%.*]] = load i32, i32* [[FLAGS_PTR]]
+// CHECK:   [[FLAGS2:%.*]] = zext i32 [[FLAGS]] to i64
+// CHECK:   [[ALIGNMASK:%.*]] = and i64 [[FLAGS2]], 255
+// CHECK:   = xor i64 [[ALIGNMASK]], -1
+// CHECK:   = add i64 16, [[ALIGNMASK]]
+
+sil @test_initial_offset : $@convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> () {
+bb0(%x : $*ResilientInt, %y : $SwiftClass):
+  %f = function_ref @closure : $@convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> ()
+  %p = partial_apply [callee_guaranteed] %f(%x, %y) : $@convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> ()
+  release_value %p : $@callee_guaranteed () ->()
   %t = tuple()
   return %t : $()
 }
