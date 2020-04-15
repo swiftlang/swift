@@ -44,6 +44,10 @@ DeclarationFragmentPrinter::getKindSpelling(FragmentKind Kind) const {
       return "typeIdentifier";
     case FragmentKind::GenericParameter:
       return "genericParameter";
+    case FragmentKind::InternalParam:
+      return "internalParam";
+    case FragmentKind::ExternalParam:
+      return "externalParam";
     case FragmentKind::Text:
       return "text";
     case FragmentKind::None:
@@ -100,10 +104,10 @@ DeclarationFragmentPrinter::printNamePre(PrintNameContext Context) {
     break;
   case PrintNameContext::ClassDynamicSelf:
   case PrintNameContext::FunctionParameterExternal:
-    openFragment(FragmentKind::Identifier);
+    openFragment(FragmentKind::ExternalParam);
     break;
   case PrintNameContext::FunctionParameterLocal:
-    openFragment(FragmentKind::Identifier);
+    openFragment(FragmentKind::InternalParam);
     break;
   case PrintNameContext::TupleElement:
   case PrintNameContext::TypeMember:
