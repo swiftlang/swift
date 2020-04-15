@@ -711,7 +711,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
             current->diagnose(diag::invalid_redecl_init,
                               current->getFullName(),
                               otherInit->isMemberwiseInitializer());
-        } else {
+        } else if (!current->isImplicit() && !other->isImplicit()) {
           ctx.Diags.diagnoseWithNotes(
             current->diagnose(diag::invalid_redecl,
                               current->getFullName()), [&]() {
