@@ -88,9 +88,11 @@ protocol mixed_redecl4 {} // expected-error {{invalid redeclaration}}
 // expected-note@-1{{found this candidate}}
 protocol mixed_redecl4a : mixed_redecl4 {} // expected-error {{'mixed_redecl4' is ambiguous for type lookup in this context}}
 
-class mixed_redecl5 {} // expected-note {{previously declared here}}
-typealias mixed_redecl5 = Int // expected-error {{invalid redeclaration}}
-typealias mixed_redecl5a = mixed_redecl5
+class mixed_redecl5 {} // expected-note {{'mixed_redecl5' previously declared here}}
+// expected-note @-1{{found this candidate}}
+typealias mixed_redecl5 = Int // expected-error {{invalid redeclaration of 'mixed_redecl5'}}
+// expected-note @-1{{found this candidate}}
+typealias mixed_redecl5a = mixed_redecl5 // expected-error {{'mixed_redecl5' is ambiguous for type lookup in this context}}
 
 func mixed_redecl6() {} // expected-note {{'mixed_redecl6()' previously declared here}}
 var mixed_redecl6: Int // expected-error {{invalid redeclaration of 'mixed_redecl6'}}
@@ -502,30 +504,33 @@ struct SR_10084_S {
 
 enum SR_10084_E {
   case foo(SR_10084_S) // expected-note {{'foo' previously declared here}}
-    
+  // expected-note@-1 3{{found this candidate}}
   static func foo(_ name: String) -> SR_10084_E { // Okay
-    return .foo(SR_10084_S(name: name))
+    return .foo(SR_10084_S(name: name)) // expected-error {{ambiguous use of 'foo'}}
   }
 
   func foo(_ name: Bool) -> SR_10084_E { // Okay
-    return .foo(SR_10084_S(name: "Test"))
+    return .foo(SR_10084_S(name: "Test")) // expected-error {{ambiguous use of 'foo'}}
   }
 
   static func foo(_ value: SR_10084_S) -> SR_10084_E { // expected-error {{invalid redeclaration of 'foo'}}
-    return .foo(value)
+    // expected-note@-1 3{{found this candidate}}
+    return .foo(value) // expected-error {{ambiguous use of 'foo'}}
   }
 }
 
 enum SR_10084_E_1 {
   static func foo(_ name: String) -> SR_10084_E_1 { // Okay
-    return .foo(SR_10084_S(name: name))
+    return .foo(SR_10084_S(name: name)) // expected-error {{ambiguous use of 'foo'}}
   }
 
   static func foo(_ value: SR_10084_S) -> SR_10084_E_1 { // expected-note {{'foo' previously declared here}}
-    return .foo(value)
+    // expected-note@-1 2{{found this candidate}}
+    return .foo(value) // expected-error {{ambiguous use of 'foo'}}
   }
 
   case foo(SR_10084_S) // expected-error {{invalid redeclaration of 'foo'}}
+  // expected-note@-1 2{{found this candidate}}
 }
 
 enum SR_10084_E_2 {
@@ -546,8 +551,9 @@ enum SR_10084_E_2 {
 
 // N.B. Redeclaration checks don't see this case because `protocol A` is invalid.
 enum SR_10084_E_3 {
-  protocol A {} //expected-error {{protocol 'A' cannot be nested inside another declaration}}
-  case A
+  protocol A {} // expected-note {{'A' previously declared here}}
+  //expected-error@-1 {{protocol 'A' cannot be nested inside another declaration}}
+  case A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_4 {
@@ -562,8 +568,9 @@ enum SR_10084_E_5 {
 
 // N.B. Redeclaration checks don't see this case because `protocol D` is invalid.
 enum SR_10084_E_6 {
-  case D
-  protocol D {} //expected-error {{protocol 'D' cannot be nested inside another declaration}}
+  case D // expected-note {{'D' previously declared here}}
+  protocol D {} //expected-error{{invalid redeclaration of 'D'}}
+  //expected-error@-1{{protocol 'D' cannot be nested inside another declaration}}
 }
 
 enum SR_10084_E_7 {

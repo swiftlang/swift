@@ -454,7 +454,6 @@ static void checkOperatorOrPrecedenceGroupRedeclaration(
       }
       ctx.Diags.diagnose(decl, diagID);
       ctx.Diags.diagnose(other, noteID);
-      decl->setInvalid();
       return;
     }
   }
@@ -571,7 +570,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     if (currentOverride && currentOverride == otherOverride) {
       current->diagnose(diag::multiple_override, current->getFullName());
       other->diagnose(diag::multiple_override_prev, other->getFullName());
-      current->setInvalid();
       break;
     }
 
@@ -718,7 +716,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
             other->diagnose(diag::invalid_redecl_prev, other->getFullName());
           });
         }
-        current->setInvalid();
       }
 
       // Make sure we don't do this checking again for the same decl. We also
@@ -1306,21 +1303,10 @@ public:
   void visitOperatorDecl(OperatorDecl *OD) {
     TypeChecker::checkDeclAttributes(OD);
     checkRedeclaration(OD);
-    auto &Ctx = OD->getASTContext();
-    if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
+    if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD))
       (void)IOD->getPrecedenceGroup();
-    } else {
-      auto nominalTypes = OD->getDesignatedNominalTypes();
-      const auto wantsDesignatedTypes =
-          Ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
-      if (nominalTypes.empty() && wantsDesignatedTypes) {
-        auto identifiers = OD->getIdentifiers();
-        auto identifierLocs = OD->getIdentifierLocs();
-        if (checkDesignatedTypes(OD, identifiers, identifierLocs, Ctx))
-          OD->setInvalid();
-      }
+    else 
       return;
-    }
     checkAccessControl(OD);
   }
 
@@ -1402,7 +1388,6 @@ public:
         if (!overridden) {
           VD->diagnose(diag::property_does_not_override)
               .highlight(OA->getLocation());
-          OA->setInvalid();
         }
       }
     }
@@ -1488,11 +1473,6 @@ public:
         if (var->isInvalid() || PBD->isInvalid())
           return;
 
-        auto markVarAndPBDInvalid = [PBD, var] {
-          PBD->setInvalid();
-          var->setInvalid();
-        };
-        
         // Properties with an opaque return type need an initializer to
         // determine their underlying type.
         if (var->getOpaqueResultTypeDecl()) {
@@ -1503,7 +1483,6 @@ public:
         if (var->getWriteImpl() == WriteImplKind::StoredWithObservers &&
             !isTypeContext) {
           var->diagnose(diag::observingprop_requires_initializer);
-          markVarAndPBDInvalid();
           return;
         }
 
@@ -1523,7 +1502,6 @@ public:
 
           var->diagnose(diag::static_requires_initializer,
                         var->getCorrectStaticSpelling());
-          markVarAndPBDInvalid();
           return;
         }
 
@@ -1540,7 +1518,6 @@ public:
           }
 
           var->diagnose(diag::global_requires_initializer, var->isLet());
-          markVarAndPBDInvalid();
           return;
         }
       });
@@ -1611,7 +1588,6 @@ public:
         if (!SD->getOverriddenDecl()) {
           SD->diagnose(diag::subscript_does_not_override)
               .highlight(OA->getLocation());
-          OA->setInvalid();
         }
       }
     }
@@ -1707,7 +1683,6 @@ public:
     if (isa<ProtocolDecl>(NTD) &&
         !NTD->getParent()->isModuleScopeContext()) {
       NTD->diagnose(diag::unsupported_nested_protocol, NTD->getName());
-      NTD->setInvalid();
       return;
     }
 
@@ -1844,7 +1819,6 @@ public:
 
       // The variables in this pattern have not been
       // initialized. Diagnose the lack of initial value.
-      pbd->setInvalid();
       SmallVector<VarDecl *, 4> vars;
       for (auto idx : range(pbd->getNumPatternEntries()))
         pbd->getPattern(idx)->collectVariables(vars);
@@ -2210,7 +2184,6 @@ public:
         if (!FD->getOverriddenDecl()) {
           FD->diagnose(diag::method_does_not_override)
               .highlight(OA->getLocation());
-          OA->setInvalid();
         }
       }
     }
@@ -2305,7 +2278,6 @@ public:
         EED->diagnose(diag::enum_with_raw_type_case_with_argument);
         DE.diagnose(ED->getInherited().front().getSourceRange().Start,
                     diag::enum_raw_type_here, rawTy);
-        EED->setInvalid();
       }
     }
 
@@ -2313,7 +2285,6 @@ public:
     Expr *RVE = EED->getRawValueExpr();
     if (RVE && !ED->hasRawType()) {
       DE.diagnose(RVE->getLoc(), diag::enum_raw_value_without_raw_type);
-      EED->setInvalid();
     }
 
     checkAccessControl(EED);
@@ -2326,7 +2297,6 @@ public:
     auto nominal = ED->computeExtendedNominal();
     if (nominal == nullptr) {
       const bool wasAlreadyInvalid = ED->isInvalid();
-      ED->setInvalid();
       if (extType && !extType->hasError() && extType->getAnyNominal()) {
         // If we've got here, then we have some kind of extension of a prima
         // fascie non-nominal type.  This can come up when we're projecting
@@ -2461,7 +2431,6 @@ public:
         if (!CD->getOverriddenDecl()) {
           CD->diagnose(diag::initializer_does_not_override)
               .highlight(attr->getLocation());
-          attr->setInvalid();
         } else if (attr->isImplicit()) {
           // Don't diagnose implicit attributes.
         } else if (overrideRequiresKeyword(CD->getOverriddenDecl())

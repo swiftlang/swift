@@ -60,7 +60,8 @@ protocol SillyProtocol {
 // N.B. Redeclaration checks don't see this case because `protocol A` is invalid.
 enum OuterEnum {
   protocol C {} // expected-error{{protocol 'C' cannot be nested inside another declaration}}
-  case C(C)
+  // expected-note@-1{{'C' previously declared here}}
+  case C(C) // expected-error{{invalid redeclaration of 'C'}}
 }
 
 class OuterClass {
