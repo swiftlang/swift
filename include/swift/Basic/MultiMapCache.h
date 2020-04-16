@@ -18,11 +18,15 @@
 
 namespace swift {
 
-/// A write-once multi-map cache that can be small. It uses a DenseMap
+/// A CRTP write-once multi-map cache that can be small. It uses a DenseMap
 /// internally, so it can be used as a cache without needing to be frozen like
-/// FrozenMultiMap (which uses only a vector internally). The cached value is
-/// computed by a passed in std::function. The std::function is able to map
-/// multiple values to a specific key via the out array.
+/// FrozenMultiMap (which uses only a vector internally). The Impl class
+/// implements the method constructValuesForKey that is used to compute the
+/// actual cache value.
+///
+/// NOTE: constructValuesForKeys is assumed to take a KeyTy and a
+/// SmallVectorImpl<ValueTy>. It must append all results to that accumulator and
+/// not read any contents of the accumulator.
 ///
 /// NOTE: We store the (size, length) of each ArrayRef<ValueTy> instead of
 /// storing the ArrayRef to avoid data invalidation issues caused by SmallVector
@@ -30,23 +34,24 @@ namespace swift {
 ///
 /// For an example of a subclass implementation see:
 /// unittests/Basic/MultiMapCacheTest.cpp.
-template <typename KeyTy, typename ValueTy,
+template <typename ImplType, typename KeyTy, typename ValueTy,
           typename MapTy =
               llvm::DenseMap<KeyTy, Optional<std::tuple<unsigned, unsigned>>>,
           typename VectorTy = std::vector<ValueTy>,
           typename VectorTyImpl = VectorTy>
 class MultiMapCache {
-  std::function<bool(const KeyTy &, VectorTyImpl &)> function;
   MapTy valueToDataOffsetIndexMap;
   VectorTy data;
 
   constexpr static unsigned ArrayStartOffset = 0;
   constexpr static unsigned ArrayLengthOffset = 1;
 
-public:
-  MultiMapCache(std::function<bool(const KeyTy &, VectorTyImpl &)> function)
-      : function(function) {}
+  constexpr ImplType &asImpl() const {
+    auto *self = const_cast<MultiMapCache *>(this);
+    return reinterpret_cast<ImplType &>(*self);
+  }
 
+public:
   void clear() {
     valueToDataOffsetIndexMap.clear();
     data.clear();
@@ -76,7 +81,7 @@ public:
 
     // We assume that constructValuesForKey /only/ inserts to the end of data
     // and does not inspect any other values in the data array.
-    if (!function(key, data)) {
+    if (!asImpl().constructValuesForKey(key, data)) {
       return None;
     }
 
@@ -89,9 +94,9 @@ public:
   }
 };
 
-template <typename KeyTy, typename ValueTy>
+template <typename ImplType, typename KeyTy, typename ValueTy>
 using SmallMultiMapCache = MultiMapCache<
-    KeyTy, ValueTy,
+    ImplType, KeyTy, ValueTy,
     llvm::SmallDenseMap<KeyTy, Optional<std::tuple<unsigned, unsigned>>, 8>,
     SmallVector<ValueTy, 32>, SmallVectorImpl<ValueTy>>;
 
