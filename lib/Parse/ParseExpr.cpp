@@ -3149,8 +3149,12 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
 }
 
 static bool isStartOfLabelledTrailingClosure(Parser &P) {
-  // Fast path: the next two tokens are a label and a colon.
-  if (!P.Tok.canBeArgumentLabel() || !P.peekToken().is(tok::colon))
+  // Fast path: the next two tokens must be a label and a colon.
+  // But 'default:' is ambiguous with switch cases and we disallow it
+  // (unless escaped) even outside of switches.
+  if (!P.Tok.canBeArgumentLabel() ||
+      P.Tok.is(tok::kw_default) ||
+      !P.peekToken().is(tok::colon))
     return false;
 
   // Do some tentative parsing to distinguish `label: { ... }` and
