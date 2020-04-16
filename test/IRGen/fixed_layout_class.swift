@@ -10,25 +10,23 @@
 // This tests @_fixed_layout classes in resilient modules.
 import fixed_layout_class
 
-func blackHole<T>(_ _ : T) { }
-
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience20useRootClassPropertyyy013fixed_layout_A0026OutsideParentWithResilientF0CF"(%T18fixed_layout_class34OutsideParentWithResilientPropertyC* %0)
 public func useRootClassProperty(_ o: OutsideParentWithResilientProperty) {
   // CHECK: getelementptr inbounds %T18fixed_layout_class34OutsideParentWithResilientPropertyC, %T18fixed_layout_class34OutsideParentWithResilientPropertyC* %0, i32 0, i32 1
-  blackHole(o.p)
+  _ = o.p
   // CHECK: load [[INT]], [[INT]]* @"$s18fixed_layout_class34OutsideParentWithResilientPropertyC1s16resilient_struct4SizeVvpWvd"
-  blackHole(o.s)
+  _ = o.s
   // CHECK: load [[INT]], [[INT]]* @"$s18fixed_layout_class34OutsideParentWithResilientPropertyC5colors5Int32VvpWvd"
-  blackHole(o.color)
+  _ = o.color
   // CHECK: ret void
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience19useSubclassPropertyyy013fixed_layout_A012OutsideChildCF"(%T18fixed_layout_class12OutsideChildC* %0)
 public func useSubclassProperty(_ o: OutsideChild) {
-  // CHECK: getelementptr inbounds %T18fixed_layout_class13OutsideParentC, %T18fixed_layout_class13OutsideParentC* %6, i32 0, i32 1
-  blackHole(o.property)
+  // CHECK: getelementptr inbounds %T18fixed_layout_class13OutsideParentC, %T18fixed_layout_class13OutsideParentC* %4, i32 0, i32 1
+  _ = o.property
   // CHECK: getelementptr inbounds %T18fixed_layout_class12OutsideChildC, %T18fixed_layout_class12OutsideChildC* %0, i32 0, i32 2
-  blackHole(o.childProperty)
+  _ = o.childProperty
   // CHECK: ret void
 }
 
@@ -49,7 +47,7 @@ public func useGenericRootClassProperty<A>(_ o: GenericOutsideParent<A>) {
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ADDR]], [[INT]] [[FIELD_OFFSET_OFFSET]]
   // CHECK: [[FIELD_OFFSET_PTR:%.*]] = bitcast i8* [[FIELD_OFFSET_ADDR]] to [[INT]]*
   // CHECK: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
-  blackHole(o.property)
+  _ = o.property
 
   // CHECK: ret void
 }
@@ -57,7 +55,7 @@ public func useGenericRootClassProperty<A>(_ o: GenericOutsideParent<A>) {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience27useGenericRootClassPropertyyy013fixed_layout_A00D13OutsideParentCySiGF"(%T18fixed_layout_class20GenericOutsideParentCySiG* %0)
 public func useGenericRootClassProperty(_ o: GenericOutsideParent<Int>) {
   // CHECK: getelementptr inbounds %T18fixed_layout_class20GenericOutsideParentCySiG, %T18fixed_layout_class20GenericOutsideParentCySiG* %0, i32 0, i32 1
-  blackHole(o.property)
+  _ = o.property
 
   // CHECK: ret void
 }
@@ -80,7 +78,7 @@ public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ADDR]], [[INT]] [[FIELD_OFFSET_OFFSET]]
   // CHECK: [[FIELD_OFFSET_PTR:%.*]] = bitcast i8* [[FIELD_OFFSET_ADDR]] to [[INT]]*
   // CHECK: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
-  blackHole(o.property)
+  _ = o.property
 
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T18fixed_layout_class19GenericOutsideChildC, %T18fixed_layout_class19GenericOutsideChildC* %0, i32 0, i32 0, i32 0
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
@@ -92,7 +90,7 @@ public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ADDR]], [[INT]] [[FIELD_OFFSET_OFFSET]]
   // CHECK: [[FIELD_OFFSET_PTR:%.*]] = bitcast i8* [[FIELD_OFFSET_ADDR]] to [[INT]]*
   // CHECK: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
-  blackHole(o.childProperty)
+  _ = o.childProperty
 
   // CHECK: ret void
 }
@@ -101,10 +99,10 @@ public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
 public func useGenericSubclassProperty(_ o: GenericOutsideChild<Int>) {
   // CHECK: [[UPCAST:%.*]] = bitcast %T18fixed_layout_class19GenericOutsideChildCySiG* %0 to %T18fixed_layout_class20GenericOutsideParentCySiG*
   // CHECK: getelementptr inbounds %T18fixed_layout_class20GenericOutsideParentCySiG, %T18fixed_layout_class20GenericOutsideParentCySiG* [[UPCAST]], i32 0, i32 1
-  blackHole(o.property)
+  _ = o.property
 
   // CHECK: getelementptr inbounds %T18fixed_layout_class19GenericOutsideChildCySiG, %T18fixed_layout_class19GenericOutsideChildCySiG* %0, i32 0, i32 2
-  blackHole(o.childProperty)
+  _ = o.childProperty
 
   // CHECK: ret void
 }
@@ -114,7 +112,7 @@ public func callVirtualMethod(_ o: OutsideParent) {
   // Note: virtual method calls still use dispatch thunks
 
   // CHECK: call swiftcc void @"$s18fixed_layout_class13OutsideParentC6methodyyFTj"
-  blackHole(o.method())
+  _ = o.method()
 
   // CHECK: ret void
 }
