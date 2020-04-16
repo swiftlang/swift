@@ -3150,7 +3150,6 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
 
 static bool isStartOfLabelledTrailingClosure(Parser &P) {
   // Fast path: the next two tokens are a label and a colon.
-  // TODO: recognize a code-completion token here and record it in the AST.
   if (!P.Tok.canBeArgumentLabel() || !P.peekToken().is(tok::colon))
     return false;
 
@@ -3158,7 +3157,12 @@ static bool isStartOfLabelledTrailingClosure(Parser &P) {
   // `label: switch x { ... }`.
   Parser::BacktrackingScope backtrack(P);
   P.consumeToken();
-  return P.peekToken().is(tok::l_brace);
+  if (P.peekToken().is(tok::l_brace))
+    return true;
+  // Consider `label: <complete>` that the user is trying to write a closure.
+  if (P.peekToken().is(tok::code_complete) && !P.peekToken().isAtStartOfLine())
+    return true;
+  return false;
 }
 
 ParserStatus
@@ -3199,13 +3203,37 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
   }
 
   // Parse labeled trailing closures.
-  while (isStartOfLabelledTrailingClosure(*this)) {
+  while (true) {
+    if (!isStartOfLabelledTrailingClosure(*this)) {
+      if (!Tok.is(tok::code_complete))
+        break;
+
+      // foo() {} <token>
+      auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
+      if (CodeCompletion)
+        CodeCompletion->completeLabeledTrailingClosure(CCExpr, Tok.isAtStartOfLine());
+      consumeToken(tok::code_complete);
+      result.hasCodeCompletion();
+      closures.push_back({Identifier(), SourceLoc(), CCExpr});
+      continue;
+    }
+
     SyntaxParsingContext ClosureCtx(SyntaxContext,
                                     SyntaxKind::MultipleTrailingClosureElement);
     Identifier label;
     auto labelLoc = consumeArgumentLabel(label);
     consumeToken(tok::colon);
-    ParserResult<Expr> closure = parseExprClosure();
+    ParserResult<Expr> closure;
+    if (Tok.is(tok::l_brace)) {
+      closure = parseExprClosure();
+    } else if (Tok.is(tok::code_complete)) {
+      assert(!Tok.isAtStartOfLine() &&
+             "isStartOfLabelledTrailingClosure() should return false");
+      // Swallow code completion token after the label.
+      // FIXME: Closure literal completion.
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionStatus();
+    }
     if (closure.isNull())
       return makeParserError();
 

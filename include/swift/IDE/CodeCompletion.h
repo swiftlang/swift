@@ -525,6 +525,7 @@ enum class CompletionKind {
   AttributeDeclParen,
   PoundAvailablePlatform,
   CallArg,
+  LabeledTrailingClosure,
   ReturnStmtExpr,
   YieldStmtExpr,
   ForEachSequence,

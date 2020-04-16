@@ -50,11 +50,28 @@ struct FunctionTypeAndDecl {
       : Type(Type), Decl(Decl), SemanticContext(SemanticContext) {}
 };
 
+struct PossibleParamInfo {
+  /// Expected parameter.
+  /// 
+  /// 'nullptr' indicates that the code completion position is at out of
+  /// expected argument position. E.g.
+  ///   func foo(x: Int) {}
+  ///   foo(x: 1, <HERE>)
+  const AnyFunctionType::Param *Param;
+  bool IsRequired;
+
+  PossibleParamInfo(const AnyFunctionType::Param *Param, bool IsRequired)
+      : Param(Param), IsRequired(IsRequired) {
+    assert((Param || !IsRequired) &&
+           "nullptr with required flag is not allowed");
+  };
+};
+
 /// Given an expression and its decl context, the analyzer tries to figure out
 /// the expected type of the expression by analyzing its context.
 class ExprContextInfo {
   SmallVector<Type, 2> PossibleTypes;
-  SmallVector<const AnyFunctionType::Param *, 2> PossibleParams;
+  SmallVector<PossibleParamInfo, 2> PossibleParams;
   SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
   bool singleExpressionBody = false;
 
@@ -73,7 +90,7 @@ public:
 
   // Returns a list of possible argument label names.
   // Valid only if \c getKind() is \c CallArgument.
-  ArrayRef<const AnyFunctionType::Param *> getPossibleParams() const {
+  ArrayRef<PossibleParamInfo> getPossibleParams() const {
     return PossibleParams;
   }
 
