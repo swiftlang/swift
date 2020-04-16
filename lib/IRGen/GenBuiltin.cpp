@@ -398,17 +398,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     call->addAttribute(llvm::AttributeList::FirstArgIndex + 1,
                        llvm::Attribute::ReadOnly);
 
-    // Remove swiftself and swifterror attribute to match signature generated from
-    // RuntimeFunctions.def. These two parameters are passed using swifterror and swiftself,
-    // but the definition of swift_willThrow generated from the def file doesn't have those
-    // attributes due to the def file limitation. In WebAssembly context, these attributes are
-    // lowered as usual parameters, so this doesn't have any side effects.
-    if (IGF.IGM.TargetInfo.OutputObjectFormat != llvm::Triple::Wasm) {
-      auto attrs = call->getAttributes();
-      IGF.IGM.addSwiftSelfAttributes(attrs, 0);
-      IGF.IGM.addSwiftErrorAttributes(attrs, 1);
-      call->setAttributes(attrs);
-    }
+    auto attrs = call->getAttributes();
+    IGF.IGM.addSwiftSelfAttributes(attrs, 0);
+    IGF.IGM.addSwiftErrorAttributes(attrs, 1);
+    call->setAttributes(attrs);
 
     IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(IGF.IGM.ErrorPtrTy),
                             errorBuffer);
