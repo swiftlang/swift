@@ -890,6 +890,13 @@ static void initLLVMModule(const IRGenModule &IGM, ModuleDecl &M) {
   
   Module->setTargetTriple(IGM.Triple.str());
 
+  if (IGM.Context.LangOpts.SDKVersion) {
+    if (Module->getSDKVersion().empty())
+      Module->setSDKVersion(*IGM.Context.LangOpts.SDKVersion);
+    else
+      assert(Module->getSDKVersion() == *IGM.Context.LangOpts.SDKVersion);
+  }
+
   // Set the module's string representation.
   Module->setDataLayout(IGM.DataLayout.getStringRepresentation());
 
