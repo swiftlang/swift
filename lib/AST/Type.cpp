@@ -2828,10 +2828,14 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
         nominal->getDeclContext()->getParentSourceFile() ==
         dc->getParentSourceFile())
       return true;
+
     return nominal->getEffectiveAccess() > AccessLevel::FilePrivate;
 
   case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
+    if (dc->getParentModule() == nominal->getDeclContext()->getParentModule())
+      return true;
+
     return nominal->getEffectiveAccess() > AccessLevel::Internal;
   }
 }
