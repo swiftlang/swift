@@ -118,19 +118,19 @@ protected:
     return S.getConstraintSystem();
   }
 
-  Type getContextualType(Expr *anchor) const {
+  Type getContextualType(TypedNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualType(anchor);
+    return cs.getContextualType(anchor.get<const Expr *>());
   }
 
-  TypeLoc getContextualTypeLoc(Expr *anchor) const {
+  TypeLoc getContextualTypeLoc(TypedNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualTypeLoc(anchor);
+    return cs.getContextualTypeLoc(anchor.get<const Expr *>());
   }
 
-  ContextualTypePurpose getContextualTypePurpose(Expr *anchor) const {
+  ContextualTypePurpose getContextualTypePurpose(TypedNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualTypePurpose(anchor);
+    return cs.getContextualTypePurpose(anchor.get<const Expr *>());
   }
 
   DeclContext *getDC() const {

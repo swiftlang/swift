@@ -249,8 +249,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   };
 
   if (isFromContextualType())
-    return getAffectedDeclFromType(
-        getContextualType(getLocator()->getAnchor()));
+    return getAffectedDeclFromType(getContextualType(getRawAnchor()));
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     // If there is a declaration associated with this
@@ -2266,8 +2265,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
   emitDiagnostic(*diagnostic, getToType());
 
   if (CTP == CTP_Initialization) {
-    auto *rawAnchor = getRawAnchor().get<const Expr *>();
-    auto *patternTR = getContextualTypeLoc(rawAnchor).getTypeRepr();
+    auto *patternTR = getContextualTypeLoc(getRawAnchor()).getTypeRepr();
     if (!patternTR)
       return true;
 
@@ -2993,8 +2991,7 @@ bool TupleContextualFailure::diagnoseAsError() {
   auto purpose = getContextualTypePurpose();
   if (isNumElementsMismatch())
     diagnostic = diag::tuple_types_not_convertible_nelts;
-  else if ((purpose == CTP_Initialization) &&
-           !getContextualType(getAnchor().get<const Expr *>()))
+  else if ((purpose == CTP_Initialization) && !getContextualType(getAnchor()))
     diagnostic = diag::tuple_types_not_convertible;
   else if (auto diag = getDiagnosticFor(purpose, getToType()))
     diagnostic = *diag;
@@ -3718,7 +3715,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Determine the contextual type of the expression
-    Type contextualType = getContextualType(getRawAnchor().get<const Expr *>());
+    Type contextualType = getContextualType(getRawAnchor());
     // Try to provide a fix-it that only contains a '.'
     if (contextualType && baseTy->isEqual(contextualType)) {
       Diag->fixItInsert(loc, ".");
@@ -3893,9 +3890,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // let _: (Int) -> Void = foo
   // ```
   if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
-    emitDiagnostic(
-        diag::cannot_convert_initializer_value, getType(anchor),
-        resolveType(getContextualType(getAnchor().get<const Expr *>())));
+    emitDiagnostic(diag::cannot_convert_initializer_value, getType(anchor),
+                   resolveType(getContextualType(getAnchor())));
     // TODO: It would be great so somehow point out which arguments are missing.
     return true;
   }
@@ -4941,11 +4937,10 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   }
 
   if (locator->isForSequenceElementType()) {
-    auto &cs = getConstraintSystem();
     // If this is a conversion failure related to binding of `for-each`
     // statement it has to be diagnosed as pattern match if there are
     // holes present in the contextual type.
-    if (cs.getContextualTypePurpose(getAnchor().get<const Expr *>()) ==
+    if (getContextualTypePurpose(getAnchor()) ==
             ContextualTypePurpose::CTP_ForEachStmt &&
         contextualType->hasHole()) {
       diagnostic.emplace(emitDiagnostic(
@@ -5409,7 +5404,7 @@ bool InOutConversionFailure::diagnoseAsError() {
                      argApplyInfo->getArgType(), argApplyInfo->getParamType());
     } else {
       assert(locator->findLast<LocatorPathElt::ContextualType>());
-      auto *anchor = getAnchor().get<const Expr *>();
+      auto anchor = getAnchor();
       auto contextualType = getContextualType(anchor);
       auto purpose = getContextualTypePurpose();
       auto diagnostic = getDiagnosticFor(purpose, contextualType);
