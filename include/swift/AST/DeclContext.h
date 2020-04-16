@@ -179,6 +179,26 @@ struct ConformanceDiagnostic {
   ProtocolDecl *ExistingExplicitProtocol;
 };
 
+/// Used in diagnostic %selects.
+struct FragileFunctionKind {
+  enum Kind : unsigned {
+    Transparent,
+    Inlinable,
+    AlwaysEmitIntoClient,
+    DefaultArgument,
+    PropertyInitializer,
+    None
+  };
+
+  Kind kind = None;
+  bool allowUsableFromInline = false;
+
+  friend bool operator==(FragileFunctionKind lhs, FragileFunctionKind rhs) {
+    return (lhs.kind == rhs.kind &&
+            lhs.allowUsableFromInline == rhs.allowUsableFromInline);
+  }
+};
+
 /// A DeclContext is an AST object which acts as a semantic container
 /// for declarations.  As a policy matter, we currently define
 /// contexts broadly: a lambda expression in a function is a new
@@ -468,6 +488,10 @@ public:
   /// domains, this ensures that only sufficiently-conservative access patterns
   /// are used.
   ResilienceExpansion getResilienceExpansion() const;
+
+  /// Get the fragile function kind for the code in this context, which
+  /// is used for diagnostics.
+  FragileFunctionKind getFragileFunctionKind() const;
 
   /// Returns true if this context may possibly contain members visible to
   /// AnyObject dynamic lookup.

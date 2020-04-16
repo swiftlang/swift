@@ -299,3 +299,10 @@ extension P {
   }
 }
 
+// rdar://problem/60605117
+public struct PrivateInlinableCrash {
+  @inlinable // expected-error {{'@inlinable' attribute can only be applied to public declarations, but 'formatYesNo' is private}}
+  private func formatYesNo(_ value: Bool) -> String {
+    value ? "YES" : "NO"
+  }
+}
