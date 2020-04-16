@@ -372,8 +372,7 @@ public:
                     unsigned ordinal) {
     // TODO: Produce a type ref for the opaque type if the underlying type isn't
     // available.
-    opaqueDescriptor->dump();
-    
+
     // Try to resolve to the underlying type, if we can.
     if (opaqueDescriptor->getKind() ==
                             Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
