@@ -52,8 +52,8 @@ func test_inout() {
   x = accept_XY(&xy);
 
   x = xy
-  x = &xy; // expected-error {{type of expression is ambiguous without more context}}
-  accept_Z(&xy); // expected-error{{type of expression is ambiguous without more context}}
+  x = &xy; // expected-error {{use of extraneous '&'}}
+  accept_Z(&xy); // expected-error{{cannot convert value of type 'X' to expected argument type 'Z'}}
 }
 
 func lvalue_or_rvalue(_ x: inout X) -> X { }

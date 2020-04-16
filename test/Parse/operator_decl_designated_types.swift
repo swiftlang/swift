@@ -33,11 +33,15 @@ infix operator **+> : MediumPrecedence, UndeclaredProtocol
 // expected-error@-1 {{use of undeclared type 'UndeclaredProtocol'}}
 
 prefix operator *+*> : MediumPrecedence
+// expected-error@-1 {{use of undeclared type 'MediumPrecedence'}}
 
 postfix operator ++*> : MediumPrecedence
+// expected-error@-1 {{use of undeclared type 'MediumPrecedence'}}
 
 prefix operator *++> : UndeclaredProtocol
+// expected-error@-1 {{use of undeclared type 'UndeclaredProtocol'}}
 postfix operator +*+> : UndeclaredProtocol
+// expected-error@-1 {{use of undeclared type 'UndeclaredProtocol'}}
 
 struct Struct {}
 class Class {}
@@ -53,15 +57,17 @@ postfix operator >>** : Class
 infix operator  <*<<< : MediumPrecedence, &
 // expected-error@-1 {{expected designated type in operator declaration}}
 
-infix operator **^^ : MediumPrecedence // expected-note 2{{previous operator declaration here}}
-infix operator **^^ : InfixMagicOperatorProtocol // expected-error 2{{operator redeclared}}
+infix operator **^^ : MediumPrecedence // expected-note {{previous operator declaration here}}
+infix operator **^^ : InfixMagicOperatorProtocol // expected-error {{operator redeclared}}
 
 infix operator ^%*%^ : MediumPrecedence, Struct, Class
 infix operator ^%*%% : Struct, Class
 prefix operator %^*^^ : Struct, Class
 postfix operator ^^*^% : Struct, Class
 prefix operator %%*^^ : LowPrecedence, Class
+// expected-error@-1{{use of undeclared type 'LowPrecedence'}}
 postfix operator ^^*%% : MediumPrecedence, Class
+// expected-error@-1{{use of undeclared type 'MediumPrecedence'}}
 
 // expected-error@+1 {{trailing comma in operator declaration}}
 infix operator <*<>*> : AdditionPrecedence,
