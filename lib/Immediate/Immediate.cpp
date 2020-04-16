@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMContext.h"
@@ -246,12 +247,14 @@ int swift::RunImmediately(CompilerInstance &CI,
   // IRGen the main module.
   auto *swiftModule = CI.getMainModule();
   const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
-  auto Module = performIRGeneration(
+  auto GenModule = performIRGeneration(
       IRGenOpts, swiftModule, std::move(SM), swiftModule->getName().str(),
       PSPs, ArrayRef<std::string>());
 
   if (Context.hadError())
     return -1;
+
+  assert(GenModule && "Emitted no diagnostics but IR generation failed?");
 
   // Load libSwiftCore to setup process arguments.
   //
@@ -323,6 +326,7 @@ int swift::RunImmediately(CompilerInstance &CI,
       JIT = std::move(*JITOrErr);
   }
 
+  auto Module = GenModule.getModule();
   {
     // Get a generator for the process symbols and attach it to the main
     // JITDylib.
@@ -338,9 +342,7 @@ int swift::RunImmediately(CompilerInstance &CI,
              Module->dump());
 
   {
-    std::unique_ptr<llvm::LLVMContext> ModuleCtx(&Module->getContext());
-    auto TSM = llvm::orc::ThreadSafeModule(std::move(Module), std::move(ModuleCtx));
-    if (auto Err = JIT->addIRModule(std::move(TSM))) {
+    if (auto Err = JIT->addIRModule(std::move(GenModule).intoThreadSafeContext())) {
       llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "");
       return -1;
     }

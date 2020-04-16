@@ -948,7 +948,7 @@ static void runIRGenPreparePasses(SILModule &Module,
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
 /// All this is done in a single thread.
-static std::unique_ptr<llvm::Module>
+static GeneratedModule
 performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                     std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
                     const PrimarySpecificPaths &PSPs,
@@ -962,7 +962,7 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
   IRGenerator irgen(Opts, *SILMod);
 
   auto targetMachine = irgen.createTargetMachine();
-  if (!targetMachine) return nullptr;
+  if (!targetMachine) return GeneratedModule::null();
 
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), SF, ModuleName,
@@ -1032,13 +1032,13 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
     });
 
     if (!IGM.finalize())
-      return nullptr;
+      return GeneratedModule::null();
 
     setModuleFlags(IGM);
   }
 
   // Bail out if there are any errors.
-  if (Ctx.hadError()) return nullptr;
+  if (Ctx.hadError()) return GeneratedModule::null();
 
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the LLVM compilation.
@@ -1059,10 +1059,10 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                     IGM.getModule(), IGM.TargetMachine.get(),
                     IGM.Context.LangOpts.EffectiveLanguageVersion,
                     IGM.OutputFilename, IGM.Context.Stats))
-      return nullptr;
+      return GeneratedModule::null();
   }
 
-  return std::unique_ptr<llvm::Module>(IGM.releaseModule());
+  return std::move(IGM).intoGeneratedModule();
 }
 
 namespace {
@@ -1184,9 +1184,7 @@ static void performParallelIRGeneration(
     ~IGMDeleter() {
       for (auto it = IRGen.begin(); it != IRGen.end(); ++it) {
         IRGenModule *IGM = it->second;
-        LLVMContext *Context = &IGM->LLVMContext;
         delete IGM;
-        delete Context;
       }
     }
   } _igmDeleter(irgen);
@@ -1361,7 +1359,7 @@ static void performParallelIRGeneration(
   codeGenThreads.join();
 }
 
-std::unique_ptr<llvm::Module> swift::performIRGeneration(
+GeneratedModule swift::performIRGeneration(
     const IRGenOptions &Opts, swift::ModuleDecl *M,
     std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
     const PrimarySpecificPaths &PSPs,
@@ -1374,7 +1372,7 @@ std::unique_ptr<llvm::Module> swift::performIRGeneration(
       M->getASTContext().evaluator(IRGenWholeModuleRequest{desc}));
 }
 
-std::unique_ptr<llvm::Module>
+GeneratedModule
 IRGenWholeModuleRequest::evaluate(Evaluator &evaluator,
                                   IRGenDescriptor desc) const {
   auto *M = desc.Ctx.get<ModuleDecl *>();
@@ -1386,7 +1384,7 @@ IRGenWholeModuleRequest::evaluate(Evaluator &evaluator,
         NumThreads, desc.parallelOutputFilenames, desc.LinkerDirectives);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
-    return nullptr;
+    return GeneratedModule::null();
   }
   return ::performIRGeneration(
       desc.Opts, M, std::unique_ptr<SILModule>(desc.SILMod), desc.ModuleName,
@@ -1394,7 +1392,7 @@ IRGenWholeModuleRequest::evaluate(Evaluator &evaluator,
       desc.LinkerDirectives);
 }
 
-std::unique_ptr<llvm::Module> swift::
+GeneratedModule swift::
 performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
@@ -1408,7 +1406,7 @@ performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
       SF.getASTContext().evaluator(IRGenSourceFileRequest{desc}));
 }
 
-std::unique_ptr<llvm::Module>
+GeneratedModule
 IRGenSourceFileRequest::evaluate(Evaluator &evaluator,
                                  IRGenDescriptor desc) const {
   auto *SF = desc.Ctx.get<SourceFile *>();

@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -891,18 +892,27 @@ private:
     DumpSource += Line;
 
     // IRGen the current line(s).
-    auto LineModule = performIRGeneration(
+    auto GenModule = performIRGeneration(
         IRGenOpts, M, std::move(sil), "REPLLine", PrimarySpecificPaths(),
         /*parallelOutputFilenames*/{});
 
     if (CI.getASTContext().hadError())
       return false;
 
+    assert(GenModule && "Emitted no diagnostics but IR generation failed?");
+
+    // Release the module and context because we are about to clone another
+    // module into the context which violates the exclusivity guarantees of
+    // GeneratedModule.
+    llvm::LLVMContext *Ctx;
+    llvm::Module *ModuleToLink;
+    std::tie(Ctx, ModuleToLink) = std::move(GenModule).release();
+
     // LineModule will get destroy by the following link process.
     // Make a copy of it to be able to correct produce DumpModule.
-    std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(*LineModule));
+    std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(*ModuleToLink));
     
-    if (!linkLLVMModules(Module, std::move(LineModule))) {
+    if (!linkLLVMModules(Module, std::unique_ptr<llvm::Module>(ModuleToLink))) {
       return false;
     }
 
@@ -938,6 +948,9 @@ private:
     }
     llvm::Function *EntryFn = TempModule->getFunction("main");
     EE->runFunctionAsMain(EntryFn, CmdLine, nullptr);
+
+    // Clean up the code generation context now that we're done cloning modules.
+    delete Ctx;
 
     return true;
   }

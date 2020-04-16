@@ -90,6 +90,7 @@ namespace swift {
   class BaseConformance;
   class BraceStmt;
   class CanType;
+  class GeneratedModule;
   class LinkLibrary;
   class SILFunction;
   class IRGenOptions;
@@ -1284,6 +1285,9 @@ public:
                   "<fake main input filename>", "") {}
 
   ~IRGenModule();
+
+public:
+  GeneratedModule intoGeneratedModule() &&;
 
 public:
   llvm::LLVMContext &getLLVMContext() const { return *LLVMContext; }

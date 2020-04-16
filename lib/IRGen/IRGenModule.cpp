@@ -909,8 +909,8 @@ llvm::Module *IRGenModule::getModule() const {
 
 GeneratedModule IRGenModule::intoGeneratedModule() && {
   return GeneratedModule{
+    std::move(LLVMContext),
     std::unique_ptr<llvm::Module>{ClangCodeGen->ReleaseModule()},
-    std::move(LLVMContext)
   };
 }
 
