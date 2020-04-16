@@ -345,9 +345,6 @@ PropertyWrapperTypeInfoRequest::evaluate(
   if (!valueVar)
     return PropertyWrapperTypeInfo();
 
-  // FIXME: Remove this one
-  (void)valueVar->getInterfaceType();
-
   TypeChecker::addImplicitConstructors(nominal);
 
   SmallVector<ValueDecl *, 2> decls;
