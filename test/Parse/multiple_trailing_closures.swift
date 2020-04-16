@@ -116,3 +116,10 @@ func test_multiple_trailing_syntax_without_labels() {
     _: {}
     _: {}
 }
+
+func produce(fn: () -> Int?, default d: () -> Int) -> Int { // expected-note {{declared here}}
+  return fn() ?? d()
+}
+// TODO: The diagnostics here are perhaps a little overboard.
+_ = produce { 0 } default: { 1 } // expected-error {{missing argument for parameter 'fn' in call}} expected-error {{consecutive statements}} expected-error {{'default' label can only appear inside a 'switch' statement}} expected-error {{top-level statement cannot begin with a closure expression}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
+_ = produce { 2 } `default`: { 3 }
