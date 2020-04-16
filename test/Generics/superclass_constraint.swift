@@ -139,8 +139,7 @@ protocol RecSuperclassReqP2: GenericClass<Self> {
   associatedtype A: RecSuperclassReqP2 // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
 }
 protocol RecSuperclassReqP3: GenericClass<Self.A> {
-  // FIXME: Infinite recursion.
-  associatedtype A//: RecSuperclassReqP3
+  associatedtype A: RecSuperclassReqP3
 }
 protocol RecSuperclassReqP4 {
   associatedtype A: GenericClass<A> // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
@@ -156,9 +155,9 @@ class InvalidConformanceToP2: GenericClass<InvalidConformanceToP2>,
 // expected-note@-1 {{possibly intended match 'InvalidConformanceToP2.A' (aka 'InvalidConformanceToP1') does not conform to 'RecSuperclassReqP2'}}
 }
 class InvalidConformanceToP3: GenericClass<Never>, RecSuperclassReqP3 {
-// expected-error@-1 {{'RecSuperclassReqP3' requires that 'InvalidConformanceToP3' inherit from 'GenericClass<InvalidConformanceToP3.A>' (aka 'GenericClass<Bool>')}}
+// expected-error@-1 {{'RecSuperclassReqP3' requires that 'InvalidConformanceToP3' inherit from 'GenericClass<InvalidConformanceToP3.A>' (aka 'GenericClass<InvalidConformanceToP3>')}}
 // expected-note@-2 {{requirement specified as 'Self' : 'GenericClass<Self.A>' [with Self = InvalidConformanceToP3]}}
-  typealias A = Bool
+  typealias A = InvalidConformanceToP3
 }
 
 class ConformanceToP1: GenericClass<ConformanceToP1>, RecSuperclassReqP1 {}

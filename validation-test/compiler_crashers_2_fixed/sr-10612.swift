@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -typecheck %s
+// RUN: %target-swift-frontend -typecheck %s
 
 protocol P1: class {
     associatedtype P1P1: P1
