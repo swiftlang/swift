@@ -905,6 +905,14 @@ let x = foo<Int,
             String,
             Int>()
 
+let x = foo<
+    Int,
+    String,
+    Int
+>()
+.filter { $0 > 10 }
+.count
+
 
 // Invalid elements should still be indented.
 //
