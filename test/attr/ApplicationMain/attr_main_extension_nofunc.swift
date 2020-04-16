@@ -3,7 +3,7 @@
 class EntryPoint {
 }
 
-@main // expected-error{{'EntryPoint' is annotated with @main and must provide a main static function of type () -> ()}}
+@main // expected-error{{'EntryPoint' is annotated with @main and must provide a main static function}}
 extension EntryPoint {
 }
 

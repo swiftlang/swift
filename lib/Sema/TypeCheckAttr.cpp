@@ -1786,14 +1786,19 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
     mainFunction = viableCandidates[0];
   }
 
-  auto voidToVoidFunctionType = FunctionType::get({}, context.TheEmptyTupleType);
+  bool mainFunctionThrows = mainFunction->hasThrows();
+
+  auto voidToVoidFunctionType =
+      FunctionType::get({}, context.TheEmptyTupleType,
+                        FunctionType::ExtInfo().withThrows(mainFunctionThrows));
   auto nominalToVoidToVoidFunctionType = FunctionType::get({AnyFunctionType::Param(nominal->getInterfaceType())}, voidToVoidFunctionType);
   auto *func = FuncDecl::create(
-      context, /*StaticLoc*/ braces.End, StaticSpellingKind::KeywordStatic,
-      /*FuncLoc*/ location,
+      context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::KeywordStatic,
+      /*FuncLoc*/ SourceLoc(),
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
                ParameterList::createEmpty(context)),
-      /*NameLoc*/ braces.End, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*NameLoc*/ SourceLoc(), /*Throws=*/mainFunctionThrows,
+      /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TypeLoc::withoutLoc(TupleType::getEmpty(context)),
       declContext);
@@ -1821,12 +1826,23 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   auto *dotSyntaxCallExpr = new (context) DotSyntaxCallExpr(
       funcDeclRefExpr, /*DotLoc*/ SourceLoc(), typeExpr, voidToVoidFunctionType);
   dotSyntaxCallExpr->setImplicit(true);
-  dotSyntaxCallExpr->setThrows(false);
+  dotSyntaxCallExpr->setThrows(mainFunctionThrows);
 
   auto *callExpr = CallExpr::createImplicit(context, dotSyntaxCallExpr, {}, {});
   callExpr->setImplicit(true);
-  callExpr->setThrows(false);
+  callExpr->setThrows(mainFunctionThrows);
   callExpr->setType(context.TheEmptyTupleType);
+
+  Expr *returnedExpr;
+
+  if (mainFunctionThrows) {
+    auto *tryExpr = new (context) TryExpr(
+        SourceLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
+    returnedExpr = tryExpr;
+  } else {
+    returnedExpr = callExpr;
+  }
+
   auto *returnStmt =
       new (context) ReturnStmt(SourceLoc(), callExpr, /*Implicit=*/true);
 
