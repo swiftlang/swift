@@ -175,9 +175,16 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
 
   OS.attributeObject("docComment", [&](){
     auto LL = Graph->Ctx.getLineList(RC);
-    size_t InitialIndentation = LL.getLines().empty()
+    StringRef FirstNonBlankLine;
+    for (const auto &Line : LL.getLines()) {
+      if (!Line.Text.empty()) {
+        FirstNonBlankLine = Line.Text;
+        break;
+      }
+    }
+    size_t InitialIndentation = FirstNonBlankLine.empty()
       ? 0
-      : markup::measureIndentation(LL.getLines().front().Text);
+      : markup::measureIndentation(FirstNonBlankLine);
     OS.attributeArray("lines", [&](){
       for (const auto &Line : LL.getLines()) {
         // Line object
@@ -185,7 +192,8 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
           // Trim off any initial indentation from the line's
           // text and start of its source range, if it has one.
           if (Line.Range.isValid()) {
-            serializeRange(InitialIndentation,
+            serializeRange(std::min(InitialIndentation,
+                                    Line.FirstNonspaceOffset),
                            Line.Range, Graph->M.getASTContext().SourceMgr, OS);
           }
           auto TrimmedLine = Line.Text.drop_front(std::min(InitialIndentation,

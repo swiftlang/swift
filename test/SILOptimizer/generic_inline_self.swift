@@ -53,6 +53,8 @@ class C : P {
 // CHECK-NEXT:    [[STATIC_METATYPE:%.*]] = upcast [[METATYPE]] : $@thick @dynamic_self C.Type to $@thick C.Type
 // CHECK-NEXT:    [[FN:%.*]] = class_method [[STATIC_METATYPE]] : $@thick C.Type, #C.init!allocator : (C.Type) -> () -> C, $@convention(method) (@thick C.Type) -> @owned C
 // CHECK-NEXT:    [[RESULT2:%.*]] = apply [[FN]]([[STATIC_METATYPE]]) : $@convention(method) (@thick C.Type) -> @owned C
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    tuple ()
 // CHECK-NEXT:    return %5 : $C
   func returnsNewInstanceTransparentProtocol() -> Self {
     return makeInstanceTransparentProtocol(type(of: self))

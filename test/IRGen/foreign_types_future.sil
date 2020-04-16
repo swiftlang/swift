@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=MandatoryCombine -prespecialize-generic-metadata -target %module-target-future -I %S/Inputs/abi %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -prespecialize-generic-metadata -target %module-target-future -I %S/Inputs/abi %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios

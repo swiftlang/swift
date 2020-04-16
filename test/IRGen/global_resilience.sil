@@ -66,8 +66,6 @@ bb0:
   // CHECK: [[VALUE:%.*]] = load i32, i32* getelementptr inbounds (%T17global_resilience20SmallResilientStructV, %T17global_resilience20SmallResilientStructV* bitcast ([[BUFFER]]* @smallGlobal to %T17global_resilience20SmallResilientStructV*), i32 0, i32 0, i32 0)
   %x_addr = struct_element_addr %addr : $*SmallResilientStruct, #SmallResilientStruct.x
   %x = load %x_addr : $*Int32
-  // Dummy use so that x isn't optimized away.
-  store %x to undef : $*Int32
 
   %tuple = tuple ()
 
@@ -84,8 +82,6 @@ bb0:
 
   // CHECK: [[VALUE:%.*]] = load %T17global_resilience20LargeResilientStructV*, %T17global_resilience20LargeResilientStructV** bitcast ([[BUFFER]]* @largeGlobal to %T17global_resilience20LargeResilientStructV**)
   %addr = global_addr @largeGlobal : $*LargeResilientStruct
-  // Dummy use so that addr isn't optimized away.
-  copy_addr %addr to undef : $*LargeResilientStruct
 
   %tuple = tuple ()
 
@@ -103,8 +99,6 @@ bb0:
   // CHECK:      load i64, i64* getelementptr inbounds (%T17global_resilience20LargeResilientStructV, %T17global_resilience20LargeResilientStructV* @fixedGlobal, i32 0, i32 1, i32 0)
   %x_addr = struct_element_addr %addr : $*LargeResilientStruct, #LargeResilientStruct.x
   %x = load %x_addr : $*Int64
-  // Dummy use so that x isn't optimized away.
-  store %x to undef : $*Int64
 
   %tuple = tuple ()
 
@@ -122,8 +116,6 @@ bb0:
 
   // CHECK: call %swift.opaque* @__swift_project_value_buffer(%swift.type* [[METADATA]], %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
   %addr = global_addr @otherGlobal : $*Size
-  // Dummy use so that addr isn't optimized away.
-  copy_addr %addr to undef : $*Size
 
   %tuple = tuple ()
 

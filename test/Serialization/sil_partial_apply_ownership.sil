@@ -47,6 +47,7 @@ sil @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 
 // CHECK-LABEL: sil @partial_apply_convert
 // CHECK:   convert_escape_to_noescape %{{.*}} : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK:   convert_escape_to_noescape [not_guaranteed] %
 sil @partial_apply_convert : $@convention(thin) () -> () {
 entry:
   %f = function_ref @subject : $@convention(thin) (Builtin.Int64) -> ()
