@@ -101,7 +101,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 /// type.
 static ConstructorDecl *
 findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
-                        VarDecl *valueVar, PropertyWrapperInitKind initKind) {
+                        VarDecl *valueVar, PropertyWrapperInitKind initKind,
+                        const SmallVectorImpl<ValueDecl *> &decls) {
   enum class NonViableReason {
     Failable,
     ParameterTypeMismatch,
@@ -111,7 +112,6 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
   SmallVector<std::tuple<ConstructorDecl *, NonViableReason, Type>, 2>
       nonviable;
   SmallVector<ConstructorDecl *, 2> viableInitializers;
-  SmallVector<ValueDecl *, 2> decls;
 
   Identifier argumentLabel;
   switch (initKind) {
@@ -125,10 +125,6 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     break;
   }
 
-  TypeChecker::addImplicitConstructors(nominal);
-
-  nominal->lookupQualified(nominal, DeclNameRef::createConstructor(),
-                           NL_QualifiedDefault, decls);
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);
     if (!init || init->getDeclContext() != nominal || init->isGeneric())
@@ -351,16 +347,23 @@ PropertyWrapperTypeInfoRequest::evaluate(
 
   // FIXME: Remove this one
   (void)valueVar->getInterfaceType();
-  
+
+  TypeChecker::addImplicitConstructors(nominal);
+
+  SmallVector<ValueDecl *, 2> decls;
+  nominal->lookupQualified(nominal, DeclNameRef::createConstructor(),
+                           NL_QualifiedDefault, decls);
+
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
   if (auto init = findSuitableWrapperInit(ctx, nominal, valueVar,
-                              PropertyWrapperInitKind::WrappedValue)) {
+                              PropertyWrapperInitKind::WrappedValue, decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasWrappedValueInit;
     result.isWrappedValueInitUsingEscapingAutoClosure =
       isEscapingAutoclosureArgument(init, ctx.Id_wrappedValue);
   } else if (auto init = findSuitableWrapperInit(
-               ctx, nominal, valueVar, PropertyWrapperInitKind::InitialValue)) {
+               ctx, nominal, valueVar, PropertyWrapperInitKind::InitialValue,
+               decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasInitialValueInit;
     result.isWrappedValueInitUsingEscapingAutoClosure =
       isEscapingAutoclosureArgument(init, ctx.Id_initialValue);
@@ -380,7 +383,7 @@ PropertyWrapperTypeInfoRequest::evaluate(
   }
 
   if (findSuitableWrapperInit(ctx, nominal, /*valueVar=*/nullptr,
-                              PropertyWrapperInitKind::Default)) {
+                              PropertyWrapperInitKind::Default, decls)) {
     result.defaultInit = PropertyWrapperTypeInfo::HasDefaultValueInit;
   }
 
