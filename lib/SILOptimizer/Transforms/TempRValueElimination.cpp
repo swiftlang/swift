@@ -115,6 +115,7 @@ bool TempRValueOptPass::collectLoadsFromProjection(
   return true;
 }
 
+/// Check if 'tempObjUser' passed to the apply instruction can be modified by it
 bool TempRValueOptPass::checkNoTempObjectModificationInApply(
     Operand *tempObjUser, SILInstruction *applyInst, SILValue srcAddr) {
   ApplySite apply(applyInst);
@@ -242,6 +243,9 @@ bool TempRValueOptPass::collectLoads(
       return false;
 
     auto beginApply = cast<BeginApplyInst>(user);
+    // Register 'eng_apply'/'abort_apply' as loads as well
+    // 'checkNoSourceModification' should check instructions until
+    // 'end_apply'/'abort_apply' as well
     for (auto tokenUses : beginApply->getTokenResult()->getUses()) {
       loadInsts.insert(tokenUses->getUser());
     }
