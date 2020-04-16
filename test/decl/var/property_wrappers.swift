@@ -1934,5 +1934,10 @@ struct TestDefaultableIntWrapper {
   }
 }
 
-
-
+@propertyWrapper
+public struct NonVisibleImplicitInit {
+// expected-error@-1 3{{internal initializer 'init()' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleImplicitInit' (which is public)}}
+  public var wrappedValue: Bool {
+    return false
+  }
+}

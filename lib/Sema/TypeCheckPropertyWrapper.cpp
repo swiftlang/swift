@@ -125,6 +125,8 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     break;
   }
 
+  TypeChecker::addImplicitConstructors(nominal);
+
   nominal->lookupQualified(nominal, DeclNameRef::createConstructor(),
                            NL_QualifiedDefault, decls);
   for (const auto &decl : decls) {
