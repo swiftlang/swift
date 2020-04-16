@@ -129,7 +129,7 @@ llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   if (IRGen.Opts.shouldOptimize()) {
     const char *markerKey = "clang.arc.retainAutoreleasedReturnValueMarker";
     if (!Module.getModuleFlag(markerKey)) {
-      auto *str = llvm::MDString::get(LLVMContext, asmString);
+      auto *str = llvm::MDString::get(getLLVMContext(), asmString);
       Module.addModuleFlag(llvm::Module::Error, markerKey, str);
     }
 
@@ -259,7 +259,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
   if (entry) return entry;
 
   // If not, create it.  This implicitly adds a trailing null.
-  auto init = llvm::ConstantDataArray::getString(LLVMContext, selector);
+  auto init = llvm::ConstantDataArray::getString(getLLVMContext(), selector);
   auto global = new llvm::GlobalVariable(Module, init->getType(), false,
                                          llvm::GlobalValue::PrivateLinkage,
                                          init,

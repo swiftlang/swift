@@ -100,7 +100,7 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
   // dynamic-layout aggregates.
   if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ti)) {
     b.addAttribute(
-      llvm::Attribute::getWithDereferenceableBytes(IGM.LLVMContext,
+      llvm::Attribute::getWithDereferenceableBytes(IGM.getLLVMContext(),
                                          fixedTI->getFixedSize().getValue()));
   }
 }
@@ -116,7 +116,7 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  attrs = attrs.addAttributes(IGM.LLVMContext,
+  attrs = attrs.addAttributes(IGM.getLLVMContext(),
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
@@ -132,7 +132,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM,
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  attrs = attrs.addAttributes(IGM.LLVMContext,
+  attrs = attrs.addAttributes(IGM.getLLVMContext(),
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
@@ -169,7 +169,7 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
   b.addAttribute(llvm::Attribute::NoCapture);
   if (allowSRet)
     b.addAttribute(llvm::Attribute::StructRet);
-  attrs = attrs.addAttributes(IGM.LLVMContext,
+  attrs = attrs.addAttributes(IGM.getLLVMContext(),
                               paramIndex + llvm::AttributeList::FirstArgIndex,
                               b);
 }
@@ -178,7 +178,7 @@ void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
                                          unsigned argIndex) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::SwiftSelf);
-  attrs = attrs.addAttributes(this->LLVMContext,
+  attrs = attrs.addAttributes(this->getLLVMContext(),
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
@@ -199,7 +199,7 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
   b.addDereferenceableAttr(getPointerSize().getValue());
   
   auto attrIndex = argIndex + llvm::AttributeList::FirstArgIndex;
-  attrs = attrs.addAttributes(this->LLVMContext, attrIndex, b);
+  attrs = attrs.addAttributes(this->getLLVMContext(), attrIndex, b);
 }
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
@@ -208,8 +208,8 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::ByVal);
   b.addAttribute(llvm::Attribute::getWithAlignment(
-      IGM.LLVMContext, llvm::Align(align.getValue())));
-  attrs = attrs.addAttributes(IGM.LLVMContext,
+      IGM.getLLVMContext(), llvm::Align(align.getValue())));
+  attrs = attrs.addAttributes(IGM.getLLVMContext(),
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
@@ -220,7 +220,7 @@ void irgen::addExtendAttribute(IRGenModule &IGM, llvm::AttributeList &attrs,
     b.addAttribute(llvm::Attribute::SExt);
   else
     b.addAttribute(llvm::Attribute::ZExt);
-  attrs = attrs.addAttributes(IGM.LLVMContext, index, b);
+  attrs = attrs.addAttributes(IGM.getLLVMContext(), index, b);
 }
 
 namespace swift {
@@ -2841,7 +2841,7 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
 void CallEmission::addAttribute(unsigned index,
                                 llvm::Attribute::AttrKind attr) {
   auto &attrs = CurCallee.getMutableAttributes();
-  attrs = attrs.addAttribute(IGF.IGM.LLVMContext, index, attr);
+  attrs = attrs.addAttribute(IGF.IGM.getLLVMContext(), index, attr);
 }
 
 /// Initialize an Explosion with the parameters of the current

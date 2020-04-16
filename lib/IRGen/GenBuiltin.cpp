@@ -657,7 +657,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // If the type is floating-point, then we need to bitcast to integer.
     auto valueTy = origValueTy;
     if (valueTy->isFloatingPointTy()) {
-      valueTy = llvm::IntegerType::get(IGF.IGM.LLVMContext,
+      valueTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(),
                                        valueTy->getPrimitiveSizeInBits());
     }
 

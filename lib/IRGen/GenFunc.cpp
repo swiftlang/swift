@@ -1809,7 +1809,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
 
   const clang::ASTContext &ASTContext = IGF.IGM.getClangASTContext();
   llvm::IntegerType *UnsignedLongTy =
-      llvm::IntegerType::get(IGF.IGM.LLVMContext,
+      llvm::IntegerType::get(IGF.IGM.getLLVMContext(),
                              ASTContext.getTypeSize(ASTContext.UnsignedLongTy));
   descriptorFields.addInt(UnsignedLongTy, 0);
   descriptorFields.addInt(UnsignedLongTy,
