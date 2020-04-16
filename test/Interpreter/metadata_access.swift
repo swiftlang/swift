@@ -1,6 +1,10 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
+// This does not work on os_stdlib because it misses availability annotation.
+// rdar://61814566
+// XFAIL: use_os_stdlib
+
 import SwiftShims
 
 struct MetadataAccessFunction {
