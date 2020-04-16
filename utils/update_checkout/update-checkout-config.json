@@ -357,7 +357,7 @@
                 "PythonKit": "master",
                 "swift-format": "master",
                 "tensorflow": "v2.2.0-rc0",
-                "tensorflow-swift-apis": "master"
+                "tensorflow-swift-apis": "marcrasi-fixing-non-cuda-build"
             }
         }
     }
