@@ -43,9 +43,6 @@ namespace swift {
   /// Returns true if the given triple represents watchOS running in a simulator.
   bool tripleIsWatchSimulator(const llvm::Triple &triple);
 
-  /// Return true if the given triple represents any simulator.
-  bool tripleIsAnySimulator(const llvm::Triple &triple);
-
   /// Returns true if the given triple represents a macCatalyst environment.
   bool tripleIsMacCatalystEnvironment(const llvm::Triple &triple);
 

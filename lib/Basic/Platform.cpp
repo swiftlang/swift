@@ -32,10 +32,6 @@ bool swift::tripleIsWatchSimulator(const llvm::Triple &triple) {
   return (triple.isWatchOS() && triple.isSimulatorEnvironment());
 }
 
-bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
-  return triple.isSimulatorEnvironment();
-}
-
 bool swift::tripleIsMacCatalystEnvironment(const llvm::Triple &triple) {
   return triple.isiOS() && !triple.isTvOS() &&
       triple.getEnvironment() == llvm::Triple::MacABI;
