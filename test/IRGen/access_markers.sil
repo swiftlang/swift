@@ -33,9 +33,6 @@ bb0(%0 : $A):
   // CHECK-NEXT: getelementptr inbounds %Ts5Int64V, %Ts5Int64V* [[PROPERTY]], i32 0, i32 0
   // CHECK-NEXT: load i64, i64*
   %4 = load %3 : $*Int64
-  // Use %4 so it's not optimized away.
-  // CHECK-NEXT: store
-  store %4 to undef : $*Int64
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH1]])
   // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH1]] to i8*
@@ -51,9 +48,6 @@ bb0(%0 : $A):
   // CHECK-NEXT: getelementptr inbounds %Ts5Int64V, %Ts5Int64V* [[PROPERTY]], i32 0, i32 0
   // CHECK-NEXT: load i64, i64*
   %7 = load %6 : $*Int64
-  // Use %7 so it's not optimized away.
-  // CHECK-NEXT: store
-  store %7 to undef : $*Int64
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH2]])
   // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH2]] to i8*
