@@ -757,6 +757,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   bool isMemberLValue = isLValue;
   auto propertyWrapperMutability =
       [&](Decl *decl) -> Optional<std::pair<bool, bool>> {
+    if (target != TargetImpl::Wrapper && target != TargetImpl::WrapperStorage)
+      return None;
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)
       return None;
@@ -1531,8 +1533,7 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
     }
 
     if (var->hasAttachedPropertyWrapper()) {
-      if (var->getParsedAccessor(AccessorKind::WillSet) ||
-          var->getParsedAccessor(AccessorKind::DidSet)) {
+      if (var->hasObservers()) {
         return synthesizeObservedSetterBody(setter, TargetImpl::Wrapper, ctx);
       }
 
@@ -1580,20 +1581,24 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
   assert(accessor->isCoroutine());
 
   auto storage = accessor->getStorage();
+  auto storageReadWriteImpl = storage->getReadWriteImpl();
   auto target = (accessor->hasForcedStaticDispatch()
                    ? TargetImpl::Ordinary
                    : TargetImpl::Implementation);
 
   // If this is a variable with an attached property wrapper, then
   // the accessors need to yield the wrappedValue or projectedValue.
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->hasAttachedPropertyWrapper()) {
-      target = TargetImpl::Wrapper;
-    }
+  if (accessor->getAccessorKind() == AccessorKind::Read ||
+      storageReadWriteImpl == ReadWriteImplKind::Modify) {
+    if (auto var = dyn_cast<VarDecl>(storage)) {
+      if (var->hasAttachedPropertyWrapper()) {
+        target = TargetImpl::Wrapper;
+      }
 
-    if (var->getOriginalWrappedProperty(
-            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
-      target = TargetImpl::WrapperStorage;
+      if (var->getOriginalWrappedProperty(
+              PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+        target = TargetImpl::WrapperStorage;
+      }
     }
   }
 
@@ -2043,8 +2048,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
       // FIXME: This should be folded into the WriteImplKind below.
       if (auto var = dyn_cast<VarDecl>(storage)) {
         if (var->hasAttachedPropertyWrapper()) {
-          if (var->getParsedAccessor(AccessorKind::DidSet) ||
-              var->getParsedAccessor(AccessorKind::WillSet))
+          if (var->hasObservers())
             return false;
 
           break;
@@ -2581,11 +2585,17 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
     }
   }
 
-  if (wrapperSetterIsUsable)
+  if (!wrapperSetterIsUsable) {
+    info = StorageImplInfo::getImmutableComputed();
+    return;
+  }
+
+  if (var->hasObservers()) {
+    info = StorageImplInfo::getMutableComputed();
+  } else {
     info = StorageImplInfo(ReadImplKind::Get, WriteImplKind::Set,
                            ReadWriteImplKind::Modify);
-  else
-    info = StorageImplInfo::getImmutableComputed();
+  }
 }
 
 static void finishNSManagedImplInfo(VarDecl *var,
