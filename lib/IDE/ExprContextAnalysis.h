@@ -73,6 +73,7 @@ class ExprContextInfo {
   SmallVector<Type, 2> PossibleTypes;
   SmallVector<PossibleParamInfo, 2> PossibleParams;
   SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
+  Expr *AnalyzedExpr = nullptr;
   bool singleExpressionBody = false;
 
 public:
@@ -98,6 +99,10 @@ public:
   // Valid only if \c getKind() is \c CallArgument.
   ArrayRef<FunctionTypeAndDecl> getPossibleCallees() const {
     return PossibleCallees;
+  }
+
+  Expr *getAnalyzedExpr() const {
+    return AnalyzedExpr;
   }
 };
 

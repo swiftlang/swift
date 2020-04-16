@@ -5948,8 +5948,37 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         DoPostfixExprBeginning();
       } else {
         //   foo() {} <HERE>
-        // Member completion
-        // TODO: Member completion.
+        // Member completion.
+        Expr *analyzedExpr = ContextInfo.getAnalyzedExpr();
+        if (!analyzedExpr)
+          break;
+
+        // Only if the completion token is the last token in the call.
+        if (analyzedExpr->getEndLoc() != CodeCompleteTokenExpr->getLoc())
+          break;
+
+        // If the call expression doesn't have a type, infer it from the
+        // possible callee info.
+        Type resultTy = analyzedExpr->getType();
+        if (!resultTy) {
+          if (ContextInfo.getPossibleCallees().empty())
+            break;
+          auto calleeInfo = ContextInfo.getPossibleCallees()[0];
+          resultTy = calleeInfo.Type->getResult();
+          analyzedExpr->setType(resultTy);
+        }
+
+        auto &SM = CurDeclContext->getASTContext().SourceMgr;
+        auto leadingChar =
+            SM.extractText({SM.getCodeCompletionLoc().getAdvancedLoc(-1), 1});
+        Lookup.setHaveLeadingSpace(leadingChar.find_first_of(" \t\f\v") !=
+                                   StringRef::npos);
+
+        if (isDynamicLookup(resultTy))
+          Lookup.setIsDynamicLookup();
+        Lookup.getValueExprCompletions(resultTy, /*VD=*/nullptr);
+        Lookup.getOperatorCompletions(analyzedExpr, leadingSequenceExprs);
+        Lookup.getPostfixKeywordCompletions(resultTy, analyzedExpr);
       }
     }
     break;
