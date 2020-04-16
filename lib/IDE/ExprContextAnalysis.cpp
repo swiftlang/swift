@@ -561,47 +561,6 @@ static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
   return false;
 }
 
-enum class ArgPositionKind {
-  /// The argument is in normal calling parenthesis.
-  /// i.e. foo(args..., <HERE>) { ... }
-  NormalArgument,
-  /// The argument is inside multiple trailing closure block.
-  /// i.e. foo(args...) { arg2: { ... } <HERE> }
-  InClosureBlock,
-  /// The argument is inside multiple trailing closure block, also it is the
-  /// sole element.
-  /// foo(args...) { <HERE> }
-  InEmptyClosureBlock,
-};
-
-static ArgPositionKind getArgPositionKind(DeclContext &DC, Expr *Args,
-                                          unsigned Position) {
-  SourceManager &SM = DC.getASTContext().SourceMgr;
-
-  if (auto tuple = dyn_cast<TupleExpr>(Args)) {
-    SourceLoc argPos = tuple->getElement(Position)->getStartLoc();
-    SourceLoc rParenLoc = tuple->getRParenLoc();
-    if (rParenLoc.isInvalid() || SM.isBeforeInBuffer(rParenLoc, argPos)) {
-      // Invariant: If the token is at the label position, the label location is
-      // invalid, and the value is a CodeCompletionExpr.
-      if (Position == tuple->getNumElements() - 1 &&
-          tuple->getNumTrailingElements() == 1 &&
-          tuple->getElementNameLoc(Position).isInvalid()) {
-        return ArgPositionKind::InEmptyClosureBlock;
-      }
-      return ArgPositionKind::InClosureBlock;
-    }
-  } else if (auto paren = dyn_cast<ParenExpr>(Args)) {
-    SourceLoc argLoc = paren->getSubExpr()->getStartLoc();
-    SourceLoc rParenLoc = paren->getRParenLoc();
-    // We don't have a way to distingish between 'foo { _: <here> }' and
-    // 'foo { <here> }'. For now, consider it latter one.
-    if (rParenLoc.isInvalid() || SM.isBeforeInBuffer(rParenLoc, argLoc))
-      return ArgPositionKind::InEmptyClosureBlock;
-  }
-  return ArgPositionKind::NormalArgument;
-}
-
 /// Given an expression and its context, the analyzer tries to figure out the
 /// expected type of the expression by analyzing its context.
 class ExprContextAnalyzer {
@@ -612,7 +571,7 @@ class ExprContextAnalyzer {
 
   // Results populated by Analyze()
   SmallVectorImpl<Type> &PossibleTypes;
-  SmallVectorImpl<const AnyFunctionType::Param *> &PossibleParams;
+  SmallVectorImpl<PossibleParamInfo> &PossibleParams;
   SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees;
   bool &singleExpressionBody;
 
@@ -623,8 +582,8 @@ class ExprContextAnalyzer {
     PossibleTypes.push_back(ty->getRValueType());
   }
 
-  void recordPossibleParam(const AnyFunctionType::Param &arg) {
-    PossibleParams.push_back(&arg);
+  void recordPossibleParam(const AnyFunctionType::Param *arg, bool isRequired) {
+    PossibleParams.emplace_back(arg, isRequired);
   }
 
   /// Collect context information at call argument position.
@@ -657,9 +616,9 @@ class ExprContextAnalyzer {
     if (!getPositionInArgs(*DC, Arg, ParsedExpr, Position, HasName))
       return false;
 
-    ArgPositionKind positionKind = getArgPositionKind(*DC, Arg, Position);
-
     // Collect possible types (or labels) at the position.
+    // FIXME: Take variadic and optional parameters into account. We need to do
+    //        something equivalent to 'constraints::matchCallArguments'
     {
       bool MayNeedName = !HasName && !E->isImplicit() &&
                          (isa<CallExpr>(E) | isa<SubscriptExpr>(E) ||
@@ -681,19 +640,6 @@ class ExprContextAnalyzer {
           if (paramList && paramList->size() != Params.size())
             paramList = nullptr;
         }
-
-        // Determine the index of the parameter that can be a single trailing
-        // closure.
-        unsigned singleTrailingClosureIdx = Params.size();
-        for (int idx = Params.size() - 1; idx >= 0; --idx) {
-          if (Params[idx].getPlainType()->is<AnyFunctionType>()) {
-            singleTrailingClosureIdx = idx;
-            break;
-          }
-          if (!paramList || !paramList->get(idx)->isDefaultArgument())
-            break;
-        }
-
         for (auto Pos = Position; Pos < Params.size(); ++Pos) {
           const auto &paramType = Params[Pos];
           Type ty = paramType.getPlainType();
@@ -701,28 +647,11 @@ class ExprContextAnalyzer {
             ty = memberDC->mapTypeIntoContext(ty);
 
           if (paramType.hasLabel() && MayNeedName) {
-            // In trailing closure block, don't suggest non-closure arguments.
-            if (positionKind >= ArgPositionKind::InClosureBlock) {
-              Type argTy = ty;
-              if (paramType.isAutoClosure() && ty->is<AnyFunctionType>())
-                argTy = ty->castTo<AnyFunctionType>()->getResult();
-              if (!argTy->is<AnyFunctionType>())
-                continue;
-
-              // If the token is the only element in the closure block. It might
-              // be a single trailing closure. We should perform global
-              // completion as well.
-              if (positionKind == ArgPositionKind::InEmptyClosureBlock &&
-                  Pos == singleTrailingClosureIdx) {
-                auto resultTy = argTy->castTo<AnyFunctionType>()->getResult();
-                if (seenTypes.insert(resultTy.getPointer()).second)
-                  recordPossibleType(resultTy);
-              }
-            }
-
+            bool isDefaulted = paramList &&
+                               paramList->get(Pos)->isDefaultArgument();
             if (seenArgs.insert({paramType.getLabel(), ty.getPointer()}).second)
-              recordPossibleParam(paramType);
-            if (paramList && paramList->get(Position)->isDefaultArgument())
+              recordPossibleParam(&paramType, !isDefaulted);
+            if (isDefaulted)
               continue;
           } else {
             auto argTy = ty;
@@ -732,6 +661,12 @@ class ExprContextAnalyzer {
               recordPossibleType(argTy);
           }
           break;
+        }
+        // If the argument position is out of expeceted number, indicate that
+        // with optional nullptr param.
+        if (Position >= Params.size()) {
+          if (seenArgs.insert({Identifier(), nullptr}).second)
+            recordPossibleParam(nullptr, /*isRequired=*/false);
         }
       }
     }
@@ -999,7 +934,7 @@ class ExprContextAnalyzer {
 public:
   ExprContextAnalyzer(
       DeclContext *DC, Expr *ParsedExpr, SmallVectorImpl<Type> &PossibleTypes,
-      SmallVectorImpl<const AnyFunctionType::Param *> &PossibleArgs,
+      SmallVectorImpl<PossibleParamInfo> &PossibleArgs,
       SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
       bool &singleExpressionBody)
       : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),

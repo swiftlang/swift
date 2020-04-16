@@ -1,86 +1,165 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_FUNC_1 | %FileCheck %s -check-prefix=GLOBAL_FUNC_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_FUNC_2 | %FileCheck %s -check-prefix=GLOBAL_FUNC_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_FUNC_3 | %FileCheck %s -check-prefix=GLOBAL_FUNC_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_FUNC_4 | %FileCheck %s -check-prefix=GLOBAL_FUNC_4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_FUNC_5 | %FileCheck %s -check-prefix=GLOBAL_FUNC_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_1 | %FileCheck %s -check-prefix=METHOD_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_2 | %FileCheck %s -check-prefix=METHOD_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_3 | %FileCheck %s -check-prefix=METHOD_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_4 | %FileCheck %s -check-prefix=METHOD_4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_5 | %FileCheck %s -check-prefix=METHOD_1
-
-// XFAIL: *
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBALFUNC_SAMELINE | %FileCheck %s -check-prefix=GLOBALFUNC_SAMELINE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBALFUNC_NEWLINE | %FileCheck %s -check-prefix=GLOBALFUNC_NEWLINE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBALFUNC_AFTERLABEL | %FileCheck %s -check-prefix=GLOBALFUNC_AFTERLABEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_SAMELINE | %FileCheck %s -check-prefix=METHOD_SAMELINE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD_NEWLINE | %FileCheck %s -check-prefix=METHOD_NEWLINE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_OVERLOADED_SAMELINE | %FileCheck %s -check-prefix=INIT_OVERLOADED_SAMELINE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_OVERLOADED_NEWLINE | %FileCheck %s -check-prefix=INIT_OVERLOADED_NEWLINE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_OPTIONAL_SAMELINE | %FileCheck %s -check-prefix=INIT_OPTIONAL_SAMELINE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_OPTIONAL_NEWLINE | %FileCheck %s -check-prefix=INIT_OPTIONAL_NEWLINE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_SAMELINE_1 | %FileCheck %s -check-prefix=INIT_REQUIRED_SAMELINE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_1 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_SAMELINE_2 | %FileCheck %s -check-prefix=INIT_REQUIRED_SAMELINE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_2 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_SAMELINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_SAMELINE_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_3
 
 func globalFunc1(fn1: () -> Int, fn2: () -> String) {}
 func testGlobalFunc() {
-  globalFunc1 {
-    #^GLOBAL_FUNC_1^#
-// GLOBAL_FUNC_1: Begin completions, 1 items
-// GLOBAL_FUNC_1-DAG: Pattern/ExprSpecific: {#fn1: () -> Int##() -> Int#}[#() -> Int#];
-// GLOBAL_FUNC_1: End completions
-  }
-  globalFunc1() {
-    #^GLOBAL_FUNC_2^#
-// Same as GLOBAL_FUNC_1
-  }
-  globalFunc1() {
-    fn1: { 1 }
-    #^GLOBAL_FUNC_3^#
-// GLOBAL_FUNC_3: Begin completions, 1 items
-// GLOBAL_FUNC_3-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#]; name=fn2: () -> String
-// GLOBAL_FUNC_3: End completions
-  }
+  globalFunc1()
+    { 1 } #^GLOBALFUNC_SAMELINE^#
+    #^GLOBALFUNC_NEWLINE^#
+// GLOBALFUNC_SAMELINE: Begin completions, 1 items
+// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// GLOBALFUNC_SAMELINE: End completions
 
-  globalFunc1(fn1: { 1 }) {
-    #^GLOBAL_FUNC_4^#
-// GLOBAL_FUNC_4: Begin completions
-// GLOBAL_FUNC_4-NOT: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#];
-// GLOBAL_FUNC_4-DAG: Pattern/ExprSpecific: {#fn2: () -> String##() -> String#}[#() -> String#];
-// GLOBAL_FUNC_4-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: String[#String#];
-// GLOBAL_FUNC_4: End completions
-  }
+// GLOBALFUNC_NEWLINE: Begin completions, 1 items
+// GLOBALFUNC_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// GLOBALFUNC_NEWLINE: End completions
 
-  globalFunc1() {
-    #^GLOBAL_FUNC_5^#
-// Same as GLOBAL_FUNC_1
-    fn2: { "" }
-  }
+  globalFunc1()
+    { 1 } fn2: #^GLOBALFUNC_AFTERLABEL^#
+// FIXME: Closure literal completion.
+// GLOBALFUNC_AFTERLABEL-NOT: Begin completions
 }
 
 struct MyStruct {
-  func method1(fn1: () -> Int, fn2: () -> String) {}
+  func method1(fn1: () -> Int, fn2: (() -> String)? = nil) {}
+  func method1(fn1: () -> Int, fn2: Int = nil) {}
 }
 func testMethod(value: MyStruct) {
   value.method1 {
-    #^METHOD_1^#
-// METHOD_1: Begin completions, 1 items
-// METHOD_1-DAG: Pattern/ExprSpecific: {#fn1: () -> Int##() -> Int#}[#() -> Int#];
-// METHOD_1: End completions
-  }
-  value.method1() {
-    #^METHOD_2^#
-// Same as METHOD_1
-  }
-  value.method1() {
-    fn1: { 1 }
-    #^METHOD_3^#
-// METHOD_3: Begin completions, 1 items
-// METHOD_3-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#]; name=fn2: () -> String
-// METHOD_3: End completions
-  }
+  } #^METHOD_SAMELINE^#
+  #^METHOD_NEWLINE^#
+// METHOD_SAMELINE: Begin completions, 1 items
+// METHOD_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)?##() -> String#}[#(() -> String)?#];
+// METHOD_SAMELINE: End completions
 
-  value.method1(fn1: { 1 }) {
-    #^METHOD_4^#
-// METHOD_4: Begin completions
-// METHOD_4-NOT: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#];
-// METHOD_4-DAG: Pattern/ExprSpecific: {#fn2: () -> String##() -> String#}[#() -> String#];
-// METHOD_4-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: String[#String#];
-// METHOD_4: End completions
-  }
+// METHOD_NEWLINE: Begin completions
+// METHOD_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)?##() -> String#}[#(() -> String)?#];
+// METHOD_NEWLINE-DAG: Keyword[class]/None:                class;
+// METHOD_NEWLINE-DAG: Keyword[if]/None:                   if;
+// METHOD_NEWLINE-DAG: Keyword[try]/None:                  try;
+// METHOD_NEWLINE-DAG: Decl[LocalVar]/Local:               value[#MyStruct#]; name=value
+// METHOD_NEWLINE: End completions
+}
 
-  value.method1 {
-    #^METHOD_5^#
-// Same as METHOD_1
-    fn2: { "" }
-  }
+struct TestStruct {
+  init(fn1: () -> Int, fn2: () -> String, fn3: () -> String) {}
+  init(fn1: () -> Int) {}
+  init(fn1: () -> Int, fn2: () -> String) {}
+  init(fn1: () -> Int, fn3: () -> String) {}
+}
+
+func testOverloadedInit() {
+  TestStruct {
+    1
+  } #^INIT_OVERLOADED_SAMELINE^#
+  #^INIT_OVERLOADED_NEWLINE^#
+
+// INIT_OVERLOADED_SAMELINE: Begin completions, 2 items
+// INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OVERLOADED_SAMELINE: End completions
+
+// INIT_OVERLOADED_NEWLINE: Begin completions
+// INIT_OVERLOADED_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// INIT_OVERLOADED_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OVERLOADED_NEWLINE-DAG: Keyword[class]/None:                class;
+// INIT_OVERLOADED_NEWLINE-DAG: Keyword[if]/None:                   if;
+// INIT_OVERLOADED_NEWLINE-DAG: Keyword[try]/None:                  try;
+// INIT_OVERLOADED_NEWLINE-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
+// INIT_OVERLOADED_NEWLINE: End completions
+}
+
+struct TestStruct2 {
+  init(fn1: () -> Int, fn2: () -> String = {}, fn3: () -> String = {}) {}
+}
+func testOptionalInit() {
+  TestStruct2 {
+    2
+  } #^INIT_OPTIONAL_SAMELINE^#
+  #^INIT_OPTIONAL_NEWLINE^#
+
+// INIT_OPTIONAL_SAMELINE: Begin completions, 2 items
+// INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OPTIONAL_SAMELINE: End completions
+
+// INIT_OPTIONAL_NEWLINE: Begin completions
+// INIT_OPTIONAL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// INIT_OPTIONAL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OPTIONAL_NEWLINE-DAG: Keyword[class]/None:                class;
+// INIT_OPTIONAL_NEWLINE-DAG: Keyword[if]/None:                   if;
+// INIT_OPTIONAL_NEWLINE-DAG: Keyword[try]/None:                  try;
+// INIT_OPTIONAL_NEWLINE-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
+// INIT_OPTIONAL_NEWLINE: End completions
+}
+
+struct TestStruct3 {
+  init(fn1: () -> Int, fn2: () -> String, fn3: () -> String) {}
+}
+func testOptionalInit() {
+  // missing 'fn2' and 'fn3'.
+  TestStruct3 {
+    2
+  } #^INIT_REQUIRED_SAMELINE_1^#
+  #^INIT_REQUIRED_NEWLINE_1^#
+
+// INIT_REQUIRED_SAMELINE_1: Begin completions, 1 items
+// INIT_REQUIRED_SAMELINE_1-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// INIT_REQUIRED_SAMELINE_1: End completions
+
+// INIT_REQUIRED_NEWLINE_1: Begin completions, 1 items
+// INIT_REQUIRED_NEWLINE_1-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// INIT_REQUIRED_NEWLINE_1: End completions
+
+  // missing 'fn3'.
+  TestStruct3 {
+    2
+  } fn2: {
+    "test"
+  } #^INIT_REQUIRED_SAMELINE_2^#
+  #^INIT_REQUIRED_NEWLINE_2^#
+
+// INIT_REQUIRED_SAMELINE_2: Begin completions, 1 items
+// INIT_REQUIRED_SAMELINE_2-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_REQUIRED_SAMELINE_2: End completions
+
+// INIT_REQUIRED_NEWLINE_2: Begin completions, 1 items
+// INIT_REQUIRED_NEWLINE_2-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_REQUIRED_NEWLINE_2: End completions
+
+  // Call is completed.
+  TestStruct3 {
+    2
+  } fn2: {
+    "test"
+  } fn3: {
+    "test"
+  } #^INIT_REQUIRED_SAMELINE_3^#
+  #^INIT_REQUIRED_NEWLINE_3^#
+
+// INIT_REQUIRED_SAMELINE_3-NOT: Begin completions
+
+// INIT_REQUIRED_NEWLINE_3: Begin completions
+// INIT_REQUIRED_NEWLINE_3-NOT: name=fn2
+// INIT_REQUIRED_NEWLINE_3-NOT: name=fn3
+// INIT_REQUIRED_NEWLINE_3-DAG: Keyword[class]/None:                class;
+// INIT_REQUIRED_NEWLINE_3-DAG: Keyword[if]/None:                   if;
+// INIT_REQUIRED_NEWLINE_3-DAG: Keyword[try]/None:                  try;
+// INIT_REQUIRED_NEWLINE_3-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
+// INIT_REQUIRED_NEWLINE_3-NOT: name=fn2
+// INIT_REQUIRED_NEWLINE_3-NOT: name=fn3
+// INIT_REQUIRED_NEWLINE_3: End completions
 }

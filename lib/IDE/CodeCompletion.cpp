@@ -1446,6 +1446,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   bool AttTargetIsIndependent = false;
+  bool IsAtStartOfLine = false;
   Optional<DeclKind> AttTargetDK;
   Optional<StmtKind> ParentStmtKind;
 
@@ -1572,6 +1573,9 @@ public:
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
+  void completeLabeledTrailingClosure(CodeCompletionExpr *E,
+                                      bool isAtStartOfLine) override;
+
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
@@ -4155,12 +4159,15 @@ public:
   }
 
   void addCallArgumentCompletionResults(
-      ArrayRef<const AnyFunctionType::Param *> Args) {
+      ArrayRef<PossibleParamInfo> ParamInfos) {
     Type ContextType;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       ContextType = typeContext->getDeclaredTypeInContext();
 
-    for (auto *Arg : Args) {
+    for (auto Info : ParamInfos) {
+      const auto *Arg = Info.Param;
+      if (!Arg)
+        continue;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Pattern,
           SemanticContextKind::ExpressionSpecific, {});
@@ -5150,6 +5157,14 @@ void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
   }
 }
 
+void CodeCompletionCallbacksImpl::completeLabeledTrailingClosure(
+    CodeCompletionExpr *E, bool isAtStartOfLine) {
+  CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
+  Kind = CompletionKind::LabeledTrailingClosure;
+  IsAtStartOfLine = isAtStartOfLine;
+}
+
 void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
@@ -5332,6 +5347,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::Import:
   case CompletionKind::UnresolvedMember:
   case CompletionKind::CallArg:
+  case CompletionKind::LabeledTrailingClosure:
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
   case CompletionKind::PlatformConditon:
@@ -5875,15 +5891,66 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           (Lookup.FoundFunctionCalls &&
            Lookup.FoundFunctionsWithoutFirstKeyword);
     } else if (!ContextInfo.getPossibleParams().empty()) {
-      Lookup.addCallArgumentCompletionResults(ContextInfo.getPossibleParams());
+      auto params = ContextInfo.getPossibleParams();
+      Lookup.addCallArgumentCompletionResults(params);
 
       shouldPerformGlobalCompletion = !ContextInfo.getPossibleTypes().empty();
+      // Fallback to global completion if the position is out of number. It's
+      // better than suggest nothing.
+      shouldPerformGlobalCompletion |= llvm::all_of(
+          params, [](const PossibleParamInfo &P) { return !P.Param; });
     }
 
     if (shouldPerformGlobalCompletion) {
       Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
                               ContextInfo.isSingleExpressionBody());
       DoPostfixExprBeginning();
+    }
+    break;
+  }
+
+  case CompletionKind::LabeledTrailingClosure: {
+    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+
+    SmallVector<PossibleParamInfo, 2> params;
+    // Only complete function type parameters
+    llvm::copy_if(ContextInfo.getPossibleParams(), std::back_inserter(params),
+                  [](const PossibleParamInfo &P) {
+                    // nullptr indicates out of bounds.
+                    if (!P.Param)
+                      return true;
+                    return P.Param->getPlainType()
+                        ->lookThroughAllOptionalTypes()
+                        ->is<AnyFunctionType>();
+                  });
+
+    bool allRequired = false;
+    if (!params.empty()) {
+      Lookup.addCallArgumentCompletionResults(params);
+      allRequired = llvm::all_of(
+          params, [](const PossibleParamInfo &P) { return P.IsRequired; });
+    }
+
+    // If there're optional parameters, do global completion or member
+    // completion depending on the completion is happening at the start of line.
+    if (!allRequired) {
+      if (IsAtStartOfLine) {
+        //   foo() {}
+        //   <HERE>
+        // Global completion.
+        auto &Sink = CompletionContext.getResultSink();
+        addDeclKeywords(Sink);
+        addStmtKeywords(Sink, MaybeFuncBody);
+        addSuperKeyword(Sink);
+        addLetVarKeywords(Sink);
+        addExprKeywords(Sink);
+        addAnyTypeKeyword(Sink);
+        DoPostfixExprBeginning();
+      } else {
+        //   foo() {} <HERE>
+        // Member completion
+        // TODO: Member completion.
+      }
     }
     break;
   }
