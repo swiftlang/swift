@@ -169,7 +169,7 @@ public class D {
 
 // CHECK-LABEL: sil [ossa] @$s18opaque_result_type10tupleAsAnyQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s18opaque_result_type10tupleAsAnyQryF", 0) 🦸 {
 public func tupleAsAny() -> some Any {
-// CHECK-NEXT: bb0(%0 : $*()):
+// CHECK:      bb0(%0 : $*()):
 // CHECK-NEXT:   %1 = tuple ()
 // CHECK-NEXT:   return %1 : $()
   return ()
