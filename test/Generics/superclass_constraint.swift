@@ -149,6 +149,12 @@ protocol RecSuperclassReqP4 {
 class InvalidConformanceToP1: GenericClass<Never>, RecSuperclassReqP1 {}
 // expected-error@-1 {{'RecSuperclassReqP1' requires that 'InvalidConformanceToP1' inherit from 'GenericClass<InvalidConformanceToP1>'}}
 // expected-note@-2 {{requirement specified as 'Self' : 'GenericClass<Self>' [with Self = InvalidConformanceToP1]}}
+class InvalidConformanceToP2: GenericClass<InvalidConformanceToP2>,
+                              RecSuperclassReqP2 {
+// expected-error@-2 {{type 'InvalidConformanceToP2' does not conform to protocol 'RecSuperclassReqP2'}}
+  typealias A = InvalidConformanceToP1
+// expected-note@-1 {{possibly intended match 'InvalidConformanceToP2.A' (aka 'InvalidConformanceToP1') does not conform to 'RecSuperclassReqP2'}}
+}
 class InvalidConformanceToP3: GenericClass<Never>, RecSuperclassReqP3 {
 // expected-error@-1 {{'RecSuperclassReqP3' requires that 'InvalidConformanceToP3' inherit from 'GenericClass<InvalidConformanceToP3.A>' (aka 'GenericClass<Bool>')}}
 // expected-note@-2 {{requirement specified as 'Self' : 'GenericClass<Self.A>' [with Self = InvalidConformanceToP3]}}
@@ -156,15 +162,12 @@ class InvalidConformanceToP3: GenericClass<Never>, RecSuperclassReqP3 {
 }
 
 class ConformanceToP1: GenericClass<ConformanceToP1>, RecSuperclassReqP1 {}
+class ConformanceToP2P3: GenericClass<ConformanceToP2P3>,
+                       RecSuperclassReqP2,
+                       RecSuperclassReqP3 {
+  typealias A = ConformanceToP2P3
+}
 
-// FIXME: False-negative.
-class ConformanceToP2: GenericClass<ConformanceToP2>, RecSuperclassReqP2 {
-// expected-error@-1 {{type 'ConformanceToP2' does not conform to protocol 'RecSuperclassReqP2'}}
-  typealias A = ConformanceToP2 // expected-note {{possibly intended match 'ConformanceToP2.A' (aka 'ConformanceToP2') does not inherit from 'GenericClass<τ_0_0.A>'}}
-}
-class ConformanceToP3: GenericClass<ConformanceToP3>, RecSuperclassReqP3 {
-  typealias A = ConformanceToP3
-}
 // FIXME: False-negative. This bug impacts any associated type declarations
 // that have a superclass bound containing dependent member types (see
 // swift::checkTypeWitness).

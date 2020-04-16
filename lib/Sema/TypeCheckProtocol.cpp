@@ -3698,11 +3698,17 @@ CheckTypeWitnessResult swift::checkTypeWitness(DeclContext *dc,
   Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
                                               : type;
 
-  // FIXME: This is incorrect; depTy is written in terms of the protocol's
-  // associated types, and we need to substitute in known type witnesses.
-  if (auto superclass = genericSig->getSuperclassBound(depTy)) {
-    if (!superclass->isExactSuperclassOf(contextType))
-      return superclass;
+  // Only check explicit superclass bounds. Otherwise, we only need to check
+  // for conformance to the protocol that implies the superclass bound.
+  if (llvm::any_of(assocType->getInherited(), [](const TypeLoc &loc) {
+        return loc.getType() && loc.getType()->getClassOrBoundGenericClass();
+      })) {
+    // FIXME: This is incorrect; depTy is written in terms of the protocol's
+    // associated types, and we need to substitute in known type witnesses.
+    if (auto superclass = genericSig->getSuperclassBound(depTy)) {
+      if (!superclass->isExactSuperclassOf(contextType))
+        return superclass;
+    }
   }
 
   // Check protocol conformances.
