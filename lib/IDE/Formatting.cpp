@@ -614,6 +614,10 @@ private:
                           PL->getStartLoc()))
           return Stop;
       }
+    } else if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(E)) {
+      SourceLoc ContextLoc = getContextLocForArgs(SM, E);
+      if (!handleAngles(USE->getLAngleLoc(), USE->getRAngleLoc(), ContextLoc))
+        return Stop;
     } else if (isa<CallExpr>(E) || isa<SubscriptExpr>(E)) {
       SourceLoc ContextLoc = getContextLocForArgs(SM, E);
       Expr *Arg;
