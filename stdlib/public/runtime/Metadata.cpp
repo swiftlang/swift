@@ -663,6 +663,11 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
 
   auto bytes = (char*) cache.getAllocator().Allocate(totalSize, alignof(void*));
 
+#ifndef NDEBUG
+  // Fill the metadata record with garbage.
+  memset(bytes, 0xAA, totalSize);
+#endif
+
   auto addressPoint = bytes + sizeof(ValueMetadata::HeaderType);
   auto metadata = reinterpret_cast<ValueMetadata *>(addressPoint);
 
