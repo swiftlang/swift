@@ -33,10 +33,7 @@
 #include "llvm/Config/config.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/IR/DiagnosticPrinter.h"
-#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/Linker/Linker.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Support/Path.h"
@@ -178,48 +175,6 @@ bool swift::immediate::tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
 
   return std::all_of(LoadedLibraries.begin(), LoadedLibraries.end(),
                      [](bool Value) { return Value; });
-}
-
-static void linkerDiagnosticHandlerNoCtx(const llvm::DiagnosticInfo &DI) {
-  if (DI.getSeverity() != llvm::DS_Error)
-    return;
-
-  std::string MsgStorage;
-  {
-    llvm::raw_string_ostream Stream(MsgStorage);
-    llvm::DiagnosticPrinterRawOStream DP(Stream);
-    DI.print(DP);
-  }
-  llvm::errs() << "Error linking swift modules\n";
-  llvm::errs() << MsgStorage << "\n";
-}
-
-
-
-static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
-                                    void *Context) {
-  // This assert self documents our precondition that Context is always
-  // nullptr. It seems that parts of LLVM are using the flexibility of having a
-  // context. We don't really care about this.
-  assert(Context == nullptr && "We assume Context is always a nullptr");
-
-  return linkerDiagnosticHandlerNoCtx(DI);
-}
-
-bool swift::immediate::linkLLVMModules(llvm::Module *Module,
-                                       std::unique_ptr<llvm::Module> SubModule
-                            // TODO: reactivate the linker mode if it is
-                            // supported in llvm again. Otherwise remove the
-                            // commented code completely.
-                            /*, llvm::Linker::LinkerMode LinkerMode */)
-{
-  llvm::LLVMContext &Ctx = SubModule->getContext();
-  auto OldHandler = Ctx.getDiagnosticHandlerCallBack();
-  void *OldDiagnosticContext = Ctx.getDiagnosticContext();
-  Ctx.setDiagnosticHandlerCallBack(linkerDiagnosticHandler, nullptr);
-  bool Failed = llvm::Linker::linkModules(*Module, std::move(SubModule));
-  Ctx.setDiagnosticHandlerCallBack(OldHandler, OldDiagnosticContext);
-  return !Failed;
 }
 
 bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
