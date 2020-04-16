@@ -132,8 +132,7 @@ FailureDiagnostic::getArgumentListExprFor(ConstraintLocator *locator) const {
   // Form a new locator that ends at the ApplyArgument element, then simplify
   // to get the argument list.
   auto newPath = ArrayRef<LocatorPathElt>(path.begin(), iter + 1);
-  auto &cs = getConstraintSystem();
-  auto argListLoc = cs.getConstraintLocator(locator->getAnchor(), newPath);
+  auto argListLoc = getConstraintLocator(locator->getAnchor(), newPath);
   return simplifyLocatorToAnchor(argListLoc);
 }
 
@@ -218,8 +217,7 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     return nullptr;
 
   auto path = locator->getPath();
-  auto *typeReqLoc = getConstraintLocator(getRawAnchor().get<const Expr *>(),
-                                          path.drop_back());
+  auto *typeReqLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
 
   auto result = llvm::find_if(
       cs.CheckedConformances,
@@ -1733,7 +1731,6 @@ bool AssignmentFailure::diagnoseAsError() {
 
 std::pair<Expr *, Optional<OverloadChoice>>
 AssignmentFailure::resolveImmutableBase(Expr *expr) const {
-  auto &cs = getConstraintSystem();
   auto *DC = getDC();
   expr = expr->getValueProvidingExpr();
 
@@ -1763,7 +1760,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     }
 
     Optional<OverloadChoice> member = getMemberRef(
-        cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember));
+        getConstraintLocator(SE, ConstraintLocator::SubscriptMember));
 
     // If it isn't settable, return it.
     if (member) {
@@ -1798,7 +1795,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   // Look through property references.
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
     // If we found a decl for the UDE, check it.
-    auto loc = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
+    auto loc = getConstraintLocator(UDE, ConstraintLocator::Member);
 
     auto member = getMemberRef(loc);
 
@@ -1864,7 +1861,6 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
     // If this is a keypath dynamic member lookup, we have to
     // adjust the locator to find member referred by it.
     if (isValidKeyPathDynamicMemberLookup(subscript)) {
-      auto &cs = getConstraintSystem();
       // Type has a following format:
       // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`
       auto *fullType = member->openedFullType->castTo<FunctionType>();
@@ -1872,7 +1868,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
 
       auto paramTy = fnType->getParams()[0].getPlainType();
       auto keyPath = paramTy->getAnyNominal();
-      auto memberLoc = cs.getConstraintLocator(
+      auto memberLoc = getConstraintLocator(
           locator, LocatorPathElt::KeyPathDynamicMember(keyPath));
 
       auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
@@ -2025,7 +2021,7 @@ bool ContextualFailure::diagnoseAsError() {
         auto &cs = getConstraintSystem();
         MissingOptionalUnwrapFailure failure(getSolution(), getType(anchor),
                                              toType,
-                                             cs.getConstraintLocator(anchor));
+                                             getConstraintLocator(anchor));
         if (failure.diagnoseAsError())
           return true;
       }
@@ -3095,8 +3091,7 @@ bool MissingCallFailure::diagnoseAsError() {
     }
 
     case ConstraintLocator::AutoclosureResult: {
-      auto loc = getConstraintLocator(getRawAnchor().get<const Expr *>(),
-                                      path.drop_back());
+      auto loc = getConstraintLocator(getRawAnchor(), path.drop_back());
       AutoClosureForwardingFailure failure(getSolution(), loc);
       return failure.diagnoseAsError();
     }
@@ -3517,15 +3512,14 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       }
 
       auto isCallArgument = [this](Expr *expr) {
-        auto &cs = getConstraintSystem();
-        auto argExpr = cs.getParentExpr(expr);
+        auto argExpr = findParentExpr(expr);
         if (!argExpr)
           return false;
-        auto possibleApplyExpr = cs.getParentExpr(expr);
+        auto possibleApplyExpr = findParentExpr(expr);
         return possibleApplyExpr && isa<ApplyExpr>(possibleApplyExpr);
       };
 
-      auto *initCall = cs.getParentExpr(cs.getParentExpr(ctorRef));
+      auto *initCall = findParentExpr(findParentExpr(ctorRef));
 
       auto isMutable = [&DC](ValueDecl *decl) {
         if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
@@ -3534,7 +3528,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         return true;
       };
 
-      auto *baseLoc = cs.getConstraintLocator(ctorRef->getBase());
+      auto *baseLoc = getConstraintLocator(ctorRef->getBase());
       if (auto selection = getCalleeOverloadChoiceIfAvailable(baseLoc)) {
         OverloadChoice choice = selection->choice;
         if (choice.isDecl() && isMutable(choice.getDecl()) &&
@@ -3563,8 +3557,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     if (getRawAnchor() &&
-        cs.DC->getContextKind() == DeclContextKind::Initializer) {
-      auto *TypeDC = cs.DC->getParent();
+        getDC()->getContextKind() == DeclContextKind::Initializer) {
+      auto *TypeDC = getDC()->getParent();
       bool propertyInitializer = true;
       // If the parent context is not a type context, we expect it
       // to be a defaulted parameter in a function declaration.
@@ -3785,13 +3779,13 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
 bool PartialApplicationFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
-  auto *anchor = cast<UnresolvedDotExpr>(getRawAnchor().get<const Expr *>());
+  auto anchor = cast<UnresolvedDotExpr>(getRawAnchor().get<const Expr *>());
 
   RefKind kind = RefKind::MutatingMethod;
 
   // If this is initializer delegation chain, we have a tailored message.
-  if (getOverloadChoiceIfAvailable(cs.getConstraintLocator(
-          anchor, ConstraintLocator::ConstructorMember))) {
+  if (getOverloadChoiceIfAvailable(
+          getConstraintLocator(anchor, ConstraintLocator::ConstructorMember))) {
     kind = anchor->getBase()->isSuperExpr() ? RefKind::SuperInit
                                             : RefKind::SelfInit;
   } else if (anchor->getBase()->isSuperExpr()) {
@@ -4763,8 +4757,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
 
   if (baseExpr) {
     auto &cs = getConstraintSystem();
-    auto *locator =
-        cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
+    auto *locator = getConstraintLocator(baseExpr, ConstraintLocator::Member);
     if (cs.hasFixFor(locator))
       return false;
   }
@@ -5590,7 +5583,7 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // one would cover both arguments.
   if (getAnchor().get<const Expr *>() == rhs && rhsType->is<FunctionType>()) {
     auto &cs = getConstraintSystem();
-    if (cs.hasFixFor(cs.getConstraintLocator(
+    if (cs.hasFixFor(getConstraintLocator(
             binaryOp, {ConstraintLocator::ApplyArgument,
                        LocatorPathElt::ApplyArgToParam(
                            0, 0, getParameterFlagsAtIndex(0))})))
@@ -5720,7 +5713,7 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
   auto *fnType = getFnType();
   const auto &param = fnType->getParams()[0];
 
-  auto *anchor = getRawAnchor().get<const Expr *>();
+  auto anchor = getRawAnchor();
 
   MissingArgumentsFailure failure(
       solution, {std::make_pair(0, param)},
@@ -5802,8 +5795,8 @@ bool ExtraneousCallFailure::diagnoseAsError() {
   // If this is something like `foo()` where `foo` is a variable
   // or a property, let's suggest dropping `()`.
   auto removeParensFixIt = [&](InFlightDiagnostic &diagnostic) {
-    auto *argLoc = getConstraintLocator(getRawAnchor().get<const Expr *>(),
-                                        ConstraintLocator::ApplyArgument);
+    auto *argLoc =
+        getConstraintLocator(getRawAnchor(), ConstraintLocator::ApplyArgument);
 
     if (auto *TE =
             dyn_cast_or_null<TupleExpr>(simplifyLocatorToAnchor(argLoc))) {
@@ -6098,7 +6091,7 @@ bool AssignmentTypeMismatchFailure::diagnoseAsError() {
 }
 
 bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto anchor = getAnchor();
 
   if (auto overload =
           getCalleeOverloadChoiceIfAvailable(getConstraintLocator(anchor))) {

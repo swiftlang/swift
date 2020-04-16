@@ -158,16 +158,23 @@ protected:
   }
 
   ConstraintLocator *
-  getConstraintLocator(Expr *anchor,
+  getConstraintLocator(TypedNode anchor,
                        ConstraintLocator::PathElement element) const {
-    return S.getConstraintLocator(anchor, {element});
+    return S.getConstraintLocator(anchor.get<const Expr *>(), {element});
   }
 
   /// Retrive the constraint locator for the given anchor and
   /// path, uniqued and automatically calculate the summary flags
   ConstraintLocator *getConstraintLocator(
-      Expr *anchor, ArrayRef<ConstraintLocator::PathElement> path = {}) const {
-    return S.getConstraintLocator(anchor, path);
+      TypedNode anchor,
+      ArrayRef<ConstraintLocator::PathElement> path = {}) const {
+    return S.getConstraintLocator(anchor.get<const Expr *>(), path);
+  }
+
+  ConstraintLocator *
+  getConstraintLocator(ConstraintLocator *baseLocator,
+                       ConstraintLocator::PathElement element) const {
+    return S.getConstraintLocator(baseLocator, element);
   }
 
   Optional<FunctionArgApplyInfo>
