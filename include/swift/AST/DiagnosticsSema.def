@@ -751,6 +751,9 @@ ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
       "please file a bug report with your project and the crash log",
       (StringRef))
+NOTE(serialization_misc_version,none,
+     "module '%0' full misc version is '%1'",
+     (StringRef, StringRef))
 NOTE(serialization_compatibility_version_mismatch,none,
      "compiling as Swift %0, with '%1' built as Swift %2 "
      "(this is supported but may expose additional compiler issues)",
