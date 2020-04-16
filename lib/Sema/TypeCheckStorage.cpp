@@ -342,10 +342,13 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (auto mut = var->getPropertyWrapperMutability()) {
       bool isMutating = mut->Setter == PropertyWrapperMutability::Mutating;
-      if (var->getParsedAccessor(AccessorKind::DidSet)) {
+      if (auto *accessor = var->getParsedAccessor(AccessorKind::DidSet)) {
         // If there's a didSet, we call the getter for the 'oldValue', and so
         // should consider the getter's mutatingness as well
-        isMutating |= (mut->Getter == PropertyWrapperMutability::Mutating);
+        if (!accessor->isSimpleDidSet()) {
+          isMutating |= (mut->Getter == PropertyWrapperMutability::Mutating);
+        }
+        isMutating |= accessor->getAttrs().hasAttribute<MutatingAttr>();
       }
       return isMutating && result;
     }
