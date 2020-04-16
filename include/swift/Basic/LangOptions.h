@@ -75,6 +75,12 @@ namespace swift {
     /// performed.
     llvm::Optional<llvm::Triple> TargetVariant;
 
+    /// The SDK version, if known.
+    Optional<llvm::VersionTuple> SDKVersion;
+
+    /// The target variant SDK version, if known.
+    Optional<llvm::VersionTuple> VariantSDKVersion;
+
     ///
     /// Language features
     ///

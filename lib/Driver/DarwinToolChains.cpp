@@ -518,6 +518,26 @@ static Optional<llvm::VersionTuple> remapVersion(
   return None;
 }
 
+Optional<llvm::VersionTuple>
+toolchains::Darwin::getTargetSDKVersion(const llvm::Triple &triple) const {
+  if (!SDKInfo)
+    return None;
+
+  // Retrieve the SDK version.
+  auto SDKVersion = SDKInfo->getVersion();
+
+  // For the Mac Catalyst environment, we have a macOS SDK with a macOS
+  // SDK version. Map that to the corresponding iOS version number to pass
+  // down to the linker.
+  if (tripleIsMacCatalystEnvironment(triple)) {
+    return remapVersion(
+        SDKInfo->getVersionMap().MacOS2iOSMacMapping, SDKVersion)
+          .getValueOr(llvm::VersionTuple(0, 0, 0));
+  }
+
+  return SDKVersion;
+}
+
 void
 toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
                                             const JobContext &context) const {
@@ -584,23 +604,10 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
 
     // Compute the SDK version.
     unsigned sdkMajor = 0, sdkMinor = 0, sdkMicro = 0;
-    if (SDKInfo) {
-      // Retrieve the SDK version.
-      auto SDKVersion = SDKInfo->getVersion();
-
-      // For the Mac Catalyst environment, we have a macOS SDK with a macOS
-      // SDK version. Map that to the corresponding iOS version number to pass
-      // down to the linker.
-      if (tripleIsMacCatalystEnvironment(triple)) {
-        SDKVersion = remapVersion(
-            SDKInfo->getVersionMap().MacOS2iOSMacMapping, SDKVersion)
-              .getValueOr(llvm::VersionTuple(0, 0, 0));
-      }
-
-      // Extract the version information.
-      sdkMajor = SDKVersion.getMajor();
-      sdkMinor = SDKVersion.getMinor().getValueOr(0);
-      sdkMicro = SDKVersion.getSubminor().getValueOr(0);
+    if (auto sdkVersion = getTargetSDKVersion(triple)) {
+      sdkMajor = sdkVersion->getMajor();
+      sdkMinor = sdkVersion->getMinor().getValueOr(0);
+      sdkMicro = sdkVersion->getSubminor().getValueOr(0);
     }
 
     Arguments.push_back("-platform_version");
@@ -614,6 +621,26 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
   if (auto targetVariant = getTargetVariant()) {
     assert(triplesAreValidForZippering(getTriple(), *targetVariant));
     addPlatformVersionArg(*targetVariant);
+  }
+}
+
+void toolchains::Darwin::addCommonFrontendArgs(
+    const OutputInfo &OI, const CommandOutput &output,
+    const llvm::opt::ArgList &inputArgs,
+    llvm::opt::ArgStringList &arguments) const {
+  ToolChain::addCommonFrontendArgs(OI, output, inputArgs, arguments);
+
+  if (auto sdkVersion = getTargetSDKVersion(getTriple())) {
+    arguments.push_back("-target-sdk-version");
+    arguments.push_back(inputArgs.MakeArgString(sdkVersion->getAsString()));
+  }
+
+  if (auto targetVariant = getTargetVariant()) {
+    if (auto variantSDKVersion = getTargetSDKVersion(*targetVariant)) {
+      arguments.push_back("-target-variant-sdk-version");
+      arguments.push_back(
+          inputArgs.MakeArgString(variantSDKVersion->getAsString()));
+    }
   }
 }
 
@@ -860,9 +887,8 @@ toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
 void
 toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
                                        const OutputInfo &outputInfo) const {
-  // If we are linking and have been provided with an SDK, go read the SDK
-  // information.
-  if (outputInfo.shouldLink() && !outputInfo.SDKPath.empty()) {
+  // If we have been provided with an SDK, go read the SDK information.
+  if (!outputInfo.SDKPath.empty()) {
     auto SDKInfoOrErr = clang::driver::parseDarwinSDKInfo(
         *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
     if (SDKInfoOrErr) {
