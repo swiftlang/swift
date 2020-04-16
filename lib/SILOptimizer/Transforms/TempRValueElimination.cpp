@@ -171,6 +171,7 @@ bool TempRValueOptPass::collectLoads(
       return false;
      LLVM_FALLTHROUGH;
   case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst: {
     ApplySite apply(user);
 
