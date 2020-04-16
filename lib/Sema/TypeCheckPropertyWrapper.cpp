@@ -158,6 +158,14 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     if (hasExtraneousParam)
       continue;
 
+    if (initKind != PropertyWrapperInitKind::Default) {
+      if (!argumentParam)
+        continue;
+
+      if (argumentParam->isInOut() || argumentParam->isVariadic())
+        continue;
+    }
+
     // Failable initializers cannot be used.
     if (init->isFailable()) {
       nonviable.push_back(
@@ -174,12 +182,6 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
 
     // Additional checks for initial-value and wrapped-value initializers
     if (initKind != PropertyWrapperInitKind::Default) {
-      if (!argumentParam)
-        continue;
-
-      if (argumentParam->isInOut() || argumentParam->isVariadic())
-        continue;
-
       auto paramType = argumentParam->getInterfaceType();
       if (paramType->is<ErrorType>())
         continue;
