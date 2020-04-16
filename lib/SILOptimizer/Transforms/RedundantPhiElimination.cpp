@@ -175,6 +175,12 @@ bool RedundantPhiEliminationPass::valuesAreEqual(SILValue val1, SILValue val2) {
       if (inst1->getMemoryBehavior() != SILInstruction::MemoryBehavior::None)
         return false;
 
+      // Allocation instructions are defined to have no side-effects.
+      // Two allocations (even if the instruction look the same) don't define
+      // the same value.
+      if (isa<AllocationInst>(inst1))
+        return false;
+
       auto *inst2 = cast<SingleValueInstruction>(val2);
 
       // Compare the operands by putting them on the worklist.
