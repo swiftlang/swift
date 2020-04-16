@@ -2317,9 +2317,7 @@ class AvailabilityWalker : public ASTWalker {
   DeclContext *DC;
   MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
-  ResilienceExpansion Expansion;
-  Optional<TypeChecker::FragileFunctionKind> FragileKind;
-  bool TreatUsableFromInlineAsPublic = false;
+  FragileFunctionKind FragileKind;
 
   /// Returns true if DC is an \c init(rawValue:) declaration and it is marked
   /// implicit.
@@ -2336,10 +2334,7 @@ class AvailabilityWalker : public ASTWalker {
 
 public:
   AvailabilityWalker(DeclContext *DC) : Context(DC->getASTContext()), DC(DC) {
-    Expansion = DC->getResilienceExpansion();
-    if (Expansion == ResilienceExpansion::Minimal)
-      std::tie(FragileKind, TreatUsableFromInlineAsPublic)
-        = TypeChecker::getFragileFunctionKind(DC);
+    FragileKind = DC->getFragileFunctionKind();
   }
 
   // FIXME: Remove this
@@ -2619,10 +2614,9 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
       return false;
   }
 
-  if (FragileKind)
+  if (FragileKind.kind != FragileFunctionKind::None)
     if (R.isValid())
-      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, *FragileKind,
-                                                TreatUsableFromInlineAsPublic))
+      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, FragileKind))
         return true;
 
   if (diagnoseExplicitUnavailability(D, R, DC, call))

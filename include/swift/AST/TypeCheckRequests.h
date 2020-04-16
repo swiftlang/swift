@@ -672,10 +672,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request the most optimal resilience expansion for the code in the context.
-class ResilienceExpansionRequest :
-    public SimpleRequest<ResilienceExpansionRequest,
-                         ResilienceExpansion(DeclContext*),
+/// Request the fragile function kind for the context.
+class FragileFunctionKindRequest :
+    public SimpleRequest<FragileFunctionKindRequest,
+                         FragileFunctionKind(DeclContext*),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -684,15 +684,16 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ResilienceExpansion evaluate(Evaluator &eval, DeclContext *context) const;
+  FragileFunctionKind evaluate(Evaluator &eval, DeclContext *context) const;
 
 public:
   // Caching.
   bool isCached() const { return true; }
 };
 
-void simple_display(llvm::raw_ostream &out,
-                    const ResilienceExpansion &value);
+void simple_display(llvm::raw_ostream &out, FragileFunctionKind value);
+
+void simple_display(llvm::raw_ostream &out, ResilienceExpansion value);
 
 /// Request the custom attribute which attaches a function builder to the
 /// given declaration.

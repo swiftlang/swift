@@ -53,6 +53,7 @@ struct PropertyWrapperMutability;
 class ProtocolDecl;
 class Requirement;
 enum class ResilienceExpansion : unsigned;
+struct FragileFunctionKind;
 class SourceFile;
 class Type;
 class ValueDecl;
