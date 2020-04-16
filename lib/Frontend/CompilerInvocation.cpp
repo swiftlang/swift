@@ -594,6 +594,18 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
   }
 
+  // Parse the SDK version.
+  if (Arg *A = Args.getLastArg(options::OPT_target_sdk_version)) {
+    auto vers = version::Version::parseVersionString(
+      A->getValue(), SourceLoc(), &Diags);
+    if (vers.hasValue()) {
+      Opts.SDKVersion = *vers;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -1434,6 +1446,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
         getRuntimeCompatVersion();
   }
+
   return false;
 }
 

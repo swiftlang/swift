@@ -702,4 +702,7 @@ def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
 def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
     HelpText<"Directory for bridging header to be printed in compatibility header">;
 
+def target_sdk_version : Separate<["-"], "target-sdk-version">,
+  HelpText<"The version of target SDK used for compilation">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
