@@ -45,7 +45,7 @@ public:
   FailureDiagnostic(const Solution &solution, ConstraintLocator *locator)
       : S(solution), Locator(locator) {}
 
-  FailureDiagnostic(const Solution &solution, Expr *anchor)
+  FailureDiagnostic(const Solution &solution, const Expr *anchor)
       : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
 
   virtual ~FailureDiagnostic();
@@ -183,11 +183,11 @@ protected:
 
   /// \returns A parent expression if sub-expression is contained anywhere
   /// in the root expression or `nullptr` otherwise.
-  Expr *findParentExpr(Expr *subExpr) const;
+  Expr *findParentExpr(const Expr *subExpr) const;
 
   /// If given expression is some kind of a member reference e.g.
   /// `x.foo` or `x[0]` extract and return its base expression.
-  Expr *getBaseExprFor(Expr *anchor) const;
+  Expr *getBaseExprFor(const Expr *anchor) const;
 
   /// For a given locator describing an argument application, or a constraint
   /// within an argument application, returns the argument list for that
@@ -506,16 +506,16 @@ public:
 /// trying to assign something to immutable value, or trying
 /// to access mutating member on immutable base.
 class AssignmentFailure final : public FailureDiagnostic {
-  Expr *DestExpr;
+  const Expr *DestExpr;
   SourceLoc Loc;
   Diag<StringRef> DeclDiagnostic;
   Diag<Type> TypeDiagnostic;
 
 public:
-  AssignmentFailure(Expr *destExpr, const Solution &solution,
+  AssignmentFailure(const Expr *destExpr, const Solution &solution,
                     SourceLoc diagnosticLoc);
 
-  AssignmentFailure(Expr *destExpr, const Solution &solution,
+  AssignmentFailure(const Expr *destExpr, const Solution &solution,
                     SourceLoc diagnosticLoc, Diag<StringRef> declDiag,
                     Diag<Type> typeDiag)
       : FailureDiagnostic(solution, destExpr), DestExpr(destExpr),
@@ -536,7 +536,13 @@ private:
   std::pair<Expr *, Optional<OverloadChoice>>
   resolveImmutableBase(Expr *expr) const;
 
-  static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx, Expr *destExpr);
+  std::pair<Expr *, Optional<OverloadChoice>>
+  resolveImmutableBase(const Expr *expr) const {
+    return resolveImmutableBase(const_cast<Expr *>(expr));
+  }
+
+  static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx,
+                                            const Expr *destExpr);
 
   /// Retrive an member reference associated with given member
   /// looking through dynamic member lookup on the way.
@@ -707,9 +713,9 @@ private:
   }
 
   /// Suggest a default value via `?? <default value>`
-  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
+  void offerDefaultValueUnwrapFixIt(DeclContext *DC, const Expr *expr) const;
   /// Suggest a force optional unwrap via `!`
-  void offerForceUnwrapFixIt(Expr *expr) const;
+  void offerForceUnwrapFixIt(const Expr *expr) const;
 };
 
 /// Diagnostics for mismatched generic arguments e.g
@@ -790,23 +796,25 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  bool exprNeedsParensBeforeAddingAs(Expr *expr) {
+  bool exprNeedsParensBeforeAddingAs(const Expr *expr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
-    return exprNeedsParensInsideFollowingOperator(DC, expr, asPG);
+    return exprNeedsParensInsideFollowingOperator(DC, const_cast<Expr *>(expr),
+                                                  asPG);
   }
 
-  bool exprNeedsParensAfterAddingAs(Expr *expr, Expr *rootExpr) {
+  bool exprNeedsParensAfterAddingAs(const Expr *expr, const Expr *rootExpr) {
     auto *DC = getDC();
     auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
 
-    return exprNeedsParensOutsideFollowingOperator(DC, expr, rootExpr, asPG);
+    return exprNeedsParensOutsideFollowingOperator(
+        DC, const_cast<Expr *>(expr), const_cast<Expr *>(rootExpr), asPG);
   }
 };
 
@@ -1244,7 +1252,7 @@ public:
 private:
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
-  bool diagnoseClosure(ClosureExpr *closure);
+  bool diagnoseClosure(const ClosureExpr *closure);
 
   /// Diagnose cases when instead of multiple distinct arguments
   /// call got a single tuple argument with expected arity/types.
@@ -1625,7 +1633,7 @@ protected:
 /// _ = S()
 /// ```
 class MissingGenericArgumentsFailure final : public FailureDiagnostic {
-  using Anchor = llvm::PointerUnion<TypeRepr *, Expr *>;
+  using Anchor = llvm::PointerUnion<TypeRepr *, const Expr *>;
 
   SmallVector<GenericTypeParamType *, 4> Parameters;
 
@@ -1721,7 +1729,7 @@ public:
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
 
-  void tryDropArrayBracketsFixIt(Expr *anchor) const;
+  void tryDropArrayBracketsFixIt(const Expr *anchor) const;
 };
 
 /// Diagnose a situation there is a mismatch between argument and parameter
