@@ -33,16 +33,26 @@ func testGlobalFunc() {
 // GLOBALFUNC_AFTERLABEL-NOT: Begin completions
 }
 
+struct SimpleEnum {
+  case foo, bar
+
+  func enumFunc() {}
+  static func + (lhs: SimpleEnum, rhs: SimpleEnum) -> SimpleEnum {}
+}
+
 struct MyStruct {
-  func method1(fn1: () -> Int, fn2: (() -> String)? = nil) {}
-  func method1(fn1: () -> Int, fn2: Int = nil) {}
+  func method1(fn1: () -> Int, fn2: (() -> String)? = nil) -> SimpleEnum {}
+  func method1(fn1: () -> Int, fn2: Int = nil) -> SimpleEnum {}
 }
 func testMethod(value: MyStruct) {
   value.method1 {
   } #^METHOD_SAMELINE^#
   #^METHOD_NEWLINE^#
-// METHOD_SAMELINE: Begin completions, 1 items
+// METHOD_SAMELINE: Begin completions, 4 items
 // METHOD_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)?##() -> String#}[#(() -> String)?#];
+// METHOD_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .enumFunc()[#Void#];
+// METHOD_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#SimpleEnum#}[#SimpleEnum#];
+// METHOD_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#SimpleEnum#];
 // METHOD_SAMELINE: End completions
 
 // METHOD_NEWLINE: Begin completions
@@ -59,6 +69,8 @@ struct TestStruct {
   init(fn1: () -> Int) {}
   init(fn1: () -> Int, fn2: () -> String) {}
   init(fn1: () -> Int, fn3: () -> String) {}
+
+  func testStructMethod() {}
 }
 
 func testOverloadedInit() {
@@ -67,9 +79,11 @@ func testOverloadedInit() {
   } #^INIT_OVERLOADED_SAMELINE^#
   #^INIT_OVERLOADED_NEWLINE^#
 
-// INIT_OVERLOADED_SAMELINE: Begin completions, 2 items
+// INIT_OVERLOADED_SAMELINE: Begin completions, 4 items
 // INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
 // INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OVERLOADED_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
+// INIT_OVERLOADED_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct#];
 // INIT_OVERLOADED_SAMELINE: End completions
 
 // INIT_OVERLOADED_NEWLINE: Begin completions
@@ -84,6 +98,7 @@ func testOverloadedInit() {
 
 struct TestStruct2 {
   init(fn1: () -> Int, fn2: () -> String = {}, fn3: () -> String = {}) {}
+  func testStructMethod() {}
 }
 func testOptionalInit() {
   TestStruct2 {
@@ -91,9 +106,11 @@ func testOptionalInit() {
   } #^INIT_OPTIONAL_SAMELINE^#
   #^INIT_OPTIONAL_NEWLINE^#
 
-// INIT_OPTIONAL_SAMELINE: Begin completions, 2 items
+// INIT_OPTIONAL_SAMELINE: Begin completions, 4 items
 // INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
 // INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OPTIONAL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
+// INIT_OPTIONAL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct2#];
 // INIT_OPTIONAL_SAMELINE: End completions
 
 // INIT_OPTIONAL_NEWLINE: Begin completions
@@ -108,6 +125,7 @@ func testOptionalInit() {
 
 struct TestStruct3 {
   init(fn1: () -> Int, fn2: () -> String, fn3: () -> String) {}
+  func testStructMethod() {}
 }
 func testOptionalInit() {
   // missing 'fn2' and 'fn3'.
@@ -150,7 +168,10 @@ func testOptionalInit() {
   } #^INIT_REQUIRED_SAMELINE_3^#
   #^INIT_REQUIRED_NEWLINE_3^#
 
-// INIT_REQUIRED_SAMELINE_3-NOT: Begin completions
+// INIT_REQUIRED_SAMELINE_3: Begin completions, 2 items
+// INIT_REQUIRED_SAMELINE_3-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
+// INIT_REQUIRED_SAMELINE_3-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct3#];
+// INIT_REQIORED_SAMELINE_3: End completions
 
 // INIT_REQUIRED_NEWLINE_3: Begin completions
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn2

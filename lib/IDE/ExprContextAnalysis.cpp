@@ -573,6 +573,7 @@ class ExprContextAnalyzer {
   SmallVectorImpl<Type> &PossibleTypes;
   SmallVectorImpl<PossibleParamInfo> &PossibleParams;
   SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees;
+  Expr *&AnalyzedExpr;
   bool &singleExpressionBody;
 
   void recordPossibleType(Type ty) {
@@ -674,6 +675,7 @@ class ExprContextAnalyzer {
   }
 
   void analyzeExpr(Expr *Parent) {
+    AnalyzedExpr = Parent;
     switch (Parent->getKind()) {
     case ExprKind::Call:
     case ExprKind::Subscript:
@@ -936,10 +938,11 @@ public:
       DeclContext *DC, Expr *ParsedExpr, SmallVectorImpl<Type> &PossibleTypes,
       SmallVectorImpl<PossibleParamInfo> &PossibleArgs,
       SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
-      bool &singleExpressionBody)
+      Expr *&AnalyzedExpr, bool &singleExpressionBody)
       : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
         Context(DC->getASTContext()), PossibleTypes(PossibleTypes),
         PossibleParams(PossibleArgs), PossibleCallees(PossibleCallees),
+        AnalyzedExpr(AnalyzedExpr),
         singleExpressionBody(singleExpressionBody) {}
 
   void Analyze() {
@@ -1048,7 +1051,8 @@ public:
 
 ExprContextInfo::ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
   ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleParams,
-                               PossibleCallees, singleExpressionBody);
+                               PossibleCallees, AnalyzedExpr,
+                               singleExpressionBody);
   Analyzer.Analyze();
 }
 
