@@ -705,4 +705,7 @@ def bridging_header_directory_for_print: Separate<["-"], "bridging-header-direct
 def target_sdk_version : Separate<["-"], "target-sdk-version">,
   HelpText<"The version of target SDK used for compilation">;
 
+def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
+  HelpText<"The version of target variant SDK used for compilation">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

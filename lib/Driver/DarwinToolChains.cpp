@@ -634,6 +634,14 @@ void toolchains::Darwin::addCommonFrontendArgs(
     arguments.push_back("-target-sdk-version");
     arguments.push_back(inputArgs.MakeArgString(sdkVersion->getAsString()));
   }
+
+  if (auto targetVariant = getTargetVariant()) {
+    if (auto variantSDKVersion = getTargetSDKVersion(*targetVariant)) {
+      arguments.push_back("-target-variant-sdk-version");
+      arguments.push_back(
+          inputArgs.MakeArgString(variantSDKVersion->getAsString()));
+    }
+  }
 }
 
 ToolChain::InvocationInfo

@@ -606,6 +606,18 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  // Parse the target variant SDK version.
+  if (Arg *A = Args.getLastArg(options::OPT_target_variant_sdk_version)) {
+    auto vers = version::Version::parseVersionString(
+      A->getValue(), SourceLoc(), &Diags);
+    if (vers.hasValue()) {
+      Opts.VariantSDKVersion = *vers;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
