@@ -160,6 +160,7 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::EndAccessInst:
     return true;
   default:
     return false;
@@ -1088,6 +1089,13 @@ void BlockState::processInstructionWithKind(RLEContext &Ctx,
     processDeallocStackInst(Ctx, DSI, Kind);
     return;
   }
+
+  // Begin access writes to memory only if one of its users writes to memory.
+  // We will look at all of its users and we can project to the source memory
+  // location so, if there are any actual writes to memory we will catch them
+  // there so, we can ignore begin_access here.
+  if (isa<BeginAccessInst>(Inst))
+    return;
 
   // If this instruction has side effects, but is inert from a load store
   // perspective, skip it.

@@ -31,6 +31,7 @@ SILValue swift::stripOwnershipInsts(SILValue v) {
       return v;
     case ValueKind::CopyValueInst:
     case ValueKind::BeginBorrowInst:
+    case ValueKind::BeginAccessInst:
       v = cast<SingleValueInstruction>(v)->getOperand(0);
     }
   }
