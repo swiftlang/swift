@@ -7332,7 +7332,7 @@ bool FuncDecl::isCallAsFunctionMethod() const {
 bool FuncDecl::isMainTypeMainMethod() const {
   return (getBaseIdentifier() == getASTContext().Id_main) &&
          !isInstanceMember() && getResultInterfaceType()->isVoid() &&
-         getParameters()->size() == 0 && !hasThrows();
+         getParameters()->size() == 0;
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,

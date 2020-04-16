@@ -155,9 +155,6 @@ private:
   /// The source location of the main type.
   SourceLoc MainDeclDiagLoc;
 
-  /// The main function in the type marked @main.
-  FuncDecl *MainFunc = nullptr;
-
   /// A hash of all interface-contributing tokens that have been lexed for
   /// this source file so far.
   /// We only collect interface hash for primary input files.

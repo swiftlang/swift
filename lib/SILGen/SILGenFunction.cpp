@@ -725,8 +725,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     // Emit a call to the main static function.
     // return Module.$main();
     auto *mainFunc = cast<FuncDecl>(mainDecl);
-
-    SILGenFunctionBuilder builder(SGM);
+    auto moduleLoc = RegularLocation::getModuleLocation();
+    auto *entryBlock = B.getInsertionBB();
 
     SILDeclRef mainFunctionDeclRef(mainFunc, SILDeclRef::Kind::Func);
     SILFunction *mainFunction =
@@ -743,16 +743,51 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     }
     auto metatype = B.createMetatype(mainType, getLoweredType(mainType->getInterfaceType()));
 
-    auto mainFunctionRef = B.createFunctionRef(mainFunc, mainFunction);
+    auto mainFunctionRef = B.createFunctionRef(moduleLoc, mainFunction);
 
-    B.createApply(mainFunc, mainFunctionRef, SubstitutionMap(), {metatype});
+    auto builtinInt32Type = SILType::getBuiltinIntegerType(32, getASTContext());
 
-    SILValue returnValue = B.createIntegerLiteral(
-        mainFunc, SILType::getBuiltinIntegerType(32, getASTContext()), 0);
+    auto *exitBlock = createBasicBlock();
+    B.setInsertionPoint(exitBlock);
+    SILValue exitCode = exitBlock->createPhiArgument(builtinInt32Type,
+                                                     ValueOwnershipKind::None);
     auto returnType = F.getConventions().getSingleSILResultType();
-    if (returnValue->getType() != returnType)
-      returnValue = B.createStruct(mainFunc, returnType, returnValue);
-    B.createReturn(mainFunc, returnValue);
+    if (exitCode->getType() != returnType)
+      exitCode = B.createStruct(moduleLoc, returnType, exitCode);
+    B.createReturn(moduleLoc, exitCode);
+
+    if (mainFunc->hasThrows()) {
+      auto *successBlock = createBasicBlock();
+      B.setInsertionPoint(successBlock);
+      successBlock->createPhiArgument(SGM.Types.getEmptyTupleType(),
+                                      ValueOwnershipKind::None);
+      SILValue zeroReturnValue =
+          B.createIntegerLiteral(moduleLoc, builtinInt32Type, 0);
+      B.createBranch(moduleLoc, exitBlock, {zeroReturnValue});
+
+      auto *failureBlock = createBasicBlock();
+      B.setInsertionPoint(failureBlock);
+      SILValue error = failureBlock->createPhiArgument(
+          SILType::getExceptionType(getASTContext()),
+          ValueOwnershipKind::Owned);
+      // Log the error.
+      B.createBuiltin(moduleLoc, getASTContext().getIdentifier("errorInMain"),
+                      SGM.Types.getEmptyTupleType(), {}, {error});
+      B.createEndLifetime(moduleLoc, error);
+      SILValue oneReturnValue =
+          B.createIntegerLiteral(moduleLoc, builtinInt32Type, 1);
+      B.createBranch(moduleLoc, exitBlock, {oneReturnValue});
+
+      B.setInsertionPoint(entryBlock);
+      B.createTryApply(moduleLoc, mainFunctionRef, SubstitutionMap(),
+                       {metatype}, successBlock, failureBlock);
+    } else {
+      B.setInsertionPoint(entryBlock);
+      B.createApply(moduleLoc, mainFunctionRef, SubstitutionMap(), {metatype});
+      SILValue returnValue =
+          B.createIntegerLiteral(moduleLoc, builtinInt32Type, 0);
+      B.createBranch(moduleLoc, exitBlock, {returnValue});
+    }
     return;
   }
   }
