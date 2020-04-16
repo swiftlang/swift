@@ -94,6 +94,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_WITH_ERROR_AUTOCLOSURE| %FileCheck %s -check-prefix=PARAM_WITH_ERROR_AUTOCLOSURE
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_1 | %FileCheck %s -check-prefix=TUPLEELEM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_2 | %FileCheck %s -check-prefix=TUPLEELEM_2
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -750,4 +753,15 @@ struct TestHasErrorAutoclosureParam {
 // PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal:   ['(']{#value: <<error type>>#}[')'][#Void#];
 // PARAM_WITH_ERROR_AUTOCLOSURE: End completions
   }
+}
+
+func testTupleElement(arg: (SimpleEnum, SimpleEnum)) {
+  testTupleElement(arg: (.foo, .#^TUPLEELEM_1^#))
+// TUPLEELEM_1: Begin completions, 3 items
+// TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific:     foo[#SimpleEnum#]; name=foo
+// TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific:     bar[#SimpleEnum#]; name=bar
+// TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific:     baz[#SimpleEnum#]; name=baz
+// TUPLEELEM_1: End completions
+  testTupleElement(arg: (.foo, .bar, .#^TUPLEELEM_2^#))
+// TUPLEELEM_2-NOT: Begin completions
 }
