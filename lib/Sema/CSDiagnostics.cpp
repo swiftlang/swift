@@ -96,12 +96,8 @@ SourceRange FailureDiagnostic::getSourceRange(TypedNode anchor) {
   }
 }
 
-Type FailureDiagnostic::getType(Expr *expr, bool wantRValue) const {
-  return resolveType(S.getType(expr), /*reconstituteSugar=*/false, wantRValue);
-}
-
-Type FailureDiagnostic::getType(const TypeLoc &loc, bool wantRValue) const {
-  return resolveType(S.getType(&loc), /*reconstituteSugar=*/false, wantRValue);
+Type FailureDiagnostic::getType(TypedNode node, bool wantRValue) const {
+  return resolveType(S.getType(node), /*reconstituteSugar=*/false, wantRValue);
 }
 
 template <typename... ArgTypes>
@@ -175,15 +171,17 @@ Type FailureDiagnostic::restoreGenericParameters(
 }
 
 Type RequirementFailure::getOwnerType() const {
-  auto *anchor = getRawAnchor().get<const Expr *>();
+  auto anchor = getRawAnchor();
 
   // If diagnostic is anchored at assignment expression
   // it means that requirement failure happend while trying
   // to convert source to destination, which means that
   // owner type is actually not an assignment expression
   // itself but its source.
-  if (auto *assignment = dyn_cast<AssignExpr>(anchor))
-    anchor = assignment->getSrc();
+  if (auto *E = anchor.dyn_cast<Expr *>()) {
+    if (auto *assignment = dyn_cast<AssignExpr>(E))
+      anchor = assignment->getSrc();
+  }
 
   return getType(anchor)->getInOutObjectType()->getMetatypeInstanceType();
 }
@@ -524,8 +522,8 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
 }
 
 bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
-  auto *anchor = getRawAnchor().get<const Expr *>();
-  auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor);
+  auto anchor = getRawAnchor();
+  auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor.get<const Expr *>());
   if (!ODRE)
     return false;
 
@@ -994,7 +992,7 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
 }
 
 bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto anchor = getAnchor();
   auto baseType = getType(anchor);
   bool resultIsOptional = ResultTypeIsOptional;
 
@@ -2017,7 +2015,6 @@ bool ContextualFailure::diagnoseAsError() {
     if (isa<OptionalTryExpr>(anchor) || isa<OptionalEvaluationExpr>(anchor)) {
       auto objectType = fromType->getOptionalObjectType();
       if (objectType->isEqual(toType)) {
-        auto &cs = getConstraintSystem();
         MissingOptionalUnwrapFailure failure(getSolution(), getType(anchor),
                                              toType,
                                              getConstraintLocator(anchor));
@@ -2352,7 +2349,8 @@ bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
 
   if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {
     auto fromType = getType(coerceExpr->getSubExpr());
-    auto toType = getType(coerceExpr->getCastTypeLoc());
+    const auto &typeLoc = coerceExpr->getCastTypeLoc();
+    auto toType = getType(&typeLoc);
 
     auto diagnostic = getDiagnosticFor(CTP_CoerceOperand, toType);
 
@@ -2513,7 +2511,7 @@ bool ContextualFailure::diagnoseYieldByReferenceMismatch() const {
   if (CTP != CTP_YieldByReference)
     return false;
 
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto anchor = getAnchor();
   auto exprType = getType(anchor, /*wantRValue=*/false);
   auto contextualType = getToType();
 
@@ -3740,8 +3738,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
             
             // If the rhs of '~=' is the enum type, a single dot suffixes
             // since the type can be inferred
-            Type secondArgType =
-                cs.getType(binaryExpr->getArg()->getElement(1));
+            Type secondArgType = getType(binaryExpr->getArg()->getElement(1));
             if (secondArgType->isEqual(baseTy)) {
               Diag->fixItInsert(loc, ".");
               return true;
@@ -3859,9 +3856,9 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (isMisplacedMissingArgument(getSolution(), locator))
     return false;
 
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto anchor = getAnchor();
 
-  if (auto *closure = dyn_cast<ClosureExpr>(anchor))
+  if (auto *closure = dyn_cast<ClosureExpr>(anchor.dyn_cast<Expr *>()))
     return diagnoseClosure(closure);
 
   // This is a situation where function type is passed as an argument
@@ -4113,7 +4110,7 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
              locator->isLastElement<LocatorPathElt::ClosureBody>()) {
     // Based on the locator we know this this is something like this:
     // `let _: () -> ((Int) -> Void) = { return {} }`.
-    funcType = getType(getRawAnchor().get<const Expr *>())
+    funcType = getType(getRawAnchor())
                    ->castTo<FunctionType>()
                    ->getResult()
                    ->castTo<FunctionType>();
@@ -4582,8 +4579,9 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
 bool ExtraneousArgumentsFailure::diagnoseAsError() {
   // Simplified anchor would point directly to the
   // argument in case of contextual mismatch.
-  auto *anchor = getAnchor().get<const Expr *>();
-  if (auto *closure = dyn_cast<ClosureExpr>(anchor)) {
+  auto *anchor = getAnchor();
+
+  if (auto *closure = dyn_cast<ClosureExpr>(anchor.dyn_cast<Expr *>()) {
     auto fnType = ContextualType;
     auto params = closure->getParameters();
 
@@ -5090,7 +5088,8 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
 
   if (auto *CE =
           dyn_cast<ExplicitCastExpr>(getRawAnchor().get<const Expr *>())) {
-    auto castTo = getType(CE->getCastTypeLoc());
+    const auto &typeLoc = CE->getCastTypeLoc();
+    auto castTo = getType(&typeLoc);
     auto *NTD = castTo->getAnyNominal();
     emitDiagnosticAt(loc, diag::unbound_generic_parameter_cast, GP,
                      NTD ? NTD->getDeclaredType() : castTo);
@@ -5532,7 +5531,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   // If argument is an l-value type and parameter is a pointer type,
   // let's match up its element type to the argument to see whether
   // it would be appropriate to suggest adding `&`.
-  auto *argExpr = getAnchor().get<const Expr *>();
+  auto argExpr = getAnchor();
   if (getType(argExpr, /*wantRValue=*/false)->is<LValueType>()) {
     auto elementTy = paramType->getAnyPointerElementType();
     if (elementTy && argType->isEqual(elementTy)) {
@@ -5784,7 +5783,7 @@ bool ExpandArrayIntoVarargsFailure::diagnoseAsNote() {
 }
 
 bool ExtraneousCallFailure::diagnoseAsError() {
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto anchor = getAnchor();
   auto *locator = getLocator();
 
   // If this is something like `foo()` where `foo` is a variable
@@ -5813,7 +5812,7 @@ bool ExtraneousCallFailure::diagnoseAsError() {
     }
   }
 
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor.dyn_cast<Expr *>())) {
     auto *baseExpr = UDE->getBase();
     auto *call = cast<CallExpr>(getRawAnchor().get<const Expr *>());
 

@@ -83,8 +83,7 @@ public:
 
   ConstraintLocator *getLocator() const { return Locator; }
 
-  Type getType(Expr *expr, bool wantRValue = true) const;
-  Type getType(const TypeLoc &loc, bool wantRValue = true) const;
+  Type getType(TypedNode node, bool wantRValue = true) const;
 
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
