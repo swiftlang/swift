@@ -1477,25 +1477,26 @@ void PrintAST::printSingleDepthOfGenericSignature(
   if (printParams) {
     // Print the generic parameters.
     Printer << "<";
-    interleave(genericParams,
-               [&](GenericTypeParamType *param) {
-                 if (!subMap.empty()) {
-                   if (auto argTy = substParam(param))
-                     printType(argTy);
-                   else
-                     printType(param);
-                 } else if (auto *GP = param->getDecl()) {
-                   Printer.callPrintStructurePre(
-                       PrintStructureKind::GenericParameter, GP);
-                   Printer.printName(GP->getName(),
-                                     PrintNameContext::GenericParameter);
-                   Printer.printStructurePost(
-                       PrintStructureKind::GenericParameter, GP);
-                 } else {
-                   printType(param);
-                 }
-               },
-               [&] { Printer << ", "; });
+    llvm::interleave(
+        genericParams,
+        [&](GenericTypeParamType *param) {
+          if (!subMap.empty()) {
+            if (auto argTy = substParam(param))
+              printType(argTy);
+            else
+              printType(param);
+          } else if (auto *GP = param->getDecl()) {
+            Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
+                                          GP);
+            Printer.printName(GP->getName(),
+                              PrintNameContext::GenericParameter);
+            Printer.printStructurePost(PrintStructureKind::GenericParameter,
+                                       GP);
+          } else {
+            printType(param);
+          }
+        },
+        [&] { Printer << ", "; });
   }
 
   if (printRequirements || printInherited) {
@@ -3025,7 +3026,7 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
   }
   Printer << tok::kw_case << " ";
 
-  interleave(elems.begin(), elems.end(),
+  llvm::interleave(elems.begin(), elems.end(),
     [&](EnumElementDecl *elt) {
       printEnumElement(elt);
     },
@@ -4438,9 +4439,9 @@ public:
       if (!T->getSubstitutions().empty()) {
         Printer << '<';
         auto replacements = T->getSubstitutions().getReplacementTypes();
-        interleave(replacements.begin(), replacements.end(),
-                   [&](Type t) { visit(t); },
-                   [&] { Printer << ", "; });
+        llvm::interleave(
+            replacements.begin(), replacements.end(), [&](Type t) { visit(t); },
+            [&] { Printer << ", "; });
         Printer << '>';
       }
       return;

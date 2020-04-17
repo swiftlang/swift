@@ -69,6 +69,10 @@ struct function_traits<R (T::*)(Args...) const> {
   using argument_types = std::tuple<Args...>;
 };
 
+} // end namespace swift
+
+namespace llvm {
+
 /// @{
 
 /// An STL-style algorithm similar to std::for_each that applies a second
@@ -103,6 +107,11 @@ inline void interleave(const Container &c, UnaryFunctor each_fn,
 }
 
 /// @}
+
+} // end namespace llvm
+
+namespace swift {
+
 /// @{
 
 /// The equivalent of std::for_each, but for two lists at once.

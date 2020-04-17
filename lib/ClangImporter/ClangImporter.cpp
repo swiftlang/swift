@@ -928,9 +928,9 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
 
   if (importerOpts.DumpClangDiagnostics) {
     llvm::errs() << "'";
-    interleave(invocationArgStrs,
-               [](StringRef arg) { llvm::errs() << arg; },
-               [] { llvm::errs() << "' '"; });
+    llvm::interleave(
+        invocationArgStrs, [](StringRef arg) { llvm::errs() << arg; },
+        [] { llvm::errs() << "' '"; });
     llvm::errs() << "'\n";
   }
 

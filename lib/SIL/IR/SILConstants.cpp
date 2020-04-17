@@ -102,8 +102,9 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     SmallVector<unsigned, 4> accessPath;
     SymbolicValueMemoryObject *memObject = getAddressValue(accessPath);
     os << "address[" << memObject->getType() << "] ";
-    interleave(accessPath.begin(), accessPath.end(),
-               [&](unsigned idx) { os << idx; }, [&]() { os << ", "; });
+    llvm::interleave(
+        accessPath.begin(), accessPath.end(), [&](unsigned idx) { os << idx; },
+        [&]() { os << ", "; });
     os << "\n";
     break;
   }

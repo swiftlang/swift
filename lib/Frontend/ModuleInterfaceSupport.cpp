@@ -453,10 +453,12 @@ public:
     out << "@available(*, unavailable)\nextension ";
     nominal->getDeclaredType().print(out, printOptions);
     out << " : ";
-    swift::interleave(ConditionalConformanceProtocols,
-                      [&out, &printOptions](const ProtocolType *protoTy) {
-                        protoTy->print(out, printOptions);
-                      }, [&out] { out << ", "; });
+    llvm::interleave(
+        ConditionalConformanceProtocols,
+        [&out, &printOptions](const ProtocolType *protoTy) {
+          protoTy->print(out, printOptions);
+        },
+        [&out] { out << ", "; });
     out << " where "
         << nominal->getGenericSignature()->getGenericParams().front()->getName()
         << " : " << DummyProtocolName << " {}\n";

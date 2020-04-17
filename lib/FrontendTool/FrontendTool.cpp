@@ -1973,7 +1973,7 @@ static void printTargetInfo(const CompilerInvocation &invocation,
 
   auto outputPaths = [&](StringRef name, const std::vector<std::string> &paths){
     out << "    \"" << name << "\": [\n";
-    interleave(paths, [&out](const std::string &path) {
+    llvm::interleave(paths, [&out](const std::string &path) {
       out << "      \"";
       out.write_escaped(path);
       out << "\"";
