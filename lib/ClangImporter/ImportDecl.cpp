@@ -1223,15 +1223,16 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                          fieldType,
                                                          clang::VK_RValue,
                                                          clang::SourceLocation());
-    
-    auto cSetterExpr = new (Ctx) clang::BinaryOperator(cSetterMemberExpr,
-                                                       cSetterValueExpr,
-                                                       clang::BO_Assign,
-                                                       fieldType,
-                                                       clang::VK_RValue,
-                                                       clang::OK_Ordinary,
-                                                       clang::SourceLocation(),
-                                                       clang::FPOptions());
+
+    auto cSetterExpr = clang::BinaryOperator::Create(Ctx,
+                                                     cSetterMemberExpr,
+                                                     cSetterValueExpr,
+                                                     clang::BO_Assign,
+                                                     fieldType,
+                                                     clang::VK_RValue,
+                                                     clang::OK_Ordinary,
+                                                     clang::SourceLocation(),
+                                                     clang::FPOptions());
     
     cSetterDecl->setBody(cSetterExpr);
   }
