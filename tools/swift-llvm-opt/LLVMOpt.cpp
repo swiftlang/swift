@@ -252,8 +252,9 @@ int main(int argc, char **argv) {
   llvm::SMDiagnostic Err;
 
   // Load the input module...
+  auto LLVMContext = std::make_unique<llvm::LLVMContext>();
   std::unique_ptr<Module> M =
-      parseIRFile(InputFilename, Err, getGlobalLLVMContext());
+      parseIRFile(InputFilename, Err, *LLVMContext.get());
 
   if (!M) {
     Err.print(argv[0], errs());
