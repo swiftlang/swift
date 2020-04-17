@@ -46,6 +46,9 @@ namespace swift {
   /// Returns true if the given triple represents a macCatalyst environment.
   bool tripleIsMacCatalystEnvironment(const llvm::Triple &triple);
 
+  /// Determine whether the triple infers the "simulator" environment.
+  bool tripleInfersSimulatorEnvironment(const llvm::Triple &triple);
+
   /// Returns true if the given -target triple and -target-variant triple
   /// can be zippered.
   bool triplesAreValidForZippering(const llvm::Triple &target,

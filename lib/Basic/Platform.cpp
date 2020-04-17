@@ -37,6 +37,21 @@ bool swift::tripleIsMacCatalystEnvironment(const llvm::Triple &triple) {
       triple.getEnvironment() == llvm::Triple::MacABI;
 }
 
+bool swift::tripleInfersSimulatorEnvironment(const llvm::Triple &triple) {
+  switch (triple.getOS()) {
+  case llvm::Triple::IOS:
+  case llvm::Triple::TvOS:
+  case llvm::Triple::WatchOS:
+    return !triple.isSimulatorEnvironment() &&
+        (triple.getArch() == llvm::Triple::x86 ||
+         triple.getArch() == llvm::Triple::x86_64) &&
+        !tripleIsMacCatalystEnvironment(triple);
+
+  default:
+    return false;
+  }
+}
+
 bool swift::triplesAreValidForZippering(const llvm::Triple &target,
                                         const llvm::Triple &targetVariant) {
   // The arch and vendor must match.
