@@ -1326,7 +1326,7 @@ void ConstraintGraph::printConnectedComponents(
 
     // Print all of the one-way components.
     out << " depends on ";
-    interleave(
+    llvm::interleave(
         component.dependsOn,
         [&](unsigned index) { out << index; },
         [&] { out << ", "; }
