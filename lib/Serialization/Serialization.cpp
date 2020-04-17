@@ -3454,12 +3454,13 @@ public:
     SubstitutionMapID underlyingTypeID = 0;
     if (auto underlying = opaqueDecl->getUnderlyingTypeSubstitutions())
       underlyingTypeID = S.addSubstitutionMapRef(*underlying);
-
+    uint8_t rawAccessLevel =
+      getRawStableAccessLevel(opaqueDecl->getFormalAccess());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
     OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
-                                 underlyingTypeID);
+                                 underlyingTypeID, rawAccessLevel);
     writeGenericParams(opaqueDecl->getGenericParams());
   }
 
