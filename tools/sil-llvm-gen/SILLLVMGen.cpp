@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -200,10 +201,10 @@ int main(int argc, char **argv) {
   }
 
   const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
-  std::unique_ptr<llvm::Module> Mod =
+  auto Mod =
       performIRGeneration(Opts, CI.getMainModule(), CI.takeSILModule(),
                           CI.getMainModule()->getName().str(),
                           PSPs,
-                          getGlobalLLVMContext(), ArrayRef<std::string>());
+                          ArrayRef<std::string>());
   return CI.getASTContext().hadError();
 }

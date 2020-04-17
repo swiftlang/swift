@@ -76,7 +76,7 @@ void IRGenModule::emitCoverageMapping() {
 
   // Encode the filenames.
   std::string Filenames;
-  llvm::LLVMContext &Ctx = LLVMContext;
+  llvm::LLVMContext &Ctx = getLLVMContext();
   {
     llvm::raw_string_ostream OS(Filenames);
     llvm::coverage::CoverageFilenamesSectionWriter(FilenameRefs).write(OS);
