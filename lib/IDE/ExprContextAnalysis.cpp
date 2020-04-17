@@ -404,21 +404,26 @@ static bool collectPossibleCalleesForApply(
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
-      Type fnType = fnExpr->getType();
-      if ((!fnType || fnType->hasError() || fnType->hasUnresolvedType()) &&
-          decl->hasInterfaceType())
-        fnType = decl->getInterfaceType();
-      if (fnType) {
-        fnType = fnType->getWithoutSpecifierType();
-        if (auto *funcTy = fnType->getAs<AnyFunctionType>())
+      Type declTy = fnExpr->getType();
+      if ((!declTy || declTy->hasError() || declTy->hasUnresolvedType()) &&
+          decl->hasInterfaceType()) {
+        declTy = decl->getInterfaceType();
+        declTy = decl->getInnermostDeclContext()->mapTypeIntoContext(declTy);
+      }
+      if (declTy) {
+        declTy = declTy->getWithoutSpecifierType();
+        if (auto *funcTy = declTy->getAs<AnyFunctionType>())
           candidates.emplace_back(funcTy, decl);
       }
     }
   } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
     for (auto *decl : OSRE->getDecls()) {
-      if (decl->hasInterfaceType())
-        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+      if (decl->hasInterfaceType()) {
+        auto declTy = decl->getInterfaceType();
+        declTy = decl->getInnermostDeclContext()->mapTypeIntoContext(declTy);
+        if (auto *funcType = declTy->getAs<AnyFunctionType>())
           candidates.emplace_back(funcType, decl);
+      }
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(DC, UDE->getBase(), UDE->getName(),
