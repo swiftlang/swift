@@ -308,6 +308,14 @@ let s = """
             c
     """
 
+func wantsToIndentContents() {
+    let dontLetItIndentMyValue = """
+a
+    b
+        c
+"""
+}
+
 print("""
     foo {
         bar()
