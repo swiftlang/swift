@@ -204,6 +204,21 @@ protected:
 
   static SourceLoc getLoc(TypedNode node);
   static SourceRange getSourceRange(TypedNode node);
+
+  template <typename T> static const T *castToExpr(TypedNode node) {
+    return cast<T>(node.get<const Expr *>());
+  }
+
+  template <typename T> static T *getAsExpr(TypedNode node) {
+    if (const auto *E = node.dyn_cast<const Expr *>())
+      return dyn_cast<T>(const_cast<Expr *>(E));
+    return nullptr;
+  }
+
+  template <typename T> static bool isExpr(TypedNode node) {
+    auto *E = node.get<const Expr *>();
+    return isa<T>(E);
+  }
 };
 
 /// Base class for all of the diagnostics related to generic requirement
