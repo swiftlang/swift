@@ -607,6 +607,16 @@ getPropertyWrapperLValueness(VarDecl *var) {
 /// Build a reference to the storage of a declaration. Returns nullptr if there
 /// was an error. This should only occur if an invalid declaration was type
 /// checked; another diagnostic should have been emitted already.
+///
+/// The resulting reference is used in synthesized property accessors and is of
+/// one of the following forms:
+///   1. Without property wrappers:
+///     - Stored: \c self.member
+///   2. With property wrappers:
+///     - Wrapped: \c self._member.wrappedValue
+///     - Composition: \c self._member.wrappedValue.wrappedValue….wrappedValue
+///     - Projected: \c self._member.projectedValue
+///     - Enclosed instance: \c Wrapper[_enclosedInstance: self, …]
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
@@ -618,6 +628,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
   Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
+  // Contains the underlying wrappedValue declaration in a property wrapper
+  // along with whether or not the reference to this field needs to be an lvalue
   llvm::SmallVector<std::pair<VarDecl *, bool>, 1> underlyingVars;
   auto finish = [&](Expr *result) -> Expr * {
     for (auto underlyingVarPair : underlyingVars) {
@@ -1755,9 +1767,9 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
 
   // Build a reference to the storage.
   Expr *ref = buildStorageReference(accessor, storage, target,
-                /*isUsedForGetAccess=*/true,
-                /*isUsedForSetAccess=*/isModify,
-                ctx);
+                                    /*isUsedForGetAccess=*/true,
+                                    /*isUsedForSetAccess=*/isModify,
+                                    ctx);
   if (ref != nullptr) {
     // Wrap it with an `&` marker if this is a modify.
     ref = maybeWrapInOutExpr(ref, ctx);
