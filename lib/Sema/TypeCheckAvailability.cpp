@@ -2828,6 +2828,23 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
   return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }
 
+/// Should we warn that \p valueDecl needs an explicit availability annotation
+/// in -require-explicit-availaiblity mode?
+static bool declNeedsExplicitAvailability(const ValueDecl *valueDecl) {
+  AccessScope scope =
+    valueDecl->getFormalAccessScope(/*useDC*/nullptr,
+                                  /*treatUsableFromInlineAsPublic*/true);
+  if (!scope.isPublic() ||
+      valueDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return false;
+
+  // Warn on decls without an introduction version.
+  auto &ctx = valueDecl->getASTContext();
+  auto safeRangeUnderApprox = AvailabilityInference::availableRange(valueDecl, ctx);
+  return !safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
+         !valueDecl->getAttrs().isUnavailable(ctx);
+}
+
 void swift::checkExplicitAvailability(Decl *decl) {
   // Check only if the command line option was set.
   if (!decl->getASTContext().LangOpts.RequireExplicitAvailability)
@@ -2840,27 +2857,35 @@ void swift::checkExplicitAvailability(Decl *decl) {
 
   ValueDecl *valueDecl = dyn_cast<ValueDecl>(decl);
   if (valueDecl == nullptr) {
-    // decl should be either a ValueDecl or an ExtensionDecl
+    // decl should be either a ValueDecl or an ExtensionDecl.
     auto extension = cast<ExtensionDecl>(decl);
     valueDecl = extension->getExtendedNominal();
     if (!valueDecl)
       return;
+
+    // Skip extensions without public members or conformances.
+    auto members = extension->getMembers();
+    auto hasMembers = std::any_of(members.begin(), members.end(),
+                                  [](const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        if (declNeedsExplicitAvailability(VD))
+          return true;
+      return false;
+    });
+
+    auto protocols = extension->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
+                                    [](const ProtocolDecl *PD) -> bool {
+      AccessScope scope =
+        PD->getFormalAccessScope(/*useDC*/nullptr,
+                                 /*treatUsableFromInlineAsPublic*/true);
+      return scope.isPublic();
+    });
+
+    if (!hasMembers && !hasProtocols) return;
   }
 
-  // Skip decls that are not public and not usable from inline.
-  AccessScope scope =
-    valueDecl->getFormalAccessScope(/*useDC*/nullptr,
-                                  /*treatUsableFromInlineAsPublic*/true);
-  if (!scope.isPublic() ||
-      decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-    return;
-
-  // Warn on decls without an introduction version.
-  auto &ctx = decl->getASTContext();
-  auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
-  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
-      !decl->getAttrs().isUnavailable(ctx)) {
-
+  if (declNeedsExplicitAvailability(valueDecl)) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
 
     auto suggestPlatform = decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
@@ -2876,6 +2901,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       {
          llvm::raw_string_ostream Out(AttrText);
 
+         auto &ctx = valueDecl->getASTContext();
          StringRef OriginalIndent = Lexer::getIndentationForLine(
            ctx.SourceMgr, InsertLoc);
          Out << "@available(" << suggestPlatform << ", *)\n"
