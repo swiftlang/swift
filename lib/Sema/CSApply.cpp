@@ -484,9 +484,7 @@ namespace {
 
         // Handle operator requirements found in protocols.
         if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
-          bool isCurried = shouldBuildCurryThunk(choice,
-                                                 /*baseIsInstance=*/false,
-                                                 /*extraUncurryLevel=*/false);
+          bool isCurried = shouldBuildCurryThunk(choice, /*baseIsInstance=*/false);
 
           // If we have a concrete conformance, build a call to the witness.
           //
@@ -551,8 +549,7 @@ namespace {
         cs.cacheExprTypes(base);
 
         return buildMemberRef(base, SourceLoc(), overload, loc, locator,
-                              locator, implicit, /*extraUncurryLevel=*/false,
-                              semantics);
+                              locator, implicit, semantics);
       }
 
       if (isa<TypeDecl>(decl) && !isa<ModuleDecl>(decl)) {
@@ -662,6 +659,10 @@ namespace {
 
     /// Calculates the nesting depth of the current application.
     unsigned getArgCount(unsigned maxArgCount) {
+      // FIXME: Walking over the ExprStack to figure out the number of argument
+      // lists being applied is brittle. We should instead be checking
+      // hasAppliedSelf to figure out if the self param is applied, and looking
+      // at the FunctionRefKind to see if the parameter list is applied.
       unsigned e = ExprStack.size();
       unsigned argCount;
 
@@ -805,8 +806,7 @@ namespace {
     /// converted into a fully-applied member reference with a pair of
     /// closures.
     bool shouldBuildCurryThunk(OverloadChoice choice,
-                               bool baseIsInstance,
-                               bool extraUncurryLevel) {
+                               bool baseIsInstance) {
       ValueDecl *member = choice.getDecl();
       auto isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
 
@@ -841,28 +841,19 @@ namespace {
             isa<CallExpr>(prev) &&
             isa<TypeExpr>(cast<CallExpr>(prev)->getFn())) {
           assert(maxArgCount == 2);
-          return 1;
+          return 2;
         }
 
         // Similarly, ".foo(...)" really applies two argument lists.
         if (auto *unresolvedMemberExpr = dyn_cast<UnresolvedMemberExpr>(prev)) {
           if (unresolvedMemberExpr->hasArguments() ||
               unresolvedMemberExpr->hasTrailingClosure())
-            return 1;
-          return 0;
+            return 2;
+          return 1;
         }
 
         return getArgCount(maxArgCount);
       }();
-
-      // Sometimes we build a member reference that has an implicit
-      // level of function application in the AST. For example,
-      // @dynamicCallable and callAsFunction are handled this way.
-      //
-      // FIXME: It would be nice to simplify this and the argCount
-      // computation above somehow.
-      if (extraUncurryLevel)
-        argCount++;
 
       // If we have fewer argument lists than expected, build a thunk.
       if (argCount < maxArgCount)
@@ -1055,7 +1046,7 @@ namespace {
                          SelectedOverload overload, DeclNameLoc memberLoc,
                          ConstraintLocatorBuilder locator,
                          ConstraintLocatorBuilder memberLocator, bool Implicit,
-                         bool extraUncurryLevel, AccessSemantics semantics) {
+                         AccessSemantics semantics) {
       auto choice = overload.choice;
       auto openedType = overload.openedType;
       auto openedFullType = overload.openedFullType;
@@ -1109,8 +1100,7 @@ namespace {
 
       bool isUnboundInstanceMember =
         (!baseIsInstance && member->isInstanceMember());
-      bool isPartialApplication =
-        shouldBuildCurryThunk(choice, baseIsInstance, extraUncurryLevel);
+      bool isPartialApplication = shouldBuildCurryThunk(choice, baseIsInstance);
 
       auto refTy = simplifyType(openedFullType);
 
@@ -2753,7 +2743,7 @@ namespace {
       return buildMemberRef(
           expr->getBase(), expr->getDotLoc(), selected, expr->getNameLoc(),
           cs.getConstraintLocator(expr), memberLocator, expr->isImplicit(),
-          /*extraUncurryLevel=*/false, expr->getAccessSemantics());
+          expr->getAccessSemantics());
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -2796,8 +2786,7 @@ namespace {
       auto *exprLoc = cs.getConstraintLocator(expr);
       auto result = buildMemberRef(
           base, expr->getDotLoc(), selected, expr->getNameLoc(), exprLoc,
-          memberLocator, expr->isImplicit(), /*extraUncurryLevel=*/true,
-          AccessSemantics::Ordinary);
+          memberLocator, expr->isImplicit(), AccessSemantics::Ordinary);
       if (!result)
         return nullptr;
 
@@ -2945,8 +2934,7 @@ namespace {
       if (cs.getType(base)->is<AnyMetatypeType>()) {
         return buildMemberRef(
             base, dotLoc, overload, nameLoc, cs.getConstraintLocator(expr),
-            ctorLocator, implicit, /*extraUncurryLevel=*/true,
-            AccessSemantics::Ordinary);
+            ctorLocator, implicit, AccessSemantics::Ordinary);
       }
 
       // The subexpression must be either 'self' or 'super'.
@@ -3119,8 +3107,7 @@ namespace {
       case OverloadChoiceKind::DeclViaDynamic:
         return buildMemberRef(base, dotLoc, selected, nameLoc,
                               cs.getConstraintLocator(expr), memberLocator,
-                              implicit, /*extraUncurryLevel=*/false,
-                              AccessSemantics::Ordinary);
+                              implicit, AccessSemantics::Ordinary);
 
       case OverloadChoiceKind::TupleIndex: {
         Type toType = simplifyType(cs.getType(expr));
@@ -7134,10 +7121,19 @@ static Expr *buildCallAsFunctionMethodRef(
   // Create direct reference to `callAsFunction` method.
   auto *fn = apply->getFn();
   auto *arg = apply->getArg();
+
+  // HACK: Temporarily push the fn expr onto the expr stack to make sure we
+  // don't try to prematurely close an existential when applying the curried
+  // member ref. This can be removed once existential opening is refactored not
+  // to rely on the shape of the AST prior to rewriting.
+  rewriter.ExprStack.push_back(fn);
+  SWIFT_DEFER {
+    rewriter.ExprStack.pop_back();
+  };
+
   auto *declRef = rewriter.buildMemberRef(
       fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(arg->getStartLoc()),
-      calleeLoc, calleeLoc, /*implicit*/ true,
-      /*extraUncurryLevel=*/true, AccessSemantics::Ordinary);
+      calleeLoc, calleeLoc, /*implicit*/ true, AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
   declRef->setImplicit(apply->isImplicit());
@@ -7167,11 +7163,19 @@ ExprRewriter::buildDynamicCallable(ApplyExpr *apply, SelectedOverload selected,
   auto argumentLabel = methodType->getParams()[0].getLabel();
   bool useKwargsMethod = argumentLabel == ctx.Id_withKeywordArguments;
 
+  // HACK: Temporarily push the fn expr onto the expr stack to make sure we
+  // don't try to prematurely close an existential when applying the curried
+  // member ref. This can be removed once existential opening is refactored not
+  // to rely on the shape of the AST prior to rewriting.
+  ExprStack.push_back(fn);
+  SWIFT_DEFER {
+    ExprStack.pop_back();
+  };
+
   // Construct expression referencing the `dynamicallyCall` method.
   auto member = buildMemberRef(fn, SourceLoc(), selected,
                                DeclNameLoc(method->getNameLoc()), loc, loc,
-                               /*implicit=*/true, /*extraUncurryLevel=*/true,
-                               AccessSemantics::Ordinary);
+                               /*implicit=*/true, AccessSemantics::Ordinary);
 
   // Construct argument to the method (either an array or dictionary
   // expression).
@@ -7529,7 +7533,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   Expr *declRef = buildMemberRef(fn, /*dotLoc=*/SourceLoc(), *selected,
                                  DeclNameLoc(fn->getEndLoc()), locator,
                                  ctorLocator, /*implicit=*/true,
-                                 /*extraUncurryLevel=*/true,
                                  AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
