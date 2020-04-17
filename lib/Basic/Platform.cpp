@@ -42,7 +42,7 @@ bool swift::tripleInfersSimulatorEnvironment(const llvm::Triple &triple) {
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
-    return !triple.isSimulatorEnvironment() &&
+    return !triple.hasEnvironment() &&
         (triple.getArch() == llvm::Triple::x86 ||
          triple.getArch() == llvm::Triple::x86_64) &&
         !tripleIsMacCatalystEnvironment(triple);
