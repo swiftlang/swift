@@ -26,23 +26,10 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/ManagedStatic.h"
 #include <tuple>
 
 using namespace swift;
-
-// FIXME: The "Global Context" is a holdover from LLVM's removal of the global
-// context. LLVM's global context was used as scratch space to allocate some
-// attributes for the routines in this file, so we just made our own to work
-// around its removal. Really, it doesn't matter where we allocate these
-// attributes, but it's somewhat convenient for now that they're all in one
-// place instead of requiring a fresh context for every call. If we can
-// sequester ownership of a context (e.g. in SILModule) we could do away with
-// this, but there are callers of \c swift::getSwiftFunctionTypeForIntrinsic
-// all over the compiler.
-static llvm::ManagedStatic<llvm::LLVMContext> GlobalContext;
-static llvm::LLVMContext &getGlobalLLVMContext() { return *GlobalContext; }
 
 struct BuiltinExtraInfoTy {
   const char *Attributes;
@@ -58,13 +45,13 @@ bool BuiltinInfo::isReadNone() const {
   return strchr(BuiltinExtraInfo[(unsigned)ID].Attributes, 'n') != nullptr;
 }
 
-bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {
+const llvm::AttributeList &
+IntrinsicInfo::getOrCreateAttributes(ASTContext &Ctx) const {
   using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeList>;
   if (DenseMapInfo::isEqual(Attrs, DenseMapInfo::getEmptyKey())) {
-    // FIXME: We should not be relying on the global LLVM context.
-    Attrs = llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
+    Attrs = llvm::Intrinsic::getAttributes(Ctx.getIntrinsicScratchContext(), ID);
   }
-  return Attrs.hasFnAttribute(Kind);
+  return Attrs;
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
@@ -1837,8 +1824,9 @@ getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
   }
   
   // Translate LLVM function attributes to Swift function attributes.
-  llvm::AttributeList attrs =
-      llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
+  IntrinsicInfo II;
+  II.ID = ID;
+  auto attrs = II.getOrCreateAttributes(Context);
   if (attrs.hasAttribute(llvm::AttributeList::FunctionIndex,
                          llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
