@@ -2500,100 +2500,67 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
 Optional<PropertyWrapperLValueness>
 PropertyWrapperLValuenessRequest::evaluate(Evaluator &,
                                            VarDecl *var) const {
-    VarDecl *VD = var;
-    unsigned numWrappers = var->getAttachedPropertyWrappers().size();
-    bool isProjectedValue = false;
-    if (numWrappers < 1) {
-      VD = var->getOriginalWrappedProperty(
+  VarDecl *VD = var;
+  unsigned numWrappers = var->getAttachedPropertyWrappers().size();
+  bool isProjectedValue = false;
+  if (numWrappers < 1) {
+    VD = var->getOriginalWrappedProperty(
         PropertyWrapperSynthesizedPropertyKind::StorageWrapper);
-      numWrappers = 1; // Can't compose projected values
-      isProjectedValue = true;
-    }
+    numWrappers = 1; // Can't compose projected values
+    isProjectedValue = true;
+  }
 
-    if (!VD)
-      return None;
+  if (!VD)
+    return None;
 
-    auto varMember = isProjectedValue
+  auto varMember = isProjectedValue
       ? &PropertyWrapperTypeInfo::projectedValueVar
       : &PropertyWrapperTypeInfo::valueVar;
 
-    // Calling the getter (or setter) on the nth property wrapper in the chain
-    // is done as follows:
-    //  1. call the getter on the (n-1)th property wrapper instance to get the
-    //     nth property wrapper instance
-    //  2. call the getter (or setter) on the nth property wrapper instance
-    //  3. if (2) is a mutating access, call the setter on the (n-1)th property
-    //     wrapper instance to write back the mutated value
-
-    // Below, we determine which of these property wrapper instances need to be
-    // accessed mutating-ly, and therefore should be l-values.
-
-    // The variables used are:
-    //
-    //    - prevWrappersMutabilityForGet:
-    //
-    //      The mutability needed for the first (n-1) wrapper instances to be
-    //      able to call the getter on the (n-1)th instance, for step (1) above
-    //
-    //    - prevWrappersMutabilityForGetAndSet:
-    //
-    //      The mutability needed for the first (n-1) wrapper instances to be
-    //      able to call both the getter and setter on the (n-1)th instance, for
-    //      steps (1) and (3) above
-    //
-    //    - mutability:
-    //
-    //      The mutability needed for calling the getter / setter on the
-    //      nth wrapper instance, for step (2) above.
-
-    llvm::SmallVector<PropertyWrapperMutability::Value, 1>
-      prevWrappersMutabilityForGet, prevWrappersMutabilityForGetAndSet;
+  auto accessorMutability = [&](unsigned wrapperIndex) -> PropertyWrapperMutability {
     PropertyWrapperMutability mutability;
+    auto wrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(wrapperIndex);
+    mutability.Getter = getGetterMutatingness(wrapperInfo.*varMember);
+    mutability.Setter = getSetterMutatingness(wrapperInfo.*varMember,
+                                              var->getInnermostDeclContext());
+    return mutability;
+  };
 
-    auto firstWrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(0);
-    mutability.Getter = getGetterMutatingness(firstWrapperInfo.*varMember);
-    mutability.Setter = getSetterMutatingness(firstWrapperInfo.*varMember,
-                                var->getInnermostDeclContext());
+  // Calling the getter (or setter) on the nth property wrapper in the chain
+  // is done as follows:
+  //  1. call the getter on the (n-1)th property wrapper instance to get the
+  //     nth property wrapper instance
+  //  2. call the getter (or setter) on the nth property wrapper instance
+  //  3. if (2) is a mutating access, call the setter on the (n-1)th property
+  //     wrapper instance to write back the mutated value
 
-    for (unsigned i : range(1, numWrappers)) {
-      if (mutability.Getter == PropertyWrapperMutability::Mutating) {
-        prevWrappersMutabilityForGet = prevWrappersMutabilityForGetAndSet;
-      }
-      if (mutability.Getter != PropertyWrapperMutability::Mutating &&
-          mutability.Setter != PropertyWrapperMutability::Mutating) {
-        prevWrappersMutabilityForGetAndSet = prevWrappersMutabilityForGet;
-      }
-      prevWrappersMutabilityForGet.push_back(mutability.Getter);
-      prevWrappersMutabilityForGetAndSet.push_back(
-        std::max(mutability.Getter, mutability.Setter));
-      auto wrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(i);
-      mutability.Getter = getGetterMutatingness(wrapperInfo.*varMember);
-      mutability.Setter = getSetterMutatingness(wrapperInfo.*varMember,
-                                  var->getInnermostDeclContext());
-    }
+  // Below, we determine which of these property wrapper instances need to be
+  // accessed mutating-ly, and therefore should be l-values.
 
-    auto mutabilitySequenceForLastGet =
-      (mutability.Getter == PropertyWrapperMutability::Mutating)
-      ?  &prevWrappersMutabilityForGetAndSet
-      : &prevWrappersMutabilityForGet;
-    auto mutabilitySequenceForLastSet =
-      (mutability.Setter == PropertyWrapperMutability::Mutating)
-      ? &prevWrappersMutabilityForGetAndSet
-      : &prevWrappersMutabilityForGet;
+  unsigned innermostWrapperIdx = numWrappers - 1;
+  auto lastAccess = accessorMutability(innermostWrapperIdx);
 
-    PropertyWrapperLValueness lvalueness;
-    for (unsigned i : range(numWrappers - 1)) {
-      lvalueness.isLValueForGetAccess.push_back(
-        (*mutabilitySequenceForLastGet)[i] == PropertyWrapperMutability::Mutating);
-      lvalueness.isLValueForSetAccess.push_back(
-        (*mutabilitySequenceForLastSet)[i] == PropertyWrapperMutability::Mutating);
-    }
-    lvalueness.isLValueForGetAccess.push_back(
-      mutability.Getter == PropertyWrapperMutability::Mutating);
-    lvalueness.isLValueForSetAccess.push_back(
-      mutability.Setter == PropertyWrapperMutability::Mutating);
+  PropertyWrapperLValueness lvalueness(numWrappers);
+  lvalueness.isLValueForGetAccess[innermostWrapperIdx] =
+      lastAccess.Getter == PropertyWrapperMutability::Mutating;
+  lvalueness.isLValueForSetAccess[innermostWrapperIdx] =
+      lastAccess.Setter == PropertyWrapperMutability::Mutating;
 
-    return lvalueness;
+  auto lastAccessForGet = lastAccess.Getter;
+  auto lastAccessForSet = lastAccess.Setter;
+  for (int i = innermostWrapperIdx - 1; i >= 0; --i) {
+    auto access = accessorMutability(i);
+
+    lastAccessForGet = access.composeWith(lastAccessForGet);
+    lastAccessForSet = access.composeWith(lastAccessForSet);
+
+    lvalueness.isLValueForGetAccess[i] =
+        lastAccessForGet == PropertyWrapperMutability::Mutating;
+    lvalueness.isLValueForSetAccess[i] =
+        lastAccessForSet == PropertyWrapperMutability::Mutating;
+  }
+
+  return lvalueness;
 }
 
 PropertyWrapperBackingPropertyInfo

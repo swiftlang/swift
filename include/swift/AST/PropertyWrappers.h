@@ -133,6 +133,9 @@ struct PropertyWrapperLValueness {
   llvm::SmallVector<bool, 1> isLValueForGetAccess;
   llvm::SmallVector<bool, 1> isLValueForSetAccess;
 
+  PropertyWrapperLValueness(unsigned numWrappers)
+      : isLValueForGetAccess(numWrappers), isLValueForSetAccess(numWrappers) {}
+
   bool operator==(PropertyWrapperLValueness other) const {
     return (isLValueForGetAccess == other.isLValueForGetAccess &&
             isLValueForSetAccess == other.isLValueForSetAccess);
