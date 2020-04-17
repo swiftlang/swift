@@ -1660,8 +1660,10 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
   }
 
   assert(!isTrapIntrinsic(fn.getPointer()) && "Use CreateNonMergeableTrap");
-  llvm::CallInst *call =
-    IRBuilderBase::CreateCall(fn.getPointer(), args, bundles);
+  llvm::CallInst *call = IRBuilderBase::CreateCall(
+      cast<llvm::FunctionType>(
+          fn.getPointer()->getType()->getPointerElementType()),
+      fn.getPointer(), args, bundles);
   call->setAttributes(fn.getAttributes());
   call->setCallingConv(fn.getCallingConv());
   return call;
