@@ -12,6 +12,8 @@
 // Adds Symbol Graph JSON serialization to other types.
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "JSON.h"
 
 void swift::symbolgraphgen::serialize(const llvm::VersionTuple &VT,
@@ -54,4 +56,93 @@ void swift::symbolgraphgen::serialize(const llvm::Triple &T,
       OS.attributeEnd();
     });
   });
+}
+
+void swift::symbolgraphgen::serialize(const ExtensionDecl *Extension,
+                                      llvm::json::OStream &OS) {
+  OS.attributeObject("swiftExtension", [&](){
+    if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
+      if (const auto *ExtendedModule = ExtendedNominal->getModuleContext()) {
+        OS.attribute("extendedModule", ExtendedModule->getNameStr());
+      }
+    }
+    if (const auto Generics = Extension->getAsGenericContext()) {
+      SmallVector<Requirement, 4> FilteredRequirements;
+
+      filterGenericRequirements(Generics->getGenericRequirements(),
+          Extension->getExtendedNominal()
+              ->getDeclContext()->getSelfNominalTypeDecl(),
+                                FilteredRequirements);
+
+      if (!FilteredRequirements.empty()) {
+        OS.attributeArray("constraints", [&](){
+          for (const auto &Requirement : FilteredRequirements) {
+            serialize(Requirement, OS);
+          }
+        }); // end constraints:
+      }
+    }
+  }); // end swiftExtension:
+}
+
+void swift::symbolgraphgen::serialize(const Requirement &Req,
+                                      llvm::json::OStream &OS) {
+  StringRef Kind;
+  switch (Req.getKind()) {
+    case RequirementKind::Conformance:
+      Kind = "conformance";
+      break;
+    case RequirementKind::Superclass:
+      Kind = "superclass";
+      break;
+    case RequirementKind::SameType:
+      Kind = "sameType";
+      break;
+    case RequirementKind::Layout:
+      return;
+  }
+
+  OS.object([&](){
+    OS.attribute("kind", Kind);
+    OS.attribute("lhs", Req.getFirstType()->getString());
+    OS.attribute("rhs", Req.getSecondType()->getString());
+  });
+}
+
+void swift::symbolgraphgen::serialize(const swift::GenericTypeParamType *Param,
+                                      llvm::json::OStream &OS) {
+  OS.object([&](){
+    OS.attribute("name", Param->getName().str());
+    OS.attribute("index", Param->getIndex());
+    OS.attribute("depth", Param->getDepth());
+  });
+}
+
+void swift::symbolgraphgen::filterGenericRequirements(
+    ArrayRef<Requirement> Requirements,
+    const NominalTypeDecl *Self,
+    SmallVectorImpl<Requirement> &FilteredRequirements) {
+  for (const auto &Req : Requirements) {
+      if (Req.getKind() == RequirementKind::Layout) {
+        continue;
+      }
+    /*
+     Don't serialize constraints that aren't applicable for display.
+
+     For example:
+
+     extension Equatable {
+       func foo(_ thing: Self) {}
+     }
+
+     `foo` includes a constraint `Self: Equatable` for the compiler's purposes,
+     but that's redundant for the purposes of documentation.
+     This is extending Equatable, after all!
+    */
+    if (Req.getFirstType()->getString() == "Self" &&
+        Req.getSecondType()->getAnyNominal() == Self) {
+      continue;
+    }
+    FilteredRequirements.push_back(Req);
+  }
 }

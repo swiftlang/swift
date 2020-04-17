@@ -105,15 +105,15 @@ BUILTIN_CAST_OR_BITCAST_OPERATION(SExtOrBitCast,  "sextOrBitCast",  "n")
 #endif
 
 #ifndef BUILTIN_BINARY_OPERATION_POLYMORPHIC
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name, Attrs) \
-  BUILTIN_BINARY_OPERATION(Id, Name, Attrs)
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name) \
+  BUILTIN_BINARY_OPERATION(Id, Name, "")
 #endif
 
 // TODO: This needs a better name. We stringify generic_ in *_{OVERLOADED_STATIC,POLYMORPHIC}
 #ifndef BUILTIN_BINARY_OPERATION_ALL
 #define BUILTIN_BINARY_OPERATION_ALL(Id, Name, Attrs, Overload) \
   BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(Id, BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR(Name), Attrs, Overload) \
-  BUILTIN_BINARY_OPERATION_POLYMORPHIC(Generic##Id, BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR(generic_##Name), Attrs)
+  BUILTIN_BINARY_OPERATION_POLYMORPHIC(Generic##Id, BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR(generic_##Name))
 #endif
 
 // NOTE: Here we need our name field to be bare. We stringify them as
@@ -469,6 +469,18 @@ BUILTIN_SIL_OPERATION(ConvertStrongToUnownedUnsafe, "convertStrongToUnownedUnsaf
 /// now.
 BUILTIN_SIL_OPERATION(ConvertUnownedUnsafeToGuaranteed, "convertUnownedUnsafeToGuaranteed", Special)
 
+/// applyDerivative
+BUILTIN_SIL_OPERATION(ApplyDerivative, "applyDerivative", Special)
+
+/// applyTranspose
+BUILTIN_SIL_OPERATION(ApplyTranspose, "applyTranspose", Special)
+
+/// differentiableFunction
+BUILTIN_SIL_OPERATION(DifferentiableFunction, "differentiableFunction", Special)
+
+/// linearFunction
+BUILTIN_SIL_OPERATION(LinearFunction, "linearFunction", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -656,6 +668,9 @@ BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
 /// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
 BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
+
+// TypePtrAuthDiscriminator has type <T> (T.Type) -> Int64
+BUILTIN_MISC_OPERATION(TypePtrAuthDiscriminator, "typePtrAuthDiscriminator", "n", Special)
 
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.

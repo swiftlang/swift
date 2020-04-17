@@ -284,10 +284,10 @@ protected:
     Discriminator : 16
   );
 
-  SWIFT_INLINE_BITFIELD(AutoClosureExpr, AbstractClosureExpr, 1,
-    /// True if this autoclosure was built for a function conversion, and
-    /// not an actual @autoclosure parameter.
-    IsThunk : 1
+  SWIFT_INLINE_BITFIELD(AutoClosureExpr, AbstractClosureExpr, 2,
+    /// If the autoclosure was built for a curry thunk, the thunk kind is
+    /// stored here.
+    Kind : 2
   );
 
   SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1,
@@ -566,11 +566,14 @@ public:
 /// typically this will have an ErrorType.
 class ErrorExpr : public Expr {
   SourceRange Range;
+  Expr *OriginalExpr;
 public:
-  ErrorExpr(SourceRange Range, Type Ty = Type())
-    : Expr(ExprKind::Error, /*Implicit=*/true, Ty), Range(Range) {}
+  ErrorExpr(SourceRange Range, Type Ty = Type(), Expr *OriginalExpr = nullptr)
+    : Expr(ExprKind::Error, /*Implicit=*/true, Ty), Range(Range),
+      OriginalExpr(OriginalExpr) {}
 
   SourceRange getSourceRange() const { return Range; }
+  Expr *getOriginalExpr() const { return OriginalExpr; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Error;
@@ -1330,9 +1333,9 @@ public:
   }
 };
 
-/// A reference to a type in expression context, spelled out as a TypeLoc. Sema
-/// forms this expression as a result of name binding.  This always has
-/// MetaTypetype.
+/// A reference to a type in expression context, spelled out as a TypeLoc.
+///
+/// The type of this expression is always \c MetaTypeType.
 class TypeExpr : public Expr {
   TypeLoc Info;
   TypeExpr(Type Ty);
@@ -2963,6 +2966,61 @@ public:
   }
 };
 
+class DifferentiableFunctionExpr : public ImplicitConversionExpr {
+public:
+  DifferentiableFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::DifferentiableFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DifferentiableFunction;
+  }
+};
+
+class LinearFunctionExpr : public ImplicitConversionExpr {
+public:
+  LinearFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::LinearFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LinearFunction;
+  }
+};
+
+class DifferentiableFunctionExtractOriginalExpr
+    : public ImplicitConversionExpr {
+public:
+  DifferentiableFunctionExtractOriginalExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::DifferentiableFunctionExtractOriginal,
+                               subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DifferentiableFunctionExtractOriginal;
+  }
+};
+
+class LinearFunctionExtractOriginalExpr : public ImplicitConversionExpr {
+public:
+  LinearFunctionExtractOriginalExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::LinearFunctionExtractOriginal,
+                               subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LinearFunctionExtractOriginal;
+  }
+};
+
+class LinearToDifferentiableFunctionExpr : public ImplicitConversionExpr {
+public:
+  LinearToDifferentiableFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(
+            ExprKind::LinearToDifferentiableFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LinearToDifferentiableFunction;
+  }
+};
+
+
 /// Use an opaque type to abstract a value of the underlying concrete type.
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
 public:
@@ -3790,6 +3848,20 @@ class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
 
 public:
+  enum class Kind : uint8_t {
+    // An autoclosure with type () -> Result. Formed from type checking an
+    // @autoclosure argument in a function call.
+    None = 0,
+
+    // An autoclosure with type (Args...) -> Result. Formed from type checking a
+    // partial application.
+    SingleCurryThunk = 1,
+
+    // An autoclosure with type (Self) -> (Args...) -> Result. Formed from type
+    // checking a partial application.
+    DoubleCurryThunk = 2
+  };
+
   AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,
                   DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
@@ -3797,15 +3869,15 @@ public:
     if (Body != nullptr)
       setBody(Body);
 
-    Bits.AutoClosureExpr.IsThunk = false;
+    Bits.AutoClosureExpr.Kind = 0;
   }
 
-  bool isThunk() const {
-    return Bits.AutoClosureExpr.IsThunk;
+  Kind getThunkKind() const {
+    return Kind(Bits.AutoClosureExpr.Kind);
   }
 
-  void setIsThunk(bool isThunk) {
-    Bits.AutoClosureExpr.IsThunk = isThunk;
+  void setThunkKind(Kind K) {
+    Bits.AutoClosureExpr.Kind = uint8_t(K);
   }
 
   SourceRange getSourceRange() const;
@@ -3823,6 +3895,16 @@ public:
   ///
   /// The body of an autoclosure always consists of a single expression.
   Expr *getSingleExpressionBody() const;
+
+  /// Unwraps a curry thunk. Basically, this gives you what the old AST looked
+  /// like, before Sema started building curry thunks. This is really only
+  /// meant for legacy usages.
+  ///
+  /// The behavior is as follows, based on the kind:
+  /// - for double curry thunks, returns the original DeclRefExpr.
+  /// - for single curry thunks, returns the ApplyExpr for the self call.
+  /// - otherwise, returns nullptr for convenience.
+  Expr *getUnwrappedCurryThunkExpr() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {
@@ -3959,7 +4041,61 @@ public:
   SourceRange getSourceRange() const { return Range; }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::OpaqueValue; 
+    return E->getKind() == ExprKind::OpaqueValue;
+  }
+};
+
+/// A placeholder to substitute with a \c wrappedValue initialization expression
+/// for a property with an attached property wrapper.
+///
+/// Wrapped value placeholder expressions are injected around the
+/// \c wrappedValue argument in a synthesized \c init(wrappedValue:)
+/// call. This injection happens for properties with attached property wrappers
+/// that can be initialized out-of-line with a wrapped value expression, rather
+/// than calling \c init(wrappedValue:) explicitly.
+///
+/// Wrapped value placeholders store the original initialization expression
+/// if one exists, along with an opaque value placeholder that can be bound
+/// to a different wrapped value expression.
+class PropertyWrapperValuePlaceholderExpr : public Expr {
+  SourceRange Range;
+  OpaqueValueExpr *Placeholder;
+  Expr *WrappedValue;
+
+  PropertyWrapperValuePlaceholderExpr(SourceRange Range, Type Ty,
+                                      OpaqueValueExpr *placeholder,
+                                      Expr *wrappedValue)
+      : Expr(ExprKind::PropertyWrapperValuePlaceholder, /*Implicit=*/true, Ty),
+        Range(Range), Placeholder(placeholder), WrappedValue(wrappedValue) {}
+
+public:
+  static PropertyWrapperValuePlaceholderExpr *
+  create(ASTContext &ctx, SourceRange range, Type ty, Expr *wrappedValue);
+
+  /// The original wrappedValue initialization expression provided via
+  /// \c = on a proprety with attached property wrappers.
+  Expr *getOriginalWrappedValue() const {
+    return WrappedValue;
+  }
+
+  void setOriginalWrappedValue(Expr *value) {
+    WrappedValue = value;
+  }
+
+  /// An opaque value placeholder that will be used to substitute in a
+  /// different wrapped value expression for out-of-line initialization.
+  OpaqueValueExpr *getOpaqueValuePlaceholder() const {
+    return Placeholder;
+  }
+
+  void setOpaqueValuePlaceholder(OpaqueValueExpr *placeholder) {
+    Placeholder = placeholder;
+  }
+
+  SourceRange getSourceRange() const { return Range; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PropertyWrapperValuePlaceholder;
   }
 };
 
@@ -4749,7 +4885,7 @@ public:
 };
 
 /// A pattern production that has been parsed but hasn't been resolved
-/// into a complete pattern. Name binding converts these into standalone pattern
+/// into a complete pattern. Pattern checking converts these into standalone pattern
 /// nodes or raises an error if a pattern production appears in an invalid
 /// position.
 class UnresolvedPatternExpr : public Expr {
@@ -4952,6 +5088,10 @@ class KeyPathExpr : public Expr {
 
   // The processed/resolved type, like Foo.Bar in \Foo.Bar.?.baz.
   TypeRepr *RootType = nullptr;
+
+  /// Determines whether a key path starts with '.' which denotes necessity for
+  /// a contextual root type.
+  bool HasLeadingDot = false;
 
 public:
   /// A single stored component, which will be one of:
@@ -5314,10 +5454,11 @@ public:
               bool isImplicit = false);
 
   KeyPathExpr(SourceLoc backslashLoc, Expr *parsedRoot, Expr *parsedPath,
-              bool isImplicit = false)
+              bool hasLeadingDot, bool isImplicit = false)
       : Expr(ExprKind::KeyPath, isImplicit), StartLoc(backslashLoc),
         EndLoc(parsedPath ? parsedPath->getEndLoc() : parsedRoot->getEndLoc()),
-        ParsedRoot(parsedRoot), ParsedPath(parsedPath) {
+        ParsedRoot(parsedRoot), ParsedPath(parsedPath),
+        HasLeadingDot(hasLeadingDot) {
     assert((parsedRoot || parsedPath) &&
            "keypath must have either root or path");
     Bits.KeyPathExpr.IsObjC = false;
@@ -5380,6 +5521,9 @@ public:
 
   /// True if this is an ObjC key path expression.
   bool isObjC() const { return Bits.KeyPathExpr.IsObjC; }
+
+  /// True if this key path expression has a leading dot.
+  bool expectsContextualRoot() const { return HasLeadingDot; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPath;

@@ -277,6 +277,7 @@ func test_floating_point() {
 func test_nonassoc(_ x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
   return x == y == x // expected-error {{adjacent operators are in non-associative precedence group 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}}
+  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (Bool, Bool), (Int, Int)}}
 }
 
 // More realistic examples.
@@ -708,7 +709,6 @@ func test() {
 func unusedExpressionResults() {
   // Unused l-value
   _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
-  // expected-error@-1 {{expression resolves to an unused variable}}
 
   // <rdar://problem/20749592> Conditional Optional binding hides compiler error
   let optionalc:C? = nil
@@ -748,8 +748,13 @@ func invalidDictionaryLiteral() {
 }
 
 
-[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'Sequence'}}
-[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'Sequence'}}
+[4].joined(separator: [1])
+// expected-error@-1 {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'String'}}
+
+[4].joined(separator: [[[1]]])
+// expected-error@-1 {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-2 {{cannot convert value of type '[[[Int]]]' to expected argument type 'String'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
@@ -776,7 +781,8 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
-  // expected-error@-1:12 {{cannot convert value of type 'Bool' to expected argument type 'Int?'}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  // expected-error@-2 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
   if (cond || a) ?? (42 > 0) {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.

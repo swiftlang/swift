@@ -1,4 +1,4 @@
-// RUN: %swift -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
+// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
@@ -36,8 +36,7 @@ doit()
 // CHECK-SAME:     i8* [[ERASED_CONFORMANCE]], 
 // CHECK-SAME:     i8* undef, 
 // CHECK-SAME:     %swift.type_descriptor* bitcast (
-// CHECK-SAME:       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, i32 }>* @"$s4main5ValueOMn" 
-// CHECK-SAME:       to %swift.type_descriptor*
+// CHECK-SAME:       {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
 // CHECK-SAME:     )
 // CHECK-SAME:   ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}

@@ -719,7 +719,7 @@
 // CHECK: CAPTURE DESCRIPTORS:
 // CHECK: ====================
 // CHECK: - Capture types:
-// CHECK: (builtin Builtin.NativeObject)
+//CHECK:  (generic_type_parameter depth=0 index=0)
 // CHECK: - Metadata sources:
 // CHECK: (generic_type_parameter depth=0 index=0)
 // CHECK: (closure_binding index=0)

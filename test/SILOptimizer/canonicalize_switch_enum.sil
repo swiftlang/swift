@@ -48,7 +48,7 @@ sil @test_switch_enum_addr : $@convention(thin) <T> (@in GenE<T>) -> Int32 {
 bb0(%0 : $*GenE<T>):
   %1 = alloc_stack $GenE<T>
   copy_addr %0 to [initialization] %1 : $*GenE<T>
-  // CHECK: switch_enum_addr %1 : $*GenE<T>, case #GenE.A!enumelt: bb1, case #GenE.B!enumelt: bb2, case #GenE.C!enumelt.1: bb3
+  // CHECK: switch_enum_addr %1 : $*GenE<T>, case #GenE.A!enumelt: bb1, case #GenE.B!enumelt: bb2, case #GenE.C!enumelt: bb3
   switch_enum_addr %1 : $*GenE<T>, case #GenE.A!enumelt: bb1, case #GenE.B!enumelt: bb2, default bb3
 
 bb1:

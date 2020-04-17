@@ -270,10 +270,16 @@ struct PrintOptions {
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
+  // Print SPI attributes and decls that are visible only as SPI.
+  bool PrintSPIs = true;
+
   /// Prints type variables and unresolved types in an expanded notation suitable
   /// for debugging.
   bool PrintTypesForDebugging = false;
-  
+
+  /// Whether this print option is for printing .swiftinterface file
+  bool IsForSwiftInterface = false;
+
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.
@@ -426,6 +432,11 @@ struct PrintOptions {
   /// The information for converting archetypes to specialized types.
   llvm::Optional<TypeTransformContext> TransformContext;
 
+  /// Whether cross-import overlay modules are printed with their own name (e.g.
+  /// _MyFrameworkYourFrameworkAdditions) or that of their underlying module
+  /// (e.g.  MyFramework).
+  bool MapCrossImportOverlaysToDeclaringModule = false;
+
   bool PrintAsMember = false;
   
   /// Whether to print parameter specifiers as 'let' and 'var'.
@@ -512,17 +523,22 @@ struct PrintOptions {
     result.PrintDocumentationComments = true;
     result.SkipUnderscoredKeywords = true;
     result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
+    result.MapCrossImportOverlaysToDeclaringModule = true;
     return result;
   }
 
-  /// Retrieve the set of options suitable for module interfaces.
+  /// Retrieve the set of options suitable for textual module interfaces.
   ///
   /// This is a format that will be parsed again later, so the output must be
   /// consistent and well-formed.
   ///
+  /// Set \p printSPIs to produce a module interface with the SPI decls and
+  /// attributes.
+  ///
   /// \see swift::emitSwiftInterface
   static PrintOptions printSwiftInterfaceFile(bool preferTypeRepr,
-                                              bool printFullConvention);
+                                              bool printFullConvention,
+                                              bool printSPIs);
 
   /// Retrieve the set of options suitable for "Generated Interfaces", which
   /// are a prettified representation of the public API of a module, to be

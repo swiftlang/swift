@@ -829,7 +829,8 @@ void Lexer::lexOperatorIdentifier() {
   if (CurPtr-TokStart == 1) {
     switch (TokStart[0]) {
     case '=':
-      if (leftBound != rightBound) {
+      // Refrain from emitting this message in operator name position.
+      if (NextToken.isNot(tok::kw_operator) && leftBound != rightBound) {
         auto d = diagnose(TokStart, diag::lex_unary_equal);
         if (leftBound)
           d.fixItInsert(getSourceLoc(TokStart), " ");

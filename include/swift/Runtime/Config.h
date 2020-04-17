@@ -226,4 +226,95 @@
 // so changing this value is not sufficient.
 #define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
 
+// Pointer authentication.
+#if __has_feature(ptrauth_calls)
+#define SWIFT_PTRAUTH 1
+#include <ptrauth.h>
+#define __ptrauth_swift_runtime_function_entry \
+  __ptrauth(ptrauth_key_function_pointer, 1, \
+            SpecialPointerAuthDiscriminators::RuntimeFunctionEntry)
+#define __ptrauth_swift_runtime_function_entry_with_key(__key) \
+  __ptrauth(ptrauth_key_function_pointer, 1, __key)
+#define __ptrauth_swift_runtime_function_entry_strip(__fn) \
+  ptrauth_strip(__fn, ptrauth_key_function_pointer)
+#define __ptrauth_swift_type_descriptor \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::TypeDescriptor)
+#define __ptrauth_swift_dynamic_replacement_key                                \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::DynamicReplacementKey)
+#define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer)         \
+  ptrauth_auth_and_resign(__fn, ptrauth_key_function_pointer, 0,               \
+                          ptrauth_key_process_independent_code,                \
+                          ptrauth_blend_discriminator(__buffer,                \
+            SpecialPointerAuthDiscriminators::OpaqueReadResumeFunction))
+#define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer)       \
+  ptrauth_auth_and_resign(__fn, ptrauth_key_function_pointer, 0,               \
+                          ptrauth_key_process_independent_code,                \
+                          ptrauth_blend_discriminator(__buffer,                \
+            SpecialPointerAuthDiscriminators::OpaqueModifyResumeFunction))
+#else
+#define SWIFT_PTRAUTH 0
+#define __ptrauth_swift_function_pointer(__typekey)
+#define __ptrauth_swift_class_method_pointer(__declkey)
+#define __ptrauth_swift_protocol_witness_function_pointer(__declkey)
+#define __ptrauth_swift_value_witness_function_pointer(__key)
+#define __ptrauth_swift_type_metadata_instantiation_function
+#define __ptrauth_swift_runtime_function_entry
+#define __ptrauth_swift_runtime_function_entry_with_key(__key)
+#define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)
+#define __ptrauth_swift_heap_object_destructor
+#define __ptrauth_swift_type_descriptor
+#define __ptrauth_swift_dynamic_replacement_key
+#define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer) (__fn)
+#define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer) (__fn)
+#endif
+
+#ifdef __cplusplus
+
+/// Copy an address-discriminated signed pointer from the source to the dest.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline void swift_ptrauth_copy(T *dest, const T *src, unsigned extra) {
+#if SWIFT_PTRAUTH
+  *dest = ptrauth_auth_and_resign(*src,
+                                  ptrauth_key_function_pointer,
+                                  ptrauth_blend_discriminator(src, extra),
+                                  ptrauth_key_function_pointer,
+                                  ptrauth_blend_discriminator(dest, extra));
+#else
+  *dest = *src;
+#endif
+}
+
+/// Initialize the destination with an address-discriminated signed pointer.
+/// This does not authenticate the source value, so be careful about how
+/// you construct it.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline void swift_ptrauth_init(T *dest, T value, unsigned extra) {
+  // FIXME: assert that T is not a function-pointer type?
+#if SWIFT_PTRAUTH
+  *dest = ptrauth_sign_unauthenticated(value,
+                                  ptrauth_key_function_pointer,
+                                  ptrauth_blend_discriminator(dest, extra));
+#else
+  *dest = value;
+#endif
+}
+
+template <typename T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline T swift_auth_data_non_address(T value, unsigned extra) {
+#if SWIFT_PTRAUTH
+  return (T)ptrauth_auth_data((void *)value,
+                               ptrauth_key_process_independent_data,
+                               extra);
+#else
+  return value;
+#endif
+}
+
+#endif
+
 #endif // SWIFT_RUNTIME_CONFIG_H

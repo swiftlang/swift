@@ -17,4 +17,4 @@ this is line1,
 // CHECK: key.sourcetext: "this is line1,"
 // CHECK: key.sourcetext: "     this is line2,"
 // CHECK: key.sourcetext: "\"\"\""
-// CHECK: key.sourcetext: "    \"content\""
+// CHECK: key.sourcetext: "        \"content\""

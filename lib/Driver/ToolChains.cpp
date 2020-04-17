@@ -127,14 +127,10 @@ static bool addOutputsOfType(ArgStringList &Arguments,
   return Added;
 }
 
-/// Handle arguments common to all invocations of the frontend (compilation,
-/// module-merging, LLDB's REPL, etc).
-static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
-                                  const CommandOutput &output,
-                                  const ArgList &inputArgs,
-                                  ArgStringList &arguments) {
-  const llvm::Triple &Triple = TC.getTriple();
-
+void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
+                                      const CommandOutput &output,
+                                      const ArgList &inputArgs,
+                                      ArgStringList &arguments) const {
   // Only pass -target to the REPL or immediate modes if it was explicitly
   // specified on the command line.
   switch (OI.CompilerMode) {
@@ -249,12 +245,15 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
+  inputArgs.AddLastArg(arguments, options::OPT_print_educational_notes);
   inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
-
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_verify_incremental_dependencies);
+  
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
@@ -372,8 +371,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasArg(options::OPT_parse_stdlib))
     Arguments.push_back("-disable-objc-attr-requires-foundation-module");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
   // Pass along an -import-objc-header arg, replacing the argument with the name
@@ -401,11 +399,19 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
     if (usePersistentPCH) {
       context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
-      if (context.OI.CompilerMode == OutputInfo::Mode::StandardCompile) {
+      switch (context.OI.CompilerMode) {
+      case OutputInfo::Mode::StandardCompile:
+      case OutputInfo::Mode::BatchModeCompile:
         // In the 'multiple invocations for each file' mode we don't need to
         // validate the PCH every time, it has been validated with the initial
         // -emit-pch invocation.
         Arguments.push_back("-pch-disable-validation");
+        break;
+
+      case OutputInfo::Mode::Immediate:
+      case OutputInfo::Mode::REPL:
+      case OutputInfo::Mode::SingleCompile:
+        break;
       }
     }
   }
@@ -423,8 +429,29 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-cross-module-optimization");
   }
                                  
-  addOutputsOfType(Arguments, context.Output, context.Args,
-                   file_types::TY_OptRecord, "-save-optimization-record-path");
+
+  file_types::ID remarksFileType = file_types::TY_YAMLOptRecord;
+  // If a specific format is specified for the remarks, forward that as is.
+  if (auto remarksFormat =
+          context.Args.getLastArg(options::OPT_save_optimization_record_EQ)) {
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-save-optimization-record=") + remarksFormat->getValue()));
+    // If that's the case, add the proper output file for the type.
+    if (llvm::Expected<file_types::ID> fileType =
+            remarkFileTypeFromArgs(context.Args))
+      remarksFileType = *fileType;
+    else
+      consumeError(fileType.takeError()); // Don't report errors here. This will
+                                          // be reported later anyway.
+  }
+  addOutputsOfType(Arguments, context.Output, context.Args, remarksFileType,
+                   "-save-optimization-record-path");
+
+  if (auto remarksFilter = context.Args.getLastArg(
+          options::OPT_save_optimization_record_passes)) {
+    Arguments.push_back("-save-optimization-record-passes");
+    Arguments.push_back(remarksFilter->getValue());
+  }
 
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
     Arguments.push_back("-migrate-keep-objc-visibility");
@@ -559,9 +586,13 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_CompiledSource:
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
-  case file_types::TY_OptRecord:
+  case file_types::TY_YAMLOptRecord:
+  case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_PrivateSwiftModuleInterfaceFile:
   case file_types::TY_SwiftSourceInfoFile:
+  case file_types::TY_SwiftCrossImportDir:
+  case file_types::TY_SwiftOverlayFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -678,6 +709,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-module-interface-path");
 
   addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
 
@@ -726,8 +761,7 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   if (context.Args.hasArg(options::OPT_parse_stdlib))
     Arguments.push_back("-disable-objc-attr-requires-foundation-module");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
@@ -808,9 +842,13 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_CompiledSource:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
-    case file_types::TY_OptRecord:
+    case file_types::TY_YAMLOptRecord:
+    case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
+    case file_types::TY_PrivateSwiftModuleInterfaceFile:
     case file_types::TY_SwiftSourceInfoFile:
+    case file_types::TY_SwiftCrossImportDir:
+    case file_types::TY_SwiftOverlayFile:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -942,8 +980,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   Arguments.push_back("-disable-diagnostic-passes");
   Arguments.push_back("-disable-sil-perf-optzns");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
   addOutputsOfType(Arguments, context.Output, context.Args,
@@ -954,6 +991,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
                    "-emit-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
@@ -1033,8 +1073,7 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   for (auto &s : getDriver().getSwiftProgramArgs())
     FrontendArgs.push_back(s.c_str());
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        FrontendArgs);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, FrontendArgs);
   addRuntimeLibraryFlags(context.OI, FrontendArgs);
 
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
@@ -1119,8 +1158,7 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
     Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
   addOutputsOfType(Arguments, context.Output, context.Args,
@@ -1259,13 +1297,13 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
   getResourceDirPath(scratchPath, args, shared);
-  runtimeLibPaths.push_back(scratchPath.str());
+  runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
   // If there's a secondary resource dir, add it too.
   scratchPath.clear();
   getSecondaryResourceDirPath(scratchPath, runtimeLibPaths[0]);
   if (!scratchPath.empty())
-    runtimeLibPaths.push_back(scratchPath.str());
+    runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
   if (!SDKPath.empty()) {
     if (!scratchPath.empty()) {
@@ -1274,12 +1312,12 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
       scratchPath = SDKPath;
       llvm::sys::path::append(scratchPath, "System", "iOSSupport");
       llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
-      runtimeLibPaths.push_back(scratchPath.str());
+      runtimeLibPaths.push_back(std::string(scratchPath.str()));
     }
 
     scratchPath = SDKPath;
     llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
-    runtimeLibPaths.push_back(scratchPath.str());
+    runtimeLibPaths.push_back(std::string(scratchPath.str()));
   }
 }
 

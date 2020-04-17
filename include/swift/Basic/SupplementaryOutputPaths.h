@@ -149,6 +149,13 @@ struct SupplementaryOutputPaths {
   /// \sa swift::emitSwiftInterface
   std::string ModuleInterfaceOutputPath;
 
+  /// The path to which we should emit a private module interface.
+  ///
+  /// The private module interface contains all SPI decls and attributes.
+  ///
+  /// \sa ModuleInterfaceOutputPath
+  std::string PrivateModuleInterfaceOutputPath;
+
   /// The path to a .c file where we should declare $ld$add symbols for those
   /// symbols moved to the current module.
   /// When symbols are moved to this module, this module declares them as HIDE

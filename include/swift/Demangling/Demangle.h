@@ -213,6 +213,9 @@ public:
   NodePointer getFirstChild() const {
     return getChild(0);
   }
+  NodePointer getLastChild() const {
+    return getChild(getNumChildren() - 1);
+  }
   NodePointer getChild(size_t index) const {
     assert(getNumChildren() > index);
     return begin()[index];

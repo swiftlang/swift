@@ -420,6 +420,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     break;
   }
+  case CaptureKind::Immutable:
   case CaptureKind::StorageAddress: {
     // Non-escaping stored decls are captured as the address of the value.
     auto type = getVarTypeInCaptureContext();

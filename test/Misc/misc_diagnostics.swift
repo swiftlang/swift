@@ -8,8 +8,11 @@ import CoreGraphics
 var roomName : String?
 
 if let realRoomName = roomName as! NSString { // expected-warning{{forced cast from 'String?' to 'NSString' only unwraps and bridges; did you mean to use '!' with 'as'?}}
-// expected-error@-1{{initializer for conditional binding must have Optional type, not 'NSString'}}
-
+  // expected-error@-1{{initializer for conditional binding must have Optional type, not 'NSString'}}
+  // expected-warning@-2{{treating a forced downcast to 'NSString' as optional will never produce 'nil'}}
+  // expected-note@-3{{add parentheses around the cast to silence this warning}}
+  // expected-note@-4{{use 'as?' to perform a conditional downcast to 'NSString'}}
+  _ = realRoomName
 }
 
 var pi = 3.14159265358979
@@ -137,7 +140,10 @@ func test17875634() {
 
 // <rdar://problem/20770032> Pattern matching ranges against tuples crashes the compiler
 func test20770032() {
-  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{expression pattern of type 'ClosedRange<Int>' cannot match values of type '(Int, Int)'}}
+  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}}
+    // expected-error@-1 {{expression pattern of type 'ClosedRange<Int>' cannot match values of type '(Int, Int)'}}
+    // expected-error@-2 {{'(Int, Int)' cannot conform to 'Equatable'; only struct/enum/class types can conform to protocols}}
+    // expected-note@-3 {{required by operator function '~=' where 'T' = '(Int, Int)'}}
   }
 }
 

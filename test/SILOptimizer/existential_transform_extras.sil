@@ -76,7 +76,7 @@ bb0(%0 : $*P):
   %2 = alloc_stack $P                             
   copy_addr %0 to [initialization] %2 : $*P      
   %4 = open_existential_addr immutable_access %2 : $*P to $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P
-  %5 = witness_method $@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %4 : $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %5 = witness_method $@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %4 : $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %6 = apply %5<@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   destroy_addr %2 : $*P 
   dealloc_stack %2 : $*P
@@ -111,7 +111,7 @@ bb0(%0 : $*P):
   copy_addr %0 to [initialization] %4 : $*P
   destroy_addr %0 : $*P
   %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
-  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   dealloc_stack %4 : $*P
   return %8 : $Int32
@@ -175,13 +175,13 @@ bb0(%0 : $*P, %1 : $*P):
   copy_addr %0 to [initialization] %4 : $*P
   destroy_addr %0 : $*P
   %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
-  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %9 = alloc_stack $P
   copy_addr %1 to [initialization] %9 : $*P
   destroy_addr %1 : $*P
   %11 = open_existential_addr immutable_access %9 : $*P to $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P
-  %12 = witness_method $@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %11 : $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %12 = witness_method $@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %11 : $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %13 = apply %12<@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %14 = struct_extract %8 : $Int32, #Int32._value
   %15 = struct_extract %13 : $Int32, #Int32._value
@@ -197,11 +197,11 @@ bb0(%0 : $*P, %1 : $*P):
 }
 
 sil_witness_table hidden Klass1: P module dealloc {
-  method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : nil
+  method #P.foo: <Self where Self : P> (Self) -> () -> Int32 : nil
 }
 
 sil_witness_table hidden Klass2: P module dealloc {
-  method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : nil
+  method #P.foo: <Self where Self : P> (Self) -> () -> Int32 : nil
 }
 
 // -----------------------------------------------------------------------------

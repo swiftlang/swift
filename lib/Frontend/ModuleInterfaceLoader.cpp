@@ -46,14 +46,13 @@ std::string
 swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
   if (!Clang.hasPreprocessor())
     return "";
-  std::string SpecificModuleCachePath = Clang.getPreprocessor()
-    .getHeaderSearchInfo()
-    .getModuleCachePath();
+  std::string SpecificModuleCachePath =
+      Clang.getPreprocessor().getHeaderSearchInfo().getModuleCachePath().str();
 
   // The returned-from-clang module cache path includes a suffix directory
   // that is specific to the clang version and invocation; we want the
   // directory above that.
-  return llvm::sys::path::parent_path(SpecificModuleCachePath);
+  return llvm::sys::path::parent_path(SpecificModuleCachePath).str();
 }
 
 #pragma mark - Forwarding Modules
@@ -241,7 +240,7 @@ struct ModuleRebuildInfo {
     for (auto &mod : outOfDateModules) {
       if (mod.path == path) return mod;
     }
-    outOfDateModules.push_back({path, None, ModuleKind::Normal, {}, {}});
+    outOfDateModules.push_back({path.str(), None, ModuleKind::Normal, {}, {}});
     return outOfDateModules.back();
   }
 
@@ -261,14 +260,14 @@ struct ModuleRebuildInfo {
   /// at \c modulePath.
   void addOutOfDateDependency(StringRef modulePath, StringRef depPath) {
     getOrInsertOutOfDateModule(modulePath)
-      .outOfDateDependencies.push_back(depPath);
+        .outOfDateDependencies.push_back(depPath.str());
   }
 
   /// Registers a missing dependency at \c depPath for the module
   /// at \c modulePath.
   void addMissingDependency(StringRef modulePath, StringRef depPath) {
     getOrInsertOutOfDateModule(modulePath)
-      .missingDependencies.push_back(depPath);
+        .missingDependencies.push_back(depPath.str());
   }
 
   /// Determines if we saw the given module path and registered is as out of
@@ -355,11 +354,13 @@ class ModuleInterfaceLoaderImpl {
   DependencyTracker *const dependencyTracker;
   const ModuleLoadingMode loadMode;
   const bool remarkOnRebuildFromInterface;
+  const bool disableInterfaceLock;
 
   ModuleInterfaceLoaderImpl(
     ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
     StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
     SourceLoc diagLoc, bool remarkOnRebuildFromInterface,
+    bool disableInterfaceLock,
     DependencyTracker *dependencyTracker = nullptr,
     ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
   : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
@@ -367,7 +368,8 @@ class ModuleInterfaceLoaderImpl {
     moduleName(moduleName), prebuiltCacheDir(prebuiltCacheDir),
     cacheDir(cacheDir), diagnosticLoc(diagLoc),
     dependencyTracker(dependencyTracker), loadMode(loadMode),
-    remarkOnRebuildFromInterface(remarkOnRebuildFromInterface) {}
+    remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
+    disableInterfaceLock(disableInterfaceLock) {}
 
   /// Construct a cache key for the .swiftmodule being generated. There is a
   /// balance to be struck here between things that go in the cache key and
@@ -903,7 +905,8 @@ class ModuleInterfaceLoaderImpl {
       ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
       ctx.getClangModuleLoader(), interfacePath, moduleName, cacheDir,
       prebuiltCacheDir, /*serializeDependencyHashes*/false,
-      trackSystemDependencies, remarkOnRebuildFromInterface, diagnosticLoc,
+      trackSystemDependencies, remarkOnRebuildFromInterface,
+      disableInterfaceLock, diagnosticLoc,
       dependencyTracker);
     auto &subInvocation = builder.getSubInvocation();
 
@@ -1000,7 +1003,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 
   llvm::SmallString<256>
   ModPath{ BaseName.getName(file_types::TY_SwiftModuleFile) },
-  InPath{  BaseName.getName(file_types::TY_SwiftModuleInterfaceFile) };
+  InPath{  BaseName.getName(file_types::TY_SwiftModuleInterfaceFile) },
+  PrivateInPath{BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile)};
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -1014,12 +1018,18 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
     return std::make_error_code(std::errc::no_such_file_or_directory);
   }
 
+  // If present, use the private interface instead of the public one.
+  if (fs.exists(PrivateInPath)) {
+    InPath = PrivateInPath;
+  }
+
   // Create an instance of the Impl to do the heavy lifting.
   auto ModuleName = ModuleID.Item.str();
   ModuleInterfaceLoaderImpl Impl(
                 Ctx, ModPath, InPath, ModuleName,
                 CacheDir, PrebuiltCacheDir, ModuleID.Loc,
-                RemarkOnRebuildFromInterface, dependencyTracker,
+                RemarkOnRebuildFromInterface, DisableInterfaceFileLock,
+                dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?
                   ModuleLoadingMode::PreferInterface : LoadMode);
@@ -1057,13 +1067,14 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
-    bool RemarkOnRebuildFromInterface) {
+    bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock) {
   ModuleInterfaceBuilder builder(SourceMgr, Diags, SearchPathOpts, LangOpts,
                                     /*clangImporter*/nullptr, InPath,
                                     ModuleName, CacheDir, PrebuiltCacheDir,
                                     SerializeDependencyHashes,
                                     TrackSystemDependencies,
-                                    RemarkOnRebuildFromInterface);
+                                    RemarkOnRebuildFromInterface,
+                                    DisableInterfaceFileLock);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
   return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,

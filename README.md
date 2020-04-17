@@ -19,7 +19,7 @@
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | ARMv7 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64)|
 |**[Windows 2019 (VS 2017)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_windows_2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64)|
-|**[Windows 2019 (VS 2019)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_windows_2019_VS2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/ooss-swift-windows-x86_64-vs2019)|
+|**[Windows 2019 (VS 2019)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_windows_2019_VS2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019)|
 
 **Swift TensorFlow Community-Hosted CI Platforms**
 
@@ -78,6 +78,9 @@ source code and up to 70 GB of disk space for the build artifacts with full
 debugging. Depending on your machine, a clean build can take a few minutes to
 several hours. Naturally, incremental builds are much faster.
 
+Once you are able to build things successfully and have a compile-test-debug
+loop going, check out the [development tips](docs/DevelopmentTips.md) for
+better productivity while working on the compiler.
 
 ### System Requirements
 
@@ -88,7 +91,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11.3](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11.4](https://developer.apple.com/xcode/resources/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -99,6 +102,12 @@ which can be installed via a package manager:
 **[Homebrew](https://brew.sh/)**
 
     brew install cmake ninja
+    
+You can also use [homebrew-bundle](https://github.com/Homebrew/homebrew-bundle)
+from the root of this repository's working directory to install all of these
+dependencies:
+
+    brew bundle
 
 **[MacPorts](https://macports.org)**
 
@@ -110,9 +119,29 @@ Instructions for installing CMake and Ninja directly can be found [below](#build
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libedit-dev \
-        libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libcurl4-openssl-dev \
-        systemtap-sdt-dev tzdata rsync python-six
+```
+sudo apt-get install    \
+  clang                 \
+  cmake                 \
+  git                   \
+  icu-devtools          \
+  libcurl4-openssl-dev  \
+  libedit-dev           \
+  libicu-dev            \
+  libncurses5-dev       \
+  libpython-dev         \
+  libsqlite3-dev        \
+  libxml2-dev           \
+  ninja-build           \
+  pkg-config            \
+  python                \
+  python-six            \
+  rsync                 \
+  swig                  \
+  systemtap-sdt-dev     \
+  tzdata                \
+  uuid-dev
+```
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
@@ -129,7 +158,9 @@ First create a directory for all of the Swift sources:
 **Note:** This is important since update-checkout (see below) checks out
 repositories next to the Swift source directory. This means that if one clones
 Swift and has other unrelated repositories, update-checkout may not clone those
-repositories and will update them instead.
+repositories and will update them instead. Be aware that `update-checkout`
+currently does not support paths with non-ASCII characters. If such characters
+are present in the path to `swift-source`, `update-checkout` will fail.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
@@ -336,7 +367,7 @@ expressed today.
 
 ### CMake
 [CMake](https://cmake.org) is the core infrastructure used to configure builds of
-Swift and its companion projects; at least version 3.4.3 is required.
+Swift and its companion projects; at least version 3.16.5 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded

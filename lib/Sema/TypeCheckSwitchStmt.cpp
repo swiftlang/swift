@@ -686,7 +686,7 @@ namespace {
             llvm_unreachable("Attempted to display disjunct to user!");
           } else {
             buffer << "DISJOIN(";
-            interleave(Spaces, [&](const Space &sp) {
+            llvm::interleave(Spaces, [&](const Space &sp) {
               sp.show(buffer, forDisplay);
             }, [&buffer]() { buffer << " |\n"; });
             buffer << ")";
@@ -1433,7 +1433,7 @@ namespace {
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
         auto &Ctx = OSP->getElementDecl()->getASTContext();
-        Identifier name = Ctx.getOptionalSomeDecl()->getName();
+        const Identifier name = Ctx.getOptionalSomeDecl()->getBaseIdentifier();
 
         auto subSpace = projectPattern(OSP->getSubPattern());
         // To match patterns like (_, _, ...)?, we must rewrite the underlying

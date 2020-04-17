@@ -129,9 +129,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
                                           Ctx.LangOpts.CollectParsedToken,
                                           Ctx.LangOpts.BuildSyntaxTree);
   importMod->addFile(*importFile);
-
-  parseIntoSourceFile(*importFile, bufferID);
-  performNameBinding(*importFile);
+  performImportResolution(*importFile);
   importMod->setHasResolvedImports();
   return importMod;
 }

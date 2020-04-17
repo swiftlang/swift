@@ -67,3 +67,7 @@ struct OtherStruct {
 // CHECK2_DECL: source.lang.swift.decl.var.global (34:5-34:14)
 // CHECK2_REF: source.lang.swift.ref.var.global (34:5-34:14)
 // CHECK2-NEXT: someValue
+
+// RUN: %sourcekitd-test -req=cursor -cursor-action -pos=17:9 %s -- %s | %FileCheck -check-prefixes=CHECK_DOC_XML %s
+// CHECK_DOC_XML: <Declaration>@<Type usr="s:29cursor_info_property_wrappers7WrapperV">Wrapper</Type> var foo: <Type usr="s:Si">Int</Type> { get set }</Declaration>
+// CHECK_DOC_XML: <decl.var.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@<ref.struct usr="s:29cursor_info_property_wrappers7WrapperV">Wrapper</ref.struct></syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>foo</decl.name>: <decl.var.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>

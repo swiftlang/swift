@@ -240,6 +240,366 @@ func outOfOrder(_ a : Int, b: Int) {
   outOfOrder(b: 42, 52)  // expected-error {{unnamed argument #2 must precede argument 'b'}} {{14-14=52, }} {{19-23=}}
 }
 
+struct Variadics7 {
+  func f(alpha: Int..., bravo: Int) {} // expected-note {{'f(alpha:bravo:)' declared here}}
+  // expected-note@-1 {{'f(alpha:bravo:)' declared here}}
+
+  func test() {
+    // no error
+    f(bravo: 0)
+    f(alpha: 0, bravo: 3)
+    f(alpha: 0, 1, bravo: 3)
+    f(alpha: 0, 1, 2, bravo: 3)
+
+    // OoO
+    f(bravo: 0, alpha: 1) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f(bravo: 0, alpha: 1, 2) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f(bravo: 0, alpha: 1, 2, 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+
+    // typo A
+    f(alphax: 0, bravo: 3) // expected-error {{incorrect argument label in call (have 'alphax:bravo:', expected 'alpha:bravo:')}}
+    f(alphax: 0, 1, bravo: 3) // expected-error {{extra argument in call}}
+    f(alphax: 0, 1, 2, bravo: 3) // expected-error {{extra arguments at positions #2, #3 in call}}
+
+    // typo B
+    f(bravox: 0) // expected-error {{incorrect argument label in call (have 'bravox:', expected 'bravo:')}}
+    f(alpha: 0, bravox: 3) // expected-error {{incorrect argument label in call (have 'alpha:bravox:', expected 'alpha:bravo:')}}
+    f(alpha: 0, 1, bravox: 3) // expected-error {{incorrect argument label in call (have 'alpha:_:bravox:', expected 'alpha:_:bravo:')}}
+    f(alpha: 0, 1, 2, bravox: 3) // expected-error {{incorrect argument label in call (have 'alpha:_:_:bravox:', expected 'alpha:_:_:bravo:')}}
+
+    // OoO + typo A B
+    f(bravox: 0, alphax: 1) // expected-error {{incorrect argument labels in call (have 'bravox:alphax:', expected 'alpha:bravo:')}}
+    f(bravox: 0, alphax: 1, 2) // expected-error {{extra argument in call}}
+    f(bravox: 0, alphax: 1, 2, 3) // expected-error {{extra arguments at positions #3, #4 in call}}
+  }
+}
+
+struct Variadics8 {
+  func f(alpha: Int..., bravo: Int, charlie: Int) {} // expected-note {{'f(alpha:bravo:charlie:)' declared here}}
+
+  func test() {
+    // no error
+    f(bravo: 3, charlie: 4)
+    f(alpha: 0, bravo: 3, charlie: 4)
+    f(alpha: 0, 1, bravo: 3, charlie: 4)
+    f(alpha: 0, 1, 2, bravo: 3, charlie: 4)
+
+    // OoO ACB
+    f(charlie: 3, bravo: 4) // expected-error {{argument 'bravo' must precede argument 'charlie'}}
+    f(alpha: 0, charlie: 3, bravo: 4) // expected-error {{argument 'bravo' must precede argument 'charlie'}}
+    f(alpha: 0, 1, charlie: 3, bravo: 4) // expected-error {{argument 'bravo' must precede argument 'charlie'}}
+    f(alpha: 0, 1, 2, charlie: 3, bravo: 4) // expected-error {{argument 'bravo' must precede argument 'charlie'}}
+    // OoO CAB
+    f(charlie: 0, alpha: 1, bravo: 4) // expected-error {{incorrect argument labels in call (have 'charlie:alpha:bravo:', expected 'alpha:bravo:charlie:')}}
+    f(charlie: 0, alpha: 1, 2, bravo: 4) // expected-error {{incorrect argument labels in call (have 'charlie:alpha:_:bravo:', expected 'alpha:bravo:charlie:')}}
+    f(charlie: 0, alpha: 1, 2, 3, bravo: 4) // expected-error {{incorrect argument labels in call (have 'charlie:alpha:_:_:bravo:', expected 'alpha:bravo:charlie:')}}
+    // OoO BAC
+    f(bravo: 0, alpha: 1, charlie: 4) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f(bravo: 0, alpha: 1, 2, charlie: 4) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f(bravo: 0, alpha: 1, 2, 3, charlie: 4) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+
+    // typo A
+    f(alphax: 0, bravo: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alphax:bravo:charlie:', expected 'alpha:bravo:charlie:')}}
+    f(alphax: 0, 1, bravo: 3, charlie: 4) // expected-error {{extra argument in call}}
+    f(alphax: 0, 1, 2, bravo: 3, charlie: 4) // expected-error {{extra arguments at positions #2, #3 in call}}
+    // typo B
+    f(bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'bravox:charlie:', expected 'bravo:charlie:')}}
+    f(alpha: 0, bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alpha:bravox:charlie:', expected 'alpha:bravo:charlie:')}}
+    f(alpha: 0, 1, bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alpha:_:bravox:charlie:', expected 'alpha:_:bravo:charlie:')}}
+    f(alpha: 0, 1, 2, bravox: 3, charlie: 4) // expected-error {{incorrect argument label in call (have 'alpha:_:_:bravox:charlie:', expected 'alpha:_:_:bravo:charlie:')}}
+    // typo C
+    f(bravo: 3, charliex: 4) // expected-error {{incorrect argument label in call (have 'bravo:charliex:', expected 'bravo:charlie:')}}
+    f(alpha: 0, bravo: 3, charliex: 4) // expected-error {{incorrect argument label in call (have 'alpha:bravo:charliex:', expected 'alpha:bravo:charlie:')}}
+    f(alpha: 0, 1, bravo: 3, charliex: 4) // expected-error {{incorrect argument label in call (have 'alpha:_:bravo:charliex:', expected 'alpha:_:bravo:charlie:')}}
+    f(alpha: 0, 1, 2, bravo: 3, charliex: 4) // expected-error {{incorrect argument label in call (have 'alpha:_:_:bravo:charliex:', expected 'alpha:_:_:bravo:charlie:')}}
+
+    // OoO ACB + typo B
+    f(alpha: 0, charlie: 3, bravox: 4) // expected-error {{incorrect argument labels in call (have 'alpha:charlie:bravox:', expected 'alpha:bravo:charlie:')}}
+    f(alpha: 0, 1, charlie: 3, bravox: 4) // expected-error {{incorrect argument labels in call (have 'alpha:_:charlie:bravox:', expected 'alpha:bravo:charlie:')}}
+    f(alpha: 0, 1, 2, charlie: 3, bravox: 4) // expected-error {{incorrect argument labels in call (have 'alpha:_:_:charlie:bravox:', expected 'alpha:bravo:charlie:')}}
+    // OoO ACB + typo C
+    f(charliex: 3, bravo: 4) // expected-error {{incorrect argument labels in call (have 'charliex:bravo:', expected 'alpha:bravo:charlie:')}}
+    f(alpha: 0, charliex: 3, bravo: 4) // expected-error {{incorrect argument labels in call (have 'alpha:charliex:bravo:', expected 'alpha:bravo:charlie:')}}
+    f(alpha: 0, 1, charliex: 3, bravo: 4) // expected-error {{incorrect argument labels in call (have 'alpha:_:charliex:bravo:', expected 'alpha:bravo:charlie:')}}
+    f(alpha: 0, 1, 2, charliex: 3, bravo: 4) // expected-error {{incorrect argument labels in call (have 'alpha:_:_:charliex:bravo:', expected 'alpha:bravo:charlie:')}}
+
+    // OoO BAC + typo B
+    f(bravox: 0, alpha: 1, charlie: 4) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:charlie:', expected 'alpha:bravo:charlie:')}}
+    f(bravox: 0, alpha: 1, 2, charlie: 4) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:_:charlie:', expected 'alpha:bravo:charlie:')}}
+    f(bravox: 0, alpha: 1, 2, 3, charlie: 4) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:_:_:charlie:', expected 'alpha:bravo:charlie:')}}
+    // OoO BAC + typo C
+    f(bravo: 0, alpha: 1, charliex: 4) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f(bravo: 0, alpha: 1, 2, charliex: 4) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f(bravo: 0, alpha: 1, 2, 3, charliex: 4) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+  }
+}
+
+// -------------------------------------------
+// Positions around defaults and variadics 
+// -------------------------------------------
+
+struct PositionsAroundDefaultsAndVariadics {
+  // unlabeled defaulted around labeled parameter
+  func f1(_ a: Bool = false, _ b: Int = 0, c: String = "", _ d: [Int] = []) {}
+
+  func test_f1() {
+    f1(true, 2, c: "3", [4])
+
+    f1(true, c: "3", 2, [4]) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+
+    f1(true, c: "3", [4], 2) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+
+    f1(true, c: "3", 2) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+
+    f1(true, c: "3", [4])
+
+    f1(c: "3", 2, [4]) // expected-error {{unnamed argument #3 must precede argument 'c'}}
+
+    f1(c: "3", [4], 2) // expected-error {{unnamed argument #3 must precede argument 'c'}}
+    
+    f1(c: "3", 2) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+
+    f1(c: "3", [4])
+
+    f1(b: "2", [3]) // expected-error {{incorrect argument labels in call (have 'b:_:', expected '_:_:c:_:')}}
+    // expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+    
+    f1(b: "2", 1) // expected-error {{incorrect argument labels in call (have 'b:_:', expected '_:_:c:_:')}}
+    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f1(b: "2", [3], 1) // expected-error {{incorrect argument labels in call (have 'b:_:_:', expected '_:_:c:_:')}}
+    // expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+
+    f1(b: "2", 1, [3]) // expected-error {{incorrect argument labels in call (have 'b:_:_:', expected '_:_:c:_:')}}
+    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'Int'}}
+  }
+
+  // unlabeled variadics before labeled parameter
+  func f2(_ a: Bool = false, _ b: Int..., c: String = "", _ d: [Int] = []) {}
+
+  func test_f2() {
+    f2(true, 21, 22, 23, c: "3", [4])
+
+    f2(true, "21", 22, 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f2(true, 21, "22", 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f2(true, 21, 22, "23", c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f2(true, 21, 22, c: "3", [4])
+    f2(true, 21, c: "3", [4])
+    f2(true, c: "3", [4])
+
+    f2(true, c: "3", 21) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+
+    f2(true, c: "3", 21, [4]) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+
+    f2(true, c: "3", [4], 21) // expected-error {{unnamed argument #4 must precede argument 'c'}}
+
+    f2(true, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-1 {{remove brackets to pass array elements directly}}
+
+    f2(true, 21, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-1 {{remove brackets to pass array elements directly}}
+    
+    f2(true, 21, 22, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-1 {{remove brackets to pass array elements directly}}
+
+    f2(21, 22, 23, c: "3", [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f2(21, 22, c: "3", [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f2(21, c: "3", [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f2(c: "3", [4])
+    f2(c: "3")
+    f2()
+
+    f2(c: "3", 21) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+    
+    f2(c: "3", 21, [4]) // expected-error {{incorrect argument labels in call (have 'c:_:_:', expected '_:_:c:_:')}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+    // expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+
+    f2(c: "3", [4], 21) // expected-error {{incorrect argument labels in call (have 'c:_:_:', expected '_:_:c:_:')}}
+    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f2([4]) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+
+    f2(21, [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+
+    f2(21, 22, [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+  }
+
+  // labeled variadics before labeled parameter
+  func f3(_ a: Bool = false, b: Int..., c: String = "", _ d: [Int] = []) {}
+
+  func test_f3() {
+    f3(true, b: 21, 22, 23, c: "3", [4])
+
+    f3(true, b: "21", 22, 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f3(true, b: 21, "22", 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f3(true, b: 21, 22, "23", c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f3(true, b: 21, 22, c: "3", [4])
+    f3(true, b: 21, c: "3", [4])
+    f3(true, c: "3", [4])
+
+    f3(true, c: "3", b: 21) // expected-error {{argument 'b' must precede argument 'c'}}
+
+    f3(true, c: "3", b: 21, [4]) // expected-error {{argument 'b' must precede argument 'c'}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+
+    f3(true, c: "3", [4], b: 21) // expected-error {{argument 'b' must precede argument 'c'}}
+
+    f3(true, b: 21, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-1 {{remove brackets to pass array elements directly}}
+
+    f3(b: 21, 22, 23, c: "3", [4])
+    f3(b: 21, 22, c: "3", [4])
+    f3(b: 21, c: "3", [4])
+    f3(c: "3", [4])
+
+    f3([4]) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
+    
+    f3()
+
+    f3(c: "3", b: 21) // expected-error {{argument 'b' must precede argument 'c'}}
+
+    f3(c: "3", b: 21, [4]) // expected-error {{argument 'b' must precede argument 'c'}}
+    // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+    // expected-note@-2 {{remove brackets to pass array elements directly}}
+
+    f3(c: "3", [4], b: 21) // expected-error {{argument 'b' must precede argument 'c'}}
+  }
+
+  // unlabeled variadics after labeled parameter
+  func f4(_ a: Bool = false, b: String = "", _ c: Int..., d: [Int] = []) {}
+
+  func test_f4() {
+    f4(true, b: "2", 31, 32, 33, d: [4])
+    
+    f4(true, b: "2", "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f4(true, b: "2", 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f4(true, b: "2", 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f4(true, b: "2", 31, 32, d: [4])
+    f4(true, b: "2", 31, d: [4])
+    f4(true, b: "2", d: [4])
+
+    f4(true, 31, b: "2", d: [4]) // expected-error {{argument 'b' must precede unnamed argument #2}}
+
+    f4(true, b: "2", d: [4], 31) // expected-error {{unnamed argument #4 must precede argument 'd'}}
+
+    f4(true, b: "2", 31)
+    f4(true, b: "2")
+
+    f4(true)
+    f4(true, 31)
+    f4(true, 31, d: [4])
+    f4(true, 31, 32)
+    f4(true, 31, 32, d: [4])
+
+    f4(b: "2", 31, 32, 33, d: [4])
+
+    f4(b: "2", "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f4(b: "2", 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f4(b: "2", 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f4(b: "2", 31, 32, d: [4])
+    f4(b: "2", 31, d: [4])
+    f4(b: "2", d: [4])
+
+    f4(31, b: "2", d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f4(b: "2", d: [4], 31) // expected-error {{unnamed argument #3 must precede argument 'b'}}
+
+    f4(b: "2", 31)
+    f4(b: "2", 31, 32)
+    f4(b: "2")
+
+    f4()
+    
+    f4(31) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f4(31, d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f4(31, 32) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+
+    f4(31, 32, d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  }
+
+  // labeled variadics after labeled parameter
+  func f5(_ a: Bool = false, b: String = "", c: Int..., d: [Int] = []) {}
+
+  func test_f5() {
+    f5(true, b: "2", c: 31, 32, 33, d: [4])
+    
+    f5(true, b: "2", c: "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(true, b: "2", c: 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(true, b: "2", c: 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+    
+    f5(true, b: "2", c: 31, 32, d: [4])
+    f5(true, b: "2", c: 31, d: [4])
+    f5(true, b: "2", d: [4])
+
+    f5(true, c: 31, b: "2", d: [4]) // expected-error {{argument 'b' must precede argument 'c'}}
+
+    f5(true, b: "2", d: [4], 31) // expected-error {{incorrect argument labels in call (have '_:b:d:_:', expected '_:b:c:d:')}}
+
+    f5(true, b: "2", c: 31)
+    f5(true, b: "2")
+
+    f5(true)
+    f5(true, c: 31)
+    f5(true, c: 31, d: [4])
+    f5(true, c: 31, 32)
+    f5(true, c: 31, 32, d: [4])
+
+    f5(b: "2", c: 31, 32, 33, d: [4])
+    
+    f5(b: "2", c: "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(b: "2", c: 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(b: "2", c: 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+    f5(b: "2", c: 31, 32, d: [4])
+    f5(b: "2", c: 31, d: [4])
+    f5(b: "2", d: [4])
+
+    f5(c: 31, b: "2", d: [4]) // expected-error {{argument 'b' must precede argument 'c'}}
+
+    f5(b: "2", d: [4], c: 31) // expected-error {{argument 'c' must precede argument 'd'}}
+
+    f5(b: "2", c: 31)
+    f5(b: "2", c: 31, 32)
+    f5(b: "2")
+
+    f5()
+    f5(c: 31)
+    f5(c: 31, d: [4])
+    f5(c: 31, 32)
+    f5(c: 31, 32, d: [4])
+  }
+}
+
 // -------------------------------------------
 // Missing arguments
 // -------------------------------------------
@@ -269,6 +629,102 @@ func mismatch1(thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { } // expected-
 mismatch1(foo: 5) // expected-error {{extra argument 'foo' in call}}
 mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}} {{11-14=bar}} {{19-25=wibble}}
 mismatch1(food: 1, zap: 2) // expected-error{{extra arguments at positions #1, #2 in call}}
+
+// -------------------------------------------
+// Out of order and default
+// -------------------------------------------
+
+struct OutOfOrderAndDefault {
+  func f11(alpha: Int, bravo: Int) {}
+  func f12(alpha: Int = -1, bravo: Int) {}
+  func f13(alpha: Int, bravo: Int = -1) {}
+  func f14(alpha: Int = -1, bravo: Int = -1) {}
+
+  func test1() {
+    // typo
+    f11(bravo: 0, alphax: 1) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:', expected 'alpha:bravo:')}}
+    f11(bravox: 0, alpha: 1) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:', expected 'alpha:bravo:')}}
+    f12(bravo: 0, alphax: 1) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:', expected 'alpha:bravo:')}}
+    f12(bravox: 0, alpha: 1) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:', expected 'alpha:bravo:')}}
+    f13(bravo: 0, alphax: 1) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:', expected 'alpha:bravo:')}}
+    f13(bravox: 0, alpha: 1) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:', expected 'alpha:bravo:')}}
+    f14(bravo: 0, alphax: 1) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:', expected 'alpha:bravo:')}}
+    f14(bravox: 0, alpha: 1) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:', expected 'alpha:bravo:')}}
+  }
+
+  func f21(alpha: Int, bravo: Int, charlie: Int) {}
+  func f22(alpha: Int = -1, bravo: Int, charlie: Int) {}
+  func f23(alpha: Int = -1, bravo: Int = -1, charlie: Int) {}
+
+  func test2() {
+    // BAC
+    f21(bravo: 0, alphax: 1, charlie: 2) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:charlie:', expected 'alpha:bravo:charlie:')}}
+    f21(bravox: 0, alpha: 1, charlie: 2) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:charlie:', expected 'alpha:bravo:charlie:')}}
+    f21(bravo: 0, alpha: 1, charliex: 2) // expected-error {{'alpha' must precede argument 'bravo'}}
+    f22(bravo: 0, alphax: 1, charlie: 2) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:charlie:', expected 'alpha:bravo:charlie:')}}
+    f22(bravox: 0, alpha: 1, charlie: 2) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:charlie:', expected 'alpha:bravo:charlie:')}}
+    f22(bravo: 0, alpha: 1, charliex: 2) // expected-error {{'alpha' must precede argument 'bravo'}}
+    f23(bravo: 0, alphax: 1, charlie: 2) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:charlie:', expected 'alpha:bravo:charlie:')}}
+    f23(bravox: 0, alpha: 1, charlie: 2) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:charlie:', expected 'alpha:bravo:charlie:')}}
+    f23(bravo: 0, alpha: 1, charliex: 2) // expected-error {{'alpha' must precede argument 'bravo'}}
+
+    // BCA
+    f21(bravo: 0, charlie: 1, alphax: 2) // expected-error {{incorrect argument labels in call (have 'bravo:charlie:alphax:', expected 'alpha:bravo:charlie:')}}
+    f21(bravox: 0, charlie: 1, alpha: 2) // expected-error {{incorrect argument labels in call (have 'bravox:charlie:alpha:', expected 'alpha:bravo:charlie:')}}
+    f21(bravo: 0, charliex: 1, alpha: 2) // expected-error {{'alpha' must precede argument 'bravo'}}
+    f22(bravo: 0, charlie: 1, alphax: 2) // expected-error {{incorrect argument labels in call (have 'bravo:charlie:alphax:', expected 'alpha:bravo:charlie:')}}
+    f22(bravox: 0, charlie: 1, alpha: 2) // expected-error {{incorrect argument labels in call (have 'bravox:charlie:alpha:', expected 'alpha:bravo:charlie:')}}
+    f22(bravo: 0, charliex: 1, alpha: 2) // expected-error {{'alpha' must precede argument 'bravo'}}
+    f23(bravo: 0, charlie: 1, alphax: 2) // expected-error {{incorrect argument labels in call (have 'bravo:charlie:alphax:', expected 'alpha:bravo:charlie:')}}
+    f23(bravox: 0, charlie: 1, alpha: 2) // expected-error {{incorrect argument labels in call (have 'bravox:charlie:alpha:', expected 'alpha:bravo:charlie:')}}
+    f23(bravo: 0, charliex: 1, alpha: 2) // expected-error {{'alpha' must precede argument 'bravo'}}
+
+    // CAB
+    f21(charlie: 0, alphax: 1, bravo: 2) // expected-error {{incorrect argument labels in call (have 'charlie:alphax:bravo:', expected 'alpha:bravo:charlie:')}}
+    f21(charlie: 0, alpha: 1, bravox: 2) // expected-error {{incorrect argument labels in call (have 'charlie:alpha:bravox:', expected 'alpha:bravo:charlie:')}}
+    f21(charliex: 0, alpha: 1, bravo: 2) // expected-error {{incorrect argument labels in call (have 'charliex:alpha:bravo:', expected 'alpha:bravo:charlie:')}}
+    f22(charlie: 0, alphax: 1, bravo: 2) // expected-error {{incorrect argument labels in call (have 'charlie:alphax:bravo:', expected 'alpha:bravo:charlie:')}}
+    f22(charlie: 0, alpha: 1, bravox: 2) // expected-error {{incorrect argument labels in call (have 'charlie:alpha:bravox:', expected 'alpha:bravo:charlie:')}}
+    f22(charliex: 0, alpha: 1, bravo: 2) // expected-error {{incorrect argument labels in call (have 'charliex:alpha:bravo:', expected 'alpha:bravo:charlie:')}}
+    f23(charlie: 0, alphax: 1, bravo: 2) // expected-error {{incorrect argument labels in call (have 'charlie:alphax:bravo:', expected 'alpha:bravo:charlie:')}}
+    f23(charlie: 0, alpha: 1, bravox: 2) // expected-error {{argument 'alpha' must precede argument 'charlie'}}
+    f23(charliex: 0, alpha: 1, bravo: 2) // expected-error {{incorrect argument labels in call (have 'charliex:alpha:bravo:', expected 'alpha:bravo:charlie:')}}
+  }
+
+  func f31(alpha: Int, bravo: Int, charlie: Int, delta: Int) {}
+  func f32(alpha: Int = -1, bravo: Int = -1, charlie: Int, delta: Int) {}
+  func f33(alpha: Int = -1, bravo: Int = -1, charlie: Int, delta: Int = -1) {}
+
+  func test3() {
+    // BACD
+    f31(bravo: 0, alphax: 2, charlie: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:charlie:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f31(bravox: 0, alpha: 2, charlie: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:charlie:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f31(bravo: 0, alpha: 2, charliex: 2, delta: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f31(bravo: 0, alpha: 2, charlie: 2, deltax: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f32(bravo: 0, alphax: 2, charlie: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:charlie:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f32(bravox: 0, alpha: 2, charlie: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:charlie:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f32(bravo: 0, alpha: 2, charliex: 2, delta: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f32(bravo: 0, alpha: 2, charlie: 2, deltax: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f33(bravo: 0, alphax: 2, charlie: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravo:alphax:charlie:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f33(bravox: 0, alpha: 2, charlie: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravox:alpha:charlie:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f33(bravo: 0, alpha: 2, charliex: 2, delta: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f33(bravo: 0, alpha: 2, charlie: 2, deltax: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+
+    // BCAD
+    f31(bravo: 0, charlie: 1, alphax: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravo:charlie:alphax:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f31(bravox: 0, charlie: 1, alpha: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravox:charlie:alpha:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f31(bravo: 0, charliex: 1, alpha: 2, delta: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f31(bravo: 0, charlie: 1, alpha: 2, deltax: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f32(bravo: 0, charlie: 1, alphax: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravo:charlie:alphax:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f32(bravox: 0, charlie: 1, alpha: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravox:charlie:alpha:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f32(bravo: 0, charliex: 1, alpha: 2, delta: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f32(bravo: 0, charlie: 1, alpha: 2, deltax: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f33(bravo: 0, charlie: 1, alphax: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravo:charlie:alphax:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f33(bravox: 0, charlie: 1, alpha: 2, delta: 3) // expected-error {{incorrect argument labels in call (have 'bravox:charlie:alpha:delta:', expected 'alpha:bravo:charlie:delta:')}}
+    f33(bravo: 0, charliex: 1, alpha: 2, delta: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+    f33(bravo: 0, charlie: 1, alpha: 2, deltax: 3) // expected-error {{argument 'alpha' must precede argument 'bravo'}}
+  }
+}
 
 // -------------------------------------------
 // Subscript keyword arguments
@@ -342,19 +798,15 @@ func trailingclosure4(f: () -> Int) {}
 trailingclosure4 { 5 }
 
 func trailingClosure5<T>(_ file: String = #file, line: UInt = #line, expression: () -> T?) { }
-// expected-note@-1 {{in call to function 'trailingClosure5(_:line:expression:)'}}
 func trailingClosure6<T>(value: Int, expression: () -> T?) { }
-// expected-note@-1 {{in call to function 'trailingClosure6(value:expression:)'}}
 
 trailingClosure5(file: "hello", line: 17) { // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
-// expected-error@-1 {{generic parameter 'T' could not be inferred}}
   return Optional.Some(5)
   // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'?}} {{19-23=some}}
   // expected-error@-2 {{generic parameter 'Wrapped' could not be inferred}}
   // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}}
 }
 trailingClosure6(5) { // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
-// expected-error@-1 {{generic parameter 'T' could not be inferred}}
   return Optional.Some(5)
   // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'?}} {{19-23=some}}
   // expected-error@-2 {{generic parameter 'Wrapped' could not be inferred}}

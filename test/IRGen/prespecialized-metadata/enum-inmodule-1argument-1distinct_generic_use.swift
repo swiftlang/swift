@@ -1,4 +1,4 @@
-// RUN: %swift -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
+// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
@@ -6,7 +6,7 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 // CHECK: @"$s4main5OuterOyAA5InnerVySiGGWV" = linkonce_odr hidden constant %swift.enum_vwtable
-// CHECK: @"$s4main5OuterOyAA5InnerVySiGGMf" = internal constant <{ 
+// CHECK: @"$s4main5OuterOyAA5InnerVySiGGMf" = linkonce_odr hidden constant <{ 
 // CHECK-SAME:   i8**, 
 // CHECK-SAME:   [[INT]], 
 // CHECK-SAME:   %swift.type_descriptor*, 
@@ -21,8 +21,7 @@
 // CHECK-SAME:   ), 
 // CHECK-SAME:   [[INT]] 513, 
 // CHECK-SAME:   %swift.type_descriptor* bitcast (
-// CHECK-SAME:     <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5OuterOMn" 
-// CHECK-SAME:     to %swift.type_descriptor*
+// CHECK-SAME:     {{.*}}$s4main5OuterOMn{{.*}} to %swift.type_descriptor*
 // CHECK-SAME:   ), 
 // CHECK-SAME:   %swift.type* getelementptr inbounds (
 // CHECK-SAME:     %swift.full_type, 
@@ -92,9 +91,7 @@ doit()
 // CHECK-SAME:     i8* undef, 
 // CHECK-SAME:     i8* undef, 
 // CHECK-SAME:     %swift.type_descriptor* bitcast (
-// CHECK-SAME:       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* 
-// CHECK-SAME:       @"$s4main5OuterOMn" 
-// CHECK-SAME:       to %swift.type_descriptor*
+// CHECK-SAME:       {{.*}}$s4main5OuterOMn{{.*}} to %swift.type_descriptor*
 // CHECK-SAME:     )
 // CHECK-SAME:   ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}

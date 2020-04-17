@@ -179,6 +179,26 @@ struct ConformanceDiagnostic {
   ProtocolDecl *ExistingExplicitProtocol;
 };
 
+/// Used in diagnostic %selects.
+struct FragileFunctionKind {
+  enum Kind : unsigned {
+    Transparent,
+    Inlinable,
+    AlwaysEmitIntoClient,
+    DefaultArgument,
+    PropertyInitializer,
+    None
+  };
+
+  Kind kind = None;
+  bool allowUsableFromInline = false;
+
+  friend bool operator==(FragileFunctionKind lhs, FragileFunctionKind rhs) {
+    return (lhs.kind == rhs.kind &&
+            lhs.allowUsableFromInline == rhs.allowUsableFromInline);
+  }
+};
+
 /// A DeclContext is an AST object which acts as a semantic container
 /// for declarations.  As a policy matter, we currently define
 /// contexts broadly: a lambda expression in a function is a new
@@ -469,6 +489,10 @@ public:
   /// are used.
   ResilienceExpansion getResilienceExpansion() const;
 
+  /// Get the fragile function kind for the code in this context, which
+  /// is used for diagnostics.
+  FragileFunctionKind getFragileFunctionKind() const;
+
   /// Returns true if this context may possibly contain members visible to
   /// AnyObject dynamic lookup.
   bool mayContainMembersAccessedByDynamicLookup() const;
@@ -552,31 +576,38 @@ public:
   ///
   /// \param lookupKind The kind of lookup to perform.
   ///
-  /// \param diagnostics If non-null, will be populated with the set of
-  /// diagnostics that should be emitted for this declaration context.
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolDecl *, 2>
   getLocalProtocols(ConformanceLookupKind lookupKind
-                      = ConformanceLookupKind::All,
-                    SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                      = nullptr) const;
+                      = ConformanceLookupKind::All) const;
 
   /// Retrieve the set of protocol conformances associated with this
   /// declaration context.
   ///
   /// \param lookupKind The kind of lookup to perform.
   ///
-  /// \param diagnostics If non-null, will be populated with the set of
-  /// diagnostics that should be emitted for this declaration context.
-  ///
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolConformance *, 2>
   getLocalConformances(ConformanceLookupKind lookupKind
-                         = ConformanceLookupKind::All,
-                       SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                         = nullptr) const;
+                         = ConformanceLookupKind::All) const;
+
+  /// Retrieve diagnostics discovered while expanding conformances for this
+  /// declaration context. This operation then removes those diagnostics from
+  /// consideration, so subsequent calls to this function with the same
+  /// declaration context that have not had any new extensions bound
+  /// will see an empty array.
+  SmallVector<ConformanceDiagnostic, 4>
+  takeConformanceDiagnostics() const;
+
+  /// Retrieves a list of separately imported overlays which are shadowing
+  /// \p declaring. If any \p overlays are returned, qualified lookups into
+  /// \p declaring should be performed into \p overlays instead; since they
+  /// are overlays, they will re-export \p declaring, but will also augment it
+  /// with additional symbols.
+  void getSeparatelyImportedOverlays(
+      ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const;
 
   /// Retrieve the syntactic depth of this declaration context, i.e.,
   /// the number of non-module-scoped contexts.
@@ -806,7 +837,7 @@ public:
   /// available.
   Optional<std::string> getBodyFingerprint() const;
 
-  bool areDependenciesUsingTokenHashesForTypeBodies() const;
+  bool areTokensHashedForThisBodyInsteadOfInterfaceHash() const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

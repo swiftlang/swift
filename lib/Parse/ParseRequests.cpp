@@ -21,6 +21,8 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
+#include "swift/Syntax/SyntaxArena.h"
+#include "swift/SyntaxParse/SyntaxTreeCreator.h"
 
 using namespace swift;
 
@@ -105,6 +107,97 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
   llvm_unreachable("Unhandled BodyKind in switch");
 }
 
+//----------------------------------------------------------------------------//
+// ParseSourceFileRequest computation.
+//----------------------------------------------------------------------------//
+
+/// A thunk that deletes an allocated PersistentParserState. This is needed for
+/// us to be able to forward declare a unique_ptr to the state in the AST.
+static void deletePersistentParserState(PersistentParserState *state) {
+  delete state;
+}
+
+ArrayRef<Decl *> ParseSourceFileRequest::evaluate(Evaluator &evaluator,
+                                                  SourceFile *SF) const {
+  assert(SF);
+  auto &ctx = SF->getASTContext();
+  auto bufferID = SF->getBufferID();
+
+  // If there's no buffer, there's nothing to parse.
+  if (!bufferID)
+    return {};
+
+  std::shared_ptr<SyntaxTreeCreator> sTreeCreator;
+  if (SF->shouldBuildSyntaxTree()) {
+    sTreeCreator = std::make_shared<SyntaxTreeCreator>(
+        ctx.SourceMgr, *bufferID, SF->SyntaxParsingCache, ctx.getSyntaxArena());
+  }
+
+  // If we've been asked to silence warnings, do so now. This is needed for
+  // secondary files, which can be parsed multiple times.
+  auto &diags = ctx.Diags;
+  auto didSuppressWarnings = diags.getSuppressWarnings();
+  auto shouldSuppress = SF->getParsingOptions().contains(
+      SourceFile::ParsingFlags::SuppressWarnings);
+  diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
+  SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
+
+  // If this buffer is for code completion, hook up the state needed by its
+  // second pass.
+  PersistentParserState *state = nullptr;
+  if (ctx.SourceMgr.getCodeCompletionBufferID() == bufferID) {
+    state = new PersistentParserState();
+    SF->setDelayedParserState({state, &deletePersistentParserState});
+  }
+
+  FrontendStatsTracer tracer(ctx.Stats, "Parsing");
+  Parser parser(*bufferID, *SF, /*SIL*/ nullptr, state, sTreeCreator);
+  PrettyStackTraceParser StackTrace(parser);
+
+  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> S(parser.CurrentTokenHash,
+                                                 SF->getInterfaceHashPtr());
+
+  SmallVector<Decl *, 128> decls;
+  parser.parseTopLevel(decls);
+
+  if (sTreeCreator) {
+    auto rawNode = parser.finalizeSyntaxTree();
+    sTreeCreator->acceptSyntaxRoot(rawNode, *SF);
+  }
+  return ctx.AllocateCopy(decls);
+}
+
+evaluator::DependencySource
+ParseSourceFileRequest::readDependencySource(Evaluator &e) const {
+  return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
+}
+
+Optional<ArrayRef<Decl *>> ParseSourceFileRequest::getCachedResult() const {
+  auto *SF = std::get<0>(getStorage());
+  return SF->getCachedTopLevelDecls();
+}
+
+void ParseSourceFileRequest::cacheResult(ArrayRef<Decl *> decls) const {
+  auto *SF = std::get<0>(getStorage());
+  assert(!SF->Decls);
+  SF->Decls = decls;
+
+  // Verify the parsed source file.
+  verify(*SF);
+}
+
+//----------------------------------------------------------------------------//
+// CodeCompletionSecondPassRequest computation.
+//----------------------------------------------------------------------------//
+
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const CodeCompletionCallbacksFactory *factory) { }
+
+evaluator::DependencySource
+CodeCompletionSecondPassRequest::readDependencySource(Evaluator &e) const {
+  return {std::get<0>(getStorage()), e.getActiveSourceScope()};
+}
 
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *parseRequestFunctions[] = {

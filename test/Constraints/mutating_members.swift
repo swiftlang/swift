@@ -27,10 +27,10 @@ func bar() -> Foo.Type { fatalError() }
 
 _ = bar().boom       // expected-error{{partial application of 'mutating' method}}
 _ = bar().boom(&y)   // expected-error{{partial application of 'mutating' method}}
-_ = bar().boom(&y)() // ok
+_ = bar().boom(&y)() // expected-error{{partial application of 'mutating' method}}
 
 func foo(_ foo: Foo.Type) {
   _ = foo.boom       // expected-error{{partial application of 'mutating' method}}
   _ = foo.boom(&y)   // expected-error{{partial application of 'mutating' method}}
-  _ = foo.boom(&y)() // ok
+  _ = foo.boom(&y)() // expected-error{{partial application of 'mutating' method}}
 }

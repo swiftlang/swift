@@ -78,6 +78,12 @@ func takesARefinery(_ x: Refinery) {
   x.sugar = .caster
 }
 
+func takesAnExtraRefinery(_ x: ExtraRefinery) {
+  // CHECK: has no member 'sugar'
+  x.sugar = .caster
+  x.setSugar(0)
+}
+
 func nullabilityRefinementProto(_ x: MyBaseClass) {
   // CHECK-PUBLIC: has no member 'requirement'
   // CHECK-PRIVATE-NOT: has no member 'requirement'

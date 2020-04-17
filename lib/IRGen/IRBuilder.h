@@ -208,9 +208,10 @@ public:
 
   using IRBuilderBase::CreateMemCpy;
   llvm::CallInst *CreateMemCpy(Address dest, Address src, Size size) {
-    return CreateMemCpy(dest.getAddress(), dest.getAlignment().getValue(),
-                        src.getAddress(), src.getAlignment().getValue(),
-                        size.getValue());
+    return CreateMemCpy(
+        dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+        src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+        size.getValue());
   }
 
   using IRBuilderBase::CreateMemSet;

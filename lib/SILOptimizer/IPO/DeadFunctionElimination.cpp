@@ -587,7 +587,14 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         ensureKeyPathComponentIsAlive(*component);
       }
     }
-
+    // Check differentiability witness entries.
+    for (auto &dw : Module->getDifferentiabilityWitnessList()) {
+      ensureAlive(dw.getOriginalFunction());
+      if (dw.getJVP())
+        ensureAlive(dw.getJVP());
+      if (dw.getVJP())
+        ensureAlive(dw.getVJP());
+    }
   }
 
   /// Removes all dead methods from vtables and witness tables.
@@ -736,8 +743,8 @@ SILTransform *swift::createLateDeadFunctionElimination() {
 }
 
 void swift::performSILDeadFunctionElimination(SILModule *M) {
-  SILPassManager PM(M);
   llvm::SmallVector<PassKind, 1> Pass = {PassKind::DeadFunctionElimination};
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPassPipelineForKinds(M->getOptions(), Pass));
+  auto &opts = M->getOptions();
+  auto plan = SILPassPipelinePlan::getPassPipelineForKinds(opts, Pass);
+  executePassPipelinePlan(M, plan);
 }

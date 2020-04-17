@@ -38,24 +38,22 @@ void swift::simple_display(llvm::raw_ostream &out,
   } else {
     assert(unit);
     out << "SIL Generation for file ";
-    switch (unit->getKind()) {
-    case FileUnitKind::Source:
-      out << '\"' << cast<SourceFile>(unit)->getFilename() << '\"';
-      break;
-    case FileUnitKind::Builtin:
-      out << "(Builtin)";
-      break;
-    case FileUnitKind::DWARFModule:
-    case FileUnitKind::ClangModule:
-    case FileUnitKind::SerializedAST:
-      out << '\"' << cast<LoadedFile>(unit)->getFilename() << '\"';
-      break;
-    }
+    simple_display(out, unit);
   }
 }
 
 SourceLoc swift::extractNearestSourceLoc(const SILGenDescriptor &desc) {
   return SourceLoc();
+}
+
+evaluator::DependencySource
+SILGenSourceFileRequest::readDependencySource(Evaluator &e) const {
+  auto &desc = std::get<0>(getStorage());
+  auto *unit = desc.context.get<FileUnit *>();
+  return {
+    dyn_cast_or_null<SourceFile>(unit),
+    evaluator::DependencyScope::Cascading
+  };
 }
 
 // Define request evaluation functions for each of the SILGen requests.

@@ -91,12 +91,12 @@ func test2<U>(value: MyStruct<U>) {
 
   let _ = MyStruct<U>[42, #^METATYPE_LABEL^#
 // METATYPE_LABEL: Begin completions, 1 items
-// METATYPE_LABEL-DAG: Keyword/ExprSpecific:               static: [#Argument name#];
+// METATYPE_LABEL-DAG: Pattern/ExprSpecific: {#static: U#}[#U#];
 // METATYPE_LABEL: End completions
 
   let _ = value[42, #^INSTANCE_LABEL^#
 // INSTANCE_LABEL: Begin completions, 1 items
-// INSTANCE_LABEL-DAG: Keyword/ExprSpecific:               instance: [#Argument name#];
+// INSTANCE_LABEL-DAG: Pattern/ExprSpecific: {#instance: U#}[#U#];
 // INSTANCE_LABEL: End completions
 }
 
@@ -111,8 +111,8 @@ class Derived: Base {
   func testInstance() {
     let _ = self[#^SELF_IN_INSTANCEMETHOD^#]
 // SELF_IN_INSTANCEMETHOD: Begin completions, 2 items
-// SELF_IN_INSTANCEMETHOD-DAG: Decl[Subscript]/CurrNominal:        ['[']{#derivedInstance: Int#}[']'][#Int#];
-// SELF_IN_INSTANCEMETHOD-DAG: Decl[Subscript]/CurrNominal:        ['[']{#instance: Int#}[']'][#Int#];
+// SELF_IN_INSTANCEMETHOD-DAG: Decl[Subscript]/CurrNominal: ['[']{#derivedInstance: Int#}[']'][#Int#];
+// SELF_IN_INSTANCEMETHOD-DAG: Decl[Subscript]/Super:       ['[']{#instance: Int#}[']'][#Int#];
 // SELF_IN_INSTANCEMETHOD: End completions
 
     let _ = super[#^SUPER_IN_INSTANCEMETHOD^#]
@@ -124,8 +124,8 @@ class Derived: Base {
   static func testStatic() {
     let _ = self[#^SELF_IN_STATICMETHOD^#]
 // SELF_IN_STATICMETHOD: Begin completions, 2 items
-// SELF_IN_STATICMETHOD-DAG: Decl[Subscript]/CurrNominal:        ['[']{#derivedStatic: Int#}[']'][#Int#];
-// SELF_IN_STATICMETHOD-DAG: Decl[Subscript]/CurrNominal:        ['[']{#static: Int#}[']'][#Int#];
+// SELF_IN_STATICMETHOD-DAG: Decl[Subscript]/CurrNominal: ['[']{#derivedStatic: Int#}[']'][#Int#];
+// SELF_IN_STATICMETHOD-DAG: Decl[Subscript]/Super:       ['[']{#static: Int#}[']'][#Int#];
 // SELF_IN_STATICMETHOD: End completions
 
     let _ = super[#^SUPER_IN_STATICMETHOD^#]

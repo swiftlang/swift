@@ -147,7 +147,7 @@ extension Error {
     // CHECK: [[GET_EMBEDDED_FN:%[0-9]+]] = function_ref @$ss24_getErrorEmbeddedNSErroryyXlSgxs0B0RzlF
     // CHECK: [[EMBEDDED_RESULT_OPT:%[0-9]+]] = apply [[GET_EMBEDDED_FN]]<Self>([[COPY2]])
     // CHECK: switch_enum [[EMBEDDED_RESULT_OPT]] : $Optional<AnyObject>,
-    // CHECK-SAME: case #Optional.some!enumelt.1: [[SUCCESS:bb[0-9]+]],
+    // CHECK-SAME: case #Optional.some!enumelt: [[SUCCESS:bb[0-9]+]],
     // CHECK-SAME: case #Optional.none!enumelt: [[FAILURE:bb[0-9]+]]
 
     // CHECK: [[SUCCESS]]([[EMBEDDED_RESULT:%.*]] : @owned $AnyObject):

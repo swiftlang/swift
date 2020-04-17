@@ -62,25 +62,25 @@ class A {
 
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties11testPropGet{{[_0-9a-zA-Z]*}}F
 func testPropGet(_ a: A) -> Int {
-  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.prop!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.prop!getter.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
   return a.prop
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties11testPropSet{{[_0-9a-zA-Z]*}}F
 func testPropSet(_ a: A, i: Int) {
-  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.prop!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.prop!setter.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
   a.prop = i
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties19testComputedPropGet{{[_0-9a-zA-Z]*}}F
 func testComputedPropGet(_ a: A) -> Int {
-  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.computedProp!getter.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
   return a.computedProp
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties19testComputedPropSet{{[_0-9a-zA-Z]*}}F
 func testComputedPropSet(_ a: A, i: Int) {
-  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
+  // CHECK: objc_method [[OBJ:%[0-9]+]] : $A, #A.computedProp!setter.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
   a.computedProp = i
 }
 
@@ -89,12 +89,12 @@ class B : A {
   @objc override var computedProp: Int {
     // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties1BC12computedPropSivg : $@convention(method) (@guaranteed B) -> Int
     get {
-      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
+      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.foreign : (A) -> () -> Int, $@convention(objc_method) (A) -> Int
       return super.computedProp
     }
     // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties1BC12computedPropSivs : $@convention(method) (Int, @guaranteed B) -> ()
     set(value) {
-      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
+      // CHECK: objc_super_method [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.foreign : (A) -> (Int) -> (), $@convention(objc_method) (Int, A) -> ()
       super.computedProp = value
     }
   }
@@ -106,7 +106,7 @@ class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15objc_properties13TestNSCopyingC8propertySo8NSStringCvs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK: bb0([[ARG0:%.*]] : @owned $NSString, [[ARG1:%.*]] : @guaranteed $TestNSCopying):
   // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSCopying.copy!1.foreign
+  // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSCopying.copy!foreign
   @NSCopying var property : NSString
 
   @NSCopying var optionalProperty : NSString?
@@ -196,7 +196,7 @@ class NonObjCClassWithObjCProperty {
 
   // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties016NonObjCClassWithD9CPropertyC11usePropertyyyF : $@convention(method) (@guaranteed NonObjCClassWithObjCProperty) -> () {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonObjCClassWithObjCProperty):
-  // CHECK: [[MODIFY:%.*]] = class_method [[ARG]] : $NonObjCClassWithObjCProperty, #NonObjCClassWithObjCProperty.property!modify.1
+  // CHECK: [[MODIFY:%.*]] = class_method [[ARG]] : $NonObjCClassWithObjCProperty, #NonObjCClassWithObjCProperty.property!modify
   // CHECK: ([[OBJECT:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[ARG]])
   // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT]]
   // CHECK: [[UNMANAGED_OBJECT:%.*]] = ref_to_unmanaged [[LOADED_OBJECT]] : $NSObject to $@sil_unmanaged NSObject
@@ -242,15 +242,15 @@ class HasLazyProperty : NSObject, HasProperty {
   lazy var window = self.instanceMethod()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s15objc_properties15HasLazyPropertyC6windowSo8NSObjectCSgvg : $@convention(method) (@guaranteed HasLazyProperty) -> @owned Optional<NSObject> {
-// CHECK: class_method %0 : $HasLazyProperty, #HasLazyProperty.instanceMethod!1 : (HasLazyProperty) -> () -> NSObject?
+// CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s15objc_properties15HasLazyPropertyC6windowSo8NSObjectCSgvg : $@convention(method) (@guaranteed HasLazyProperty) -> @owned Optional<NSObject> {
+// CHECK: class_method %0 : $HasLazyProperty, #HasLazyProperty.instanceMethod : (HasLazyProperty) -> () -> NSObject?
 // CHECK: return
 
 //   The way we import this setter splits the name into the parameter list,
 //   which can cause fits for SILGenApply the way it's currently implemented.
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties26testPropSetWithPreposition
 func testPropSetWithPreposition(object: ObjectWithSplitProperty?) {
-  // CHECK: #ObjectWithSplitProperty.flagForSomething!setter.1.foreign : (ObjectWithSplitProperty) -> (Bool) -> (), $@convention(objc_method) ({{Bool|ObjCBool}}, ObjectWithSplitProperty) -> ()
+  // CHECK: #ObjectWithSplitProperty.flagForSomething!setter.foreign : (ObjectWithSplitProperty) -> (Bool) -> (), $@convention(objc_method) ({{Bool|ObjCBool}}, ObjectWithSplitProperty) -> ()
   object?.flagForSomething = false
 }
 
@@ -270,13 +270,36 @@ public struct SomeWrapper {
   }
 }
 
+@propertyWrapper struct W<Value> {
+  var wrappedValue: Value {
+    get { return x }
+    set {  }
+  }
+
+  var x: Value
+
+  init(wrappedValue: Value) {
+    x = wrappedValue
+  }
+}
+
 class SomeWrapperTests {
   @objc @SomeWrapper dynamic var someWrapper: Int = 0
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsC14testAssignmentyyF
-// CHECK: [[M:%.*]] = objc_method %0 : $SomeWrapperTests, #SomeWrapperTests.someWrapper!setter.1.foreign
-// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]]({{.*}}) : $@convention(objc_method)
+// CHECK:  [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC04someD0SivsTD
+// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[M]]({{.*}})
 // CHECK: assign_by_wrapper {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@callee_guaranteed (Int) -> ()
   func testAssignment() {
     someWrapper = 1000
+  }
+
+  @W @objc dynamic var s: String? = nil
+// CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsC16testBridgedValueyySSF
+// CHECK: [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC1sSSSgvsTD
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]](
+// CHECK:  assign_by_wrapper {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@callee_guaranteed (@owned Optional<String>) -> ()
+  // Let's not crash.
+  func testBridgedValue(_ s: String) {
+    self.s = s
   }
 }

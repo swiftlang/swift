@@ -135,6 +135,9 @@ public:
   SILValue getCallee() const { return getCalleeOperand()->get(); }
 
   /// Return the callee operand.
+  Operand *getCalleeOperand() { FOREACH_IMPL_RETURN(getCalleeOperand()); }
+
+  /// Return the callee operand.
   const Operand *getCalleeOperand() const {
     FOREACH_IMPL_RETURN(getCalleeOperand());
   }
@@ -195,6 +198,10 @@ public:
   SILType getSubstCalleeSILType() const {
     FOREACH_IMPL_RETURN(getSubstCalleeSILType());
   }
+  void setSubstCalleeType(CanSILFunctionType t) {
+    FOREACH_IMPL_RETURN(setSubstCalleeType(t));
+  }
+
   /// Get the conventions of the callee with the applied substitutions.
   SILFunctionConventions getSubstCalleeConv() const {
     return SILFunctionConventions(getSubstCalleeType(), getModule());
@@ -503,6 +510,17 @@ public:
     return getArguments().slice(getNumIndirectSILResults());
   }
 
+  InoutArgumentRange getInoutArguments() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(getInstruction())->getInoutArguments();
+    case FullApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(getInstruction())->getInoutArguments();
+    case FullApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(getInstruction())->getInoutArguments();
+    }
+  }
+
   /// Returns true if \p op is the callee operand of this apply site
   /// and not an argument operand.
   bool isCalleeOperand(const Operand &op) const {
@@ -582,6 +600,32 @@ public:
 } // namespace swift
 
 namespace llvm {
+
+template<>
+struct PointerLikeTypeTraits<swift::ApplySite> {
+public:
+  static inline void *getAsVoidPointer(swift::ApplySite apply) {
+    return (void*)apply.getInstruction();
+  }
+  static inline swift::ApplySite getFromVoidPointer(void *pointer) {
+    return swift::ApplySite((swift::SILInstruction*)pointer);
+  }
+  enum { NumLowBitsAvailable =
+         PointerLikeTypeTraits<swift::SILNode *>::NumLowBitsAvailable };
+};
+
+template<>
+struct PointerLikeTypeTraits<swift::FullApplySite> {
+public:
+  static inline void *getAsVoidPointer(swift::FullApplySite apply) {
+    return (void*)apply.getInstruction();
+  }
+  static inline swift::FullApplySite getFromVoidPointer(void *pointer) {
+    return swift::FullApplySite((swift::SILInstruction*)pointer);
+  }
+  enum { NumLowBitsAvailable =
+         PointerLikeTypeTraits<swift::SILNode *>::NumLowBitsAvailable };
+};
 
 // An ApplySite casts like a SILInstruction*.
 template <> struct simplify_type<const ::swift::ApplySite> {

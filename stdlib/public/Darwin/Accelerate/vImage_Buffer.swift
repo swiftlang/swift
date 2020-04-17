@@ -217,7 +217,7 @@ extension vImage_Buffer {
 
         var error = kvImageNoError
         
-        _ = withUnsafePointer(to: self) {
+        withUnsafePointer(to: self) {
             error =  vImageCopyBuffer($0,
                                       &destinationBuffer,
                                       pixelSize,

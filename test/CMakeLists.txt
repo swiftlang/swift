@@ -57,10 +57,29 @@ function(get_test_dependencies SDK result_var_name)
   endif()
 
   if(NOT SWIFT_BUILT_STANDALONE)
-    list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
-         clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
-         llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
-         llvm-strings llvm-readelf dsymutil)
+    list(APPEND deps_binaries
+      arcmt-test
+      c-arcmt-test
+      c-index-test
+      clang
+      count
+      dsymutil
+      FileCheck
+      llc
+      llvm-ar
+      llvm-as
+      llvm-bcanalyzer
+      llvm-cov
+      llvm-dis
+      llvm-dwarfdump
+      llvm-link
+      llvm-nm
+      llvm-objdump
+      llvm-profdata
+      llvm-readelf
+      llvm-readobj
+      llvm-strings
+      not)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
@@ -73,6 +92,7 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "LINUX") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
+     ("${SDK}" STREQUAL "OPENBSD") OR
      ("${SDK}" STREQUAL "ANDROID") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
      ("${SDK}" STREQUAL "HAIKU"))
@@ -175,7 +195,7 @@ foreach(SDK ${SWIFT_SDKS})
     foreach(BUILD_FLAVOR ${build_flavors})
     # Configure variables for this subdirectory.
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
+    get_versioned_target_triple(VARIANT_TRIPLE ${SDK} ${ARCH} "${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
     set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
     set(DEFAULT_OSX_VARIANT_SUFFIX "")
 
@@ -222,32 +242,30 @@ foreach(SDK ${SWIFT_SDKS})
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
 
-    # NOTE create a stub BlocksRuntime library that can be used for the
-    # reflection tests
-    file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
-      "void
+    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+      # NOTE create a stub BlocksRuntime library that can be used for the
+      # reflection tests
+      file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
+        "void
 #if defined(_WIN32)
 __declspec(dllexport)
 #endif
 _Block_release(void) { }\n")
-    _add_swift_library_single(
-      BlocksRuntimeStub${VARIANT_SUFFIX}
-      BlocksRuntimeStub
-      SHARED
-      DONT_EMBED_BITCODE
-      NOSWIFTRT
-      ARCHITECTURE ${ARCH}
-      SDK ${SDK}
-      INSTALL_IN_COMPONENT dev
-      ${test_bin_dir}/Inputs/BlocksRuntime.c)
-    set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
-      LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
-      RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
-      OUTPUT_NAME BlocksRuntime)
-    list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
+      _add_swift_target_library_single(
+        BlocksRuntimeStub${VARIANT_SUFFIX}
+        BlocksRuntimeStub
+        SHARED
+        ARCHITECTURE ${ARCH}
+        SDK ${SDK}
+        INSTALL_IN_COMPONENT dev
+        ${test_bin_dir}/Inputs/BlocksRuntime.c)
+      set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
+        LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
+        RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
+        OUTPUT_NAME BlocksRuntime)
+      list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
 
-    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
       list(APPEND test_dependencies
           "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
@@ -293,9 +311,9 @@ _Block_release(void) { }\n")
               # Reboot the device and remove everything in its tmp
               # directory. Build products and test executables are pushed
               # to that directory when running the test suite.
-              ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
+              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
           COMMAND
-              ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
+              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
               --ndk "${SWIFT_ANDROID_NDK_PATH}"
               --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
               --destination-arch "${ARCH}"
@@ -323,7 +341,7 @@ _Block_release(void) { }\n")
       endif()
 
       execute_process(COMMAND
-          "${PYTHON_EXECUTABLE}" "-c" "import psutil"
+          $<TARGET_FILE:Python2::Interpreter> "-c" "import psutil"
           RESULT_VARIABLE python_psutil_status
           TIMEOUT 1 # second
           ERROR_QUIET)
@@ -383,7 +401,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              ${PYTHON_EXECUTABLE} "${LIT}"
+              $<TARGET_FILE:Python2::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"
@@ -402,7 +420,7 @@ _Block_release(void) { }\n")
             ${command_upload_swift_reflection_test}
             ${command_clean_test_results_dir}
             COMMAND
-              ${PYTHON_EXECUTABLE} "${LIT}"
+              $<TARGET_FILE:Python2::Interpreter> "${LIT}"
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"

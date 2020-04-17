@@ -112,6 +112,7 @@ internal class __RawSetStorage: __SwiftNativeNSSet {
 // The old names must not be used in the new runtime.
 @_fixed_layout
 @usableFromInline
+@_objc_non_lazy_realization
 internal class __EmptySetSingleton: __RawSetStorage {
   @nonobjc
   override internal init(_doNotCallMe: ()) {

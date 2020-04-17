@@ -67,9 +67,9 @@ void CommandOutput::ensureEntry(StringRef PrimaryInputFile,
   assert(Type != file_types::TY_Nothing);
   auto &M = DerivedOutputMap.getOrCreateOutputMapForInput(PrimaryInputFile);
   if (Overwrite) {
-    M[Type] = OutputFile;
+    M[Type] = OutputFile.str();
   } else {
-    auto res = M.insert(std::make_pair(Type, OutputFile));
+    auto res = M.insert(std::make_pair(Type, OutputFile.str()));
     if (res.second) {
       // New entry, no need to compare.
     } else {
@@ -408,20 +408,16 @@ void Job::printSummary(raw_ostream &os) const {
   }
 
   os << "{" << getSource().getClassName() << ": ";
-  interleave(Outputs,
-             [&](const std::string &Arg) {
-               os << llvm::sys::path::filename(Arg);
-             },
-             [&] { os << ' '; });
+  interleave(
+      Outputs, [&](StringRef Arg) { os << llvm::sys::path::filename(Arg); },
+      [&] { os << ' '; });
   if (actual_out > limit) {
     os << " ... " << (actual_out-limit) << " more";
   }
   os << " <= ";
-  interleave(Inputs,
-             [&](const std::string &Arg) {
-               os << llvm::sys::path::filename(Arg);
-             },
-             [&] { os << ' '; });
+  interleave(
+      Inputs, [&](StringRef Arg) { os << llvm::sys::path::filename(Arg); },
+      [&] { os << ' '; });
   if (actual_in > limit) {
     os << " ... " << (actual_in-limit) << " more";
   }

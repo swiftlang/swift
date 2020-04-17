@@ -211,3 +211,15 @@ func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: 
   (try? returnsVeryCurried()())?(fn)
   // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 }
+
+// rdar://problem/59066040 - Confusing error message about argument mismatch where the problem is escapiness
+func test_passing_nonescaping_to_escaping_function() {
+  struct S {}
+  typealias Handler = (S) -> ()
+
+  func bar(_ handler: Handler?) {}
+
+  func foo(_ handler: Handler) { // expected-note {{parameter 'handler' is implicitly non-escaping}}
+    bar(handler) // expected-error {{passing non-escaping parameter 'handler' to function expecting an @escaping closure}}
+  }
+}

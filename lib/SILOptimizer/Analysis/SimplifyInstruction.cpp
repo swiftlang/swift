@@ -65,6 +65,7 @@ namespace {
     SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
     SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
     SILValue visitBeginAccessInst(BeginAccessInst *BAI);
+    SILValue visitMetatypeInst(MetatypeInst *MTI);
 
     SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
   };
@@ -179,8 +180,8 @@ visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
 }
 
 // Simplify:
-//   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.Some!enumelt.1
-//   %2 = enum $Optional<C>, #Optional.Some!enumelt.1, %1 : $C
+//   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.Some!enumelt
+//   %2 = enum $Optional<C>, #Optional.Some!enumelt, %1 : $C
 // to %0 since we are building the same enum.
 static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
   assert(EI->hasOperand() && "Expected an enum with an operand!");
@@ -208,11 +209,11 @@ SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
   auto *EI = dyn_cast<EnumInst>(SEI->getEnumOperand());
   if (EI && EI->getType() == SEI->getEnumOperand()->getType()) {
     // Simplify a select_enum on an enum instruction.
-    //   %27 = enum $Optional<Int>, #Optional.Some!enumelt.1, %20 : $Int
+    //   %27 = enum $Optional<Int>, #Optional.Some!enumelt, %20 : $Int
     //   %28 = integer_literal $Builtin.Int1, -1
     //   %29 = integer_literal $Builtin.Int1, 0
     //   %30 = select_enum %27 : $Optional<Int>, case #Optional.None!enumelt: %28,
-    //                                         case #Optional.Some!enumelt.1: %29
+    //                                         case #Optional.Some!enumelt: %29
     // We will return %29.
     return SEI->getCaseResult(EI->getElement());
   }
@@ -449,6 +450,24 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
         return isIncidentalUse(operand->getUser());
       })) {
     return BAI->getOperand();
+  }
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitMetatypeInst(MetatypeInst *MI) {
+  auto metaType = MI->getType().castTo<MetatypeType>();
+  auto instanceType = metaType.getInstanceType();
+  // Tuple, Struct, and Enum MetatypeTypes have a single value.
+  // If this metatype is already passed as an argument reuse it to enable
+  // downstream CSE/SILCombine optimizations.
+  // Note: redundant metatype instructions are already handled by CSE.
+  if (isa<TupleType>(instanceType)
+      || instanceType.getStructOrBoundGenericStruct()
+      || instanceType.getEnumOrBoundGenericEnum()) {
+    for (SILArgument *argument : MI->getFunction()->getArguments()) {
+      if (argument->getType().getASTType() == metaType)
+        return argument;
+    }
   }
   return SILValue();
 }

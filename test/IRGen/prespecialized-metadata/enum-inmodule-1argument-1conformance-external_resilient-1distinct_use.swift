@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -enable-library-evolution -emit-library -module-name TestModule -module-link-name TestModule %S/Inputs/protocol-public.swift -emit-module-interface -swift-version 5 -o %t/%target-library-name(TestModule)
-// RUN: %target-swift-frontend -target %module-target-future -emit-ir -I %t -L %t %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
+// RUN: %target-swift-frontend -prespecialize-generic-metadata -target %module-target-future -emit-ir -I %t -L %t %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
@@ -51,7 +51,9 @@ doit()
 // CHECK-SAME:     i8* [[ERASED_TYPE]], 
 // CHECK-SAME:     i8* [[ERASED_TABLE]], 
 // CHECK-SAME:     i8* undef, 
-// CHECK-SAME:     %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, i32 }>* @"$s4main5ValueOMn" to %swift.type_descriptor*)
+// CHECK-SAME:     %swift.type_descriptor* bitcast (
+// CHECK-SAME:       {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
+// CHECK-SAME:     )
 // CHECK-SAME:   )
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

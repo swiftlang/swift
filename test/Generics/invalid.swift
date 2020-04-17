@@ -1,12 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-func bet() where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
-
-typealias gimel where A : B // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
-// expected-error@-1 {{expected '=' in type alias declaration}}
-
-class dalet where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
-
 protocol he where A : B { // expected-error {{use of undeclared type 'A'}}
   // expected-error@-1 {{use of undeclared type 'B'}}
 

@@ -500,9 +500,10 @@ static inline bool isAccessorLazilyGenerated(MetadataAccessStrategy strategy) {
   llvm_unreachable("bad kind");
 }
 
-/// Is it basically trivial to access the given metadata?  If so, we don't
-/// need a cache variable in its accessor.
-bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type);
+/// Is complete metadata for the given type available at a fixed address?
+bool isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM, CanType type);
+/// Should requests for the given type's metadata be cached?
+bool shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type);
 
 bool isNominalGenericContextTypeMetadataAccessTrivial(IRGenModule &IGM,
                                                       NominalTypeDecl &nominal,

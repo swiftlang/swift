@@ -28,6 +28,7 @@ func test_indirect_by_val_alignment() {
 
 // aarch64: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
 // arm64: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
+// arm64e: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
 // armv7k: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
 // armv7s: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()
 // armv7: define hidden swiftcc void  @"$s11c_functions30test_indirect_by_val_alignmentyyF"()

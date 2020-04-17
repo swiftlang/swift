@@ -52,6 +52,11 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(kpElt.getKeyPathDecl());
       break;
     }
+
+    case PatternMatch:
+      id.AddPointer(elt.castTo<LocatorPathElt::PatternMatch>().getPattern());
+      break;
+
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
@@ -62,7 +67,8 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case TypeParameterRequirement:
     case ContextualType:
     case SynthesizedArgument:
-    case TernaryBranch: {
+    case TernaryBranch:
+    case ClosureBody: {
       auto numValues = numNumericValuesInPathElement(elt.getKind());
       for (unsigned i = 0; i < numValues; ++i)
         id.AddInteger(elt.getValue(i));
@@ -82,6 +88,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ApplyFunction:
   case ConstraintLocator::SequenceElementType:
   case ConstraintLocator::ClosureResult:
+  case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
@@ -117,6 +124,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::DynamicCallable:
   case ConstraintLocator::ImplicitCallAsFunction:
   case ConstraintLocator::TernaryBranch:
+  case ConstraintLocator::PatternMatch:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -228,13 +236,15 @@ bool ConstraintLocator::isForContextualType() const {
 }
 
 bool ConstraintLocator::isForAssignment() const {
-  auto *anchor = getAnchor();
-  return anchor && isa<AssignExpr>(anchor) && getPath().empty();
+  return directlyAt<AssignExpr>();
 }
 
 bool ConstraintLocator::isForCoercion() const {
-  auto *anchor = getAnchor();
-  return anchor && isa<CoerceExpr>(anchor) && getPath().empty();
+  return directlyAt<CoerceExpr>();
+}
+
+bool ConstraintLocator::isForOptionalTry() const {
+  return directlyAt<OptionalTryExpr>();
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
@@ -317,6 +327,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     }
     case ClosureResult:
       out << "closure result";
+      break;
+
+    case ClosureBody:
+      out << "type of a closure body";
       break;
 
     case ConstructorMember:
@@ -476,10 +490,15 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "implicit reference to callAsFunction";
       break;
 
-    case TernaryBranch:
+    case TernaryBranch: {
       auto branchElt = elt.castTo<LocatorPathElt::TernaryBranch>();
       out << (branchElt.forThen() ? "'then'" : "'else'")
           << " branch of a ternary operator";
+      break;
+    }
+
+    case PatternMatch:
+      out << "pattern match";
       break;
     }
   }

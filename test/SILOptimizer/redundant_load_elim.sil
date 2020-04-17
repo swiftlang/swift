@@ -255,8 +255,8 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $*Int32):
 
 bb1:                                              // Preds: bb0
   %4 = tuple (%0 : $Int32, %1 : $Int32)           // user: %5
-  %5 = enum $XYZ, #XYZ.B!enumelt.1, %4 : $(Int32, Int32) // user: %6
-  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt.1: bb4, case #XYZ.C!enumelt.1: bb6 // id: %6
+  %5 = enum $XYZ, #XYZ.B!enumelt, %4 : $(Int32, Int32) // user: %6
+  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt: bb4, case #XYZ.C!enumelt: bb6 // id: %6
 
 bb2:                                              // Preds: bb1
   br bb3                                          // id: %7

@@ -39,7 +39,7 @@ entry:
   apply %z<GenericClass<NSObject>>(%b) : $@convention(thin) <T> (@thick T.Type) -> ()
 
   // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
-  // CHECK: [[OBJC_CLASS:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
+  // CHECK: [[OBJC_CLASS:%.*]] = call %objc_class* @{{.*}}(%objc_class* [[T0]])
   // CHECK: call swiftcc void @objc_class_sink(%objc_class* [[OBJC_CLASS]], %swift.type* [[METADATA]])
   %c = metatype $@objc_metatype GenericClass<NSString>.Type
   apply %y<GenericClass<NSString>>(%c) : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()

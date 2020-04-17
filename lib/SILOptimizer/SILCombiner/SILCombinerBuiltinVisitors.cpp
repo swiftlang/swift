@@ -252,7 +252,11 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
     };
     return B.createTuple(I->getLoc(), Ty, Elements);
   }
-      
+
+  // Replace the type check with 'true'.
+  case BuiltinValueKind::IsSameMetatype:
+    return Builder.createIntegerLiteral(I->getLoc(), I->getType(), true);
+
   default:
     break;
   }
@@ -530,6 +534,9 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
 }
 
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
+  if (I->getFunction()->hasOwnership())
+    return nullptr;
+
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)

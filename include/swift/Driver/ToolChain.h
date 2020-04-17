@@ -136,6 +136,13 @@ protected:
           ExtraEnvironment(std::move(extraEnv)) {}
   };
 
+  /// Handle arguments common to all invocations of the frontend (compilation,
+  /// module-merging, LLDB's REPL, etc).
+  virtual void addCommonFrontendArgs(const OutputInfo &OI,
+                                     const CommandOutput &output,
+                                     const llvm::opt::ArgList &inputArgs,
+                                     llvm::opt::ArgStringList &arguments) const;
+
   virtual InvocationInfo constructInvocation(const CompileJobAction &job,
                                              const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const InterpretJobAction &job,
@@ -317,6 +324,16 @@ public:
   virtual void validateArguments(DiagnosticEngine &diags,
                                  const llvm::opt::ArgList &args,
                                  StringRef defaultTarget) const {}
+
+  /// Validate the output information.
+  ///
+  /// An override point for platform-specific subclasses to customize their
+  /// behavior once the outputs are known.
+  virtual void validateOutputInfo(DiagnosticEngine &diags,
+                                  const OutputInfo &outputInfo) const { }
+
+  llvm::Expected<file_types::ID>
+  remarkFileTypeFromArgs(const llvm::opt::ArgList &Args) const;
 };
 } // end namespace driver
 } // end namespace swift

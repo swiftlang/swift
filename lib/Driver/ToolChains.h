@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/ToolChain.h"
+#include "clang/Driver/DarwinSDKInfo.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Compiler.h"
 
@@ -47,6 +48,11 @@ protected:
   void addDeploymentTargetArgs(llvm::opt::ArgStringList &Arguments,
                                const JobContext &context) const;
 
+  void addCommonFrontendArgs(
+      const OutputInfo &OI, const CommandOutput &output,
+      const llvm::opt::ArgList &inputArgs,
+      llvm::opt::ArgStringList &arguments) const override;
+
   InvocationInfo constructInvocation(const InterpretJobAction &job,
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
@@ -58,9 +64,21 @@ protected:
                          const llvm::opt::ArgList &args,
                          StringRef defaultTarget) const override;
 
+  void validateOutputInfo(DiagnosticEngine &diags,
+                          const OutputInfo &outputInfo) const override;
+
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
   bool shouldStoreInvocationInDebugInfo() const override;
+
+  /// Retrieve the target SDK version for the given target triple.
+  Optional<llvm::VersionTuple>
+  getTargetSDKVersion(const llvm::Triple &triple) const ;
+
+  /// Information about the SDK that the application is being built against.
+  /// This information is only used by the linker, so it is only populated
+  /// when there will be a linker job.
+  mutable Optional<clang::driver::DarwinSDKInfo> SDKInfo;
 
   const Optional<llvm::Triple> TargetVariant;
 
@@ -114,11 +132,8 @@ protected:
   /// platforms.
   virtual std::string getTargetForLinker() const;
 
-  /// Whether to specify a linker -rpath to the Swift runtime library path.
-  /// -rpath is not supported on all platforms, and subclasses may override
-  /// this method to return false on platforms that don't support it. The
-  /// default is to return true (and so specify an -rpath).
-  virtual bool shouldProvideRPathToLinker() const;
+  bool addRuntimeRPath(const llvm::Triple &T,
+                       const llvm::opt::ArgList &Args) const;
 
   InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
                                      const JobContext &context) const override;
@@ -137,8 +152,6 @@ class LLVM_LIBRARY_VISIBILITY Android : public GenericUnix {
 protected:
   std::string getTargetForLinker() const override;
 
-  bool shouldProvideRPathToLinker() const override;
-
 public:
   Android(const Driver &D, const llvm::Triple &Triple)
       : GenericUnix(D, Triple) {}
@@ -155,6 +168,16 @@ public:
   Cygwin(const Driver &D, const llvm::Triple &Triple)
       : GenericUnix(D, Triple) {}
   ~Cygwin() = default;
+};
+
+class LLVM_LIBRARY_VISIBILITY OpenBSD : public GenericUnix {
+protected:
+  std::string getDefaultLinker() const override;
+
+public:
+  OpenBSD(const Driver &D, const llvm::Triple &Triple)
+      : GenericUnix(D, Triple) {}
+  ~OpenBSD() = default;
 };
 
 } // end namespace toolchains

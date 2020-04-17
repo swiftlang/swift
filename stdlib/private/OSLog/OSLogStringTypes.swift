@@ -33,6 +33,7 @@ extension OSLogInterpolation {
   ///  - privacy: a privacy qualifier which is either private or public.
   ///  It is auto-inferred by default.
   @_semantics("constant_evaluable")
+  @_semantics("oslog.requires_constant_arguments")
   @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
@@ -43,8 +44,14 @@ extension OSLogInterpolation {
     guard argumentCount < maxOSLogArgumentCount else { return }
 
     formatString += getStringFormatSpecifier(align, privacy)
-    addStringHeaders(privacy)
 
+    // If minimum column width is specified, append this value first. Note that the
+    // format specifier would use a '*' for width e.g. %*s.
+    if let minColumns = align.minimumColumnWidth {
+      appendPrecisionArgument(minColumns)
+    }
+
+    addStringHeaders(privacy)
     arguments.append(argumentString)
     argumentCount += 1
   }
@@ -94,8 +101,8 @@ extension OSLogInterpolation {
     if case .start = align.anchor {
       specifier += "-"
     }
-    if align.minimumColumnWidth > 0 {
-      specifier += align.minimumColumnWidth.description
+    if let _ = align.minimumColumnWidth {
+      specifier += "*"
     }
     specifier += "s"
     return specifier

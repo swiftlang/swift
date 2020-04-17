@@ -328,6 +328,12 @@ public:
   /// \sa importHeader
   ModuleDecl *getImportedHeaderModule() const override;
 
+  /// Retrieves the Swift wrapper for the given Clang module, creating
+  /// it if necessary.
+  ModuleDecl *
+  getWrapperForModule(const clang::Module *mod,
+                      bool returnOverlayIfPossible = false) const override;
+
   std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
                                         time_t &fileModTime);
 

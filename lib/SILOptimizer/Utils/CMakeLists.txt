@@ -1,3 +1,5 @@
+add_subdirectory(Differentiation)
+
 silopt_register_sources(
   BasicBlockOptUtils.cpp
   CFGOptUtils.cpp
@@ -11,6 +13,7 @@ silopt_register_sources(
   GenericCloner.cpp
   Generics.cpp
   InstOptUtils.cpp
+  KeyPathProjector.cpp
   LoadStoreOptUtils.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp

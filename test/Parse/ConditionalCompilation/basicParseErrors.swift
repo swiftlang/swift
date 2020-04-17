@@ -78,6 +78,7 @@ struct S {
 // expected-note@-2{{did you mean 'FreeBSD'?}} {{8-15=FreeBSD}}
 // expected-note@-3{{did you mean 'Android'?}} {{8-15=Android}}
 // expected-note@-4{{did you mean 'OSX'?}} {{8-15=OSX}}
+// expected-note@-5{{did you mean 'OpenBSD'?}} {{8-15=OpenBSD}}
 #endif
 
 #if arch(leg) // expected-warning {{unknown architecture for build configuration 'arch'}} expected-note{{did you mean 'arm'?}} {{10-13=arm}}

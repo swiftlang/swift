@@ -21,6 +21,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -479,6 +480,17 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     accessPath.back() += index.getIntegerValue().getLimitedValue();
     return SymbolicValue::getAddress(memObject, accessPath,
                                      evaluator.getAllocator());
+  }
+  
+  // `convert_function` instructions that only change substitutions can be
+  // looked through to the original function.
+  //
+  // TODO: Certain covariant or otherwise ABI-compatible conversions should
+  // be handled as well.
+  if (auto cf = dyn_cast<ConvertFunctionInst>(value)) {
+    if (cf->onlyConvertsSubstitutions()) {
+      return getConstantValue(cf->getOperand());
+    }
   }
 
   if (auto *convertEscapeInst = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
@@ -1707,7 +1719,9 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       isa<DestroyAddrInst>(inst) || isa<RetainValueInst>(inst) ||
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
       isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
-      isa<EndBorrowInst>(inst))
+      isa<EndBorrowInst>(inst) ||
+      // Skip sanitizer instrumentation
+      isSanitizerInstrumentation(inst))
     return None;
 
   // If this is a special flow-sensitive instruction like a stack allocation,

@@ -253,7 +253,7 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       }
       options.showTopNonLiteral = uval;
     } else if (opt == "module-cache-path") {
-      options.moduleCachePath = value;
+      options.moduleCachePath = value.str();
     }
   }
 
@@ -403,7 +403,7 @@ removeCodeCompletionTokens(StringRef Input, StringRef TokenName,
     StringRef next = StringRef(fullMatch).split(',').second;
     while (next != "") {
       auto split = next.split(',');
-      prefixes.push_back(split.first);
+      prefixes.push_back(split.first.str());
       next = split.second;
     }
   }
@@ -695,7 +695,7 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
 
 static bool readPopularAPIList(StringRef filename,
                                std::vector<std::string> &result) {
-  std::ifstream in(filename);
+  std::ifstream in(filename.str());
   if (!in.is_open()) {
     llvm::errs() << "error opening '" << filename << "'\n";
     return true;

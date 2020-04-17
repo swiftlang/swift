@@ -25,64 +25,6 @@
 #include "swift/AST/TypeDeclFinder.h"
 
 using namespace swift;
-using FragileFunctionKind = TypeChecker::FragileFunctionKind;
-
-std::pair<FragileFunctionKind, bool>
-TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
-  for (DC = DC->getLocalContext(); DC && DC->isLocalContext();
-       DC = DC->getParent()) {
-    if (isa<DefaultArgumentInitializer>(DC)) {
-      // Default argument generators of public functions cannot reference
-      // @usableFromInline declarations; all other fragile function kinds
-      // can.
-      auto *VD = cast<ValueDecl>(DC->getInnermostDeclarationDeclContext());
-      auto access =
-        VD->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*treatUsableFromInlineAsPublic=*/false);
-      return std::make_pair(FragileFunctionKind::DefaultArgument,
-                            !access.isPublic());
-    }
-
-    if (isa<PatternBindingInitializer>(DC))
-      return std::make_pair(FragileFunctionKind::PropertyInitializer,
-                            /*treatUsableFromInlineAsPublic=*/true);
-
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
-      // If the function is a nested function, we will serialize its body if
-      // we serialize the parent's body.
-      if (AFD->getDeclContext()->isLocalContext())
-        continue;
-
-      // Bodies of public transparent and always-inline functions are
-      // serialized, so use conservative access patterns.
-      if (AFD->isTransparent())
-        return std::make_pair(FragileFunctionKind::Transparent,
-                              /*treatUsableFromInlineAsPublic=*/true);
-
-      if (AFD->getAttrs().hasAttribute<InlinableAttr>())
-        return std::make_pair(FragileFunctionKind::Inlinable,
-                              /*treatUsableFromInlineAsPublic=*/true);
-
-      if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-        return std::make_pair(FragileFunctionKind::AlwaysEmitIntoClient,
-                              /*treatUsableFromInlineAsPublic=*/true);
-
-      // If a property or subscript is @inlinable, the accessors are
-      // @inlinable also.
-      if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
-        auto *storage = accessor->getStorage();
-        if (storage->getAttrs().getAttribute<InlinableAttr>())
-          return std::make_pair(FragileFunctionKind::Inlinable,
-                                /*treatUsableFromInlineAsPublic=*/true);
-        if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-          return std::make_pair(FragileFunctionKind::AlwaysEmitIntoClient,
-                                /*treatUsableFromInlineAsPublic=*/true);
-      }
-    }
-  }
-
-  llvm_unreachable("Context is not nested inside a fragile function");
-}
 
 /// A uniquely-typed boolean to reduce the chances of accidentally inverting
 /// a check.
@@ -94,8 +36,9 @@ enum class DowngradeToWarning: bool {
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                                            ConcreteDeclRef declRef,
                                            const DeclContext *DC,
-                                           FragileFunctionKind Kind,
-                                           bool TreatUsableFromInlineAsPublic) {
+                                           FragileFunctionKind Kind) {
+  assert(Kind.kind != FragileFunctionKind::None);
+
   const ValueDecl *D = declRef.getDecl();
   // Do some important fast-path checks that apply to all cases.
 
@@ -104,8 +47,7 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
     return false;
 
   // Check whether the declaration is accessible.
-  if (diagnoseInlinableDeclRefAccess(loc, D, DC, Kind,
-                                     TreatUsableFromInlineAsPublic))
+  if (diagnoseInlinableDeclRefAccess(loc, D, DC, Kind))
     return true;
 
   // Check whether the declaration comes from a publically-imported module.
@@ -121,15 +63,17 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                            const ValueDecl *D,
                                            const DeclContext *DC,
-                                           FragileFunctionKind Kind,
-                                           bool TreatUsableFromInlineAsPublic) {
+                                           FragileFunctionKind Kind) {
+  assert(Kind.kind != FragileFunctionKind::None);
+
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
     return false;
 
-  // Public declarations are OK.
+  // Public non-SPI declarations are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              TreatUsableFromInlineAsPublic).isPublic())
+                              Kind.allowUsableFromInline).isPublic() &&
+      !D->isSPI())
     return false;
 
   auto &Context = DC->getASTContext();
@@ -188,10 +132,10 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
            loc, diagID,
            D->getDescriptiveKind(), diagName,
            D->getFormalAccessScope().accessLevelForDiagnostics(),
-           static_cast<unsigned>(Kind),
+           static_cast<unsigned>(Kind.kind),
            isAccessor);
 
-  if (TreatUsableFromInlineAsPublic) {
+  if (Kind.allowUsableFromInline) {
     Context.Diags.diagnose(D, diag::resilience_decl_declared_here,
                            D->getDescriptiveKind(), diagName, isAccessor);
   } else {
@@ -205,16 +149,22 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
                                       const SourceFile &userSF,
                                       FragileFunctionKind fragileKind) {
+  assert(fragileKind.kind != FragileFunctionKind::None);
+
   auto definingModule = D->getModuleContext();
-  if (!userSF.isImportedImplementationOnly(definingModule))
+
+  bool isImplementationOnly =
+    userSF.isImportedImplementationOnly(definingModule);
+  if (!isImplementationOnly && !userSF.isImportedAsSPI(D))
     return false;
 
   // TODO: different diagnostics
   ASTContext &ctx = definingModule->getASTContext();
-  ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_implementation_only,
+  ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
                      D->getDescriptiveKind(), D->getFullName(),
-                     static_cast<unsigned>(fragileKind),
-                     definingModule->getName());
+                     static_cast<unsigned>(fragileKind.kind),
+                     definingModule->getName(),
+                     static_cast<unsigned>(!isImplementationOnly));
   return true;
 }
 

@@ -17,6 +17,30 @@
 
 using namespace swift;
 
+/// Invoke \p visitor for each reachable block in \p f in worklist order (at
+/// least one predecessor has been visited).
+bool ReachableBlocks::visit(SILFunction *f,
+                            function_ref<bool(SILBasicBlock *)> visitor) {
+  assert(visited.empty() && "blocks already visited");
+
+  // Walk over the CFG, starting at the entry block, until all reachable blocks
+  // are visited.
+  SILBasicBlock *entryBB = f->getEntryBlock();
+  SmallVector<SILBasicBlock *, 8> worklist = {entryBB};
+  visited.insert(entryBB);
+  while (!worklist.empty()) {
+    SILBasicBlock *bb = worklist.pop_back_val();
+    if (!visitor(bb))
+      return false;
+
+    for (auto &succ : bb->getSuccessors()) {
+      if (visited.insert(succ).second)
+        worklist.push_back(succ);
+    }
+  }
+  return true;
+}
+
 /// Remove all instructions in the body of \p bb in safe manner by using
 /// undef.
 void swift::clearBlockBody(SILBasicBlock *bb) {
@@ -42,25 +66,16 @@ void swift::removeDeadBlock(SILBasicBlock *bb) {
 }
 
 bool swift::removeUnreachableBlocks(SILFunction &f) {
-  // All reachable blocks, but does not include the entry block.
-  llvm::SmallPtrSet<SILBasicBlock *, 8> visited;
+  ReachableBlocks reachable;
+  // Visit all the blocks without doing any extra work.
+  reachable.visit(&f, [](SILBasicBlock *) { return true; });
 
-  // Walk over the CFG, starting at the entry block, until all reachable blocks are visited.
-  llvm::SmallVector<SILBasicBlock *, 8> worklist(1, f.getEntryBlock());
-  while (!worklist.empty()) {
-    SILBasicBlock *bb = worklist.pop_back_val();
-    for (auto &Succ : bb->getSuccessors()) {
-      if (visited.insert(Succ).second)
-        worklist.push_back(Succ);
-    }
-  }
-
-  // Remove the blocks we never reached. Exclude the entry block from the iteration because it's
-  // not included in the Visited set.
+  // Remove the blocks we never reached. Assume the entry block is visited.
+  // Reachable's visited set contains dangling pointers during this loop.
   bool changed = false;
   for (auto ii = std::next(f.begin()), end = f.end(); ii != end;) {
     auto *bb = &*ii++;
-    if (!visited.count(bb)) {
+    if (!reachable.isVisited(bb)) {
       removeDeadBlock(bb);
       changed = true;
     }
@@ -273,21 +288,26 @@ void StaticInitCloner::add(SILInstruction *initVal) {
 SingleValueInstruction *
 StaticInitCloner::clone(SingleValueInstruction *initVal) {
   assert(numOpsToClone.count(initVal) != 0 && "initVal was not added");
-  // Find the right order to clone: all operands of an instruction must be
-  // cloned before the instruction itself.
-  while (!readyToClone.empty()) {
-    SILInstruction *inst = readyToClone.pop_back_val();
+  
+  if (!isValueCloned(initVal)) {
+    // Find the right order to clone: all operands of an instruction must be
+    // cloned before the instruction itself.
+    while (!readyToClone.empty()) {
+      SILInstruction *inst = readyToClone.pop_back_val();
 
-    // Clone the instruction into the SILGlobalVariable
-    visit(inst);
+      // Clone the instruction into the SILGlobalVariable
+      visit(inst);
 
-    // Check if users of I can now be cloned.
-    for (SILValue result : inst->getResults()) {
-      for (Operand *use : result->getUses()) {
-        SILInstruction *user = use->getUser();
-        if (numOpsToClone.count(user) != 0 && --numOpsToClone[user] == 0)
-          readyToClone.push_back(user);
+      // Check if users of I can now be cloned.
+      for (SILValue result : inst->getResults()) {
+        for (Operand *use : result->getUses()) {
+          SILInstruction *user = use->getUser();
+          if (numOpsToClone.count(user) != 0 && --numOpsToClone[user] == 0)
+            readyToClone.push_back(user);
+        }
       }
+      if (inst == initVal)
+        break;
     }
   }
   return cast<SingleValueInstruction>(getMappedValue(initVal));

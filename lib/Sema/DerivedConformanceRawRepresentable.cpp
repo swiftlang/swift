@@ -121,8 +121,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
 
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     labelItem, SourceLoc(), SourceLoc(), body,
                                      /*case body var decls*/ None));
   }
 
@@ -206,7 +206,7 @@ struct RuntimeVersionCheck {
 
     // availableInfo = "#available(\(platformSpec), \(otherSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
+        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc());
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
@@ -350,8 +350,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                   stmts, SourceLoc());
 
     // cases.append("case \(litPat): \(body)")
-    cases.push_back(CaseStmt::create(C, SourceLoc(), CaseLabelItem(litPat),
-                                     SourceLoc(), SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     CaseLabelItem(litPat), SourceLoc(),
+                                     SourceLoc(), body,
                                      /*case body var decls*/ None));
     Idx++;
   }
@@ -363,8 +364,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
                                     ASTNode(dfltReturnStmt), SourceLoc());
-  cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem, SourceLoc(),
-                                   SourceLoc(), dfltBody,
+  cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                   dfltLabelItem, SourceLoc(), SourceLoc(),
+                                   dfltBody,
                                    /*case body var decls*/ None));
 
   auto rawDecl = initDecl->getParameters()->get(0);
@@ -466,7 +468,22 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
   if (TypeChecker::conformsToProtocol(rawType, equatableProto, DC, None)
           .isInvalid())
     return false;
-  
+
+  auto &C = type->getASTContext();
+  auto rawValueDecls = enumDecl->lookupDirect(DeclName(C.Id_RawValue));
+  if (rawValueDecls.size() > 1)
+    return false;
+
+  // Check that the RawValue matches the expected raw type.
+  if (!rawValueDecls.empty()) {
+    if (auto alias = dyn_cast<TypeDecl>(rawValueDecls.front())) {
+      auto ty = alias->getDeclaredInterfaceType();
+      if (!DC->mapTypeIntoContext(ty)->isEqual(rawType)) {
+        return false;
+      }
+    }
+  }
+
   // There must be enum elements.
   if (enumDecl->getAllElements().empty())
     return false;

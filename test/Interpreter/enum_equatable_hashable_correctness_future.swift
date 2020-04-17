@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift -target %module-target-future
+// RUN: %target-run-simple-swift -prespecialize-generic-metadata -target %module-target-future
 // REQUIRES: executable_test
 
 import StdlibUnittest

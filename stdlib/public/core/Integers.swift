@@ -1,8 +1,8 @@
-//===--- Integers.swift.gyb -----------------------------------*- swift -*-===//
+//===--- Integers.swift ---------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -696,7 +696,7 @@ public protocol BinaryInteger :
   /// A type that represents the words of a binary integer.
   ///
   /// The `Words` type must conform to the `RandomAccessCollection` protocol
-  /// with an `Element` type of `UInt` and `Index` type of `Int.
+  /// with an `Element` type of `UInt` and `Index` type of `Int`.
   associatedtype Words: RandomAccessCollection
       where Words.Element == UInt, Words.Index == Int
 

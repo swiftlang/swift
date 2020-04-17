@@ -263,7 +263,7 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
   /// component.
   ///
   /// The initial parsed representation is always an identifier, and
-  /// name binding will resolve this to a specific declaration.
+  /// name lookup will resolve this to a specific declaration.
   llvm::PointerUnion<DeclNameRef, TypeDecl *> IdOrDecl;
 
   /// The declaration context from which the bound declaration was
@@ -282,7 +282,8 @@ public:
   /// correction.
   void overwriteNameRef(DeclNameRef newId) { IdOrDecl = newId; }
 
-  /// Return true if this has been name-bound already.
+  /// Return true if this name has been resolved to a type decl. This happens
+  /// during type resolution.
   bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
 
   TypeDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<TypeDecl*>(); }
@@ -472,12 +473,15 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
 ///   (x: Foo, y: Bar) -> Baz
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
-  // These fields are only used in SIL mode, which is the only time
-  // we can have polymorphic and substituted function values.
+  // The generic params / environment / substitutions fields are only used
+  // in SIL mode, which is the only time we can have polymorphic and
+  // substituted function values.
   GenericParamList *GenericParams;
   GenericEnvironment *GenericEnv;
-  bool GenericParamsAreImplied;
-  ArrayRef<TypeRepr *> GenericSubs;
+  ArrayRef<TypeRepr *> InvocationSubs;
+  GenericParamList *PatternGenericParams;
+  GenericEnvironment *PatternGenericEnv;
+  ArrayRef<TypeRepr *> PatternSubs;
 
   TupleTypeRepr *ArgsTy;
   TypeRepr *RetTy;
@@ -487,21 +491,37 @@ class FunctionTypeRepr : public TypeRepr {
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
                    SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy,
-                   bool GenericParamsAreImplied = false,
-                   ArrayRef<TypeRepr *> GenericSubs = {})
+                   GenericParamList *patternGenericParams = nullptr,
+                   ArrayRef<TypeRepr *> patternSubs = {},
+                   ArrayRef<TypeRepr *> invocationSubs = {})
     : TypeRepr(TypeReprKind::Function),
-      GenericParams(genericParams),
-      GenericEnv(nullptr),
-      GenericParamsAreImplied(GenericParamsAreImplied),
-      GenericSubs(GenericSubs),
+      GenericParams(genericParams), GenericEnv(nullptr),
+      InvocationSubs(invocationSubs),
+      PatternGenericParams(patternGenericParams), PatternGenericEnv(nullptr),
+      PatternSubs(patternSubs),
       ArgsTy(argsTy), RetTy(retTy),
       ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
-  bool areGenericParamsImplied() const { return GenericParamsAreImplied; }
-  ArrayRef<TypeRepr*> getSubstitutions() const { return GenericSubs; }
+
+  GenericParamList *getPatternGenericParams() const {
+    return PatternGenericParams;
+  }
+  GenericEnvironment *getPatternGenericEnvironment() const {
+    return PatternGenericEnv;
+  }
+
+  ArrayRef<TypeRepr*> getPatternSubstitutions() const { return PatternSubs; }
+  ArrayRef<TypeRepr*> getInvocationSubstitutions() const {
+    return InvocationSubs;
+  }
+
+  void setPatternGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert(PatternGenericEnv == nullptr);
+    PatternGenericEnv = genericEnv;
+  }
 
   void setGenericEnvironment(GenericEnvironment *genericEnv) {
     assert(GenericEnv == nullptr);

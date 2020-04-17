@@ -404,6 +404,7 @@ function verify_host_is_supported() {
     local host="$1"
     case ${host} in
       freebsd-x86_64            \
+      | openbsd-amd64           \
       | cygwin-x86_64           \
       | haiku-x86_64            \
       | linux-x86_64            \
@@ -420,6 +421,7 @@ function verify_host_is_supported() {
       | iphoneos-armv7          \
       | iphoneos-armv7s         \
       | iphoneos-arm64          \
+      | iphoneos-arm64e         \
       | appletvsimulator-x86_64 \
       | appletvos-arm64         \
       | watchsimulator-i386     \
@@ -460,6 +462,10 @@ function set_build_options_for_host() {
     SWIFT_HOST_VARIANT_ARCH=$architecture
 
     case ${host} in
+        android-aarch64)
+            SWIFT_HOST_TRIPLE="aarch64-unknown-linux-android"
+            llvm_target_arch="AArch64"
+            ;;
         linux-armv6)
             SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
             llvm_target_arch="ARM"
@@ -475,6 +481,10 @@ function set_build_options_for_host() {
         appletvsimulator-*  | \
         watchos-*           | \
         watchsimulator-*)
+            swift_cmake_options+=(
+              -DPython2_EXECUTABLE=$(xcrun -f python2.7)
+              -DPython3_EXECUTABLE=$(xcrun -f python3)
+            )
             case ${host} in
                 macosx-x86_64)
                     SWIFT_HOST_TRIPLE="x86_64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
@@ -484,14 +494,14 @@ function set_build_options_for_host() {
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     ;;
                 iphonesimulator-i386)
-                    SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 iphonesimulator-x86_64)
-                    SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
@@ -518,8 +528,15 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
+                iphoneos-arm64e)
+                    SWIFT_HOST_TRIPLE="arm64e-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
+                    llvm_target_arch="AArch64"
+
+                    SWIFT_HOST_VARIANT_SDK="IOS"
+                    cmake_osx_deployment_target=""
+                    ;;
                 appletvsimulator-x86_64)
-                    SWIFT_HOST_TRIPLE="x86_64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
+                    SWIFT_HOST_TRIPLE="x86_64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}-simulator"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
@@ -533,7 +550,7 @@ function set_build_options_for_host() {
                     cmake_osx_deployment_target=""
                     ;;
                 watchsimulator-i386)
-                    SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                    SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}-simulator"
                     llvm_target_arch="X86"
 
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
@@ -603,6 +620,7 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
             )
             ;;
     esac
@@ -1550,12 +1568,18 @@ for host in "${ALL_HOSTS[@]}"; do
 
             swift)
 
+                if [[ "${ANDROID_API_LEVEL}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_ANDROID_API_LEVEL:STRING="${ANDROID_API_LEVEL}"
+                    )
+                fi
+
                 if [[ ! "${SKIP_BUILD_ANDROID}" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
                         -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
-                        -DSWIFT_ANDROID_API_LEVEL:STRING="${ANDROID_API_LEVEL}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC:STRING="${ANDROID_ICU_UC}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
@@ -1702,10 +1726,17 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_SDKS:STRING="$(join ";" ${SWIFT_SDKS[@]})"
                     )
                 fi
+
                 if [[ "${SWIFT_PRIMARY_VARIANT_SDK}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_PRIMARY_VARIANT_SDK:STRING="${SWIFT_PRIMARY_VARIANT_SDK}"
+                    )
+                fi
+
+                if [[ "${SWIFT_PRIMARY_VARIANT_ARCH}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
                         -DSWIFT_PRIMARY_VARIANT_ARCH:STRING="${SWIFT_PRIMARY_VARIANT_ARCH}"
                     )
                 fi
@@ -1790,10 +1821,16 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Sources/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Sources/FoundationNetworking"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Sources/FoundationXML"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}/src"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/FoundationNetworking"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/FoundationXML"
                 fi
 
                 # Watchpoint testing is currently disabled: see rdar://38566150.
@@ -1836,6 +1873,17 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
                     -DLLDB_TEST_USER_ARGS="${DOTEST_ARGS}"
                 )
+
+                if [[ $(is_cross_tools_host ${host}) ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
+                        -DCLANG_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/clang-tblgen
+                        -DLLDB_TABLEGEN=$(build_directory "${LOCAL_HOST}" lldb)/bin/lldb-tblgen
+                        -DLLDB_TABLEGEN_EXE=$(build_directory "${LOCAL_HOST}" lldb)/bin/lldb-tblgen
+                        -DLLVM_NATIVE_BUILD=$(build_directory "${LOCAL_HOST}" llvm)
+                    )
+                fi
 
                 if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_USE_SYSTEM_DEBUGSERVER})" == "TRUE" ]]; then
                   cmake_options+=(
@@ -2162,6 +2210,8 @@ for host in "${ALL_HOSTS[@]}"; do
               HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
             elif [[ "$(uname -s)" == "Haiku" ]] ; then
               HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
+            elif [[ "${ANDROID_DATA}" ]] ; then
+              HOST_CXX_HEADERS_DIR="$PREFIX/include/c++"
             else # Linux
               HOST_CXX_HEADERS_DIR="/usr/include/c++"
             fi
@@ -2311,21 +2361,31 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : $2 }')"
                 fi
 
+                FILTER_SWIFT_OPTION="--filter=[sS]wift"
+                LLVM_LIT_FILTER_ARG=""
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
+                    LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
                 fi
 
                 # Record the times test took and report the slowest.
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
 
+                echo "--- Running LLDB unit tests ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                echo "--- Running LLDB tests (Swift tests using ClangImporter) ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS}
+                         ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
+                echo "--- Rerun LLDB Swift tests (using only DWARFImporter) ---"
+                with_pushd ${results_dir} \
+                    call "${llvm_build_dir}/bin/llvm-lit" \
+                         "${lldb_build_dir}/test" \
+                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_OPTION} \
+                         --param dotest-args="--setting symbols.use-swift-clangimporter=false"
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \
@@ -2767,10 +2827,12 @@ for host in "${ALL_HOSTS[@]}"; do
             # Run dsymutil on executables and shared libraries.
             #
             # Exclude shell scripts and static archives.
+            # Exclude swift-api-digester dSYM to reduce debug toolchain size.
             (cd "${INSTALL_SYMROOT}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v '.py$' | \
                grep -v '.a$' | \
+               grep -v 'swift-api-digester' | \
                xargs -n 1 -P ${BUILD_JOBS} ${dsymutil_path})
 
             # Strip executables, shared libraries and static libraries in

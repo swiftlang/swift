@@ -117,6 +117,7 @@ internal class __RawDictionaryStorage: __SwiftNativeNSDictionary {
 // renamed. The old name must not be used in the new runtime.
 @_fixed_layout
 @usableFromInline
+@_objc_non_lazy_realization
 internal class __EmptyDictionarySingleton: __RawDictionaryStorage {
   @nonobjc
   internal override init(_doNotCallMe: ()) {

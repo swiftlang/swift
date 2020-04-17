@@ -163,14 +163,17 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
   //
   // We can still succeed with a subtype match later in
   // OverrideMatcher::match().
-  auto declGenericCtx = decl->getAsGenericContext();
-  auto &ctx = decl->getASTContext();
-  auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
+  if (decl->getDeclContext()->getSelfClassDecl()) {
+    if (auto declGenericCtx = decl->getAsGenericContext()) {
+      auto &ctx = decl->getASTContext();
+      auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
 
-  if (sig && declGenericCtx &&
-      declGenericCtx->getGenericSignature().getCanonicalSignature() !=
-          sig.getCanonicalSignature()) {
-    return false;
+      if (sig &&
+          declGenericCtx->getGenericSignature().getCanonicalSignature() !=
+              sig.getCanonicalSignature()) {
+        return false;
+      }
+    }
   }
 
   // If this is a constructor, let's compare only parameter types.
@@ -652,8 +655,7 @@ static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
     // Get `@differentiable` attribute description.
     std::string baseDiffAttrString;
     llvm::raw_string_ostream os(baseDiffAttrString);
-    baseDA->print(os, derivedDecl, omitWrtClause,
-                  /*omitDerivativeFunctions*/ true);
+    baseDA->print(os, derivedDecl, omitWrtClause);
     os.flush();
     diags
         .diagnose(derivedDecl,
@@ -688,9 +690,6 @@ static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
           derivedParameters->isSubsetOf(baseParameters)) {
         overrides = false;
         break;
-      }
-      if (!derivedParameters && !baseParameters) {
-        assert(false);
       }
     }
     if (overrides)
@@ -1063,21 +1062,23 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     emittedMatchError = true;
   }
 
-  auto baseGenericCtx = baseDecl->getAsGenericContext();
-  auto derivedGenericCtx = decl->getAsGenericContext();
+  if (isClassOverride()) {
+    auto baseGenericCtx = baseDecl->getAsGenericContext();
+    auto derivedGenericCtx = decl->getAsGenericContext();
 
-  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
-  if (baseGenericCtx && derivedGenericCtx) {
-    if (!ctx.overrideGenericSignatureReqsSatisfied(
-            baseDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
-      auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl);
-      diags.diagnose(decl, diag::override_method_different_generic_sig,
-                     decl->getBaseName(),
-                     derivedGenericCtx->getGenericSignature()->getAsString(),
-                     baseGenericCtx->getGenericSignature()->getAsString(),
-                     newSig->getAsString());
-      diags.diagnose(baseDecl, diag::overridden_here);
-      emittedMatchError = true;
+    using Direction = ASTContext::OverrideGenericSignatureReqCheck;
+    if (baseGenericCtx && derivedGenericCtx) {
+      if (!ctx.overrideGenericSignatureReqsSatisfied(
+              baseDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
+        auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl);
+        diags.diagnose(decl, diag::override_method_different_generic_sig,
+                       decl->getBaseName(),
+                       derivedGenericCtx->getGenericSignature()->getAsString(),
+                       baseGenericCtx->getGenericSignature()->getAsString(),
+                       newSig->getAsString());
+        diags.diagnose(baseDecl, diag::overridden_here);
+        emittedMatchError = true;
+      }
     }
   }
 
@@ -1157,7 +1158,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     // Otherwise, if this is a subscript, validate that covariance is ok.
     // If the parent is non-mutable, it's okay to be covariant.
     auto parentSubscript = cast<SubscriptDecl>(baseDecl);
-    if (parentSubscript->supportsMutation()) {
+    if (parentSubscript->supportsMutation() &&
+        attempt != OverrideCheckingAttempt::MismatchedTypes) {
       diags.diagnose(subscript, diag::override_mutable_covariant_subscript,
                      declTy, baseTy);
       diags.diagnose(baseDecl, diag::subscript_override_here);
@@ -1435,6 +1437,7 @@ namespace  {
     UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(SetterAccess)
     UNINTERESTING_ATTR(TypeEraser)
+    UNINTERESTING_ATTR(SPIAccessControl)
     UNINTERESTING_ATTR(HasStorage)
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(UsableFromInline)
@@ -1450,6 +1453,7 @@ namespace  {
     UNINTERESTING_ATTR(Differentiable)
     UNINTERESTING_ATTR(Derivative)
     UNINTERESTING_ATTR(Transpose)
+    UNINTERESTING_ATTR(NoDerivative)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
@@ -1687,8 +1691,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure that the overriding property doesn't have storage.
     if ((overrideASD->hasStorage() ||
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
-        !(overrideASD->getParsedAccessor(AccessorKind::WillSet) ||
-          overrideASD->getParsedAccessor(AccessorKind::DidSet))) {
+        !overrideASD->hasObservers()) {
       bool downgradeToWarning = false;
       if (!ctx.isSwiftVersionAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
@@ -1701,7 +1704,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
           diag::override_with_stored_property_warn :
           diag::override_with_stored_property;
       diags.diagnose(overrideASD, diagID,
-                     overrideASD->getBaseName().getIdentifier());
+                     overrideASD->getBaseIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);
       if (!downgradeToWarning)
         return true;
@@ -1718,7 +1721,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     if (overrideASD->getWriteImpl() == WriteImplKind::InheritedWithObservers
         && !baseIsSettable) {
       diags.diagnose(overrideASD, diag::observing_readonly_property,
-                     overrideASD->getBaseName().getIdentifier());
+                     overrideASD->getBaseIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);
       return true;
     }
@@ -1728,7 +1731,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // setter but override the getter, and that would be surprising at best.
     if (baseIsSettable && !overrideASD->isSettable(override->getDeclContext())) {
       diags.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
-                     overrideASD->getBaseName().getIdentifier());
+                     overrideASD->getBaseIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);
       return true;
     }
@@ -1768,7 +1771,11 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
                    !isa<ExtensionDecl>(base->getDeclContext()));
-    if (baseCanBeObjC) {
+    // If the base and the override come from the same module, try to fix
+    // the base declaration. Otherwise we can wind up diagnosing into e.g. the
+    // SDK overlay modules.
+    if (baseCanBeObjC &&
+        base->getModuleContext() == override->getModuleContext()) {
       SourceLoc insertionLoc =
         override->getAttributeInsertionLoc(/*forModifier=*/false);
       diags.diagnose(base, diag::overridden_here_can_be_objc)
@@ -1960,7 +1967,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
   return overriddenAssocTypes;
 }
 
-llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
+llvm::TinyPtrVector<ValueDecl *>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // Value to return in error cases
   auto noResults = llvm::TinyPtrVector<ValueDecl *>();
@@ -2075,9 +2082,8 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
                                          OverrideCheckingAttempt::PerfectMatch);
 }
 
-llvm::Expected<bool>
-IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
-                                         ValueDecl *decl) const {
+bool IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
+                                              ValueDecl *decl) const {
   auto base = decl->getOverriddenDecl();
   if (!base)
     return false;

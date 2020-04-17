@@ -25,24 +25,24 @@ sil_global @x : $Bar
 // YAML-NEXT: Pass:            sil-devirtualizer
 // YAML-NEXT: Name:            sil.ClassMethodDevirtualized
 // YAML-NEXT: DebugLoc:
-// YAML-NEXT:   File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:   Line:            46
-// YAML-NEXT:   Column:          8
+// YAML:        File:            {{.*}}/devirtualize_ownership.sil
+// YAML:        Line:            46
+// YAML:        Column:          8
 // YAML-NEXT: Function:        function_with_cm
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Devirtualized call to class method '
 // YAML-NEXT:   - Method:          '"main.Bar.foo(_:)"'
 // YAML-NEXT:     DebugLoc:
-// YAML-NEXT:       File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:       Line:            52
-// YAML-NEXT:       Column:          6
+// YAML:            File:            {{.*}}/devirtualize_ownership.sil
+// YAML:            Line:            52
+// YAML:            Column:          6
 // YAML-NEXT: ...
 
 sil [ossa] @function_with_cm : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @x : $*Bar                     // users: %2, %3
   %1 = alloc_ref $Bar                             // user: %2
-  %5 = class_method %1 : $Bar, #Bar.foo!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %5 = class_method %1 : $Bar, #Bar.foo : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
   %6 = apply %5(%1) : $@convention(method) (@guaranteed Bar) -> ()
   destroy_value %1 : $Bar
   %7 = tuple ()                                   // user: %8
@@ -52,7 +52,7 @@ bb0:
 sil @_TFC4main3Bar3foofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
 
 sil_vtable Bar {
-  #Bar.foo!1: @_TFC4main3Bar3foofS0_FT_T_
+  #Bar.foo: @_TFC4main3Bar3foofS0_FT_T_
 }
 
 private class Node {
@@ -70,7 +70,7 @@ bb0(%0 : @guaranteed $Node):
   // CHECK-NOT: class_method [[ARG_COPY]]
   // CHECK: [[FUNC:%.*]] = function_ref @transparent_target
   // CHECK: [[BORROW_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
-  %3 = class_method %1 : $Node, #Node.index!getter.1 : (Node) -> () -> Int, $@convention(method) (@guaranteed Node) -> Int
+  %3 = class_method %1 : $Node, #Node.index!getter : (Node) -> () -> Int, $@convention(method) (@guaranteed Node) -> Int
   // CHECK: [[RESULT:%.*]] = apply [[FUNC]]([[BORROW_ARG_COPY]])
   %4 = apply %3(%1) : $@convention(method) (@guaranteed Node) -> Int
   // CHECK: destroy_value [[ARG_COPY]]
@@ -83,17 +83,17 @@ bb0(%0 : @guaranteed $Node):
 // YAML-NEXT: Pass:            sil-devirtualizer
 // YAML-NEXT: Name:            sil.ClassMethodDevirtualized
 // YAML-NEXT: DebugLoc:
-// YAML-NEXT:   File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:   Line:            75
-// YAML-NEXT:   Column:          8
+// YAML:        File:            {{.*}}/devirtualize_ownership.sil
+// YAML:        Line:            75
+// YAML:        Column:          8
 // YAML-NEXT: Function:        class_method_apply
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Devirtualized call to class method '
 // YAML-NEXT:   - Method:          '"transparent_target"'
 // YAML-NEXT:     DebugLoc:
-// YAML-NEXT:       File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:       Line:            101
-// YAML-NEXT:       Column:          46
+// YAML:            File:            {{.*}}/devirtualize_ownership.sil
+// YAML:            Line:            101
+// YAML:            Column:          46
 // YAML-NEXT: ...
 
 
@@ -107,7 +107,7 @@ bb0(%0 : @guaranteed $Node):
 }
 
 sil_vtable Node {
-  #Node.index!getter.1: @transparent_target
+  #Node.index!getter: @transparent_target
 }
 
 private class B {
@@ -124,7 +124,7 @@ bb0(%0 : $@thick C.Type):
   %2 = upcast %0 : $@thick C.Type to $@thick B.Type
   // CHECK-NOT: class_method
   // CHECK: function_ref @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
-  %3 = class_method %2 : $@thick B.Type, #B.foo!1 : (B.Type) -> () -> Int, $@convention(method) (@thick B.Type) -> Int
+  %3 = class_method %2 : $@thick B.Type, #B.foo : (B.Type) -> () -> Int, $@convention(method) (@thick B.Type) -> Int
   %4 = apply %3(%2) : $@convention(method) (@thick B.Type) -> Int
   %5 = tuple ()
   // CHECK: return
@@ -135,23 +135,23 @@ bb0(%0 : $@thick C.Type):
 // YAML-NEXT: Pass:            sil-devirtualizer
 // YAML-NEXT: Name:            sil.ClassMethodDevirtualized
 // YAML-NEXT: DebugLoc:
-// YAML-NEXT:   File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:   Line:            128
-// YAML-NEXT:   Column:          8
+// YAML:        File:            {{.*}}/devirtualize_ownership.sil
+// YAML:        Line:            128
+// YAML:        Column:          8
 // YAML-NEXT: Function:        'caller(_:)'
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Devirtualized call to class method '
 // YAML-NEXT:   - Method:          '"static meta.B.foo(_:)"'
 // YAML-NEXT:     DebugLoc:
-// YAML-NEXT:       File:            {{.*}}/devirtualize_ownership.sil
-// YAML-NEXT:       Line:            119
-// YAML-NEXT:       Column:          13
+// YAML:            File:            {{.*}}/devirtualize_ownership.sil
+// YAML:            Line:            119
+// YAML:            Column:          13
 // YAML-NEXT: ...
 
 sil_vtable B {
-  #B.foo!1: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  #B.foo: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
 }
 
 sil_vtable C {
-  #B.foo!1: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  #B.foo: @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
 }

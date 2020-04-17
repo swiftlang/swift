@@ -77,7 +77,7 @@ internal struct _StringObject {
     internal init(zero: ()) { self._storage = 0 }
   }
 
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(wasm32)
   @usableFromInline @frozen
   internal enum Variant {
     case immortal(UInt)
@@ -512,7 +512,7 @@ extension _StringObject {
     // spare bits (the most significant nibble) in a pointer.
     let word1 = small.rawBits.0.littleEndian
     let word2 = small.rawBits.1.littleEndian
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(wasm32)
     // On 32-bit, we need to unpack the small string.
     let smallStringDiscriminatorAndCount: UInt64 = 0xFF00_0000_0000_0000
 
@@ -801,7 +801,7 @@ extension _StringObject {
     _internalInvariant(largeFastIsShared)
 #if _runtime(_ObjC)
     if largeIsCocoa {
-      return _cocoaASCIIPointer(cocoaObject)._unsafelyUnwrappedUnchecked
+      return stableCocoaASCIIPointer(cocoaObject)._unsafelyUnwrappedUnchecked
     }
 #endif
 
@@ -819,7 +819,7 @@ extension _StringObject {
 
   @inline(__always)
   internal var nativeStorage: __StringStorage {
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(wasm32)
     guard case .native(let storage) = _variant else {
       _internalInvariantFailure()
     }
@@ -987,7 +987,7 @@ extension _StringObject {
   ) {
     let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
     let discriminator = Nibbles.largeCocoa(providesFastUTF8: providesFastUTF8)
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(wasm32)
     self.init(
       variant: .bridged(cocoa),
       discriminator: discriminator,

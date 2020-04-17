@@ -14,7 +14,7 @@ func unrollLetArrayLiteralTest() {
   // CHECK-NOT: forEach
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $Int64
   // CHECK: store [[INT1]] to [[STACK]]
-  // CHECK: try_apply %{{.*}}([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed Int64) -> @error Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  // CHECK: try_apply %{{.*}}([[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
 
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store [[INT2]] to [[STACK]] : $*Int64
@@ -28,7 +28,7 @@ func unrollLetArrayLiteralWithVariableElements(x: Int64, y: Int64) {
   // CHECK-NOT: forEach
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $Int64
   // CHECK: store %0 to [[STACK]]
-  // CHECK: try_apply %{{.*}}([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed Int64) -> @error Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  // CHECK: try_apply %{{.*}}([[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store %1 to [[STACK]] : $*Int64
@@ -50,7 +50,7 @@ func unrollLetArrayLiteralWithNonTrivialElements() {
   // CHECK-NOT: forEach
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $String
   // CHECK: store [[STRING1]] to [[STACK]] : $*String
-  // CHECK: try_apply %{{.*}}([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed String) -> @error Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  // CHECK: try_apply %{{.*}}([[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store [[STRING2]] to [[STACK]] : $*String
@@ -73,7 +73,7 @@ func unrollLetArrayLiteralWithClosures(i: Int32, j: Int32) {
   // CHECK-NOT: forEach
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack
   // CHECK: store [[CLOSURE1]] to [[STACK]]
-  // CHECK: try_apply %{{.*}}([[STACK]]) : $@noescape @callee_guaranteed (@in_guaranteed {{.*}}) -> @error Error, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  // CHECK: try_apply %{{.*}}([[STACK]]) : ${{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store [[CLOSURE2]] to [[STACK]]

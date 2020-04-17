@@ -8,6 +8,10 @@ class Foo: NSObject {
   dynamic var number2 = 2
   @objc var number3 = 3
   @objc dynamic var number4 = 4
+  @objc var number5: Int {
+    get { return 5 }
+    set {}
+  }
 }
 
 class Bar: NSObject {
@@ -33,6 +37,10 @@ class Bar: NSObject {
     }
     
     _ = observe(\.foo.number4, options: [.new]) { _, change in // Okay
+      print("observer4")
+    }
+
+    _ = observe(\.foo.number5, options: [.new]) { _, change in // Okay
       print("observer4")
     }
   }

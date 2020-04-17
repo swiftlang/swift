@@ -1,4 +1,8 @@
 // RUN: %target-swift-frontend -emit-ir -parse-stdlib %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-endian
+// RUN: %target-swift-frontend -emit-ir -disable-concrete-type-metadata-mangled-name-accessors -parse-stdlib %s | %FileCheck %s --check-prefix=DISABLED
+
+// DISABLED-NOT: __swift_instantiateConcreteTypeFromMangledName
+// DISABLED-NOT: MD" = {{.*}} global
 
 // CHECK: @"$s36access_type_metadata_by_mangled_name3FooCyAA3BarCyAA3ZimCyAA4ZangCGGGMD" = linkonce_odr hidden global { i32, i32 }
 

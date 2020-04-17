@@ -129,16 +129,16 @@ public:
     value = value.drop_front(1);
 
     switch (component) {
-#define case_setIfNonEmpty(FIELD)                                      \
-    case TypeImportComponent::FIELD:                                   \
-      check(!value.empty(), "incoming value of " #FIELD " was empty"); \
-      check(FIELD.empty(), #FIELD " was already set");                 \
-      FIELD = value;                                                   \
-      return true;                                                     \
+#define case_setIfNonEmpty(FIELD)                                              \
+  case TypeImportComponent::FIELD:                                             \
+    check(!value.empty(), "incoming value of " #FIELD " was empty");           \
+    check(FIELD.empty(), #FIELD " was already set");                           \
+    FIELD = StringType(value);                                                 \
+    return true;
 
-    case_setIfNonEmpty(ABIName)
-    case_setIfNonEmpty(SymbolNamespace)
-    case_setIfNonEmpty(RelatedEntityName)
+      case_setIfNonEmpty(ABIName)
+      case_setIfNonEmpty(SymbolNamespace)
+      case_setIfNonEmpty(RelatedEntityName)
 
 #undef case_setIfNonEmpty
 #undef check

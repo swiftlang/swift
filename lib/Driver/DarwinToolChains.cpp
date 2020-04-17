@@ -21,6 +21,7 @@
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
+#include "clang/Driver/DarwinSDKInfo.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Option/Options.h"
@@ -481,60 +482,164 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
   }
 }
 
+/// Remap the given version number via the version map, or produce \c None if
+/// there is no mapping for this version.
+static Optional<llvm::VersionTuple> remapVersion(
+    const llvm::StringMap<llvm::VersionTuple> &versionMap,
+    llvm::VersionTuple version) {
+  // The build number is never used in the lookup.
+  version = version.withoutBuild();
+
+  // Look for this specific version.
+  auto known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  // If an extra ".0" was specified (in the subminor version), drop that
+  // and look again.
+  if (!version.getSubminor() || *version.getSubminor() != 0)
+    return None;
+
+  version = llvm::VersionTuple(version.getMajor(), *version.getMinor());
+  known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  // If another extra ".0" wa specified (in the minor version), drop that
+  // and look again.
+  if (!version.getMinor() || *version.getMinor() != 0)
+    return None;
+
+  version = llvm::VersionTuple(version.getMajor());
+  known = versionMap.find(version.getAsString());
+  if (known != versionMap.end())
+    return known->second;
+
+  return None;
+}
+
+Optional<llvm::VersionTuple>
+toolchains::Darwin::getTargetSDKVersion(const llvm::Triple &triple) const {
+  if (!SDKInfo)
+    return None;
+
+  // Retrieve the SDK version.
+  auto SDKVersion = SDKInfo->getVersion();
+
+  // For the Mac Catalyst environment, we have a macOS SDK with a macOS
+  // SDK version. Map that to the corresponding iOS version number to pass
+  // down to the linker.
+  if (tripleIsMacCatalystEnvironment(triple)) {
+    return remapVersion(
+        SDKInfo->getVersionMap().MacOS2iOSMacMapping, SDKVersion)
+          .getValueOr(llvm::VersionTuple(0, 0, 0));
+  }
+
+  return SDKVersion;
+}
+
 void
 toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
                                             const JobContext &context) const {
-  const llvm::Triple &Triple = getTriple();
-  // FIXME: Properly handle deployment targets.
-  assert(Triple.isiOS() || Triple.isWatchOS() || Triple.isMacOSX());
-  if (Triple.isiOS()) {
-    bool isiOSSimulator = tripleIsiOSSimulator(Triple);
-    if (Triple.isTvOS()) {
-      if (isiOSSimulator)
-        Arguments.push_back("-tvos_simulator_version_min");
-      else
-        Arguments.push_back("-tvos_version_min");
+  auto addPlatformVersionArg = [&](const llvm::Triple &triple) {
+    // Compute the name of the platform for the linker.
+    const char *platformName;
+    if (tripleIsMacCatalystEnvironment(triple)) {
+      platformName = "mac-catalyst";
     } else {
-      if (isiOSSimulator)
-        Arguments.push_back("-ios_simulator_version_min");
-      else if (tripleIsMacCatalystEnvironment(Triple))
-        Arguments.push_back("-maccatalyst_version_min");
-      else
-        Arguments.push_back("-iphoneos_version_min");
+      switch (getDarwinPlatformKind(triple)) {
+      case DarwinPlatformKind::MacOS:
+        platformName = "macos";
+        break;
+      case DarwinPlatformKind::IPhoneOS:
+        platformName = "ios";
+        break;
+      case DarwinPlatformKind::IPhoneOSSimulator:
+        platformName = "ios-simulator";
+        break;
+      case DarwinPlatformKind::TvOS:
+        platformName = "tvos";
+        break;
+      case DarwinPlatformKind::TvOSSimulator:
+        platformName = "tvos-simulator";
+        break;
+      case DarwinPlatformKind::WatchOS:
+        platformName = "watchos";
+        break;
+      case DarwinPlatformKind::WatchOSSimulator:
+        platformName = "watchos-simulator";
+        break;
+      }
     }
-    unsigned major, minor, micro;
-    Triple.getiOSVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
 
-    if (TargetVariant) {
-      assert(triplesAreValidForZippering(Triple, *TargetVariant));
-      assert(TargetVariant->isMacOSX());
-      Arguments.push_back("-macosx_version_min");
-      unsigned major, minor, micro;
-      TargetVariant->getMacOSXVersion(major, minor, micro);
-      addVersionString(context.Args, Arguments, major, minor, micro);
+    // Compute the platform version.
+    unsigned major, minor, micro;
+    if (tripleIsMacCatalystEnvironment(triple)) {
+      triple.getiOSVersion(major, minor, micro);
+
+      // Mac Catalyst was introduced with an iOS deployment target of 13.0;
+      // the linker doesn't want to see a deployment target before that.
+      if (major < 13) {
+        major = 13;
+        minor = 0;
+        micro = 0;
+      }
+    } else {
+      switch (getDarwinPlatformKind((triple))) {
+      case DarwinPlatformKind::MacOS:
+        triple.getMacOSXVersion(major, minor, micro);
+        break;
+      case DarwinPlatformKind::IPhoneOS:
+      case DarwinPlatformKind::IPhoneOSSimulator:
+      case DarwinPlatformKind::TvOS:
+      case DarwinPlatformKind::TvOSSimulator:
+        triple.getiOSVersion(major, minor, micro);
+        break;
+      case DarwinPlatformKind::WatchOS:
+      case DarwinPlatformKind::WatchOSSimulator:
+        triple.getOSVersion(major, minor, micro);
+        break;
+      }
     }
-  } else if (Triple.isWatchOS()) {
-    if (tripleIsWatchSimulator(Triple))
-      Arguments.push_back("-watchos_simulator_version_min");
-    else
-      Arguments.push_back("-watchos_version_min");
-    unsigned major, minor, micro;
-    Triple.getOSVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
-  } else {
-    Arguments.push_back("-macosx_version_min");
-    unsigned major, minor, micro;
-    Triple.getMacOSXVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
 
-    if (TargetVariant) {
-      assert(triplesAreValidForZippering(Triple, *TargetVariant));
-      assert(tripleIsMacCatalystEnvironment(*TargetVariant));
-      Arguments.push_back("-maccatalyst_version_min");
-      unsigned major, minor, micro;
-      TargetVariant->getiOSVersion(major, minor, micro);
-      addVersionString(context.Args, Arguments, major, minor, micro);
+    // Compute the SDK version.
+    unsigned sdkMajor = 0, sdkMinor = 0, sdkMicro = 0;
+    if (auto sdkVersion = getTargetSDKVersion(triple)) {
+      sdkMajor = sdkVersion->getMajor();
+      sdkMinor = sdkVersion->getMinor().getValueOr(0);
+      sdkMicro = sdkVersion->getSubminor().getValueOr(0);
+    }
+
+    Arguments.push_back("-platform_version");
+    Arguments.push_back(platformName);
+    addVersionString(context.Args, Arguments, major, minor, micro);
+    addVersionString(context.Args, Arguments, sdkMajor, sdkMinor, sdkMicro);
+  };
+
+  addPlatformVersionArg(getTriple());
+
+  if (auto targetVariant = getTargetVariant()) {
+    assert(triplesAreValidForZippering(getTriple(), *targetVariant));
+    addPlatformVersionArg(*targetVariant);
+  }
+}
+
+void toolchains::Darwin::addCommonFrontendArgs(
+    const OutputInfo &OI, const CommandOutput &output,
+    const llvm::opt::ArgList &inputArgs,
+    llvm::opt::ArgStringList &arguments) const {
+  ToolChain::addCommonFrontendArgs(OI, output, inputArgs, arguments);
+
+  if (auto sdkVersion = getTargetSDKVersion(getTriple())) {
+    arguments.push_back("-target-sdk-version");
+    arguments.push_back(inputArgs.MakeArgString(sdkVersion->getAsString()));
+  }
+
+  if (auto targetVariant = getTargetVariant()) {
+    if (auto variantSDKVersion = getTargetSDKVersion(*targetVariant)) {
+      arguments.push_back("-target-variant-sdk-version");
+      arguments.push_back(
+          inputArgs.MakeArgString(variantSDKVersion->getAsString()));
     }
   }
 }
@@ -776,5 +881,21 @@ toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
   // Validating darwin unsupported -static-stdlib argument.
   if (args.hasArg(options::OPT_static_stdlib)) {
     diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
+  }
+}
+
+void
+toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
+                                       const OutputInfo &outputInfo) const {
+  // If we have been provided with an SDK, go read the SDK information.
+  if (!outputInfo.SDKPath.empty()) {
+    auto SDKInfoOrErr = clang::driver::parseDarwinSDKInfo(
+        *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
+    if (SDKInfoOrErr) {
+      SDKInfo = *SDKInfoOrErr;
+    } else {
+      llvm::consumeError(SDKInfoOrErr.takeError());
+      diags.diagnose(SourceLoc(), diag::warn_drv_darwin_sdk_invalid_settings);
+    }
   }
 }

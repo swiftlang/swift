@@ -89,7 +89,7 @@ func testGenericFreeFunc() {
   genericFreeFunc1(#^GENERIC_FREE_FUNC_1^#
 }
 // GENERIC_FREE_FUNC_1: Begin completions, 1 items
-// GENERIC_FREE_FUNC_1: Decl[FreeFunction]/CurrModule: ['(']{#t: _...#}[')'][#Void#]{{; name=.+$}}
+// GENERIC_FREE_FUNC_1: Decl[FreeFunction]/CurrModule: ['(']{#t: T...#}[')'][#Void#]{{; name=.+$}}
 // GENERIC_FREE_FUNC_1: End completions
 
 

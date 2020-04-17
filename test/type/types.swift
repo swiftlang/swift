@@ -18,13 +18,17 @@ var d3 : () -> Float = { 4 }
 
 var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{26-26=()}}
 
-var e0 : [Int]
-e0[] // expected-error {{no exact matches in call to subscript}}
-// expected-note@-1 {{candidate has partially matching parameter list (Int)}}
-// expected-note@-2 {{candidate has partially matching parameter list (Range<Int>)}}
-// expected-note@-3 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
-// expected-note@-4 {{candidate has partially matching parameter list (Range<Array<Int>.Index>)}}
-// expected-note@-5 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  var e0 : [Int]
+  e0[] // expected-error {{no exact matches in call to subscript}}
+  // expected-note@-1 {{candidate has partially matching parameter list (Int)}}
+  // expected-note@-2 {{candidate has partially matching parameter list (Range<Int>)}}
+  // expected-note@-3 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
+  // expected-note@-4 {{candidate has partially matching parameter list (RangeSet<Array<Int>.Index>)}}
+  // expected-note@-5 {{candidate has partially matching parameter list (Range<Array<Int>.Index>)}}
+  // expected-note@-6 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
+  // expected-note@-7 {{candidate has partially matching parameter list (RangeSet<Array<Int>.Index>)}}
+}
 
 var f0 : [Float]
 var f1 : [(Int,Int)]

@@ -177,8 +177,8 @@ protocol P {  // expected-note{{extended type declared here}}
   class var v2: Int { get } // expected-error {{class properties are only allowed within classes; use 'static' to declare a requirement fulfilled by either a static or class property}} {{3-8=static}}
   static final var v3: Int { get } // expected-error {{only classes and class members may be marked with 'final'}}
 
-  static let l1: Int // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
-  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a requirement fulfilled by either a static or class property}} {{3-8=static}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  static let l1: Int // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}}
+  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a requirement fulfilled by either a static or class property}} {{3-8=static}} expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}}
 }
 
 extension P {

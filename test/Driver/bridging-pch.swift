@@ -48,6 +48,7 @@
 // PERSISTENT-DISABLED-YESPCHJOB-NOT: -pch-output-dir
 
 // RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB
+// RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch %s %S/Inputs/error.swift -driver-batch-count 2 -enable-batch-mode 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB
 // PERSISTENT-YESPCHJOB: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -emit-pch -pch-output-dir {{.*}}/pch
 // PERSISTENT-YESPCHJOB: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -import-objc-header {{.*}}bridging-header.h{{"?}} -pch-output-dir {{.*}}/pch{{"?}} -pch-disable-validation
 

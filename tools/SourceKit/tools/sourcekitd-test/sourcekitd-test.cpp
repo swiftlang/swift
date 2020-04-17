@@ -26,6 +26,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Program.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
@@ -290,7 +291,7 @@ static inline std::string getInterfaceGenDocumentName() {
   llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
   llvm::sys::fs::make_absolute(path);
   llvm::sys::path::native(path);
-  return path.str();
+  return std::string(path.str());
 }
 
 static int printAnnotations();
@@ -305,7 +306,7 @@ static void addCodeCompleteOptions(sourcekitd_object_t Req, TestOptions &Opts) {
     for (auto &Opt : Opts.RequestOptions) {
       auto KeyValue = StringRef(Opt).split('=');
       std::string KeyStr("key.codecomplete.");
-      KeyStr.append(KeyValue.first);
+      KeyStr.append(KeyValue.first.str());
       sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
 
       // FIXME: more robust way to determine the option type.
@@ -326,7 +327,7 @@ static void addCodeCompleteOptions(sourcekitd_object_t Req, TestOptions &Opts) {
 
 static bool readPopularAPIList(StringRef filename,
                                std::vector<std::string> &result) {
-  std::ifstream in(filename);
+  std::ifstream in(filename.str());
   if (!in.is_open()) {
     llvm::errs() << "error opening '" << filename << "'\n";
     return true;
@@ -387,6 +388,16 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
   return Error ? 1 : 0;
 }
 
+static int performShellExecution(ArrayRef<const char *> Args) {
+  auto Program = llvm::sys::findProgramByName(Args[0]);
+  if (std::error_code ec = Program.getError()) {
+    llvm::errs() << "command not found: " << Args[0] << "\n";
+    return ec.value();
+  }
+  SmallVector<StringRef, 8> execArgs(Args.begin(), Args.end());
+  return llvm::sys::ExecuteAndWait(*Program, execArgs);
+}
+
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts);
 
 static int handleTestInvocation(ArrayRef<const char *> Args,
@@ -419,6 +430,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     }
   }
 
+  if (Opts.ShellExecution)
+    return performShellExecution(Opts.CompilerArgs);
+
   assert(Opts.repeatRequest >= 1);
   for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
     if (int ret = handleTestInvocation(Opts, InitOpts)) {
@@ -441,7 +455,7 @@ static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
 
       auto typenames = sourcekitd_request_array_create(nullptr, 0);
       for (auto &name : expectedTypeNames) {
-        std::string n = name;
+        std::string n = name.str();
         sourcekitd_request_array_set_string(typenames, SOURCEKITD_ARRAY_APPEND, n.c_str());
       }
       sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes, typenames);
@@ -489,13 +503,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     AbsSourceFile += SourceFile;
     llvm::sys::fs::make_absolute(AbsSourceFile);
     llvm::sys::path::native(AbsSourceFile);
-    SourceFile = AbsSourceFile.str();
+    SourceFile = std::string(AbsSourceFile.str());
   }
   std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
 
   if (!Opts.TextInputFile.empty()) {
     auto Buf = getBufferForFilename(Opts.TextInputFile, Opts.VFSFiles);
-    Opts.SourceText = Buf->getBuffer();
+    Opts.SourceText = Buf->getBuffer().str();
   }
 
   std::unique_ptr<llvm::MemoryBuffer> SourceBuf;
@@ -579,6 +593,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCodeComplete);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    // Default to sort by name.
+    Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
     addCodeCompleteOptions(Req, Opts);
     break;
 
@@ -755,13 +771,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       return 1;
     }
     if (!BaseName.empty()) {
-      std::string S = BaseName;
+      std::string S = BaseName.str();
       sourcekitd_request_dictionary_set_string(Req, KeyBaseName, S.c_str());
     }
     if (!ArgPieces.empty()) {
       sourcekitd_object_t Arr = sourcekitd_request_array_create(nullptr, 0);
       for (StringRef A : ArgPieces) {
-        std::string S = A;
+        std::string S = A.str();
         sourcekitd_request_array_set_string(Arr, SOURCEKITD_ARRAY_APPEND,
                                             S.c_str());
       }
@@ -1278,7 +1294,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
           for (auto &FmtOpt : Opts.RequestOptions) {
             auto KeyValue = StringRef(FmtOpt).split('=');
             std::string KeyStr("key.editor.format.");
-            KeyStr.append(KeyValue.first);
+            KeyStr.append(KeyValue.first.str());
             sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
             int64_t Value = 0;
             KeyValue.second.getAsInteger(0, Value);
@@ -1476,10 +1492,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     return;
   }
 
-  std::string Filename = FilenameIn;
+  std::string Filename = FilenameIn.str();
   llvm::SmallString<256> output;
   if (!llvm::sys::fs::real_path(Filename, output))
-    Filename = output.str();
+    Filename = std::string(output.str());
 
   const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
   const char *USR = sourcekitd_variant_dictionary_get_string(Info, KeyUSR);
@@ -1648,10 +1664,10 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     return;
   }
 
-  std::string Filename = FilenameIn;
+  std::string Filename = FilenameIn.str();
   llvm::SmallString<256> output;
   if (llvm::sys::fs::real_path(Filename, output))
-    Filename = output.str();
+    Filename = std::string(output.str());
 
   sourcekitd_variant_t OffsetObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyOffset);

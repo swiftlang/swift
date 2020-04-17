@@ -184,6 +184,11 @@ Flag<["-"], "driver-verify-fine-grained-dependency-graph-after-every-import">,
 InternalDebugOpt,
 HelpText<"Debug DriverGraph by verifying it after every import">;
 
+def verify_incremental_dependencies :
+  Flag<["-"], "verify-incremental-dependencies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable the dependency verifier for each frontend job">;
+
 def driver_emit_fine_grained_dependency_dot_file_after_every_import :
 Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
@@ -333,6 +338,9 @@ def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-pa
 def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   Alias<emit_loaded_module_trace_path>;
+def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit a remark if a cross-import of a module is triggered.">;
 
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
@@ -367,6 +375,9 @@ def no_color_diagnostics : Flag<["-"], "no-color-diagnostics">,
 def debug_diagnostic_names : Flag<["-"], "debug-diagnostic-names">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
   HelpText<"Include diagnostic names when printing">;
+def print_educational_notes : Flag<["-"], "print-educational-notes">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Include educational notes in printed diagnostic output, if available">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
@@ -421,6 +432,12 @@ def emit_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
+
+def emit_private_module_interface_path :
+  Separate<["-"], "emit-private-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
+         DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
 
 def avoid_emit_module_source_info :
   Flag<["-"], "avoid-emit-module-source-info">,
@@ -484,14 +501,23 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
 // Experimental feature options
-def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
+
+// Note: this flag will be removed when JVP/differential generation in the
+// differentiation transform is robust.
+def enable_experimental_forward_mode_differentiation :
+  Flag<["-"], "enable-experimental-forward-mode-differentiation">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable experimental differentiable programming features">;
+  HelpText<"Enable experimental forward mode differentiation">;
+
+def enable_experimental_additive_arithmetic_derivation :
+  Flag<["-"], "enable-experimental-additive-arithmetic-derivation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental 'AdditiveArithmetic' derived conformances">;
 
 def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable experimental concise '#file' identifier and '#filePath' alternative">;
+  HelpText<"Enable experimental concise '#file' identifier">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -542,10 +568,20 @@ def Rpass_missed_EQ : Joined<["-"], "Rpass-missed=">,
 
 def save_optimization_record : Flag<["-"], "save-optimization-record">,
   Flags<[FrontendOption]>, HelpText<"Generate a YAML optimization record file">;
+def save_optimization_record_EQ : Joined<["-"], "save-optimization-record=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Generate an optimization record file in a specific format "
+           "(default: YAML)">, MetaVarName<"<format>">;
 def save_optimization_record_path :
   Separate<["-"], "save-optimization-record-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
-  HelpText<"Specify the file name of any generated YAML optimization record">;
+  HelpText<"Specify the file name of any generated optimization record">;
+def save_optimization_record_passes :
+  Separate<["-"], "save-optimization-record-passes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Only include passes which match a specified regular expression in"
+           "the generated optimization record "
+           "(by default, include all passes)">, MetaVarName<"<regex>">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
@@ -1002,6 +1038,16 @@ def disable_astscope_lookup : Flag<["-"], "disable-astscope-lookup">,
 def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
   Flags<[FrontendOption]>,
   HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
+
+def enable_request_based_incremental_dependencies : Flag<["-"],
+  "enable-request-based-incremental-dependencies">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable request-based name tracking">;
+
+def disable_request_based_incremental_dependencies : Flag<["-"],
+  "disable-request-based-incremental-dependencies">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable request-based name tracking">;
 
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,

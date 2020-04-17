@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-import _SwiftFoundationOverlayShims
+@_implementationOnly import _SwiftFoundationOverlayShims
 
 // We don't check for NSCopying here for performance reasons. We would
 // just crash anyway, and NSMutableDictionary will still do that when
@@ -41,7 +41,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  fileprivate init(_cocoaDictionary: __shared NSDictionary) {
+  private init(_cocoaDictionary: __shared NSDictionary) {
     assert(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),

@@ -126,8 +126,17 @@ namespace swift {
     SILVTable *readVTable(serialization::DeclID);
     SILGlobalVariable *getGlobalForReference(StringRef Name);
     SILGlobalVariable *readGlobalVar(StringRef Name);
-    SILWitnessTable *readWitnessTable(serialization::DeclID,
+
+    /// Read and return the witness table identified with \p WId.
+    SILWitnessTable *readWitnessTable(serialization::DeclID WId,
                                       SILWitnessTable *existingWt);
+
+    /// Read the witness table identified with \p WId, return the table or
+    /// the first error if any.
+    llvm::Expected<SILWitnessTable *>
+      readWitnessTableChecked(serialization::DeclID WId,
+                              SILWitnessTable *existingWt);
+
     void readWitnessTableEntries(
            llvm::BitstreamEntry &entry,
            std::vector<SILWitnessTable::Entry> &witnessEntries,

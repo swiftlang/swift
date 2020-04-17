@@ -114,13 +114,16 @@ public:
   DiagnosticEngine &Diags;
   SourceFile &SF;
   Lexer *L;
-  SILParserTUStateBase *SIL; // Non-null when parsing a .sil file.
+  SILParserTUStateBase *SIL; // Non-null when parsing SIL decls.
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
+
+  /// Tracks parsed decls that LLDB requires to be inserted at the top-level.
+  std::vector<Decl *> ContextSwitchedTopLevelDecls;
 
   NullablePtr<llvm::MD5> CurrentTokenHash;
   void recordTokenHash(const Token Tok) {
@@ -173,9 +176,14 @@ public:
 
   LocalContext *CurLocalContext = nullptr;
 
-  bool isDelayedParsingEnabled() const {
-    return DelayBodyParsing || isCodeCompletionFirstPass();
-  }
+  /// Whether we should delay parsing nominal type, extension, and function
+  /// bodies.
+  bool isDelayedParsingEnabled() const;
+
+  /// Whether to evaluate the conditions of #if decls, meaning that the bodies
+  /// of any active clauses are hoisted such that they become sibling nodes with
+  /// the #if decl.
+  bool shouldEvaluatePoundIfDecls() const;
 
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
     CodeCompletion = Callbacks;
@@ -212,16 +220,6 @@ public:
   /// trailing trivias for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
   ParsedTrivia TrailingTrivia;
-
-  /// Whether we should delay parsing nominal type and extension bodies,
-  /// and skip function bodies.
-  ///
-  /// This is false in primary files, since we want to type check all
-  /// declarations and function bodies.
-  ///
-  /// This is true for non-primary files, where declarations only need to be
-  /// lazily parsed and type checked.
-  bool DelayBodyParsing;
 
   /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
@@ -400,17 +398,14 @@ public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
          PersistentParserState *PersistentState = nullptr,
-         std::shared_ptr<SyntaxParseActions> SPActions = nullptr,
-         bool DelayBodyParsing = true);
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   ~Parser();
 
   /// Returns true if the buffer being parsed is allowed to contain SIL.
@@ -889,8 +884,8 @@ public:
   /// Returns true if the parser is at the start of a SIL decl.
   bool isStartOfSILDecl();
 
-  /// Parse the top-level Swift decls into the source file.
-  void parseTopLevel();
+  /// Parse the top-level Swift decls into the provided vector.
+  void parseTopLevel(SmallVectorImpl<Decl *> &decls);
 
   /// Parse the top-level SIL decls into the SIL module.
   void parseTopLevelSIL();
@@ -1015,8 +1010,6 @@ public:
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
       bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
-      Optional<DeclNameRefWithLoc> &jvpSpec,
-      Optional<DeclNameRefWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
   /// Parse a differentiability parameters clause, i.e. the 'wrt:' clause in
@@ -1074,7 +1067,7 @@ public:
                                 bool allowClassRequirement,
                                 bool allowAnyObject);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
-                             Parser::ParseDeclOptions Options,
+                             ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
   std::pair<std::vector<Decl *>, Optional<std::string>>
   parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
@@ -1624,7 +1617,7 @@ public:
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo,
                                  bool shouldSkipDoTokenConsume = false);
-  ParserResult<CatchStmt> parseStmtCatch();
+  ParserResult<CaseStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
@@ -1642,14 +1635,10 @@ public:
   void
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 
-  enum class WhereClauseKind : unsigned {
-    Declaration,
-    Protocol,
-    AssociatedType
-  };
   ParserStatus
-  parseFreestandingGenericWhereClause(GenericParamList *GPList,
-                             WhereClauseKind kind=WhereClauseKind::Declaration);
+  parseFreestandingGenericWhereClause(GenericContext *genCtx,
+                                      GenericParamList *&GPList,
+                                      ParseDeclOptions flags);
 
   ParserStatus parseGenericWhereClause(
       SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,
@@ -1734,6 +1723,15 @@ struct ParsedDeclName {
 
   /// Form a declaration name from this parsed declaration name.
   DeclNameRef formDeclNameRef(ASTContext &ctx) const;
+};
+
+/// To assist debugging parser crashes, tell us the location of the
+/// current token.
+class PrettyStackTraceParser : public llvm::PrettyStackTraceEntry {
+  Parser &P;
+public:
+  explicit PrettyStackTraceParser(Parser &P) : P(P) {}
+  void print(llvm::raw_ostream &out) const override;
 };
 
 /// Parse a stringified Swift declaration name,

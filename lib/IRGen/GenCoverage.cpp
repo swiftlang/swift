@@ -174,6 +174,6 @@ void IRGenModule::emitCoverageMapping() {
       CovDataVal, llvm::getCoverageMappingVarName());
   std::string CovSection = getCoverageSection(*this);
   CovData->setSection(CovSection);
-  CovData->setAlignment(8);
+  CovData->setAlignment(llvm::MaybeAlign(8));
   addUsedGlobal(CovData);
 }

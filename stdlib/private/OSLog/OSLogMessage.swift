@@ -175,7 +175,6 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   // constant evaluation and folding. Note that these methods will be inlined,
   // constant evaluated/folded and optimized in the context of a caller.
 
-  @_semantics("oslog.interpolation.init")
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)

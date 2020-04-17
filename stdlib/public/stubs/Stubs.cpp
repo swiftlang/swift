@@ -41,7 +41,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
 #include <sstream>
 #include <cmath>
 #elif defined(__ANDROID__)
@@ -261,6 +261,18 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
 }
 #endif
 
+// TODO: replace this with a float16 implementation instead of calling _float.
+// Argument type will have to stay float, though; only the formatting changes.
+// Note, return type is __swift_ssize_t, not uint64_t as with the other
+// formatters. We'd use this type there if we could, but it's ABI so we can't
+// go back and change it.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+__swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
+                                      float Value, bool Debug) {
+  __fp16 v = Value;
+  return swift_format_float16(&v, Buffer, BufferLength);
+}
+
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
                                float Value, bool Debug) {
@@ -357,7 +369,7 @@ static bool swift_stringIsSignalingNaN(const char *nptr) {
   return strcasecmp(nptr, "snan") == 0;
 }
 
-#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__) || defined(__OpenBSD__)
 // Cygwin does not support uselocale(), but we can use the locale feature 
 // in stringstream object.
 template <typename T>
@@ -500,6 +512,14 @@ const char *swift::_swift_stdlib_strtof_clocale(
 }
 #endif
 
+const char *swift::_swift_stdlib_strtof16_clocale(
+    const char * nptr, __fp16 *outResult) {
+  float tmp;
+  const char *result = _swift_stdlib_strtof_clocale(nptr, &tmp);
+  *outResult = tmp;
+  return result;
+}
+
 void swift::_swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)
   _lock_file(stdout);
@@ -527,4 +547,3 @@ int swift::_swift_stdlib_putc_stderr(int C) {
 size_t swift::_swift_stdlib_getHardwareConcurrency() {
   return std::thread::hardware_concurrency();
 }
-

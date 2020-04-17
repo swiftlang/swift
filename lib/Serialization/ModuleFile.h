@@ -100,12 +100,18 @@ class ModuleFile
   /// modules, which are assumed to contain canonical SIL for an entire module.
   bool IsSIB = false;
 
+  // Full blob from the misc. version field of the metadata block. This should
+  // include the version string of the compiler that built the module.
+  StringRef MiscVersion;
+
 public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:
     ModuleDecl::ImportedModule Import = {};
     const StringRef RawPath;
+    const StringRef RawSPIs;
+    SmallVector<Identifier, 4> spiGroups;
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
@@ -120,9 +126,9 @@ public:
       return static_cast<ImportFilterKind>(1 << RawImportControl);
     }
 
-    Dependency(StringRef path, bool isHeader, ImportFilterKind importControl,
+    Dependency(StringRef path, StringRef spiGroups, bool isHeader, ImportFilterKind importControl,
                bool isScoped)
-      : RawPath(path), RawImportControl(rawControlFromKind(importControl)),
+      : RawPath(path), RawSPIs(spiGroups), RawImportControl(rawControlFromKind(importControl)),
         IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
@@ -130,13 +136,13 @@ public:
     }
 
   public:
-    Dependency(StringRef path, ImportFilterKind importControl, bool isScoped)
-      : Dependency(path, false, importControl, isScoped) {}
+    Dependency(StringRef path, StringRef spiGroups, ImportFilterKind importControl, bool isScoped)
+      : Dependency(path, spiGroups, false, importControl, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
       auto importControl = exported ? ImportFilterKind::Public
                                     : ImportFilterKind::Private;
-      return Dependency(headerPath, true, importControl, false);
+      return Dependency(headerPath, StringRef(), true, importControl, false);
     }
 
     bool isLoaded() const {
@@ -415,12 +421,22 @@ private:
       llvm::OnDiskIterableChainedHashTable<DeclUSRTableInfo>;
   std::unique_ptr<SerializedDeclUSRTable> DeclUSRsTable;
 
+  class DerivativeFunctionConfigTableInfo;
+  using SerializedDerivativeFunctionConfigTable =
+      llvm::OnDiskIterableChainedHashTable<DerivativeFunctionConfigTableInfo>;
+  std::unique_ptr<SerializedDerivativeFunctionConfigTable>
+      DerivativeFunctionConfigurations;
+
   /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
   StringRef SourceLocsTextData;
 
   /// An array of fixed size source location data for each USR appearing in
   /// \c DeclUSRsTable.
   StringRef BasicDeclLocsData;
+
+  /// An array of fixed-size location data for each `SingleRawComment` piece
+  /// of declaration's documentation `RawComment`s.
+  StringRef DocRangesData;
 
   struct ModuleBits {
     /// The decl ID of the main class in this module file, if it has one.
@@ -543,6 +559,12 @@ private:
   /// index_block::DeclMembersLayout format.
   std::unique_ptr<SerializedDeclMembersTable>
   readDeclMembersTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk derivative function configuration table stored in
+  /// index_block::DerivativeFunctionConfigTableLayout format.
+  std::unique_ptr<ModuleFile::SerializedDerivativeFunctionConfigTable>
+  readDerivativeFunctionConfigTable(ArrayRef<uint64_t> fields,
+                                    StringRef blobData);
 
   /// Reads the index block, which contains global tables.
   ///
@@ -725,7 +747,7 @@ public:
   /// Searches the module's operators for one with the given name and fixity.
   ///
   /// If none is found, returns null.
-  OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
+  OperatorDecl *lookupOperator(Identifier name, OperatorFixity fixity);
 
   /// Searches the module's precedence groups for one with the given
   /// name and fixity.
@@ -768,6 +790,12 @@ public:
                        bool isInstanceMethod,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
 
+  /// Loads all derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD,
+      llvm::SetVector<AutoDiffConfig> &results);
+
   /// Reports all class members in the module to the given consumer.
   ///
   /// This is intended for use with id-style lookup and code completion.
@@ -786,6 +814,11 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results);
 
+  /// Find all SPI names imported from \p importedModule by this module,
+  /// collecting the identifiers in \p spiGroups.
+  void lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                              SmallVectorImpl<Identifier> &spiGroups) const;
+
   /// Reports all link-time dependencies.
   void collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const;
 
@@ -799,6 +832,9 @@ public:
   void getTopLevelDecls(
          SmallVectorImpl<Decl*> &Results,
          llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
+
+  /// Adds all operators to the given vector.
+  void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &Results);
 
   /// Adds all precedence groups to the given vector.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results);
@@ -849,6 +885,13 @@ public:
   virtual ValueDecl *
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override;
+
+  virtual AbstractFunctionDecl *
+  loadReferencedFunctionDecl(const DerivativeAttr *DA,
+                             uint64_t contextData) override;
+
+  virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
+                                  uint64_t contextData) override;
 
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
@@ -967,13 +1010,14 @@ public:
   llvm::Expected<ProtocolConformanceRef>
   readConformanceChecked(llvm::BitstreamCursor &Cursor,
                          GenericEnvironment *genericEnv = nullptr);
-  
+
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
-  /// Read the given normal conformance from the current module file.
-  NormalProtocolConformance *
-  readNormalConformance(serialization::NormalConformanceID id);
+  /// Read the given normal conformance from the current module file,
+  /// returns the conformance or the first error.
+  llvm::Expected<NormalProtocolConformance *>
+  readNormalConformanceChecked(serialization::NormalConformanceID id);
 
   /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();

@@ -119,7 +119,7 @@ internal class Other {
 // CHECK: integer_literal
 // CHECK: [[R1:%.*]] = ref_element_addr %0 : $Other, #Other.z
 // CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[R1]] : $*DerivedProtocol to $*@opened("{{.*}}") DerivedProtocol
-// CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}") DerivedProtocol, #DerivedProtocol.foo!1 : <Self where Self : DerivedProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}") DerivedProtocol : $@convention(witness_method: DerivedProtocol) <τ_0_0 where τ_0_0 : DerivedProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}") DerivedProtocol, #DerivedProtocol.foo : <Self where Self : DerivedProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}") DerivedProtocol : $@convention(witness_method: DerivedProtocol) <τ_0_0 where τ_0_0 : DerivedProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W1]]<@opened("{{.*}}") DerivedProtocol>([[O1]]) : $@convention(witness_method: DerivedProtocol) <τ_0_0 where τ_0_0 : DerivedProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: integer_literal
@@ -129,7 +129,7 @@ internal class Other {
 // CHECK: cond_fail
 // CHECK: [[R2:%.*]] = ref_element_addr %0 : $Other, #Other.p
 // CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[R2]] : $*PublicProtocol to $*@opened("{{.*}}") PublicProtocol
-// CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}") PublicProtocol, #PublicProtocol.foo!1 : <Self where Self : PublicProtocol> (Self) -> () -> Int, [[O2]] : $*@opened("{{.*}}") PublicProtocol : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}") PublicProtocol, #PublicProtocol.foo : <Self where Self : PublicProtocol> (Self) -> () -> Int, [[O2]] : $*@opened("{{.*}}") PublicProtocol : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W2]]<@opened("{{.*}}") PublicProtocol>([[O2]]) : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: builtin 
@@ -143,7 +143,7 @@ internal class Other {
 // CHECK: cond_fail
 // CHECK: [[R3:%.*]] = ref_element_addr %0 : $Other, #Other.r
 // CHECK: [[O3:%.*]] = open_existential_addr immutable_access [[R3]] : $*GenericProtocol to $*@opened("{{.*}}") GenericProtocol
-// CHECK: [[W3:%.*]] = witness_method $@opened("{{.*}}") GenericProtocol, #GenericProtocol.foo!1 : <Self where Self : GenericProtocol> (Self) -> () -> Int, [[O3]] : $*@opened("{{.*}}") GenericProtocol : $@convention(witness_method: GenericProtocol) <τ_0_0 where τ_0_0 : GenericProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: [[W3:%.*]] = witness_method $@opened("{{.*}}") GenericProtocol, #GenericProtocol.foo : <Self where Self : GenericProtocol> (Self) -> () -> Int, [[O3]] : $*@opened("{{.*}}") GenericProtocol : $@convention(witness_method: GenericProtocol) <τ_0_0 where τ_0_0 : GenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W3]]<@opened("{{.*}}") GenericProtocol>([[O3]]) : $@convention(witness_method: GenericProtocol) <τ_0_0 where τ_0_0 : GenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: builtin 
@@ -152,7 +152,7 @@ internal class Other {
 // CHECK: cond_fail
 // CHECK: [[R4:%.*]] = ref_element_addr %0 : $Other, #Other.s
 // CHECK: [[O4:%.*]] = open_existential_addr immutable_access %36 : $*MultipleConformanceProtocol to $*@opened("{{.*}}") MultipleConformanceProtocol
-// CHECK: [[W4:%.*]] = witness_method $@opened("{{.*}}") MultipleConformanceProtocol, #MultipleConformanceProtocol.foo!1 : <Self where Self : MultipleConformanceProtocol> (Self) -> () -> Int, %37 : $*@opened("{{.*}}") MultipleConformanceProtocol : $@convention(witness_method: MultipleConformanceProtocol) <τ_0_0 where τ_0_0 : MultipleConformanceProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: [[W4:%.*]] = witness_method $@opened("{{.*}}") MultipleConformanceProtocol, #MultipleConformanceProtocol.foo : <Self where Self : MultipleConformanceProtocol> (Self) -> () -> Int, %37 : $*@opened("{{.*}}") MultipleConformanceProtocol : $@convention(witness_method: MultipleConformanceProtocol) <τ_0_0 where τ_0_0 : MultipleConformanceProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W4]]<@opened("{{.*}}") MultipleConformanceProtocol>(%37) : $@convention(witness_method: MultipleConformanceProtocol) <τ_0_0 where τ_0_0 : MultipleConformanceProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: builtin
@@ -237,25 +237,15 @@ internal class OtherClass {
 // CHECK-LABEL: sil hidden [noinline] @$s25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF : $@convention(method) (@guaranteed OtherClass) -> Int {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK: debug_value
-// CHECK: [[STACK1:%.*]] = alloc_stack $PropProtocol
 // CHECK: [[R1:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg1
-// CHECK: [[ACC1:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R1]]
-
-// TODO: this copy_addr should be eliminated: rdar://problem/59345115
-// CHECK: copy_addr [[ACC1]] to [initialization] [[STACK1]]
-// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[STACK1]] : $*PropProtocol to $*@opened("{{.*}}") PropProtocol
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[R1]] : $*PropProtocol to $*@opened("{{.*}}") PropProtocol
 // CHECK: [[U1:%.*]] = unchecked_addr_cast [[O1]] : $*@opened("{{.*}}") PropProtocol to $*PropClass 
 // CHECK: [[S1:%.*]] = struct_element_addr [[U1]] : $*PropClass, #PropClass.val
 // CHECK: [[S11:%.*]] = struct_element_addr [[S1]] : $*Int, #Int._value
 // CHECK: load [[S11]] 
-// CHECK: [[STACK2:%.*]] = alloc_stack $GenericPropProtocol
 // CHECK: [[R2:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg2
-// CHECK: [[ACC2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R2]]
-
-// TODO: this copy_addr should be eliminated: rdar://problem/59345115
-// CHECK: copy_addr [[ACC2]] to [initialization] [[STACK2]]
-// CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[STACK2]] : $*GenericPropProtocol to $*@opened("{{.*}}") GenericPropProtocol
-// CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}") GenericPropProtocol, #GenericPropProtocol.val!getter.1 : <Self where Self : GenericPropProtocol> (Self) -> () -> Int, [[O2]] : $*@opened("{{.*}}") GenericPropProtocol : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[R2]] : $*GenericPropProtocol to $*@opened("{{.*}}") GenericPropProtocol
+// CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}") GenericPropProtocol, #GenericPropProtocol.val!getter : <Self where Self : GenericPropProtocol> (Self) -> () -> Int, [[O2]] : $*@opened("{{.*}}") GenericPropProtocol : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W2]]<@opened("{{.*}}") GenericPropProtocol>([[O2]]) : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: integer_literal
@@ -263,13 +253,8 @@ internal class OtherClass {
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: cond_fail
-// CHECK: [[STACK4:%.*]] = alloc_stack $NestedPropProtocol
 // CHECK: [[R4:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg3
-// CHECK: [[ACC4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R4]]
-
-// TODO: this copy_addr should be eliminated: rdar://problem/59345115
-// CHECK: copy_addr [[ACC4]] to [initialization] [[STACK4]]
-// CHECK: [[O4:%.*]] = open_existential_addr immutable_access [[STACK4]] : $*NestedPropProtocol to $*@opened("{{.*}}") NestedPropProtocol
+// CHECK: [[O4:%.*]] = open_existential_addr immutable_access [[R4]] : $*NestedPropProtocol to $*@opened("{{.*}}") NestedPropProtocol
 // CHECK: [[U4:%.*]] = unchecked_addr_cast [[O4]] : $*@opened("{{.*}}") NestedPropProtocol to $*Outer.Inner
 // CHECK: [[S4:%.*]] = struct_element_addr [[U4]] : $*Outer.Inner, #Outer.Inner.val
 // CHECK: [[S41:%.*]] = struct_element_addr [[S4]] : $*Int, #Int._value
@@ -278,14 +263,9 @@ internal class OtherClass {
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: cond_fail
-// CHECK: [[STACK5:%.*]] = alloc_stack $GenericNestedPropProtocol
 // CHECK: [[R5:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg4
-// CHECK: [[ACC5:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R5]]
-
-// TODO: this copy_addr should be eliminated: rdar://problem/59345115
-// CHECK: copy_addr [[ACC5]] to [initialization] [[STACK5]]
-// CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[STACK5]] : $*GenericNestedPropProtocol to $*@opened("{{.*}}") GenericNestedPropProtocol
-// CHECK: [[W5:%.*]] = witness_method $@opened("{{.*}}") GenericNestedPropProtocol, #GenericNestedPropProtocol.val!getter.1 : <Self where Self : GenericNestedPropProtocol> (Self) -> () -> Int, [[O5:%.*]] : $*@opened("{{.*}}") GenericNestedPropProtocol : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int 
+// CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[R5]] : $*GenericNestedPropProtocol to $*@opened("{{.*}}") GenericNestedPropProtocol
+// CHECK: [[W5:%.*]] = witness_method $@opened("{{.*}}") GenericNestedPropProtocol, #GenericNestedPropProtocol.val!getter : <Self where Self : GenericNestedPropProtocol> (Self) -> () -> Int, [[O5:%.*]] : $*@opened("{{.*}}") GenericNestedPropProtocol : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int 
 // CHECK: apply [[W5]]<@opened("{{.*}}") GenericNestedPropProtocol>([[O5]]) : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: builtin
@@ -351,14 +331,9 @@ internal class OtherKlass {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK: debug_value
 // CHECK: integer_literal
-// CHECK: [[STACK1:%.*]] = alloc_stack $AGenericProtocol
 // CHECK: [[R1:%.*]] = ref_element_addr [[ARG]] : $OtherKlass, #OtherKlass.arg2
-// CHECK: [[ACC1:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R1]]
-
-// TODO: this copy_addr should be eliminated: rdar://problem/59345115
-// CHECK: copy_addr [[ACC1]] to [initialization] [[STACK1]]
-// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[STACK1]] : $*AGenericProtocol to $*@opened("{{.*}}") AGenericProtocol
-// CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}") AGenericProtocol, #AGenericProtocol.val!getter.1 : <Self where Self : AGenericProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}") AGenericProtocol : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[R1]] : $*AGenericProtocol to $*@opened("{{.*}}") AGenericProtocol
+// CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}") AGenericProtocol, #AGenericProtocol.val!getter : <Self where Self : AGenericProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}") AGenericProtocol : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W1]]<@opened("{{.*}}") AGenericProtocol>([[O1]]) : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: integer_literal

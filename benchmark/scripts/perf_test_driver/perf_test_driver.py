@@ -111,7 +111,8 @@ class BenchmarkDriver(object):
     def run_for_opt_level(self, binary, opt_level, test_filter):
         print("testing driver at path: %s" % binary)
         names = []
-        for l in subprocess.check_output([binary, "--list"]).split("\n")[1:]:
+        output = subprocess.check_output([binary, "--list"], universal_newlines=True)
+        for l in output.split("\n")[1:]:
             m = BENCHMARK_OUTPUT_RE.match(l)
             if m is None:
                 continue

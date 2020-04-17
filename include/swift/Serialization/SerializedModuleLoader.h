@@ -184,6 +184,10 @@ public:
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) override;
 
+  virtual void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results) override;
+
   virtual void verifyAllModules() override;
 };
 
@@ -328,12 +332,16 @@ public:
   lookupNestedType(Identifier name,
                    const NominalTypeDecl *parent) const override;
 
-  virtual OperatorDecl *lookupOperator(Identifier name,
-                                       DeclKind fixity) const override;
+protected:
+  virtual void
+  lookupOperatorDirect(Identifier name, OperatorFixity fixity,
+                       TinyPtrVector<OperatorDecl *> &results) const override;
 
-  virtual PrecedenceGroupDecl *
-  lookupPrecedenceGroup(Identifier name) const override;
+  virtual void lookupPrecedenceGroupDirect(
+      Identifier name,
+      TinyPtrVector<PrecedenceGroupDecl *> &results) const override;
 
+public:
   virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override;
@@ -349,6 +357,10 @@ public:
   void lookupObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
+
+  virtual void
+  lookupImportedSPIGroups(const ModuleDecl *importedModule,
+                         SmallVectorImpl<Identifier> &spiGroups) const override;
 
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
 
@@ -373,6 +385,9 @@ public:
       llvm::function_ref<bool(DeclAttributes)> matchAttributes) const override;
 
   virtual void
+  getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;
+
+  virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const override;
 
   virtual void
@@ -392,6 +407,8 @@ public:
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
 
   virtual StringRef getFilename() const override;
+
+  virtual StringRef getModuleDefiningPath() const override;
 
   ClassDecl *getMainClass() const override;
 

@@ -100,11 +100,11 @@ func f7() -> (c: Int, v: A) {
 }
 
 func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
-// expected-note@-1 {{required by global function 'f8' where 'T' = '(Int, Double)'}}
+// expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
 f8(3, f4) // expected-error {{global function 'f8' requires that 'Int' conform to 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{type '(Int, Double)' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -161,7 +161,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{unable to infer complex closure return type; add explicit type to disambiguate}} {{21-21=-> <#Result#> }}
+  myMap(0..<10, { x in // expected-error{{unable to infer complex closure return type; add explicit type to disambiguate}} {{21-21=-> <#Result#> }} {{educational-notes=complex-closure-inference}}
     ()
     return x
   })
@@ -255,7 +255,8 @@ struct Toe {
   let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
   func clip() {
-    toenail.inspect { x in
+    // TODO(diagnostics): Solver should stop once it has detected that `toenail` doesn't exist and report that.
+    toenail.inspect { x in // expected-error {{type of expression is ambiguous without more context}}
       toenail.inspect { y in }
     }
   }
@@ -403,11 +404,11 @@ f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to ex
 f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-let f8 = f7(2)
-_ = f8(1)
-f8(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
-f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
+let f10 = f7(2)
+_ = f10(1)
+f10(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
+f10(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f10(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 
@@ -666,9 +667,10 @@ _ = (i = 6) ? 42 : 57 // expected-error {{use of '=' in a boolean context, did y
 // <rdar://problem/22263468> QoI: Not producing specific argument conversion diagnostic for tuple init
 func r22263468(_ a : String?) {
   typealias MyTuple = (Int, String)
-  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' must be unwrapped to a value of type 'String'}}
-  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
+  // re-think the way errors in tuple elements are detected because it's currently impossible to detect
+  // exactly what went wrong here and aggregate fixes for different elements at the same time.
+  _ = MyTuple(42, a) // expected-error {{tuple type 'MyTuple' (aka '(Int, String)') is not convertible to tuple type '(Int, String?)'}}
 }
 
 
@@ -726,7 +728,6 @@ func r23560128() {
   var a : (Int,Int)?
   a.0 = 42 // expected-error{{value of optional type '(Int, Int)?' must be unwrapped to refer to member '0' of wrapped base type '(Int, Int)'}}
   // expected-note@-1{{chain the optional }}
-  // expected-note@-2{{force-unwrap using '!'}}
 }
 
 // <rdar://problem/21890157> QoI: wrong error message when accessing properties on optional structs without unwrapping
@@ -736,7 +737,6 @@ struct ExampleStruct21890157 {
 var example21890157: ExampleStruct21890157?
 example21890157.property = "confusing"  // expected-error {{value of optional type 'ExampleStruct21890157?' must be unwrapped to refer to member 'property' of wrapped base type 'ExampleStruct21890157'}}
   // expected-note@-1{{chain the optional }}
-  // expected-note@-2{{force-unwrap using '!'}}
 
 
 struct UnaryOp {}
@@ -1404,4 +1404,69 @@ func foo(frame: Frame) {
     frame.rect.width + 10.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
     // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
 
+}
+
+// Make sure we prefer the conformance failure.
+func f11(_ n: Int) {}
+func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
+f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
+
+// FIXME: Arguably we should also prefer the conformance failure in this case.
+let f12: (Int) -> Void = { _ in }
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}
+f12(3, f4)// expected-error {{extra argument in call}}
+
+// SR-12242
+struct SR_12242_R<Value> {}
+struct SR_12242_T {}
+
+protocol SR_12242_P {}
+
+func fSR_12242() -> SR_12242_R<[SR_12242_T]> {}
+
+func genericFunc<SR_12242_T: SR_12242_P>(_ completion:  @escaping (SR_12242_R<[SR_12242_T]>) -> Void) {
+  let t = fSR_12242()
+  completion(t) // expected-error {{cannot convert value of type 'diagnostics.SR_12242_R<[diagnostics.SR_12242_T]>' to expected argument type 'diagnostics.SR_12242_R<[SR_12242_T]>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('diagnostics.SR_12242_T' and 'SR_12242_T') are expected to be equal}}
+}
+
+func assignGenericMismatch() {
+  var a: [Int]?
+  var b: [String]
+
+  a = b // expected-error {{cannot assign value of type '[String]' to type '[Int]?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+
+  b = a // expected-error {{cannot assign value of type '[Int]' to type '[String]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  // expected-error@-2 {{value of optional type '[Int]?' must be unwrapped to a value of type '[Int]'}}
+  // expected-note@-3 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-4 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
+
+// [Int] to [String]? argument to param conversion
+let value: [Int] = []
+func gericArgToParamOptional(_ param: [String]?) {}
+
+gericArgToParamOptional(value) // expected-error {{convert value of type '[Int]' to expected argument type '[String]?'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+
+// Inout Expr conversions
+func gericArgToParamInout1(_ x: inout [[Int]]) {}
+func gericArgToParamInout2(_ x: inout [[String]]) {
+  gericArgToParamInout1(&x) // expected-error {{cannot convert value of type '[[String]]' to expected argument type '[[Int]]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+}
+
+func gericArgToParamInoutOptional(_ x: inout [[String]]?) {
+  gericArgToParamInout1(&x) // expected-error {{cannot convert value of type '[[String]]?' to expected argument type '[[Int]]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+  // expected-error@-2 {{value of optional type '[[String]]?' must be unwrapped to a value of type '[[String]]'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
+
+func gericArgToParamInout(_ x: inout [[Int]]) { // expected-note {{change variable type to '[[String]]?' if it doesn't need to be declared as '[[Int]]'}}
+  gericArgToParamInoutOptional(&x) // expected-error {{cannot convert value of type '[[Int]]' to expected argument type '[[String]]?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  // expected-error@-2 {{inout argument could be set to a value with a type other than '[[Int]]'; use a value declared as type '[[String]]?' instead}}
 }

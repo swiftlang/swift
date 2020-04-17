@@ -27,7 +27,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target thumbv7-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-thumbv7 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
+// RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7 %s < %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7-NEGATIVE %s < %t.android.txt
 
@@ -36,6 +36,9 @@
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.windows.txt
 // RUN: %FileCheck -check-prefix WINDOWS-x86_64 %s < %t.windows.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target amd64-unknown-openbsd -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.openbsd.txt
+// RUN: %FileCheck -check-prefix OPENBSD-amd64 %s < %t.openbsd.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-unknown-linux-gnu %s -Lbar -o dynlib.out 2>&1 > %t.linux.dynlib.txt
 // RUN: %FileCheck -check-prefix LINUX_DYNLIB-x86_64 %s < %t.linux.dynlib.txt
@@ -59,6 +62,12 @@
 // RUN: %swiftc_driver -driver-print-jobs -target wasm32-unknown-wasi -Xclang-linker -flag -Xclang-linker arg %s 2>&1 | %FileCheck -check-prefix WASI-clang-linker-order %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
+
+// RUN: %swiftc_driver_plain -driver-print-jobs -target x86_64-unknown-linux-gnu -toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix LINUX-STDLIB-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -target x86_64-unknown-linux-gnu -no-toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix LINUX-NO-STDLIB-RPATH %s
+
+// RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-unknown-linux-androideabi -toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix ANDROID-STDLIB-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -target armv7-unknown-linux-androideabi -no-toolchain-stdlib-rpath %s 2>&1 | %FileCheck -check-prefix ANDROID-NO-STDLIB-RPATH %s
 
 // RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
@@ -92,6 +101,15 @@
 // INFERRED_NAMED_DARWIN tests above: 'libLINKER.dylib'.
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 
+// Check reading the SDKSettings.json from an SDK
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4 %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_UNVERSIONED %s
+
+// MACOS_10_15: -platform_version macos 10.9.0 10.15.0
+// MACOS_10_15_4: -platform_version macos 10.9.0 10.15.4
+// MACOS_UNVERSIONED: -platform_version macos 10.9.0 0.0.0
+
 // There are more RUN lines further down in the file.
 
 // CHECK: swift
@@ -108,7 +126,7 @@
 
 // SIMPLE: {{(bin/)?}}ld{{"? }}
 // SIMPLE-NOT: -syslibroot
-// SIMPLE: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
+// SIMPLE: -platform_version macos 10.{{[0-9]+}}.{{[0-9]+}} 0.0.0
 // SIMPLE-NOT: -syslibroot
 // SIMPLE: -o linker
 
@@ -124,7 +142,7 @@
 // IOS_SIMPLE-DAG: -L {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)iphonesimulator}}
 // IOS_SIMPLE-DAG: -lSystem
 // IOS_SIMPLE-DAG: -arch x86_64
-// IOS_SIMPLE-DAG: -ios_simulator_version_min 7.1.{{[0-9]+}}
+// IOS_SIMPLE-DAG: -platform_version ios-simulator 7.1.{{[0-9]+}} 0.0.0
 // IOS_SIMPLE: -o linker
 
 
@@ -136,7 +154,7 @@
 // tvOS_SIMPLE-DAG: -L {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)appletvsimulator}}
 // tvOS_SIMPLE-DAG: -lSystem
 // tvOS_SIMPLE-DAG: -arch x86_64
-// tvOS_SIMPLE-DAG: -tvos_simulator_version_min 9.0.{{[0-9]+}}
+// tvOS_SIMPLE-DAG: -platform_version tvos-simulator 9.0.{{[0-9]+}} 0.0.0
 // tvOS_SIMPLE: -o linker
 
 
@@ -148,7 +166,7 @@
 // watchOS_SIMPLE-DAG: -L {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)watchsimulator}}
 // watchOS_SIMPLE-DAG: -lSystem
 // watchOS_SIMPLE-DAG: -arch i386
-// watchOS_SIMPLE-DAG: -watchos_simulator_version_min 2.0.{{[0-9]+}}
+// watchOS_SIMPLE-DAG: -platform_version watchos-simulator 2.0.{{[0-9]+}} 0.0.0
 // watchOS_SIMPLE: -o linker
 
 
@@ -264,6 +282,22 @@
 // WINDOWS-x86_64-DAG: -Xlinker -undefined
 // WINDOWS-x86_64: -o linker
 
+// OPENBSD-amd64: swift
+// OPENBSD-amd64: -o [[OBJECTFILE:.*]]
+
+// OPENBSD-amd64: clang
+// OPENBSD-amd64-DAG: -fuse-ld=lld
+// OPENBSD-amd64-DAG: [[OBJECTFILE]]
+// OPENBSD-amd64-DAG: -lswiftCore
+// OPENBSD-amd64-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)]]
+// OPENBSD-amd64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
+// OPENBSD-amd64-DAG: -F foo -iframework car -F cdr
+// OPENBSD-amd64-DAG: -framework bar
+// OPENBSD-amd64-DAG: -L baz
+// OPENBSD-amd64-DAG: -lboo
+// OPENBSD-amd64-DAG: -Xlinker -undefined
+// OPENBSD-amd64: -o linker
+
 
 // COMPLEX: {{(bin/)?}}ld{{"? }}
 // COMPLEX-DAG: -dylib
@@ -273,7 +307,7 @@
 // COMPLEX-DAG: -L baz
 // COMPLEX-DAG: -F garply -F car -F cdr
 // COMPLEX-DAG: -undefined dynamic_lookup
-// COMPLEX-DAG: -macosx_version_min 10.9.1
+// COMPLEX-DAG: -platform_version macos 10.9.1 0.0.0
 // COMPLEX: -o sdk.out
 
 // LINUX_DYNLIB-x86_64: swift
@@ -409,6 +443,11 @@
 // RELATIVE_ARCLITE: {{/|\\\\}}DISTINCTIVE-PATH{{/|\\\\}}usr{{/|\\\\}}lib{{/|\\\\}}arc{{/|\\\\}}libarclite_macosx.a
 // RELATIVE_ARCLITE: -o {{[^ ]+}}
 
+// LINUX-STDLIB-RPATH: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux]]
+// LINUX-NO-STDLIB-RPATH-NOT: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux]]
+
+// ANDROID-STDLIB-RPATH: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)android]]
+// ANDROID-NO-STDLIB-RPATH-NOT: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)android]]
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc

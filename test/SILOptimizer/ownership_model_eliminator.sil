@@ -201,7 +201,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 
 // CHECK-LABEL: sil @switch_enum_default_case : $@convention(thin) (@owned Either<Builtin.NativeObject, AnyObject>) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Either<Builtin.NativeObject, AnyObject>):
-// CHECK:   switch_enum [[ARG]] : $Either<Builtin.NativeObject, AnyObject>, case #Either.left!enumelt.1: [[SUCC_BB:bb[0-9]+]], default [[DEFAULT_BB:bb[0-9]+]]
+// CHECK:   switch_enum [[ARG]] : $Either<Builtin.NativeObject, AnyObject>, case #Either.left!enumelt: [[SUCC_BB:bb[0-9]+]], default [[DEFAULT_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCC_BB]]([[LHS:%.*]] : $Builtin.NativeObject
 // CHECK:   strong_release [[LHS]]
@@ -216,7 +216,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 // CHECK: } // end sil function 'switch_enum_default_case'
 sil [ossa] @switch_enum_default_case : $@convention(thin) (@owned Either<Builtin.NativeObject, Builtin.AnyObject>) -> () {
 bb0(%0 : @owned $Either<Builtin.NativeObject, Builtin.AnyObject>):
-  switch_enum %0 : $Either<Builtin.NativeObject, Builtin.AnyObject>, case #Either.left!enumelt.1: bb1, default bb2
+  switch_enum %0 : $Either<Builtin.NativeObject, Builtin.AnyObject>, case #Either.left!enumelt: bb1, default bb2
 
 bb1(%1 : @owned $Builtin.NativeObject):
   destroy_value %1 : $Builtin.NativeObject

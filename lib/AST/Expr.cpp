@@ -311,6 +311,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
 
   NO_REFERENCE(OpaqueValue);
+  NO_REFERENCE(PropertyWrapperValuePlaceholder);
   NO_REFERENCE(DefaultArgument);
 
   PASS_THROUGH_REFERENCE(BindOptional, getSubExpr);
@@ -349,6 +350,11 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(PointerToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(ForeignObjectConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(UnevaluatedInstance, getSubExpr);
+  PASS_THROUGH_REFERENCE(DifferentiableFunction, getSubExpr);
+  PASS_THROUGH_REFERENCE(LinearFunction, getSubExpr);
+  PASS_THROUGH_REFERENCE(DifferentiableFunctionExtractOriginal, getSubExpr);
+  PASS_THROUGH_REFERENCE(LinearFunctionExtractOriginal, getSubExpr);
+  PASS_THROUGH_REFERENCE(LinearToDifferentiableFunction, getSubExpr);
   PASS_THROUGH_REFERENCE(BridgeToObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
@@ -619,6 +625,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
 
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
+  case ExprKind::PropertyWrapperValuePlaceholder:
   case ExprKind::DefaultArgument:
   case ExprKind::BindOptional:
   case ExprKind::OptionalEvaluation:
@@ -667,6 +674,11 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::PointerToPointer:
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
+  case ExprKind::DifferentiableFunction:
+  case ExprKind::LinearFunction:
+  case ExprKind::DifferentiableFunctionExtractOriginal:
+  case ExprKind::LinearFunctionExtractOriginal:
+  case ExprKind::LinearToDifferentiableFunction:
   case ExprKind::EnumIsCase:
   case ExprKind::ConditionalBridgeFromObjC:
   case ExprKind::BridgeFromObjC:
@@ -1393,6 +1405,17 @@ static ValueDecl *getCalledValue(Expr *E) {
   return nullptr;
 }
 
+PropertyWrapperValuePlaceholderExpr *
+PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
+                                            Type ty, Expr *wrappedValue) {
+  auto *placeholder =
+      new (ctx) OpaqueValueExpr(range, ty, /*isPlaceholder=*/true);
+
+  return new (ctx) PropertyWrapperValuePlaceholderExpr(range, ty,
+                                                       placeholder,
+                                                       wrappedValue);
+}
+
 const ParamDecl *DefaultArgumentExpr::getParamDecl() const {
   return getParameterAt(DefaultArgsOwner.getDecl(), ParamIndex);
 }
@@ -1841,6 +1864,56 @@ void AutoClosureExpr::setBody(Expr *E) {
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {
   return cast<ReturnStmt>(Body->getFirstElement().get<Stmt *>())->getResult();
+}
+
+Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
+  switch (getThunkKind()) {
+  case AutoClosureExpr::Kind::None:
+    break;
+
+  case AutoClosureExpr::Kind::SingleCurryThunk: {
+    auto *body = getSingleExpressionBody();
+    body = body->getSemanticsProvidingExpr();
+
+    if (auto *openExistential = dyn_cast<OpenExistentialExpr>(body)) {
+      body = openExistential->getSubExpr();
+    }
+
+    if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
+      return outerCall->getFn();
+    }
+
+    assert(false && "Malformed curry thunk?");
+    break;
+  }
+
+  case AutoClosureExpr::Kind::DoubleCurryThunk: {
+    auto *body = getSingleExpressionBody();
+    if (auto *innerClosure = dyn_cast<AutoClosureExpr>(body)) {
+      assert(innerClosure->getThunkKind() ==
+               AutoClosureExpr::Kind::SingleCurryThunk);
+      auto *innerBody = innerClosure->getSingleExpressionBody();
+      innerBody = innerBody->getSemanticsProvidingExpr();
+
+      if (auto *openExistential = dyn_cast<OpenExistentialExpr>(innerBody)) {
+        innerBody = openExistential->getSubExpr();
+      }
+
+      if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
+        if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
+          if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {
+            return declRef;
+          }
+        }
+      }
+    }
+
+    assert(false && "Malformed curry thunk?");
+    break;
+  }
+  }
+
+  return nullptr;
 }
 
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)

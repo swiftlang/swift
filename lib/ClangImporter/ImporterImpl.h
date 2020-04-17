@@ -775,14 +775,16 @@ public:
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
-  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version);
+  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version,
+                         bool UseCanonicalDecl = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
 
   Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
                                Version version,
-                               bool SuperfluousTypedefsAreTransparent);
+                               bool SuperfluousTypedefsAreTransparent,
+                               bool UseCanonicalDecl);
 
   /// Same as \c importDeclReal, but for use inside importer
   /// implementation.
@@ -790,9 +792,11 @@ public:
   /// Unlike \c importDeclReal, this function for convenience transparently
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
-  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version) {
+  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version,
+                   bool UseCanonicalDecl = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
-                                  /*SuperfluousTypedefsAreTransparent=*/true);
+                                  /*SuperfluousTypedefsAreTransparent=*/true,
+                                  /*UseCanonicalDecl*/UseCanonicalDecl);
   }
 
   /// Import the given Clang declaration into Swift.  Use this function
@@ -803,7 +807,8 @@ public:
   /// not be represented in Swift.
   Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version) {
     return importDeclAndCacheImpl(ClangDecl, version,
-                                  /*SuperfluousTypedefsAreTransparent=*/false);
+                                  /*SuperfluousTypedefsAreTransparent=*/false,
+                                  /*UseCanonicalDecl*/true);
   }
 
   /// Import a cloned version of the given declaration, which is part of
@@ -923,12 +928,13 @@ public:
   ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
 
   /// Constructs a Swift module for the given Clang module.
-  ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
+  ModuleDecl *finishLoadingClangModule(SourceLoc importLoc,
+                                       const clang::Module *clangModule,
                                        bool preferOverlay);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.
-  void handleDeferredImports();
+  void handleDeferredImports(SourceLoc diagLoc);
 
   /// Retrieve the named Swift type, e.g., Int32.
   ///
@@ -1281,6 +1287,17 @@ public:
   ValueDecl *
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
+  AbstractFunctionDecl *
+  loadReferencedFunctionDecl(const DerivativeAttr *DA,
+                             uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
+  Type loadTypeEraserType(const TypeEraserAttr *TRA,
+                          uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 

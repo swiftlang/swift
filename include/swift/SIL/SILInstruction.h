@@ -1444,7 +1444,18 @@ public:
     }
   }
 
+  /// Set to true that this alloc_stack contains a value whose lifetime can not
+  /// be ascertained from uses.
+  ///
+  /// As an example if an alloc_stack is known to be only conditionally
+  /// initialized.
   void setDynamicLifetime() { dynamicLifetime = true; }
+
+  /// Returns true if the alloc_stack's initialization can not be ascertained
+  /// from uses directly (so should be treated conservatively).
+  ///
+  /// An example of an alloc_stack with dynamic lifetime is an alloc_stack that
+  /// is conditionally initialized.
   bool hasDynamicLifetime() const { return dynamicLifetime; }
 
   /// Return the debug variable information attached to this instruction.
@@ -1875,6 +1886,7 @@ public:
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
+  Operand *getCalleeOperand() { return &getAllOperands()[Callee]; }
   const Operand *getCalleeOperand() const { return &getAllOperands()[Callee]; }
   SILValue getCallee() const { return getCalleeOperand()->get(); }
 
@@ -1933,6 +1945,11 @@ public:
   SILType getSubstCalleeSILType() const {
     return SubstCalleeType;
   }
+  
+  void setSubstCalleeType(CanSILFunctionType t) {
+    SubstCalleeType = SILType::getPrimitiveObjectType(t);
+  }
+  
   SILFunctionConventions getSubstCalleeConv() const {
     return SILFunctionConventions(getSubstCalleeType(), this->getModule());
   }
@@ -2039,6 +2056,25 @@ public:
 /// does it have the given semantics?
 bool doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics);
 
+/// Predicate used to filter InoutArgumentRange.
+struct OperandToInoutArgument {
+  ArrayRef<SILParameterInfo> paramInfos;
+  OperandValueArrayRef arguments;
+  OperandToInoutArgument(ArrayRef<SILParameterInfo> paramInfos,
+                         OperandValueArrayRef arguments)
+      : paramInfos(paramInfos), arguments(arguments) {
+    assert(paramInfos.size() == arguments.size());
+  }
+  Optional<SILValue> operator()(size_t i) const {
+    if (paramInfos[i].isIndirectMutating())
+      return arguments[i];
+    return None;
+  }
+};
+
+using InoutArgumentRange =
+    OptionalTransformRange<IntRange<size_t>, OperandToInoutArgument>;
+
 /// The partial specialization of ApplyInstBase for full applications.
 /// Adds some methods relating to 'self' and to result types that don't
 /// make sense for partial applications.
@@ -2050,6 +2086,9 @@ protected:
   template <class... As>
   ApplyInstBase(As &&...args)
     : ApplyInstBase<Impl, Base, false>(std::forward<As>(args)...) {}
+
+private:
+  const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
 public:
   using super::getCallee;
@@ -2133,6 +2172,16 @@ public:
 
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
     return getArguments().slice(getNumIndirectResults());
+  }
+
+  /// Returns all `@inout` and `@inout_aliasable` arguments passed to the
+  /// instruction.
+  InoutArgumentRange getInoutArguments() const {
+    auto &impl = asImpl();
+    return InoutArgumentRange(
+        indices(getArgumentsWithoutIndirectResults()),
+        OperandToInoutArgument(impl.getSubstCalleeConv().getParameters(),
+                               impl.getArgumentsWithoutIndirectResults()));
   }
 
   bool hasSemantics(StringRef semanticsString) const {
@@ -4314,6 +4363,11 @@ public:
   bool withoutActuallyEscaping() const {
     return SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping;
   }
+            
+  /// Returns `true` if the function conversion is between types with the same
+  /// argument and return types, as well as all other attributes, after substitution,
+  /// such as converting `$<A, B> in (A) -> B for <Int, String>` to `(Int) -> String`.
+  bool onlyConvertsSubstitutions() const;
 };
 
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value
@@ -6170,7 +6224,7 @@ public:
 class InitExistentialRefInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::InitExistentialRefInst, InitExistentialRefInst,
-          SingleValueInstruction> {
+          OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   CanType ConcreteType;
@@ -6181,7 +6235,8 @@ class InitExistentialRefInst final
                          ArrayRef<SILValue> TypeDependentOperands,
                          ArrayRef<ProtocolConformanceRef> Conformances)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Instance, TypeDependentOperands, ExistentialType),
+          DebugLoc, Instance, TypeDependentOperands, ExistentialType,
+          Instance.getOwnershipKind()),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
   static InitExistentialRefInst *
@@ -7398,15 +7453,35 @@ public:
            OpIndex <= Operands.back().getOperandNumber();
   }
 
+  /// Returns the operand on the cond_br terminator associated with the value
+  /// that will be passed to DestBB in A.
+  Operand *getOperandForDestBB(const SILBasicBlock *DestBB,
+                               const SILArgument *A) const;
+
+  /// Returns the operand on the cond_br terminator associated with the value
+  /// that will be passed as the \p Index argument to DestBB.
+  Operand *getOperandForDestBB(const SILBasicBlock *DestBB,
+                               unsigned ArgIndex) const;
+
   /// Returns the argument on the cond_br terminator that will be passed to
   /// DestBB in A.
   SILValue getArgForDestBB(const SILBasicBlock *DestBB,
-                           const SILArgument *A) const;
+                           const SILArgument *A) const {
+    if (auto *op = getOperandForDestBB(DestBB, A)) {
+      return op->get();
+    }
+    return SILValue();
+  }
 
   /// Returns the argument on the cond_br terminator that will be passed as the
   /// \p Index argument to DestBB.
   SILValue getArgForDestBB(const SILBasicBlock *DestBB,
-                           unsigned ArgIndex) const;
+                           unsigned ArgIndex) const {
+    if (auto *op = getOperandForDestBB(DestBB, ArgIndex)) {
+      return op->get();
+    }
+    return SILValue();
+  }
 
   /// Return the SILPhiArgument from either the true or false destination for
   /// the given operand.
@@ -7933,6 +8008,198 @@ class TryApplyInst final
          const GenericSpecializationInformation *SpecializationInfo);
 };
 
+/// DifferentiableFunctionInst - creates a `@differentiable` function-typed
+/// value from an original function operand and derivative function operands
+/// (optional). The differentiation transform canonicalizes
+/// `differentiable_function` instructions, filling in derivative function
+/// operands if missing.
+class DifferentiableFunctionInst final
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::DifferentiableFunctionInst,
+          DifferentiableFunctionInst, OwnershipForwardingSingleValueInst> {
+private:
+  friend SILBuilder;
+  /// Differentiability parameter indices.
+  IndexSubset *ParameterIndices;
+  /// Indicates whether derivative function operands (JVP/VJP) exist.
+  bool HasDerivativeFunctions;
+
+  DifferentiableFunctionInst(SILDebugLocation DebugLoc,
+                             IndexSubset *ParameterIndices,
+                             SILValue OriginalFunction,
+                             ArrayRef<SILValue> DerivativeFunctions,
+                             bool HasOwnership);
+
+  static SILType getDifferentiableFunctionType(SILValue OriginalFunction,
+                                               IndexSubset *ParameterIndices);
+
+  static ValueOwnershipKind
+  getMergedOwnershipKind(SILValue OriginalFunction,
+                         ArrayRef<SILValue> DerivativeFunctions);
+
+public:
+  static DifferentiableFunctionInst *
+  create(SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
+         SILValue OriginalFunction,
+         Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
+         bool HasOwnership);
+
+  /// Returns the original function operand.
+  SILValue getOriginalFunction() const { return getOperand(0); }
+
+  /// Returns differentiability parameter indices.
+  IndexSubset *getParameterIndices() const { return ParameterIndices; }
+
+  /// Returns true if derivative functions (JVP/VJP) exist.
+  bool hasDerivativeFunctions() const { return HasDerivativeFunctions; }
+
+  /// Returns the derivative function operands if they exist.
+  /// Otherwise, return `None`.
+  Optional<std::pair<SILValue, SILValue>>
+  getOptionalDerivativeFunctionPair() const {
+    if (!HasDerivativeFunctions)
+      return None;
+    return std::make_pair(getOperand(1), getOperand(2));
+  }
+
+  ArrayRef<Operand> getDerivativeFunctionArray() const {
+    return getAllOperands().drop_front();
+  }
+
+  /// Returns the JVP function operand.
+  SILValue getJVPFunction() const {
+    assert(HasDerivativeFunctions);
+    return getOperand(1);
+  }
+
+  /// Returns the VJP function operand.
+  SILValue getVJPFunction() const {
+    assert(HasDerivativeFunctions);
+    return getOperand(2);
+  }
+
+  /// Returns the derivative function operand (JVP or VJP) with the given kind.
+  SILValue getDerivativeFunction(AutoDiffDerivativeFunctionKind kind) const {
+    switch (kind) {
+    case AutoDiffDerivativeFunctionKind::JVP:
+      return getJVPFunction();
+    case AutoDiffDerivativeFunctionKind::VJP:
+      return getVJPFunction();
+    }
+  }
+};
+
+/// LinearFunctionInst - given a function, its derivative and traspose functions,
+/// create an `@differentiable(linear)` function that represents a bundle of these.
+class LinearFunctionInst final :
+    public InstructionBaseWithTrailingOperands<
+               SILInstructionKind::LinearFunctionInst,
+               LinearFunctionInst, OwnershipForwardingSingleValueInst> {
+private:
+  friend SILBuilder;
+  /// Parameters to differentiate with respect to.
+  IndexSubset *ParameterIndices;
+  /// Indicates whether a transpose function exists.
+  bool HasTransposeFunction;
+
+  static SILType getLinearFunctionType(
+      SILValue OriginalFunction, IndexSubset *ParameterIndices);
+
+public:
+  LinearFunctionInst(SILDebugLocation Loc, IndexSubset *ParameterIndices,
+                     SILValue OriginalFunction,
+                     Optional<SILValue> TransposeFunction, bool HasOwnership);
+
+  static LinearFunctionInst *create(SILModule &Module, SILDebugLocation Loc,
+                                    IndexSubset *ParameterIndices,
+                                    SILValue OriginalFunction,
+                                    Optional<SILValue> TransposeFunction,
+                                    bool HasOwnership);
+
+  IndexSubset *getParameterIndices() const { return ParameterIndices; }
+  bool hasTransposeFunction() const { return HasTransposeFunction; }
+  SILValue getOriginalFunction() const { return getOperand(0); }
+  Optional<SILValue> getOptionalTransposeFunction() const {
+    return HasTransposeFunction ? Optional<SILValue>(getOperand(1)) : None;
+  }
+  SILValue getTransposeFunction() const {
+    assert(HasTransposeFunction);
+    return getOperand(1);
+  }
+};
+
+/// DifferentiableFunctionExtractInst - extracts either the original or
+/// derivative function value from a `@differentiable` function.
+class DifferentiableFunctionExtractInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::DifferentiableFunctionExtractInst,
+          SingleValueInstruction> {
+private:
+  /// The extractee.
+  NormalDifferentiableFunctionTypeComponent Extractee;
+  /// True if the instruction has an explicit extractee type.
+  bool HasExplicitExtracteeType;
+
+  static SILType
+  getExtracteeType(SILValue function,
+                   NormalDifferentiableFunctionTypeComponent extractee,
+                   SILModule &module);
+
+public:
+  /// Note: explicit extractee type may be specified only in lowered SIL.
+  explicit DifferentiableFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc,
+      NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
+      Optional<SILType> extracteeType = None);
+
+  NormalDifferentiableFunctionTypeComponent getExtractee() const {
+    return Extractee;
+  }
+
+  AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
+    auto kind = Extractee.getAsDerivativeFunctionKind();
+    assert(kind);
+    return *kind;
+  }
+
+  bool hasExplicitExtracteeType() const { return HasExplicitExtracteeType; }
+};
+
+/// LinearFunctionExtractInst - given an `@differentiable(linear)` function
+/// representing a bundle of the original function and the transpose function,
+/// extract the specified function.
+class LinearFunctionExtractInst
+    : public InstructionBase<
+          SILInstructionKind::LinearFunctionExtractInst,
+          SingleValueInstruction> {
+private:
+  /// The extractee.
+  LinearDifferentiableFunctionTypeComponent extractee;
+  /// The list containing the `@differentiable(linear)` function operand.
+  FixedOperandList<1> operands;
+
+  static SILType
+  getExtracteeType(SILValue function,
+                   LinearDifferentiableFunctionTypeComponent extractee,
+                   SILModule &module);
+
+public:
+  explicit LinearFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc,
+      LinearDifferentiableFunctionTypeComponent extractee,
+      SILValue theFunction);
+
+  LinearDifferentiableFunctionTypeComponent getExtractee() const {
+    return extractee;
+  }
+
+  SILValue getFunctionOperand() const { return operands[0].get(); }
+  ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
+};
+
+/// DifferentiabilityWitnessFunctionInst - Looks up a differentiability witness
+/// function for a given original function.
 class DifferentiabilityWitnessFunctionInst
     : public InstructionBase<
           SILInstructionKind::DifferentiabilityWitnessFunctionInst,

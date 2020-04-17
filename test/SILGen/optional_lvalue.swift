@@ -11,7 +11,7 @@
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
-// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt.1
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
   x! = y
@@ -27,7 +27,7 @@ func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
-// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt.1
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[WRITE]] : $*Optional<Int>, #Optional.some!enumelt
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
 func assign_iuo_lvalue(_ x: inout Int!, _ y: Int) {
   x! = y
@@ -65,7 +65,8 @@ struct Struct<T> {
 // CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue07assign_a1_B13_reabstractedyyAA6StructVyS2icGz_S2ictF
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @$sS2iIegyd_S2iIegnr_TR
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT]]
-// CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_guaranteed (@in_guaranteed Int) -> @out Int
+// CHECK:         [[REABSTRACTED_CONV:%.*]] = convert_function [[REABSTRACTED]]
+// CHECK:         assign [[REABSTRACTED_CONV]] to {{%.*}} :
 func assign_optional_lvalue_reabstracted(_ x: inout Struct<(Int) -> Int>,
                                          _ y: @escaping (Int) -> Int) {
   x.value! = y

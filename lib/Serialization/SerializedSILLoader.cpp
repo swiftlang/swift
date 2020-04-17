@@ -202,3 +202,8 @@ void SerializedSILLoader::getAllProperties() {
     Des->getAllProperties();
 }
 
+/// Deserialize all DifferentiabilityWitnesses in all SILModules.
+void SerializedSILLoader::getAllDifferentiabilityWitnesses() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDifferentiabilityWitnesses();
+}

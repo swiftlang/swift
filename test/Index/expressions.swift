@@ -58,3 +58,21 @@ func test2<X: AP>(x: X) {
   // CHECK: [[@LINE+1]]:19 | type-alias/associated-type/Swift | A | [[AP_P_USR]] | Ref,RelCont | rel: 1
   _ = type(of: x).A.self
 }
+
+@available(*, unavailable, renamed: "test")
+func test2(_ o: S1?) {
+  // CHECK: [[@LINE-1]]:6 | function/Swift | test2(_:) | [[test2_unavailable_USR:.*]] | Def
+  // CHECK: [[@LINE-2]]:17 | struct/Swift | S1 | [[S1_USR]] | Ref
+  test(o) // CHECK: [[@LINE]]:3 | function/Swift | test(_:) | {{.*}} | Ref,Call,RelCall,RelCont | rel: 1
+    // CHECK-NEXT: RelCall,RelCont | function/Swift | test2(_:) | [[test2_unavailable_USR]]
+}
+
+protocol Disposable {
+  func dispose()
+}
+
+func useDisposable(_ d: Disposable?) {
+  // CHECK: [[@LINE+1]]:26 | instance-method/Swift | dispose() | s:14swift_ide_test10DisposableP7disposeyyF | Ref,RelCont | rel: 1
+  guard let dispose = d?.dispose else { return }
+  _ = dispose
+}

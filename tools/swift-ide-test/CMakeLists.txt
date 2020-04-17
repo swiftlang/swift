@@ -6,6 +6,7 @@ add_swift_host_tool(swift-ide-test
 )
 target_link_libraries(swift-ide-test
                       PRIVATE
+                        swiftAST
                         swiftDriver
                         swiftFrontend
                         swiftIDE)
@@ -15,6 +16,9 @@ if(LibXml2_FOUND)
   include_directories(SYSTEM ${LIBXML2_INCLUDE_DIR})
   target_link_libraries(swift-ide-test PRIVATE ${LIBXML2_LIBRARIES})
   target_compile_definitions(swift-ide-test PRIVATE SWIFT_HAVE_LIBXML=1)
+  if("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "OpenBSD" AND NOT CMAKE_CROSSCOMPILING)
+    include_directories(SYSTEM "/usr/local/include")
+  endif()
 endif()
 
 # Create a symlink for swift-api-dump.py in the bin directory

@@ -1653,12 +1653,12 @@ std::string GenericSignatureBuilder::PotentialArchetype::getDebugName() const {
   if (proto) {
     result.push_back('[');
     result.push_back('.');
-    result.append(proto->getName().str().begin(), proto->getName().str().end());
+    result.append(proto->getName().str());
     result.push_back(']');
   }
 
   result.push_back('.');
-  result.append(getNestedName().str().begin(), getNestedName().str().end());
+  result.append(getNestedName().str());
 
   return result.str().str();
 }
@@ -2139,16 +2139,16 @@ void EquivalenceClass::dump(llvm::raw_ostream &out,
              },
              [&] { out << ", "; });
   out << "\nSame-type constraints:";
-  interleave(sameTypeConstraints,
-             [&](const Constraint<Type> &constraint) {
-               out << "\n  " << constraint.getSubjectDependentType({ })
-                   << " == " << constraint.value;
+  llvm::interleave(
+      sameTypeConstraints,
+      [&](const Constraint<Type> &constraint) {
+        out << "\n  " << constraint.getSubjectDependentType({})
+            << " == " << constraint.value;
 
-               if (constraint.source->isDerivedRequirement())
-                 out << " [derived]";
-             }, [&] {
-               out << ", ";
-             });
+        if (constraint.source->isDerivedRequirement())
+          out << " [derived]";
+      },
+      [&] { out << ", "; });
   if (concreteType)
     out << "\nConcrete type: " << concreteType.getString();
   if (superclass)
@@ -2922,15 +2922,15 @@ void RewritePath::print(llvm::raw_ostream &out) const {
     if (!getPath().empty()) out << " -> ";
   }
 
-  interleave(getPath().begin(), getPath().end(),
-             [&](AssociatedTypeDecl *assocType) {
-               out.changeColor(raw_ostream::BLUE);
-               out << assocType->getProtocol()->getName() << "."
-               << assocType->getName();
-               out.resetColor();
-             }, [&] {
-               out << " -> ";
-             });
+  llvm::interleave(
+      getPath().begin(), getPath().end(),
+      [&](AssociatedTypeDecl *assocType) {
+        out.changeColor(raw_ostream::BLUE);
+        out << assocType->getProtocol()->getName() << "."
+            << assocType->getName();
+        out.resetColor();
+      },
+      [&] { out << " -> "; });
   out << "]";
 }
 
@@ -3458,8 +3458,8 @@ void EquivalenceClass::modified(GenericSignatureBuilder &builder) {
 GenericSignatureBuilder::GenericSignatureBuilder(
                                ASTContext &ctx)
   : Context(ctx), Diags(Context.Diags), Impl(new Implementation) {
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumGenericSignatureBuilders++;
+  if (auto *Stats = Context.Stats)
+    Stats->getFrontendCounters().NumGenericSignatureBuilders++;
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
@@ -3659,8 +3659,14 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
       // Check whether this associated type references a protocol to which
       // the base conforms. If not, it's unresolved.
       if (baseEquivClass->conformsTo.find(assocType->getProtocol())
-            == baseEquivClass->conformsTo.end())
-        return ResolvedType::forUnresolved(baseEquivClass);
+          == baseEquivClass->conformsTo.end()) {
+        if (!baseEquivClass->concreteType ||
+            !lookupConformance(type->getCanonicalType(),
+                               baseEquivClass->concreteType,
+                               assocType->getProtocol())) {
+          return ResolvedType::forUnresolved(baseEquivClass);
+        }
+      }
 
       nestedTypeDecl = assocType;
     } else {
@@ -3783,8 +3789,8 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
            Key.Index == 0)));
 
   // Create a potential archetype for this type parameter.
-  void *mem = Impl->Allocator.Allocate<PotentialArchetype>();
-  auto PA = new (mem) PotentialArchetype(getASTContext(), GenericParam);
+  auto PA =
+      new (Impl->Allocator) PotentialArchetype(getASTContext(), GenericParam);
   Impl->GenericParams.push_back(GenericParam);
   Impl->PotentialArchetypes.push_back(PA);
 }
@@ -3934,8 +3940,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
   // Retrieve the set of requirements that a given associated type declaration
   // produces, in the form that would be seen in the where clause.
-  auto getAssociatedTypeReqs = [&](AssociatedTypeDecl *assocType,
-                                   const char *start) {
+  const auto getAssociatedTypeReqs = [&](const AssociatedTypeDecl *assocType,
+                                         const char *start) {
     std::string result;
     {
       llvm::raw_string_ostream out(result);
@@ -3949,6 +3955,13 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       }, [&] {
         out << ", ";
       });
+
+      if (const auto whereClause = assocType->getTrailingWhereClause()) {
+        if (!assocType->getInherited().empty())
+          out << ", ";
+
+        whereClause->print(out, /*printWhereKeyword*/false);
+      }
     }
     return result;
   };
@@ -4358,10 +4371,16 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                         ->getDependentType(getGenericParams());
 
       Impl->HadAnyError = true;
-      
+
       if (subjectType->is<DependentMemberType>()) {
         subjectType = resolveDependentMemberTypes(*this, subjectType);
-      } else {
+      }
+
+      if (!subjectType->is<DependentMemberType>()) {
+        // If we end up here, it means either the subject type was never a
+        // a dependent member type, or it was initially a dependent member
+        // type, but resolving it lead to some other type. Let's map this
+        // to an error type so we can emit correct diagnostics.
         subjectType = ErrorType::get(subjectType);
       }
 
@@ -5056,6 +5075,50 @@ public:
       }
 
       return Action::Continue;
+    }
+
+    // Infer requirements from `@differentiable` or `@differentiable(linear)`
+    // function types.
+    // For all non-`@noDerivative` parameter and result types:
+    // - `@differentiable`: add `T: Differentiable` requirement.
+    // - `@differentiable(linear)`: add
+    //   `T: Differentiable`, `T == T.TangentVector` requirements.
+    if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+      auto &ctx = Builder.getASTContext();
+      auto *differentiableProtocol =
+          ctx.getProtocol(KnownProtocolKind::Differentiable);
+      if (differentiableProtocol && fnTy->isDifferentiable()) {
+        auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
+          Requirement req(RequirementKind::Conformance, type,
+                          protocol->getDeclaredType());
+          Builder.addRequirement(req, source, nullptr);
+        };
+        auto addSameTypeConstraint = [&](Type firstType,
+                                         AssociatedTypeDecl *assocType) {
+          auto *protocol = assocType->getProtocol();
+          auto conf = Builder.lookupConformance(CanType(), firstType, protocol);
+          auto secondType = conf.getAssociatedType(
+              firstType, assocType->getDeclaredInterfaceType());
+          Requirement req(RequirementKind::SameType, firstType, secondType);
+          Builder.addRequirement(req, source, nullptr);
+        };
+        auto *tangentVectorAssocType =
+            differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
+        auto addRequirements = [&](Type type, bool isLinear) {
+          addConformanceConstraint(type, differentiableProtocol);
+          if (isLinear)
+            addSameTypeConstraint(type, tangentVectorAssocType);
+        };
+        auto constrainParametersAndResult = [&](bool isLinear) {
+          for (auto &param : fnTy->getParams())
+            if (!param.isNoDerivative())
+              addRequirements(param.getPlainType(), isLinear);
+          addRequirements(fnTy->getResult(), isLinear);
+        };
+        // Add requirements.
+        constrainParametersAndResult(fnTy->getDifferentiabilityKind() ==
+                                     DifferentiabilityKind::Linear);
+      }
     }
 
     if (!ty->isSpecialized())
@@ -7336,7 +7399,7 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
   return true;
 }
 
-llvm::Expected<GenericSignature>
+GenericSignature
 AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
          GenericSignatureImpl *baseSignature,
@@ -7394,7 +7457,7 @@ AbstractGenericSignatureRequest::evaluate(
           canBaseSignature.getPointer(), std::move(canAddedParameters),
           std::move(canAddedRequirements)});
     if (!canSignatureResult || !*canSignatureResult)
-      return canSignatureResult;
+      return GenericSignature();
 
     // Substitute in the original generic parameters to form a more-sugared
     // result closer to what the original request wanted. Note that this
@@ -7449,11 +7512,11 @@ AbstractGenericSignatureRequest::evaluate(
       SourceLoc(), /*allowConcreteGenericParams=*/true);
 }
 
-llvm::Expected<GenericSignature>
+GenericSignature
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator, ModuleDecl *parentModule,
         GenericSignatureImpl *parentSig,
-        GenericParamList *gpl,
+        GenericParamSource paramSource,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,
         bool allowConcreteGenericParams) const {
@@ -7464,78 +7527,99 @@ InferredGenericSignatureRequest::evaluate(
   // from that context.
   builder.addGenericSignature(parentSig);
 
-  // Type check the generic parameters, treating all generic type
-  // parameters as dependent, unresolved.
-  SmallVector<GenericParamList *, 2> gpLists;
-  if (gpl->getOuterParameters() && !parentSig) {
-    for (auto *outerParams = gpl;
+  DeclContext *lookupDC = nullptr;
+
+  const auto visitRequirement = [&](const Requirement &req,
+                                    RequirementRepr *reqRepr) {
+    const auto source = FloatingRequirementSource::forExplicit(reqRepr);
+
+    // If we're extending a protocol and adding a redundant requirement,
+    // for example, `extension Foo where Self: Foo`, then emit a
+    // diagnostic.
+
+    if (auto decl = lookupDC->getAsDecl()) {
+      if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
+        auto extType = extDecl->getDeclaredInterfaceType();
+        auto extSelfType = extDecl->getSelfInterfaceType();
+        auto reqLHSType = req.getFirstType();
+        auto reqRHSType = req.getSecondType();
+
+        if (extType->isExistentialType() &&
+            reqLHSType->isEqual(extSelfType) &&
+            reqRHSType->isEqual(extType)) {
+
+          auto &ctx = extDecl->getASTContext();
+          ctx.Diags.diagnose(extDecl->getLoc(),
+                             diag::protocol_extension_redundant_requirement,
+                             extType->getString(),
+                             extSelfType->getString(),
+                             reqRHSType->getString());
+        }
+      }
+    }
+
+    builder.addRequirement(req, reqRepr, source, nullptr,
+                            lookupDC->getParentModule());
+    return false;
+  };
+
+  GenericParamList *genericParams = nullptr;
+  if (auto params = paramSource.dyn_cast<GenericParamList *>())
+      genericParams = params;
+  else
+      genericParams = paramSource.get<GenericContext *>()->getGenericParams();
+
+  if (genericParams) {
+    // Extensions never have a parent signature.
+    if (genericParams->getOuterParameters())
+      assert(parentSig == nullptr);
+
+    // Type check the generic parameters, treating all generic type
+    // parameters as dependent, unresolved.
+    SmallVector<GenericParamList *, 2> gpLists;
+    for (auto *outerParams = genericParams;
          outerParams != nullptr;
          outerParams = outerParams->getOuterParameters()) {
       gpLists.push_back(outerParams);
     }
-  } else {
-    gpLists.push_back(gpl);
-  }
 
-  // The generic parameter lists MUST appear from innermost to outermost.
-  // We walk them backwards to order outer requirements before
-  // inner requirements.
-  for (auto &genericParams : llvm::reverse(gpLists)) {
-    assert(genericParams->size() > 0 &&
-           "Parsed an empty generic parameter list?");
+    // The generic parameter lists MUST appear from innermost to outermost.
+    // We walk them backwards to order outer requirements before
+    // inner requirements.
+    for (auto &genericParams : llvm::reverse(gpLists)) {
+      assert(genericParams->size() > 0 &&
+             "Parsed an empty generic parameter list?");
+
+      // First, add the generic parameters to the generic signature builder.
+      // Do this before checking the inheritance clause, since it may
+      // itself be dependent on one of these parameters.
+      for (const auto param : *genericParams)
+        builder.addGenericParameter(param);
+
+      // Add the requirements for each of the generic parameters to the builder.
+      // Now, check the inheritance clauses of each parameter.
+      for (const auto param : *genericParams)
+        builder.addGenericParameterRequirements(param);
+
+      // Determine where and how to perform name lookup.
+      lookupDC = genericParams->begin()[0]->getDeclContext();
+
+      // Add the requirements clause to the builder.
+      WhereClauseOwner(lookupDC, genericParams)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           visitRequirement);
+    }
+  } else {
+    // The declaration has a where clause, but no generic parameters of its own.
+    const auto ctx = paramSource.get<GenericContext *>();
+
+    assert(ctx->getTrailingWhereClause() && "No params or where clause");
 
     // Determine where and how to perform name lookup.
-    DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
+    lookupDC = ctx;
 
-    // First, add the generic parameters to the generic signature builder.
-    // Do this before checking the inheritance clause, since it may
-    // itself be dependent on one of these parameters.
-    for (auto param : *genericParams)
-      builder.addGenericParameter(param);
-
-    // Add the requirements for each of the generic parameters to the builder.
-    // Now, check the inheritance clauses of each parameter.
-    for (auto param : *genericParams)
-      builder.addGenericParameterRequirements(param);
-
-    // Add the requirements clause to the builder.
-
-    using FloatingRequirementSource =
-      GenericSignatureBuilder::FloatingRequirementSource;
-    WhereClauseOwner(lookupDC, genericParams).visitRequirements(
-        TypeResolutionStage::Structural,
-        [&](const Requirement &req, RequirementRepr *reqRepr) {
-          auto source = FloatingRequirementSource::forExplicit(reqRepr);
-          
-          // If we're extending a protocol and adding a redundant requirement,
-          // for example, `extension Foo where Self: Foo`, then emit a
-          // diagnostic.
-          
-          if (auto decl = lookupDC->getAsDecl()) {
-            if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
-              auto extType = extDecl->getDeclaredInterfaceType();
-              auto extSelfType = extDecl->getSelfInterfaceType();
-              auto reqLHSType = req.getFirstType();
-              auto reqRHSType = req.getSecondType();
-              
-              if (extType->isExistentialType() &&
-                  reqLHSType->isEqual(extSelfType) &&
-                  reqRHSType->isEqual(extType)) {
-                
-                auto &ctx = extDecl->getASTContext();
-                ctx.Diags.diagnose(extDecl->getLoc(),
-                                   diag::protocol_extension_redundant_requirement,
-                                   extType->getString(),
-                                   extSelfType->getString(),
-                                   reqRHSType->getString());
-              }
-            }
-          }
-          
-          builder.addRequirement(req, reqRepr, source, nullptr,
-                                  lookupDC->getParentModule());
-          return false;
-        });
+    WhereClauseOwner(ctx).visitRequirements(
+      TypeResolutionStage::Structural, visitRequirement);
   }
       
   /// Perform any remaining requirement inference.

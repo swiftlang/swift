@@ -1,4 +1,4 @@
-//===--- swift_indent_main.cpp - Swift code formatting tool ---------------===//
+//===--- SymbolGraphGen.h - Swift SymbolGraph Generator -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,32 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/Triple.h"
-#include "swift/AST/AttrKind.h"
+#ifndef SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPHGEN_H
+#define SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPHGEN_H
+
+#include "swift/AST/Module.h"
+#include "SymbolGraphOptions.h"
 
 namespace swift {
-
-class ModuleDecl;
-
 namespace symbolgraphgen {
-
-struct SymbolGraphOptions {
-  /// The directory to output the symbol graph JSON files.
-  StringRef OutputDir;
-
-  /// The target of the module.
-  llvm::Triple Target;
-
-  /// Pretty-print the JSON with newlines and indentation.
-  bool PrettyPrint;
-
-  /// The minimum access level that symbols must have in order to be
-  /// included in the graph.
-  AccessLevel MinimumAccessLevel;
-};
 
 /// Emit a Symbol Graph JSON file for a module.
 int emitSymbolGraphForModule(ModuleDecl *M, const SymbolGraphOptions &Options);
 
 } // end namespace symbolgraphgen
 } // end namespace swift
+
+#endif // SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPHGEN_H

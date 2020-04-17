@@ -75,6 +75,12 @@ namespace swift {
     /// performed.
     llvm::Optional<llvm::Triple> TargetVariant;
 
+    /// The SDK version, if known.
+    Optional<llvm::VersionTuple> SDKVersion;
+
+    /// The target variant SDK version, if known.
+    Optional<llvm::VersionTuple> VariantSDKVersion;
+
     ///
     /// Language features
     ///
@@ -108,6 +114,13 @@ namespace swift {
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
     bool EnableConcisePoundFile = false;
+
+    /// Detect and automatically import modules' cross-import overlays.
+    bool EnableCrossImportOverlays = false;
+
+    /// Emit a remark when import resolution implicitly adds a cross-import
+    /// overlay.
+    bool EnableCrossImportRemarks = false;
 
     ///
     /// Support for alternate usage modes
@@ -189,7 +202,7 @@ namespace swift {
     bool BuildRequestDependencyGraph = false;
 
     /// Enable SIL type lowering
-    bool EnableSubstSILFunctionTypesForFunctionValues = false;
+    bool EnableSubstSILFunctionTypesForFunctionValues = true;
 
     /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
     /// error.
@@ -293,6 +306,11 @@ namespace swift {
     /// incrementals parsing.
     bool BuildSyntaxTree = false;
 
+    /// Whether parsing is occurring for creation of syntax tree only, and no typechecking will occur after
+    /// parsing e.g. when parsing for SwiftSyntax. This is intended to affect parsing, e.g. disable
+    /// unnecessary name lookups that are not useful for pure syntactic parsing.
+    bool ParseForSyntaxTreeOnly = false;
+
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
@@ -318,6 +336,19 @@ namespace swift {
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
     bool EnableExperimentalDifferentiableProgramming = false;
+
+    /// Whether to enable forward mode differentiation.
+    bool EnableExperimentalForwardModeDifferentiation = false;
+
+    /// Whether to enable experimental `AdditiveArithmetic` derived
+    /// conformances.
+    bool EnableExperimentalAdditiveArithmeticDerivedConformances = false;
+
+    /// Enable verification when every SubstitutionMap is constructed.
+    bool VerifyAllSubstitutionMaps = false;
+
+    /// If set to \c false, fall back to the legacy manual reference name tracking code.
+    bool EnableRequestBasedIncrementalDependencies = true;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -345,7 +376,7 @@ namespace swift {
     /// Sets an implicit platform condition.
     void addPlatformConditionValue(PlatformConditionKind Kind, StringRef Value) {
       assert(!Value.empty());
-      PlatformConditionValues.emplace_back(Kind, Value);
+      PlatformConditionValues.emplace_back(Kind, Value.str());
     }
 
     /// Removes all values added with addPlatformConditionValue.
@@ -363,7 +394,7 @@ namespace swift {
     /// compiler flag.
     void addCustomConditionalCompilationFlag(StringRef Name) {
       assert(!Name.empty());
-      CustomConditionalCompilationFlags.push_back(Name);
+      CustomConditionalCompilationFlags.push_back(Name.str());
     }
 
     /// Determines if a given conditional compilation flag has been set.
@@ -387,33 +418,6 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the class metadata update callback mechanism:
-    //
-    // - macOS 10.14.4
-    // - iOS 12.2
-    // - tvOS 12.2
-    // - watchOS 5.2
-    bool doesTargetSupportObjCMetadataUpdateCallback() const;
-
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the objc_getClass() hook:
-    //
-    // - macOS 10.14.4
-    // - iOS 12.2
-    // - tvOS 12.2
-    // - watchOS 5.2
-    bool doesTargetSupportObjCGetClassHook() const;
-
-    // The following deployment targets ship an Objective-C runtime supporting
-    // the objc_loadClassref() entry point:
-    //
-    // - macOS 10.15
-    // - iOS 13
-    // - tvOS 13
-    // - watchOS 6
-    bool doesTargetSupportObjCClassStubs() const;
-
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
@@ -436,7 +440,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 6>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };
@@ -536,6 +540,7 @@ namespace swift {
     /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
+    
   };
 } // end namespace swift
 

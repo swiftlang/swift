@@ -716,8 +716,10 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
     return nullptr;
   
   // Types register as substitutions even when symbolically referenced.
+  // OOPS: Except for opaque type references!
   if (kind == SymbolicReferenceKind::Context &&
-      resolved->getKind() != Node::Kind::OpaqueTypeDescriptorSymbolicReference)
+      resolved->getKind() != Node::Kind::OpaqueTypeDescriptorSymbolicReference &&
+      resolved->getKind() != Node::Kind::OpaqueReturnTypeOf)
     addSubstitution(resolved);
   return resolved;
 }
@@ -1692,7 +1694,7 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
   return createWithChildren(kind, createType(Nominal), args);
 }
 
-NodePointer Demangler::demangleImplParamConvention() {
+NodePointer Demangler::demangleImplParamConvention(Node::Kind ConvKind) {
   const char *attr = nullptr;
   switch (nextChar()) {
     case 'i': attr = "@in"; break;
@@ -1710,7 +1712,7 @@ NodePointer Demangler::demangleImplParamConvention() {
       pushBack();
       return nullptr;
   }
-  return createWithChild(Node::Kind::ImplParameter,
+  return createWithChild(ConvKind,
                          createNode(Node::Kind::ImplConvention, attr));
 }
 
@@ -1738,12 +1740,27 @@ NodePointer Demangler::demangleImplFunctionType() {
     NodePointer SubstitutionRetroConformances;
     if (!demangleBoundGenerics(Substitutions, SubstitutionRetroConformances))
       return nullptr;
-    
-    bool isImplied = !nextIf('i');
-    
-    auto subsNode = createNode(isImplied
-                               ? Node::Kind::ImplImpliedSubstitutions
-                               : Node::Kind::ImplSubstitutions);
+
+    NodePointer sig = popNode(Node::Kind::DependentGenericSignature);
+    if (!sig)
+      return nullptr;
+
+    auto subsNode = createNode(Node::Kind::ImplPatternSubstitutions);
+    subsNode->addChild(sig, *this);
+    assert(Substitutions.size() == 1);
+    subsNode->addChild(Substitutions[0], *this);
+    if (SubstitutionRetroConformances)
+      subsNode->addChild(SubstitutionRetroConformances, *this);
+    type->addChild(subsNode, *this);
+  }
+
+  if (nextIf('I')) {
+    Vector<NodePointer> Substitutions;
+    NodePointer SubstitutionRetroConformances;
+    if (!demangleBoundGenerics(Substitutions, SubstitutionRetroConformances))
+      return nullptr;
+
+    auto subsNode = createNode(Node::Kind::ImplInvocationSubstitutions);
     assert(Substitutions.size() == 1);
     subsNode->addChild(Substitutions[0], *this);
     if (SubstitutionRetroConformances)
@@ -1757,6 +1774,11 @@ NodePointer Demangler::demangleImplFunctionType() {
 
   if (nextIf('e'))
     type->addChild(createNode(Node::Kind::ImplEscaping), *this);
+
+  if (nextIf('d'))
+    type->addChild(createNode(Node::Kind::ImplDifferentiable), *this);
+  if (nextIf('l'))
+    type->addChild(createNode(Node::Kind::ImplLinear), *this);
 
   const char *CAttr = nullptr;
   switch (nextChar()) {
@@ -1783,16 +1805,33 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (FAttr)
     type->addChild(createNode(Node::Kind::ImplFunctionAttribute, FAttr), *this);
 
+  const char *CoroAttr = nullptr;
+  if (nextIf('A'))
+    CoroAttr = "@yield_once";
+  else if (nextIf('G'))
+    CoroAttr = "@yield_many";
+  if (CoroAttr)
+    type->addChild(createNode(Node::Kind::ImplFunctionAttribute, CoroAttr), *this);
+
   addChild(type, GenSig);
 
   int NumTypesToAdd = 0;
-  while (NodePointer Param = demangleImplParamConvention()) {
+  while (NodePointer Param =
+           demangleImplParamConvention(Node::Kind::ImplParameter)) {
     type = addChild(type, Param);
     NumTypesToAdd++;
   }
   while (NodePointer Result = demangleImplResultConvention(
                                                     Node::Kind::ImplResult)) {
     type = addChild(type, Result);
+    NumTypesToAdd++;
+  }
+  while (nextIf('Y')) {
+    NodePointer YieldResult =
+      demangleImplParamConvention(Node::Kind::ImplYield);
+    if (!YieldResult)
+      return nullptr;
+    type = addChild(type, YieldResult);
     NumTypesToAdd++;
   }
   if (nextIf('z')) {
@@ -2759,6 +2798,14 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    case 'F':
+      return popFunctionType(Node::Kind::DifferentiableFunctionType);
+    case 'G':
+      return popFunctionType(Node::Kind::EscapingDifferentiableFunctionType);
+    case 'H':
+      return popFunctionType(Node::Kind::LinearFunctionType);
+    case 'I':
+      return popFunctionType(Node::Kind::EscapingLinearFunctionType);
     case 'o':
       return createType(createWithChild(Node::Kind::Unowned,
                                         popNode(Node::Kind::Type)));

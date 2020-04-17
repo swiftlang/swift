@@ -40,11 +40,8 @@ let some = Some(keyPath: \Demo.here)
 func testFunc() {
   let _: (S) -> Int = \.i
   _ = ([S]()).map(\.i)
-
-  // FIXME: A terrible error, but the same as the pre-existing key path
-  // error in the similar situation: 'let _ = \S.init'.
-  _ = ([S]()).map(\.init)
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  _ = \S.init // expected-error {{key path cannot refer to initializer 'init()'}}
+  _ = ([S]()).map(\.init) // expected-error {{key path cannot refer to initializer 'init()'}}
 
   let kp = \S.i
   let _: KeyPath<S, Int> = kp // works, because type defaults to KeyPath nominal
@@ -59,6 +56,24 @@ public extension Array {
         let sortedA = self.sorted(by: { $0[keyPath: keyPath] < $1[keyPath: keyPath] })
         return sortedA
     }
+
+  var i: Int { 0 }
+}
+
+func takesVariadicFnWithGenericRet<T>(_ fn: (S...) -> T) {}
+
+// rdar://problem/59445486
+func testVariadicKeypathAsFunc() {
+  // These are okay, the base type of the KeyPath is inferred to be [S].
+  let _: (S...) -> Int = \.i
+  let _: (S...) -> Int = \Array.i
+  takesVariadicFnWithGenericRet(\.i)
+  takesVariadicFnWithGenericRet(\Array.i)
+
+  // These are not okay, the KeyPath should have a base that matches the
+  // internal parameter type of the function, i.e [S].
+  let _: (S...) -> Int = \S.i // expected-error {{key path value type 'S' cannot be converted to contextual type '[S]'}}
+  takesVariadicFnWithGenericRet(\S.i) // expected-error {{key path value type 'S' cannot be converted to contextual type '[S]'}}
 }
 
 // rdar://problem/54322807

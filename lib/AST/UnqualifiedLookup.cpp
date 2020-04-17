@@ -490,7 +490,8 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   auto localCounter = lookupCounter;
   (void)localCounter; // for debugging
 #endif
-  FrontendStatsTracer StatsTracer(Ctx.Stats, "performUnqualifedLookup",
+  FrontendStatsTracer StatsTracer(Ctx.Stats,
+                                  "performUnqualifedLookup",
                                   DC->getParentSourceFile());
 
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
@@ -1273,7 +1274,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
   return factory.isFirstResultEnough();
 }
 
-llvm::Expected<LookupResult>
+LookupResult
 UnqualifiedLookupRequest::evaluate(Evaluator &evaluator,
                                    UnqualifiedLookupDescriptor desc) const {
   SmallVector<LookupResultEntry, 4> results;
@@ -1447,7 +1448,7 @@ bool UnqualifiedLookupFactory::shouldDiffer() const {
     "swift/test/TypeCoercion/overload_noncall.swift",
     "swift/test/expr/capture/nested_class.swift",
     "swift/test/expr/capture/order.swift",
-    "swift/test/NameBinding/name-binding.swift"
+    "swift/test/NameLookup/name_lookup2.swift"
   };
   StringRef fileName = SF->getFilename();
   return llvm::any_of(testsThatShouldDiffer, [&](const char *testFile) {

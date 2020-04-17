@@ -34,6 +34,7 @@ extension OSLogInterpolation {
   ///  - privacy: a privacy qualifier which is either private or public.
   ///    It is auto-inferred by default.
   @_semantics("constant_evaluable")
+  @_semantics("oslog.requires_constant_arguments")
   @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
@@ -76,6 +77,7 @@ extension OSLogInterpolation {
   ///  - privacy: a privacy qualifier which is either private or public.
   ///    It is auto-inferred by default.
   @_semantics("constant_evaluable")
+  @_semantics("oslog.requires_constant_arguments")
   @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
@@ -102,8 +104,19 @@ extension OSLogInterpolation {
     guard argumentCount < maxOSLogArgumentCount else { return }
     formatString +=
       format.formatSpecifier(for: T.self, align: align, privacy: privacy)
-    addIntHeaders(privacy, sizeForEncoding(T.self))
+    // If minimum column width is specified, append this value first. Note that the
+    // format specifier would use a '*' for width e.g. %*d.
+    if let minColumns = align.minimumColumnWidth {
+      appendPrecisionArgument(minColumns)
+    }
 
+    // If minimum number of digits (precision) is specified, append the precision before
+    // the argument. Note that the format specifier would use a '*' for precision: %.*d.
+    if let minDigits = format.minDigits {
+      appendPrecisionArgument(minDigits)
+    }
+
+    addIntHeaders(privacy, sizeForEncoding(T.self))
     arguments.append(number)
     argumentCount += 1
   }
@@ -130,6 +143,27 @@ extension OSLogInterpolation {
     totalBytesForSerializingArguments += byteCount + 2
 
     preamble = getUpdatedPreamble(privacy: privacy, isScalar: true)
+  }
+
+  // Append argument indicating precision or width of a format specifier to the buffer.
+  // These specify the value of the '*' in a format specifier like: %*.*ld.
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
+  internal mutating func appendPrecisionArgument(_ count: @escaping () -> Int) {
+    // Note that we don't have to update the preamble here.
+    let argumentHeader = getArgumentHeader(privacy: .auto, type: .count)
+    arguments.append(argumentHeader)
+    // Append number of bytes needed to serialize the argument.
+    let byteCount = sizeForEncoding(CInt.self)
+    arguments.append(UInt8(byteCount))
+    // Increment total byte size by the number of bytes needed for this
+    // argument, which is the sum of the byte size of the argument and
+    // two bytes needed for the headers.
+    totalBytesForSerializingArguments += 2 + byteCount
+    // The count is expected to be a CInt.
+    arguments.append({ CInt(count()) })
+    argumentCount += 1
   }
 }
 

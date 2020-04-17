@@ -47,8 +47,8 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   /// The module that this symbol graph will represent.
   const ModuleDecl &M;
 
-  /// The symbol graph for a module.
-  SymbolGraph Graph;
+  /// The symbol graph for the main module of interest.
+  SymbolGraph MainGraph;
 
   /// A map of modules whose types were extended by the main module of interest `M`.
   llvm::DenseMap<ModuleDecl *, SymbolGraph *> ExtendedModuleGraphs;
@@ -60,11 +60,29 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   // MARK: - Utilities
 
-  /// Returns `true` if the symbol should be included as a node in the graph.
-  bool shouldIncludeNode(const Decl *D) const;
-
-  /// Get a "sub" symbol graph for the parent module of a type that the main module `M` is extending.
-  SymbolGraph &getExtendedModuleSymbolGraph(ModuleDecl *M);
+  /// Get a "sub" symbol graph for the appropriate module concerning a declaration.
+  ///
+  /// This will get the "rootmost" module responsible for a declaration's
+  /// documentation. For example:
+  ///
+  /// Module A:
+  ///
+  /// ```swift
+  /// public struct AStruct {}
+  /// ```
+  ///
+  /// Module B:
+  ///
+  /// ```swift
+  /// import A
+  /// extension AStruct {
+  ///   public struct BStruct {}
+  /// }
+  ///
+  /// `BStruct` will go in module A's extension symbol graph, because `BStruct`
+  /// is a member of `AStruct`, and module A owns `AStruct`, and so on for
+  /// further nestings.
+  SymbolGraph *getModuleSymbolGraph(const Decl *D);
 
   // MARK: - SourceEntityWalker
 

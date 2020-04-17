@@ -583,11 +583,14 @@ static void formatDiagnosticArgument(StringRef Modifier,
     }
     break;
   }
+
   case DiagnosticArgumentKind::TypeRepr:
     assert(Modifier.empty() && "Improper modifier for TypeRepr argument");
+    assert(Arg.getAsTypeRepr() && "TypeRepr argument is null");
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsTypeRepr()
         << FormatOpts.ClosingQuotationMark;
     break;
+
   case DiagnosticArgumentKind::PatternKind:
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();
@@ -984,16 +987,15 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     info->ChildDiagnosticInfo = childInfoPtrs;
     
     SmallVector<std::string, 1> educationalNotePaths;
-    if (useDescriptiveDiagnostics) {
-      auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
-      while (associatedNotes && *associatedNotes) {
-        SmallString<128> notePath(getDiagnosticDocumentationPath());
-        llvm::sys::path::append(notePath, *associatedNotes);
-        educationalNotePaths.push_back(notePath.str());
-        associatedNotes++;
-      }
-      info->EducationalNotePaths = educationalNotePaths;
+
+    auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
+    while (associatedNotes && *associatedNotes) {
+      SmallString<128> notePath(getDiagnosticDocumentationPath());
+      llvm::sys::path::append(notePath, *associatedNotes);
+      educationalNotePaths.push_back(notePath.str().str());
+      associatedNotes++;
     }
+    info->EducationalNotePaths = educationalNotePaths;
 
     for (auto &consumer : Consumers) {
       consumer->handleDiagnostic(SourceMgr, *info);

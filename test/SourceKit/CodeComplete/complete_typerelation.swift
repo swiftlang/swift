@@ -31,10 +31,10 @@ func testUnknown() {
 }
 
 // RUN: %sourcekitd-test -req=complete -pos=13:17 %s -- %s > %t.identical.response
-// RUN: diff --strip-trailing-cr -u %s.identical.response %t.identical.response
+// RUN: %diff -u %s.identical.response %t.identical.response
 
 // RUN: %sourcekitd-test -req=complete -pos=17:17 %s -- %s > %t.convertible.response
-// RUN: diff --strip-trailing-cr -u %s.convertible.response %t.convertible.response
+// RUN: %diff -u %s.convertible.response %t.convertible.response
 
 // RUN: %empty-directory(%t/cache)
 // RUN: %sourcekitd-test -req=complete.cache.ondisk -cache-path %t/cache == -req=complete -pos=21:10 %s -- %s | %FileCheck %s --check-prefix=BOOLCONTEXT

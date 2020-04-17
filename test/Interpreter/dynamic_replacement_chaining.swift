@@ -27,7 +27,7 @@ import StdlibUnittest
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -53,14 +53,14 @@ DynamicallyReplaceable.test("DynamicallyReplaceable") {
   executablePath.removeLast(4)
 
 #if os(Linux)
-	_ = dlopen(target_library_name("B"), RTLD_NOW)
-	_ = dlopen(target_library_name("C"), RTLD_NOW)
+  _ = dlopen(target_library_name("B"), RTLD_NOW)
+  _ = dlopen(target_library_name("C"), RTLD_NOW)
 #elseif os(Windows)
-        _ = LoadLibraryA(target_library_name("B"))
-        _ = LoadLibraryA(target_library_name("C"))
+  _ = LoadLibraryA(target_library_name("B"))
+  _ = LoadLibraryA(target_library_name("C"))
 #else
-	_ = dlopen(executablePath+target_library_name("B"), RTLD_NOW)
-	_ = dlopen(executablePath+target_library_name("C"), RTLD_NOW)
+  _ = dlopen(executablePath+target_library_name("B"), RTLD_NOW)
+  _ = dlopen(executablePath+target_library_name("C"), RTLD_NOW)
 #endif
 
 #if CHAINING

@@ -24,6 +24,7 @@
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -256,19 +257,26 @@ static cl::opt<std::string>
                     cl::desc("YAML output filename for pass remarks"),
                     cl::value_desc("filename"));
 
+static cl::opt<std::string> RemarksPasses(
+    "save-optimization-record-passes",
+    cl::desc("Only include passes which match a specified regular expression "
+             "in the generated optimization record (by default, include all "
+             "passes)"),
+    cl::value_desc("regex"));
+
+// sil-opt doesn't have the equivalent of -save-optimization-record=<format>.
+// Instead, use -save-optimization-record-format <format>.
+static cl::opt<std::string> RemarksFormat(
+    "save-optimization-record-format",
+    cl::desc("The format used for serializing remarks (default: YAML)"),
+    cl::value_desc("format"), cl::init("yaml"));
+
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
-  SILPassManager PM(Module, IRGenMod);
-  for (auto P : Passes) {
-#define PASS(ID, Tag, Name)
-#define IRGEN_PASS(ID, Tag, Name)                                              \
-  if (P == PassKind::ID)                                                       \
-    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());
-#include "swift/SILOptimizer/PassManager/Passes.def"
-  }
-
-  PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
-      Module->getOptions(), Passes));
+  auto &opts = Module->getOptions();
+  executePassPipelinePlan(
+      Module, SILPassPipelinePlan::getPassPipelineForKinds(opts, Passes),
+      /*isMandatory*/ false, IRGenMod);
 
   if (Module->getOptions().VerifyAll)
     Module->verify();
@@ -341,6 +349,9 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
       EnableExperimentalDifferentiableProgramming;
 
+  Invocation.getDiagnosticOptions().VerifyMode =
+      VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
+
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
@@ -396,14 +407,40 @@ int main(int argc, char **argv) {
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
+  if (VerifyMode)
+    PrintDiags.setSuppressOutput(true);
+
+  struct FinishDiagProcessingCheckRAII {
+    bool CalledFinishDiagProcessing = false;
+    ~FinishDiagProcessingCheckRAII() {
+      assert(CalledFinishDiagProcessing &&
+             "returned from the function "
+             "without calling finishDiagProcessing");
+    }
+  } FinishDiagProcessingCheckRAII;
+
+  auto finishDiagProcessing = [&](int retValue) -> int {
+    FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
+    PrintDiags.setSuppressOutput(false);
+    bool diagnosticsError = CI.getDiags().finishProcessing();
+    // If the verifier is enabled and did not encounter any verification errors,
+    // return 0 even if the compile failed. This behavior isn't ideal, but large
+    // parts of the test suite are reliant on it.
+    if (VerifyMode && !diagnosticsError) {
+      return 0;
+    }
+    return retValue ? retValue : diagnosticsError;
+  };
+
   if (CI.setup(Invocation))
-    return 1;
+    return finishDiagProcessing(1);
 
   CI.performSema();
 
   // If parsing produced an error, don't run any passes.
-  if (CI.getASTContext().hadError())
-    return 1;
+  bool HadError = CI.getASTContext().hadError();
+  if (HadError)
+    return finishDiagProcessing(1);
 
   // Load the SIL if we have a module. We have to do this after SILParse
   // creating the unfortunate double if statement.
@@ -420,27 +457,27 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
-  // If we're in verify mode, install a custom diagnostic handling for
-  // SourceMgr.
-  if (VerifyMode)
-    enableDiagnosticVerifier(CI.getSourceMgr());
-
   if (CI.getSILModule())
     CI.getSILModule()->setSerializeSILAction([]{});
 
-  std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile;
   if (RemarksFilename != "") {
-    std::error_code EC;
-    OptRecordFile = std::make_unique<llvm::raw_fd_ostream>(
-        RemarksFilename, EC, llvm::sys::fs::F_None);
-    if (EC) {
-      llvm::errs() << EC.message() << '\n';
-      return 1;
+    llvm::remarks::Format remarksFormat = llvm::remarks::Format::YAML;
+    llvm::Expected<llvm::remarks::Format> formatOrErr =
+        llvm::remarks::parseFormat(RemarksFormat);
+    if (llvm::Error E = formatOrErr.takeError()) {
+      CI.getDiags().diagnose(SourceLoc(),
+                             diag::error_creating_remark_serializer,
+                             toString(std::move(E)));
+      HadError = true;
+    } else {
+      remarksFormat = *formatOrErr;
     }
-    auto Stream = std::make_unique<llvm::yaml::Output>(*OptRecordFile,
-                                                        &CI.getSourceMgr());
-    CI.getSILModule()->setOptRecordStream(std::move(Stream),
-                                          std::move(OptRecordFile));
+
+    auto Pair = createSILRemarkStreamer(*CI.getSILModule(), RemarksFilename,
+                                        RemarksPasses, remarksFormat,
+                                        CI.getDiags(), CI.getSourceMgr());
+    CI.getSILModule()->setSILRemarkStreamer(std::move(Pair.first),
+                                            std::move(Pair.second));
   }
 
   if (OptimizationGroup == OptGroup::Diagnostics) {
@@ -497,21 +534,16 @@ int main(int argc, char **argv) {
       if (EC) {
         llvm::errs() << "while opening '" << OutputFile << "': "
                      << EC.message() << '\n';
-        return 1;
+        return finishDiagProcessing(1);
       }
       CI.getSILModule()->print(OS, CI.getMainModule(), SILOpts,
                                !DisableASTDump);
     }
   }
 
-  bool HadError = CI.getASTContext().hadError();
+  HadError |= CI.getASTContext().hadError();
 
-  // If we're in -verify mode, we've buffered up all of the generated
-  // diagnostics.  Check now to ensure that they meet our expectations.
   if (VerifyMode) {
-    HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs(),
-                                 /*autoApplyFixes*/false,
-                                 /*ignoreUnknown*/false);
     DiagnosticEngine &diags = CI.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
@@ -521,5 +553,5 @@ int main(int argc, char **argv) {
     }
   }
 
-  return HadError;
+  return finishDiagProcessing(HadError);
 }

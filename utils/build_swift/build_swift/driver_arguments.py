@@ -223,7 +223,11 @@ def _apply_default_arguments(args):
         args.test_watchos_simulator = False
 
     if not args.build_android:
-        args.test_android = False
+        # If building natively on an Android host, allow running the test suite
+        # without the NDK config.
+        if not StdlibDeploymentTarget.Android.contains(StdlibDeploymentTarget
+                                                       .host_target().name):
+            args.test_android = False
         args.test_android_host = False
 
     if not args.test_android:
@@ -563,6 +567,9 @@ def create_argument_parser():
 
     option(['--indexstore-db'], toggle_true('build_indexstoredb'),
            help='build IndexStoreDB')
+    option('--test-indexstore-db-sanitize-all',
+           toggle_true('test_indexstoredb_sanitize_all'),
+           help='run indexstore-db tests under all sanitizers')
     option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
     option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
@@ -604,6 +611,12 @@ def create_argument_parser():
 
     option('--pythonkit', store_true('build_pythonkit'),
            help='build PythonKit')
+
+    option('--tensorflow-swift-apis', store_true('build_tensorflow_swift_apis'),
+           help='build TensorFlow Swift APIs')
+    option('--install-tensorflow-swift-apis',
+           store_true('install_tensorflow_swift_apis'),
+           help='install TensorFlow Swift APIs')
 
     option('--build-ninja', toggle_true,
            help='build the Ninja tool')
@@ -819,6 +832,8 @@ def create_argument_parser():
     option('--only-executable-test', toggle_true,
            help='Only run executable tests. Does nothing if host-test is not '
                 'allowed')
+    option('--only-non-executable-test', toggle_true,
+           help='Only run non-executable tests.')
 
     option('--test-paths', append,
            type=argparse.ShellSplitType(),

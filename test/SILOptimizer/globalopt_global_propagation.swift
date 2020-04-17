@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend  -O -emit-sil -enforce-exclusivity=unchecked  %s | %FileCheck %s
-// RUN: %target-swift-frontend  -O -wmo -emit-sil -enforce-exclusivity=unchecked  %s | %FileCheck -check-prefix=CHECK-WMO %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -wmo -emit-sil %s | %FileCheck -check-prefix=CHECK-WMO %s
+// RUN: %target-swift-frontend -parse-as-library -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -wmo -emit-sil %s | %FileCheck -check-prefix=CHECK-WMO %s
 
 // Check that values of internal and private global variables, which are provably assigned only 
 // once, are propagated into their uses and enable further optimizations like constant
@@ -91,6 +93,7 @@ public func test_internal_global_var_int() -> Int {
 // CHECK-WMO-LABEL: sil [noinline] @$s28globalopt_global_propagation012test_public_B11_var_doubleSdyF
 // CHECK-WMO: bb0:
 // CHECK-WMO-NEXT: global_addr
+// CHECK-WMO-NEXT: begin_access [read] [dynamic]
 // CHECK-WMO-NEXT: struct_element_addr
 // CHECK-WMO-NEXT: load
 @inline(never)
@@ -103,6 +106,7 @@ public func test_public_global_var_double() -> Double {
 // CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation012test_public_B8_var_intSiyF
 // CHECK: bb0: 
 // CHECK-NEXT: global_addr
+// CHECK-NEXT: begin_access [read] [dynamic]
 // CHECK-NEXT: struct_element_addr
 // CHECK-NEXT: load
 @inline(never)
@@ -113,12 +117,12 @@ public func test_public_global_var_int() -> Int {
 // Values of globals cannot be propagated as there are multiple assignments to it.
 // CHECK-WMO-LABEL: sil [noinline] @$s28globalopt_global_propagation026test_internal_and_private_B25_var_with_two_assignmentsSiyF
 // CHECK-WMO: bb0: 
-// CHECK-WMO: global_addr
-// CHECK-WMO: global_addr
-// CHECK-WMO: struct_element_addr
-// CHECK-WMO: load
-// CHECK-WMO: struct_element_addr
-// CHECK-WMO: load
+// CHECK-WMO-DAG: global_addr
+// CHECK-WMO-DAG: struct_element_addr
+// CHECK-WMO-DAG: load
+// CHECK-WMO-DAG: global_addr
+// CHECK-WMO-DAG: struct_element_addr
+// CHECK-WMO-DAG: load
 // CHECK-WMO: return
 @inline(never)
 public func test_internal_and_private_global_var_with_two_assignments() -> Int {

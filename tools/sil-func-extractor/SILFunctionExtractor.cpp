@@ -142,7 +142,7 @@ static void getFunctionNames(std::vector<std::string> &Names) {
       if (Token.empty()) {
         break;
       }
-      Names.push_back(Token);
+      Names.push_back(Token.str());
       Buffer = NewBuffer;
     }
   }
@@ -153,12 +153,12 @@ static bool stringInSortedArray(
     llvm::function_ref<bool(const std::string &, const std::string &)> &&cmp) {
   if (list.empty())
     return false;
-  auto iter = std::lower_bound(list.begin(), list.end(), str, cmp);
+  auto iter = std::lower_bound(list.begin(), list.end(), str.str(), cmp);
   // If we didn't find str, return false.
   if (list.end() == iter)
     return false;
 
-  return !cmp(str, *iter);
+  return !cmp(str.str(), *iter);
 }
 
 void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,

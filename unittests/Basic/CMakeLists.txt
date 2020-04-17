@@ -15,10 +15,12 @@ add_swift_unittest(SwiftBasicTests
   EncodedSequenceTest.cpp
   ExponentialGrowthAppendingBinaryByteStreamTests.cpp
   FileSystemTest.cpp
+  FrozenMultiMapTest.cpp
   ImmutablePointerSetTest.cpp
   JSONSerialization.cpp
   OptionSetTest.cpp
   OwnedStringTest.cpp
+  MultiMapCacheTest.cpp
   PointerIntEnumTest.cpp
   PrefixMapTest.cpp
   RangeTest.cpp

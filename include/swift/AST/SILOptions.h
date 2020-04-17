@@ -23,6 +23,7 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include <string>
 #include <climits>
 
@@ -71,6 +72,9 @@ public:
   
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
+
+  /// If true, no SIL verification is done at all.
+  bool VerifyNone = false;
 
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;
@@ -161,9 +165,16 @@ public:
   /// pipeline or after serialization.
   bool StripOwnershipAfterSerialization = true;
 
-  /// The name of the file to which the backend should save YAML optimization
+  /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;
+
+  /// The regex that filters the passes that should be saved to the optimization
+  /// records.
+  std::string OptRecordPasses;
+
+  /// The format used for serializing remarks (default: YAML)
+  llvm::remarks::Format OptRecordFormat = llvm::remarks::Format::YAML;
 
   SILOptions() {}
 

@@ -16,8 +16,8 @@
 
 #include "Outlining.h"
 
-#include "swift/AST/GenericEnvironment.h"
 #include "Explosion.h"
+#include "GenOpaque.h"
 #include "GenProto.h"
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
@@ -25,6 +25,9 @@
 #include "LoadableTypeInfo.h"
 #include "LocalTypeDataKind.h"
 #include "MetadataRequest.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/IRGenOptions.h"
+#include "swift/SIL/SILModule.h"
 
 using namespace swift;
 using namespace irgen;
@@ -132,15 +135,36 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
   return {loweredType, nullptr};
 }
 
-void TypeInfo::callOutlinedCopy(IRGenFunction &IGF,
-                                Address dest, Address src, SILType T,
-                                IsInitialization_t isInit,
+void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
+                                SILType T, IsInitialization_t isInit,
                                 IsTake_t isTake) const {
-  OutliningMetadataCollector collector(IGF);
-  if (T.hasArchetype()) {
-    collectMetadataForOutlining(collector, T);
+  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
+    OutliningMetadataCollector collector(IGF);
+    if (T.hasArchetype()) {
+      collectMetadataForOutlining(collector, T);
+    }
+    collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
+    return;
   }
-  collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
+
+  if (!T.hasArchetype()) {
+    // Call the outlined copy function (the implementation will call vwt in this
+    // case).
+    OutliningMetadataCollector collector(IGF);
+    collector.emitCallToOutlinedCopy(dest, src, T, *this, isInit, isTake);
+    return;
+  }
+
+  if (isInit == IsInitialization && isTake == IsTake) {
+    return emitInitializeWithTakeCall(IGF, T, dest, src);
+  } else if (isInit == IsInitialization && isTake == IsNotTake) {
+    return emitInitializeWithCopyCall(IGF, T, dest, src);
+  } else if (isInit == IsNotInitialization && isTake == IsTake) {
+    return emitAssignWithTakeCall(IGF, T, dest, src);
+  } else if (isInit == IsNotInitialization && isTake == IsNotTake) {
+    return emitAssignWithCopyCall(IGF, T, dest, src);
+  }
+  llvm_unreachable("unknown case");
 }
 
 void OutliningMetadataCollector::emitCallToOutlinedCopy(
@@ -173,6 +197,28 @@ void OutliningMetadataCollector::emitCallToOutlinedCopy(
   call->setCallingConv(IGF.IGM.DefaultCC);
 }
 
+static bool needsSpecialOwnershipHandling(SILType t) {
+  auto astType = t.getASTType();
+  auto ref = dyn_cast<ReferenceStorageType>(astType);
+  if (!ref) {
+    return false;
+  }
+  return ref->getOwnership() != ReferenceOwnership::Strong;
+}
+
+bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type);
+
+static bool canUseValueWitnessForValueOp(IRGenModule &IGM, SILType T) {
+  if (!IGM.getSILModule().isTypeMetadataForLayoutAccessible(T))
+    return false;
+
+  if (needsSpecialOwnershipHandling(T))
+    return false;
+  if (T.getASTType()->hasDynamicSelfType())
+    return false;
+  return true;
+}
+
 llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
                               SILType T, const TypeInfo &ti,
                               const OutliningMetadataCollector &collector) {
@@ -181,10 +227,16 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
     IRGenMangler().mangleOutlinedInitializeWithTakeFunction(manglingBits.first,
                                                            manglingBits.second);
 
-  return getOrCreateOutlinedCopyAddrHelperFunction(T, ti, collector, funcName,
-      [](IRGenFunction &IGF, Address dest, Address src,
-         SILType T, const TypeInfo &ti) {
-        ti.initializeWithTake(IGF, dest, src, T, true);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      T, ti, collector, funcName,
+      [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
+         const TypeInfo &ti) {
+        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+            T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
+          ti.initializeWithTake(IGF, dest, src, T, true);
+        } else {
+          emitInitializeWithTakeCall(IGF, T, dest, src);
+        }
       });
 }
 
@@ -196,10 +248,16 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
     IRGenMangler().mangleOutlinedInitializeWithCopyFunction(manglingBits.first,
                                                            manglingBits.second);
 
-  return getOrCreateOutlinedCopyAddrHelperFunction(T, ti, collector, funcName,
-      [](IRGenFunction &IGF, Address dest, Address src,
-         SILType T, const TypeInfo &ti) {
-        ti.initializeWithCopy(IGF, dest, src, T, true);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      T, ti, collector, funcName,
+      [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
+         const TypeInfo &ti) {
+        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+            T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
+          ti.initializeWithCopy(IGF, dest, src, T, true);
+        } else {
+          emitInitializeWithCopyCall(IGF, T, dest, src);
+        }
       });
 }
 
@@ -211,10 +269,16 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
     IRGenMangler().mangleOutlinedAssignWithTakeFunction(manglingBits.first,
                                                         manglingBits.second);
 
-  return getOrCreateOutlinedCopyAddrHelperFunction(T, ti, collector, funcName,
-      [](IRGenFunction &IGF, Address dest, Address src,
-         SILType T, const TypeInfo &ti) {
-        ti.assignWithTake(IGF, dest, src, T, true);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      T, ti, collector, funcName,
+      [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
+         const TypeInfo &ti) {
+        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+            T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
+          ti.assignWithTake(IGF, dest, src, T, true);
+        } else {
+          emitAssignWithTakeCall(IGF, T, dest, src);
+        }
       });
 }
 
@@ -226,10 +290,16 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
     IRGenMangler().mangleOutlinedAssignWithCopyFunction(manglingBits.first,
                                                         manglingBits.second);
 
-  return getOrCreateOutlinedCopyAddrHelperFunction(T, ti, collector, funcName,
-      [](IRGenFunction &IGF, Address dest, Address src,
-         SILType T, const TypeInfo &ti) {
-        ti.assignWithCopy(IGF, dest, src, T, true);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      T, ti, collector, funcName,
+      [this](IRGenFunction &IGF, Address dest, Address src, SILType T,
+             const TypeInfo &ti) {
+        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+            T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
+          ti.assignWithCopy(IGF, dest, src, T, true);
+        } else {
+          emitAssignWithCopyCall(IGF, T, dest, src);
+        }
       });
 }
 
@@ -259,11 +329,28 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
 
 void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
                                    Address addr, SILType T) const {
-  OutliningMetadataCollector collector(IGF);
-  if (T.hasArchetype()) {
-    collectMetadataForOutlining(collector, T);
+  // Short-cut destruction of trivial values.
+  if (IGF.IGM.getTypeLowering(T).isTrivial())
+    return;
+
+  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
+    OutliningMetadataCollector collector(IGF);
+    if (T.hasArchetype()) {
+      collectMetadataForOutlining(collector, T);
+    }
+    collector.emitCallToOutlinedDestroy(addr, T, *this);
+    return;
   }
-  collector.emitCallToOutlinedDestroy(addr, T, *this);
+
+  if (!T.hasArchetype()) {
+    // Call the outlined copy function (the implementation will call vwt in this
+    // case).
+    OutliningMetadataCollector collector(IGF);
+    collector.emitCallToOutlinedDestroy(addr, T, *this);
+    return;
+  }
+
+  return emitDestroyCall(IGF, T, addr);
 }
 
 void OutliningMetadataCollector::emitCallToOutlinedDestroy(
@@ -298,9 +385,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
         Explosion params = IGF.collectParameters();
         Address addr = ti.getAddressForPointer(params.claimNext());
         collector.bindMetadataParameters(IGF, params);
+        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling ||
+            T.hasArchetype() || !canUseValueWitnessForValueOp(*this, T)) {
+          ti.destroy(IGF, addr, T, true);
+        } else {
+          emitDestroyCall(IGF, T, addr);
+        }
 
-        ti.destroy(IGF, addr, T, true);
-        
         IGF.Builder.CreateRet(addr.getAddress());
       },
       true /*setIsNoInline*/);

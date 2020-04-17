@@ -520,7 +520,7 @@ SIMPLE_DECL_ATTR(_inheritsConvenienceInitializers,
   93)
 
 DECL_ATTR(_typeEraser, TypeEraser,
-  OnProtocol | UserInaccessible | NotSerialized |
+  OnProtocol | UserInaccessible |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   94)
 
@@ -540,12 +540,22 @@ DECL_ATTR(derivative, Derivative,
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   97)
 
-// NOTE: 98 is unused
+DECL_ATTR(_spi, SPIAccessControl,
+  OnAbstractFunction | OnExtension | OnGenericType | OnVar | OnSubscript |
+  OnImport | OnAccessor | OnEnumElement |
+  AllowMultipleAttributes | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  98)
 
 DECL_ATTR(transpose, Transpose,
   OnFunc | LongAttribute | AllowMultipleAttributes |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   99)
+
+SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
+  OnAbstractFunction | OnVar | OnSubscript |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  100)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

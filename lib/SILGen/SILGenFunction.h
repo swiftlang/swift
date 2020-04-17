@@ -530,6 +530,13 @@ public:
     return F.getTypeLowering(type);
   }
 
+  SILType getSILInterfaceType(SILParameterInfo param) const {
+    return silConv.getSILType(param, CanSILFunctionType());
+  }
+  SILType getSILInterfaceType(SILResultInfo result) const {
+    return silConv.getSILType(result, CanSILFunctionType());
+  }
+
   SILType getSILType(SILParameterInfo param, CanSILFunctionType fnTy) const {
     return silConv.getSILType(param, fnTy);
   }
@@ -645,9 +652,6 @@ public:
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
                                   CleanupLocation cleanupLoc);
 
-  /// Generates code for a curry thunk from one uncurry level
-  /// of a function to another.
-  void emitCurryThunk(SILDeclRef thunk);
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to the conventions.
@@ -831,13 +835,12 @@ public:
   /// Create (but do not emit) the epilog branch, and save the
   /// current cleanups depth as the destination for return statement branches.
   ///
-  /// \param returnType  If non-null, the epilog block will be created with an
-  ///                    argument of this type to receive the return value for
-  ///                    the function.
+  /// \param hasDirectResults  If true, the epilog block will be created with
+  ///                    arguments for each direct result of this function.
   /// \param isThrowing  If true, create an error epilog block.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  void prepareEpilog(Type returnType, bool isThrowing, CleanupLocation L);
+  void prepareEpilog(bool hasDirectResults, bool isThrowing, CleanupLocation L);
   void prepareRethrowEpilog(CleanupLocation l);
   void prepareCoroutineUnwindEpilog(CleanupLocation l);
   
@@ -1085,7 +1088,7 @@ public:
   void emitBreakOutOf(SILLocation loc, Stmt *S);
 
   void emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
-                         ArrayRef<CatchStmt*> clauses,
+                         ArrayRef<CaseStmt *> clauses,
                          JumpDest catchFallthroughDest);
 
   /// Emit code for the throw expr. If \p emitWillThrow is set then emit a
@@ -1508,6 +1511,7 @@ public:
   RValue emitApplyOfPropertyWrapperBackingInitializer(
       SILLocation loc,
       VarDecl *var,
+      SubstitutionMap subs,
       RValue &&originalValue,
       SGFContext C = SGFContext());
 
@@ -1771,9 +1775,19 @@ public:
                                     AbstractionPattern origType,
                                     CanType substType,
                                     SGFContext ctx = SGFContext());
+  ManagedValue emitOrigToSubstValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SILType loweredResultTy,
+                                    SGFContext ctx = SGFContext());
   RValue emitOrigToSubstValue(SILLocation loc, RValue &&input,
                               AbstractionPattern origType,
                               CanType substType,
+                              SGFContext ctx = SGFContext());
+  RValue emitOrigToSubstValue(SILLocation loc, RValue &&input,
+                              AbstractionPattern origType,
+                              CanType substType,
+                              SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
   /// Convert a value with the abstraction patterns of the substituted
@@ -1785,6 +1799,16 @@ public:
   RValue emitSubstToOrigValue(SILLocation loc, RValue &&input,
                               AbstractionPattern origType,
                               CanType substType,
+                              SGFContext ctx = SGFContext());
+  ManagedValue emitSubstToOrigValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType substType,
+                                    SILType loweredResultTy,
+                                    SGFContext ctx = SGFContext());
+  RValue emitSubstToOrigValue(SILLocation loc, RValue &&input,
+                              AbstractionPattern origType,
+                              CanType substType,
+                              SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
   /// Transform the AST-level types in the function signature without an
@@ -1800,12 +1824,14 @@ public:
                                     CanType inputSubstType,
                                     AbstractionPattern outputOrigType,
                                     CanType outputSubstType,
+                                    SILType loweredResultTy,
                                     SGFContext ctx = SGFContext());
   RValue emitTransformedValue(SILLocation loc, RValue &&input,
                               AbstractionPattern inputOrigType,
                               CanType inputSubstType,
                               AbstractionPattern outputOrigType,
                               CanType outputSubstType,
+                              SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
   /// Used for emitting SILArguments of bare functions, such as thunks.
@@ -1830,6 +1856,23 @@ public:
   createWithoutActuallyEscapingClosure(SILLocation loc,
                                        ManagedValue noEscapingFunctionValue,
                                        SILType escapingFnTy);
+
+  //===--------------------------------------------------------------------===//
+  // Differentiation thunks
+  //===--------------------------------------------------------------------===//
+
+  /// Get or create a thunk for reabstracting and self-reordering
+  /// differentials/pullbacks returned by user-defined JVP/VJP functions, and
+  /// apply it to the given differential/pullback.
+  ///
+  /// If `reorderSelf` is true, reorder self so that it appears as:
+  /// - The last parameter, for differentials.
+  /// - The last result, for pullbacks.
+  ManagedValue getThunkedAutoDiffLinearMap(ManagedValue linearMap,
+                                           AutoDiffLinearMapKind linearMapKind,
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType,
+                                           bool reorderSelf);
 
   //===--------------------------------------------------------------------===//
   // Declarations

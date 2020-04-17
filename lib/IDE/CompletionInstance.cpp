@@ -16,8 +16,10 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -162,11 +164,13 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
 
 } // namespace
 
-bool CompletionInstance::performCachedOperaitonIfPossible(
+bool CompletionInstance::performCachedOperationIfPossible(
     const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+  llvm::PrettyStackTraceString trace(
+      "While performing cached completion if possible");
 
   if (!CachedCI)
     return false;
@@ -176,22 +180,15 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     return false;
 
   auto &CI = *CachedCI;
+  auto *oldSF = CI.getCodeCompletionFile().get();
 
-  if (!CI.hasPersistentParserState())
-    return false;
-  auto &oldState = CI.getPersistentParserState();
-  if (!oldState.hasCodeCompletionDelayedDeclState())
-    return false;
+  auto *oldState = oldSF->getDelayedParserState();
+  assert(oldState->hasCodeCompletionDelayedDeclState());
+  auto &oldInfo = oldState->getCodeCompletionDelayedDeclState();
 
   auto &SM = CI.getSourceMgr();
   if (SM.getIdentifierForBuffer(SM.getCodeCompletionBufferID()) !=
       completionBuffer->getBufferIdentifier())
-    return false;
-
-  auto &oldInfo = oldState.getCodeCompletionDelayedDeclState();
-
-  // Currently, only completions within a function body is supported.
-  if (oldInfo.Kind != CodeCompletionDelayedDeclKind::FunctionBody)
     return false;
 
   // Parse the new buffer into temporary SourceFile.
@@ -204,104 +201,163 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   TypeCheckerOptions typeckOpts;
   SearchPathOptions searchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
-  std::unique_ptr<ASTContext> Ctx(
+  std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
-  registerIDERequestFunctions(Ctx->evaluator);
-  registerTypeCheckerRequestFunctions(Ctx->evaluator);
-  registerSILGenRequestFunctions(Ctx->evaluator);
-  ModuleDecl *M = ModuleDecl::create(Identifier(), *Ctx);
-  PersistentParserState newState;
-  SourceFile *newSF =
-      new (*Ctx) SourceFile(*M, SourceFileKind::Library, tmpBufferID,
-                            SourceFile::ImplicitModuleImportKind::None);
-  newSF->enableInterfaceHash();
+  registerParseRequestFunctions(tmpCtx->evaluator);
+  registerIDERequestFunctions(tmpCtx->evaluator);
+  registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
+  registerSILGenRequestFunctions(tmpCtx->evaluator);
+  ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
+  SourceFile *tmpSF =
+      new (*tmpCtx) SourceFile(*tmpM, oldSF->Kind, tmpBufferID,
+                               SourceFile::ImplicitModuleImportKind::None);
+  tmpSF->enableInterfaceHash();
   // Ensure all non-function-body tokens are hashed into the interface hash
-  Ctx->LangOpts.EnableTypeFingerprints = false;
-  parseIntoSourceFile(*newSF, tmpBufferID, &newState);
+  tmpCtx->LangOpts.EnableTypeFingerprints = false;
+
   // Couldn't find any completion token?
-  if (!newState.hasCodeCompletionDelayedDeclState())
+  auto *newState = tmpSF->getDelayedParserState();
+  if (!newState->hasCodeCompletionDelayedDeclState())
     return false;
 
-  auto &newInfo = newState.getCodeCompletionDelayedDeclState();
+  auto &newInfo = newState->getCodeCompletionDelayedDeclState();
+  unsigned newBufferID;
+  DeclContext *traceDC = nullptr;
+  switch (newInfo.Kind) {
+  case CodeCompletionDelayedDeclKind::FunctionBody: {
+    // If the interface has changed, AST must be refreshed.
+    llvm::SmallString<32> oldInterfaceHash{};
+    llvm::SmallString<32> newInterfaceHash{};
+    oldSF->getInterfaceHash(oldInterfaceHash);
+    tmpSF->getInterfaceHash(newInterfaceHash);
+    if (oldInterfaceHash != newInterfaceHash)
+      return false;
 
-  // The new completion must happens in function body too.
-  if (newInfo.Kind != CodeCompletionDelayedDeclKind::FunctionBody)
-    return false;
+    DeclContext *DC =
+        getEquivalentDeclContextFromSourceFile(newInfo.ParentContext, oldSF);
+    if (!DC)
+      return false;
 
-  auto *oldSF = oldInfo.ParentContext->getParentSourceFile();
+    // OK, we can perform fast completion for this. Update the orignal delayed
+    // decl state.
 
-  // If the interface has changed, AST must be refreshed.
-  llvm::SmallString<32> oldInterfaceHash{};
-  llvm::SmallString<32> newInterfaceHash{};
-  oldSF->getInterfaceHash(oldInterfaceHash);
-  newSF->getInterfaceHash(newInterfaceHash);
-  if (oldInterfaceHash != newInterfaceHash)
-    return false;
+    // Fast completion keeps the buffer in memory for multiple completions.
+    // To reduce the consumption, slice the source buffer so it only holds
+    // the portion that is needed for the second pass.
+    auto startOffset = newInfo.StartOffset;
+    if (newInfo.PrevOffset != ~0u)
+      startOffset = newInfo.PrevOffset;
+    auto startLoc = tmpSM.getLocForOffset(tmpBufferID, startOffset);
+    startLoc = Lexer::getLocForStartOfLine(tmpSM, startLoc);
+    startOffset = tmpSM.getLocOffsetInBuffer(startLoc, tmpBufferID);
 
-  DeclContext *DC =
-      getEquivalentDeclContextFromSourceFile(newInfo.ParentContext, oldSF);
-  if (!DC)
-    return false;
+    auto endOffset = newInfo.EndOffset;
+    auto endLoc = tmpSM.getLocForOffset(tmpBufferID, endOffset);
+    endLoc = Lexer::getLocForEndOfToken(tmpSM, endLoc);
+    endOffset = tmpSM.getLocOffsetInBuffer(endLoc, tmpBufferID);
 
-  // OK, we can perform fast completion for this. Update the orignal delayed
-  // decl state.
+    newInfo.StartOffset -= startOffset;
+    newInfo.EndOffset -= startOffset;
+    if (newInfo.PrevOffset != ~0u)
+      newInfo.PrevOffset -= startOffset;
 
-  // Fast completion keeps the buffer in memory for multiple completions.
-  // To reduce the consumption, slice the source buffer so it only holds
-  // the portion that is needed for the second pass.
-  auto startOffset = newInfo.StartOffset;
-  if (newInfo.PrevOffset != ~0u)
-    startOffset = newInfo.PrevOffset;
-  auto startLoc = tmpSM.getLocForOffset(tmpBufferID, startOffset);
-  startLoc = Lexer::getLocForStartOfLine(tmpSM, startLoc);
-  startOffset = tmpSM.getLocOffsetInBuffer(startLoc, tmpBufferID);
+    auto sourceText =
+        completionBuffer->getBuffer().slice(startOffset, endOffset);
+    auto newOffset = Offset - startOffset;
 
-  auto endOffset = newInfo.EndOffset;
-  auto endLoc = tmpSM.getLocForOffset(tmpBufferID, endOffset);
-  endLoc = Lexer::getLocForEndOfToken(tmpSM, endLoc);
-  endOffset = tmpSM.getLocOffsetInBuffer(endLoc, tmpBufferID);
+    newBufferID = SM.addMemBufferCopy(sourceText,
+                                      completionBuffer->getBufferIdentifier());
+    SM.openVirtualFile(SM.getLocForBufferStart(newBufferID),
+                       tmpSM.getDisplayNameForLoc(startLoc),
+                       tmpSM.getLineAndColumn(startLoc).first - 1);
+    SM.setCodeCompletionPoint(newBufferID, newOffset);
 
-  newInfo.StartOffset -= startOffset;
-  newInfo.EndOffset -= startOffset;
-  if (newInfo.PrevOffset != ~0u)
-    newInfo.PrevOffset -= startOffset;
+    // Construct dummy scopes. We don't need to restore the original scope
+    // because they are probably not 'isResolvable()' anyway.
+    auto &SI = oldState->getScopeInfo();
+    assert(SI.getCurrentScope() == nullptr);
+    Scope Top(SI, ScopeKind::TopLevel);
+    Scope Body(SI, ScopeKind::FunctionBody);
 
-  auto sourceText = completionBuffer->getBuffer().slice(startOffset, endOffset);
-  auto newOffset = Offset - startOffset;
+    oldInfo.ParentContext = DC;
+    oldInfo.StartOffset = newInfo.StartOffset;
+    oldInfo.EndOffset = newInfo.EndOffset;
+    oldInfo.PrevOffset = newInfo.PrevOffset;
+    oldState->restoreCodeCompletionDelayedDeclState(oldInfo);
 
-  auto newBufferID =
-      SM.addMemBufferCopy(sourceText, completionBuffer->getBufferIdentifier());
-  SM.openVirtualFile(SM.getLocForBufferStart(newBufferID),
-                     tmpSM.getDisplayNameForLoc(startLoc),
-                     tmpSM.getLineAndColumn(startLoc).first - 1);
-  SM.setCodeCompletionPoint(newBufferID, newOffset);
+    auto *AFD = cast<AbstractFunctionDecl>(DC);
+    if (AFD->isBodySkipped())
+      AFD->setBodyDelayed(AFD->getBodySourceRange());
 
-  // Construct dummy scopes. We don't need to restore the original scope
-  // because they are probably not 'isResolvable()' anyway.
-  auto &SI = oldState.getScopeInfo();
-  assert(SI.getCurrentScope() == nullptr);
-  Scope Top(SI, ScopeKind::TopLevel);
-  Scope Body(SI, ScopeKind::FunctionBody);
+    traceDC = AFD;
+    break;
+  }
+  case CodeCompletionDelayedDeclKind::Decl:
+  case CodeCompletionDelayedDeclKind::TopLevelCodeDecl: {
+    // Support decl/top-level code only if the completion happens in a single
+    // file 'main' script (e.g. playground).
+    auto *oldM = oldInfo.ParentContext->getParentModule();
+    if (oldM->getFiles().size() != 1 || oldSF->Kind != SourceFileKind::Main)
+      return false;
 
-  oldInfo.ParentContext = DC;
-  oldInfo.StartOffset = newInfo.StartOffset;
-  oldInfo.EndOffset = newInfo.EndOffset;
-  oldInfo.PrevOffset = newInfo.PrevOffset;
-  oldState.restoreCodeCompletionDelayedDeclState(oldInfo);
+    // Perform fast completion.
 
-  auto *AFD = cast<AbstractFunctionDecl>(DC);
-  if (AFD->isBodySkipped())
-    AFD->setBodyDelayed(AFD->getBodySourceRange());
-  if (DiagC)
-    CI.addDiagnosticConsumer(DiagC);
+    // Prepare the new buffer in the source manager.
+    auto sourceText = completionBuffer->getBuffer();
+    if (newInfo.Kind == CodeCompletionDelayedDeclKind::TopLevelCodeDecl) {
+      // We don't need the source text after the top-level code.
+      auto endOffset = newInfo.EndOffset;
+      auto endLoc = tmpSM.getLocForOffset(tmpBufferID, endOffset);
+      endLoc = Lexer::getLocForEndOfToken(tmpSM, endLoc);
+      endOffset = tmpSM.getLocOffsetInBuffer(endLoc, tmpBufferID);
+      sourceText = sourceText.slice(0, endOffset);
+    }
+    newBufferID = SM.addMemBufferCopy(sourceText,
+                                      completionBuffer->getBufferIdentifier());
+    SM.setCodeCompletionPoint(newBufferID, Offset);
 
-  CI.getDiags().diagnose(SM.getLocForOffset(newBufferID, newInfo.StartOffset),
-                         diag::completion_reusing_astcontext);
+    // Create a new module and a source file using the current AST context.
+    auto &Ctx = oldM->getASTContext();
+    auto newM = ModuleDecl::create(oldM->getName(), Ctx);
+    CompilerInstance::ImplicitImports implicitImport(CI);
+    SourceFile *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main,
+                                             newBufferID, implicitImport.kind);
+    newM->addFile(*newSF);
+    CompilerInstance::addAdditionalInitialImportsTo(newSF, implicitImport);
+    newSF->enableInterfaceHash();
 
-  Callback(CI);
+    // Tell the compiler instance we've replaced the code completion file.
+    CI.setCodeCompletionFile(newSF);
 
-  if (DiagC)
-    CI.removeDiagnosticConsumer(DiagC);
+    // Re-process the whole file (parsing will be lazily triggered). Still
+    // re-use imported modules.
+    performImportResolution(*newSF);
+    bindExtensions(*newSF);
+
+    traceDC = newM;
+#ifndef NDEBUG
+    const auto *reparsedState = newSF->getDelayedParserState();
+    assert(reparsedState->hasCodeCompletionDelayedDeclState() &&
+           "Didn't find completion token?");
+
+    auto &reparsedInfo = reparsedState->getCodeCompletionDelayedDeclState();
+    assert(reparsedInfo.Kind == newInfo.Kind);
+#endif
+    break;
+  }
+  }
+
+  {
+    PrettyStackTraceDeclContext trace("performing cached completion", traceDC);
+
+    if (DiagC)
+      CI.addDiagnosticConsumer(DiagC);
+
+    Callback(CI, /*reusingASTContext=*/true);
+
+    if (DiagC)
+      CI.removeDiagnosticConsumer(DiagC);
+  }
 
   CachedReuseCount += 1;
 
@@ -313,30 +369,46 @@ bool CompletionInstance::performNewOperation(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+  llvm::PrettyStackTraceString trace("While performing new completion");
 
   auto TheInstance = std::make_unique<CompilerInstance>();
-  auto &CI = *TheInstance;
-  if (DiagC)
-    CI.addDiagnosticConsumer(DiagC);
+  {
+    auto &CI = *TheInstance;
+    if (DiagC)
+      CI.addDiagnosticConsumer(DiagC);
 
-  if (FileSystem != llvm::vfs::getRealFileSystem())
-    CI.getSourceMgr().setFileSystem(FileSystem);
+    SWIFT_DEFER {
+      if (DiagC)
+        CI.removeDiagnosticConsumer(DiagC);
+    };
 
-  Invocation.setCodeCompletionPoint(completionBuffer, Offset);
+    if (FileSystem != llvm::vfs::getRealFileSystem())
+      CI.getSourceMgr().setFileSystem(FileSystem);
 
-  if (CI.setup(Invocation)) {
-    Error = "failed to setup compiler instance";
-    return false;
+    Invocation.setCodeCompletionPoint(completionBuffer, Offset);
+
+    if (CI.setup(Invocation)) {
+      Error = "failed to setup compiler instance";
+      return false;
+    }
+    registerIDERequestFunctions(CI.getASTContext().evaluator);
+
+    CI.performParseAndResolveImportsOnly();
+
+    // If we didn't create a source file for completion, bail. This can happen
+    // if for example we fail to load the stdlib.
+    auto completionFile = CI.getCodeCompletionFile();
+    if (!completionFile)
+      return true;
+
+    // If we didn't find a code completion token, bail.
+    auto *state = completionFile.get()->getDelayedParserState();
+    if (!state->hasCodeCompletionDelayedDeclState())
+      return true;
+
+    Callback(CI, /*reusingASTContext=*/false);
   }
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
-
-  CI.performParseAndResolveImportsOnly();
-  if (CI.hasPersistentParserState())
-    Callback(CI);
-
-  if (DiagC)
-    CI.removeDiagnosticConsumer(DiagC);
 
   if (ArgsHash.hasValue()) {
     CachedCI = std::move(TheInstance);
@@ -352,7 +424,7 @@ bool swift::ide::CompletionInstance::performOperation(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
 
   // Always disable source location resolutions from .swiftsourceinfo file
   // because they're somewhat heavy operations and aren't needed for completion.
@@ -365,6 +437,9 @@ bool swift::ide::CompletionInstance::performOperation(
   // Since caching uses the interface hash, and since per type fingerprints
   // weaken that hash, disable them here:
   Invocation.getLangOptions().EnableTypeFingerprints = false;
+
+  // We don't need token list.
+  Invocation.getLangOptions().CollectParsedToken = false;
 
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();
@@ -379,7 +454,7 @@ bool swift::ide::CompletionInstance::performOperation(
     // the cached completion instance.
     std::lock_guard<std::mutex> lock(mtx);
 
-    if (performCachedOperaitonIfPossible(Invocation, ArgsHash, completionBuffer,
+    if (performCachedOperationIfPossible(Invocation, ArgsHash, completionBuffer,
                                          Offset, DiagC, Callback))
       return true;
 

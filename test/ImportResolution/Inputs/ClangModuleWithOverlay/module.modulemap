@@ -1,0 +1,4 @@
+module ClangModuleWithOverlay {
+  header "ClangModuleWithOverlay.h"
+  export *
+}

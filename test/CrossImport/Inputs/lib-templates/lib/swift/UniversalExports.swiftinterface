@@ -1,0 +1,11 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -swift-version 5 -enable-library-evolution -module-name UniversalExports
+
+import Swift
+
+// This is also a clang overlay:
+@_exported import UniversalExports
+
+@_exported import AlwaysImported
+import NeverImported
+import MI6    // @_exported imports NeverImported

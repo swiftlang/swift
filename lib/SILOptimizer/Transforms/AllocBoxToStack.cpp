@@ -620,11 +620,11 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
   // Create the new function type for the cloned function with some of
   // the parameters promoted.
   auto ClonedTy = SILFunctionType::get(
-      OrigFTI->getSubstGenericSignature(), OrigFTI->getExtInfo(),
+      OrigFTI->getInvocationGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
       ClonedInterfaceArgTys, OrigFTI->getYields(), OrigFTI->getResults(),
-      OrigFTI->getOptionalErrorResult(), OrigFTI->getSubstitutions(),
-      OrigFTI->isGenericSignatureImplied(), M.getASTContext(),
+      OrigFTI->getOptionalErrorResult(), OrigFTI->getPatternSubstitutions(),
+      OrigFTI->getInvocationSubstitutions(), M.getASTContext(),
       OrigFTI->getWitnessMethodConformanceOrInvalid());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())

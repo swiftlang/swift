@@ -136,6 +136,8 @@ class HostSpecificConfiguration(object):
                     suffix = "-only_non_executable"
                 elif args.only_executable_test:
                     suffix = "-only_executable"
+                elif args.only_non_executable_test:
+                    suffix = "-only_non_executable"
                 else:
                     suffix = ""
                 subset_suffix = ""
@@ -214,25 +216,25 @@ class HostSpecificConfiguration(object):
             platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
         if not args.test_osx:
             platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        if not args.test_ios_host:
+        if not args.test_ios_host and not args.only_non_executable_test:
             platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
-        else:
+        elif not args.only_non_executable_test:
             raise ArgumentError(None,
                                 "error: iOS device tests are not " +
                                 "supported in open-source Swift.")
         if not args.test_ios_simulator:
             platforms_to_skip_test.add(StdlibDeploymentTarget.iOSSimulator)
-        if not args.test_tvos_host:
+        if not args.test_tvos_host and not args.only_non_executable_test:
             platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
-        else:
+        elif not args.only_non_executable_test:
             raise ArgumentError(None,
                                 "error: tvOS device tests are not " +
                                 "supported in open-source Swift.")
         if not args.test_tvos_simulator:
             platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.test_watchos_host:
+        if not args.test_watchos_host and not args.only_non_executable_test:
             platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
-        else:
+        elif not args.only_non_executable_test:
             raise ArgumentError(None,
                                 "error: watchOS device tests are not " +
                                 "supported in open-source Swift.")
@@ -255,10 +257,10 @@ class HostSpecificConfiguration(object):
         platforms_to_skip_test_host = set()
         if not args.test_android_host:
             platforms_to_skip_test_host.add(StdlibDeploymentTarget.Android)
-        if not args.test_ios_host:
+        if not args.test_ios_host and not args.only_non_executable_test:
             platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
-        if not args.test_tvos_host:
+        if not args.test_tvos_host and not args.only_non_executable_test:
             platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleTV)
-        if not args.test_watchos_host:
+        if not args.test_watchos_host and not args.only_non_executable_test:
             platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleWatch)
         return platforms_to_skip_test_host

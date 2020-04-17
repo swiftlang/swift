@@ -723,8 +723,8 @@ static TypeResolutionOptions applyContextualPatternOptions(
   return options;
 }
 
-llvm::Expected<Type> PatternTypeRequest::evaluate(
-    Evaluator &evaluator, ContextualPattern pattern) const {
+Type PatternTypeRequest::evaluate(Evaluator &evaluator,
+                                  ContextualPattern pattern) const {
   Pattern *P = pattern.getPattern();
   DeclContext *dc = pattern.getDeclContext();
 
@@ -915,12 +915,7 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
 /// Perform top-down type coercion on the given pattern.
 Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
                                           Type type,
-                                          TypeResolutionOptions options,
-                                          TypeLoc tyLoc) {
-  if (tyLoc.isNull()) {
-    tyLoc = TypeLoc::withoutLoc(type);
-  }
-
+                                          TypeResolutionOptions options) {
   auto P = pattern.getPattern();
   auto dc = pattern.getDeclContext();
   auto &Context = dc->getASTContext();

@@ -28,11 +28,13 @@
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
+#include "swift/SILOptimizer/Utils/KeyPathProjector.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include <utility>
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -77,9 +79,14 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
 }
 
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
+  if (PAI->getFunction()->hasOwnership())
+    return nullptr;
+
   // partial_apply without any substitutions or arguments is just a
-  // thin_to_thick_function.
-  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0)) {
+  // thin_to_thick_function. thin_to_thick_function supports only thin operands.
+  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0) &&
+      PAI->getSubstCalleeType()->getRepresentation() ==
+          SILFunctionTypeRepresentation::Thin) {
     if (!PAI->isOnStack())
       return Builder.createThinToThickFunction(PAI->getLoc(), PAI->getCallee(),
                                                PAI->getType());
@@ -207,92 +214,6 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   return NAI;
 }
 
-/// Ends the begin_access "scope" if a begin_access was inserted for optimizing
-/// a keypath pattern.
-static void insertEndAccess(BeginAccessInst *&beginAccess, bool isModify,
-                            SILBuilder &builder) {
-  if (beginAccess) {
-    builder.createEndAccess(beginAccess->getLoc(), beginAccess,
-                            /*aborted*/ false);
-    if (isModify)
-      beginAccess->setAccessKind(SILAccessKind::Modify);
-    beginAccess = nullptr;
-  }
-}
-
-/// Creates the projection pattern for a keypath instruction.
-///
-/// Currently only the StoredProperty pattern is handled.
-/// TODO: handle other patterns, like getters/setters, optional chaining, etc.
-///
-/// Returns false if \p keyPath is not a keypath instruction or if there is any
-/// other reason why the optimization cannot be done.
-static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
-                                         SILLocation loc,
-                                         BeginAccessInst *&beginAccess,
-                                         SILBuilder &builder) {
-  if (auto *upCast = dyn_cast<UpcastInst>(keyPath))
-    keyPath = upCast->getOperand();
-
-  // Is it a keypath instruction at all?
-  auto *kpInst = dyn_cast<KeyPathInst>(keyPath);
-  if (!kpInst || !kpInst->hasPattern())
-    return SILValue();
-
-  auto components = kpInst->getPattern()->getComponents();
-
-  // Check if the keypath only contains patterns which we support.
-  for (const KeyPathPatternComponent &comp : components) {
-    if (comp.getKind() != KeyPathPatternComponent::Kind::StoredProperty)
-      return SILValue();
-  }
-
-  SILValue addr = root;
-  for (const KeyPathPatternComponent &comp : components) {
-    assert(comp.getKind() == KeyPathPatternComponent::Kind::StoredProperty);
-    VarDecl *storedProperty = comp.getStoredPropertyDecl();
-    SILValue elementAddr;
-    if (addr->getType().getStructOrBoundGenericStruct()) {
-      addr = builder.createStructElementAddr(loc, addr, storedProperty);
-    } else if (addr->getType().getClassOrBoundGenericClass()) {
-      SingleValueInstruction *Ref = builder.createLoad(loc, addr,
-                                         LoadOwnershipQualifier::Unqualified);
-      insertEndAccess(beginAccess, /*isModify*/ false, builder);
-
-      // Handle the case where the storedProperty is in a super class.
-      while (Ref->getType().getClassOrBoundGenericClass() !=
-             storedProperty->getDeclContext()) {
-        SILType superCl = Ref->getType().getSuperclass();
-        if (!superCl) {
-          // This should never happen, because the property should be in the
-          // decl or in a superclass of it. Just handle this to be on the safe
-          // side.
-          return SILValue();
-        }
-        Ref = builder.createUpcast(loc, Ref, superCl);
-      }
-
-      addr = builder.createRefElementAddr(loc, Ref, storedProperty);
-
-      // Class members need access enforcement.
-      if (builder.getModule().getOptions().EnforceExclusivityDynamic) {
-        beginAccess = builder.createBeginAccess(loc, addr, SILAccessKind::Read,
-                                                SILAccessEnforcement::Dynamic,
-                                                /*noNestedConflict*/ false,
-                                                /*fromBuiltin*/ false);
-        addr = beginAccess;
-      }
-    } else {
-      // This should never happen, as a stored-property pattern can only be
-      // applied to classes and structs. But to be safe - and future prove -
-      // let's handle this case and bail.
-      insertEndAccess(beginAccess, /*isModify*/ false, builder);
-      return SILValue();
-    }
-  }
-  return addr;
-}
-
 /// Try to optimize a keypath application with an apply instruction.
 ///
 /// Replaces (simplified SIL):
@@ -311,13 +232,13 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
     return false;
 
   SILValue keyPath, rootAddr, valueAddr;
-  bool isModify = false;
+  bool isSet = false;
   if (callee->getName() == "swift_setAtWritableKeyPath" ||
       callee->getName() == "swift_setAtReferenceWritableKeyPath") {
     keyPath = AI->getArgument(1);
     rootAddr = AI->getArgument(0);
     valueAddr = AI->getArgument(2);
-    isModify = true;
+    isSet = true;
   } else if (callee->getName() == "swift_getAtKeyPath") {
     keyPath = AI->getArgument(2);
     rootAddr = AI->getArgument(1);
@@ -325,22 +246,26 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
   } else {
     return false;
   }
-
-  BeginAccessInst *beginAccess = nullptr;
-  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr,
-                                                    AI->getLoc(), beginAccess,
-                                                    Builder);
-  if (!projectedAddr)
+  
+  auto projector = KeyPathProjector::create(keyPath, rootAddr,
+                                            AI->getLoc(), Builder);
+  if (!projector)
     return false;
-
-  if (isModify) {
-    Builder.createCopyAddr(AI->getLoc(), valueAddr, projectedAddr,
-                           IsTake, IsNotInitialization);
-  } else {
-    Builder.createCopyAddr(AI->getLoc(), projectedAddr, valueAddr,
-                           IsNotTake, IsInitialization);
-  }
-  insertEndAccess(beginAccess, isModify, Builder);
+  
+  KeyPathProjector::AccessType accessType;
+  if (isSet) accessType = KeyPathProjector::AccessType::Set;
+  else accessType = KeyPathProjector::AccessType::Get;
+  
+  projector->project(accessType, [&](SILValue projectedAddr) {
+    if (isSet) {
+      Builder.createCopyAddr(AI->getLoc(), valueAddr, projectedAddr,
+                             IsTake, IsInitialization);
+    } else {
+      Builder.createCopyAddr(AI->getLoc(), projectedAddr, valueAddr,
+                             IsNotTake, IsInitialization);
+    }
+  });
+  
   eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
   return true;
@@ -385,19 +310,24 @@ bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
   EndApplyInst *endApply = dyn_cast<EndApplyInst>(AIUse->getUser());
   if (!endApply)
     return false;
-
-  BeginAccessInst *beginAccess = nullptr;
-  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr,
-                                                    AI->getLoc(), beginAccess,
-                                                    Builder);
-  if (!projectedAddr)
+  
+  auto projector = KeyPathProjector::create(keyPath, rootAddr,
+                                            AI->getLoc(), Builder);
+  if (!projector)
     return false;
+    
+  KeyPathProjector::AccessType accessType;
+  if (isModify) accessType = KeyPathProjector::AccessType::Modify;
+  else accessType = KeyPathProjector::AccessType::Get;
+  
+  projector->project(accessType, [&](SILValue projectedAddr) {
+    // Replace the projected address.
+    valueAddr->replaceAllUsesWith(projectedAddr);
+    
+    // Skip to the end of the key path application before cleaning up.
+    Builder.setInsertionPoint(endApply);
+  });
 
-  // Replace the projected address.
-  valueAddr->replaceAllUsesWith(projectedAddr);
-
-  Builder.setInsertionPoint(endApply);
-  insertEndAccess(beginAccess, isModify, Builder);
   eraseInstFromFunction(*endApply);
   eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
@@ -783,10 +713,10 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
 /// (@in or @owned convention).
 struct ConcreteArgumentCopy {
   SILValue origArg;
-  CopyAddrInst *tempArgCopy;
+  AllocStackInst *tempArg;
 
-  ConcreteArgumentCopy(SILValue origArg, CopyAddrInst *tempArgCopy)
-      : origArg(origArg), tempArgCopy(tempArgCopy) {
+  ConcreteArgumentCopy(SILValue origArg, AllocStackInst *tempArg)
+      : origArg(origArg), tempArg(tempArg) {
     assert(origArg->getType().isAddress());
   }
 
@@ -825,9 +755,18 @@ struct ConcreteArgumentCopy {
     SILBuilderWithScope B(apply.getInstruction(), BuilderCtx);
     auto loc = apply.getLoc();
     auto *ASI = B.createAllocStack(loc, CEI.ConcreteValue->getType());
-    auto *CAI = B.createCopyAddr(loc, CEI.ConcreteValue, ASI, IsNotTake,
-                                 IsInitialization_t::IsInitialization);
-    return ConcreteArgumentCopy(origArg, CAI);
+    // If the type is an address, simple copy it.
+    if (CEI.ConcreteValue->getType().isAddress()) {
+      B.createCopyAddr(loc, CEI.ConcreteValue, ASI, IsNotTake,
+                       IsInitialization_t::IsInitialization);
+    } else {
+      // Otherwise, we probably got the value from the source of a store
+      // instruction so, create a store into the temporary argument.
+      B.createStrongRetain(loc, CEI.ConcreteValue, B.getDefaultAtomicity());
+      B.createStore(loc, CEI.ConcreteValue, ASI,
+                    StoreOwnershipQualifier::Unqualified);
+    }
+    return ConcreteArgumentCopy(origArg, ASI);
   }
 };
 
@@ -858,20 +797,19 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     FullApplySite Apply,
     const llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COAIs,
     SILBuilderContext &BuilderCtx) {
-
   // Ensure that the callee is polymorphic.
   assert(Apply.getOrigCalleeType()->isPolymorphic());
 
   // Create the new set of arguments to apply including their substitutions.
   SubstitutionMap NewCallSubs = Apply.getSubstitutionMap();
   SmallVector<SILValue, 8> NewArgs;
-  bool UpdatedArgs = false;
   unsigned ArgIdx = 0;
   // Push the indirect result arguments.
   for (unsigned EndIdx = Apply.getSubstCalleeConv().getSILArgIndexOfFirstParam();
        ArgIdx < EndIdx; ++ArgIdx) {
       NewArgs.push_back(Apply.getArgument(ArgIdx));
   }
+
   // Transform the parameter arguments.
   SmallVector<ConcreteArgumentCopy, 4> concreteArgCopies;
   for (unsigned EndIdx = Apply.getNumArguments(); ArgIdx < EndIdx; ++ArgIdx) {
@@ -890,16 +828,18 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       NewArgs.push_back(Apply.getArgument(ArgIdx));
       continue;
     }
-    UpdatedArgs = true;
+
     // Ensure that we have a concrete value to propagate.
     assert(CEI.ConcreteValue);
+
     auto argSub =
         ConcreteArgumentCopy::generate(CEI, Apply, ArgIdx, BuilderCtx);
     if (argSub) {
       concreteArgCopies.push_back(*argSub);
-      NewArgs.push_back(argSub->tempArgCopy->getDest());
-    } else
+      NewArgs.push_back(argSub->tempArg);
+    } else {
       NewArgs.push_back(CEI.ConcreteValue);
+    }
 
     // Form a new set of substitutions where the argument is
     // replaced with a concrete type.
@@ -922,7 +862,33 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         });
   }
 
-  if (!UpdatedArgs) {
+  // We need to make sure that we can a) update Apply to use the new args and b)
+  // at least one argument has changed. If no arguments have changed, we need
+  // to return nullptr. Otherwise, we will have an infinite loop.
+  auto substTy =
+      Apply.getCallee()
+          ->getType()
+          .substGenericArgs(Apply.getModule(), NewCallSubs,
+                            Apply.getFunction()->getTypeExpansionContext())
+          .getAs<SILFunctionType>();
+  SILFunctionConventions conv(substTy,
+                              SILModuleConventions(Apply.getModule()));
+  bool canUpdateArgs = true;
+  bool madeUpdate = false;
+  for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {
+    // Make sure that *all* the arguments in both the new substitution function
+    // and our vector of new arguments have the same type.
+    canUpdateArgs &=
+        conv.getSILArgumentType(index) == NewArgs[index]->getType();
+    // Make sure that we have changed at least one argument.
+    madeUpdate |=
+        NewArgs[index]->getType() != Apply.getArgument(index)->getType();
+  }
+
+  // If we can't update the args (because of a type mismatch) or the args don't
+  // change, bail out by removing the instructions we've added and returning
+  // nullptr.
+  if (!canUpdateArgs || !madeUpdate) {
     // Remove any new instructions created while attempting to optimize this
     // apply. Since the apply was never rewritten, if they aren't removed here,
     // they will be removed later as dead when visited by SILCombine, causing
@@ -969,8 +935,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     auto cleanupLoc = RegularLocation::getAutoGeneratedLocation();
     for (ConcreteArgumentCopy &argCopy : llvm::reverse(concreteArgCopies)) {
       cleanupBuilder.createDestroyAddr(cleanupLoc, argCopy.origArg);
-      cleanupBuilder.createDeallocStack(cleanupLoc,
-                                        argCopy.tempArgCopy->getDest());
+      cleanupBuilder.createDeallocStack(cleanupLoc, argCopy.tempArg);
     }
   }
   return NewApply.getInstruction();
@@ -1274,6 +1239,9 @@ FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
 }
 
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
+  if (AI->getFunction()->hasOwnership())
+    return nullptr;
+
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
@@ -1353,6 +1321,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 }
 
 SILInstruction *SILCombiner::visitBeginApplyInst(BeginApplyInst *BAI) {
+  if (BAI->getFunction()->hasOwnership())
+    return nullptr;
+
   if (tryOptimizeInoutKeypath(BAI))
     return nullptr;
   return nullptr;
@@ -1408,6 +1379,9 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
 }
 
 SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
+  if (AI->getFunction()->hasOwnership())
+    return nullptr;
+
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
   if (isa<PartialApplyInst>(AI->getCallee()))

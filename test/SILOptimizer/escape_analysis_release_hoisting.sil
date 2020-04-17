@@ -1,0 +1,48 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -release-hoisting %s | %FileCheck %s
+// REQUIRES: CPU=x86_64
+// REQUIRES: OS=macosx
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// Test <rdar://59559805> miscompile; use-after-free
+// Avoid hoisting strong_release of an existential
+// over a store to the value.
+protocol ArrayElementProtocol {}
+
+struct ArrayElementStruct : ArrayElementProtocol {
+  @_hasStorage @_hasInitialValue var dummy: Int { get set }
+}
+
+// CHECK-LABEL: sil @testArrayStorageInitAfterFree : $@convention(thin) () -> () {
+// CHECK:   [[ARRAY:%.*]] = alloc_ref [stack] [tail_elems $ArrayElementProtocol * undef : $Builtin.Word] $_ContiguousArrayStorage<ArrayElementProtocol>
+// CHECK:   [[CAST:%.*]] = upcast [[ARRAY]] : $_ContiguousArrayStorage<ArrayElementProtocol> to $__ContiguousArrayStorageBase
+// CHECK:   [[TAIL:%.*]] = ref_tail_addr [[CAST]] : $__ContiguousArrayStorageBase, $ArrayElementProtocol
+// CHECK:   [[ADR:%.*]] = init_existential_addr [[TAIL]] : $*ArrayElementProtocol, $ArrayElementStruct
+// CHECK:   store %{{.*}} to [[ADR]] : $*ArrayElementStruct
+// CHECK:   strong_release [[ARRAY]] : $_ContiguousArrayStorage<ArrayElementProtocol>
+// CHECK-LABEL: } // end sil function 'testArrayStorageInitAfterFree'
+sil @testArrayStorageInitAfterFree : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] [tail_elems $ArrayElementProtocol * undef : $Builtin.Word] $_ContiguousArrayStorage<ArrayElementProtocol>
+  %1 = upcast %0 : $_ContiguousArrayStorage<ArrayElementProtocol> to $__ContiguousArrayStorageBase
+  %2 = struct $_SwiftArrayBodyStorage (undef : $Int, undef : $UInt)
+  %3 = struct $_ArrayBody (%2 : $_SwiftArrayBodyStorage)
+  %4 = ref_element_addr %1 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  store %3 to %4 : $*_ArrayBody
+  %6 = ref_tail_addr %1 : $__ContiguousArrayStorageBase, $ArrayElementProtocol
+  %7 = value_to_bridge_object undef : $Builtin.Int64
+  %8 = struct $_StringObject (undef : $UInt64, %7 : $Builtin.BridgeObject)
+  %9 = struct $_StringGuts (%8 : $_StringObject)
+  %10 = struct $String (%9 : $_StringGuts)
+  %11 = struct $ArrayElementStruct (undef : $Int)
+  %12 = init_existential_addr %6 : $*ArrayElementProtocol, $ArrayElementStruct
+  store %11 to %12 : $*ArrayElementStruct
+  strong_release %0 : $_ContiguousArrayStorage<ArrayElementProtocol>
+  dealloc_ref [stack] %0 : $_ContiguousArrayStorage<ArrayElementProtocol>
+  %16 = tuple ()
+  return %16 : $()
+}

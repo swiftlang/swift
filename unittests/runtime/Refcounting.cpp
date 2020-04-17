@@ -17,6 +17,10 @@
 using namespace swift;
 
 struct TestObject : HeapObject {
+  constexpr TestObject(HeapMetadata const *newMetadata)
+    : HeapObject(newMetadata, InlineRefCounts::Immortal)
+    , Addr(NULL), Value(0) {}
+
   size_t *Addr;
   size_t Value;
 };
@@ -33,6 +37,8 @@ static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
   { { &destroyTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
   { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
 };
+
+static TestObject ImmortalTestObject{&TestClassObjectMetadata};
 
 /// Create an object that, when deallocated, stores the given value to
 /// the given pointer.
@@ -219,4 +225,50 @@ TEST(RefcountingTest, nonatomic_unknown_retain_release_n) {
   swift_nonatomic_unknownObjectRelease_n(object, 1);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(1u, swift_retainCount(object));
+}
+
+// Verify that refcounting operations on immortal objects never changes the
+// refcount field.
+TEST(RefcountingTest, immortal_retain_release) {
+  auto initialBitsValue = ImmortalTestObject.refCounts.getBitsValue();
+
+  swift_retain(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_release(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_nonatomic_retain(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_nonatomic_release(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+
+  swift_unownedRetain(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_unownedRelease(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_nonatomic_unownedRetain(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_nonatomic_unownedRelease(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+
+  for (unsigned i = 0; i < 32; i++) {
+    uint32_t amount = 1U << i;
+
+    swift_retain_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_release_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_nonatomic_retain_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_nonatomic_release_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    
+    swift_unownedRetain_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_unownedRelease_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_nonatomic_unownedRetain_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_nonatomic_unownedRelease_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  }
 }

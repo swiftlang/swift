@@ -489,7 +489,7 @@ private:
       }
 
     if (FD.hasName())
-      return FD.getName().str();
+      return FD.getBaseIdentifier().str();
 
     return StringRef();
   }
@@ -659,10 +659,8 @@ private:
       }
     }
 
-    StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
     llvm::DIModule *M =
-        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath,
-                              Sysroot);
+        DBuilder.createModule(Parent, Name, ConfigMacros, RemappedIncludePath);
     DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
     return M;
   }
@@ -790,14 +788,17 @@ private:
 
       break;
     }
+    
+    // TODO: Eliminate substitutions in SILFunctionTypes for now.
+    // On platforms where the substitutions affect representation, we will need
+    // to preserve this info and teach type reconstruction about it.
+    Ty = Ty->replaceSubstitutedSILFunctionTypesWithUnsubstituted(IGM.getSILModule());
 
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(
         Ty, nullptr);
 
-    if (!Opts.DisableRoundTripDebugTypes
-        // FIXME: implement type reconstruction for opaque types
-        && !Ty->hasOpaqueArchetype()) {
+    if (!Opts.DisableRoundTripDebugTypes) {
       // Make sure we can reconstruct mangled types for the debugger.
 #ifndef NDEBUG
       auto &Ctx = Ty->getASTContext();
@@ -944,8 +945,8 @@ private:
                                   Alignment(1), true, false);
       }
       unsigned Offset = 0;
-      auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
-                                  Scope, File, Flags);
+      auto MTy = createMemberType(ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
+                                  Offset, Scope, File, Flags);
       Elements.push_back(MTy);
     }
     return DBuilder.getOrCreateArray(Elements);
@@ -1692,13 +1693,27 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       DBuilder.createFile(DebugPrefixMap.remapPath(SourcePath),
                           DebugPrefixMap.remapPath(Opts.DebugCompilationDir));
 
+  StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
+  StringRef SDK;
+  {
+    auto B = llvm::sys::path::rbegin(Sysroot);
+    auto E = llvm::sys::path::rend(Sysroot);
+    auto It = std::find_if(B, E, [](auto SDK) { return SDK.endswith(".sdk"); });
+    if (It != E)
+      SDK = *It;
+  }
+
   TheCU = DBuilder.createCompileUnit(
       Lang, MainFile,
       Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
       MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
-          : llvm::DICompileUnit::LineTablesOnly);
+      : llvm::DICompileUnit::LineTablesOnly,
+      /* DWOId */ 0, /* SplitDebugInlining */ true,
+      /* DebugInfoForProfiling */ false,
+      llvm::DICompileUnit::DebugNameTableKind::Default,
+      /* RangesBaseAddress */ false, Sysroot, SDK);
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading

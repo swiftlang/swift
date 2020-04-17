@@ -108,6 +108,11 @@ public:
     // We'll need formal type metadata for this archetype.
     collector.collectTypeMetadataForLayout(T);
   }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                        SILType T) const override {
+    return IGM.typeLayoutCache.getOrCreateArchetypeEntry(T.getObjectType());
+  }
 };
 
 /// A type implementation for a class archetype, that is, an archetype

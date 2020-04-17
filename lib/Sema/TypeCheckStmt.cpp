@@ -84,10 +84,6 @@ namespace {
                           unsigned nextDiscriminator = 0)
       : ParentDC(parent), NextDiscriminator(nextDiscriminator) {}
 
-    bool hasAutoClosures() const {
-      return NextDiscriminator != 0;
-    }
-
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
       // Reparenting is required with:
@@ -228,14 +224,9 @@ namespace {
   };
 } // end anonymous namespace
 
-static void setAutoClosureDiscriminators(DeclContext *DC, Stmt *S) {
-  S->walk(ContextualizeClosures(DC));
-}
-
-bool TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
+void TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
   ContextualizeClosures CC(DC);
   E->walk(CC);
-  return CC.hasAutoClosures();
 }
 
 void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
@@ -408,7 +399,8 @@ public:
   
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "typecheck-stmt", S);
+    FrontendStatsTracer StatsTracer(getASTContext().Stats,
+                                    "typecheck-stmt", S);
     PrettyStackTraceStmt trace(getASTContext(), "type-checking", S);
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
     if (S2 == nullptr)
@@ -421,7 +413,7 @@ public:
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
     bool HadError = typeCheckStmt(S);
-    setAutoClosureDiscriminators(DC, S);
+    S->walk(ContextualizeClosures(DC));
     return HadError;
   }
   
@@ -1034,40 +1026,6 @@ public:
     std::swap(*prevCaseDecls, *nextCaseDecls);
   }
 
-  void checkUnknownAttrRestrictions(CaseStmt *caseBlock,
-                                    bool &limitExhaustivityChecks) {
-    if (caseBlock->getCaseLabelItems().size() != 1) {
-      assert(!caseBlock->getCaseLabelItems().empty() &&
-             "parser should not produce case blocks with no items");
-      getASTContext().Diags.diagnose(caseBlock->getLoc(),
-                                     diag::unknown_case_multiple_patterns)
-          .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
-      limitExhaustivityChecks = true;
-    }
-
-    if (FallthroughDest != nullptr) {
-      if (!caseBlock->isDefault())
-        getASTContext().Diags.diagnose(caseBlock->getLoc(),
-                                       diag::unknown_case_must_be_last);
-      limitExhaustivityChecks = true;
-    }
-
-    const auto &labelItem = caseBlock->getCaseLabelItems().front();
-    if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
-      getASTContext().Diags.diagnose(labelItem.getStartLoc(),
-                                     diag::unknown_case_where_clause)
-          .highlight(labelItem.getGuardExpr()->getSourceRange());
-    }
-
-    const Pattern *pattern =
-        labelItem.getPattern()->getSemanticsProvidingPattern();
-    if (!isa<AnyPattern>(pattern)) {
-      getASTContext().Diags.diagnose(labelItem.getStartLoc(),
-                                     diag::unknown_case_must_be_catchall)
-          .highlight(pattern->getSourceRange());
-    }
-  }
-
   void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
                                                CaseStmt *previousBlock) {
     auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
@@ -1114,40 +1072,28 @@ public:
     }
   }
 
-  Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
-    // Type-check the subject expression.
-    Expr *subjectExpr = switchStmt->getSubjectExpr();
-    auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
-    auto limitExhaustivityChecks = !resultTy;
-    if (Expr *newSubjectExpr =
-            TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
-      subjectExpr = newSubjectExpr;
-    switchStmt->setSubjectExpr(subjectExpr);
-    Type subjectType = switchStmt->getSubjectExpr()->getType();
-
-    // Type-check the case blocks.
-    AddSwitchNest switchNest(*this);
-    AddLabeledStmt labelNest(*this, switchStmt);
-
-    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
-    // the list of raw cases.
-    for (auto &node : switchStmt->getRawCases()) {
-      if (!node.is<Decl *>())
-        continue;
-      TypeChecker::typeCheckDecl(node.get<Decl *>());
-    }
+  template <typename Iterator>
+  void checkSiblingCaseStmts(Iterator casesBegin, Iterator casesEnd,
+                             CaseParentKind parentKind,
+                             bool &limitExhaustivityChecks, Type subjectType) {
+    static_assert(
+        std::is_same<typename std::iterator_traits<Iterator>::value_type,
+                     CaseStmt *>::value,
+        "Expected an iterator over CaseStmt *");
 
     SmallVector<VarDecl *, 8> scratchMemory1;
     SmallVector<VarDecl *, 8> scratchMemory2;
-
-    auto cases = switchStmt->getCases();
     CaseStmt *previousBlock = nullptr;
-    for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
+
+    for (auto i = casesBegin; i != casesEnd; ++i) {
       auto *caseBlock = *i;
-      // Fallthrough transfers control to the next case block. In the
-      // final case block, it is invalid.
-      FallthroughSource = caseBlock;
-      FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
+
+      if (parentKind == CaseParentKind::Switch) {
+        // Fallthrough transfers control to the next case block. In the
+        // final case block, it is invalid. Only switch supports fallthrough.
+        FallthroughSource = caseBlock;
+        FallthroughDest = std::next(i) == casesEnd ? nullptr : *std::next(i);
+      }
 
       scratchMemory1.clear();
       scratchMemory2.clear();
@@ -1235,22 +1181,57 @@ public:
 
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
-        checkUnknownAttrRestrictions(caseBlock, limitExhaustivityChecks);
+        assert(parentKind == CaseParentKind::Switch &&
+               "'@unknown' can only appear on switch cases");
+        checkUnknownAttrRestrictions(
+            getASTContext(), caseBlock, FallthroughDest,
+            limitExhaustivityChecks);
       }
 
-      // If the previous case fellthrough, similarly check that that case's
-      // bindings includes our first label item's pattern bindings and types.
-      if (PreviousFallthrough && previousBlock) {
-        checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
+      if (parentKind == CaseParentKind::Switch) {
+        // If the previous case fellthrough, similarly check that that case's
+        // bindings includes our first label item's pattern bindings and types.
+        // Only switch statements support fallthrough.
+        if (PreviousFallthrough && previousBlock) {
+          checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
+        }
+        PreviousFallthrough = nullptr;
       }
 
       // Type-check the body statements.
-      PreviousFallthrough = nullptr;
       Stmt *body = caseBlock->getBody();
       limitExhaustivityChecks |= typeCheckStmt(body);
       caseBlock->setBody(body);
       previousBlock = caseBlock;
     }
+  }
+
+  Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
+    // Type-check the subject expression.
+    Expr *subjectExpr = switchStmt->getSubjectExpr();
+    auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
+    auto limitExhaustivityChecks = !resultTy;
+    if (Expr *newSubjectExpr =
+            TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
+      subjectExpr = newSubjectExpr;
+    switchStmt->setSubjectExpr(subjectExpr);
+    Type subjectType = switchStmt->getSubjectExpr()->getType();
+
+    // Type-check the case blocks.
+    AddSwitchNest switchNest(*this);
+    AddLabeledStmt labelNest(*this, switchStmt);
+
+    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
+    // the list of raw cases.
+    for (auto &node : switchStmt->getRawCases()) {
+      if (!node.is<Decl *>())
+        continue;
+      TypeChecker::typeCheckDecl(node.get<Decl *>());
+    }
+
+    auto cases = switchStmt->getCases();
+    checkSiblingCaseStmts(cases.begin(), cases.end(), CaseParentKind::Switch,
+                          limitExhaustivityChecks, subjectType);
 
     if (!switchStmt->isImplicit()) {
       TypeChecker::checkSwitchExhaustiveness(switchStmt, DC,
@@ -1265,27 +1246,6 @@ public:
     llvm_unreachable("case stmt outside of switch?!");
   }
 
-  Stmt *visitCatchStmt(CatchStmt *S) {
-    // Catches are handled in visitDoCatchStmt.
-    llvm_unreachable("catch stmt outside of do-catch?!");
-  }
-
-  void checkCatchStmt(CatchStmt *S) {
-    // Check the catch pattern.
-    TypeChecker::typeCheckCatchPattern(S, DC);
-
-    // Check the guard expression, if present.
-    if (Expr *guard = S->getGuardExpr()) {
-      TypeChecker::typeCheckCondition(guard, DC);
-      S->setGuardExpr(guard);
-    }
-      
-    // Type-check the clause body.
-    Stmt *body = S->getBody();
-    typeCheckStmt(body);
-    S->setBody(body);
-  }
-
   Stmt *visitDoCatchStmt(DoCatchStmt *S) {
     // The labels are in scope for both the 'do' and all of the catch
     // clauses.  This allows the user to break out of (or restart) the
@@ -1298,11 +1258,14 @@ public:
     typeCheckStmt(newBody);
     S->setBody(newBody);
 
-    // Check all the catch clauses independently.
-    for (auto clause : S->getCatches()) {
-      checkCatchStmt(clause);
-    }
-    
+    // Do-catch statements always limit exhaustivity checks.
+    bool limitExhaustivityChecks = true;
+
+    auto catches = S->getCatches();
+    checkSiblingCaseStmts(catches.begin(), catches.end(),
+                          CaseParentKind::DoCatch, limitExhaustivityChecks,
+                          getASTContext().getExceptionType());
+
     return S;
   }
 
@@ -1314,42 +1277,6 @@ public:
 
 };
 } // end anonymous namespace
-
-bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
-  // Grab the standard exception type.
-  Type exnType = DC->getASTContext().getErrorDecl()->getDeclaredType();
-
-  Pattern *pattern = S->getErrorPattern();
-  if (Pattern *newPattern = TypeChecker::resolvePattern(pattern, DC,
-                                           /*isStmtCondition*/false)) {
-    pattern = newPattern;
-
-    // Coerce the pattern to the exception type.
-    bool coercionError = false;
-    if (exnType) {
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
-      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-      auto coercedPattern = coercePatternToType(
-          contextualPattern, exnType, patternOptions);
-      if (coercedPattern)
-        pattern = coercedPattern;
-      else
-        coercionError = true;
-    }
-
-    if (!exnType || coercionError) {
-      // If that failed, be sure to give the variables error types
-      // before we type-check the guard.  (This will probably kill
-      // most of the type-checking, but maybe not.)
-      pattern->forEachVariable([&](VarDecl *var) {
-        var->setInvalid();
-      });
-    }
-
-    S->setErrorPattern(pattern);
-  }
-  return false;
-}
 
 static bool isDiscardableType(Type type) {
   return (type->hasError() ||
@@ -1466,8 +1393,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         isa<DotSyntaxCallExpr>(E) ? cast<DotSyntaxCallExpr>(E)->getFn() : E;
 
     if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
-      if (auto *declRef = dyn_cast<DeclRefExpr>(Fn->getFn())) {
-        if (auto *FD = dyn_cast<AbstractFunctionDecl>(declRef->getDecl())) {
+      if (auto *calledValue = Fn->getCalledValue()) {
+        if (auto *FD = dyn_cast<AbstractFunctionDecl>(calledValue)) {
           if (FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
             isDiscardable = true;
           }
@@ -1728,6 +1655,7 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   auto res = TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
   TypeChecker::checkFunctionErrorHandling(AFD);
+  TypeChecker::computeCaptures(AFD);
   return res;
 }
 
@@ -1805,14 +1733,11 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
 
     // Make sure we can reference the designated initializer correctly.
-    if (fromCtor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      TypeChecker::FragileFunctionKind fragileKind;
-      bool treatUsableFromInlineAsPublic;
-      std::tie(fragileKind, treatUsableFromInlineAsPublic) =
-          TypeChecker::getFragileFunctionKind(fromCtor);
+    auto fragileKind = fromCtor->getFragileFunctionKind();
+    if (fragileKind.kind != FragileFunctionKind::None) {
       TypeChecker::diagnoseInlinableDeclRef(
-          fromCtor->getLoc(), ctor, fromCtor, fragileKind,
-          treatUsableFromInlineAsPublic);
+          fromCtor->getLoc(), ctor, fromCtor,
+          fragileKind);
     }
   }
 
@@ -1883,12 +1808,13 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   // rule for classes in non-resilient modules so that they can have inlinable
   // constructors, as long as those constructors don't reference private
   // declarations.
-  if (!isDelegating && classDecl->isResilient() &&
-      ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-    auto kind = TypeChecker::getFragileFunctionKind(ctor);
-    ctor->diagnose(diag::class_designated_init_inlinable_resilient,
-                   classDecl->getDeclaredInterfaceType(),
-                   static_cast<unsigned>(kind.first));
+  if (!isDelegating && classDecl->isResilient()) {
+    auto kind = ctor->getFragileFunctionKind();
+    if (kind.kind != FragileFunctionKind::None) {
+      ctor->diagnose(diag::class_designated_init_inlinable_resilient,
+                     classDecl->getDeclaredInterfaceType(),
+                     static_cast<unsigned>(kind.kind));
+    }
   }
 
   // If we don't want a super.init call, we're done.
@@ -1926,7 +1852,7 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   }
 }
 
-llvm::Expected<bool>
+bool
 TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
                                             AbstractFunctionDecl *AFD,
                                             SourceLoc endTypeCheckLoc) const {
@@ -1951,6 +1877,8 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
 
         body = *optBody;
         alreadyTypeChecked = true;
+
+        body->walk(ContextualizeClosures(AFD));
       }
     } else if (func->hasSingleExpressionBody() &&
                func->getResultInterfaceType()->isVoid()) {
@@ -2010,12 +1938,13 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  // If nothing went wrong yet, perform extra checking.
-  if (!hadError && endTypeCheckLoc.isInvalid())
-    performAbstractFuncDeclDiagnostics(AFD, body);
-
   // Wire up the function body now.
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+
+  // If nothing went wrong yet, perform extra checking.
+  if (!hadError && endTypeCheckLoc.isInvalid())
+    performAbstractFuncDeclDiagnostics(AFD);
+
   return hadError;
 }
 
@@ -2064,4 +1993,93 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   TLCD->setBody(Body);
   checkTopLevelErrorHandling(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
+}
+
+void swift::checkUnknownAttrRestrictions(
+    ASTContext &ctx, CaseStmt *caseBlock, CaseStmt *fallthroughDest,
+    bool &limitExhaustivityChecks) {
+  if (caseBlock->getCaseLabelItems().size() != 1) {
+    assert(!caseBlock->getCaseLabelItems().empty() &&
+           "parser should not produce case blocks with no items");
+    ctx.Diags.diagnose(caseBlock->getLoc(),
+                       diag::unknown_case_multiple_patterns)
+        .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
+    limitExhaustivityChecks = true;
+  }
+
+  if (fallthroughDest != nullptr) {
+    if (!caseBlock->isDefault())
+      ctx.Diags.diagnose(caseBlock->getLoc(),
+                         diag::unknown_case_must_be_last);
+    limitExhaustivityChecks = true;
+  }
+
+  const auto &labelItem = caseBlock->getCaseLabelItems().front();
+  if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
+    ctx.Diags.diagnose(labelItem.getStartLoc(),
+                                   diag::unknown_case_where_clause)
+        .highlight(labelItem.getGuardExpr()->getSourceRange());
+  }
+
+  const Pattern *pattern =
+      labelItem.getPattern()->getSemanticsProvidingPattern();
+  if (!isa<AnyPattern>(pattern)) {
+    ctx.Diags.diagnose(labelItem.getStartLoc(),
+                       diag::unknown_case_must_be_catchall)
+        .highlight(pattern->getSourceRange());
+  }
+}
+
+void swift::bindSwitchCasePatternVars(CaseStmt *caseStmt) {
+  llvm::SmallDenseMap<Identifier, std::pair<VarDecl *, bool>, 4> latestVars;
+  auto recordVar = [&](VarDecl *var) {
+    if (!var->hasName())
+      return;
+
+    // If there is an existing variable with this name, set it as the
+    // parent of this new variable.
+    auto &entry = latestVars[var->getName()];
+    if (entry.first) {
+      assert(!var->getParentVarDecl() ||
+             var->getParentVarDecl() == entry.first);
+      var->setParentVarDecl(entry.first);
+
+      // Check for a mutability mismatch.
+      if (entry.second != var->isLet()) {
+        // Find the original declaration.
+        auto initialCaseVarDecl = entry.first;
+        while (auto parentVar = initialCaseVarDecl->getParentVarDecl())
+          initialCaseVarDecl = parentVar;
+
+        auto diag = var->diagnose(diag::mutability_mismatch_multiple_pattern_list,
+                                  var->isLet(), initialCaseVarDecl->isLet());
+
+        VarPattern *foundVP = nullptr;
+        var->getParentPattern()->forEachNode([&](Pattern *P) {
+          if (auto *VP = dyn_cast<VarPattern>(P))
+            if (VP->getSingleVar() == var)
+              foundVP = VP;
+        });
+        if (foundVP)
+          diag.fixItReplace(foundVP->getLoc(),
+                            initialCaseVarDecl->isLet() ? "let" : "var");
+      }
+    } else {
+      entry.second = var->isLet();
+    }
+
+    // Record this variable as the latest with this name.
+    entry.first = var;
+  };
+
+  // Wire up the parent var decls for each variable that occurs within
+  // the patterns of each case item. in source order.
+  for (const auto &caseItem : caseStmt->getCaseLabelItems()) {
+    caseItem.getPattern()->forEachVariable(recordVar);
+  }
+
+  // Wire up the case body variables to the latest patterns.
+  for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    recordVar(bodyVar);
+  }
 }

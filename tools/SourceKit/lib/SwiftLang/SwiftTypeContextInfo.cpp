@@ -33,14 +33,14 @@ static bool swiftTypeContextInfoImpl(
     bool EnableASTCaching, std::string &Error) {
   return Lang.performCompletionLikeOperation(
       UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
-      [&](CompilerInstance &CI) {
+      [&](CompilerInstance &CI, bool reusingASTContext) {
         // Create a factory for code completion callbacks that will feed the
         // Consumer.
         std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
             ide::makeTypeContextInfoCallbacksFactory(Consumer));
 
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
       });
 }
 

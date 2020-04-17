@@ -41,6 +41,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       log.indent(solverState->depth * 2);
     log << "(increasing score due to ";
     switch (kind) {
+    case SK_Hole:
+      log << "hole in the constraint system";
+      break;
+
     case SK_Unavailable:
       log << "use of an unavailable declaration";
       break;
@@ -94,9 +98,6 @@ bool ConstraintSystem::worseThanBestSolution() const {
   if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
-  if (retainAllSolutions())
-    return false;
-
   if (!solverState || !solverState->BestScore ||
       CurrentScore <= *solverState->BestScore)
     return false;
@@ -146,7 +147,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
     return false;
 
   switch (x.getKind()) {
-  case OverloadChoiceKind::BaseType:
   case OverloadChoiceKind::KeyPathApplication:
     // FIXME: Compare base types after substitution?
     return true;
@@ -385,7 +385,7 @@ static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                            false);
 }
 
-llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
+bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();
@@ -799,6 +799,21 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (sameOverloadChoice(choice1, choice2))
       continue;
 
+    // If constraint system is underconstrained e.g. because there are
+    // editor placeholders, it's possible to end up with multiple solutions
+    // where each ambiguous declaration is going to have its own overload kind:
+    //
+    // func foo(_: Int) -> [Int] { ... }
+    // func foo(_: Double) -> (result: String, count: Int) { ... }
+    //
+    // _ = foo(<#arg#>).count
+    //
+    // In this case solver would produce 2 solutions: one where `count`
+    // is a property reference on `[Int]` and another one is tuple access
+    // for a `count:` element.
+    if (choice1.isDecl() != choice2.isDecl())
+      return SolutionCompareResult::Incomparable;
+
     auto decl1 = choice1.getDecl();
     auto dc1 = decl1->getDeclContext();
     auto decl2 = choice2.getDecl();
@@ -883,7 +898,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::TupleIndex:
       continue;
 
-    case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::KeyPathApplication:
       llvm_unreachable("Never considered different");
 

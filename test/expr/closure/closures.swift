@@ -140,7 +140,7 @@ func anonymousClosureArgsInClosureWithArgs() {
   }
   var a5 = { (_: [Int], w: [Int]) in
     f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
-    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}} expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}}
   }
 }
 
@@ -483,3 +483,24 @@ let closure = { // expected-error {{unable to infer complex closure return type;
   var helper = true
   return helper
 }
+
+// SR-9839
+func SR9839(_ x: @escaping @convention(block) () -> Void) {}
+
+func id<T>(_ x: T) -> T {
+  return x
+}
+
+var qux: () -> Void = {}
+
+SR9839(qux)
+SR9839(id(qux)) // expected-error {{conflicting arguments to generic parameter 'T' ('() -> Void' vs. '@convention(block) () -> Void')}}
+
+func forceUnwrap<T>(_ x: T?) -> T {
+  return x!
+}
+
+var qux1: (() -> Void)? = {}
+
+SR9839(qux1!)
+SR9839(forceUnwrap(qux1))

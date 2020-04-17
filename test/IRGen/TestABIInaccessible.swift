@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name main -I %t -emit-ir -primary-file %s %S/Inputs/ABIInaccessible.swift | %FileCheck %s
+// RUN: %target-swift-frontend -disable-type-layout -module-name main -I %t -emit-ir -primary-file %s %S/Inputs/ABIInaccessible.swift | %FileCheck %s
 
 public struct AnotherType<T> {
   init(_ t: T) {

@@ -49,6 +49,22 @@ test suite, via ``utils/build-script --validation-test``.
 Using ``utils/build-script`` will rebuild all targets which can add substantial
 time to a debug cycle.
 
+#### Using utils/run-test
+
+Using `utils/run-test` allows the user to run a single test or tests in a specific directory. 
+This can significantly speed up the debug cycle.  One can use this tool 
+instead of invoking `lit.py` directly as described in the next section.
+
+Here is an example of running the `test/Parse` tests:
+```
+    % ${swift_SOURCE_ROOT}/utils/run-test --build-dir ${SWIFT_BUILD_DIR} ${swift_SOURCE_ROOT}/test/Parse
+```
+Note that one example of a valid `${SWIFT_BUILD_DIR}` is 
+`{swift_SOURCE_ROOT}/../build/Ninja-DebugAssert/swift-linux-x86_64`.  
+It differs based on your build options and on which directory you invoke the script from.
+
+For full help options, pass `-h` to `utils/run-test` utility.
+
 #### Using lit.py
 
 Using `lit.py` directly can provide more control and faster feedback to your
@@ -250,6 +266,34 @@ code for the target that is not the build machine:
 
   Use this substitution only when you intend to run the program later in the
   test.
+
+* ``%target-run-simple-swift``: build a one-file Swift program and run it on
+  the target machine.
+
+  Use this substitution for executable tests that don't require special
+  compiler arguments.
+
+  Add ``REQUIRES: executable_test`` to the test.
+
+* ``%target-run-simple-swift(`` *compiler arguments* ``)``: like
+  ``%target-run-simple-swift``, but enables specifying compiler arguments when
+  compiling the Swift program.
+
+  Add ``REQUIRES: executable_test`` to the test.
+
+* ``%target-run-simple-swiftgyb``: build a one-file Swift `.gyb` program and
+  run it on the target machine.
+
+  Use this substitution for executable tests that don't require special
+  compiler arguments.
+
+  Add ``REQUIRES: executable_test`` to the test.
+
+* ``%target-run-simple-swiftgyb(`` *compiler arguments* ``)``: like
+  ``%target-run-simple-swiftgyb``, but enables specifying compiler arguments
+  when compiling the Swift program.
+
+  Add ``REQUIRES: executable_test`` to the test.
 
 * ``%target-run-simple-swift``: build a one-file Swift program and run it on
   the target machine.

@@ -11,13 +11,13 @@ silopt_register_sources(
   DiagnoseInvalidEscapingCaptures.cpp
   DiagnoseStaticExclusivity.cpp
   DiagnoseUnreachable.cpp
+  Differentiation.cpp
   GuaranteedARCOpts.cpp
   IRGenPrepare.cpp
   MandatoryInlining.cpp
   PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp
-  SemanticARCOpts.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
   MandatoryCombine.cpp

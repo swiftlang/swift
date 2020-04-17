@@ -110,7 +110,7 @@ entry(%f : $@callee_owned (Builtin.Word) -> (), %x : $Builtin.Word):
 
 sil @objc_partial_apply : $@convention(thin) (ObjCClass) -> @callee_owned (Int) -> () {
 entry(%c : $ObjCClass):
-  %m = objc_method %c : $ObjCClass, #ObjCClass.method!1.foreign : (ObjCClass) -> (Int) -> (), $@convention(objc_method) (Int, ObjCClass) -> ()
+  %m = objc_method %c : $ObjCClass, #ObjCClass.method!foreign : (ObjCClass) -> (Int) -> (), $@convention(objc_method) (Int, ObjCClass) -> ()
   %p = partial_apply %m(%c) : $@convention(objc_method) (Int, ObjCClass) -> ()
   return %p : $@callee_owned (Int) -> ()
 }
@@ -131,7 +131,7 @@ entry(%c : $ObjCClass):
 // CHECK:  store double %0, double* [[ORIGINXVAL]]
 sil @objc_partial_apply_indirect_sil_argument : $@convention(thin) (ObjCClass) -> @callee_owned (NSRect) -> () {
 entry(%c : $ObjCClass):
-  %m = objc_method %c : $ObjCClass, #ObjCClass.method2!1.foreign : (ObjCClass) -> (NSRect) -> (), $@convention(objc_method) (NSRect, ObjCClass) -> ()
+  %m = objc_method %c : $ObjCClass, #ObjCClass.method2!foreign : (ObjCClass) -> (NSRect) -> (), $@convention(objc_method) (NSRect, ObjCClass) -> ()
   %p = partial_apply %m(%c) : $@convention(objc_method) (NSRect, ObjCClass) -> ()
   return %p : $@callee_owned (NSRect) -> ()
 }
@@ -156,7 +156,7 @@ entry(%c : $ObjCClass):
 
 sil @objc_partial_apply_consumes_self : $@convention(thin) (ObjCClass) -> @callee_owned () -> @owned ObjCClass {
 entry(%c : $ObjCClass):
-  %m = objc_method %c : $ObjCClass, #ObjCClass.fakeInitFamily!1.foreign : (ObjCClass) -> () -> ObjCClass, $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass
+  %m = objc_method %c : $ObjCClass, #ObjCClass.fakeInitFamily!foreign : (ObjCClass) -> () -> ObjCClass, $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass
   %p = partial_apply %m(%c) : $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass
   return %p : $@callee_owned () -> @owned ObjCClass
 }
@@ -174,7 +174,7 @@ entry(%x : $Int):
 
 sil @dynamic_lookup_br_partial_apply : $@convention(thin) (Builtin.AnyObject) -> @callee_owned (Int) -> () {
 entry(%o : $Builtin.AnyObject):
-  dynamic_method_br %o : $Builtin.AnyObject, #ObjCClass.method!1.foreign, yes, no
+  dynamic_method_br %o : $Builtin.AnyObject, #ObjCClass.method!foreign, yes, no
 
 yes(%m : $@convention(objc_method) (Int, Builtin.AnyObject) -> ()):
   %p = partial_apply %m(%o) : $@convention(objc_method) (Int, Builtin.AnyObject) -> ()
@@ -222,7 +222,7 @@ entry(%c : $Gizmo):
 
 sil @objc_partial_apply_2 : $@convention(thin) (Gizmo) -> @callee_owned (Fob) -> () {
 entry(%c : $Gizmo):
-  %m = objc_method %c : $Gizmo, #Gizmo.test!1.foreign : (Gizmo) -> (Fob) -> (), $@convention(objc_method) (Fob,  Gizmo) -> ()
+  %m = objc_method %c : $Gizmo, #Gizmo.test!foreign : (Gizmo) -> (Fob) -> (), $@convention(objc_method) (Fob,  Gizmo) -> ()
   %p = partial_apply %m(%c) : $@convention(objc_method) (Fob,  Gizmo) -> ()
   return %p : $@callee_owned (Fob) -> ()
 }
@@ -235,7 +235,7 @@ entry(%c : $Gizmo):
 
 sil @objc_partial_apply_callee_guaranteed : $@convention(thin) (ObjCClass) -> @callee_guaranteed (Int) -> () {
 entry(%c : $ObjCClass):
-  %m = objc_method %c : $ObjCClass, #ObjCClass.method!1.foreign : (ObjCClass) -> (Int) -> (), $@convention(objc_method) (Int, ObjCClass) -> ()
+  %m = objc_method %c : $ObjCClass, #ObjCClass.method!foreign : (ObjCClass) -> (Int) -> (), $@convention(objc_method) (Int, ObjCClass) -> ()
   %p = partial_apply [callee_guaranteed] %m(%c) : $@convention(objc_method) (Int, ObjCClass) -> ()
   return %p : $@callee_guaranteed (Int) -> ()
 }
@@ -258,7 +258,7 @@ entry(%c : $ObjCClass):
 
 sil @objc_partial_apply_2_callee_guaranteed : $@convention(thin) (Gizmo) -> @callee_guaranteed (Fob) -> () {
 entry(%c : $Gizmo):
-  %m = objc_method %c : $Gizmo, #Gizmo.test!1.foreign : (Gizmo) -> (Fob) -> (), $@convention(objc_method) (Fob,  Gizmo) -> ()
+  %m = objc_method %c : $Gizmo, #Gizmo.test!foreign : (Gizmo) -> (Fob) -> (), $@convention(objc_method) (Fob,  Gizmo) -> ()
   %p = partial_apply [callee_guaranteed] %m(%c) : $@convention(objc_method) (Fob,  Gizmo) -> ()
   return %p : $@callee_guaranteed (Fob) -> ()
 }

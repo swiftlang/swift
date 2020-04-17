@@ -163,6 +163,7 @@ public:
   using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
 
 private:
@@ -346,11 +347,34 @@ public:
 
   std::shared_ptr<MemoryReader> Reader;
 
+  StoredPointer PtrAuthMask;
+
+  StoredPointer stripSignedPointer(StoredSignedPointer P) {
+    return P.SignedValue & PtrAuthMask;
+  }
+
+  RemoteAbsolutePointer stripSignedPointer(const RemoteAbsolutePointer &P) {
+    if (P.isResolved()) {
+      return RemoteAbsolutePointer("", 
+        P.getResolvedAddress().getAddressData() & PtrAuthMask);
+    }
+    return P;
+  }
+
+  StoredPointer queryPtrAuthMask() {
+    StoredPointer QueryResult;
+    if (Reader->queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask,
+                                nullptr, &QueryResult)) {
+      return QueryResult;
+    }
+    return ~StoredPointer(0);
+  }
+
   template <class... T>
   MetadataReader(std::shared_ptr<MemoryReader> reader, T &&... args)
     : Builder(std::forward<T>(args)...),
-      Reader(std::move(reader)) {
-
+      Reader(std::move(reader)),
+      PtrAuthMask(queryPtrAuthMask()) {
   }
 
   MetadataReader(const MetadataReader &other) = delete;
@@ -383,7 +407,7 @@ public:
       RemoteAbsolutePointer resolved;
       if (directness == Directness::Indirect) {
         if (auto indirectAddress = readPointer(remoteAddress)) {
-          resolved = *indirectAddress;
+          resolved = stripSignedPointer(*indirectAddress);
         } else {
           return nullptr;
         }
@@ -681,8 +705,8 @@ public:
 
     // Swift-native protocol.
     auto Demangled =
-      readDemanglingForContextDescriptor(ProtocolAddress.getSwiftProtocol(),
-                                         dem);
+      readDemanglingForContextDescriptor(
+        stripSignedPointer({ProtocolAddress.getSwiftProtocol()}), dem);
     if (!Demangled)
       return resolver.failure();
 
@@ -799,7 +823,7 @@ public:
 
 #if SWIFT_OBJC_INTEROP
         BuiltProtocolDecl objcProtocol(StringRef name) {
-          return builder.createObjCProtocolDecl(name);
+          return builder.createObjCProtocolDecl(name.str());
         }
 #endif
       } resolver{Builder};
@@ -1053,11 +1077,16 @@ public:
       demangledSymbol = demangledSymbol->getChild(0);
       assert(demangledSymbol->getKind() == Demangle::Node::Kind::Type);
       break;
-    // We don't handle pointers to other symbols yet.
-    // TODO: Opaque type descriptors could be useful.
+    // Pointers to opaque type descriptors demangle to the name of the opaque
+    // type declaration.
+    case Demangle::Node::Kind::OpaqueTypeDescriptor:
+      demangledSymbol = demangledSymbol->getChild(0);
+      break;
+      // We don't handle pointers to other symbols yet.
     default:
       return nullptr;
     }
+  
     return demangledSymbol;
   }
   
@@ -1516,7 +1545,10 @@ protected:
     // Low bit set in the offset indicates that the offset leads to the absolute
     // address in memory.
     if (indirect) {
-      return readPointer(resultAddress);
+      if (auto ptr = readPointer(resultAddress)) {
+        return stripSignedPointer(*ptr);
+      }
+      return None;
     }
     
     return RemoteAbsolutePointer("", resultAddress);
@@ -1655,25 +1687,6 @@ protected:
     return nullptr;
   }
 
-private:
-  template <template <class R> class M>
-  MetadataRef _readMetadata(StoredPointer address) {
-    return _readMetadata(address, sizeof(M<Runtime>));
-  }
-
-  MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
-    auto size = sizeAfter;
-    uint8_t *buffer = (uint8_t *) malloc(size);
-    if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
-      free(buffer);
-      return nullptr;
-    }
-
-    auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
-    MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
-    return MetadataRef(address, metadata);
-  }
-
   StoredPointer
   readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
                                      bool skipArtificialSubclasses = false) {
@@ -1681,7 +1694,11 @@ private:
     case MetadataKind::Class: {
       auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
       while (true) {
-        auto descriptorAddress = classMeta->getDescription();
+        if (!classMeta->isTypeMetadata())
+          return 0;
+
+        StoredSignedPointer descriptorAddressSigned = classMeta->getDescriptionAsSignedPointer();
+        StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
 
         // If this class has a null descriptor, it's artificial,
         // and we need to skip it upon request.  Otherwise, we're done.
@@ -1709,19 +1726,42 @@ private:
     case MetadataKind::Optional:
     case MetadataKind::Enum: {
       auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
-      return valueMeta->getDescription();
+      StoredSignedPointer descriptorAddressSigned = valueMeta->getDescriptionAsSignedPointer();
+      StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
+      return descriptorAddress;
     }
         
     case MetadataKind::ForeignClass: {
       auto foreignMeta = cast<TargetForeignClassMetadata<Runtime>>(metadata);
-      return foreignMeta->Description;
+      StoredSignedPointer descriptorAddressSigned = foreignMeta->getDescriptionAsSignedPointer();
+      StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
+      return descriptorAddress;
     }
 
     default:
       return 0;
     }
   }
-  
+
+private:
+  template <template <class R> class M>
+  MetadataRef _readMetadata(StoredPointer address) {
+    return _readMetadata(address, sizeof(M<Runtime>));
+  }
+
+  MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
+    auto size = sizeAfter;
+    uint8_t *buffer = (uint8_t *) malloc(size);
+    if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
+      free(buffer);
+      return nullptr;
+    }
+
+    auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
+    MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
+    return MetadataRef(address, metadata);
+  }
+
   /// Returns Optional(ParentContextDescriptorRef()) if there's no parent descriptor.
   /// Returns None if there was an error reading the parent descriptor.
   Optional<ParentContextDescriptorRef>
@@ -2609,16 +2649,20 @@ private:
 
     // Otherwise, it's the RW-data; read the RO-data pointer from a
     // well-known position within the RW-data.
+    StoredSignedPointer signedDataPtr;
     static constexpr uint32_t OffsetToROPtr = 8;
-    if (!Reader->readInteger(RemoteAddress(dataPtr + OffsetToROPtr), &dataPtr))
+    if (!Reader->readInteger(RemoteAddress(dataPtr + OffsetToROPtr), &signedDataPtr))
       return StoredPointer();
+    dataPtr = stripSignedPointer(signedDataPtr);
 
     // Newer Objective-C runtimes implement a size optimization where the RO
     // field is a tagged union. If the low-bit is set, then the pointer needs
     // to be dereferenced once more to yield the real class_ro_t pointer.
-    if (dataPtr & 1)
-      if (!Reader->readInteger(RemoteAddress(dataPtr^1), &dataPtr))
+    if (dataPtr & 1) {
+      if (!Reader->readInteger(RemoteAddress(dataPtr^1), &signedDataPtr))
         return StoredPointer();
+      dataPtr = stripSignedPointer(signedDataPtr);
+    }
 
     return dataPtr;
   }

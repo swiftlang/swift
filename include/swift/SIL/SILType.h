@@ -380,6 +380,11 @@ public:
   bool hasArchetype() const {
     return getASTType()->hasArchetype();
   }
+
+  /// True if the type involves any opaque archetypes.
+  bool hasOpaqueArchetype() const {
+    return getASTType()->hasOpaqueArchetype();
+  }
   
   /// Returns the ASTContext for the referenced Swift type.
   ASTContext &getASTContext() const {
@@ -532,6 +537,11 @@ public:
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
 
+  /// Given a lowered type (but without any particular value category),
+  /// map it out of its current context.  Equivalent to
+  /// SILType::getPrimitiveObjectType(type).mapTypeOutOfContext().getASTType().
+  static CanType mapTypeOutOfContext(CanType type);
+
   /// Given two SIL types which are representations of the same type,
   /// check whether they have an abstraction difference.
   bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
@@ -541,6 +551,9 @@ public:
   /// formal type. Meant for verification purposes/assertions.
   bool isLoweringOf(TypeExpansionContext context, SILModule &M,
                     CanType formalType);
+
+  /// Returns true if this SILType is a differentiable type.
+  bool isDifferentiable(SILModule &M) const;
 
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {

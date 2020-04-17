@@ -217,13 +217,48 @@ AvailabilityContext AvailabilityInference::inferForType(Type t) {
   return walker.AvailabilityInfo;
 }
 
+AvailabilityContext ASTContext::getObjCMetadataUpdateCallbackAvailability() {
+  return getSwift50Availability();
+}
+
+AvailabilityContext ASTContext::getObjCGetClassHookAvailability() {
+  return getSwift50Availability();
+}
+
+AvailabilityContext ASTContext::getSwift50Availability() {
+  auto target = LangOpts.Target;
+
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
+  if (target.isMacOSX()) {
+    return AvailabilityContext(
+                            VersionRange::allGTE(llvm::VersionTuple(10,14,4)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+                            VersionRange::allGTE(llvm::VersionTuple(12,2)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+                            VersionRange::allGTE(llvm::VersionTuple(5,2)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
 AvailabilityContext ASTContext::getOpaqueTypeAvailability() {
+  return getSwift51Availability();
+}
+
+AvailabilityContext ASTContext::getObjCClassStubsAvailability() {
   return getSwift51Availability();
 }
 
 AvailabilityContext ASTContext::getSwift51Availability() {
   auto target = LangOpts.Target;
   
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
   if (target.isMacOSX()) {
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(10,15,0)));
@@ -249,6 +284,9 @@ AvailabilityContext ASTContext::getPrespecializedGenericMetadataAvailability() {
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
+
   if (target.isMacOSX() ) {
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
@@ -265,6 +303,9 @@ AvailabilityContext ASTContext::getSwift52Availability() {
 
 AvailabilityContext ASTContext::getSwift53Availability() {
   auto target = LangOpts.Target;
+
+  if (target.getArchName() == "arm64e")
+    return AvailabilityContext::alwaysAvailable();
 
   if (target.isMacOSX() ) {
     return AvailabilityContext(

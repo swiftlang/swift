@@ -33,13 +33,16 @@ public:
   /// The lifetime frontier for the value. It is the list of instructions
   /// following the last uses of the value. All the frontier instructions
   /// end the value's lifetime.
-  typedef llvm::SmallVector<SILInstruction *, 4> Frontier;
+  using Frontier = SmallVector<SILInstruction *, 4>;
 
-  /// Constructor for the value \p Def with a specific set of users of Def's
-  /// users.
-  ValueLifetimeAnalysis(SILInstruction *def,
-                        ArrayRef<SILInstruction *> userList)
-      : defValue(def), userSet(userList.begin(), userList.end()) {
+  /// Constructor for the value \p Def with a specific range of users.
+  ///
+  /// We templatize over the RangeTy so that we can initialize
+  /// ValueLifetimeAnalysis with misc iterators including transform
+  /// iterators.
+  template <typename RangeTy>
+  ValueLifetimeAnalysis(SILInstruction *def, const RangeTy &userRange)
+      : defValue(def), userSet(userRange.begin(), userRange.end()) {
     propagateLiveness();
   }
 

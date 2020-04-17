@@ -1,9 +1,7 @@
-
 add_swift_host_library(swiftSema STATIC
   BuilderTransform.cpp
   CSApply.cpp
   CSBindings.cpp
-  CSDiag.cpp
   CSGen.cpp
   CSRanking.cpp
   CSSimplify.cpp
@@ -11,25 +9,27 @@ add_swift_host_library(swiftSema STATIC
   CSStep.cpp
   CSFix.cpp
   CSDiagnostics.cpp
-  CalleeCandidateInfo.cpp
   CodeSynthesis.cpp
+  ConstantnessSemaDiagnostics.cpp
   Constraint.cpp
   ConstraintGraph.cpp
   ConstraintLocator.cpp
   ConstraintSystem.cpp
   DebuggerTestingTransform.cpp
+  DerivedConformanceAdditiveArithmetic.cpp
   DerivedConformanceCaseIterable.cpp
   DerivedConformanceCodable.cpp
   DerivedConformanceCodingKey.cpp
+  DerivedConformanceDifferentiable.cpp
   DerivedConformanceEquatableHashable.cpp
   DerivedConformanceComparable.cpp
   DerivedConformanceError.cpp
   DerivedConformanceRawRepresentable.cpp
   DerivedConformances.cpp
+  ImportResolution.cpp
   InstrumenterSupport.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
-  NameBinding.cpp
   PCMacro.cpp
   PlaygroundTransform.cpp
   ResilienceDiagnostics.cpp

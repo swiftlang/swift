@@ -24,6 +24,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
@@ -339,4 +340,26 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
       std::move(invocationInfo.ExtraEnvironment),
       std::move(invocationInfo.FilelistInfos), sortedJobs, NextQuasiPID,
       responseFileInfo);
+}
+
+llvm::Expected<file_types::ID>
+ToolChain::remarkFileTypeFromArgs(const llvm::opt::ArgList &Args) const {
+  const Arg *A = Args.getLastArg(options::OPT_save_optimization_record_EQ);
+  if (!A)
+    return file_types::TY_YAMLOptRecord;
+
+  llvm::Expected<llvm::remarks::Format> FormatOrErr =
+      llvm::remarks::parseFormat(A->getValue());
+  if (llvm::Error E = FormatOrErr.takeError())
+    return std::move(E);
+
+  switch (*FormatOrErr) {
+  case llvm::remarks::Format::YAML:
+    return file_types::TY_YAMLOptRecord;
+  case llvm::remarks::Format::Bitstream:
+    return file_types::TY_BitstreamOptRecord;
+  default:
+    return llvm::createStringError(std::errc::invalid_argument,
+                                   "Unknown remark format.");
+  }
 }

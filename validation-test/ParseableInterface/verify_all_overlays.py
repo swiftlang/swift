@@ -49,7 +49,12 @@ for filename in os.listdir(sdk_overlay_dir):
     else:
         continue
 
-    if module_name == "Swift" or module_name == "SwiftLang":
+    if module_name in [
+        "_Differentiation",
+        "DifferentiationUnittest",
+        "Swift",
+        "SwiftLang",
+    ]:
         continue
 
     # swift -build-module-from-parseable-interface

@@ -29,6 +29,7 @@ extension OSLogInterpolation {
   ///  - privacy: a privacy qualifier which is either private or public.
   ///    It is auto-inferred by default.
   @_semantics("constant_evaluable")
+  @_semantics("oslog.requires_constant_arguments")
   @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
@@ -44,6 +45,7 @@ extension OSLogInterpolation {
   ///  - privacy: a privacy qualifier which is either private or public.
   ///    It is auto-inferred by default.
   @_semantics("constant_evaluable")
+  @_semantics("oslog.requires_constant_arguments")
   @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(

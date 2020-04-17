@@ -215,23 +215,24 @@ struct ClosureContextInfo {
 
 struct FieldTypeInfo {
   std::string Name;
+  int Value;
   const TypeRef *TR;
   bool Indirect;
 
-  FieldTypeInfo() : Name(""), TR(nullptr), Indirect(false) {}
-  FieldTypeInfo(const std::string &Name, const TypeRef *TR, bool Indirect)
-      : Name(Name), TR(TR), Indirect(Indirect) {}
+  FieldTypeInfo() : Name(""), Value(0), TR(nullptr), Indirect(false) {}
+  FieldTypeInfo(const std::string &Name, int Value, const TypeRef *TR, bool Indirect)
+    : Name(Name), Value(Value), TR(TR), Indirect(Indirect) {}
 
-  static FieldTypeInfo forEmptyCase(std::string Name) {
-    return FieldTypeInfo(Name, nullptr, false);
+  static FieldTypeInfo forEmptyCase(std::string Name, int Value) {
+    return FieldTypeInfo(Name, Value, nullptr, false);
   }
 
-  static FieldTypeInfo forIndirectCase(std::string Name, const TypeRef *TR) {
-    return FieldTypeInfo(Name, TR, true);
+  static FieldTypeInfo forIndirectCase(std::string Name, int Value, const TypeRef *TR) {
+    return FieldTypeInfo(Name, Value, TR, true);
   }
 
-  static FieldTypeInfo forField(std::string Name, const TypeRef *TR) {
-    return FieldTypeInfo(Name, TR, false);
+  static FieldTypeInfo forField(std::string Name, int Value, const TypeRef *TR) {
+    return FieldTypeInfo(Name, Value, TR, false);
   }
 };
 
@@ -371,7 +372,7 @@ public:
                     unsigned ordinal) {
     // TODO: Produce a type ref for the opaque type if the underlying type isn't
     // available.
-    
+
     // Try to resolve to the underlying type, if we can.
     if (opaqueDescriptor->getKind() ==
                             Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
@@ -391,7 +392,15 @@ public:
       
       return underlyingTy->subst(*this, subs);
     }
-    return nullptr;
+    
+    // Otherwise, build a type ref that represents the opaque type.
+    return OpaqueArchetypeTypeRef::create(*this,
+                                          mangleNode(opaqueDescriptor,
+                                                     SymbolicResolver(),
+                                                     Dem),
+                                          nodeToString(opaqueDescriptor),
+                                          ordinal,
+                                          genericArgs);
   }
 
   const TupleTypeRef *

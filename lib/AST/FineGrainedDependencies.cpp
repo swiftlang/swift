@@ -103,17 +103,20 @@ void SourceFileDepGraph::forEachArc(
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
-    NodeKind k, const ContextNameFingerprint &contextNameFingerprint) {
-  const std::string &context = std::get<0>(contextNameFingerprint);
-  const std::string &name = std::get<1>(contextNameFingerprint);
-  const Optional<std::string> &fingerprint =
-      std::get<2>(contextNameFingerprint);
-  auto *interfaceNode = findExistingNodeOrCreateIfNew(
-      DependencyKey(k, DeclAspect::interface, context, name), fingerprint,
-      true /* = isProvides */);
+    const DependencyKey &interfaceKey, Optional<StringRef> fingerprint) {
+
+  // Optimization for whole-file users:
+  if (interfaceKey.getKind() == NodeKind::sourceFileProvide &&
+      !allNodes.empty())
+    return getSourceFileNodePair();
+
+  assert(interfaceKey.isInterface());
+  const DependencyKey implementationKey =
+      interfaceKey.correspondingImplementation();
+  auto *interfaceNode = findExistingNodeOrCreateIfNew(interfaceKey, fingerprint,
+                                                      true /* = isProvides */);
   auto *implementationNode = findExistingNodeOrCreateIfNew(
-      DependencyKey(k, DeclAspect::implementation, context, name), fingerprint,
-      true /* = isProvides */);
+      implementationKey, fingerprint, true /* = isProvides */);
 
   InterfaceAndImplementationPair<SourceFileDepGraphNode> nodePair{
       interfaceNode, implementationNode};
@@ -136,7 +139,7 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
 }
 
 SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
-    DependencyKey key, const Optional<std::string> &fingerprint,
+    const DependencyKey &key, const Optional<StringRef> fingerprint,
     const bool isProvides) {
   SourceFileDepGraphNode *result = memoizedNodes.findExistingOrCreateIfNew(
       key, [&](DependencyKey key) -> SourceFileDepGraphNode * {
@@ -164,20 +167,25 @@ SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
   return result;
 }
 
+NullablePtr<SourceFileDepGraphNode>
+SourceFileDepGraph::findExistingNode(const DependencyKey &key) {
+  auto existing = memoizedNodes.findExisting(key);
+  return existing ? existing.getValue() : NullablePtr<SourceFileDepGraphNode>();
+}
+
 std::string DependencyKey::demangleTypeAsContext(StringRef s) {
   return swift::Demangle::demangleTypeAsString(s.str());
 }
 
-DependencyKey
-DependencyKey::createKeyForWholeSourceFile(const StringRef swiftDeps) {
+DependencyKey DependencyKey::createKeyForWholeSourceFile(DeclAspect aspect,
+                                                         StringRef swiftDeps) {
   assert(!swiftDeps.empty());
-  const auto context = DependencyKey::computeContextForProvidedEntity<
+  const std::string context = DependencyKey::computeContextForProvidedEntity<
       NodeKind::sourceFileProvide>(swiftDeps);
-  const auto name =
+  const std::string name =
       DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
           swiftDeps);
-  return DependencyKey(NodeKind::sourceFileProvide, DeclAspect::interface,
-                       context, name);
+  return DependencyKey(NodeKind::sourceFileProvide, aspect, context, name);
 }
 
 //==============================================================================
@@ -228,7 +236,7 @@ std::string DependencyKey::humanReadableName() const {
     return demangleTypeAsContext(context) + "." + name;
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
-    return llvm::sys::path::filename(name);
+    return llvm::sys::path::filename(name).str();
   case NodeKind::potentialMember:
     return demangleTypeAsContext(context) + ".*";
   case NodeKind::nominal:

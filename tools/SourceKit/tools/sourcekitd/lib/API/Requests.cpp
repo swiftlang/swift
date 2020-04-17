@@ -701,7 +701,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     std::string swiftVer;
     Optional<StringRef> swiftVerValStr = Req.getString(KeySwiftVersion);
     if (swiftVerValStr.hasValue()) {
-      swiftVer = swiftVerValStr.getValue();
+      swiftVer = swiftVerValStr.getValue().str();
     } else {
       Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
       if (swiftVerVal.hasValue())
@@ -833,7 +833,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
         err = createErrorRequestInvalid("missing 'key.name'");
         return true;
       }
-      CCInfo.Name = *Name;
+      CCInfo.Name = (*Name).str();
 
       sourcekitd_uid_t Kind = dict.getUID(KeyKind);
       if (!Kind) {
@@ -1271,7 +1271,7 @@ static sourcekitd_response_t indexSource(StringRef Filename,
 }
 
 void SKIndexingConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 bool SKIndexingConsumer::startDependency(UIdent Kind,
@@ -1422,9 +1422,7 @@ public:
   }
 
   sourcekitd_response_t createResponse() {
-    TopDict.setCustomBuffer(KeyAnnotations,
-        CustomBufferKind::DocSupportAnnotationArray,
-        AnnotationsBuilder.createBuffer());
+    TopDict.setCustomBuffer(KeyAnnotations, AnnotationsBuilder.createBuffer());
     return RespBuilder.createResponse();
   }
 
@@ -1573,15 +1571,19 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
   // while GenericParams is empty.
   if (!Info.GenericRequirements.empty()) {
     auto ReqArray = Elem.setArray(KeyGenericRequirements);
+
     for (auto &Req : Info.GenericRequirements) {
       auto ReqElem = ReqArray.appendDictionary();
       ReqElem.set(KeyDescription, Req);
     }
   }
+
+  if (!Info.RequiredBystanders.empty())
+    Elem.set(KeyRequiredBystanders, Info.RequiredBystanders);
 }
 
 void SKDocConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 bool SKDocConsumer::handleSourceText(StringRef Text) {
@@ -1862,8 +1864,7 @@ static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> 
   for (auto &R: Info.Results) {
     ArrBuilder.add(R);
   }
-  Dict.setCustomBuffer(KeyExpressionTypeList, CustomBufferKind::ExpressionTypeArray,
-                       ArrBuilder.createBuffer());
+  Dict.setCustomBuffer(KeyExpressionTypeList, ArrBuilder.createBuffer());
   Rec(Builder.createResponse());
 }
 
@@ -1920,8 +1921,7 @@ public:
       return createErrorRequestFailed(ErrorDescription.c_str());
 
     RespBuilder.getDictionary().setCustomBuffer(KeyResults,
-        CustomBufferKind::CodeCompletionResultsArray,
-        ResultsBuilder.createBuffer());
+                                                ResultsBuilder.createBuffer());
     return RespBuilder.createResponse();
   }
 
@@ -1929,6 +1929,7 @@ public:
   void failed(StringRef ErrDescription) override;
 
   void setCompletionKind(UIdent kind) override;
+  void setReusingASTContext(bool flag) override;
   bool handleResult(const CodeCompletionInfo &Info) override;
 };
 } // end anonymous namespace
@@ -1952,12 +1953,17 @@ codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
 }
 
 void SKCodeCompletionConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 void SKCodeCompletionConsumer::setCompletionKind(UIdent kind) {
   assert(kind.isValid());
   RespBuilder.getDictionary().set(KeyKind, kind);
+}
+
+void SKCodeCompletionConsumer::setReusingASTContext(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
 }
 
 bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
@@ -2132,7 +2138,7 @@ codeCompleteUpdate(StringRef name, int64_t offset,
 }
 
 void SKGroupedCodeCompletionConsumer::failed(StringRef ErrDescription) {
-  ErrorDescription = ErrDescription;
+  ErrorDescription = ErrDescription.str();
 }
 
 bool SKGroupedCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
@@ -2248,7 +2254,7 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
     }
 
     void failed(StringRef ErrDescription) override {
-      ErrorDescription = ErrDescription;
+      ErrorDescription = ErrDescription.str();
     }
 
     bool isError() const { return ErrorDescription.hasValue(); }
@@ -2301,7 +2307,7 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
     }
 
     void failed(StringRef ErrDescription) override {
-      ErrorDescription = ErrDescription;
+      ErrorDescription = ErrDescription.str();
     }
 
     bool isError() const { return ErrorDescription.hasValue(); }
@@ -2548,18 +2554,13 @@ sourcekitd_response_t SKEditorConsumer::createResponse() {
     return Error;
 
   if (Opts.EnableSyntaxMap) {
-    Dict.setCustomBuffer(KeySyntaxMap,
-        CustomBufferKind::TokenAnnotationsArray,
-        SyntaxMap.createBuffer());
+    Dict.setCustomBuffer(KeySyntaxMap, SyntaxMap.createBuffer());
   }
   if (!SemanticAnnotations.empty()) {
-    Dict.setCustomBuffer(KeyAnnotations,
-        CustomBufferKind::TokenAnnotationsArray,
-        SemanticAnnotations.createBuffer());
+    Dict.setCustomBuffer(KeyAnnotations, SemanticAnnotations.createBuffer());
   }
   if (Opts.EnableStructure) {
-    Dict.setCustomBuffer(KeySubStructure, CustomBufferKind::DocStructureArray,
-                         DocStructure.createBuffer());
+    Dict.setCustomBuffer(KeySubStructure, DocStructure.createBuffer());
   }
 
 
@@ -2686,6 +2687,9 @@ static void fillDictionaryForDiagnosticInfoBase(
   if (!Info.Filename.empty())
     Elem.set(KeyFilePath, Info.Filename);
 
+  if (!Info.EducationalNotePaths.empty())
+    Elem.set(KeyEducationalNotePaths, Info.EducationalNotePaths);
+
   if (!Info.Ranges.empty()) {
     auto RangesArr = Elem.setArray(KeyRanges);
     for (auto R : Info.Ranges) {
@@ -2743,11 +2747,13 @@ void serializeSyntaxTreeAsByteTree(
                                          *SyntaxTree.getRaw(), UserInfo);
 
   std::unique_ptr<llvm::WritableMemoryBuffer> Buf =
-      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(Stream.data().size());
-  memcpy(Buf->getBufferStart(), Stream.data().data(), Stream.data().size());
+      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(sizeof(uint64_t) + Stream.data().size());
+  *reinterpret_cast<uint64_t*>(Buf->getBufferStart()) =
+      (uint64_t)CustomBufferKind::RawData;
+  memcpy(Buf->getBufferStart() + sizeof(uint64_t),
+         Stream.data().data(), Stream.data().size());
 
-  Dict.setCustomBuffer(KeySerializedSyntaxTree, CustomBufferKind::RawData,
-                       std::move(Buf));
+  Dict.setCustomBuffer(KeySerializedSyntaxTree, std::move(Buf));
 
   auto EndClock = clock();
   LOG_SECTION("incrParse Performance", InfoLowPrio) {

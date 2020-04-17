@@ -971,9 +971,8 @@ SILGenFunction::emitOpenExistential(
     existentialType = existentialValue.getType();
     assert(existentialType.isObject());
     if (loweredOpenedType.isAddress()) {
-      return ManagedValue::forUnmanaged(
-        B.createOpenExistentialBox(loc, existentialValue.getValue(),
-                                   loweredOpenedType));
+      return B.createOpenExistentialBox(loc, existentialValue,
+                                        loweredOpenedType);
     } else {
       assert(!silConv.useLoweredAddresses());
       return B.createOpenExistentialBoxValue(
@@ -1164,12 +1163,14 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
   case SubstToOrig:
     return SGF.emitSubstToOrigValue(loc, value,
                                     getReabstractionOrigType(),
-                                    getReabstractionSubstType(), C);
+                                    getReabstractionSubstType(),
+                                    getReabstractionLoweredResultType(), C);
 
   case OrigToSubst:
     return SGF.emitOrigToSubstValue(loc, value,
                                     getReabstractionOrigType(),
-                                    getReabstractionSubstType(), C);
+                                    getReabstractionSubstType(),
+                                    getReabstractionLoweredResultType(), C);
   }
   llvm_unreachable("bad kind");
 }
@@ -1231,6 +1232,8 @@ static void printReabstraction(const Conversion &conversion,
   conversion.getReabstractionOrigType().print(out);
   out << ", subst: ";
   conversion.getReabstractionSubstType().print(out);
+  out << ", loweredResult: ";
+  conversion.getReabstractionLoweredResultType().print(out);
   out << ')';
 }
 

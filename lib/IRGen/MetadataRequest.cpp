@@ -16,12 +16,14 @@
 
 #include "MetadataRequest.h"
 
+#include "Callee.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenArchetype.h"
 #include "GenClass.h"
 #include "GenMeta.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "GenericArguments.h"
@@ -285,7 +287,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
 
   ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
   if (alignment)
-    var->setAlignment(alignment);
+    var->setAlignment(llvm::MaybeAlign(alignment));
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
 
@@ -300,7 +302,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,
                                                        MangledTypeRefRole role){
-  return getAddrOfStringForTypeRef(SymbolicMangling{str, {}}, role);
+  return getAddrOfStringForTypeRef(SymbolicMangling{str.str(), {}}, role);
 }
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
@@ -404,7 +406,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
                                       nullptr,
                                       symbolName);
   ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
-  var->setAlignment(2);
+  var->setAlignment(llvm::MaybeAlign(2));
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
   
@@ -556,7 +558,7 @@ irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM, CanType type,
                                       SymbolReferenceKind refKind) {
   if (IGM.isStandardLibrary())
     return ConstantReference();
-  if (!isTypeMetadataAccessTrivial(IGM, type))
+  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
     return ConstantReference();
   return IGM.getAddrOfTypeMetadata(type, refKind);
 }
@@ -587,7 +589,7 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
   if (allowUninitialized) return classObject;
 
   // TODO: memoize this the same way that we memoize Swift type metadata?
-  return IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
+  return IGF.Builder.CreateCall(IGF.IGM.getFixedClassInitializationFn(),
                                 classObject);
 }
 
@@ -607,6 +609,19 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
   return MetadataResponse::forComplete(metadata);
 }
 
+static llvm::Value *
+emitIdempotentClassMetadataInitialization(IRGenFunction &IGF,
+                                          llvm::Value *metadata) {
+  if (IGF.IGM.ObjCInterop) {
+    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getFixedClassInitializationFn(),
+                                      metadata);
+    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
+  }
+
+  return metadata;
+}
+
 /// Returns a metadata reference for a nominal type.
 ///
 /// This is only valid in a couple of special cases:
@@ -615,6 +630,10 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
 /// 2) The nominal type is a value type with a fixed size from this
 ///    resilience domain, in which case we can reference the constant
 ///    metadata directly.
+/// 3) The nominal type is a class with known Swift metadata and
+///   a fixed layout from this resilience domain, in which case we only
+///   need perform idempotent class initialization to realize it
+///   in the ObjC runtime.
 ///
 /// In any other case, a metadata accessor should be called instead.
 static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
@@ -625,11 +644,21 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 
   if (!theDecl->isGenericContext()) {
     assert(!IGF.IGM.isResilient(theDecl, ResilienceExpansion::Maximal));
-    // TODO: If Obj-C interop is off, we can relax this to allow referencing
-    // class metadata too.
-    assert(isa<StructDecl>(theDecl) || isa<EnumDecl>(theDecl));
-    auto metadata = IGF.IGM.getAddrOfTypeMetadata(theType);
-    return MetadataResponse::forComplete(metadata);
+    if (auto response = IGF.tryGetLocalTypeMetadata(theType, request)) {
+      return response;
+    }
+
+    llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(theType);
+    
+    // We need to realize classes with the ObjC runtime.
+    if (auto c = dyn_cast<ClassDecl>(theDecl)) {
+      
+      assert(hasKnownSwiftMetadata(IGF.IGM, c));
+      metadata = emitIdempotentClassMetadataInitialization(IGF, metadata);
+    }
+    auto response = MetadataResponse::forComplete(metadata);
+    IGF.setScopedLocalTypeMetadata(theType, response);
+    return response;
   }
 
   // We are applying generic parameters to a generic type.
@@ -679,9 +708,23 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     return false;
   }
 
-  if (nominal.getModuleContext() != IGM.getSwiftModule() ||
-      nominal.isResilient(IGM.getSwiftModule(), ResilienceExpansion::Minimal)) {
-    return false;
+  if (IGM.getSILModule().isWholeModule()) {
+    if (nominal.isResilient(IGM.getSwiftModule(),
+                            ResilienceExpansion::Maximal)) {
+      return false;
+    }
+  } else {
+    // If whole module optimization is not enabled, we can only construct a
+    // canonical prespecialization if the usage is in the same *file* as that
+    // containing the type's decl!  The reason is that the generic metadata
+    // accessor is defined in the IRGenModule corresponding to the source file
+    // containing the type's decl.
+    SourceFile *nominalFile = nominal.getDeclContext()->getParentSourceFile();
+    if (auto *moduleFile = IGM.IRGen.getSourceFile(&IGM)) {
+      if (nominalFile != moduleFile) {
+        return false;
+      }
+    }
   }
 
   if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
@@ -722,7 +765,7 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     };
     auto isExistential = [&]() { return argument->isExistentialType(); };
     auto metadataAccessIsTrivial = [&]() {
-      return irgen::isTypeMetadataAccessTrivial(IGM,
+      return irgen::isCompleteTypeMetadataStaticallyAddressable(IGM,
                                                 argument->getCanonicalType());
     };
     return !isGenericWithoutPrespecializedConformance() && !isExistential() && 
@@ -732,9 +775,9 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
   && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
 }
 
-/// Is it basically trivial to access the given metadata?  If so, we don't
-/// need a cache variable in its accessor.
-bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
+/// Is complete metadata for the given type available at a fixed address?
+bool irgen::isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM,
+                                                        CanType type) {
   assert(!type->hasArchetype());
 
   // Value type metadata only requires dynamic initialization on first
@@ -775,10 +818,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   if (isa<SILBoxType>(type))
     return true;
 
-  // DynamicSelfType is actually local.
-  if (type->hasDynamicSelfType())
-    return true;
-
   if (isa<BoundGenericStructType>(type) || isa<BoundGenericEnumType>(type)) {
     auto nominalType = cast<BoundGenericType>(type);
     auto *nominalDecl = nominalType->getDecl();
@@ -791,6 +830,51 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
                                                             type);
   }
 
+  return false;
+}
+
+/// Should requests for the given type's metadata be cached?
+bool irgen::shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type) {
+  // DynamicSelfType is actually local.
+  if (type->hasDynamicSelfType())
+    return false;
+
+  // Nongeneric, nonresilient classes with known Swift metadata need to be
+  // realized with the Objective-C runtime, but that only requires a single
+  // runtime call that already has a fast path exit for already-realized
+  // classes, so we don't need to put up another layer of caching in front.
+  //
+  // TODO: On platforms without ObjC interop, we can do direct access to
+  // Swift metadata without a runtime call at all.
+  if (auto clas = dyn_cast<ClassType>(type)) {
+    if (!hasKnownSwiftMetadata(IGM, clas))
+      return true;
+    auto strategy = IGM.getClassMetadataStrategy(clas->getDecl());
+    return strategy != ClassMetadataStrategy::Fixed;
+  }
+  
+  // Trivially accessible metadata does not need a cache.
+  if (isCompleteTypeMetadataStaticallyAddressable(IGM, type))
+    return false;
+  
+  return true;
+}
+
+/// Should requests for the given type's metadata go through an accessor?
+static bool shouldTypeMetadataAccessUseAccessor(IRGenModule &IGM, CanType type){
+  // Anything that requires caching should go through an accessor to outline
+  // the cache check.
+  if (shouldCacheTypeMetadataAccess(IGM, type))
+    return true;
+  
+  // Fixed-metadata classes don't require caching, but we still want to go
+  // through the accessor to outline the ObjC realization.
+  // TODO: On non-Apple platforms, fixed classes should not need any
+  // initialization so should be directly addressable.
+  if (isa<ClassType>(type)) {
+    return true;
+  }
+  
   return false;
 }
 
@@ -1161,12 +1245,30 @@ namespace {
         break;
       }
 
+      FunctionMetadataDifferentiabilityKind metadataDifferentiabilityKind;
+      switch (type->getDifferentiabilityKind()) {
+      case DifferentiabilityKind::NonDifferentiable:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+        break;
+      case DifferentiabilityKind::Normal:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Normal;
+        break;
+      case DifferentiabilityKind::Linear:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Linear;
+        break;
+      }
+
       auto flagsVal = FunctionTypeFlags()
                           .withNumParameters(numParams)
                           .withConvention(metadataConvention)
                           .withThrows(type->throws())
                           .withParameterFlags(hasFlags)
-                          .withEscaping(isEscaping);
+                          .withEscaping(isEscaping)
+                          .withDifferentiabilityKind(
+                              metadataDifferentiabilityKind);
 
       auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                           flagsVal.getIntValue());
@@ -1813,8 +1915,17 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     GenericArguments &genericArgs) {
   auto &IGM = IGF.IGM;
   
-  llvm::Constant *descriptor =
+  llvm::Value *descriptor =
     IGM.getAddrOfTypeContextDescriptor(nominal, RequireMetadata);
+
+  // Sign the descriptor.
+  auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
+  if (schema) {
+    auto authInfo = PointerAuthInfo::emit(
+        IGF, schema, nullptr,
+        PointerAuthEntity::Special::TypeDescriptorAsArgument);
+    descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+  }
 
   auto request = params.claimNext();
 
@@ -1949,19 +2060,6 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
   return MetadataResponse::handle(IGF, DynamicMetadataRequest(request), result);
 }
 
-static llvm::Value *
-emitIdempotentClassMetadataInitialization(IRGenFunction &IGF,
-                                          llvm::Value *metadata) {
-  if (IGF.IGM.ObjCInterop) {
-    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCClassPtrTy);
-    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetInitializedObjCClassFn(),
-                                      metadata);
-    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
-  }
-
-  return metadata;
-}
-
 /// Emit the body of a metadata accessor function for the given type.
 ///
 /// This function is appropriate for ordinary situations where the
@@ -2003,20 +2101,19 @@ emitDirectTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // metadata using this function.
   assert(!requiresForeignTypeMetadata(typeDecl));
 
-  // Classes that might not have Swift metadata use a different
-  // access pattern.
   if (auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
-    if (!hasKnownSwiftMetadata(IGF.IGM, classDecl)) {
-      return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
-    }
-
-    llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
-    return MetadataResponse::forComplete(
-      emitIdempotentClassMetadataInitialization(IGF, metadata));
+    // For known-Swift metadata, we can perform a direct reference with
+    // potentially idempotent initialization.
+    if (hasKnownSwiftMetadata(IGF.IGM, classDecl))
+      return emitDirectTypeMetadataRef(IGF, type, request);
+  
+    // Classes that might not have Swift metadata use a different
+    // access pattern.
+    return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
   }
 
   // We should not be doing more serious work along this path.
-  assert(isTypeMetadataAccessTrivial(IGF.IGM, type));
+  assert(isCompleteTypeMetadataStaticallyAddressable(IGF.IGM, type));
 
   // Okay, everything else is built from a Swift metadata object.
   llvm::Constant *metadata = IGF.IGM.getAddrOfTypeMetadata(type);
@@ -2064,7 +2161,7 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
 
   // If our preferred access method is to go via an accessor, it means
   // there is some non-trivial computation that needs to be cached.
-  if (isTypeMetadataAccessTrivial(IGM, type)) {
+  if (!shouldCacheTypeMetadataAccess(IGM, type)) {
     cacheStrategy = CacheStrategy::None;
   } else {
     switch (cacheStrategy) {
@@ -2137,6 +2234,10 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
 }
 
 static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
+  // Never access by mangled name if we've been asked not to.
+  if (IGM.getOptions().DisableConcreteTypeMetadataMangledNameAccessors)
+    return false;
+  
   // A nongeneric nominal type with nontrivial metadata has an accessor
   // already we can just call.
   if (auto nom = dyn_cast<NominalType>(type)) {
@@ -2148,17 +2249,19 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
   }
   
   // The Swift 5.1 runtime fails to demangle associated types of opaque types.
-  auto hasNestedOpaqueArchetype = type.findIf([](CanType sub) -> bool {
-    if (auto archetype = dyn_cast<NestedArchetypeType>(sub)) {
-      if (isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
-        return true;
+  if (!IGM.getAvailabilityContext().isContainedIn(IGM.Context.getSwift52Availability())) {
+    auto hasNestedOpaqueArchetype = type.findIf([](CanType sub) -> bool {
+      if (auto archetype = dyn_cast<NestedArchetypeType>(sub)) {
+        if (isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
+          return true;
+        }
       }
-    }
-    return false;
-  });
-  
-  if (hasNestedOpaqueArchetype)
-    return false;
+      return false;
+    });
+    
+    if (hasNestedOpaqueArchetype)
+      return false;
+  }
   
   return true;
 
@@ -2194,7 +2297,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       // others may require accessors to trigger instantiation.
       //
       // TODO: Also need to count the parent type's generic arguments.
-      if (isTypeMetadataAccessTrivial(IGM, nom)) {
+      if (!shouldCacheTypeMetadataAccess(IGM, nom)) {
         NumAddresses += 1;
       } else {
         NumCalls += 1;
@@ -2545,8 +2648,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   }
   
   if (type->hasArchetype() ||
-      isTypeMetadataAccessTrivial(IGM, type)) {
-    // FIXME: propagate metadata request!
+      !shouldTypeMetadataAccessUseAccessor(IGM, type)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 

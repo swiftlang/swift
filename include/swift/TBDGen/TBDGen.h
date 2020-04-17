@@ -12,9 +12,11 @@
 #ifndef SWIFT_IRGEN_TBDGEN_H
 #define SWIFT_IRGEN_TBDGEN_H
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "swift/Basic/Version.h"
+#include <vector>
 
 namespace llvm {
 class raw_ostream;
@@ -59,6 +61,32 @@ struct TBDGenOptions {
   /// Typically, these modules are static linked libraries. Thus their symbols
   /// are embeded in the current dylib.
   std::vector<std::string> embedSymbolsFromModules;
+
+  friend bool operator==(const TBDGenOptions &lhs, const TBDGenOptions &rhs) {
+    return lhs.HasMultipleIGMs == rhs.HasMultipleIGMs &&
+           lhs.IsInstallAPI == rhs.IsInstallAPI &&
+           lhs.LinkerDirectivesOnly == rhs.LinkerDirectivesOnly &&
+           lhs.InstallName == rhs.InstallName &&
+           lhs.ModuleLinkName == rhs.ModuleLinkName &&
+           lhs.CurrentVersion == rhs.CurrentVersion &&
+           lhs.CompatibilityVersion == rhs.CompatibilityVersion &&
+           lhs.ModuleInstallNameMapPath == rhs.ModuleInstallNameMapPath &&
+           lhs.embedSymbolsFromModules == rhs.embedSymbolsFromModules;
+  }
+
+  friend bool operator!=(const TBDGenOptions &lhs, const TBDGenOptions &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend llvm::hash_code hash_value(const TBDGenOptions &opts) {
+    using namespace llvm;
+    return hash_combine(
+        opts.HasMultipleIGMs, opts.IsInstallAPI, opts.LinkerDirectivesOnly,
+        opts.InstallName, opts.ModuleLinkName, opts.CurrentVersion,
+        opts.CompatibilityVersion, opts.ModuleInstallNameMapPath,
+        hash_combine_range(opts.embedSymbolsFromModules.begin(),
+                           opts.embedSymbolsFromModules.end()));
+  }
 };
 
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,

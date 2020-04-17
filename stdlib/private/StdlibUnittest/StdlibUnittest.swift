@@ -18,7 +18,7 @@ import SwiftPrivateLibcExtras
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Foundation
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -1744,6 +1744,7 @@ public enum OSVersion : CustomStringConvertible {
   case watchOSSimulator
   case linux
   case freeBSD
+  case openBSD
   case android
   case ps4
   case windowsCygnus
@@ -1771,6 +1772,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Linux"
     case .freeBSD:
       return "FreeBSD"
+    case .openBSD:
+      return "OpenBSD"
     case .ps4:
       return "PS4"
     case .android:
@@ -1817,6 +1820,8 @@ func _getOSVersion() -> OSVersion {
   return .linux
 #elseif os(FreeBSD)
   return .freeBSD
+#elseif os(OpenBSD)
+  return .openBSD
 #elseif os(PS4)
   return .ps4
 #elseif os(Android)

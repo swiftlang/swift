@@ -315,6 +315,12 @@ EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+EnableCrossImportOverlays("enable-cross-import-overlays",
+                          llvm::cl::desc("Automatically import declared cross-import overlays."),
+                          llvm::cl::cat(Category),
+                          llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 SkipDeinit("skip-deinit",
            llvm::cl::desc("Whether to skip printing destructors"),
            llvm::cl::cat(Category),
@@ -422,6 +428,12 @@ CodeCompletionComments("code-completion-comments",
                        llvm::cl::desc("Include comments in code completion results"),
                        llvm::cl::cat(Category),
                        llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+CodeCOmpletionAnnotateResults("code-completion-annotate-results",
+                              llvm::cl::desc("annotate completion results with XML"),
+                              llvm::cl::cat(Category),
+                              llvm::cl::init(false));
 
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
@@ -691,6 +703,11 @@ static llvm::cl::opt<bool>
                        llvm::cl::desc("Disable ObjC interop."),
                        llvm::cl::cat(Category), llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+    EnableCxxInterop("enable-cxx-interop",
+                     llvm::cl::desc("Enable C++ interop."),
+                     llvm::cl::cat(Category), llvm::cl::init(false));
+
 static llvm::cl::opt<std::string>
 GraphVisPath("output-request-graphviz",
              llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
@@ -775,9 +792,10 @@ static bool doCodeCompletionImpl(
       Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
       Offset, /*EnableASTCaching=*/false, Error,
       CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-      [&](CompilerInstance &CI) {
-        performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                        *callbacksFactory);
+      [&](CompilerInstance &CI, bool reusingASTContext) {
+        assert(!reusingASTContext && "reusing AST context without enabling it");
+        auto SF = CI.getCodeCompletionFile();
+        performCodeCompletionSecondPass(*SF.get(), *callbacksFactory);
       });
   return isSuccess ? 0 : 1;
 }
@@ -831,7 +849,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef CodeCompletionToken,
                             bool CodeCompletionDiagnostics,
                             bool CodeCompletionKeywords,
-                            bool CodeCompletionComments) {
+                            bool CodeCompletionComments,
+                            bool CodeCompletionAnnotateResults) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -839,11 +858,13 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   }
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
+  CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
 
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
       new ide::PrintingCodeCompletionConsumer(
-          llvm::outs(), CodeCompletionKeywords, CodeCompletionComments));
+          llvm::outs(), CodeCompletionKeywords, CodeCompletionComments,
+          CodeCompletionAnnotateResults));
 
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
@@ -1123,8 +1144,6 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
     registerParseRequestFunctions(Parser.getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
 
-    // Collecting syntactic information shouldn't evaluate # conditions.
-    Parser.getParser().State->PerformConditionEvaluation = false;
     Parser.getDiagnosticEngine().addConsumer(PrintDiags);
 
     (void)Parser.parse();
@@ -1359,9 +1378,6 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   registerParseRequestFunctions(Parser.getParser().Context.evaluator);
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
-
-  // Collecting syntactic information shouldn't evaluate # conditions.
-  Parser.getParser().State->PerformConditionEvaluation = false;
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -2758,6 +2774,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       scratch.clear();
       next.second->getImportedModules(scratch,
                                       ModuleDecl::ImportFilterKind::Public);
+      // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.second->getName();
         for (auto accessPathPiece : import.first) {
@@ -3311,7 +3328,8 @@ int main(int argc, char *argv[]) {
 
     ide::PrintingCodeCompletionConsumer Consumer(
         llvm::outs(), options::CodeCompletionKeywords,
-        options::CodeCompletionComments);
+        options::CodeCompletionComments,
+        options::CodeCOmpletionAnnotateResults);
     for (StringRef filename : options::InputFilenames) {
       auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
       if (!resultsOpt) {
@@ -3361,6 +3379,8 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().BuildSyntaxTree = true;
   InitInvok.getLangOptions().RequestEvaluatorGraphVizPath =
     options::GraphVisPath;
+  InitInvok.getLangOptions().EnableCrossImportOverlays =
+    options::EnableCrossImportOverlays;
   if (options::DisableObjCInterop) {
     InitInvok.getLangOptions().EnableObjCInterop = false;
   } else if (options::EnableObjCInterop) {
@@ -3368,6 +3388,9 @@ int main(int argc, char *argv[]) {
   } else if (!options::Triple.empty()) {
     InitInvok.getLangOptions().EnableObjCInterop =
         llvm::Triple(options::Triple).isOSDarwin();
+  }
+  if (options::EnableCxxInterop) {
+    InitInvok.getLangOptions().EnableCXXInterop = true;
   }
 
   // We disable source location resolutions from .swiftsourceinfo files by
@@ -3515,7 +3538,8 @@ int main(int argc, char *argv[]) {
                                 options::CodeCompletionToken,
                                 options::CodeCompletionDiagnostics,
                                 options::CodeCompletionKeywords,
-                                options::CodeCompletionComments);
+                                options::CodeCompletionComments,
+                                options::CodeCOmpletionAnnotateResults);
     break;
 
   case ActionType::REPLCodeCompletion:

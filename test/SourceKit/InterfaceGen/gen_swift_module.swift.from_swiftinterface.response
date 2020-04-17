@@ -62,7 +62,6 @@ public func pub_function()
     key.name: "MyClass",
     key.offset: 8,
     key.length: 47,
-    key.runtime_name: "_TtC4main7MyClass",
     key.nameoffset: 14,
     key.namelength: 7,
     key.bodyoffset: 23,

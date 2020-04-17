@@ -43,44 +43,6 @@ using namespace swift::driver;
 //==============================================================================
 // MARK: Affordances to unit tests
 //==============================================================================
-/// Initial underscore makes non-cascading, on member means private.
- ModuleDepGraph::Changes
-ModuleDepGraph::simulateLoad(const Job *cmd,
-             llvm::StringMap<std::vector<std::string>> simpleNames,
-             llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
-                 compoundNames,
-             const bool includePrivateDeps,
-             const bool hadCompilationError) {
-  StringRef swiftDeps =
-      cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
-  assert(!swiftDeps.empty());
-  StringRef interfaceHash = swiftDeps;
-  auto sfdg = SourceFileDepGraph::simulateLoad(
-      swiftDeps, includePrivateDeps, hadCompilationError, interfaceHash,
-      simpleNames, compoundNames);
-
-  SourceManager sm;
-  DiagnosticEngine diags(sm);
-  // help for debugging: emit imported file, too
-  if (emitFineGrainedDependencyDotFileAfterEveryImport) {
-    sfdg.emitDotFile(swiftDeps, diags);
-  }
-
-  return loadFromSourceFileDepGraph(cmd, sfdg, diags);
-}
-
-std::string SourceFileDepGraph::noncascading(std::string name) {
-  std::string s{SourceFileDepGraph::noncascadingOrPrivatePrefix};
-  s += name;
-  return s;
-}
-
-LLVM_ATTRIBUTE_UNUSED
-std::string SourceFileDepGraph::privatize(std::string name) {
-  std::string s{SourceFileDepGraph::noncascadingOrPrivatePrefix};
-  s += name;
-  return s;
-}
 
 LLVM_ATTRIBUTE_UNUSED
 std::vector<const Job *>
@@ -115,7 +77,7 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromPath(const Job *Cmd,
     return None;
   auto r = loadFromBuffer(Cmd, *buffer.get(), diags);
   assert(path == getSwiftDeps(Cmd) && "Should be reading the job's swiftdeps");
-  assert(!r || !nodeMap[path].empty() &&
+  assert(!r || !nodeMap[path.str()].empty() &&
          "Must have a node for the whole file");
   return r;
 }
@@ -145,10 +107,11 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromSourceFileDepGraph(
 }
 
 bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
-  const StringRef swiftDeps = getSwiftDeps(cmd);
+  std::string swiftDeps = getSwiftDeps(cmd).str();
 
   // optimization
-  const auto fileKey = DependencyKey::createKeyForWholeSourceFile(swiftDeps);
+  const auto fileKey = DependencyKey::createKeyForWholeSourceFile(
+      DeclAspect::interface, swiftDeps);
   if (const auto fileNode = nodeMap.find(swiftDeps, fileKey)) {
     if (fileNode && fileNode.getValue()->getHasBeenTraced())
       return true;
@@ -215,7 +178,14 @@ std::vector<const Job *> ModuleDepGraph::jobsContaining(
 void ModuleDepGraph::registerJob(const Job *job) {
   // No need to create any nodes; that will happen when the swiftdeps file is
   // read. Just record the correspondence.
-  jobsBySwiftDeps.insert(std::make_pair(getSwiftDeps(job), job));
+  jobsBySwiftDeps.insert(std::make_pair(getSwiftDeps(job).str(), job));
+}
+
+std::vector<const Job *> ModuleDepGraph::getAllJobs() const {
+  std::vector<const Job *> jobs;
+  for (auto const &entry : jobsBySwiftDeps)
+    jobs.push_back(entry.second);
+  return jobs;
 }
 
 std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {
@@ -264,7 +234,7 @@ ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g,
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-integrate");
 
   // When done, disappearedNodes contains the nodes which no longer exist.
-  auto disappearedNodes = nodeMap[swiftDepsOfJob];
+  auto disappearedNodes = nodeMap[swiftDepsOfJob.str()];
   // When done, changeDependencyKeys contains a list of keys that changed
   // as a result of this integration.
   // Or if the integration failed, None.
@@ -320,7 +290,7 @@ ModuleDepGraph::PreexistingNodeIfAny ModuleDepGraph::findPreexistingMatch(
   }
   if (integrand->getIsProvides()) {
     const auto &preexistingNodeInPlaceIter =
-        matches->find(swiftDepsOfCompilationToBeIntegrated);
+        matches->find(swiftDepsOfCompilationToBeIntegrated.str());
     if (preexistingNodeInPlaceIter != matches->end())
       return std::make_pair(LocationOfPreexistingNode::here,
                             preexistingNodeInPlaceIter->second);
@@ -416,7 +386,7 @@ bool ModuleDepGraph::recordWhatUseDependsUpon(
             usesByDef[def->getKey()].insert(moduleUseNode).second;
         if (isNewUse && def->getKey().getKind() == NodeKind::externalDepend) {
           StringRef externalSwiftDeps = def->getKey().getName();
-          externalDependencies.insert(externalSwiftDeps);
+          externalDependencies.insert(externalSwiftDeps.str());
           useHasNewExternalDependency = true;
         }
       });
@@ -460,7 +430,7 @@ void ModuleDepGraph::forCorrespondingImplementationOfProvidedInterface(
   const auto &interfaceKey = interfaceNode->getKey();
   const DependencyKey implementationKey(
       interfaceKey.getKind(), DeclAspect::implementation,
-      interfaceKey.getContext(), interfaceKey.getName());
+      interfaceKey.getContext().str(), interfaceKey.getName().str());
   if (const auto implementationNode =
           nodeMap.find(swiftDeps, implementationKey))
     fn(implementationNode.getValue());
@@ -491,7 +461,7 @@ void ModuleDepGraph::forEachArc(
 
 void ModuleDepGraph::forEachNodeInJob(
     StringRef swiftDeps, function_ref<void(ModuleDepGraphNode *)> fn) const {
-  if (const auto *nodesByKeys = nodeMap.find(swiftDeps).getPtrOrNull()) {
+  if (const auto *nodesByKeys = nodeMap.find(swiftDeps.str()).getPtrOrNull()) {
     for (const auto &keyAndNode : *nodesByKeys)
       fn(keyAndNode.second);
   }
@@ -560,7 +530,7 @@ void ModuleDepGraph::emitDotFileForJob(DiagnosticEngine &diags,
 }
 
 void ModuleDepGraph::emitDotFile(DiagnosticEngine &diags, StringRef baseName) {
-  unsigned seqNo = dotFileSequenceNumber[baseName]++;
+  unsigned seqNo = dotFileSequenceNumber[baseName.str()]++;
   std::string fullName =
       baseName.str() + "-post-integration." + std::to_string(seqNo) + ".dot";
   withOutputFile(diags, fullName, [&](llvm::raw_ostream &out) {
@@ -666,7 +636,7 @@ void ModuleDepGraph::verifyNodeIsInRightEntryInNodeMap(
 void ModuleDepGraph::verifyExternalDependencyUniqueness(
     const DependencyKey &key) const {
   assert((key.getKind() != NodeKind::externalDepend ||
-          externalDependencies.count(key.getName()) == 1) &&
+          externalDependencies.count(key.getName().str()) == 1) &&
          "Ensure each external dependency is tracked exactly once");
 }
 

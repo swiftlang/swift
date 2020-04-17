@@ -14,7 +14,7 @@
 // integer-valued interpolations passed to the os log APIs.
 
 @frozen
-public struct OSLogIntegerFormatting: Equatable {
+public struct OSLogIntegerFormatting {
   /// The base to use for the string representation. `radix` must be at least 2
   /// and at most 36. The default is 10.
   public var radix: Int
@@ -32,7 +32,7 @@ public struct OSLogIntegerFormatting: Equatable {
 
   /// Minimum number of digits to display. Numbers having fewer digits than
   /// minDigits will be displayed with leading zeros.
-  public var minDigits: Int
+  public var minDigits: (() -> Int)?
 
   /// - Parameters:
   ///   - radix: The base to use for the string representation. `radix` must be
@@ -49,12 +49,12 @@ public struct OSLogIntegerFormatting: Equatable {
   @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
-  public init(
+  internal init(
     radix: Int = 10,
     explicitPositiveSign: Bool = false,
     includePrefix: Bool = false,
     uppercase: Bool = false,
-    minDigits: Int = 1
+    minDigits: (() -> Int)?
   ) {
     precondition(radix >= 2 && radix <= 36)
 
@@ -75,12 +75,27 @@ public struct OSLogIntegerFormatting: Equatable {
   @_optimize(none)
   public static func decimal(
     explicitPositiveSign: Bool = false,
-    minDigits: Int = 1
+    minDigits: @escaping @autoclosure () -> Int
   ) -> OSLogIntegerFormatting {
     return OSLogIntegerFormatting(
       radix: 10,
       explicitPositiveSign: explicitPositiveSign,
       minDigits: minDigits)
+  }
+
+  /// - Parameters:
+  ///   - explicitPositiveSign: Pass `true` to add a + sign to non-negative
+  ///     numbers. Default is `false`.
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
+  public static func decimal(
+    explicitPositiveSign: Bool = false
+  ) -> OSLogIntegerFormatting {
+    return OSLogIntegerFormatting(
+      radix: 10,
+      explicitPositiveSign: explicitPositiveSign,
+      minDigits: nil)
   }
 
   /// Default decimal format.
@@ -106,7 +121,7 @@ public struct OSLogIntegerFormatting: Equatable {
     explicitPositiveSign: Bool = false,
     includePrefix: Bool = false,
     uppercase: Bool = false,
-    minDigits: Int = 1
+    minDigits: @escaping @autoclosure () -> Int
   ) -> OSLogIntegerFormatting {
     return OSLogIntegerFormatting(
       radix: 16,
@@ -114,6 +129,30 @@ public struct OSLogIntegerFormatting: Equatable {
       includePrefix: includePrefix,
       uppercase: uppercase,
       minDigits: minDigits)
+  }
+
+  /// - Parameters:
+  ///   - explicitPositiveSign: Pass `true` to add a + sign to non-negative
+  ///     numbers. Default is `false`.
+  ///   - includePrefix: Pass `true` to add a prefix: 0b, 0o, 0x to corresponding
+  ///     radices. Default is `false`.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
+  public static func hex(
+    explicitPositiveSign: Bool = false,
+    includePrefix: Bool = false,
+    uppercase: Bool = false
+  ) -> OSLogIntegerFormatting {
+    return OSLogIntegerFormatting(
+      radix: 16,
+      explicitPositiveSign: explicitPositiveSign,
+      includePrefix: includePrefix,
+      uppercase: uppercase,
+      minDigits: nil)
   }
 
   /// Default hexadecimal format.
@@ -139,7 +178,7 @@ public struct OSLogIntegerFormatting: Equatable {
     explicitPositiveSign: Bool = false,
     includePrefix: Bool = false,
     uppercase: Bool = false,
-    minDigits: Int = 1
+    minDigits: @autoclosure @escaping () -> Int
   ) -> OSLogIntegerFormatting {
     OSLogIntegerFormatting(
       radix: 8,
@@ -147,6 +186,30 @@ public struct OSLogIntegerFormatting: Equatable {
       includePrefix: includePrefix,
       uppercase: uppercase,
       minDigits: minDigits)
+  }
+
+  /// - Parameters:
+  ///   - explicitPositiveSign: Pass `true` to add a + sign to non-negative
+  ///     numbers. Default is `false`.
+  ///   - includePrefix: Pass `true` to add a prefix: 0b, 0o, 0x to corresponding
+  ///     radices. Default is `false`.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
+  public static func octal(
+    explicitPositiveSign: Bool = false,
+    includePrefix: Bool = false,
+    uppercase: Bool = false
+  ) -> OSLogIntegerFormatting {
+    OSLogIntegerFormatting(
+      radix: 8,
+      explicitPositiveSign: explicitPositiveSign,
+      includePrefix: includePrefix,
+      uppercase: uppercase,
+      minDigits: nil)
   }
 
   /// Default octal format.
@@ -294,16 +357,19 @@ extension OSLogIntegerFormatting {
     // In our case, we're already handling prefix ourselves; we choose not to
     // support this functionality. In our case, alignment always pads spaces (
     // to the left or right) until the minimum field width is met.
-    if align.minimumColumnWidth > 0 {
-      specification += align.minimumColumnWidth.description
+    if let _ = align.minimumColumnWidth {
+      // The alignment could be a dynamic value. Therefore, use a star here and pass it
+      // as an additional argument.
+      specification += "*"
     }
 
     // 3. Precision
 
     // Default precision for integers is 1, otherwise use the requested precision.
-    if minDigits != 1 {
-      specification += "."
-      specification += minDigits.description
+    // The precision could be a dynamic value. Therefore, use a star here and pass it
+    // as an additional argument.
+    if let _ = minDigits {
+      specification += ".*"
     }
 
     // 4. Length modifier

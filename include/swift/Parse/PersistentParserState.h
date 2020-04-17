@@ -19,7 +19,6 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/LocalContext.h"
-#include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/Scope.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -58,11 +57,6 @@ public:
 
 /// Parser state persistent across multiple parses.
 class PersistentParserState {
-public:
-  // FIXME: When condition evaluation moves to a later phase, remove this bit
-  // and adjust the client call 'performParseOnly'.
-  bool PerformConditionEvaluation = true;
-private:
   swift::ScopeInfo ScopeInfo;
 
   std::unique_ptr<CodeCompletionDelayedDeclState> CodeCompletionDelayedDeclStat;
@@ -85,11 +79,15 @@ public:
   void restoreCodeCompletionDelayedDeclState(
       const CodeCompletionDelayedDeclState &other);
 
-  bool hasCodeCompletionDelayedDeclState() {
+  bool hasCodeCompletionDelayedDeclState() const {
     return CodeCompletionDelayedDeclStat.get() != nullptr;
   }
 
   CodeCompletionDelayedDeclState &getCodeCompletionDelayedDeclState() {
+    return *CodeCompletionDelayedDeclStat.get();
+  }
+  const CodeCompletionDelayedDeclState &
+  getCodeCompletionDelayedDeclState() const {
     return *CodeCompletionDelayedDeclStat.get();
   }
 

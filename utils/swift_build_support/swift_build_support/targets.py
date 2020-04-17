@@ -117,7 +117,7 @@ class StdlibDeploymentTarget(object):
     OSX = DarwinPlatform("macosx", archs=["x86_64"],
                          sdk_name="OSX")
 
-    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64"],
+    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64", "arm64e"],
                          sdk_name="IOS")
     iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64"],
                                   sdk_name="IOS_SIMULATOR",
@@ -150,6 +150,8 @@ class StdlibDeploymentTarget(object):
 
     FreeBSD = Platform("freebsd", archs=["x86_64"])
 
+    OpenBSD = Platform("openbsd", archs=["amd64"])
+
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
     Android = AndroidPlatform("android", archs=["armv7", "aarch64"])
@@ -166,6 +168,7 @@ class StdlibDeploymentTarget(object):
         AppleWatch, AppleWatchSimulator,
         Linux,
         FreeBSD,
+        OpenBSD,
         Cygwin,
         Android,
         Windows,
@@ -220,6 +223,10 @@ class StdlibDeploymentTarget(object):
         elif system == 'FreeBSD':
             if machine == 'amd64':
                 return StdlibDeploymentTarget.FreeBSD.x86_64
+
+        elif system == 'OpenBSD':
+            if machine == 'amd64':
+                return StdlibDeploymentTarget.OpenBSD.amd64
 
         elif system == 'CYGWIN_NT-10.0':
             if machine == 'x86_64':

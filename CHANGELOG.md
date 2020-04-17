@@ -6,7 +6,8 @@ CHANGELOG
 
 | Version                | Released   | Toolchain   |
 | :--------------------- | :--------- | :---------- |
-| [Swift 5.2](#swift-52) |            |             |
+| [Swift 5.3](#swift-53) |            |             |
+| [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
 | [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
 | [Swift 5.0](#swift-50) | 2019-03-25 | Xcode 10.2  |
 | [Swift 4.2](#swift-42) | 2018-09-17 | Xcode 10.0  |
@@ -23,8 +24,91 @@ CHANGELOG
 
 </details>
 
-Swift Next
+Swift 5.3
 ----------
+
+* [SE-0268][]:
+  
+  A `didSet` observer which does not refer to the `oldValue` in its body or does not explicitly request it by placing it in the parameter list (i.e. `didSet(oldValue)`) will no longer trigger a call to the property getter to fetch the `oldValue`.
+  
+  ```swift
+  class C {
+    var value: Int = 0 {
+      didSet { print("didSet called!") }
+    }
+  }
+  
+  let c = C()
+  // This does not trigger a call to the getter for 'value'
+  // because the 'didSet' observer on 'value' does not
+  // refer to the 'oldValue' in its body, which means
+  // the 'oldValue' does not need to be fetched.
+  c.value = 1
+  ```
+  
+* [SE-0276][]:
+
+  Catch clauses in a `do`-`catch` statement can now include multiple patterns in a comma-separated list. The body of a `catch` clause will be executed if a thrown error matches any of its patterns.
+
+  ```swift
+  do {
+    try performTask()
+  } catch TaskError.someFailure(let msg),
+          TaskError.anotherFailure(let msg) {
+    showMessage(msg)
+  }
+  ```
+
+* [SE-0280][]:
+  
+  Enum cases can now satisfy static protocol requirements. A static get-only property of type `Self` can be witnessed by an enum case with no associated values and a static function with arguments and returning `Self` can be witnessed by an enum case with associated values.
+  
+  ```swift
+  protocol P {
+    static var foo: Self { get }
+    static func bar(value: Int) -> Self
+  }
+  
+  enum E: P {
+    case foo // matches 'static var foo'
+    case bar(value: Int) // matches 'static func bar(value:)'
+  }
+  ```
+
+* [SE-0267][]:
+  
+  Non-generic members that support a generic parameter list, including nested type declarations, are now allowed to carry a contextual `where` clause against outer generic parameters. Previously, such declarations could only be expressed by placing the member inside a dedicated constrained extension.
+
+  ```swift
+  struct Box<Wrapped> {
+    func boxes() -> [Box<Wrapped.Element>] where Wrapped: Sequence { ... }
+  }
+  ```
+  Since contextual `where` clauses are effectively visibility constraints, overrides adopting this feature must be at least as visible as the overridden method. In practice, this implies any instance of `Derived` that can access `Base.foo` must also be able to access `Derived.foo`.
+  
+  ```swift
+  class Base<T> {
+    func foo() where T == Int { ... }
+  }
+  
+  class Derived<U>: Base<U> {
+    // OK, <U where U: Equatable> has broader visibility than <T where T == Int>
+    override func foo() where U: Equatable { ... } 
+  }
+
+* [SR-75][]:
+
+  Unapplied references to protocol methods are now supported. Previously this
+  only worked for methods defined in structs, enums and classes.
+
+  ```swift
+  protocol Cat {
+    func play(catToy: Toy)
+  }
+
+  let fn = Cat.play(catToy:)
+  fn(myCat)(myToy)
+  ```
 
 * [SE-0266][]:
   
@@ -62,8 +146,12 @@ Swift Next
   closure's capture list in addition to the existing 'use `self.` explicitly'
   fix-it.
 
+**Add new entries to the top of this section, not here!**
+
 Swift 5.2
 ---------
+
+### 2020-03-24 (Xcode 11.4)
 
 * [SR-11841][]:
 
@@ -256,8 +344,6 @@ Swift 5.2
   let s = Subscriptable()
   print(s[0])
   ```
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.1
 ---------
@@ -7914,8 +8000,13 @@ Swift 1.0
 [SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
 [SE-0266]: <https://github.com/apple/swift-evolution/blob/master/proposals/0266-synthesized-comparable-for-enumerations.md>
+[SE-0267]: <https://github.com/apple/swift-evolution/blob/master/proposals/0267-where-on-contextually-generic.md>
+[SE-0268]: <https://github.com/apple/swift-evolution/blob/master/proposals/0268-didset-semantics.md>
 [SE-0269]: <https://github.com/apple/swift-evolution/blob/master/proposals/0269-implicit-self-explicit-capture.md>
+[SE-0276]: <https://github.com/apple/swift-evolution/blob/master/proposals/0276-multi-pattern-catch-clauses.md>
+[SE-0280]: <https://github.com/apple/swift-evolution/blob/master/proposals/0280-enum-cases-as-protocol-witnesses.md>
 
+[SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
 [SR-631]: <https://bugs.swift.org/browse/SR-631>

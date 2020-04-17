@@ -42,7 +42,10 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
+    case CodeCompletionString::Chunk::ChunkKind::Keyword:
+    case CodeCompletionString::Chunk::ChunkKind::Attribute:
     case CodeCompletionString::Chunk::ChunkKind::Text:
+    case CodeCompletionString::Chunk::ChunkKind::BaseName:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
@@ -59,6 +62,8 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::Whitespace:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail:
+    case CodeCompletionString::Chunk::ChunkKind::TypeIdSystem:
+    case CodeCompletionString::Chunk::ChunkKind::TypeIdUser:
       if (!C.isAnnotation())
         Str += C.getText();
       break;
@@ -72,6 +77,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterTypeBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
@@ -232,11 +238,9 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
     newSF.addImports(importsWithOptions);
   }
 
-  PersistentParserState PersistentState;
-  parseIntoSourceFile(newSF, *BufferID, &PersistentState);
   performTypeChecking(newSF);
 
-  performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);
+  performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
 
   // Reset the error state because it's only relevant to the code that we just
   // processed, which now gets thrown away.
@@ -266,7 +270,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
   if (!Tokens.empty()) {
     Token &LastToken = Tokens.back();
     if (LastToken.is(tok::identifier) || LastToken.isKeyword()) {
-      Prefix = LastToken.getText();
+      Prefix = LastToken.getText().str();
 
       unsigned Offset = Ctx.SourceMgr.getLocOffsetInBuffer(LastToken.getLoc(),
                                                            BufferID);
@@ -293,7 +297,7 @@ StringRef REPLCompletions::getRoot() const {
     return Root.getValue();
   }
 
-  std::string RootStr = CookedResults[0].InsertableString;
+  std::string RootStr = CookedResults[0].InsertableString.str();
   for (auto R : CookedResults) {
     if (R.NumBytesToErase != 0) {
       RootStr.resize(0);

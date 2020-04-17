@@ -203,3 +203,16 @@ func test_generic_subscript_requirements_mismatch_diagnostics() {
 
   s[number: ["hello"]] // expected-error {{subscript 'subscript(number:)' requires that 'String' conform to 'BinaryInteger'}}
 }
+
+// rdar://61084565 - infinite recursion in dynamic member lookup
+func rdar61084565() {
+  @dynamicMemberLookup
+  struct Foo {
+    subscript(dynamicMember _: KeyPath<Foo, Int>) -> Int {
+      return 42
+    }
+  }
+
+  let a = Foo()
+  a[] // expected-error {{value of type 'Foo' has no subscripts}}
+}

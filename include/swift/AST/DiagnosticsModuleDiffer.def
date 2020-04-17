@@ -102,6 +102,8 @@ ERROR(added_invisible_designated_init,none,"%0 has new designated initializers t
 
 ERROR(not_inheriting_convenience_inits,none,"%0 no longer inherits convenience inits from its superclass", (StringRef))
 
+ERROR(enum_case_added,none,"%0 has been added as a new enum case", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

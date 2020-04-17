@@ -78,14 +78,26 @@ func transpose(v: Float) -> Float
 @transpose(of: foo, wrt: (0, v))
 func transpose(v: Float) -> Float
 
-// expected-error @+2 {{expected ')' in 'transpose' attribute}}
+// NOTE: The "expected ',' separator" diagnostic is not ideal.
+// Ideally, the diagnostic should point out that that `Swift.Float.+(_:_)` is
+// not a valid declaration name (missing colon after second argument label).
+// expected-error @+2 {{expected ',' separator}}
 // expected-error @+1 {{expected declaration}}
 @transpose(of: Swift.Float.+(_:_))
 func transpose(v: Float) -> Float
 
-// expected-error @+2 {{expected ')' in 'transpose' attribute}}
+// NOTE: The "expected ',' separator" diagnostic is not ideal.
+// Ideally, the diagnostic should point out that that `Swift.Float.+.a` is
+// not a valid declaration name.
+// expected-error @+2 {{expected ',' separator}}
 // expected-error @+1 {{expected declaration}}
 @transpose(of: Swift.Float.+.a)
+func transpose(v: Float) -> Float
+
+// TF-1168: missing comma before `wrt:`.
+// expected-error @+2 {{expected ',' separator}}
+// expected-error @+1 {{expected declaration}}
+@transpose(of: foo wrt: x)
 func transpose(v: Float) -> Float
 
 func testLocalTransposeRegistration() {

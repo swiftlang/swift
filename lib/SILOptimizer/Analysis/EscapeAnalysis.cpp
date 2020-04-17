@@ -18,6 +18,7 @@
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -122,6 +123,8 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
   case ValueKind::TupleElementAddrInst:
+  case ValueKind::InitExistentialAddrInst:
+  case ValueKind::OpenExistentialAddrInst:
   case ValueKind::BeginAccessInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -138,7 +141,6 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
-  case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UnconditionalCheckedCastInst:
     // DO NOT use LOADABLE_REF_STORAGE because unchecked references don't have
     // retain/release instructions that trigger the 'default' case.
@@ -148,6 +150,20 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
 #include "swift/AST/ReferenceStorage.def"
     return cast<SingleValueInstruction>(value)->getOperand(0);
 
+  case ValueKind::UncheckedAddrCastInst: {
+    auto *uac = cast<UncheckedAddrCastInst>(value);
+    SILValue op = uac->getOperand();
+    SILType srcTy = op->getType().getObjectType();
+    SILType destTy = value->getType().getObjectType();
+    SILFunction *f = uac->getFunction();
+    // If the source and destination of the cast don't agree on being a pointer,
+    // we bail. Otherwise we would miss important edges in the connection graph:
+    // e.g. loads of non-pointers are ignored, while it could be an escape of
+    // the value (which could be a pointer before the cast).
+    if (findCachedPointerKind(srcTy, *f) != findCachedPointerKind(destTy, *f))
+      return SILValue();
+    return op;
+  }
   case ValueKind::TupleExtractInst: {
     auto *TEI = cast<TupleExtractInst>(value);
     // Special handling for extracting the pointer-result from an
@@ -387,6 +403,7 @@ void EscapeAnalysis::ConnectionGraph::clear() {
   UsePoints.clear();
   UsePointTable.clear();
   NodeAllocator.DestroyAll();
+  valid = true;
   assert(ToMerge.empty());
 }
 
@@ -400,6 +417,9 @@ void EscapeAnalysis::ConnectionGraph::clear() {
 // it's interior property.
 EscapeAnalysis::CGNode *
 EscapeAnalysis::ConnectionGraph::getNode(SILValue V) {
+  if (!isValid())
+    return nullptr;
+
   // Early filter obvious non-pointer opcodes.
   if (isa<FunctionRefInst>(V) || isa<DynamicFunctionRefInst>(V) ||
       isa<PreviousDynamicFunctionRefInst>(V))
@@ -1012,6 +1032,9 @@ CGNode *EscapeAnalysis::ConnectionGraph::getReturnNode() {
 
 bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
                                                 CGNodeMap &Mapping) {
+  assert(isValid());
+  assert(SourceGraph->isValid());
+
   // The main point of the merging algorithm is to map each content node in the
   // source graph to a content node in this (destination) graph. This may
   // require creating new nodes or merging existing nodes in this graph.
@@ -1476,6 +1499,11 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
 #ifndef NDEBUG
   OS << "CG of " << F->getName() << '\n';
 
+  if (!isValid()) {
+    OS << "  invalid\n";
+    return;
+  }
+
   // Assign the same IDs to SILValues as the SILPrinter does.
   llvm::DenseMap<const SILNode *, unsigned> InstToIDMap;
   InstToIDMap[nullptr] = (unsigned)-1;
@@ -1579,21 +1607,24 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
   // Invalidating EscapeAnalysis clears the connection graph.
   if (isEmpty())
     return;
+  assert(isValid());
 
   verifyStructure();
 
   // Verify that all pointer nodes are still mapped, otherwise the process of
-  // merging nodes may have lost information.
-  for (SILBasicBlock &BB : *F) {
-    for (auto &I : BB) {
-      if (isNonWritableMemoryAddress(&I))
+  // merging nodes may have lost information. Only visit reachable blocks,
+  // because the graph builder only mapped values from reachable blocks.
+  ReachableBlocks reachable;
+  reachable.visit(F, [this](SILBasicBlock *bb) {
+    for (auto &i : *bb) {
+      if (isNonWritableMemoryAddress(&i))
         continue;
 
-      if (auto ai = dyn_cast<ApplyInst>(&I)) {
-        if (EA->canOptimizeArrayUninitializedCall(ai, this).isValid())
+      if (auto ai = dyn_cast<ApplyInst>(&i)) {
+        if (EA->canOptimizeArrayUninitializedCall(ai).isValid())
           continue;
       }
-      for (auto result : I.getResults()) {
+      for (auto result : i.getResults()) {
         if (EA->getPointerBase(result))
           continue;
 
@@ -1609,7 +1640,8 @@ void EscapeAnalysis::ConnectionGraph::verify() const {
         }
       }
     }
-  }
+    return true;
+  });
 #endif
 }
 
@@ -1703,27 +1735,32 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
   ConnectionGraph *ConGraph = &FInfo->Graph;
   assert(ConGraph->isEmpty());
 
-  // We use a worklist for iteration to visit the blocks in dominance order.
-  llvm::SmallPtrSet<SILBasicBlock*, 32> VisitedBlocks;
-  llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  VisitedBlocks.insert(&*ConGraph->F->begin());
-  WorkList.push_back(&*ConGraph->F->begin());
-
-  while (!WorkList.empty()) {
-    SILBasicBlock *BB = WorkList.pop_back_val();
-
+  // Visit the blocks in dominance order.
+  ReachableBlocks reachable;
+  reachable.visit(ConGraph->F, [&](SILBasicBlock *bb) {
     // Create edges for the instructions.
-    for (auto &I : *BB) {
-      analyzeInstruction(&I, FInfo, BottomUpOrder, RecursionDepth);
+    for (auto &i : *bb) {
+      analyzeInstruction(&i, FInfo, BottomUpOrder, RecursionDepth);
+      
+      // Bail if the graph gets too big. The node merging algorithm has
+      // quadratic complexity and we want to avoid this.
+      // TODO: fix the quadratic complexity (if possible) and remove this limit.
+      if (ConGraph->Nodes.size() > 10000) {
+        ConGraph->invalidate();
+        return false;
+      }
     }
-    for (auto &Succ : BB->getSuccessors()) {
-      if (VisitedBlocks.insert(Succ.getBB()).second)
-        WorkList.push_back(Succ.getBB());
-    }
-  }
+    return true;
+  });
+
+  if (!ConGraph->isValid())
+    return;
 
   // Second step: create defer-edges for block arguments.
   for (SILBasicBlock &BB : *ConGraph->F) {
+    if (!reachable.isVisited(&BB))
+      continue;
+
     if (!linkBBArgs(&BB))
       continue;
 
@@ -1813,8 +1850,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
 }
 
 EscapeAnalysis::ArrayUninitCall
-EscapeAnalysis::canOptimizeArrayUninitializedCall(
-    ApplyInst *ai, const ConnectionGraph *conGraph) {
+EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
   ArrayUninitCall call;
   // This must be an exact match so we don't accidentally optimize
   // "array.uninitialized_intrinsic".
@@ -1860,8 +1896,7 @@ bool EscapeAnalysis::canOptimizeArrayUninitializedResult(
   if (!ai)
     return false;
 
-  auto *conGraph = getConnectionGraph(ai->getFunction());
-  return canOptimizeArrayUninitializedCall(ai, conGraph).isValid();
+  return canOptimizeArrayUninitializedCall(ai).isValid();
 }
 
 // Handle @_semantics("array.uninitialized")
@@ -1911,7 +1946,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return;
       case ArrayCallKind::kArrayUninitialized: {
         ArrayUninitCall call = canOptimizeArrayUninitializedCall(
-            cast<ApplyInst>(FAS.getInstruction()), ConGraph);
+            cast<ApplyInst>(FAS.getInstruction()));
         if (call.isValid()) {
           createArrayUninitializedSubgraph(call, ConGraph);
           return;
@@ -2165,9 +2200,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     }
     case SILInstructionKind::RefElementAddrInst:
     case SILInstructionKind::RefTailAddrInst:
-    case SILInstructionKind::ProjectBoxInst:
-    case SILInstructionKind::InitExistentialAddrInst:
-    case SILInstructionKind::OpenExistentialAddrInst: {
+    case SILInstructionKind::ProjectBoxInst: {
       // For projections into objects, get the non-address reference operand and
       // return an interior content node that the reference points to.
       auto SVI = cast<SingleValueInstruction>(I);
@@ -2469,6 +2502,16 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
 bool EscapeAnalysis::mergeCalleeGraph(SILInstruction *AS,
                                       ConnectionGraph *CallerGraph,
                                       ConnectionGraph *CalleeGraph) {
+  if (!CallerGraph->isValid())
+    return false;
+    
+  if (!CalleeGraph->isValid()) {
+    setAllEscaping(AS, CallerGraph);
+    // Conservatively assume that setting that setAllEscaping(AS) did change the
+    // graph.
+    return true;
+  }
+                                      
   // This CGNodeMap uses an intrusive worklist to keep track of Mapped nodes
   // from the CalleeGraph. Meanwhile, mergeFrom uses separate intrusive
   // worklists to update nodes in the CallerGraph.
@@ -2527,6 +2570,11 @@ bool EscapeAnalysis::mergeCalleeGraph(SILInstruction *AS,
 
 bool EscapeAnalysis::mergeSummaryGraph(ConnectionGraph *SummaryGraph,
                                         ConnectionGraph *Graph) {
+  if (!Graph->isValid()) {
+    bool changed = SummaryGraph->isValid();
+    SummaryGraph->invalidate();
+    return changed;
+  }
 
   // Make a 1-to-1 mapping of all arguments and the return value. This CGNodeMap
   // node map uses an intrusive worklist to keep track of Mapped nodes from the

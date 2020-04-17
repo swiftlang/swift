@@ -164,6 +164,23 @@ void RequirementRepr::print(ASTPrinter &out) const {
   printImpl(out, /*AsWritten=*/true);
 }
 
+static void printTrailingRequirements(ASTPrinter &Printer,
+                                      ArrayRef<RequirementRepr> Reqs,
+                                      bool printWhereKeyword) {
+  if (Reqs.empty()) return;
+
+  if (printWhereKeyword)
+    Printer << " where ";
+  interleave(
+      Reqs,
+      [&](const RequirementRepr &req) {
+        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
+        req.print(Printer);
+        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
+      },
+      [&] { Printer << ", "; });
+}
+
 void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '<';
   interleave(*this,
@@ -176,20 +193,22 @@ void GenericParamList::print(llvm::raw_ostream &OS) const {
              },
              [&] { OS << ", "; });
 
-  if (!getRequirements().empty()) {
-    OS << " where ";
-    interleave(getRequirements(),
-               [&](const RequirementRepr &req) {
-                 req.print(OS);
-               },
-               [&] { OS << ", "; });
-  }
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(),
+                            /*printWhereKeyword*/true);
   OS << '>';
 }
 
 void GenericParamList::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
+}
+
+void TrailingWhereClause::print(llvm::raw_ostream &OS,
+                                bool printWhereKeyword) const {
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(),
+                            printWhereKeyword);
 }
 
 static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
@@ -264,6 +283,10 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
+  case ReadWriteImplKind::StoredWithSimpleDidSet:
+    return "stored_simple_didset";
+  case ReadWriteImplKind::InheritedWithSimpleDidSet:
+    return "inherited_simple_didset";
   }
   llvm_unreachable("bad kind");
 }
@@ -660,9 +683,7 @@ namespace {
       }
       if (auto whereClause = decl->getTrailingWhereClause()) {
         OS << " where requirements: ";
-        interleave(whereClause->getRequirements(),
-                   [&](const RequirementRepr &req) { req.print(OS); },
-                   [&] { OS << ", "; });
+        whereClause->print(OS, /*printWhereKeyword*/false);
       }
       if (decl->overriddenDeclsComputed()) {
         OS << " overridden=";
@@ -781,13 +802,15 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
       PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
-      
-      for (Decl *D : SF.getTopLevelDecls()) {
-        if (D->isImplicit())
-          continue;
 
-        OS << '\n';
-        printRec(D);
+      if (auto decls = SF.getCachedTopLevelDecls()) {
+        for (Decl *D : *decls) {
+          if (D->isImplicit())
+            continue;
+
+          OS << '\n';
+          printRec(D);
+        }
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -1708,21 +1731,10 @@ public:
     Indent -= 2;
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitCatches(ArrayRef<CatchStmt*> clauses) {
+  void visitCatches(ArrayRef<CaseStmt *> clauses) {
     for (auto clause : clauses) {
-      visitCatchStmt(clause);
+      visitCaseStmt(clause);
     }
-  }
-  void visitCatchStmt(CatchStmt *clause) {
-    printCommon(clause, "catch") << '\n';
-    printRec(clause->getErrorPattern());
-    if (auto guard = clause->getGuardExpr()) {
-      OS << '\n';
-      printRec(guard);
-    }
-    OS << '\n';
-    printRec(clause->getBody());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };
 
@@ -2352,6 +2364,34 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E) {
+    printCommon(E, "differentiable_function") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitLinearFunctionExpr(LinearFunctionExpr *E) {
+    printCommon(E, "linear_function") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitDifferentiableFunctionExtractOriginalExpr(
+      DifferentiableFunctionExtractOriginalExpr *E) {
+    printCommon(E, "differentiable_function_extract_original") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitLinearFunctionExtractOriginalExpr(
+      LinearFunctionExtractOriginalExpr *E) {
+    printCommon(E, "linear_function_extract_original") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitLinearToDifferentiableFunctionExpr(
+      LinearToDifferentiableFunctionExpr *E) {
+    printCommon(E, "linear_to_differentiable_function") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 
   void visitInOutExpr(InOutExpr *E) {
     printCommon(E, "inout_expr") << '\n';
@@ -2471,6 +2511,18 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPropertyWrapperValuePlaceholderExpr(
+      PropertyWrapperValuePlaceholderExpr *E) {
+    printCommon(E, "property_wrapper_value_placeholder_expr");
+    OS << '\n';
+    printRec(E->getOpaqueValuePlaceholder());
+    if (auto *value = E->getOriginalWrappedValue()) {
+      OS << '\n';
+      printRec(value);
+    }
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitDefaultArgumentExpr(DefaultArgumentExpr *E) {
     printCommon(E, "default_argument_expr");
     OS << " default_args_owner=";
@@ -2583,7 +2635,7 @@ public:
   }
   void visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
     printCommon(E, "enum_is_case_expr") << ' ' <<
-      E->getEnumElement()->getName() << "\n";
+      E->getEnumElement()->getBaseIdentifier() << "\n";
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -3001,6 +3053,31 @@ public:
     OS << " type="; Ty.dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
+    printCommon("sil_box");
+    Indent += 2;
+
+    ArrayRef<SILBoxTypeReprField> Fields = T->getFields();
+    for (unsigned i = 0, end = Fields.size(); i != end; ++i) {
+      OS << '\n';
+      printCommon("sil_box_field");
+      if (Fields[i].isMutable()) {
+        OS << " mutable";
+      }
+      OS << '\n';
+      printRec(Fields[i].getFieldType());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    for (auto genArg : T->getGenericArguments()) {
+      OS << '\n';
+      printRec(genArg);
+    }
+
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    Indent -= 2;
+  }
 };
 
 } // end anonymous namespace
@@ -3204,8 +3281,11 @@ static void dumpSubstitutionMapRec(
     out << "substitution ";
     genericParams[i]->print(out);
     out << " -> ";
-    if (replacementTypes[i])
-      replacementTypes[i]->print(out);
+    if (replacementTypes[i]) {
+      PrintOptions opts;
+      opts.PrintForSIL = true;
+      replacementTypes[i]->print(out, opts);
+    }
     else
       out << "<<unresolved concrete type>>";
     printParen(')');
@@ -3239,9 +3319,12 @@ void ProtocolConformanceRef::dump() const {
   llvm::errs() << '\n';
 }
 
-void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
-                                  unsigned indent) const {
+void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
+                                  bool details) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  if (!details && isConcrete())
+    visited.insert(getConcrete());
+
   dumpProtocolConformanceRefRec(*this, out, indent, visited);
 }
 void ProtocolConformance::dump() const {
@@ -3649,8 +3732,26 @@ namespace {
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
       printCommon(label, "sil_function_type");
-      // FIXME: Print the structure of the type.
       printField("type", T->getString());
+
+      for (auto param : T->getParameters()) {
+        printRec("input", param.getInterfaceType());
+      }
+      for (auto yield : T->getYields()) {
+        printRec("yield", yield.getInterfaceType());
+      }
+      for (auto result : T->getResults()) {
+        printRec("result", result.getInterfaceType());
+      }
+      if (auto error  = T->getOptionalErrorResult()) {
+        printRec("error", error->getInterfaceType());
+      }
+      OS << '\n';
+      T->getPatternSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
+                                        Indent+2);
+      OS << '\n';
+      T->getInvocationSubstitutions().dump(OS, SubstitutionMap::DumpStyle::Full,
+                                           Indent+2);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

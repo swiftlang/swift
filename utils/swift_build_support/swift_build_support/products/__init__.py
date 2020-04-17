@@ -29,6 +29,7 @@ from .swift import Swift
 from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
+from .tensorflow import TensorFlowSwiftAPIs
 from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
 
@@ -47,6 +48,7 @@ __all__ = [
     'PythonKit',
     'Swift',
     'SwiftPM',
+    'TensorFlowSwiftAPIs',
     'XCTest',
     'SwiftSyntax',
     'SKStressTester',

@@ -5,6 +5,8 @@ add_swift_host_library(swiftImmediate STATIC
     executionengine
     linker
     mcjit
+    orcjit
+    jitlink
     transformutils)
 target_link_libraries(swiftImmediate PRIVATE
   swiftFrontend

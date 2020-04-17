@@ -20,6 +20,7 @@ namespace clang {
 class ASTContext;
 class CompilerInstance;
 class Decl;
+class Module;
 class Preprocessor;
 class Sema;
 class TargetInfo;
@@ -124,6 +125,12 @@ public:
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.
   virtual ModuleDecl *getImportedHeaderModule() const = 0;
+
+  /// Retrieves the Swift wrapper for the given Clang module, creating
+  /// it if necessary.
+  virtual ModuleDecl *
+  getWrapperForModule(const clang::Module *mod,
+                      bool returnOverlayIfPossible = false) const = 0;
 
   /// Adds a new search path to the Clang CompilerInstance, as if specified with
   /// -I or -F.

@@ -23,23 +23,25 @@ if var x = foo() {
 
 use(x) // expected-error{{unresolved identifier 'x'}}
 
-if let x = nonOptionalStruct() { } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
-if let x = nonOptionalEnum() { } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
+if let x = nonOptionalStruct() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
+if let x = nonOptionalEnum() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
 
 guard let _ = nonOptionalStruct() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 guard let _ = nonOptionalEnum() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
 
-if case let x? = nonOptionalStruct() { } // expected-error{{'?' pattern cannot match values of type 'NonOptionalStruct'}}
-if case let x? = nonOptionalEnum() { } // expected-error{{'?' pattern cannot match values of type 'NonOptionalEnum'}}
+if case let x? = nonOptionalStruct() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalStruct'}}
+if case let x? = nonOptionalEnum() { _ = x } // expected-error{{'?' pattern cannot match values of type 'NonOptionalEnum'}}
 
 class B {} // expected-note * {{did you mean 'B'?}}
 class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
 if let {} // expected-error {{expected '{' after 'if' condition}} expected-error {{pattern matching in a condition requires the 'case' keyword}}
-if let x = {} // expected-error{{'{' after 'if'}} expected-error {{variable binding in a condition requires an initializer}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
+if let x = { } // expected-error{{'{' after 'if'}} expected-error {{variable binding in a condition requires an initializer}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
+// expected-warning@-1{{value 'x' was defined but never used}}
 
 if let x = foo() {
+  _ = x
 } else {
   // TODO: more contextual error? "x is only available on the true branch"?
   use(x) // expected-error{{unresolved identifier 'x'}}
@@ -62,8 +64,8 @@ if var x = opt {} // expected-warning {{value 'x' was defined but never used; co
 
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
-if let y = someInteger {}  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
-if case let y? = someInteger {}  // expected-error {{'?' pattern cannot match values of type 'Int'}}
+if let y = someInteger { _ = y }  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+if case let y? = someInteger { _ = y }  // expected-error {{'?' pattern cannot match values of type 'Int'}}
 
 // Test multiple clauses on "if let".
 if let x = opt, let y = opt, x != y,
@@ -142,3 +144,97 @@ func testWhileScoping(_ a: Int?) {// expected-note {{did you mean 'a'?}}
   useInt(x) // expected-error{{use of unresolved identifier 'x'}}
 }
 
+// Matching a case with a single, labeled associated value.
+public enum SomeParseResult<T> {
+  case error(length: Int)
+  case repeated(value: String, repetitions: Int)
+  // expected-note@-1{{'repeated(value:repetitions:)' declared here}}
+
+  var _error: Int? {
+    if case .error(let result) = self { return result }
+    return nil
+  }
+
+  var _error2: Int? {
+    if case .error(length: let result) = self { return result }
+    return nil
+  }
+
+  var _error3: Int? {
+    if case .error(wrong: let result) = self { return result } // expected-error{{tuple pattern element label 'wrong' must be 'length'}}
+    return nil
+  }
+
+  var _repeated: (String, Int)? {
+    if case .repeated(let value, let repetitions) = self {
+      return (value, repetitions)
+    }
+    return nil
+  }
+
+  var _repeated2: (String, Int)? {
+    if case .repeated(value: let value, let repetitions) = self {
+      return (value, repetitions)
+    }
+    return nil
+  }
+
+  var _repeated3: (String, Int)? {
+    if case .repeated(let value, repetitions: let repetitions) = self {
+      return (value, repetitions)
+    }
+    return nil
+  }
+
+  var _repeated4: (String, Int)? {
+    if case .repeated(value: let value, repetitions: let repetitions) = self {
+      return (value, repetitions)
+    }
+    return nil
+  }
+
+  var _repeated5: (String, Int)? {
+    if case .repeated(value: let value, wrong: let repetitions) = self { // expected-error{{tuple pattern element label 'wrong' must be 'repetitions'}}
+      return (value, repetitions)
+    }
+    return nil
+  }
+}
+
+func matchImplicitTupling(pr: SomeParseResult<Int>) {
+  if case .repeated(let x) = pr { // expected-warning{{enum case 'repeated' has 2 associated values; matching them as a tuple is deprecated}}
+    let y: Int = x // expected-error{{cannot convert value of type '(value: String, repetitions: Int)' to specified type 'Int'}}
+  }
+}
+
+// Cope with an ambiguity between a case name and a static member. Prefer the
+// case.
+enum CaseStaticAmbiguity {
+  case C(Bool)
+
+  var isC: Bool {
+    if case .C = self { return true }
+    return false
+  }
+
+  static func C(_: Int) -> CaseStaticAmbiguity { return .C(true) }
+}
+
+// Case name/static member ambiguity along with implicit optional unwrapping.
+enum HasPayload {
+  case payload(Int, Bool)
+
+  static func payload(_ bool: Bool, int: Int) -> HasPayload {
+    .payload(int, bool)
+  }
+}
+
+class UsesPayload {
+  private var eOpt: HasPayload? = nil
+
+  deinit {
+    if case .payload(_, let x) = eOpt {
+      _ = x
+    }
+  }
+}

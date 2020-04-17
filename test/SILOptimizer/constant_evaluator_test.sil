@@ -717,8 +717,8 @@ sil @interpretShapeArea : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %1 = integer_literal $Builtin.Int64, 10
   %2 = struct $Int64 (%1 : $Builtin.Int64)
-  %3 = enum $Shape, #Shape.square!enumelt.1, %2 : $Int64
-  switch_enum %3 : $Shape, case #Shape.square!enumelt.1: bb1, case #Shape.rectangle!enumelt.1: bb2
+  %3 = enum $Shape, #Shape.square!enumelt, %2 : $Int64
+  switch_enum %3 : $Shape, case #Shape.square!enumelt: bb1, case #Shape.rectangle!enumelt: bb2
 
 bb1(%4 : $Int64):
   debug_value %4 : $Int64, let, name "side"
@@ -1531,3 +1531,16 @@ bb0:
   dealloc_stack %2 : $*UInt64
   return %5 : $String
 } // CHECK: Returns string: "18446744073709551615"
+
+// CHECK-LABEL: @interpretTsanInstrumentationSkip
+sil [ossa] @interpretTsanInstrumentationSkip : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 23
+  %1 = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %1 : $*Builtin.Int32
+  // This builtin should be skipped and should not affect the value of the argument
+  %2 = builtin "tsanInoutAccess"(%1 : $*Builtin.Int32) : $()
+  %3 = load [trivial] %1 : $*Builtin.Int32
+  dealloc_stack %1 : $*Builtin.Int32
+  return %3 : $Builtin.Int32
+} // CHECK: Returns int: 23

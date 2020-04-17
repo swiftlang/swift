@@ -606,9 +606,8 @@ SILInstruction *getInstructionFollowingValueDefinition(SILValue value) {
 /// \p value is a trivial type, return the value itself.
 SILValue makeOwnedCopyOfSILValue(SILValue value, SILFunction &fun) {
   SILType type = value->getType();
-  if (type.isTrivial(fun))
+  if (type.isTrivial(fun) || type.isAddress())
     return value;
-  assert(!type.isAddress() && "cannot make owned copy of addresses");
 
   SILInstruction *instAfterValueDefinition =
       getInstructionFollowingValueDefinition(value);
@@ -706,11 +705,15 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     CanType elementType;
     ArrayRef<SymbolicValue> arrayElements =
         symVal.getStorageOfArray().getStoredElements(elementType);
+    auto elementSILType = builder.getModule().Types
+      .getLoweredType(AbstractionPattern::getOpaque(), elementType,
+                      TypeExpansionContext(builder.getFunction()));
 
     // Emit code for the symbolic values corresponding to the array elements.
     SmallVector<SILValue, 8> elementSILValues;
     for (SymbolicValue elementSymVal : arrayElements) {
-      SILValue elementSIL = emitCodeForSymbolicValue(elementSymVal, elementType,
+      SILValue elementSIL = emitCodeForSymbolicValue(elementSymVal,
+                                                     elementSILType.getASTType(),
                                                      builder, loc, stringInfo);
       elementSILValues.push_back(elementSIL);
     }
@@ -722,56 +725,71 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     assert(expectedType->is<AnyFunctionType>() ||
            expectedType->is<SILFunctionType>());
 
-    SymbolicClosure *closure = symVal.getClosure();
-    SubstitutionMap callSubstMap = closure->getCallSubstitutionMap();
     SILModule &module = builder.getModule();
-    ArrayRef<SymbolicClosureArgument> captures = closure->getCaptures();
+    SymbolicClosure *closure = symVal.getClosure();
+    SILValue resultVal;
 
-    // Recursively emit code for all captured values that are mapped to a
-    // symbolic value. If there is a captured value that is not mapped
-    // to a symbolic value, use the captured value as such (after possibly
-    // copying non-trivial captures).
-    SmallVector<SILValue, 4> capturedSILVals;
-    for (SymbolicClosureArgument capture : captures) {
-      SILValue captureOperand = capture.first;
-      Optional<SymbolicValue> captureSymVal = capture.second;
-      if (!captureSymVal) {
-        SILFunction &fun = builder.getFunction();
-        assert(captureOperand->getFunction() == &fun &&
-               "non-constant captured arugment not defined in this function");
-        // If the captureOperand is a non-trivial value, it should be copied
-        // as it now used in a new folded closure.
-        SILValue captureCopy = makeOwnedCopyOfSILValue(captureOperand, fun);
-        capturedSILVals.push_back(captureCopy);
-        continue;
+    // If the closure was created in the context of this function where the code
+    // is generated, reuse the original closure value (after extending its
+    // lifetime by copying).
+    SingleValueInstruction *originalClosureInst = closure->getClosureInst();
+    SILFunction &fun = builder.getFunction();
+    if (originalClosureInst->getFunction() == &fun) {
+      // Copy the closure, since the returned value must be owned and the
+      // closure's lifetime must be extended until this point.
+      resultVal = makeOwnedCopyOfSILValue(originalClosureInst, fun);
+    } else {
+      // If the closure captures a value that is not a constant, it should only
+      // come from the caller of the log call. It should be handled by the then
+      // case and we should never reach here. Assert this.
+      assert(closure->hasOnlyConstantCaptures() &&
+             "closure with non-constant captures not defined in this function");
+      SubstitutionMap callSubstMap = closure->getCallSubstitutionMap();
+      ArrayRef<SymbolicClosureArgument> captures = closure->getCaptures();
+      // Recursively emit code for all captured values which must be mapped to a
+      // symbolic value.
+      SmallVector<SILValue, 4> capturedSILVals;
+      for (SymbolicClosureArgument capture : captures) {
+        SILValue captureOperand = capture.first;
+        Optional<SymbolicValue> captureSymVal = capture.second;
+        assert(captureSymVal);
+        // Note that the captured operand type may have generic parameters which
+        // has to be substituted with the substitution map that was inferred by
+        // the constant evaluator at the partial-apply site.
+        SILType operandType = captureOperand->getType();
+        SILType captureType = operandType.subst(module, callSubstMap);
+        SILValue captureSILVal = emitCodeForSymbolicValue(
+            captureSymVal.getValue(), captureType.getASTType(), builder, loc,
+            stringInfo);
+        capturedSILVals.push_back(captureSILVal);
       }
-      // Here, we have a symbolic value for the capture. Therefore, use it to
-      // create a new constant at this point. Note that the captured operand
-      // type may have generic parameters which has to be substituted with the
-      // substitution map that was inferred by the constant evaluator at the
-      // partial-apply site.
-      SILType operandType = captureOperand->getType();
-      SILType captureType = operandType.subst(module, callSubstMap);
-      SILValue captureSILVal = emitCodeForSymbolicValue(
-          captureSymVal.getValue(), captureType.getASTType(), builder, loc,
-          stringInfo);
-      capturedSILVals.push_back(captureSILVal);
+      FunctionRefInst *functionRef =
+          builder.createFunctionRef(loc, closure->getTarget());
+      SILType closureType = closure->getClosureType();
+      ParameterConvention convention =
+          closureType.getAs<SILFunctionType>()->getCalleeConvention();
+      resultVal = builder.createPartialApply(loc, functionRef, callSubstMap,
+                                             capturedSILVals, convention);
     }
-
-    FunctionRefInst *functionRef =
-        builder.createFunctionRef(loc, closure->getTarget());
-    SILType closureType = closure->getClosureType();
-    ParameterConvention convention =
-        closureType.getAs<SILFunctionType>()->getCalleeConvention();
-    PartialApplyInst *papply = builder.createPartialApply(
-        loc, functionRef, callSubstMap, capturedSILVals, convention);
-    // The type of the created closure must be a lowering of the expected type.
-    SILType resultType = papply->getType();
+    // If the expected type is a SILFunctionType convert the closure to the
+    // expected type using a convert_function instruction. Otherwise, if the
+    // expected type is AnyFunctionType, nothing needs to be done.
+    // Note that we cannot assert the lowering in the latter case, as that
+    // utility doesn't exist yet.
+    auto resultType = resultVal->getType().castTo<SILFunctionType>();
     CanType expectedCanType = expectedType->getCanonicalType();
-    assert(expectedType->is<SILFunctionType>()
-               ? resultType.getASTType() == expectedCanType
-               : resultType.is<SILFunctionType>());
-    return papply;
+    if (auto expectedFnType = dyn_cast<SILFunctionType>(expectedCanType)) {
+      assert(expectedFnType->getUnsubstitutedType(module)
+               == resultType->getUnsubstitutedType(module));
+      // Convert to the expected type if necessary.
+      if (expectedFnType != resultType) {
+        auto convert = builder.createConvertFunction(
+            loc, resultVal, SILType::getPrimitiveObjectType(expectedFnType),
+            false);
+        return convert;
+      }
+    }
+    return resultVal;
   }
   default: {
     llvm_unreachable("Symbolic value kind is not supported");
@@ -855,17 +873,11 @@ getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
 /// value, if there is exactly one such introducing value. Otherwise, return
 /// None. There can be multiple borrow scopes for a SILValue iff it is derived
 /// from a guaranteed basic block parameter representing a phi node.
-static Optional<BorrowScopeIntroducingValue>
+static Optional<BorrowedValue>
 getUniqueBorrowScopeIntroducingValue(SILValue value) {
   assert(value.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
          "parameter must be a guarenteed value");
-  SmallVector<BorrowScopeIntroducingValue, 4> borrowIntroducers;
-  getUnderlyingBorrowIntroducingValues(value, borrowIntroducers);
-  assert(borrowIntroducers.size() > 0 &&
-         "folding guaranteed value with no borrow introducer");
-  if (borrowIntroducers.size() > 1)
-    return None;
-  return borrowIntroducers[0];
+  return getSingleBorrowIntroducingValue(value);
 }
 
 /// Replace all uses of \c originalVal by \c foldedVal and adjust lifetimes of
@@ -918,7 +930,7 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   // destroy foldedVal at the end of the borrow scope.
   assert(originalVal.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
 
-  Optional<BorrowScopeIntroducingValue> originalScopeBegin =
+  Optional<BorrowedValue> originalScopeBegin =
       getUniqueBorrowScopeIntroducingValue(originalVal);
   assert(originalScopeBegin &&
          "value without a unique borrow scope should not have been folded");
@@ -969,7 +981,7 @@ static void substituteConstants(FoldState &foldState) {
     // value at the point where the owned value is defined.
     SILInstruction *insertionPoint = definingInst;
     if (constantSILValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-      Optional<BorrowScopeIntroducingValue> borrowIntroducer =
+      Optional<BorrowedValue> borrowIntroducer =
           getUniqueBorrowScopeIntroducingValue(constantSILValue);
       if (!borrowIntroducer) {
         // This case happens only if constantSILValue is derived from a
@@ -1323,6 +1335,17 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
       worklist.push_back(storeInst);
       candidateStartInstructions.insert(storeInst);
     }
+    // Skip other uses of alloc_stack including function calls on the
+    // alloc_stack and data dependenceis through them. This is done because
+    // all functions using the alloc_stack are expected to be constant evaluated
+    // and therefore should only be passed constants or auto closures. These
+    // constants must be constructed immediately before the call and would only
+    // appear in the SIL after the alloc_stack instruction. This invariant is
+    // relied upon here so as to restrict the backward dependency search, which
+    // in turn keeps the code that is constant evaluated small.
+    // Note that if the client code violates this assumption, it will be
+    // diagnosed by this pass (in function detectAndDiagnoseErrors) as it will
+    // result in non-constant values for OSLogMessage instance.
   }
 
   // Find the first basic block in the control-flow order. Typically, if
@@ -1336,14 +1359,27 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
   }
 
   SILBasicBlock *firstBB = nullptr;
-  SILBasicBlock *entryBB = oslogInit->getFunction()->getEntryBlock();
-  for (SILBasicBlock *bb: llvm::breadth_first<SILBasicBlock *>(entryBB)) {
-    if (candidateBBs.count(bb)) {
-      firstBB = bb;
-      break;
+  if (candidateBBs.size() == 1) {
+    firstBB = *candidateBBs.begin();
+  } else {
+    SILBasicBlock *entryBB = oslogInit->getFunction()->getEntryBlock();
+    for (SILBasicBlock *bb : llvm::breadth_first<SILBasicBlock *>(entryBB)) {
+      if (candidateBBs.count(bb)) {
+        firstBB = bb;
+        break;
+      }
+    }
+    if (!firstBB) {
+      // This case will be reached only if the log call appears in unreachable
+      // code and, for some reason, its data depedencies extend beyond a basic
+      // block. This case should generally not happen unless the library
+      // implementation of the os log APIs change. It is better to warn in this
+      // case, rather than skipping the call silently.
+      diagnose(callee->getASTContext(), oslogInit->getLoc().getSourceLoc(),
+               diag::oslog_call_in_unreachable_code);
+      return nullptr;
     }
   }
-  assert(firstBB);
 
   // Iterate over the instructions in the firstBB and find the instruction that
   // starts the interpolation.
@@ -1354,7 +1390,7 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
       break;
     }
   }
-  assert(startInst);
+  assert(startInst && "could not find beginning of interpolation");
   return startInst;
 }
 
@@ -1444,7 +1480,10 @@ class OSLogOptimization : public SILFunctionTransform {
     // iteration.
     for (auto *oslogInit : oslogMessageInits) {
       SILInstruction *interpolationStart = beginOfInterpolation(oslogInit);
-      assert(interpolationStart);
+      if (!interpolationStart) {
+        // The log call is in unreachable code here.
+        continue;
+      }
       madeChange |= constantFold(interpolationStart, oslogInit, assertConfig);
     }
 

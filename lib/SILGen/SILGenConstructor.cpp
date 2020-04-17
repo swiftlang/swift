@@ -107,6 +107,7 @@ static RValue maybeEmitPropertyWrapperInitFromValue(
     SILGenFunction &SGF,
     SILLocation loc,
     VarDecl *field,
+    SubstitutionMap subs,
     RValue &&arg) {
   auto originalProperty = field->getOriginalWrappedProperty();
   if (!originalProperty ||
@@ -118,7 +119,33 @@ static RValue maybeEmitPropertyWrapperInitFromValue(
     return std::move(arg);
 
   return SGF.emitApplyOfPropertyWrapperBackingInitializer(loc, originalProperty,
-                                                          std::move(arg));
+                                                          subs, std::move(arg));
+}
+
+static SubstitutionMap getSubstitutionsForPropertyInitializer(
+    DeclContext *dc,
+    NominalTypeDecl *nominal) {
+  // We want a substitution list written in terms of the generic
+  // signature of the type, with replacement archetypes from the
+  // constructor's context (which might be in an extension of
+  // the type, which adds additional generic requirements).
+  if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
+    // Generate a set of substitutions for the initialization function,
+    // whose generic signature is that of the type context, and whose
+    // replacement types are the archetypes of the initializer itself.
+    return SubstitutionMap::get(
+      nominal->getGenericSignatureOfContext(),
+      [&](SubstitutableType *type) {
+        if (auto gp = type->getAs<GenericTypeParamType>()) {
+          return genericEnv->mapTypeIntoContext(gp);
+        }
+
+        return Type(type);
+      },
+      LookUpConformanceInModule(dc->getParentModule()));
+  }
+
+  return SubstitutionMap();
 }
 
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
@@ -161,6 +188,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   auto *decl = selfTy.getStructOrBoundGenericStruct();
   assert(decl && "not a struct?!");
 
+  auto subs = getSubstitutionsForPropertyInitializer(decl, decl);
+
   // If we have an indirect return slot, initialize it in-place.
   if (resultSlot) {
     auto elti = elements.begin(), eltEnd = elements.end();
@@ -178,7 +207,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
                "number of args does not match number of fields");
         (void)eltEnd;
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-        maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, std::move(*elti))
+        maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
+                                              std::move(*elti))
           .forwardInto(SGF, Loc, init.get());
         ++elti;
       } else {
@@ -190,6 +220,21 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
         // Cleanup after this initialization.
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+
+        // If this is a property wrapper backing storage var that isn't
+        // memberwise initialized and has an original wrapped value, apply
+        // the property wrapper backing initializer.
+        if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
+          auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
+          if (wrappedInfo.originalInitialValue) {
+            auto arg = SGF.emitRValue(wrappedInfo.originalInitialValue);
+            maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
+                                                  std::move(arg))
+              .forwardInto(SGF, Loc, init.get());
+            continue;
+          }
+        }
+
         SGF.emitExprInto(field->getParentInitializer(), init.get());
       }
     }
@@ -205,26 +250,36 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   for (VarDecl *field : decl->getStoredProperties()) {
     auto fieldTy =
         selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
-    SILValue v;
+    RValue value;
 
     // If it's memberwise initialized, do so now.
     if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/false)) {
-      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      v = maybeEmitPropertyWrapperInitFromValue(
-          SGF, Loc, field, std::move(*elti))
-        .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+      value = std::move(*elti);
       ++elti;
     } else {
       // Otherwise, use its initializer.
       assert(field->isParentInitialized());
+      Expr *init = field->getParentInitializer();
 
-      // Cleanup after this initialization.
-      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-      v = SGF.emitRValue(field->getParentInitializer())
-             .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+      // If this is a property wrapper backing storage var that isn't
+      // memberwise initialized, use the original wrapped value if it exists.
+      if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
+        auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
+        if (wrappedInfo.originalInitialValue) {
+          init = wrappedInfo.originalInitialValue;
+        }
+      }
+
+      value = SGF.emitRValue(init);
     }
+
+    // Cleanup after this initialization.
+    FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+    SILValue v = maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
+                                                       std::move(value))
+        .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
 
     eltValues.push_back(v);
   }
@@ -281,7 +336,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  prepareEpilog(Type(), ctor->hasThrows(), CleanupLocation(ctor));
+  prepareEpilog(false, ctor->hasThrows(), CleanupLocation(ctor));
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -659,7 +714,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(Type(), ctor->hasThrows(),
+  prepareEpilog(false, ctor->hasThrows(),
                 CleanupLocation::get(endOfInitLoc));
 
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
@@ -900,7 +955,7 @@ static Type getInitializationTypeInContext(
   if (auto singleVar = pattern->getSingleVar()) {
     if (auto originalProperty = singleVar->getOriginalWrappedProperty()) {
       if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
-        interfaceType = originalProperty->getValueInterfaceType();
+        interfaceType = originalProperty->getPropertyWrapperInitValueInterfaceType();
     }
   }
 
@@ -912,6 +967,8 @@ static Type getInitializationTypeInContext(
 void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             VarDecl *selfDecl,
                                             NominalTypeDecl *nominal) {
+  auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
+
   for (auto member : nominal->getMembers()) {
     // Find instance pattern binding declarations that have initializers.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
@@ -924,30 +981,6 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         auto *varPattern = pbd->getPattern(i);
         // Cleanup after this initialization.
         FullExpr scope(Cleanups, varPattern);
-
-        // We want a substitution list written in terms of the generic
-        // signature of the type, with replacement archetypes from the
-        // constructor's context (which might be in an extension of
-        // the type, which adds additional generic requirements).
-        SubstitutionMap subs;
-        auto *genericEnv = dc->getGenericEnvironmentOfContext();
-        auto typeGenericSig = nominal->getGenericSignatureOfContext();
-
-        if (genericEnv && typeGenericSig) {
-          // Generate a set of substitutions for the initialization function,
-          // whose generic signature is that of the type context, and whose
-          // replacement types are the archetypes of the initializer itself.
-          subs = SubstitutionMap::get(
-            typeGenericSig,
-            [&](SubstitutableType *type) {
-              if (auto gp = type->getAs<GenericTypeParamType>()) {
-                return genericEnv->mapTypeIntoContext(gp);
-              }
-
-              return Type(type);
-            },
-            LookUpConformanceInModule(dc->getParentModule()));
-        }
 
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.
@@ -970,7 +1003,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           if (originalVar &&
               originalVar->isPropertyMemberwiseInitializedWithWrappedType()) {
             result = maybeEmitPropertyWrapperInitFromValue(
-                *this, init, singleVar, std::move(result));
+                *this, init, singleVar, subs, std::move(result));
           }
         }
 
@@ -1000,7 +1033,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   VarLocs[selfDecl] = VarLoc::get(selfArg);
 
   auto cleanupLoc = CleanupLocation::get(loc);
-  prepareEpilog(TupleType::getEmpty(getASTContext()), false, cleanupLoc);
+  prepareEpilog(false, false, cleanupLoc);
 
   // Emit the initializers.
   emitMemberInitializers(cd, selfDecl, cd);

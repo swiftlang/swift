@@ -20,16 +20,16 @@ class TestChain {
 // rdar://problem/58098222
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s == \
-// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=16:32 %s -async -- %s | %FileCheck %s
+// RUN:   -req=complete -pos=16:32 %s -async -- %s == \
+// RUN:   -req=complete -pos=16:32 %s -async -- %s == \
+// RUN:   -req=complete -pos=16:32 %s -async -- %s == \
+// RUN:   -req=complete -pos=16:32 %s -async -- %s == \
+// RUN:   -req=complete -pos=16:32 %s -async -- %s == \
+// RUN:   -req=complete -pos=16:32 %s -async -- %s == \
+// RUN:   -req=complete -pos=16:32 %s -async -- %s == \
+// RUN:   -req=complete -pos=16:32 %s -async -- %s == \
+// RUN:   -req=complete -pos=16:32 %s -async -- %s == \
+// RUN:   -req=complete -pos=16:32 %s -async -- %s | %FileCheck %s
 
 // CHECK-NOT: key.name: "prop1"
 // CHECK-NOT: key.name: "prop2"

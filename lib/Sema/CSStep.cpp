@@ -220,6 +220,7 @@ bool SplitterStep::mergePartialSolutions() const {
   ArrayRef<unsigned> counts = countsVec;
   SmallVector<unsigned, 2> indices(numComponents, 0);
   bool anySolutions = false;
+  size_t solutionMemory = 0;
   do {
     // Create a new solver scope in which we apply all of the relevant partial
     // solutions.
@@ -236,6 +237,7 @@ bool SplitterStep::mergePartialSolutions() const {
     if (!CS.worseThanBestSolution()) {
       // Finalize this solution.
       auto solution = CS.finalize();
+      solutionMemory += solution.getTotalMemory();
       if (isDebugMode())
         getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
 
@@ -243,6 +245,12 @@ bool SplitterStep::mergePartialSolutions() const {
       Solutions.push_back(std::move(solution));
       anySolutions = true;
     }
+
+    // Since merging partial solutions can go exponential, make sure we didn't
+    // pass the "too complex" thresholds including allocated memory and time.
+    if (CS.getExpressionTooComplex(solutionMemory))
+      return false;
+
   } while (nextCombination(counts, indices));
 
   return anySolutions;
@@ -344,6 +352,25 @@ StepResult ComponentStep::take(bool prevFailed) {
     // we can't solve this system unless we have free type variables
     // allowed in the solution.
     return finalize(/*isSuccess=*/false);
+  }
+
+  // If we don't have any disjunction or type variable choices left, we're done
+  // solving. Make sure we don't have any unsolved constraints left over, using
+  // report_fatal_error to make sure we trap in release builds instead of
+  // potentially miscompiling.
+  if (!CS.ActiveConstraints.empty()) {
+    CS.print(llvm::errs());
+    llvm::report_fatal_error("Active constraints left over?");
+  }
+  if (!CS.solverState->allowsFreeTypeVariables()) {
+    if (!CS.InactiveConstraints.empty()) {
+      CS.print(llvm::errs());
+      llvm::report_fatal_error("Inactive constraints left over?");
+    }
+    if (CS.hasFreeTypeVariables()) {
+      CS.print(llvm::errs());
+      llvm::report_fatal_error("Free type variables left over?");
+    }
   }
 
   // If this solution is worse than the best solution we've seen so far,
