@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <functional>
@@ -698,11 +699,9 @@ void SILModule::serialize() {
   setSerialized();
 }
 
-void SILModule::setSILRemarkStreamer(
-    std::unique_ptr<llvm::raw_fd_ostream> &&remarkStream,
-    std::unique_ptr<swift::SILRemarkStreamer> &&remarkStreamer) {
-  silRemarkStream = std::move(remarkStream);
-  silRemarkStreamer = std::move(remarkStreamer);
+void SILModule::installSILRemarkStreamer() {
+  assert(!silRemarkStreamer && "SIL Remark Streamer is already installed!");
+  silRemarkStreamer = SILRemarkStreamer::create(*this);
 }
 
 bool SILModule::isStdlibModule() const {
