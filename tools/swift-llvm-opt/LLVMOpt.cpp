@@ -24,7 +24,6 @@
 
 #include "swift/Subsystems.h"
 #include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/LLVMPasses/Passes.h"
