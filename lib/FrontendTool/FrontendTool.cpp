@@ -779,8 +779,6 @@ static bool buildModuleFromInterface(const CompilerInvocation &Invocation,
 
 static bool compileLLVMIR(const CompilerInvocation &Invocation,
                           CompilerInstance &Instance) {
-  auto &LLVMContext = getGlobalLLVMContext();
-
   // Load in bitcode file.
   assert(Invocation.getFrontendOptions().InputsAndOutputs.hasSingleInput() &&
          "We expect a single input for bitcode input!");
@@ -800,8 +798,9 @@ static bool compileLLVMIR(const CompilerInvocation &Invocation,
   llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
 
   llvm::SMDiagnostic Err;
+  auto LLVMContext = std::make_unique<llvm::LLVMContext>();
   std::unique_ptr<llvm::Module> Module =
-      llvm::parseIR(MainFile->getMemBufferRef(), Err, LLVMContext);
+      llvm::parseIR(MainFile->getMemBufferRef(), Err, *LLVMContext.get());
   if (!Module) {
     // TODO: Translate from the diagnostic info to the SourceManager location
     // if available.
