@@ -132,6 +132,26 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   }
 }
 
+/// Returns true if the introduced version in \p newAttr should be used instead
+/// of the introduced version in \p prevAttr when both are attached to the same
+/// declaration and refer to the active platform.
+static bool isBetterThan(const AvailableAttr *newAttr,
+                         const AvailableAttr *prevAttr) {
+  assert(newAttr);
+
+  // If there is no prevAttr, newAttr of course wins.
+  if (!prevAttr)
+    return true;
+
+  // If they belong to the same platform, the one that introduces later wins.
+  if (prevAttr->Platform == newAttr->Platform)
+    return prevAttr->Introduced.getValue() < newAttr->Introduced.getValue();
+
+  // If the new attribute's platform inherits from the old one, it wins.
+  return inheritsAvailabilityFromPlatform(newAttr->Platform,
+                                          prevAttr->Platform);
+}
+
 Optional<AvailabilityContext>
 AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
   const AvailableAttr *bestAvailAttr = nullptr;
@@ -145,12 +165,8 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
       continue;
     }
 
-    // Okay, we have a candidate, but is it better than one we already found?
-    if (!bestAvailAttr ||
-        inheritsAvailabilityFromPlatform(AvailAttr->Platform,
-                                         bestAvailAttr->Platform)) {
+    if (isBetterThan(AvailAttr, bestAvailAttr))
       bestAvailAttr = AvailAttr;
-    }
   }
 
   if (!bestAvailAttr)
