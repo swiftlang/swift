@@ -1542,12 +1542,11 @@ namespace {
                       ConstraintLocatorBuilder locator,
                       ConstraintLocatorBuilder calleeLocator);
 
-    // Resolve `@dynamicCallable` applications.
-    Expr *finishApplyDynamicCallable(ApplyExpr *apply,
-                                     SelectedOverload selected,
-                                     FuncDecl *method,
-                                     AnyFunctionType *methodType,
-                                     ConstraintLocatorBuilder applyFunctionLoc);
+    /// Build the function and argument for a `@dynamicCallable` application.
+    std::pair</*fn*/ Expr *, /*arg*/ Expr *>
+    buildDynamicCallable(ApplyExpr *apply, SelectedOverload selected,
+                         FuncDecl *method, AnyFunctionType *methodType,
+                         ConstraintLocatorBuilder applyFunctionLoc);
 
   private:
     /// Simplify the given type by substituting all occurrences of
@@ -7146,12 +7145,11 @@ static Expr *buildCallAsFunctionMethodRef(
 }
 
 // Resolve `@dynamicCallable` applications.
-Expr *
-ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
-                                         SelectedOverload selected,
-                                         FuncDecl *method,
-                                         AnyFunctionType *methodType,
-                                         ConstraintLocatorBuilder loc) {
+std::pair<Expr *, Expr *>
+ExprRewriter::buildDynamicCallable(ApplyExpr *apply, SelectedOverload selected,
+                                   FuncDecl *method,
+                                   AnyFunctionType *methodType,
+                                   ConstraintLocatorBuilder loc) {
   auto &ctx = cs.getASTContext();
   auto *fn = apply->getFn();
 
@@ -7203,8 +7201,7 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
       handleStringLiteralExpr(cast<LiteralExpr>(labelExpr));
 
       Expr *valueExpr = coerceToType(arg->getElement(i), valueType, loc);
-      if (!valueExpr)
-        return nullptr;
+      assert(valueExpr && "Failed to coerce?");
       Expr *pair = TupleExpr::createImplicit(ctx, {labelExpr, valueExpr}, {});
       auto eltTypes = { TupleTypeElt(keyType), TupleTypeElt(valueType) };
       cs.setType(pair, TupleType::get(eltTypes, ctx));
@@ -7217,22 +7214,21 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
   }
   argument->setImplicit();
 
-  // Construct call to the `dynamicallyCall` method.
-  auto result = CallExpr::createImplicit(ctx, member, argument,
-                                         { argumentLabel });
-  cs.setType(result->getArg(), AnyFunctionType::composeInput(ctx, params,
-                                                             false));
-  cs.setType(result, methodType->getResult());
-  cs.cacheExprTypes(result);
-  return result;
+  // Build the argument list expr.
+  argument = TupleExpr::createImplicit(ctx, {argument}, {argumentLabel});
+  cs.setType(argument,
+             TupleType::get({TupleTypeElt(argumentType, argumentLabel)}, ctx));
+
+  return std::make_pair(member, argument);
 }
 
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                 ConstraintLocatorBuilder locator,
                                 ConstraintLocatorBuilder calleeLocator) {
   auto &ctx = cs.getASTContext();
-  
-  auto fn = apply->getFn();
+
+  auto *arg = apply->getArg();
+  auto *fn = apply->getFn();
 
   bool hasTrailingClosure =
     isa<CallExpr>(apply) && cast<CallExpr>(apply)->hasTrailingClosure();
@@ -7401,7 +7397,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     if (method && methodType) {
       // Handle a call to a @dynamicCallable method.
       if (isValidDynamicCallableMethod(method, methodType))
-        return finishApplyDynamicCallable(
+        std::tie(fn, arg) = buildDynamicCallable(
             apply, *selected, method, methodType, applyFunctionLoc);
     }
   }
@@ -7458,13 +7454,11 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // the function.
   SmallVector<Identifier, 2> argLabelsScratch;
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
-    auto origArg = apply->getArg();
-    Expr *arg = coerceCallArguments(origArg, fnType, callee,
-                                    apply,
-                                    apply->getArgumentLabels(argLabelsScratch),
-                                    hasTrailingClosure,
-                                    locator.withPathElement(
-                                      ConstraintLocator::ApplyArgument));
+    arg = coerceCallArguments(arg, fnType, callee, apply,
+                              apply->getArgumentLabels(argLabelsScratch),
+                              hasTrailingClosure,
+                              locator.withPathElement(
+                                  ConstraintLocator::ApplyArgument));
     if (!arg) {
       return nullptr;
     }
