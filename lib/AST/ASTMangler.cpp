@@ -693,9 +693,13 @@ std::string ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
 }
 
 std::string ASTMangler::mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl) {
+  return mangleOpaqueTypeDecl(decl->getNamingDecl());
+}
+
+std::string ASTMangler::mangleOpaqueTypeDecl(const ValueDecl *decl) {
   DWARFMangling = true;
   OptimizeProtocolNames = false;
-  return mangleDeclAsUSR(decl->getNamingDecl(), MANGLING_PREFIX_STR);
+  return mangleDeclAsUSR(decl, MANGLING_PREFIX_STR);
 }
 
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
