@@ -397,12 +397,13 @@ extension _StringGuts {
     }
 
     // TODO(String performance): Stack buffer if small enough
-    var cus = Array<UInt16>(repeating: 0, count: count)
-    cus.withUnsafeMutableBufferPointer {
+    let cus = Array<UInt16>(unsafeUninitializedCapacity: count) {
+      buffer, initializedCapacity in
       _cocoaStringCopyCharacters(
         from: self._object.cocoaObject,
         range: start..<end,
-        into: $0.baseAddress._unsafelyUnwrappedUnchecked)
+        into: buffer.baseAddress._unsafelyUnwrappedUnchecked)
+      initializedCapacity = count
     }
     return cus.withUnsafeBufferPointer {
       return Character(String._uncheckedFromUTF16($0))
