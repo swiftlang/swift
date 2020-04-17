@@ -977,11 +977,16 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
 
     if (SF) {
       IGM.emitSourceFile(*SF);
+      // Emit synthesized file unit, if it exists.
+      if (auto *synthesizedFile = SF->getSynthesizedFile())
+        IGM.emitSynthesizedFileUnit(*synthesizedFile);
     } else {
       for (auto *File : M->getFiles()) {
         if (auto *nextSF = dyn_cast<SourceFile>(File)) {
           if (nextSF->ASTStage >= SourceFile::TypeChecked)
             IGM.emitSourceFile(*nextSF);
+        } else if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File)) {
+          IGM.emitSynthesizedFileUnit(*nextSFU);
         } else {
           File->collectLinkLibraries([&IGM](LinkLibrary LinkLib) {
             IGM.addLinkLibrary(LinkLib);
@@ -989,11 +994,6 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
         }
       }
     }
-
-    // Emit synthesized file units.
-    for (auto *File : M->getFiles())
-      if (auto *nextSFU = dyn_cast<SynthesizedFileUnit>(File))
-        IGM.emitSynthesizedFileUnit(*nextSFU);
 
     // Okay, emit any definitions that we suddenly need.
     irgen.emitLazyDefinitions();
