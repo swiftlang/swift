@@ -1,19 +1,19 @@
 // Test that global variables are handled properly by the ClangImporter.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-clang -c %S/Inputs/global-var.cc -I %S/Inputs -fPIC -o %t/global-var.o
-// RUN: %target-build-swift %s -I %S/Inputs -o %t/global-var %t/global-var.o -Xfrontend -enable-cxx-interop
-// RUN: %target-codesign %t/global-var
-// RUN: %target-run %t/global-var
+// RUN: %target-clang -c %S/Inputs/extern-var.cc -I %S/Inputs -fPIC -o %t/extern-var.o
+// RUN: %target-build-swift %s -I %S/Inputs -o %t/extern-var %t/extern-var.o -Xfrontend -enable-cxx-interop
+// RUN: %target-codesign %t/extern-var
+// RUN: %target-run %t/extern-var
 //
 // REQUIRES: executable_test
 
-import GlobalVar
+import ExternVar
 import StdlibUnittest
 
-var StaticsTestSuite = TestSuite("global-var")
+var StaticsTestSuite = TestSuite("extern-var")
 
-StaticsTestSuite.test("global-var") {
+StaticsTestSuite.test("extern-var") {
   expectEqual(counter, 0)
   expectEqual(count(), 1)
   expectEqual(counter, 1)
@@ -22,7 +22,7 @@ StaticsTestSuite.test("global-var") {
   expectEqual(count(), 43)
 }
 
-StaticsTestSuite.test("namespaced-global-var") {
+StaticsTestSuite.test("namespaced-extern-var") {
   expectEqual(Namespaced.counter, 0)
   expectEqual(Namespaced.count(), 1)
   expectEqual(Namespaced.counter, 1)
