@@ -1239,8 +1239,8 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
                             llvm::Attribute::NoInline);
 
   // Give the function an empty body.
-  auto entry = llvm::BasicBlock::Create(LLVMContext, "", fixLifetime);
-  llvm::ReturnInst::Create(LLVMContext, entry);
+  auto entry = llvm::BasicBlock::Create(getLLVMContext(), "", fixLifetime);
+  llvm::ReturnInst::Create(getLLVMContext(), entry);
   
   FixLifetimeFn = fixLifetime;
   return fixLifetime;

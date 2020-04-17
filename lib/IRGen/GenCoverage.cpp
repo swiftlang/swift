@@ -80,7 +80,7 @@ void IRGenModule::emitCoverageMapping() {
   size_t CurrentSize, PrevSize = FilenamesSize;
 
   // Now we need to build up the list of function records.
-  llvm::LLVMContext &Ctx = LLVMContext;
+  llvm::LLVMContext &Ctx = getLLVMContext();
   auto *Int32Ty = llvm::Type::getInt32Ty(Ctx);
 
   llvm::Type *FunctionRecordTypes[] = {
