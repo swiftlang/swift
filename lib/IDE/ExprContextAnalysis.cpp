@@ -762,7 +762,9 @@ class ExprContextAnalyzer {
       unsigned Position = 0;
       bool HasName;
       if (getPositionInArgs(*DC, Parent, ParsedExpr, Position, HasName)) {
-        recordPossibleType(tupleT->getElementType(Position));
+        // The expected type may have fewer number of elements.
+        if (Position < tupleT->getNumElements())
+          recordPossibleType(tupleT->getElementType(Position));
       }
       break;
     }

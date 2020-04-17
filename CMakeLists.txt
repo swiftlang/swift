@@ -1059,11 +1059,13 @@ if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
       set(SOURCEKIT_RUNTIME_DIR lib)
     endif()
     add_dependencies(sourcekit-inproc BlocksRuntime dispatch)
-    swift_install_in_component(FILES
-                                 $<TARGET_FILE:dispatch>
-                                 $<TARGET_FILE:BlocksRuntime>
-                               DESTINATION ${SOURCEKIT_RUNTIME_DIR}
-                               COMPONENT sourcekit-inproc)
+    if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "OSX|WINDOWS")
+      swift_install_in_component(FILES
+                                   $<TARGET_FILE:dispatch>
+                                   $<TARGET_FILE:BlocksRuntime>
+                                 DESTINATION ${SOURCEKIT_RUNTIME_DIR}
+                                 COMPONENT sourcekit-inproc)
+    endif()
     if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
       swift_install_in_component(FILES
                                    $<TARGET_LINKER_FILE:dispatch>

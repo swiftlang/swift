@@ -13,7 +13,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
     INSTALL_RPATH @executable_path/../lib)
 elseif(NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
   set_target_properties(swift-syntax-parser-test PROPERTIES
-    BUILD_WITH_INSTALL_RPATH YES
     INSTALL_RPATH ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 endif()
 target_compile_options(swift-syntax-parser-test PRIVATE

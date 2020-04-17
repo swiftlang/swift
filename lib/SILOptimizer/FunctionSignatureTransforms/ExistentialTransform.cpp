@@ -179,7 +179,8 @@ void ExistentialSpecializerCloner::cloneArguments(
         NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
     GenericSILType = GenericSILType.getCategoryType(
                                           ArgDesc.Arg->getType().getCategory());
-    auto *NewArg = ClonedEntryBB->createFunctionArgument(GenericSILType);
+    auto *NewArg =
+      ClonedEntryBB->createFunctionArgument(GenericSILType, ArgDesc.Decl);
     NewArg->setOwnershipKind(ValueOwnershipKind(
         NewF, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
     // Determine the Conformances.

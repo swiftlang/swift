@@ -1077,11 +1077,16 @@ public:
       demangledSymbol = demangledSymbol->getChild(0);
       assert(demangledSymbol->getKind() == Demangle::Node::Kind::Type);
       break;
-    // We don't handle pointers to other symbols yet.
-    // TODO: Opaque type descriptors could be useful.
+    // Pointers to opaque type descriptors demangle to the name of the opaque
+    // type declaration.
+    case Demangle::Node::Kind::OpaqueTypeDescriptor:
+      demangledSymbol = demangledSymbol->getChild(0);
+      break;
+      // We don't handle pointers to other symbols yet.
     default:
       return nullptr;
     }
+  
     return demangledSymbol;
   }
   

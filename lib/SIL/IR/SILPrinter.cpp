@@ -601,31 +601,41 @@ public:
     if (BB->args_empty())
       return;
 
-    for (SILValue V : BB->getArguments()) {
-      if (V->use_empty())
+    for (SILArgument *arg : BB->getArguments()) {
+      StringRef name;
+      if (arg->getDecl() && arg->getDecl()->hasName())
+        name = arg->getDecl()->getBaseName().userFacingName();
+
+      if (arg->use_empty() && name.empty())
         continue;
-      *this << "// " << Ctx.getID(V);
-      PrintState.OS.PadToColumn(50);
-      *this << "// user";
-      if (std::next(V->use_begin()) != V->use_end())
-        *this << 's';
-      *this << ": ";
 
-      llvm::SmallVector<ID, 32> UserIDs;
-      for (auto *Op : V->getUses())
-        UserIDs.push_back(Ctx.getID(Op->getUser()));
-
-      // Display the user ids sorted to give a stable use order in the
-      // printer's output if we are asked to do so. This makes diffing large
-      // sections of SIL significantly easier at the expense of not showing
-      // the _TRUE_ order of the users in the use list.
-      if (Ctx.sortSIL()) {
-        std::sort(UserIDs.begin(), UserIDs.end());
+      *this << "// " << Ctx.getID(arg);
+      if (!name.empty()) {
+        *this << " \"" << name << '\"';
       }
+      if (!arg->use_empty()) {
+        PrintState.OS.PadToColumn(50);
+        *this << "// user";
+        if (std::next(arg->use_begin()) != arg->use_end())
+          *this << 's';
+        *this << ": ";
 
-      interleave(UserIDs.begin(), UserIDs.end(),
-                 [&] (ID id) { *this << id; },
-                 [&] { *this << ", "; });
+        llvm::SmallVector<ID, 32> UserIDs;
+        for (auto *Op : arg->getUses())
+          UserIDs.push_back(Ctx.getID(Op->getUser()));
+
+        // Display the user ids sorted to give a stable use order in the
+        // printer's output if we are asked to do so. This makes diffing large
+        // sections of SIL significantly easier at the expense of not showing
+        // the _TRUE_ order of the users in the use list.
+        if (Ctx.sortSIL()) {
+          std::sort(UserIDs.begin(), UserIDs.end());
+        }
+
+        interleave(UserIDs.begin(), UserIDs.end(),
+                   [&] (ID id) { *this << id; },
+                   [&] { *this << ", "; });
+      }
       *this << '\n';
     }
   }

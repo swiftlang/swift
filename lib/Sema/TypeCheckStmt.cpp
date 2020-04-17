@@ -1733,14 +1733,11 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
 
     // Make sure we can reference the designated initializer correctly.
-    if (fromCtor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      TypeChecker::FragileFunctionKind fragileKind;
-      bool treatUsableFromInlineAsPublic;
-      std::tie(fragileKind, treatUsableFromInlineAsPublic) =
-          TypeChecker::getFragileFunctionKind(fromCtor);
+    auto fragileKind = fromCtor->getFragileFunctionKind();
+    if (fragileKind.kind != FragileFunctionKind::None) {
       TypeChecker::diagnoseInlinableDeclRef(
-          fromCtor->getLoc(), ctor, fromCtor, fragileKind,
-          treatUsableFromInlineAsPublic);
+          fromCtor->getLoc(), ctor, fromCtor,
+          fragileKind);
     }
   }
 
@@ -1811,12 +1808,13 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   // rule for classes in non-resilient modules so that they can have inlinable
   // constructors, as long as those constructors don't reference private
   // declarations.
-  if (!isDelegating && classDecl->isResilient() &&
-      ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-    auto kind = TypeChecker::getFragileFunctionKind(ctor);
-    ctor->diagnose(diag::class_designated_init_inlinable_resilient,
-                   classDecl->getDeclaredInterfaceType(),
-                   static_cast<unsigned>(kind.first));
+  if (!isDelegating && classDecl->isResilient()) {
+    auto kind = ctor->getFragileFunctionKind();
+    if (kind.kind != FragileFunctionKind::None) {
+      ctor->diagnose(diag::class_designated_init_inlinable_resilient,
+                     classDecl->getDeclaredInterfaceType(),
+                     static_cast<unsigned>(kind.kind));
+    }
   }
 
   // If we don't want a super.init call, we're done.

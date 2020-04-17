@@ -711,7 +711,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
             current->diagnose(diag::invalid_redecl_init,
                               current->getFullName(),
                               otherInit->isMemberwiseInitializer());
-        } else {
+        } else if (!current->isImplicit() && !other->isImplicit()) {
           ctx.Diags.diagnoseWithNotes(
             current->diagnose(diag::invalid_redecl,
                               current->getFullName()), [&]() {
@@ -1697,10 +1697,10 @@ public:
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
     auto *DC = NTD->getDeclContext();
-    if (DC->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      auto kind = TypeChecker::getFragileFunctionKind(DC);
+    auto kind = DC->getFragileFunctionKind();
+    if (kind.kind != FragileFunctionKind::None) {
       NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getFullName(),
-                    static_cast<unsigned>(kind.first));
+                    static_cast<unsigned>(kind.kind));
     }
 
     // We don't support protocols outside the top level of a file.

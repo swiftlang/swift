@@ -837,12 +837,8 @@ struct WrapperWithProjectedValue<T> {
 class TestInvalidRedeclaration {
   @WrapperWithProjectedValue var i = 17
   // expected-note@-1 {{'i' previously declared here}}
-  // expected-note@-2 {{'$i' previously declared here}}
-  // expected-note@-3 {{'_i' previously declared here}}
   @WrapperWithProjectedValue var i = 39
   // expected-error@-1 {{invalid redeclaration of 'i'}}
-  // expected-error@-2 {{invalid redeclaration of '$i'}}
-  // expected-error@-3 {{invalid redeclaration of '_i'}}
 }
 
 // ---------------------------------------------------------------------------
@@ -1938,5 +1934,10 @@ struct TestDefaultableIntWrapper {
   }
 }
 
-
-
+@propertyWrapper
+public struct NonVisibleImplicitInit {
+// expected-error@-1 {{internal initializer 'init()' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleImplicitInit' (which is public)}}
+  public var wrappedValue: Bool {
+    return false
+  }
+}
