@@ -2844,15 +2844,16 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       << "\" - \"" << llvm::sys::path::filename(J->getExecutable())
       << "\", inputs: [";
 
-    interleave(InputActions.begin(), InputActions.end(),
-               [](const Action *A) {
-                 auto Input = cast<InputAction>(A);
-                 llvm::outs() << '"' << Input->getInputArg().getValue() << '"';
-               },
-               [] { llvm::outs() << ", "; });
+    llvm::interleave(
+        InputActions.begin(), InputActions.end(),
+        [](const Action *A) {
+          auto Input = cast<InputAction>(A);
+          llvm::outs() << '"' << Input->getInputArg().getValue() << '"';
+        },
+        [] { llvm::outs() << ", "; });
     if (!InputActions.empty() && !J->getInputs().empty())
       llvm::outs() << ", ";
-    interleave(
+    llvm::interleave(
         J->getInputs().begin(), J->getInputs().end(),
         [](const Job *Input) {
           auto FileNames = Input->getOutput().getPrimaryOutputFilenames();
@@ -3305,9 +3306,10 @@ static unsigned printActions(const Action *A,
     os << "\"" << IA->getInputArg().getValue() << "\"";
   } else {
     os << "{";
-    interleave(*cast<JobAction>(A),
-               [&](const Action *Input) { os << printActions(Input, Ids); },
-               [&] { os << ", "; });
+    llvm::interleave(
+        *cast<JobAction>(A),
+        [&](const Action *Input) { os << printActions(Input, Ids); },
+        [&] { os << ", "; });
     os << "}";
   }
 

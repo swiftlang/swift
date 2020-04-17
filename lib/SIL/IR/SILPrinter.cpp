@@ -632,9 +632,9 @@ public:
           std::sort(UserIDs.begin(), UserIDs.end());
         }
 
-        interleave(UserIDs.begin(), UserIDs.end(),
-                   [&] (ID id) { *this << id; },
-                   [&] { *this << ", "; });
+        llvm::interleave(
+            UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
+            [&] { *this << ", "; });
       }
       *this << '\n';
     }
@@ -794,8 +794,9 @@ public:
       std::sort(UserIDs.begin(), UserIDs.end());
     }
 
-    interleave(UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
+        [&] { *this << ", "; });
     return true;
   }
 
@@ -1054,15 +1055,16 @@ public:
       *this << "**" << Ctx.getID(result) << "** = ";
     } else {
       *this << '(';
-      interleave(result->getParent()->getResults(),
-                 [&](SILValue value) {
-                   if (value == SILValue(result)) {
-                     *this << "**" << Ctx.getID(result) << "**";
-                     return;
-                   }
-                   *this << Ctx.getID(value);
-                 },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          result->getParent()->getResults(),
+          [&](SILValue value) {
+            if (value == SILValue(result)) {
+              *this << "**" << Ctx.getID(result) << "**";
+              return;
+            }
+            *this << Ctx.getID(value);
+          },
+          [&] { *this << ", "; });
       *this << ')';
     }
 
@@ -1190,9 +1192,10 @@ public:
     printSubstitutions(AI->getSubstitutionMap(),
                        AI->getOrigCalleeType()->getInvocationGenericSignature());
     *this << '(';
-    interleave(AI->getArguments(),
-               [&](const SILValue &arg) { *this << Ctx.getID(arg); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        AI->getArguments(),
+        [&](const SILValue &arg) { *this << Ctx.getID(arg); },
+        [&] { *this << ", "; });
     *this << ") : ";
     if (auto callee = AI->getCallee())
       *this << callee->getType();
@@ -1268,7 +1271,7 @@ public:
     printSubstitutions(BI->getSubstitutions());
     *this << "(";
     
-    interleave(BI->getArguments(), [&](SILValue v) {
+    llvm::interleave(BI->getArguments(), [&](SILValue v) {
       *this << getIDAndType(v);
     }, [&]{
       *this << ", ";
@@ -1447,9 +1450,9 @@ public:
   }
 
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
-    interleave(MFE->getElements(),
-               [&](SILValue Var) { *this << getIDAndType(Var); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        MFE->getElements(), [&](SILValue Var) { *this << getIDAndType(Var); },
+        [&] { *this << ", "; });
   }
 
   void visitDebugValueInst(DebugValueInst *DVI) {
@@ -1665,22 +1668,24 @@ public:
 
   void visitStructInst(StructInst *SI) {
     *this << SI->getType() << " (";
-    interleave(SI->getElements(),
-               [&](const SILValue &V) { *this << getIDAndType(V); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        SI->getElements(), [&](const SILValue &V) { *this << getIDAndType(V); },
+        [&] { *this << ", "; });
     *this << ')';
   }
 
   void visitObjectInst(ObjectInst *OI) {
     *this << OI->getType() << " (";
-    interleave(OI->getBaseElements(),
-               [&](const SILValue &V) { *this << getIDAndType(V); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        OI->getBaseElements(),
+        [&](const SILValue &V) { *this << getIDAndType(V); },
+        [&] { *this << ", "; });
     if (!OI->getTailElements().empty()) {
       *this << ", [tail_elems] ";
-      interleave(OI->getTailElements(),
-                 [&](const SILValue &V) { *this << getIDAndType(V); },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          OI->getTailElements(),
+          [&](const SILValue &V) { *this << getIDAndType(V); },
+          [&] { *this << ", "; });
     }
     *this << ')';
   }
@@ -1700,16 +1705,17 @@ public:
     // If the type is simple, just print the tuple elements.
     if (SimpleType) {
       *this << '(';
-      interleave(TI->getElements(),
-                 [&](const SILValue &V){ *this << getIDAndType(V); },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          TI->getElements(),
+          [&](const SILValue &V) { *this << getIDAndType(V); },
+          [&] { *this << ", "; });
       *this << ')';
     } else {
       // Otherwise, print the type, then each value.
       *this << TI->getType() << " (";
-      interleave(TI->getElements(),
-                 [&](const SILValue &V) { *this << Ctx.getID(V); },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          TI->getElements(), [&](const SILValue &V) { *this << Ctx.getID(V); },
+          [&] { *this << ", "; });
       *this << ')';
     }
   }
@@ -2024,9 +2030,9 @@ public:
   void visitYieldInst(YieldInst *YI) {
     auto values = YI->getYieldedValues();
     if (values.size() != 1) *this << '(';
-    interleave(values,
-               [&](SILValue value) { *this << getIDAndType(value); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        values, [&](SILValue value) { *this << getIDAndType(value); },
+        [&] { *this << ", "; });
     if (values.size() != 1) *this << ')';
     *this << ", resume " << Ctx.getID(YI->getResumeBB())
           << ", unwind " << Ctx.getID(YI->getUnwindBB());
@@ -2119,9 +2125,9 @@ public:
     if (args.empty()) return;
 
     *this << '(';
-    interleave(args,
-               [&](SILValue v) { *this << getIDAndType(v); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        args, [&](SILValue v) { *this << getIDAndType(v); },
+        [&] { *this << ", "; });
     *this << ')';
   }
   

@@ -1090,9 +1090,9 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     if (!spis.empty()) {
       SmallString<64> out;
       llvm::raw_svector_ostream outStream(out);
-      swift::interleave(spis,
-                        [&outStream](Identifier next) { outStream << next.str(); },
-                        [&outStream] { outStream << StringRef("\0", 1); });
+      llvm::interleave(
+          spis, [&outStream](Identifier next) { outStream << next.str(); },
+          [&outStream] { outStream << StringRef("\0", 1); });
       ImportedModuleSPI.emit(ScratchRecord, out);
     }
   }

@@ -65,9 +65,10 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
   locScope->lookupLocalsOrMembers({this}, gatherer);
   if (!gatherer.getDecls().empty()) {
     llvm::errs() << "Local bindings: ";
-    interleave(gatherer.getDecls().begin(), gatherer.getDecls().end(),
-               [&](ValueDecl *value) { llvm::errs() << value->getFullName(); },
-               [&]() { llvm::errs() << " "; });
+    llvm::interleave(
+        gatherer.getDecls().begin(), gatherer.getDecls().end(),
+        [&](ValueDecl *value) { llvm::errs() << value->getFullName(); },
+        [&]() { llvm::errs() << " "; });
     llvm::errs() << "\n";
   }
 }

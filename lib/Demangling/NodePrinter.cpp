@@ -706,29 +706,29 @@ private:
     bool hasLabels = LabelList && LabelList->getNumChildren() > 0;
 
     Printer << '(';
-    interleave(Parameters->begin(), Parameters->end(),
-               [&](NodePointer Param) {
-                 assert(Param->getKind() == Node::Kind::TupleElement);
+    llvm::interleave(
+        Parameters->begin(), Parameters->end(),
+        [&](NodePointer Param) {
+          assert(Param->getKind() == Node::Kind::TupleElement);
 
-                 if (hasLabels) {
-                   Printer << getLabelFor(Param, ParamIndex) << ':';
-                 } else if (!showTypes) {
-                   if (auto Label = getChildIf(Param,
-                                               Node::Kind::TupleElementName))
-                     Printer << Label->getText() << ":";
-                   else
-                     Printer << "_:";
-                 }
+          if (hasLabels) {
+            Printer << getLabelFor(Param, ParamIndex) << ':';
+          } else if (!showTypes) {
+            if (auto Label = getChildIf(Param, Node::Kind::TupleElementName))
+              Printer << Label->getText() << ":";
+            else
+              Printer << "_:";
+          }
 
-                 if (hasLabels && showTypes)
-                   Printer << ' ';
+          if (hasLabels && showTypes)
+            Printer << ' ';
 
-                 ++ParamIndex;
+          ++ParamIndex;
 
-                 if (showTypes)
-                   print(Param);
-               },
-               [&]() { Printer << (showTypes ? ", " : ""); });
+          if (showTypes)
+            print(Param);
+        },
+        [&]() { Printer << (showTypes ? ", " : ""); });
     Printer << ')';
   }
 
