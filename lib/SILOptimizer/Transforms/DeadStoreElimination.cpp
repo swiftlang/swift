@@ -162,7 +162,6 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndAccessInst:
-  case SILInstructionKind::StrongReleaseInst:
     return true;
   default:
     return false;
@@ -1149,6 +1148,16 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
     // actual writes/reads of memory we will catch them there so, we can ignore
     // begin_access here.
     return;
+  } else if (auto *release = dyn_cast<StrongReleaseInst>(I)) {
+    // For strong releases, we have to prove that the strong release won't
+    // envoke the destructor. For now, we just try to find a set_deallocating
+    // instruction that indicates the life-ending strong_release has been
+    // devirtualized. TODO: there should be a better way to do this.
+    for (auto *use : release->getOperand()->getUses()) {
+      if (isa<SetDeallocatingInst>(use->getUser()))
+        return;
+    }
+    processUnknownReadInst(I, Kind);
   } else if (I->mayReadFromMemory()) {
     processUnknownReadInst(I, Kind);
   }  
