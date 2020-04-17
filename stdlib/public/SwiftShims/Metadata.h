@@ -34,6 +34,7 @@ namespace swift { extern "C" {
 #endif
 
 // Shims to call a metadata accessor in Swift.
+API_AVAILABLE(macos(9999), ios(9999), watchos(9999), tvos(9999))
 SWIFT_RUNTIME_STDLIB_API
 MetadataResponse _swift_metadataAccessorCall(void *accessor,
                                              __swift_size_t request,

@@ -1,10 +1,6 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-// This does not work on os_stdlib because it misses availability annotation.
-// rdar://61814566
-// XFAIL: use_os_stdlib
-
 import SwiftShims
 
 struct MetadataAccessFunction {
@@ -36,23 +32,25 @@ func callStructAccessor(
   return accessFn(request: 0, args: generics)
 }
 
-let int = callStructAccessor(for: Int.self)
-// CHECK: Int
-print(unsafeBitCast(int.type!, to: Any.Type.self))
-// CHECK: 0
-print(int.state)
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  let int = callStructAccessor(for: Int.self)
+  // CHECK: Int
+  print(unsafeBitCast(int.type!, to: Any.Type.self))
+  // CHECK: 0
+  print(int.state)
 
-let doubleArray = callStructAccessor(for: [Int].self, with: Double.self)
-// CHECK: Array<Double>
-print(unsafeBitCast(doubleArray.type!, to: Any.Type.self))
-// CHECK: 0
-print(doubleArray.state)
+  let doubleArray = callStructAccessor(for: [Int].self, with: Double.self)
+  // CHECK: Array<Double>
+  print(unsafeBitCast(doubleArray.type!, to: Any.Type.self))
+  // CHECK: 0
+  print(doubleArray.state)
 
-let dictOfIntAndDoubleArray = callStructAccessor(
-  for: [String: [Int]].self,
-  with: Int.self, [Double].self
-)
-// CHECK: Dictionary<Int, Array<Double>>
-print(unsafeBitCast(dictOfIntAndDoubleArray.type!, to: Any.Type.self))
-// CHECK: 0
-print(dictOfIntAndDoubleArray.state)
+  let dictOfIntAndDoubleArray = callStructAccessor(
+    for: [String: [Int]].self,
+    with: Int.self, [Double].self
+  )
+  // CHECK: Dictionary<Int, Array<Double>>
+  print(unsafeBitCast(dictOfIntAndDoubleArray.type!, to: Any.Type.self))
+  // CHECK: 0
+  print(dictOfIntAndDoubleArray.state)
+}
