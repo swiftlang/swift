@@ -84,9 +84,6 @@ ERROR(error_unexpected_input_file,none,
 
 ERROR(error_unknown_target,none,
       "unknown target '%0'", (StringRef))
-WARNING(warning_inferred_simulator_target,none,
-      "inferring simulator environment for target '%0'; "
-      "use '-target %1' instead", (StringRef, StringRef))
 
 ERROR(error_framework_bridging_header,none,
       "using bridging headers with framework targets is unsupported", ())
