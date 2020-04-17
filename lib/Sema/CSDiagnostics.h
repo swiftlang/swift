@@ -1278,10 +1278,11 @@ private:
   /// `@Foo(answer: 42) var question = "ultimate question"`
   bool isPropertyWrapperInitialization() const;
 
-  /// Gather informatioin associated with expression that represents
+  /// Gather information associated with expression that represents
   /// a call - function, arguments, # of arguments and whether it has
   /// a trailing closure.
-  std::tuple<Expr *, Expr *, unsigned, bool> getCallInfo(Expr *anchor) const;
+  std::tuple<Expr *, Expr *, unsigned, bool>
+  getCallInfo(TypedNode anchor) const;
 
   /// Transform given argument into format suitable for a fix-it
   /// text e.g. `[<label>:]? <#<type#>`

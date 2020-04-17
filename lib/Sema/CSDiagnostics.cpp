@@ -3909,9 +3909,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   unsigned numArguments = 0;
   bool hasTrailingClosure = false;
 
-  auto *rawAnchor = getRawAnchor().get<const Expr *>();
   std::tie(fnExpr, argExpr, numArguments, hasTrailingClosure) =
-      getCallInfo(const_cast<Expr *>(rawAnchor));
+      getCallInfo(getRawAnchor());
 
   // TODO(diagnostics): We should be able to suggest this fix-it
   // unconditionally.
@@ -3987,7 +3986,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   bool hasTrailingClosure = false;
 
   std::tie(fnExpr, argExpr, insertableEndIdx, hasTrailingClosure) =
-      getCallInfo(const_cast<Expr *>(anchor.get<const Expr *>()));
+      getCallInfo(anchor);
 
   if (!argExpr)
     return false;
@@ -4293,17 +4292,17 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
 }
 
 std::tuple<Expr *, Expr *, unsigned, bool>
-MissingArgumentsFailure::getCallInfo(Expr *anchor) const {
-  if (auto *call = dyn_cast<CallExpr>(anchor)) {
+MissingArgumentsFailure::getCallInfo(TypedNode anchor) const {
+  if (auto *call = getAsExpr<CallExpr>(anchor)) {
     return std::make_tuple(call->getFn(), call->getArg(),
                            call->getNumArguments(), call->hasTrailingClosure());
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+  } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
     return std::make_tuple(UME, UME->getArgument(), UME->getNumArguments(),
                            UME->hasTrailingClosure());
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+  } else if (auto *SE = getAsExpr<SubscriptExpr>(anchor)) {
     return std::make_tuple(SE, SE->getIndex(), SE->getNumArguments(),
                            SE->hasTrailingClosure());
-  } else if (auto *OLE = dyn_cast<ObjectLiteralExpr>(anchor)) {
+  } else if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor)) {
     return std::make_tuple(OLE, OLE->getArg(), OLE->getNumArguments(),
                            OLE->hasTrailingClosure());
   }
