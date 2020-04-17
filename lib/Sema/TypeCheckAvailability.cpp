@@ -2862,6 +2862,27 @@ void swift::checkExplicitAvailability(Decl *decl) {
     valueDecl = extension->getExtendedNominal();
     if (!valueDecl)
       return;
+
+    // Skip extensions without public members or conformances.
+    auto members = extension->getMembers();
+    auto hasMembers = std::any_of(members.begin(), members.end(),
+                                  [](const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        if (declNeedsExplicitAvailability(VD))
+          return true;
+      return false;
+    });
+
+    auto protocols = extension->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
+                                    [](const ProtocolDecl *PD) -> bool {
+      AccessScope scope =
+        PD->getFormalAccessScope(/*useDC*/nullptr,
+                                 /*treatUsableFromInlineAsPublic*/true);
+      return scope.isPublic();
+    });
+
+    if (!hasMembers && !hasProtocols) return;
   }
 
   if (declNeedsExplicitAvailability(valueDecl)) {
