@@ -13,27 +13,45 @@ import StdlibUnittest
 
 var StaticsTestSuite = TestSuite("extern-var")
 
-StaticsTestSuite.test("extern-var") {
+StaticsTestSuite.test("read") {
   expectEqual(counter, 0)
-  expectEqual(count(), 1)
-  expectEqual(counter, 1)
+  expectEqual(getCounterFromCxx(), 0)
+}
+
+StaticsTestSuite.test("write-from-swift") {
   counter = 42
   expectEqual(counter, 42)
-  expectEqual(count(), 43)
+  expectEqual(getCounterFromCxx(), 42)
+}
+
+StaticsTestSuite.test("write-from-cxx") {
+  setCounterFromCxx(84)
+  expectEqual(counter, 84)
+  expectEqual(getCounterFromCxx(), 84)
 }
 
 //FIXME mangle non-top-level var names to prevent name collisions
-// StaticsTestSuite.test("namespaced-extern-var") {
+// StaticsTestSuite.test("namespaced-read") {
 //   expectEqual(Namespaced.counter, 0)
-//   expectEqual(Namespaced.count(), 1)
-//   expectEqual(Namespaced.counter, 1)
-//   Namespaced.counter = 42
-//   expectEqual(Namespaced.counter, 42)
-//   expectEqual(Namespaced.count(), 43)
+//   expectEqual(Namespaced.getCounterFromCxx(), 0)
 // }
 
 //FIXME mangle non-top-level var names to prevent name collisions
-// StaticsTestSuite.test("non-colliding-extern-vars") {
+// StaticsTestSuite.test("namespaced-write-from-swift") {
+//   Namespaced.counter = 42
+//   expectEqual(Namespaced.counter, 42)
+//   expectEqual(Namespaced.getCounterFromCxx(), 42)
+// }
+
+//FIXME mangle non-top-level var names to prevent name collisions
+// StaticsTestSuite.test("namespaced-write-from-cxx") {
+//   Namespaced.setCounterFromCxx(84)
+//   expectEqual(Namespaced.counter, 84)
+//   expectEqual(Namespaced.getCounterFromCxx(), 84)
+// }
+
+//FIXME mangle non-top-level var names to prevent name collisions
+// StaticsTestSuite.test("no-collisions") {
 //   counter = 12
 //   Namespaced.counter = 42
 //   expectEqual(counter, 12)
