@@ -69,6 +69,7 @@ import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
+import Differentiation
 import Diffing
 import DiffingMyers
 import DropFirst
@@ -258,6 +259,7 @@ registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
+registerBenchmark(Differentiation)
 registerBenchmark(Diffing)
 registerBenchmark(DiffingMyers)
 registerBenchmark(DropFirst)
