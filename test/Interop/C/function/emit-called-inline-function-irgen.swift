@@ -16,5 +16,8 @@ import EmitCalledInlineFunction
 // CXX-DAG: define linkonce_odr i32 @_Z15calledFromSwiftv() #{{[0-9]+}} comdat {
 // CXX-DAG: define linkonce_odr i32 @_Z18calledTransitivelyv() #{{[0-9]+}} comdat {
 // CXX-DAG: define linkonce_odr i32 @_ZN1C32memberFunctionCalledTransitivelyEv(%class.C* %this)
+// CXX-DAG: define linkonce_odr i32 @_Z29calledTransitivelyFromVarInitv() #{{[0-9]+}} comdat {
 
 calledFromSwift()
+
+let _ = varUsedFromSwift

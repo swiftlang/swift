@@ -25,6 +25,18 @@ class C {
     return 42;
   }
 };
+
+inline int calledTransitivelyFromVarInit() {
+  return 42;
+}
+
+inline int varUsedFromSwift = calledTransitivelyFromVarInit();
+#else
+// C only allows constant initializers for variables with static storage
+// duration, so there's no way to initialize this with the result of a call to
+// an inline method. Just provide _some_ definition of `varImportedToSwift` so
+// we can import it in the test.
+static int varUsedFromSwift = 42;
 #endif
 
 INLINE int calledFromSwift() {
