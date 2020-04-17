@@ -48,6 +48,7 @@ namespace swift {
   class DiagnosticEngine;
   class Evaluator;
   class FileUnit;
+  class GeneratedModule;
   class GenericEnvironment;
   class GenericParamList;
   class IRGenOptions;
@@ -230,11 +231,10 @@ namespace swift {
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
-  std::unique_ptr<llvm::Module>
+  GeneratedModule
   performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
-                      llvm::LLVMContext &LLVMContext,
                       ArrayRef<std::string> parallelOutputFilenames,
                       llvm::GlobalVariable **outModuleHash = nullptr,
                       llvm::StringSet<> *LinkerDirectives = nullptr);
@@ -242,12 +242,11 @@ namespace swift {
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
-  std::unique_ptr<llvm::Module>
+  GeneratedModule
   performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       StringRef PrivateDiscriminator,
-                      llvm::LLVMContext &LLVMContext,
                       llvm::GlobalVariable **outModuleHash = nullptr,
                       llvm::StringSet<> *LinkerDirectives = nullptr);
 
@@ -289,9 +288,7 @@ namespace swift {
                    UnifiedStatsReporter *Stats);
 
   /// Dump YAML describing all fixed-size types imported from the given module.
-  bool performDumpTypeInfo(const IRGenOptions &Opts,
-                           SILModule &SILMod,
-                           llvm::LLVMContext &LLVMContext);
+  bool performDumpTypeInfo(const IRGenOptions &Opts, SILModule &SILMod);
 
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>
