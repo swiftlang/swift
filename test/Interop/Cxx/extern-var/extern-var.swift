@@ -1,5 +1,3 @@
-// Test that global variables are handled properly by the ClangImporter.
-
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -c %S/Inputs/extern-var.cc -I %S/Inputs -fPIC -o %t/extern-var.o
 // RUN: %target-build-swift %s -I %S/Inputs -o %t/extern-var %t/extern-var.o -Xfrontend -enable-cxx-interop
