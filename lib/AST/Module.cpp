@@ -2694,16 +2694,21 @@ SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   if (!PrivateDiscriminator.empty())
     return PrivateDiscriminator;
 
-  assert(1 == count_if(getParentModule()->getFiles(),
-                       [](const FileUnit *FU) -> bool {
-                         return isa<SynthesizedFileUnit>(FU);
-                       }) &&
-         "Cannot promise uniqueness if multiple synthesized file units exist");
+  StringRef sourceFileName = getSourceFile().getFilename();
+  if (sourceFileName.empty()) {
+    assert(1 == count_if(getParentModule()->getFiles(),
+                         [](const FileUnit *FU) -> bool {
+                           return isa<SourceFile>(FU) &&
+                                  cast<SourceFile>(FU)->getFilename().empty();
+                         }) &&
+           "Cannot promise uniqueness if multiple source files are nameless");
+  }
 
   // Use a discriminator invariant across Swift version: a hash of the module
-  // name and a special string.
+  // name, the parent source file name, and a special string.
   llvm::MD5 hash;
   hash.update(getParentModule()->getName().str());
+  hash.update(llvm::sys::path::filename(sourceFileName));
   // TODO: Use a more robust discriminator for synthesized files. Pick something
   // that cannot conflict with `SourceFile` discriminators.
   hash.update("SYNTHESIZED FILE");
