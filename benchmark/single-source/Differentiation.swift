@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-import TestsUtils
+#if canImport(_Differentiation)
 
+import TestsUtils
 import _Differentiation
 
 public let Differentiation = [
@@ -68,3 +69,5 @@ public func run_DifferentiationArraySum(N: Int) {
     blackHole(valueWithGradient(at: onesArray, in: sum))
   }
 }
+
+#endif
