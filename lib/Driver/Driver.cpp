@@ -264,17 +264,31 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
 std::unique_ptr<ToolChain>
 Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
 
-  if (const Arg *A = ArgList.getLastArg(options::OPT_target))
+  if (const Arg *A = ArgList.getLastArg(options::OPT_target)) {
     DefaultTargetTriple = llvm::Triple::normalize(A->getValue());
+  }
 
-  const llvm::Triple target(DefaultTargetTriple);
+  llvm::Triple target(DefaultTargetTriple);
+
+  // Backward compatibility hack: infer "simulator" environment for x86
+  // iOS/tvOS/watchOS.
+  if (tripleInfersSimulatorEnvironment(target)) {
+    // Set the simulator environment.
+    target.setEnvironment(llvm::Triple::EnvironmentType::Simulator);
+
+    auto newTargetTriple = target.normalize();
+    Diags.diagnose(SourceLoc(), diag::warning_inferred_simulator_target,
+                   DefaultTargetTriple, newTargetTriple);
+
+    DefaultTargetTriple = newTargetTriple;
+  }
 
   switch (target.getOS()) {
-  case llvm::Triple::Darwin:
-  case llvm::Triple::MacOSX:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
-  case llvm::Triple::WatchOS: {
+  case llvm::Triple::WatchOS:
+  case llvm::Triple::Darwin:
+  case llvm::Triple::MacOSX: {
     Optional<llvm::Triple> targetVariant;
     if (const Arg *A = ArgList.getLastArg(options::OPT_target_variant))
       targetVariant = llvm::Triple(llvm::Triple::normalize(A->getValue()));

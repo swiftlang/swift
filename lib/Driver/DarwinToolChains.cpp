@@ -479,7 +479,7 @@ toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
     }
 
     StringRef Sim;
-    if (tripleIsAnySimulator(Triple)) {
+    if (Triple.isSimulatorEnvironment()) {
       Sim = "sim";
     }
 
