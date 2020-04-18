@@ -92,6 +92,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DenseMap<const void *, llvm::TrackingMDNodeRef> DIModuleCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   TrackingDIRefMap DIRefMap;
+  TrackingDIRefMap InnerTypeCache;
   /// @}
 
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
@@ -1003,23 +1004,44 @@ private:
     return BitWidth;
   }
 
+  /// Collect the type parameters of a bound generic type. This is needed to
+  /// anchor any typedefs that may appear in parameters so they can be
+  /// resolved in the debugger without needing to query the Swift module.
+  llvm::DINodeArray collectGenericParams(BoundGenericType *BGT) {
+      SmallVector<llvm::Metadata *, 16> TemplateParams;
+      for (auto Param : BGT->getGenericArgs()) {
+        TemplateParams.push_back(DBuilder.createTemplateTypeParameter(
+            TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param))));
+      }
+      return DBuilder.getOrCreateArray(TemplateParams);
+  }
+  
   /// Create a sized container for a sizeless type. Used to represent
   /// BoundGenericEnums that may have different sizes depending on what they are
   /// bound to, but still share a mangled name.
   llvm::DIType *createOpaqueStructWithSizedContainer(
       llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
       unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
-      StringRef MangledName) {
-    // Let the MDNode folding set do the work of uniquing the inner type. This
-    // should be cheap.
-    llvm::DICompositeType *UniqueType = DBuilder.createStructType(
-        Scope, Name, File, Line, 0, 0, Flags, nullptr,
-        DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
-        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+      StringRef MangledName, llvm::DINodeArray BoundParams) {
+    // This uses a separate cache and not DIRefMap for the inner type to avoid
+    // associating the anonymous container (which is specific to the
+    // variable/storage and not the type) with the MangledName.
+    llvm::DICompositeType *UniqueType = nullptr;
+    auto *UID = llvm::MDString::get(IGM.getLLVMContext(), MangledName);
+    if (llvm::Metadata *V = InnerTypeCache.lookup(UID))
+      UniqueType = cast<llvm::DICompositeType>(V);
+    else {
+      UniqueType = DBuilder.createStructType(
+          Scope, Name, File, Line, 0, 0, Flags, nullptr, nullptr,
+          llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+      if (BoundParams)
+        DBuilder.replaceArrays(UniqueType, nullptr, BoundParams);
+      InnerTypeCache[UID] = llvm::TrackingMDNodeRef(UniqueType);
+    }
+
     llvm::Metadata *Elements[] = {
         DBuilder.createMemberType(Scope, "", File, 0, SizeInBits,
                                   AlignInBits, 0, Flags, UniqueType)};
-
     return DBuilder.createStructType(
         Scope, "", File, Line, SizeInBits, AlignInBits, Flags,
         /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
@@ -1332,7 +1354,7 @@ private:
       auto L = getDebugLoc(*this, Decl);
       return createOpaqueStructWithSizedContainer(
           Scope, Decl ? Decl->getNameStr() : "", File, L.Line, SizeInBits,
-          AlignInBits, Flags, MangledName);
+          AlignInBits, Flags, MangledName, collectGenericParams(StructTy));
     }
 
     case TypeKind::BoundGenericClass: {
@@ -1441,7 +1463,7 @@ private:
       auto *File = getOrCreateFile(L.Filename);
       return createOpaqueStructWithSizedContainer(
           Scope, Decl->getName().str(), File, L.Line, SizeInBits, AlignInBits,
-          Flags, MangledName);
+          Flags, MangledName, collectGenericParams(EnumTy));
     }
 
     case TypeKind::BuiltinVector: {
@@ -1637,7 +1659,23 @@ private:
       if (Decl->isOutermostPrivateOrFilePrivateScope())
         Scope = getFilePrivateScope(Scope, Decl);
 
+    // If this is a forward decl, create one for this mangled name and don't
+    // cache it.
+    if (DbgTy.isForwardDecl() && !isa<TypeAliasType>(DbgTy.getType())) {
+      auto *FwdDecl = DBuilder.createReplaceableCompositeType(
+          llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
+          llvm::dwarf::DW_LANG_Swift, 0, 0, llvm::DINode::FlagFwdDecl,
+          MangledName);
+      ReplaceMap.emplace_back(
+        std::piecewise_construct, std::make_tuple(DbgTy.getType()),
+          std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
+      return FwdDecl;
+    }
     llvm::DIType *DITy = createType(DbgTy, MangledName, Scope, getFile(Scope));
+
+    // Don't cache a type alias to a forward declaration either.
+    if (DbgTy.isForwardDecl())
+      return DITy;
 
     // Incrementally build the DIRefMap.
     if (auto *CTy = dyn_cast<llvm::DICompositeType>(DITy)) {
