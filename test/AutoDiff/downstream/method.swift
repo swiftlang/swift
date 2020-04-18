@@ -1,3 +1,5 @@
+// TODO: Delete when https://github.com/apple/swift/pull/31112 is available in this branch.
+
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
