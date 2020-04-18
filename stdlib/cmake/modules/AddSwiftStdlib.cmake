@@ -958,10 +958,9 @@ function(_add_swift_target_library_single target name)
     if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
       set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
     endif()
-    # Only set the install RPATH if cross-compiling the host tools, in which
-    # case both the NDK and Sysroot paths must be set.
-    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
-       NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+    # Only set the install RPATH if the toolchain and stdlib will be in Termux
+    # or some other native sysroot on Android.
+    if(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
       set_target_properties("${target}"
         PROPERTIES
         INSTALL_RPATH "$ORIGIN")
