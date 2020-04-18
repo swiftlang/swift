@@ -41,11 +41,8 @@ endfunction()
 # FIXME: this is a HACK.  All SourceKit CMake code using this function should be
 # rewritten to use 'add_swift_host_library' or 'add_swift_target_library'.
 function(add_sourcekit_default_compiler_flags target)
-  set(c_compile_flags)
-  set(link_flags)
-
   # Add variant-specific flags.
-  _add_host_variant_c_compile_flags(RESULT_VAR_NAME c_compile_flags)
+  _add_host_variant_c_compile_flags(${target})
   _add_host_variant_link_flags(${target})
 
   # Set compilation and link flags.

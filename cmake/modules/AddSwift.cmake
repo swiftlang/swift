@@ -159,23 +159,16 @@ function(_add_host_variant_c_compile_link_flags)
 endfunction()
 
 
-function(_add_host_variant_c_compile_flags)
-  set(oneValueArgs RESULT_VAR_NAME)
-  cmake_parse_arguments(CFLAGS
-    ""
-    "${oneValueArgs}"
-    ""
-    ${ARGN})
-
-  set(result ${${CFLAGS_RESULT_VAR_NAME}})
-
+function(_add_host_variant_c_compile_flags target)
   _add_host_variant_c_compile_link_flags(
     ANALYZE_CODE_COVERAGE FALSE
     RESULT_VAR_NAME result)
+  target_compile_options(${target} PRIVATE
+    ${result})
 
   is_build_type_optimized("${CMAKE_BUILD_TYPE}" optimized)
   if(optimized)
-    list(APPEND result "-O2")
+    target_compile_options(${target} PRIVATE -O2)
 
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
@@ -183,17 +176,17 @@ function(_add_host_variant_c_compile_flags)
     if(NOT debug AND NOT LLVM_ENABLE_ASSERTIONS)
       if(SWIFT_HOST_VARIANT_ARCH MATCHES "i?86")
         if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-          list(APPEND result "-momit-leaf-frame-pointer")
+          target_compile_options(${target} PRIVATE -momit-leaf-frame-pointer)
         else()
-          list(APPEND result "/Oy")
+          target_compile_options(${target} PRIVATE /Oy)
         endif()
       endif()
     endif()
   else()
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-      list(APPEND result "-O0")
+      target_compile_options(${target} PRIVATE -O0)
     else()
-      list(APPEND result "/Od")
+      target_compile_options(${target} PRIVATE /Od)
     endif()
   endif()
 
@@ -203,64 +196,73 @@ function(_add_host_variant_c_compile_flags)
     if(debuginfo)
       _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
       if(_lto_flag_out)
-        list(APPEND result "-gline-tables-only")
+        target_compile_options(${target} PRIVATE -gline-tables-only)
       else()
-        list(APPEND result "-g")
+        target_compile_options(${target} PRIVATE -g)
       endif()
     else()
-      list(APPEND result "-g0")
+      target_compile_options(${target} PRIVATE -g0)
     endif()
   endif()
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     # MSVC/clang-cl don't support -fno-pic or -fms-compatibility-version.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-      list(APPEND result -fno-pic)
-      list(APPEND result "-fms-compatibility-version=1900")
+      target_compile_options(${target} PRIVATE
+        -fms-compatibility-version=1900
+        -fno-pic)
     endif()
 
-    list(APPEND result "-DLLVM_ON_WIN32")
-    list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
-    list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
+    target_compile_definitions(${target} PRIVATE
+      LLVM_ON_WIN32
+      _CRT_SECURE_NO_WARNINGS
+      _CRT_NONSTDC_NO_WARNINGS)
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-      list(APPEND result "-D_CRT_USE_BUILTIN_OFFSETOF")
+      target_compile_definitions(${target} PRIVATE
+        _CRT_USE_BUILTIN_OFFSETOF)
     endif()
     # TODO(compnerd) permit building for different families
-    list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
+    target_compile_definitions(${target} PRIVATE
+      _CRT_USE_WINAPI_FAMILY_DESKTOP_APP)
     if(SWIFT_HOST_VARIANT_ARCH MATCHES arm)
-      list(APPEND result "-D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE")
+      target_compile_definitions(${target} PRIVATE
+        _ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE)
     endif()
-    list(APPEND result "-D_MT")
-    # TODO(compnerd) handle /MT
-    list(APPEND result "-D_DLL")
-    # NOTE: We assume that we are using VS 2015 U2+
-    list(APPEND result "-D_ENABLE_ATOMIC_ALIGNMENT_FIX")
-    # NOTE: We use over-aligned values for the RefCount side-table
-    # (see revision d913eefcc93f8c80d6d1a6de4ea898a2838d8b6f)
-    # This is required to build with VS2017 15.8+
-    list(APPEND result "-D_ENABLE_EXTENDED_ALIGNED_STORAGE=1")
+    target_compile_definitions(${target} PRIVATE
+      # TODO(compnerd) handle /MT
+      _MD
+      _DLL
+      # NOTE: We assume that we are using VS 2015 U2+
+      _ENABLE_ATOMIC_ALIGNMENT_FIX
+      # NOTE: We use over-aligned values for the RefCount side-table
+      # (see revision d913eefcc93f8c80d6d1a6de4ea898a2838d8b6f)
+      # This is required to build with VS2017 15.8+
+      _ENABLE_EXTENDED_ALIGNED_STORAGE=1)
 
     # msvcprt's std::function requires RTTI, but we do not want RTTI data.
     # Emulate /GR-.
     # TODO(compnerd) when moving up to VS 2017 15.3 and newer, we can disable
     # RTTI again
     if(SWIFT_COMPILER_IS_MSVC_LIKE)
-      list(APPEND result /GR-)
+      target_compile_options(${target} PRIVATE /GR-)
     else()
-      list(APPEND result -frtti)
-      list(APPEND result -Xclang;-fno-rtti-data)
+      target_compile_options(${target} PRIVATE
+        -frtti
+        "SHELL:-Xclang -fno-rtti-data")
     endif()
 
     # NOTE: VS 2017 15.3 introduced this to disable the static components of
     # RTTI as well.  This requires a newer SDK though and we do not have
     # guarantees on the SDK version currently.
-    list(APPEND result "-D_HAS_STATIC_RTTI=0")
+    target_compile_definitions(${target} PRIVATE
+      _HAS_STATIC_RTTI=0)
 
     # NOTE(compnerd) workaround LLVM invoking `add_definitions(-D_DEBUG)` which
     # causes failures for the runtime library when cross-compiling due to
     # undefined symbols from the standard library.
     if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
-      list(APPEND result "-U_DEBUG")
+      target_compile_options(${target} PRIVATE
+        -U_DEBUG)
     endif()
   endif()
 
@@ -274,52 +276,54 @@ function(_add_host_variant_c_compile_flags)
       # the build.
       if(CMAKE_C_COMPILER_ID MATCHES Clang AND CMAKE_C_COMPILER_VERSION
           VERSION_LESS 9.0.0)
-        list(APPEND result -mcx16)
+        target_compile_options(${target} PRIVATE -mcx16)
       endif()
     endif()
   endif()
 
   if(LLVM_ENABLE_ASSERTIONS)
-    list(APPEND result "-UNDEBUG")
+    target_compile_options(${target} PRIVATE -UNDEBUG)
   else()
-    list(APPEND result "-DNDEBUG")
+    target_compile_definitions(${target} PRIVATE -DNDEBUG)
   endif()
-  
+
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
-    list(APPEND result "-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
+    target_compile_definitions(${target} PRIVATE
+      SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
   endif()
 
   if(SWIFT_ANALYZE_CODE_COVERAGE)
-    list(APPEND result "-fprofile-instr-generate"
-                       "-fcoverage-mapping")
+    target_compile_options(${target} PRIVATE
+      -fprofile-instr-generate
+      -fcoverage-mapping)
   endif()
 
   if((SWIFT_HOST_VARIANT_ARCH STREQUAL armv7 OR
       SWIFT_HOST_VARIANT_ARCH STREQUAL aarch64) AND
      (SWIFT_HOST_VARIANT_SDK STREQUAL LINUX OR
       SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID))
-     list(APPEND result -funwind-tables)
+    target_compile_options(${target} PRIVATE -funwind-tables)
   endif()
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
-    list(APPEND result -nostdinc++)
+    target_compile_options(${target} PRIVATE -nostdinc++)
     swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
     swift_android_include_for_arch("${SWIFT_HOST_VARIANT_ARCH}"
       "${SWIFT_HOST_VARIANT_ARCH}_INCLUDE")
-    foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
-      list(APPEND result "SHELL:${CMAKE_INCLUDE_SYSTEM_FLAG_C}${path}")
-    endforeach()
-    list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
+    target_include_directories(${target} SYSTEM PRIVATE
+      ${CFLAGS_CXX_INCLUDES}
+      ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
+    target_compile_definitions(${target} PRIVATE
+      __ANDROID_API__=${SWIFT_ANDROID_API_LEVEL})
   endif()
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
     if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
-      # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
-      list(APPEND result "-march=core2")
+      # this is the minimum architecture that supports 16 byte CAS, which is
+      # necessary to avoid a dependency to libatomic
+      target_compile_options(${target} PRIVATE -march=core2)
     endif()
   endif()
-
-  set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
 function(_add_host_variant_link_flags target)
@@ -586,18 +590,16 @@ function(_add_swift_host_library_single target)
   # Call llvm_config() only for libraries that are part of the compiler.
   swift_common_llvm_config("${target}" ${ASHLS_LLVM_LINK_COMPONENTS})
 
-  # Collect compile and link flags for the static and non-static targets.
-  # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
-  set(c_compile_flags ${ASHLS_C_COMPILE_FLAGS})
-  set(link_flags)
-
-  _add_host_variant_c_compile_flags(RESULT_VAR_NAME c_compile_flags)
-
+  target_compile_options(${target} PRIVATE
+    ${ASHLS_C_COMPILE_FLAGS})
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     if(libkind STREQUAL SHARED)
-      list(APPEND c_compile_flags -D_WINDLL)
+      target_compile_definitions(${target} PRIVATE
+        _WINDLL)
     endif()
   endif()
+
+  _add_host_variant_c_compile_flags(${target})
   _add_host_variant_link_flags(${target})
 
   # Set compilation and link flags.
@@ -621,8 +623,6 @@ function(_add_swift_host_library_single target)
     endif()
   endif()
 
-  target_compile_options(${target} PRIVATE
-    ${c_compile_flags})
   if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
     target_link_options(${target} PRIVATE
       "LINKER:-compatibility_version,1")
@@ -743,11 +743,9 @@ function(add_swift_host_tool executable)
   precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")
 
-  _add_host_variant_c_compile_flags(RESULT_VAR_NAME c_compile_flags)
 
   add_executable(${executable} ${ASHT_UNPARSED_ARGUMENTS})
-  target_compile_options(${executable} PRIVATE
-    ${c_compile_flags})
+  _add_host_variant_c_compile_flags(${executable})
   _add_host_variant_link_flags(${executable})
   target_link_directories(${executable} PRIVATE
     ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
