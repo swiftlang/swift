@@ -25,7 +25,6 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"

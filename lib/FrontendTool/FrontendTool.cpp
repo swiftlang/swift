@@ -41,7 +41,6 @@
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/JSONSerialization.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PrettyStackTrace.h"
@@ -779,8 +778,6 @@ static bool buildModuleFromInterface(const CompilerInvocation &Invocation,
 
 static bool compileLLVMIR(const CompilerInvocation &Invocation,
                           CompilerInstance &Instance) {
-  auto &LLVMContext = getGlobalLLVMContext();
-
   // Load in bitcode file.
   assert(Invocation.getFrontendOptions().InputsAndOutputs.hasSingleInput() &&
          "We expect a single input for bitcode input!");
@@ -800,8 +797,9 @@ static bool compileLLVMIR(const CompilerInvocation &Invocation,
   llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
 
   llvm::SMDiagnostic Err;
+  auto LLVMContext = std::make_unique<llvm::LLVMContext>();
   std::unique_ptr<llvm::Module> Module =
-      llvm::parseIR(MainFile->getMemBufferRef(), Err, LLVMContext);
+      llvm::parseIR(MainFile->getMemBufferRef(), Err, *LLVMContext.get());
   if (!Module) {
     // TODO: Translate from the diagnostic info to the SourceManager location
     // if available.
@@ -1558,7 +1556,6 @@ static bool performCompileStepsPostSILGen(
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
   const ASTContext &Context = Instance.getASTContext();
-  const SILOptions &SILOpts = Invocation.getSILOptions();
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
   Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
@@ -1582,10 +1579,7 @@ static bool performCompileStepsPostSILGen(
     return Context.hadError();
   }
 
-  auto pair = createSILRemarkStreamer(
-      *SM, SILOpts.OptRecordFile, SILOpts.OptRecordPasses,
-      SILOpts.OptRecordFormat, Instance.getDiags(), Instance.getSourceMgr());
-  SM->setSILRemarkStreamer(std::move(pair.first), std::move(pair.second));
+  SM->installSILRemarkStreamer();
 
   // This is the action to be used to serialize SILModule.
   // It may be invoked multiple times, but it will perform
