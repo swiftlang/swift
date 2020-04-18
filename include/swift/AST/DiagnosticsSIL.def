@@ -580,14 +580,15 @@ NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
 
 // OS log optimization diagnostics.
 
-ERROR(oslog_non_const_interpolation_options, none, "interpolation arguments "
-      "like format and privacy options must be constants", ())
+ERROR(oslog_constant_eval_trap, none, "%0", (StringRef))
 
-ERROR(oslog_const_evaluable_fun_error, none, "evaluation of constant-evaluable "
-      "function '%0' failed", (StringRef))
+ERROR(oslog_too_many_instructions, none, "interpolated expression and arguments "
+      "are too complex", ())
 
-ERROR(oslog_fail_stop_error, none, "constant evaluation of log call failed "
-      "with fatal error", ())
+ERROR(oslog_invalid_log_message, none, "invalid log message; do not define "
+      "extensions to types defined in the os module", ())
+
+NOTE(oslog_const_evaluable_fun_error, none, "'%0' failed evaluation", (StringRef))
 
 ERROR(oslog_non_constant_message, none, "'OSLogMessage' instance passed to the "
       "log call is not a constant", ())
@@ -598,8 +599,11 @@ ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' instance "
 ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
       "constant", (StringRef))
 
-ERROR(oslog_message_alive_after_opts, none, "OSLogMessage instance must not "
-      "be explicitly created and must be deletable", ())
+ERROR(oslog_message_alive_after_opts, none, "os log string interpolation cannot "
+      "be used in this context", ())
+
+ERROR(oslog_message_explicitly_created, none, "'OSLogMessage' must be "
+      " created from a string interpolation or string literal", ())
 
 WARNING(oslog_call_in_unreachable_code, none, "os log call will never be "
         "executed and may have undiagnosed errors", ())
