@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-#if os(macOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin.C
 #else
 import Glibc
