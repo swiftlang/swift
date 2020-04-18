@@ -28,6 +28,10 @@ llvm::cl::opt<unsigned>
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
                                    Diag<T...> diag, U &&... args) {
+  // The lifetime of StringRef arguments will be extended as necessary by this
+  // utility. The copy happens in onTentativeDiagnosticFlush at the bottom of
+  // DiagnosticEngine.cpp, which is called when the destructor of the
+  // InFlightDiagnostic returned by diagnose runs.
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
@@ -939,8 +943,8 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
                triggerLocSkipsInternalLocs);
     return;
   case UnknownReason::Trap: {
-    const char *message = unknownReason.getTrapMessage();
-    diagnose(ctx, diagLoc, diag::constexpr_trap, StringRef(message));
+    diagnose(ctx, diagLoc, diag::constexpr_trap,
+             unknownReason.getTrapMessage());
     if (emitTriggerLocInDiag)
       diagnose(ctx, triggerLoc, diag::constexpr_trap_operation,
                triggerLocSkipsInternalLocs);
@@ -987,7 +991,7 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     std::string demangledCalleeName =
         demangleSymbolNameForDiagnostics(callee->getName());
     diagnose(ctx, diagLoc, diag::constexpr_found_callee_with_no_body,
-             StringRef(demangledCalleeName));
+             demangledCalleeName);
     if (emitTriggerLocInDiag)
       diagnose(ctx, triggerLoc, diag::constexpr_callee_with_no_body,
                triggerLocSkipsInternalLocs);
@@ -1040,7 +1044,7 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
                          witnessMethodName);
 
     diagnose(ctx, diagLoc, diag::constexpr_unresolvable_witness_call,
-             StringRef(witnessMethodName));
+             witnessMethodName);
     if (emitTriggerLocInDiag)
       diagnose(ctx, triggerLoc, diag::constexpr_no_witness_table_entry,
                triggerLocSkipsInternalLocs);

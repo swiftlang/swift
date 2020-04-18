@@ -108,6 +108,10 @@ using namespace Lowering;
 template <typename... T, typename... U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&... args) {
+  // The lifetime of StringRef arguments will be extended as necessary by this
+  // utility. The copy happens in onTentativeDiagnosticFlush at the bottom of
+  // DiagnosticEngine.cpp, which is called when the destructor of the
+  // InFlightDiagnostic returned by diagnose runs.
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
@@ -365,9 +369,8 @@ static bool diagnoseSpecialErrors(SILInstruction *unevaluableInst,
 
   if (unknownReason.getKind() == UnknownReason::Trap) {
     // We have an assertion failure or fatal error.
-    const char *message = unknownReason.getTrapMessage();
     diagnose(ctx, sourceLoc, diag::oslog_constant_eval_trap,
-             StringRef(message));
+             unknownReason.getTrapMessage());
     return true;
   }
   if (unknownReason.getKind() == UnknownReason::TooManyInstructions) {
@@ -1431,19 +1434,28 @@ suppressGlobalStringTablePointerError(SingleValueInstruction *oslogMessage) {
   SmallVector<SILInstruction *, 8> users;
   getTransitiveUsers(oslogMessage, users);
 
+  // Collect all globalStringTablePointer instructions.
+  SmallVector<BuiltinInst *, 4> globalStringTablePointerInsts;
   for (SILInstruction *user : users) {
     BuiltinInst *bi = dyn_cast<BuiltinInst>(user);
-    if (!bi ||
-        bi->getBuiltinInfo().ID != BuiltinValueKind::GlobalStringTablePointer)
-      continue;
-    // Replace this builtin by a string_literal instruction for an empty string.
+    if (bi &&
+        bi->getBuiltinInfo().ID == BuiltinValueKind::GlobalStringTablePointer)
+      globalStringTablePointerInsts.push_back(bi);
+  }
+
+  // Replace the globalStringTablePointer builtins by a string_literal
+  // instruction for an empty string and clean up dead code.
+  InstructionDeleter deleter;
+  for (BuiltinInst *bi : globalStringTablePointerInsts) {
     SILBuilderWithScope builder(bi);
     StringLiteralInst *stringLiteral = builder.createStringLiteral(
         bi->getLoc(), StringRef(""), StringLiteralInst::Encoding::UTF8);
     bi->replaceAllUsesWith(stringLiteral);
-    // Here, the bulitin instruction is dead, so clean it up.
-    eliminateDeadInstruction(bi);
+    // The bulitin instruction is likely dead. But since we are iterating over
+    // many instructions, do the cleanup at the end.
+    deleter.trackIfDead(bi);
   }
+  deleter.cleanUpDeadInstructions();
 }
 
 /// If the SILInstruction is an initialization of OSLogMessage, return the
