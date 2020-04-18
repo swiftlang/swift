@@ -2139,16 +2139,16 @@ void EquivalenceClass::dump(llvm::raw_ostream &out,
              },
              [&] { out << ", "; });
   out << "\nSame-type constraints:";
-  interleave(sameTypeConstraints,
-             [&](const Constraint<Type> &constraint) {
-               out << "\n  " << constraint.getSubjectDependentType({ })
-                   << " == " << constraint.value;
+  llvm::interleave(
+      sameTypeConstraints,
+      [&](const Constraint<Type> &constraint) {
+        out << "\n  " << constraint.getSubjectDependentType({})
+            << " == " << constraint.value;
 
-               if (constraint.source->isDerivedRequirement())
-                 out << " [derived]";
-             }, [&] {
-               out << ", ";
-             });
+        if (constraint.source->isDerivedRequirement())
+          out << " [derived]";
+      },
+      [&] { out << ", "; });
   if (concreteType)
     out << "\nConcrete type: " << concreteType.getString();
   if (superclass)
@@ -2922,15 +2922,15 @@ void RewritePath::print(llvm::raw_ostream &out) const {
     if (!getPath().empty()) out << " -> ";
   }
 
-  interleave(getPath().begin(), getPath().end(),
-             [&](AssociatedTypeDecl *assocType) {
-               out.changeColor(raw_ostream::BLUE);
-               out << assocType->getProtocol()->getName() << "."
-               << assocType->getName();
-               out.resetColor();
-             }, [&] {
-               out << " -> ";
-             });
+  llvm::interleave(
+      getPath().begin(), getPath().end(),
+      [&](AssociatedTypeDecl *assocType) {
+        out.changeColor(raw_ostream::BLUE);
+        out << assocType->getProtocol()->getName() << "."
+            << assocType->getName();
+        out.resetColor();
+      },
+      [&] { out << " -> "; });
   out << "]";
 }
 

@@ -18,30 +18,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && \
-                        defined(REMARK)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
-#endif
-
-#ifndef ERROR
-#  define ERROR(ID,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Options,Text,Signature)
-#endif
-
-#ifndef WARNING
-#  define WARNING(ID,Options,Text,Signature) \
-  DIAG(WARNING,ID,Options,Text,Signature)
-#endif
-
-#ifndef NOTE
-#  define NOTE(ID,Options,Text,Signature) \
-  DIAG(NOTE,ID,Options,Text,Signature)
-#endif
-
-#ifndef REMARK
-#  define REMARK(ID,Options,Text,Signature)   \
-DIAG(REMARK,ID,Options,Text,Signature)
-#endif
+#define DEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"
 
 WARNING(warning_no_such_sdk,none,
         "no such SDK: '%0'", (StringRef))
@@ -60,6 +38,10 @@ ERROR(error_unsupported_target_arch, none,
 
 ERROR(error_unsupported_opt_for_target, none,
       "unsupported option '%0' for target '%1'", (StringRef, StringRef))
+
+WARNING(warning_inferred_simulator_target,none,
+      "inferring simulator environment for target '%0'; "
+      "use '-target %1' instead", (StringRef, StringRef))
 
 ERROR(error_argument_not_allowed_with, none,
       "argument '%0' is not allowed with '%1'", (StringRef, StringRef))
@@ -407,12 +389,5 @@ ERROR(expectation_missing_opening_braces,none,
 ERROR(expectation_missing_closing_braces,none,
       "didn't find '}}' to match '{{' in expectation", ())
 
-#ifndef DIAG_NO_UNDEF
-# if defined(DIAG)
-#  undef DIAG
-# endif
-# undef REMARK
-# undef NOTE
-# undef WARNING
-# undef ERROR
-#endif
+#define UNDEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"

@@ -1766,14 +1766,8 @@ function(add_swift_target_library name)
       list(APPEND swiftlib_link_flags_all "-Wl,-z,defs")
     endif()
     # Setting back linker flags which are not supported when making Android build on macOS cross-compile host.
-    if(SWIFTLIB_SHARED)
-      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
-        list(APPEND swiftlib_link_flags_all "-dynamiclib -Wl,-headerpad_max_install_names")
-      elseif(${sdk} STREQUAL ANDROID)
-        list(APPEND swiftlib_link_flags_all "-shared")
-        # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
-        list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
-      endif()
+    if(SWIFTLIB_SHARED AND sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+      list(APPEND swiftlib_link_flags_all "-dynamiclib -Wl,-headerpad_max_install_names")
     endif()
 
     set(sdk_supported_archs
@@ -1913,6 +1907,13 @@ function(add_swift_target_library name)
       endif()
 
      list(APPEND swiftlib_c_compile_flags_all "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
+
+      # Setting back linker flags which are not supported when making Android build on macOS cross-compile host.
+      if(SWIFTLIB_SHARED AND ${sdk} STREQUAL ANDROID)
+        list(APPEND swiftlib_link_flags_all "-shared")
+        # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
+        list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
+      endif()
 
       # Add this library variant.
       _add_swift_target_library_single(

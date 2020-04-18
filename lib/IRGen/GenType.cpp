@@ -1797,7 +1797,8 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
   // Use an [N x i8] array for storage, but load and store as a single iNNN
   // scalar.
   auto storageType = llvm::ArrayType::get(IGM.Int8Ty, size.getValue());
-  auto intType = llvm::IntegerType::get(IGM.LLVMContext, size.getValueInBits());
+  auto intType = llvm::IntegerType::get(IGM.getLLVMContext(),
+                                        size.getValueInBits());
   // There are no spare bits in an opaque storage type.
   auto type = new OpaqueStorageTypeInfo(storageType, intType, size,
                     SpareBitVector::getConstant(size.getValueInBits(), false),

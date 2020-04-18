@@ -32,6 +32,7 @@
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -40,7 +41,6 @@
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/JSONSerialization.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PrettyStackTrace.h"
@@ -778,8 +778,6 @@ static bool buildModuleFromInterface(const CompilerInvocation &Invocation,
 
 static bool compileLLVMIR(const CompilerInvocation &Invocation,
                           CompilerInstance &Instance) {
-  auto &LLVMContext = getGlobalLLVMContext();
-
   // Load in bitcode file.
   assert(Invocation.getFrontendOptions().InputsAndOutputs.hasSingleInput() &&
          "We expect a single input for bitcode input!");
@@ -799,8 +797,9 @@ static bool compileLLVMIR(const CompilerInvocation &Invocation,
   llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
 
   llvm::SMDiagnostic Err;
+  auto LLVMContext = std::make_unique<llvm::LLVMContext>();
   std::unique_ptr<llvm::Module> Module =
-      llvm::parseIR(MainFile->getMemBufferRef(), Err, LLVMContext);
+      llvm::parseIR(MainFile->getMemBufferRef(), Err, *LLVMContext.get());
   if (!Module) {
     // TODO: Translate from the diagnostic info to the SourceManager location
     // if available.
@@ -1376,27 +1375,26 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   return Context.hadError();
 }
 
-static void generateIR(const IRGenOptions &IRGenOpts,
-                       std::unique_ptr<SILModule> SM,
-                       const PrimarySpecificPaths &PSPs,
-                       StringRef OutputFilename, ModuleOrSourceFile MSF,
-                       std::unique_ptr<llvm::Module> &IRModule,
-                       llvm::GlobalVariable *&HashGlobal,
-                       ArrayRef<std::string> parallelOutputFilenames,
-                       llvm::StringSet<> &LinkerDirectives) {
-  // FIXME: We shouldn't need to use the global context here, but
-  // something is persisting across calls to performIRGeneration.
-  auto &LLVMContext = getGlobalLLVMContext();
-  IRModule = MSF.is<SourceFile *>()
-                 ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
-                                       std::move(SM), OutputFilename, PSPs,
-                                       MSF.get<SourceFile *>()->getPrivateDiscriminator().str(),
-                                       LLVMContext, &HashGlobal,
-                                       &LinkerDirectives)
-                 : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
-                                       std::move(SM), OutputFilename, PSPs,
-                                       LLVMContext, parallelOutputFilenames,
-                                       &HashGlobal, &LinkerDirectives);
+static GeneratedModule
+generateIR(const IRGenOptions &IRGenOpts,
+           std::unique_ptr<SILModule> SM,
+           const PrimarySpecificPaths &PSPs,
+           StringRef OutputFilename, ModuleOrSourceFile MSF,
+           llvm::GlobalVariable *&HashGlobal,
+           ArrayRef<std::string> parallelOutputFilenames,
+           llvm::StringSet<> &LinkerDirectives) {
+  if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
+    return performIRGeneration(IRGenOpts, *SF,
+                               std::move(SM), OutputFilename, PSPs,
+                               SF->getPrivateDiscriminator().str(),
+                               &HashGlobal,
+                               &LinkerDirectives);
+  } else {
+    return performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
+                               std::move(SM), OutputFilename, PSPs,
+                               parallelOutputFilenames,
+                               &HashGlobal, &LinkerDirectives);
+  }
 }
 
 static bool processCommandLineAndRunImmediately(const CompilerInvocation &Invocation,
@@ -1425,7 +1423,7 @@ static bool processCommandLineAndRunImmediately(const CompilerInvocation &Invoca
 static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
                                 ModuleOrSourceFile MSF,
                                 bool astGuaranteedToCorrespondToSIL,
-                                llvm::Module &IRModule) {
+                                const llvm::Module &IRModule) {
   if (!astGuaranteedToCorrespondToSIL ||
       !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
     return false;
@@ -1558,7 +1556,6 @@ static bool performCompileStepsPostSILGen(
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
   const ASTContext &Context = Instance.getASTContext();
-  const SILOptions &SILOpts = Invocation.getSILOptions();
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
   Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
@@ -1582,10 +1579,7 @@ static bool performCompileStepsPostSILGen(
     return Context.hadError();
   }
 
-  auto pair = createSILRemarkStreamer(
-      *SM, SILOpts.OptRecordFile, SILOpts.OptRecordPasses,
-      SILOpts.OptRecordFormat, Instance.getDiags(), Instance.getSourceMgr());
-  SM->setSILRemarkStreamer(std::move(pair.first), std::move(pair.second));
+  SM->installSILRemarkStreamer();
 
   // This is the action to be used to serialize SILModule.
   // It may be invoked multiple times, but it will perform
@@ -1663,7 +1657,7 @@ static bool performCompileStepsPostSILGen(
     Stats->flushTracesAndProfiles();
 
   if (Action == FrontendOptions::ActionType::DumpTypeInfo)
-    return performDumpTypeInfo(IRGenOpts, *SM, getGlobalLLVMContext());
+    return performDumpTypeInfo(IRGenOpts, *SM);
 
   if (Action == FrontendOptions::ActionType::Immediate)
     return processCommandLineAndRunImmediately(
@@ -1677,10 +1671,9 @@ static bool performCompileStepsPostSILGen(
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
     Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
-  std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
-  generateIR(
-      IRGenOpts, std::move(SM), PSPs, OutputFilename, MSF, IRModule, HashGlobal,
+  auto IRModule = generateIR(
+      IRGenOpts, std::move(SM), PSPs, OutputFilename, MSF, HashGlobal,
       ParallelOutputFilenames, LinkerDirectives);
 
   // Walk the AST for indexing after IR generation. Walking it before seems
@@ -1698,10 +1691,11 @@ static bool performCompileStepsPostSILGen(
     return HadError;
 
   if (validateTBDIfNeeded(Invocation, MSF, astGuaranteedToCorrespondToSIL,
-                          *IRModule))
+                          *IRModule.getModule()))
     return true;
 
-  return generateCode(Invocation, Instance, OutputFilename, IRModule.get(),
+  return generateCode(Invocation, Instance, OutputFilename,
+                      IRModule.getModule(),
                       HashGlobal) ||
          HadError;
 }
@@ -1973,7 +1967,7 @@ static void printTargetInfo(const CompilerInvocation &invocation,
 
   auto outputPaths = [&](StringRef name, const std::vector<std::string> &paths){
     out << "    \"" << name << "\": [\n";
-    interleave(paths, [&out](const std::string &path) {
+    llvm::interleave(paths, [&out](const std::string &path) {
       out << "      \"";
       out.write_escaped(path);
       out << "\"";

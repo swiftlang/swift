@@ -258,8 +258,8 @@ public:
 
   void visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     printHeader("opaque_archetype");
-    printField("id", O->getID());
-    printField("description", O->getDescription());
+    printField("id", O->getID().str());
+    printField("description", O->getDescription().str());
     fprintf(file, " ordinal %u ", O->getOrdinal());
     for (auto argList : O->getArgumentLists()) {
       fprintf(file, "\n");

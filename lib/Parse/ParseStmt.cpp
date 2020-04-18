@@ -679,6 +679,30 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
 }
 
+static ParserStatus parseOptionalControlTransferTarget(Parser &P,
+                                                       Identifier &Target,
+                                                       SourceLoc &TargetLoc,
+                                                       StmtKind Kind) {
+  // If we have an identifier after 'break' or 'continue', which is not the
+  // start of another stmt or decl, we assume it is the label to break to,
+  // unless there is a line break.  There is ambiguity with expressions (e.g.
+  // "break x+y") but since the expression after the them is dead, we don't feel
+  // bad eagerly parsing this.
+  if (!P.Tok.isAtStartOfLine()) {
+    if (P.Tok.is(tok::identifier) && !P.isStartOfStmt() &&
+        !P.isStartOfSwiftDecl()) {
+      TargetLoc = P.consumeIdentifier(&Target);
+      return makeParserSuccess();
+    } else if (P.Tok.is(tok::code_complete)) {
+      if (P.CodeCompletion)
+        P.CodeCompletion->completeStmtLabel(Kind);
+      TargetLoc = P.consumeToken(tok::code_complete);
+      return makeParserCodeCompletionStatus();
+    }
+  }
+  return makeParserSuccess();
+}
+
 /// parseStmtBreak
 ///
 ///   stmt-break:
@@ -689,17 +713,12 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
   SourceLoc Loc = consumeToken(tok::kw_break);
   SourceLoc TargetLoc;
   Identifier Target;
+  ParserStatus Status;
+  Status |= parseOptionalControlTransferTarget(*this, Target, TargetLoc,
+                                               StmtKind::Break);
 
-  // If we have an identifier after this, which is not the start of another
-  // stmt or decl, we assume it is the label to break to, unless there is a
-  // line break.  There is ambiguity with expressions (e.g. "break x+y") but
-  // since the expression after the break is dead, we don't feel bad eagerly
-  // parsing this.
-  if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
-      !isStartOfStmt() && !isStartOfSwiftDecl())
-    TargetLoc = consumeIdentifier(&Target);
-
-  return makeParserResult(new (Context) BreakStmt(Loc, Target, TargetLoc));
+  return makeParserResult(Status,
+                          new (Context) BreakStmt(Loc, Target, TargetLoc));
 }
 
 /// parseStmtContinue
@@ -712,17 +731,12 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
   SourceLoc Loc = consumeToken(tok::kw_continue);
   SourceLoc TargetLoc;
   Identifier Target;
+  ParserStatus Status;
+  Status |= parseOptionalControlTransferTarget(*this, Target, TargetLoc,
+                                               StmtKind::Continue);
 
-  // If we have an identifier after this, which is not the start of another
-  // stmt or decl, we assume it is the label to continue to, unless there is a
-  // line break.  There is ambiguity with expressions (e.g. "continue x+y") but
-  // since the expression after the continue is dead, we don't feel bad eagerly
-  // parsing this.
-  if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
-      !isStartOfStmt() && !isStartOfSwiftDecl())
-    TargetLoc = consumeIdentifier(&Target);
-
-  return makeParserResult(new (Context) ContinueStmt(Loc, Target, TargetLoc));
+  return makeParserResult(Status,
+                          new (Context) ContinueStmt(Loc, Target, TargetLoc));
 }
 
 

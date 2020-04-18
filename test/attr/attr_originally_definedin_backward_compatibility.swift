@@ -1,4 +1,5 @@
 // REQUIRES: OS=macosx
+// REQUIRES: executable_test
 //
 // RUN: %empty-directory(%t)
 //
