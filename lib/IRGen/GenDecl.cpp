@@ -476,11 +476,6 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
                                          LibraryKind::Library,
                                          /*forceLoad*/ true));
       }
-      if (*compatibilityVersion <= llvm::VersionTuple(5, 1)) {
-        this->addLinkLibrary(LinkLibrary("swiftCompatibility51",
-                                         LibraryKind::Library,
-                                         /*forceLoad*/ true));
-      }
     }
 
     if (auto compatibilityVersion =

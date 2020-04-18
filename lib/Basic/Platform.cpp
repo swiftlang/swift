@@ -406,11 +406,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
       if (Minor <= 14) {
         return llvm::VersionTuple(5, 0);
       } else if (Minor <= 15) {
-        if (Micro <= 3) {
-          return llvm::VersionTuple(5, 1);
-        } else {
-          return llvm::VersionTuple(5, 2);
-        }
+        return llvm::VersionTuple(5, 1);
       }
     }
   } else if (Triple.isiOS()) { // includes tvOS
@@ -418,22 +414,14 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     if (Major <= 12) {
       return llvm::VersionTuple(5, 0);
     } else if (Major <= 13) {
-      if (Minor <= 3) {
-        return llvm::VersionTuple(5, 1);
-      } else {
-        return llvm::VersionTuple(5, 2);
-      }
+      return llvm::VersionTuple(5, 1);
     }
   } else if (Triple.isWatchOS()) {
     Triple.getWatchOSVersion(Major, Minor, Micro);
     if (Major <= 5) {
       return llvm::VersionTuple(5, 0);
     } else if (Major <= 6) {
-      if (Minor <= 1) {
-        return llvm::VersionTuple(5, 1);
-      } else {
-        return llvm::VersionTuple(5, 2);
-      }
+      return llvm::VersionTuple(5, 1);
     }
   }
 
