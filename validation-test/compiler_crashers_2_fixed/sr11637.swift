@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend -primary-file %s -emit-silgen
+// RUN: %target-swift-frontend -primary-file %s -emit-silgen
 
 // REQUIRES: asserts
 
