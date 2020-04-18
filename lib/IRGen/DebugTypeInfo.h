@@ -63,6 +63,9 @@ public:
   static DebugTypeInfo getArchetype(swift::Type Ty, llvm::Type *StorageTy,
                                     Size size, Alignment align);
 
+  /// Create a forward declaration for a type whose size is unknown.
+  static DebugTypeInfo getForwardDecl(swift::Type Ty);
+
   /// Create a standalone type from a TypeInfo object.
   static DebugTypeInfo getFromTypeInfo(swift::Type Ty, const TypeInfo &Info);
   /// Global variables.
@@ -89,6 +92,7 @@ public:
   }
 
   bool isNull() const { return Type == nullptr; }
+  bool isForwardDecl() const { return StorageType == nullptr; }
   bool operator==(DebugTypeInfo T) const;
   bool operator!=(DebugTypeInfo T) const;
 
