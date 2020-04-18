@@ -162,6 +162,7 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndAccessInst:
+  case SILInstructionKind::SetDeallocatingInst:
     return true;
   default:
     return false;
@@ -1085,25 +1086,77 @@ void DSEContext::processDebugValueAddrInst(SILInstruction *I, DSEKind Kind) {
 
 void DSEContext::processUnknownReadInstForGenKillSet(SILInstruction *I) {
   BlockState *S = getBlockState(I);
+  SmallVector<unsigned, 4> toStopTracking;
+  bool unknownWrite = false;
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->BBMaxStoreSet.test(i))
       continue;
-    if (!AA->mayReadFromMemory(I, LocationVault[i].getBase()))
-      continue;
-    // Update the genset and kill set.
-    S->startTrackingLocation(S->BBKillSet, i);
-    S->stopTrackingLocation(S->BBGenSet, i);
+    auto val = LocationVault[i].getBase();
+    for (auto &op : I->getAllOperands()) {
+      if (!op.get()->getType().isAddress())
+        continue;
+      auto projection = lookUpForMatchingAddr(op.get(), val);
+      if (projection.matched) {
+        if (!AA->mayWriteToMemory(I, val))
+          continue;
+        toStopTracking.push_back(i);
+      } else { // if (!projection.objectEntry)
+        unknownWrite = true;
+      }
+    }
+  }
+
+  if (unknownWrite) {
+    for (unsigned i = 0; i < S->LocationNum; ++i) {
+      if (!S->BBMaxStoreSet.test(i))
+        continue;
+      S->startTrackingLocation(S->BBKillSet, i);
+      S->stopTrackingLocation(S->BBGenSet, i);
+    }
+  } else {
+    for (auto i : toStopTracking) {
+      if (!S->BBMaxStoreSet.test(i))
+        continue;
+      S->startTrackingLocation(S->BBKillSet, i);
+      S->stopTrackingLocation(S->BBGenSet, i);
+    }
   }
 }
 
 void DSEContext::processUnknownReadInstForDSE(SILInstruction *I) {
   BlockState *S = getBlockState(I);
+  SmallVector<unsigned, 4> toStopTracking;
+  bool unknownWrite = false;
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->isTrackingLocation(S->BBWriteSetMid, i))
       continue;
-    if (!AA->mayReadFromMemory(I, LocationVault[i].getBase()))
-      continue;
-    S->stopTrackingLocation(S->BBWriteSetMid, i);
+    auto val = LocationVault[i].getBase();
+    for (auto &op : I->getAllOperands()) {
+      if (!op.get()->getType().isAddress())
+        continue;
+      auto projection = lookUpForMatchingAddr(op.get(), val);
+      if (projection.matched) {
+        if (!AA->mayWriteToMemory(I, val))
+          continue;
+        toStopTracking.push_back(i);
+      } else { // if (!projection.objectEntry)
+        unknownWrite = true;
+      }
+    }
+  }
+
+  if (unknownWrite) {
+    for (unsigned i = 0; i < S->LocationNum; ++i) {
+      if (!S->isTrackingLocation(S->BBWriteSetMid, i))
+        continue;
+      S->stopTrackingLocation(S->BBWriteSetMid, i);
+    }
+  } else {
+    for (auto i : toStopTracking) {
+      if (!S->isTrackingLocation(S->BBWriteSetMid, i))
+        continue;
+      S->stopTrackingLocation(S->BBWriteSetMid, i);
+    }
   }
 }
 
@@ -1149,6 +1202,11 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
     // begin_access here.
     return;
   } else if (auto *release = dyn_cast<StrongReleaseInst>(I)) {
+    // If the strong release operand type can't have a custom destructor it's
+    // OK.
+    if (release->getOperand()->getType().getClassOrBoundGenericClass() ==
+        nullptr)
+      return;
     // For strong releases, we have to prove that the strong release won't
     // envoke the destructor. For now, we just try to find a set_deallocating
     // instruction that indicates the life-ending strong_release has been

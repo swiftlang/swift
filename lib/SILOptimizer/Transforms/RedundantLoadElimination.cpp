@@ -161,6 +161,8 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndAccessInst:
+  case SILInstructionKind::SetDeallocatingInst:
+  case SILInstructionKind::DeallocRefInst:
     return true;
   default:
     return false;
@@ -968,6 +970,8 @@ void BlockState::processLoadInst(RLEContext &Ctx, LoadInst *LI, RLEKind Kind) {
 void BlockState::processUnknownWriteInstForGenKillSet(RLEContext &Ctx,
                                                       SILInstruction *I) {
   auto *AA = Ctx.getAA();
+  SmallVector<unsigned, 4> toStopTracking;
+  bool unknownWrite = false;
   for (unsigned i = 0; i < LocationNum; ++i) {
     if (!isTrackingLocation(ForwardSetMax, i))
       continue;
@@ -976,17 +980,42 @@ void BlockState::processUnknownWriteInstForGenKillSet(RLEContext &Ctx,
     // TODO: checking may alias with Base is overly conservative,
     // we should check may alias with base plus projection path.
     LSLocation &R = Ctx.getLocation(i);
-    if (!AA->mayWriteToMemory(I, R.getBase()))
-      continue;
-    // MayAlias.
-    stopTrackingLocation(BBGenSet, i);
-    startTrackingLocation(BBKillSet, i);
+    for (auto &op : I->getAllOperands()) {
+      if (!op.get()->getType().isAddress())
+        continue;
+      auto projection = lookUpForMatchingAddr(op.get(), R.getBase());
+      if (projection.matched) {
+        if (!AA->mayWriteToMemory(I, R.getBase()))
+          continue;
+        toStopTracking.push_back(i);
+      } else { // if (!projection.objectEntry)
+        unknownWrite = true;
+      }
+    }
+  }
+
+  if (unknownWrite) {
+    for (unsigned i = 0; i < LocationNum; ++i) {
+      if (!isTrackingLocation(ForwardSetMax, i))
+        continue;
+      stopTrackingLocation(BBGenSet, i);
+      startTrackingLocation(BBKillSet, i);
+    }
+  } else {
+    for (auto i : toStopTracking) {
+      if (!isTrackingLocation(ForwardSetMax, i))
+        continue;
+      stopTrackingLocation(BBGenSet, i);
+      startTrackingLocation(BBKillSet, i);
+    }
   }
 }
 
 void BlockState::processUnknownWriteInstForRLE(RLEContext &Ctx,
                                                SILInstruction *I) {
   auto *AA = Ctx.getAA();
+  SmallVector<unsigned, 4> toStopTracking;
+  bool unknownWrite = false;
   for (unsigned i = 0; i < LocationNum; ++i) {
     if (!isTrackingLocation(ForwardSetIn, i))
       continue;
@@ -995,11 +1024,34 @@ void BlockState::processUnknownWriteInstForRLE(RLEContext &Ctx,
     // TODO: checking may alias with Base is overly conservative,
     // we should check may alias with base plus projection path.
     LSLocation &R = Ctx.getLocation(i);
-    if (!AA->mayWriteToMemory(I, R.getBase()))
-      continue;
-    // MayAlias.
-    stopTrackingLocation(ForwardSetIn, i);
-    stopTrackingValue(ForwardValIn, i);
+    for (auto &op : I->getAllOperands()) {
+      if (!op.get()->getType().isAddress())
+        continue;
+      auto projection = lookUpForMatchingAddr(op.get(), R.getBase());
+      if (projection.matched) {
+        if (!AA->mayWriteToMemory(I, R.getBase()))
+          continue;
+        toStopTracking.push_back(i);
+      } else { // if (!projection.objectEntry)
+        unknownWrite = true;
+      }
+    }
+  }
+
+  if (unknownWrite) {
+    for (unsigned i = 0; i < LocationNum; ++i) {
+      if (!isTrackingLocation(ForwardSetIn, i))
+        continue;
+      stopTrackingLocation(ForwardSetIn, i);
+      stopTrackingValue(ForwardValIn, i);
+    }
+  } else {
+    for (auto i : toStopTracking) {
+      if (!isTrackingLocation(ForwardSetIn, i))
+        continue;
+      stopTrackingLocation(ForwardSetIn, i);
+      stopTrackingValue(ForwardValIn, i);
+    }
   }
 }
 
@@ -1095,6 +1147,11 @@ void BlockState::processInstructionWithKind(RLEContext &Ctx,
   // location so, if there are any actual writes to memory we will catch them
   // there so, we can ignore begin_access here.
   if (isa<BeginAccessInst>(Inst))
+    return;
+
+  // If the load is valid, then this strong release won't invoke the destructor.
+  // So we can ignore it.
+  if (isa<StrongReleaseInst>(Inst))
     return;
 
   // If this instruction has side effects, but is inert from a load store
