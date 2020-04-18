@@ -93,3 +93,18 @@ struct MutatingDidSet {
 // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_observers14MutatingDidSetV5value33_{{.*}} : $@convention(method) (Int, @inout MutatingDidSet) -> () {
 // CHECK: function_ref @$s26property_wrapper_observers5StateV12wrappedValueSivs : $@convention(method) (Int, State) -> ()
 // CHECK: function_ref @$s26property_wrapper_observers14MutatingDidSetV5value33_{{.*}} : $@convention(method) (@inout MutatingDidSet) -> ()
+
+struct MutatingWillSet {
+  @State private var value: Int {
+    mutating willSet {}
+  }
+
+  mutating func test() {
+    value = 10
+  }
+}
+
+// MutatingWillSet.value.setter
+// CHECK-LABEL: sil private [ossa] @$s26property_wrapper_observers15MutatingWillSetV5value33_{{.*}}Sivs : $@convention(method) (Int, @inout MutatingWillSet) -> () {
+// CHECK: function_ref @$s26property_wrapper_observers15MutatingWillSetV5value33_{{.*}}Sivw : $@convention(method) (Int, @inout MutatingWillSet) -> ()
+// CHECK: function_ref @$s26property_wrapper_observers5StateV12wrappedValueSivs : $@convention(method) (Int, State) -> ()

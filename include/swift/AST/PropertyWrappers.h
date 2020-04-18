@@ -130,8 +130,8 @@ void simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m);
 /// Describes whether the reference to a property wrapper instance used for
 /// accessing a wrapped property should be an l-value or not.
 struct PropertyWrapperLValueness {
-  llvm::SmallVector<bool, 1> isLValueForGetAccess;
-  llvm::SmallVector<bool, 1> isLValueForSetAccess;
+  llvm::SmallVector<bool, 4> isLValueForGetAccess;
+  llvm::SmallVector<bool, 4> isLValueForSetAccess;
 
   PropertyWrapperLValueness(unsigned numWrappers)
       : isLValueForGetAccess(numWrappers), isLValueForSetAccess(numWrappers) {}

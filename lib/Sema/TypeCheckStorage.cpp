@@ -342,14 +342,16 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (auto mut = var->getPropertyWrapperMutability()) {
       bool isMutating = mut->Setter == PropertyWrapperMutability::Mutating;
-      if (auto *accessor = var->getParsedAccessor(AccessorKind::DidSet)) {
+      if (auto *didSet = var->getParsedAccessor(AccessorKind::DidSet)) {
         // If there's a didSet, we call the getter for the 'oldValue', and so
         // should consider the getter's mutatingness as well
-        if (!accessor->isSimpleDidSet()) {
+        if (!didSet->isSimpleDidSet()) {
           isMutating |= (mut->Getter == PropertyWrapperMutability::Mutating);
         }
-        isMutating |= accessor->getAttrs().hasAttribute<MutatingAttr>();
+        isMutating |= didSet->getAttrs().hasAttribute<MutatingAttr>();
       }
+      if (auto *willSet = var->getParsedAccessor(AccessorKind::WillSet))
+        isMutating |= willSet->getAttrs().hasAttribute<MutatingAttr>();
       return isMutating && result;
     }
   }
@@ -738,40 +740,39 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
     // Perform accesses to the wrappedValues along the composition chain.
     if (firstWrapperIdx < lastWrapperIdx) {
-      if (auto lvalueness = getPropertyWrapperLValueness(var)) {
+      auto lvalueness = *getPropertyWrapperLValueness(var);
 
-        // Figure out if the outermost wrapper instance should be an l-value
-        bool isLValueForGet = lvalueness->isLValueForGetAccess[firstWrapperIdx];
-        bool isLValueForSet = lvalueness->isLValueForSetAccess[firstWrapperIdx];
-        isMemberLValue = (isLValueForGet && isUsedForGetAccess) ||
-                         (isLValueForSet && isUsedForSetAccess);
+      // Figure out if the outermost wrapper instance should be an l-value
+      bool isLValueForGet = lvalueness.isLValueForGetAccess[firstWrapperIdx];
+      bool isLValueForSet = lvalueness.isLValueForSetAccess[firstWrapperIdx];
+      isMemberLValue = (isLValueForGet && isUsedForGetAccess) ||
+                       (isLValueForSet && isUsedForSetAccess);
 
-        for (unsigned i : range(firstWrapperIdx, lastWrapperIdx)) {
-          auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-          auto wrappedValue = wrapperInfo.valueVar;
+      for (unsigned i : range(firstWrapperIdx, lastWrapperIdx)) {
+        auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
+        auto wrappedValue = wrapperInfo.valueVar;
 
-          // Figure out if the wrappedValue accesses should be l-values
-          bool isWrapperRefLValue = isLValue;
-          if (i < lastWrapperIdx - 1) {
-            bool isLValueForGet = lvalueness->isLValueForGetAccess[i+1];
-            bool isLValueForSet = lvalueness->isLValueForSetAccess[i+1];
-            isWrapperRefLValue = (isLValueForGet && isUsedForGetAccess) ||
-                                 (isLValueForSet && isUsedForSetAccess);
-          }
-
-          // Check for availability of wrappedValue.
-          if (accessor->getAccessorKind() == AccessorKind::Get ||
-              accessor->getAccessorKind() == AccessorKind::Read) {
-            if (wrappedValue->getAttrs().getUnavailable(ctx)) {
-              diagnoseExplicitUnavailability(
-                  wrappedValue,
-                  var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
-                  var->getDeclContext(), nullptr);
-            }
-          }
-
-          underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
+        // Figure out if the wrappedValue accesses should be l-values
+        bool isWrapperRefLValue = isLValue;
+        if (i < lastWrapperIdx - 1) {
+          bool isLValueForGet = lvalueness.isLValueForGetAccess[i+1];
+          bool isLValueForSet = lvalueness.isLValueForSetAccess[i+1];
+          isWrapperRefLValue = (isLValueForGet && isUsedForGetAccess) ||
+                               (isLValueForSet && isUsedForSetAccess);
         }
+
+        // Check for availability of wrappedValue.
+        if (accessor->getAccessorKind() == AccessorKind::Get ||
+            accessor->getAccessorKind() == AccessorKind::Read) {
+          if (wrappedValue->getAttrs().getUnavailable(ctx)) {
+            diagnoseExplicitUnavailability(
+                wrappedValue,
+                var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
+                var->getDeclContext(), nullptr);
+          }
+        }
+
+        underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
       }
     }
     semantics = AccessSemantics::DirectToStorage;
