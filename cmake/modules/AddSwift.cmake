@@ -12,22 +12,6 @@ set(SWIFTLIB_DIR
 set(SWIFTSTATICLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
 
-function(add_dependencies_multiple_targets)
-  cmake_parse_arguments(
-      ADMT # prefix
-      "" # options
-      "" # single-value args
-      "TARGETS;DEPENDS" # multi-value args
-      ${ARGN})
-  precondition(ADMT_UNPARSED_ARGUMENTS NEGATE MESSAGE "unrecognized arguments: ${ADMT_UNPARSED_ARGUMENTS}")
-
-  if(NOT "${ADMT_DEPENDS}" STREQUAL "")
-    foreach(target ${ADMT_TARGETS})
-      add_dependencies("${target}" ${ADMT_DEPENDS})
-    endforeach()
-  endif()
-endfunction()
-
 function(_compute_lto_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
   if (lowercase_option STREQUAL "full")
@@ -522,6 +506,7 @@ function(_add_swift_host_library_single target)
 
   add_library("${target}" ${libkind} ${ASHLS_SOURCES})
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
+  add_dependencies(${target} ${LLVM_COMMON_DEPENDS})
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH} SWIFTLIB_INCLUDE)
@@ -561,13 +546,6 @@ function(_add_swift_host_library_single target)
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
   set_target_properties("${target}" PROPERTIES FOLDER "Swift libraries")
-
-  # Handle linking and dependencies.
-  add_dependencies_multiple_targets(
-      TARGETS "${target}"
-      DEPENDS
-        ${gyb_dependency_targets}
-        ${LLVM_COMMON_DEPENDS})
 
   # Call llvm_config() only for libraries that are part of the compiler.
   swift_common_llvm_config("${target}" ${ASHLS_LLVM_LINK_COMPONENTS})
@@ -731,6 +709,7 @@ function(add_swift_host_tool executable)
   _add_host_variant_link_flags(${executable})
   target_link_directories(${executable} PRIVATE
     ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
+  add_dependencies(${executable} ${LLVM_COMMON_DEPENDS})
 
   set_target_properties(${executable} PROPERTIES
     FOLDER "Swift executables")
@@ -744,9 +723,6 @@ function(add_swift_host_tool executable)
       INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
   endif()
 
-  add_dependencies_multiple_targets(
-    TARGETS ${executable}
-    DEPENDS ${LLVM_COMMON_DEPENDS})
   llvm_update_compile_flags(${executable})
   swift_common_llvm_config(${executable} ${ASHT_LLVM_LINK_COMPONENTS})
   set_output_directory(${executable}
