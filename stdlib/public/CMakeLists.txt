@@ -29,6 +29,8 @@ set(SWIFT_RUNTIME_CORE_LINK_FLAGS "${SWIFT_RUNTIME_LINK_FLAGS}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-mcmodel=large")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-xc++")
 endif()
 
 # C++ code in the runtime and standard library should generally avoid
