@@ -126,7 +126,7 @@ class IntrinsicInfo {
 public:
   llvm::Intrinsic::ID ID;
   SmallVector<Type, 4> Types;
-  bool hasAttribute(llvm::Attribute::AttrKind Kind) const;
+  const llvm::AttributeList &getOrCreateAttributes(ASTContext &Ctx) const;
 };
 
 /// Turn a string like "release" into the LLVM enum.

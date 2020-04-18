@@ -103,7 +103,8 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
 
   auto &II = BInst->getIntrinsicInfo();
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
-    if (II.hasAttribute(llvm::Attribute::ReadNone)) {
+    auto attrs = II.getOrCreateAttributes(F->getASTContext());
+    if (attrs.hasFnAttribute(llvm::Attribute::ReadNone)) {
       for (auto &Op : BInst->getAllOperands()) {
         if (!Op.get()->getType().isTrivial(*F)) {
           return true;
