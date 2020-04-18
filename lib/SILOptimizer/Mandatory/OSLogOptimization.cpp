@@ -1210,7 +1210,9 @@ static void deleteInstructionWithUsersAndFixLifetimes(
 /// Try to dead-code eliminate the OSLogMessage instance \c oslogMessage passed
 /// to the os log call and clean up its dependencies. If the instance cannot be
 /// eliminated, emit diagnostics.
-static void tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
+/// \returns true if elimination is successful and false if it is not successful
+/// and diagnostics is emitted.
+static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
   InstructionDeleter deleter;
   // List of instructions that are possibly dead.
   SmallVector<SILInstruction *, 4> worklist = {oslogMessage};
@@ -1249,13 +1251,15 @@ static void tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
     SILFunction *fun = oslogMessage->getFunction();
     diagnose(fun->getASTContext(), oslogMessage->getLoc().getSourceLoc(),
              diag::oslog_message_alive_after_opts);
+    return false;
   }
+  return true;
 }
 
 /// Constant evaluate instructions starting from \p start and fold the uses
 /// of the SIL value \p oslogMessage.
-/// \returns true if the body of the function containing \p oslogMessage is
-/// modified. Returns false otherwise.
+/// \returns true if folding is successful and false if it is not successful and
+/// diagnostics is emitted.
 static bool constantFold(SILInstruction *start,
                          SingleValueInstruction *oslogMessage,
                          unsigned assertConfig) {
@@ -1282,9 +1286,7 @@ static bool constantFold(SILInstruction *start,
     return false;
 
   substituteConstants(state);
-
-  tryEliminateOSLogMessage(oslogMessage);
-  return true;
+  return tryEliminateOSLogMessage(oslogMessage);
 }
 
 /// Given a call to the initializer of OSLogMessage, which conforms to
@@ -1548,14 +1550,14 @@ class OSLogOptimization : public SILFunctionTransform {
         // The log call is in unreachable code here.
         continue;
       }
-      bool bodyModified =
+      bool foldingSucceeded =
           constantFold(interpolationStart, oslogInit, assertConfig);
-      // If body was not modified, it implies that an error was diagnosed.
+      // If folding did not succeeded, it implies that an error was diagnosed.
       // However, this will also trigger a diagnostics later on since
       // _globalStringTablePointerBuiltin would not be passed a string literal.
       // Suppress this error by synthesizing a dummy string literal for the
       // builtin.
-      if (!bodyModified)
+      if (!foldingSucceeded)
         suppressGlobalStringTablePointerError(oslogInit);
       madeChange = true;
     }
