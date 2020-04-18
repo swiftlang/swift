@@ -75,17 +75,9 @@ endfunction()
 # _add_host_variant_c_compile_link_flags(
 #   ANALYZE_CODE_COVERAGE analyze_code_coverage
 #   RESULT_VAR_NAME result_var_name
-#   DEPLOYMENT_VERSION_OSX version # If provided, overrides the default value of the OSX deployment target set by the Swift project for this compilation only.
-#   DEPLOYMENT_VERSION_MACCATALYST version
-#   DEPLOYMENT_VERSION_IOS version
-#   DEPLOYMENT_VERSION_TVOS version
-#   DEPLOYMENT_VERSION_WATCHOS version
 # )
 function(_add_host_variant_c_compile_link_flags)
-  set(oneValueArgs RESULT_VAR_NAME ANALYZE_CODE_COVERAGE
-    DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
-    MACCATALYST_BUILD_FLAVOR
-  )
+  set(oneValueArgs RESULT_VAR_NAME ANALYZE_CODE_COVERAGE)
   cmake_parse_arguments(CFLAGS
     ""
     "${oneValueArgs}"
@@ -93,30 +85,13 @@ function(_add_host_variant_c_compile_link_flags)
     ${ARGN})
 
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
-    "${SWFIT_HOST_VARIANT_SDK}" "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
+    "${SWFIT_HOST_VARIANT_SDK}" "")
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
   is_darwin_based_sdk("${SWIFT_HOST_VARIANT_SDK}" IS_DARWIN)
   if(IS_DARWIN)
-    # Check if there's a specific OS deployment version needed for this invocation
-    if(SWIFT_HOST_VARIANT_SDK STREQUAL OSX)
-      if(DEFINED maccatalyst_build_flavor)
-        set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST})
-      else()
-        set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_OSX})
-      endif()
-    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "^IOS")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_IOS})
-    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "^TVOS")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_TVOS})
-    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "^WATCHOS")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_WATCHOS})
-    endif()
-
-    if("${DEPLOYMENT_VERSION}" STREQUAL "")
-      set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    endif()
+    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
   endif()
 
   # MSVC, clang-cl, gcc don't understand -target.
@@ -185,10 +160,7 @@ endfunction()
 
 
 function(_add_host_variant_c_compile_flags)
-  set(oneValueArgs
-    DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
-    RESULT_VAR_NAME
-    MACCATALYST_BUILD_FLAVOR)
+  set(oneValueArgs RESULT_VAR_NAME)
   cmake_parse_arguments(CFLAGS
     ""
     "${oneValueArgs}"
@@ -199,13 +171,7 @@ function(_add_host_variant_c_compile_flags)
 
   _add_host_variant_c_compile_link_flags(
     ANALYZE_CODE_COVERAGE FALSE
-    DEPLOYMENT_VERSION_OSX "${CFLAGS_DEPLOYMENT_VERSION_OSX}"
-    DEPLOYMENT_VERSION_MACCATALYST "${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST}"
-    DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
-    DEPLOYMENT_VERSION_TVOS "${CFLAGS_DEPLOYMENT_VERSION_TVOS}"
-    DEPLOYMENT_VERSION_WATCHOS "${CFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
-    RESULT_VAR_NAME result
-    MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
+    RESULT_VAR_NAME result)
 
   is_build_type_optimized("${CMAKE_BUILD_TYPE}" optimized)
   if(optimized)
@@ -358,10 +324,7 @@ endfunction()
 
 function(_add_host_variant_link_flags)
   set(oneValueArgs
-  DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
-  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME
-  MACCATALYST_BUILD_FLAVOR
-  )
+  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME)
   cmake_parse_arguments(LFLAGS
     ""
     "${oneValueArgs}"
@@ -374,13 +337,7 @@ function(_add_host_variant_link_flags)
 
   _add_host_variant_c_compile_link_flags(
     ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
-    DEPLOYMENT_VERSION_OSX "${LFLAGS_DEPLOYMENT_VERSION_OSX}"
-    DEPLOYMENT_VERSION_MACCATALYST "${LFLAGS_DEPLOYMENT_VERSION_MACCATALYST}"
-    DEPLOYMENT_VERSION_IOS "${LFLAGS_DEPLOYMENT_VERSION_IOS}"
-    DEPLOYMENT_VERSION_TVOS "${LFLAGS_DEPLOYMENT_VERSION_TVOS}"
-    DEPLOYMENT_VERSION_WATCHOS "${LFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
-    RESULT_VAR_NAME result
-    MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
+    RESULT_VAR_NAME result)
   if(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
     list(APPEND link_libraries "pthread" "dl")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL FREEBSD)
@@ -482,7 +439,7 @@ function(_add_host_variant_link_flags)
   endif()
 
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
-    "${SWIFT_HOST_VARIANT_SDK}" "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
+    "${SWIFT_HOST_VARIANT_SDK}" "")
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
   set("${LFLAGS_LINK_LIBRARIES_VAR_NAME}" "${link_libraries}" PARENT_SCOPE)
