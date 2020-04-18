@@ -380,11 +380,6 @@ function(_add_host_variant_link_flags target)
     target_link_libraries(${target} PRIVATE
       ${cxx_link_libraries})
 
-    # link against the ICU libraries
-    target_link_libraries(${target} PRIVATE
-      ${SWIFT_ANDROID_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N}
-      ${SWIFT_ANDROID_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC})
-
     swift_android_lib_for_arch(${SWIFT_HOST_VARIANT_ARCH}
       ${SWIFT_HOST_VARIANT_ARCH}_LIB)
     target_link_directories(${target} PRIVATE
@@ -400,19 +395,6 @@ function(_add_host_variant_link_flags target)
         "SHELL:-Xlinker -object_path_lto"
         "SHELL:-Xlinker ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${target}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}-lto${CMAKE_C_OUTPUT_EXTENSION}")
     endif()
-  endif()
-
-  if(NOT "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_SDK}_ICU_UC}" STREQUAL "")
-    get_filename_component(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_LIBDIR
-      "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_SDK}_ICU_UC}" DIRECTORY)
-    target_link_directories(${target} PRIVATE
-      "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_LIBDIR}")
-  endif()
-  if(NOT "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N}" STREQUAL "")
-    get_filename_component(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_SDK}_ICU_I18N_LIBDIR
-      "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N}" DIRECTORY)
-    target_link_directories(${target} PRIVATE
-      "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_LIBDIR}")
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
