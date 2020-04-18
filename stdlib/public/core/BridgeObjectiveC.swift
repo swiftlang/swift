@@ -429,6 +429,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   @inlinable
   public var pointee: Pointee {
     @_transparent get {
+      if Pointee.self == AnyClass.self {
+        return UnsafePointer(self).pointee
+      }
       // The memory addressed by this pointer contains a non-owning reference,
       // therefore we *must not* point an `UnsafePointer<AnyObject>` to
       // it---otherwise we would allow the compiler to assume it has a +1

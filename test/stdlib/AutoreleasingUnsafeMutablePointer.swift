@@ -183,4 +183,14 @@ suite.test("subscript and advanced(by:) works") {
   expectEqual(LifetimeTracked.instances, originalInstances)
 }
 
+suite.test("objc_copyClassList() works") {
+    var nc: UInt32 = 0
+    if let classes = objc_copyClassList(&nc) {
+        for i in 0 ..< Int(nc) {
+            _ = NSStringFromClass(classes[i])
+        }
+        free(UnsafeMutableRawPointer(classes))
+    }
+}
+
 runAllTests()
