@@ -73,10 +73,6 @@ endfunction()
 
 # Usage:
 # _add_host_variant_c_compile_link_flags(
-#   SDK sdk
-#   ARCH arch
-#   BUILD_TYPE build_type
-#   ENABLE_LTO enable_lto
 #   ANALYZE_CODE_COVERAGE analyze_code_coverage
 #   RESULT_VAR_NAME result_var_name
 #   DEPLOYMENT_VERSION_OSX version # If provided, overrides the default value of the OSX deployment target set by the Swift project for this compilation only.
@@ -84,10 +80,9 @@ endfunction()
 #   DEPLOYMENT_VERSION_IOS version
 #   DEPLOYMENT_VERSION_TVOS version
 #   DEPLOYMENT_VERSION_WATCHOS version
-#
 # )
 function(_add_host_variant_c_compile_link_flags)
-  set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE
+  set(oneValueArgs RESULT_VAR_NAME ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     MACCATALYST_BUILD_FLAVOR
   )
@@ -98,36 +93,35 @@ function(_add_host_variant_c_compile_link_flags)
     ${ARGN})
 
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
-      "${CFLAGS_SDK}" "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
+    "${SWFIT_HOST_VARIANT_SDK}" "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
+  is_darwin_based_sdk("${SWIFT_HOST_VARIANT_SDK}" IS_DARWIN)
   if(IS_DARWIN)
     # Check if there's a specific OS deployment version needed for this invocation
-    if("${CFLAGS_SDK}" STREQUAL "OSX")
+    if(SWIFT_HOST_VARIANT_SDK STREQUAL OSX)
       if(DEFINED maccatalyst_build_flavor)
         set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST})
       else()
         set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_OSX})
       endif()
-    elseif("${CFLAGS_SDK}" STREQUAL "IOS" OR "${CFLAGS_SDK}" STREQUAL "IOS_SIMULATOR")
+    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "^IOS")
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_IOS})
-    elseif("${CFLAGS_SDK}" STREQUAL "TVOS" OR "${CFLAGS_SDK}" STREQUAL "TVOS_SIMULATOR")
+    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "^TVOS")
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_TVOS})
-    elseif("${CFLAGS_SDK}" STREQUAL "WATCHOS" OR "${CFLAGS_SDK}" STREQUAL "WATCHOS_SIMULATOR")
+    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "^WATCHOS")
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_WATCHOS})
     endif()
 
     if("${DEPLOYMENT_VERSION}" STREQUAL "")
-      set(DEPLOYMENT_VERSION "${SWIFT_SDK_${CFLAGS_SDK}_DEPLOYMENT_VERSION}")
+      set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
     endif()
   endif()
 
   # MSVC, clang-cl, gcc don't understand -target.
-  if(CMAKE_C_COMPILER_ID MATCHES "^Clang|AppleClang$" AND
-      NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    get_target_triple(target target_variant "${CFLAGS_SDK}" "${CFLAGS_ARCH}"
+  if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
       MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     list(APPEND result "-target" "${target}")
@@ -136,18 +130,19 @@ function(_add_host_variant_c_compile_link_flags)
     endif()
   endif()
 
-  set(_sysroot "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_PATH}")
+  set(_sysroot
+    "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
   if(IS_DARWIN)
     list(APPEND result "-isysroot" "${_sysroot}")
   elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
     list(APPEND result "--sysroot=${_sysroot}")
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
     # lld can handle targeting the android build.  However, if lld is not
     # enabled, then fallback to the linker included in the android NDK.
     if(NOT SWIFT_ENABLE_LLD_LINKER)
-      swift_android_tools_path(${CFLAGS_ARCH} tools_path)
+      swift_android_tools_path(${SWIFT_HOST_VARIANT_ARCH} tools_path)
       list(APPEND result "-B" "${tools_path}")
     endif()
   endif()
@@ -157,8 +152,8 @@ function(_add_host_variant_c_compile_link_flags)
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
     list(APPEND result
-      "-arch" "${CFLAGS_ARCH}"
-      "-F${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
+      "-arch" "${SWIFT_HOST_VARIANT_ARCH}"
+      "-F${SWIFT_SDK_${SWIFT_HOST_VARIANT_ARCH}_PATH}/../../../Developer/Library/Frameworks")
 
     set(add_explicit_version TRUE)
 
@@ -171,7 +166,7 @@ function(_add_host_variant_c_compile_link_flags)
 
     if(add_explicit_version)
       list(APPEND result
-        "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
+        "-m${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
      endif()
   endif()
 
@@ -180,7 +175,7 @@ function(_add_host_variant_c_compile_link_flags)
                        "-fcoverage-mapping")
   endif()
 
-  _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
+  _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
   if (_lto_flag_out)
     list(APPEND result "${_lto_flag_out}")
   endif()
@@ -190,9 +185,9 @@ endfunction()
 
 
 function(_add_host_variant_c_compile_flags)
-  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
+  set(oneValueArgs
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
-    RESULT_VAR_NAME ENABLE_LTO
+    RESULT_VAR_NAME
     MACCATALYST_BUILD_FLAVOR)
   cmake_parse_arguments(CFLAGS
     ""
@@ -203,11 +198,6 @@ function(_add_host_variant_c_compile_flags)
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
   _add_host_variant_c_compile_link_flags(
-    SDK "${CFLAGS_SDK}"
-    ARCH "${CFLAGS_ARCH}"
-    BUILD_TYPE "${CFLAGS_BUILD_TYPE}"
-    ENABLE_ASSERTIONS "${CFLAGS_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${CFLAGS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE FALSE
     DEPLOYMENT_VERSION_OSX "${CFLAGS_DEPLOYMENT_VERSION_OSX}"
     DEPLOYMENT_VERSION_MACCATALYST "${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST}"
@@ -217,15 +207,15 @@ function(_add_host_variant_c_compile_flags)
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
-  is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
+  is_build_type_optimized("${CMAKE_BUILD_TYPE}" optimized)
   if(optimized)
     list(APPEND result "-O2")
 
     # Omit leaf frame pointers on x86 production builds (optimized, no debug
     # info, and no asserts).
-    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debug)
-    if(NOT debug AND NOT CFLAGS_ENABLE_ASSERTIONS)
-      if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
+    is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debug)
+    if(NOT debug AND NOT LLVM_ENABLE_ASSERTIONS)
+      if(SWIFT_HOST_VARIANT_ARCH MATCHES "i?86")
         if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
           list(APPEND result "-momit-leaf-frame-pointer")
         else()
@@ -243,9 +233,9 @@ function(_add_host_variant_c_compile_flags)
 
   # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
+    is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debuginfo)
     if(debuginfo)
-      _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
+      _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
       if(_lto_flag_out)
         list(APPEND result "-gline-tables-only")
       else()
@@ -256,7 +246,7 @@ function(_add_host_variant_c_compile_flags)
     endif()
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     # MSVC/clang-cl don't support -fno-pic or -fms-compatibility-version.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result -fno-pic)
@@ -271,7 +261,7 @@ function(_add_host_variant_c_compile_flags)
     endif()
     # TODO(compnerd) permit building for different families
     list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
-    if("${CFLAGS_ARCH}" MATCHES arm)
+    if(SWIFT_HOST_VARIANT_ARCH MATCHES arm)
       list(APPEND result "-D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE")
     endif()
     list(APPEND result "-D_MT")
@@ -308,8 +298,8 @@ function(_add_host_variant_c_compile_flags)
     endif()
   endif()
 
-  if(${CFLAGS_SDK} STREQUAL ANDROID)
-    if(${CFLAGS_ARCH} STREQUAL x86_64)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
+    if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
       # NOTE(compnerd) Android NDK 21 or lower will generate library calls to
       # `__sync_val_compare_and_swap_16` rather than lowering to the CPU's
       # `cmpxchg16b` instruction as the `cx16` feature is disabled due to a bug
@@ -323,7 +313,7 @@ function(_add_host_variant_c_compile_flags)
     endif()
   endif()
 
-  if(CFLAGS_ENABLE_ASSERTIONS)
+  if(LLVM_ENABLE_ASSERTIONS)
     list(APPEND result "-UNDEBUG")
   else()
     list(APPEND result "-DNDEBUG")
@@ -333,28 +323,31 @@ function(_add_host_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()
 
-  if(CFLAGS_ANALYZE_CODE_COVERAGE)
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
     list(APPEND result "-fprofile-instr-generate"
                        "-fcoverage-mapping")
   endif()
 
-  if((CFLAGS_ARCH STREQUAL "armv7" OR CFLAGS_ARCH STREQUAL "aarch64") AND
-     (CFLAGS_SDK STREQUAL "LINUX" OR CFLAGS_SDK STREQUAL "ANDROID"))
+  if((SWIFT_HOST_VARIANT_ARCH STREQUAL armv7 OR
+      SWIFT_HOST_VARIANT_ARCH STREQUAL aarch64) AND
+     (SWIFT_HOST_VARIANT_SDK STREQUAL LINUX OR
+      SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID))
      list(APPEND result -funwind-tables)
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
     list(APPEND result -nostdinc++)
     swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
-    swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
-    foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${CFLAGS_ARCH}_INCLUDE)
+    swift_android_include_for_arch("${SWIFT_HOST_VARIANT_ARCH}"
+      "${SWIFT_HOST_VARIANT_ARCH}_INCLUDE")
+    foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
       list(APPEND result "SHELL:${CMAKE_INCLUDE_SYSTEM_FLAG_C}${path}")
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "LINUX")
-    if(${CFLAGS_ARCH} STREQUAL x86_64)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+    if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
       # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
       list(APPEND result "-march=core2")
     endif()
@@ -364,7 +357,7 @@ function(_add_host_variant_c_compile_flags)
 endfunction()
 
 function(_add_host_variant_link_flags)
-  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
+  set(oneValueArgs
   DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
   RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME
   MACCATALYST_BUILD_FLAVOR
@@ -375,20 +368,12 @@ function(_add_host_variant_link_flags)
     ""
     ${ARGN})
 
-  precondition(LFLAGS_SDK MESSAGE "Should specify an SDK")
-  precondition(LFLAGS_ARCH MESSAGE "Should specify an architecture")
-
   set(result ${${LFLAGS_RESULT_VAR_NAME}})
   set(link_libraries ${${LFLAGS_LINK_LIBRARIES_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
 
   _add_host_variant_c_compile_link_flags(
-    SDK "${LFLAGS_SDK}"
-    ARCH "${LFLAGS_ARCH}"
-    BUILD_TYPE "${LFLAGS_BUILD_TYPE}"
-    ENABLE_ASSERTIONS "${LFLAGS_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${LFLAGS_ENABLE_LTO}"
-    ANALYZE_CODE_COVERAGE "${LFLAGS_ANALYZE_CODE_COVERAGE}"
+    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
     DEPLOYMENT_VERSION_OSX "${LFLAGS_DEPLOYMENT_VERSION_OSX}"
     DEPLOYMENT_VERSION_MACCATALYST "${LFLAGS_DEPLOYMENT_VERSION_MACCATALYST}"
     DEPLOYMENT_VERSION_IOS "${LFLAGS_DEPLOYMENT_VERSION_IOS}"
@@ -396,45 +381,47 @@ function(_add_host_variant_link_flags)
     DEPLOYMENT_VERSION_WATCHOS "${LFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
     RESULT_VAR_NAME result
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
-  if("${LFLAGS_SDK}" STREQUAL "LINUX")
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
     list(APPEND link_libraries "pthread" "dl")
-  elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL FREEBSD)
     list(APPEND link_libraries "pthread")
-  elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL CYGWIN)
     # No extra libraries required.
-  elseif("${LFLAGS_SDK}" STREQUAL "WINDOWS")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     # We don't need to add -nostdlib using MSVC or clang-cl, as MSVC and clang-cl rely on auto-linking entirely.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       # NOTE: we do not use "/MD" or "/MDd" and select the runtime via linker
       # options. This causes conflicts.
       list(APPEND result "-nostdlib")
     endif()
-    swift_windows_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
-    list(APPEND library_search_directories ${${LFLAGS_ARCH}_LIB})
+    swift_windows_lib_for_arch(${SWIFT_HOST_VARIANT_ARCH}
+      ${SWIFT_HOST_VARIANT_ARCH}_LIB)
+    list(APPEND library_search_directories ${${SWIFT_HOST_VARIANT_ARCH}_LIB})
 
     # NOTE(compnerd) workaround incorrectly extensioned import libraries from
     # the Windows SDK on case sensitive file systems.
     list(APPEND library_search_directories
-         ${CMAKE_BINARY_DIR}/winsdk_lib_${LFLAGS_ARCH}_symlinks)
-  elseif("${LFLAGS_SDK}" STREQUAL "HAIKU")
+      ${CMAKE_BINARY_DIR}/winsdk_lib_${SWIFT_HOST_VARIANT_ARCH}_symlinks)
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL HAIKU)
     list(APPEND link_libraries "bsd" "atomic")
     list(APPEND result "-Wl,-Bsymbolic")
-  elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
     list(APPEND link_libraries "dl" "log" "atomic")
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
 
     # link against the custom C++ library
-    swift_android_cxx_libraries_for_arch(${LFLAGS_ARCH} cxx_link_libraries)
+    swift_android_cxx_libraries_for_arch(${SWIFT_HOST_VARIANT_ARCH} cxx_link_libraries)
     list(APPEND link_libraries ${cxx_link_libraries})
 
     # link against the ICU libraries
     list(APPEND link_libraries
-      ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_I18N}
-      ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_UC})
+      ${SWIFT_ANDROID_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N}
+      ${SWIFT_ANDROID_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC})
 
-    swift_android_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
-    foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
+    swift_android_lib_for_arch(${SWIFT_HOST_VARIANT_ARCH}
+      ${SWIFT_HOST_VARIANT_ARCH}_LIB)
+    foreach(path IN LISTS ${SWIFT_HOST_VARIANT_ARCH}_LIB)
       list(APPEND library_search_directories ${path})
     endforeach()
   else()
@@ -443,7 +430,7 @@ function(_add_host_variant_link_flags)
     # be touched. The reason why this must be done is that on OS X, debug info is
     # left in object files. So if the object file is removed when we go to
     # generate a dsym, the debug info is gone.
-    if (LFLAGS_ENABLE_LTO)
+    if (SWIFT_TOOLS_ENABLE_LTO)
       precondition(LFLAGS_LTO_OBJECT_NAME
         MESSAGE "Should specify a unique name for the lto object")
       set(lto_object_dir ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
@@ -452,26 +439,26 @@ function(_add_host_variant_link_flags)
       endif()
   endif()
 
-  if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" STREQUAL "")
-    get_filename_component(SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC_LIBDIR
-      "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC_LIBDIR}")
+  if(NOT "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_SDK}_ICU_UC}" STREQUAL "")
+    get_filename_component(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_LIBDIR
+      "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_SDK}_ICU_UC}" DIRECTORY)
+    list(APPEND library_search_directories "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_LIBDIR}")
   endif()
-  if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" STREQUAL "")
-    get_filename_component(SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR
-      "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR}")
+  if(NOT "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N}" STREQUAL "")
+    get_filename_component(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_SDK}_ICU_I18N_LIBDIR
+      "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N}" DIRECTORY)
+    list(APPEND library_search_directories "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_LIBDIR}")
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     # FIXME: On Apple platforms, find_program needs to look for "ld64.lld"
     find_program(LDLLD_PATH "ld.lld")
     if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
-       ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
-        NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
+      (SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS AND
+       NOT CMAKE_SYSTEM_NAME STREQUAL WINDOWS))
       list(APPEND result "-fuse-ld=lld")
     elseif(SWIFT_ENABLE_GOLD_LINKER AND
-        "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+        "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
       if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
         list(APPEND result "-fuse-ld=gold.exe")
       else()
@@ -495,7 +482,7 @@ function(_add_host_variant_link_flags)
   endif()
 
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
-    "${LFLAGS_SDK}" "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
+    "${SWIFT_HOST_VARIANT_SDK}" "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
   set("${LFLAGS_LINK_LIBRARIES_VAR_NAME}" "${link_libraries}" PARENT_SCOPE)
@@ -593,7 +580,7 @@ function(_add_swift_host_library_single target)
   add_library("${target}" ${libkind} ${ASHLS_SOURCES})
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
 
-  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH} SWIFTLIB_INCLUDE)
     target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
     set_target_properties(${target}
@@ -615,15 +602,15 @@ function(_add_swift_host_library_single target)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_NAME_DIR "@rpath")
-  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
-  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL CYGWIN)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
-  elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN")
@@ -649,15 +636,7 @@ function(_add_swift_host_library_single target)
 
   set(library_search_directories)
 
-  _add_host_variant_c_compile_flags(
-    SDK "${SWIFT_HOST_VARIANT_SDK}"
-    ARCH "${SWIFT_HOST_VARIANT_ARCH}"
-    BUILD_TYPE ${CMAKE_BUILD_TYPE}
-    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
-    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
-    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
-    RESULT_VAR_NAME c_compile_flags
-    )
+  _add_host_variant_c_compile_flags(RESULT_VAR_NAME c_compile_flags)
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     if(libkind STREQUAL SHARED)
@@ -665,12 +644,6 @@ function(_add_swift_host_library_single target)
     endif()
   endif()
   _add_host_variant_link_flags(
-    SDK "${SWIFT_HOST_VARIANT_SDK}"
-    ARCH "${SWIFT_HOST_VARIANT_ARCH}"
-    BUILD_TYPE ${CMAKE_BUILD_TYPE}
-    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
-    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
-    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
     LTO_OBJECT_NAME "${target}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}"
     RESULT_VAR_NAME link_flags
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
@@ -832,22 +805,9 @@ function(add_swift_host_tool executable)
   set(library_search_directories
     ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
 
-  _add_host_variant_c_compile_flags(
-    SDK ${SWIFT_HOST_VARIANT_SDK}
-    ARCH ${SWIFT_HOST_VARIANT_ARCH}
-    BUILD_TYPE ${CMAKE_BUILD_TYPE}
-    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
-    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
-    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
-    RESULT_VAR_NAME c_compile_flags)
+  _add_host_variant_c_compile_flags(RESULT_VAR_NAME c_compile_flags)
   _add_host_variant_link_flags(
-    SDK ${SWIFT_HOST_VARIANT_SDK}
-    ARCH ${SWIFT_HOST_VARIANT_ARCH}
-    BUILD_TYPE ${CMAKE_BUILD_TYPE}
-    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
-    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
     LTO_OBJECT_NAME "${executable}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}"
-    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
     RESULT_VAR_NAME link_flags
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)

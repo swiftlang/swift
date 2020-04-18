@@ -41,31 +41,13 @@ endfunction()
 # FIXME: this is a HACK.  All SourceKit CMake code using this function should be
 # rewritten to use 'add_swift_host_library' or 'add_swift_target_library'.
 function(add_sourcekit_default_compiler_flags target)
-  set(sdk "${SWIFT_HOST_VARIANT_SDK}")
-  set(arch "${SWIFT_HOST_VARIANT_ARCH}")
   set(c_compile_flags)
   set(link_flags)
 
   # Add variant-specific flags.
-  set(build_type "${CMAKE_BUILD_TYPE}")
-  set(enable_assertions "${LLVM_ENABLE_ASSERTIONS}")
-  set(analyze_code_coverage "${SWIFT_ANALYZE_CODE_COVERAGE}")
-  _add_host_variant_c_compile_flags(
-    SDK "${sdk}"
-    ARCH "${arch}"
-    BUILD_TYPE "${build_type}"
-    ENABLE_ASSERTIONS "${enable_assertions}"
-    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
-    RESULT_VAR_NAME c_compile_flags)
+  _add_host_variant_c_compile_flags(RESULT_VAR_NAME c_compile_flags)
   _add_host_variant_link_flags(
-    SDK "${sdk}"
-    ARCH "${arch}"
-    BUILD_TYPE "${build_type}"
-    ENABLE_ASSERTIONS "${enable_assertions}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
-    LTO_OBJECT_NAME "${target}-${sdk}-${arch}"
-    ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
+    LTO_OBJECT_NAME "${target}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}"
     RESULT_VAR_NAME link_flags
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
