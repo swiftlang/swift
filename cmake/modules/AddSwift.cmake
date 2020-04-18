@@ -322,65 +322,69 @@ function(_add_host_variant_c_compile_flags)
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
-function(_add_host_variant_link_flags)
-  set(oneValueArgs
-  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME)
-  cmake_parse_arguments(LFLAGS
-    ""
-    "${oneValueArgs}"
-    ""
-    ${ARGN})
-
-  set(result ${${LFLAGS_RESULT_VAR_NAME}})
-  set(link_libraries ${${LFLAGS_LINK_LIBRARIES_VAR_NAME}})
-  set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
-
+function(_add_host_variant_link_flags target)
   _add_host_variant_c_compile_link_flags(
     ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
     RESULT_VAR_NAME result)
+  target_link_options(${target} PRIVATE
+    ${result})
+
   if(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
-    list(APPEND link_libraries "pthread" "dl")
+    target_link_libraries(${target} PRIVATE
+      pthread
+      dl)
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL FREEBSD)
-    list(APPEND link_libraries "pthread")
+    target_link_libraries(${target} PRIVATE
+      pthread)
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL CYGWIN)
     # No extra libraries required.
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
-    # We don't need to add -nostdlib using MSVC or clang-cl, as MSVC and clang-cl rely on auto-linking entirely.
+    # We don't need to add -nostdlib using MSVC or clang-cl, as MSVC and
+    # clang-cl rely on auto-linking entirely.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       # NOTE: we do not use "/MD" or "/MDd" and select the runtime via linker
       # options. This causes conflicts.
-      list(APPEND result "-nostdlib")
+      target_link_options(${target} PRIVATE
+        -nostdlib)
     endif()
     swift_windows_lib_for_arch(${SWIFT_HOST_VARIANT_ARCH}
       ${SWIFT_HOST_VARIANT_ARCH}_LIB)
-    list(APPEND library_search_directories ${${SWIFT_HOST_VARIANT_ARCH}_LIB})
+    target_link_directories(${target} PRIVATE
+      ${${SWIFT_HOST_VARIANT_ARCH}_LIB})
 
     # NOTE(compnerd) workaround incorrectly extensioned import libraries from
     # the Windows SDK on case sensitive file systems.
-    list(APPEND library_search_directories
+    target_link_directories(${target} PRIVATE
       ${CMAKE_BINARY_DIR}/winsdk_lib_${SWIFT_HOST_VARIANT_ARCH}_symlinks)
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL HAIKU)
-    list(APPEND link_libraries "bsd" "atomic")
-    list(APPEND result "-Wl,-Bsymbolic")
+    target_link_libraries(${target} PRIVATE
+      atomic
+      bsd)
+    target_link_options(${target} PRIVATE
+      "SHELL:-Xlinker -Bsymbolic")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
-    list(APPEND link_libraries "dl" "log" "atomic")
-    # We need to add the math library, which is linked implicitly by libc++
-    list(APPEND result "-lm")
+    target_link_libraries(${target} PRIVATE
+      atomic
+      dl
+      log
+      # We need to add the math library, which is linked implicitly by libc++
+      m)
 
     # link against the custom C++ library
-    swift_android_cxx_libraries_for_arch(${SWIFT_HOST_VARIANT_ARCH} cxx_link_libraries)
-    list(APPEND link_libraries ${cxx_link_libraries})
+    swift_android_cxx_libraries_for_arch(${SWIFT_HOST_VARIANT_ARCH}
+      cxx_link_libraries)
+    target_link_libraries(${target} PRIVATE
+      ${cxx_link_libraries})
 
     # link against the ICU libraries
-    list(APPEND link_libraries
+    target_link_libraries(${target} PRIVATE
       ${SWIFT_ANDROID_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N}
       ${SWIFT_ANDROID_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC})
 
     swift_android_lib_for_arch(${SWIFT_HOST_VARIANT_ARCH}
       ${SWIFT_HOST_VARIANT_ARCH}_LIB)
-    foreach(path IN LISTS ${SWIFT_HOST_VARIANT_ARCH}_LIB)
-      list(APPEND library_search_directories ${path})
-    endforeach()
+    target_link_directories(${target} PRIVATE
+      ${${SWIFT_HOST_VARIANT_ARCH}_LIB})
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not
@@ -388,38 +392,37 @@ function(_add_host_variant_link_flags)
     # left in object files. So if the object file is removed when we go to
     # generate a dsym, the debug info is gone.
     if (SWIFT_TOOLS_ENABLE_LTO)
-      precondition(LFLAGS_LTO_OBJECT_NAME
-        MESSAGE "Should specify a unique name for the lto object")
-      set(lto_object_dir ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
-      set(lto_object ${lto_object_dir}/${LFLAGS_LTO_OBJECT_NAME}-lto.o)
-        list(APPEND result "-Wl,-object_path_lto,${lto_object}")
-      endif()
+      target_link_options(${target} PRIVATE
+        "SHELL:-Xlinker -object_path_lto"
+        "SHELL:-Xlinker ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${target}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}-lto${CMAKE_C_OUTPUT_EXTENSION}")
+    endif()
   endif()
 
   if(NOT "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_SDK}_ICU_UC}" STREQUAL "")
     get_filename_component(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_LIBDIR
       "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_SDK}_ICU_UC}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_LIBDIR}")
+    target_link_directories(${target} PRIVATE
+      "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_LIBDIR}")
   endif()
   if(NOT "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N}" STREQUAL "")
     get_filename_component(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_SDK}_ICU_I18N_LIBDIR
       "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_LIBDIR}")
+    target_link_directories(${target} PRIVATE
+      "${SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_LIBDIR}")
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     # FIXME: On Apple platforms, find_program needs to look for "ld64.lld"
     find_program(LDLLD_PATH "ld.lld")
     if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
-      (SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS AND
-       NOT CMAKE_SYSTEM_NAME STREQUAL WINDOWS))
-      list(APPEND result "-fuse-ld=lld")
+       (SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS AND NOT CMAKE_SYSTEM_NAME STREQUAL WINDOWS))
+      target_link_options(${target} PRIVATE -fuse-ld=lld)
     elseif(SWIFT_ENABLE_GOLD_LINKER AND
-        "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+           "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
       if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-        list(APPEND result "-fuse-ld=gold.exe")
+        target_link_options(${target} PRIVATE -fuse-ld=gold.exe)
       else()
-        list(APPEND result "-fuse-ld=gold")
+        target_link_options(${target} PRIVATE -fuse-ld=gold)
       endif()
     endif()
   endif()
@@ -431,19 +434,16 @@ function(_add_host_variant_link_flags)
   # TODO: Evaluate/enable -f{function,data}-sections --gc-sections for bfd,
   # gold, and lld.
   if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
-    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    if(CMAKE_SYSTEM_NAME MATCHES Darwin)
       # See rdar://48283130: This gives 6MB+ size reductions for swift and
       # SourceKitService, and much larger size reductions for sil-opt etc.
-      list(APPEND result "-Wl,-dead_strip")
+      target_link_options(${target} PRIVATE
+        "SHELL:-Xlinker -dead_strip")
     endif()
   endif()
 
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
     "${SWIFT_HOST_VARIANT_SDK}" "")
-
-  set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
-  set("${LFLAGS_LINK_LIBRARIES_VAR_NAME}" "${link_libraries}" PARENT_SCOPE)
-  set("${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}" "${library_search_directories}" PARENT_SCOPE)
 endfunction()
 
 # Add a single variant of a new Swift library.
@@ -591,8 +591,6 @@ function(_add_swift_host_library_single target)
   set(c_compile_flags ${ASHLS_C_COMPILE_FLAGS})
   set(link_flags)
 
-  set(library_search_directories)
-
   _add_host_variant_c_compile_flags(RESULT_VAR_NAME c_compile_flags)
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
@@ -600,11 +598,7 @@ function(_add_swift_host_library_single target)
       list(APPEND c_compile_flags -D_WINDLL)
     endif()
   endif()
-  _add_host_variant_link_flags(
-    LTO_OBJECT_NAME "${target}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}"
-    RESULT_VAR_NAME link_flags
-    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
-      )
+  _add_host_variant_link_flags(${target})
 
   # Set compilation and link flags.
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
@@ -629,8 +623,6 @@ function(_add_swift_host_library_single target)
 
   target_compile_options(${target} PRIVATE
     ${c_compile_flags})
-  target_link_options(${target} PRIVATE
-    ${link_flags})
   if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
     target_link_options(${target} PRIVATE
       "LINKER:-compatibility_version,1")
@@ -657,10 +649,6 @@ function(_add_swift_host_library_single target)
       endif()
     endif()
   endif()
-  target_link_libraries(${target} PRIVATE
-    ${link_libraries})
-  target_link_directories(${target} PRIVATE
-    ${library_search_directories})
 
   # Do not add code here.
 endfunction()
@@ -755,29 +743,14 @@ function(add_swift_host_tool executable)
   precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")
 
-  # Determine compiler flags.
-  set(c_compile_flags)
-  set(link_flags)
-  set(link_libraries)
-  set(library_search_directories
-    ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
-
   _add_host_variant_c_compile_flags(RESULT_VAR_NAME c_compile_flags)
-  _add_host_variant_link_flags(
-    LTO_OBJECT_NAME "${executable}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}"
-    RESULT_VAR_NAME link_flags
-    LINK_LIBRARIES_VAR_NAME link_libraries
-    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
   add_executable(${executable} ${ASHT_UNPARSED_ARGUMENTS})
   target_compile_options(${executable} PRIVATE
     ${c_compile_flags})
+  _add_host_variant_link_flags(${executable})
   target_link_directories(${executable} PRIVATE
-    ${library_search_directories})
-  target_link_options(${executable} PRIVATE
-    ${link_flags})
-  target_link_libraries(${executable} PRIVATE
-    ${link_libraries})
+    ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
 
   set_target_properties(${executable} PROPERTIES
     FOLDER "Swift executables")

@@ -46,11 +46,7 @@ function(add_sourcekit_default_compiler_flags target)
 
   # Add variant-specific flags.
   _add_host_variant_c_compile_flags(RESULT_VAR_NAME c_compile_flags)
-  _add_host_variant_link_flags(
-    LTO_OBJECT_NAME "${target}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}"
-    RESULT_VAR_NAME link_flags
-    LINK_LIBRARIES_VAR_NAME link_libraries
-    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
+  _add_host_variant_link_flags(${target})
 
   # Set compilation and link flags.
   if(${SWIFT_HOST_VARIANT_SDK} STREQUAL WINDOWS)
@@ -61,12 +57,6 @@ function(add_sourcekit_default_compiler_flags target)
   endif()
   target_compile_options(${target} PRIVATE
     -fblocks)
-  target_link_options(${target} PRIVATE
-    ${link_flags})
-  target_link_directories(${target} PRIVATE
-    ${library_search_directories})
-  target_link_libraries(${target} PRIVATE
-    ${link_libraries})
 endfunction()
 
 # Add a new SourceKit library.
