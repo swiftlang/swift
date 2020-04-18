@@ -22,7 +22,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/Utils.h"
@@ -765,13 +764,13 @@ static void printOrDumpDecl(Decl *d, PrintOrDump which) {
 
 /// The compiler and execution environment for the REPL.
 class REPLEnvironment {
+  std::unique_ptr<llvm::LLVMContext> LLVMContext;
   CompilerInstance &CI;
   ModuleDecl *MostRecentModule;
   ProcessCmdLine CmdLine;
   llvm::SmallPtrSet<swift::ModuleDecl *, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
   bool RanGlobalInitializers;
-  llvm::LLVMContext &LLVMContext;
   llvm::Module *Module;
   llvm::StringSet<> FuncsAlreadyGenerated;
   llvm::StringSet<> GlobalsAlreadyEmitted;
@@ -1028,15 +1027,14 @@ private:
 public:
   REPLEnvironment(CompilerInstance &CI,
                   const ProcessCmdLine &CmdLine,
-                  llvm::LLVMContext &LLVMCtx,
                   bool ParseStdlib)
-    : CI(CI),
+    : LLVMContext(std::make_unique<llvm::LLVMContext>()),
+      CI(CI),
       MostRecentModule(CI.getMainModule()),
       CmdLine(CmdLine),
       RanGlobalInitializers(false),
-      LLVMContext(LLVMCtx),
-      Module(new llvm::Module("REPL", LLVMContext)),
-      DumpModule("REPL", LLVMContext),
+      Module(new llvm::Module("REPL", *LLVMContext.get())),
+      DumpModule("REPL", *LLVMContext.get()),
       IRGenOpts(),
       SILOpts(),
       Input(*this)
@@ -1281,7 +1279,7 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
 
 void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                     bool ParseStdlib) {
-  REPLEnvironment env(CI, CmdLine, getGlobalLLVMContext(), ParseStdlib);
+  REPLEnvironment env(CI, CmdLine, ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
   

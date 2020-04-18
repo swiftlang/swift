@@ -233,9 +233,6 @@ private:
   // The list of SILProperties in the module.
   PropertyListType properties;
 
-  /// The remark output stream used to record SIL remarks to a file.
-  std::unique_ptr<llvm::raw_fd_ostream> silRemarkStream;
-
   /// The remark streamer used to serialize SIL remarks to a file.
   std::unique_ptr<swift::SILRemarkStreamer> silRemarkStreamer;
 
@@ -526,9 +523,7 @@ public:
   swift::SILRemarkStreamer *getSILRemarkStreamer() {
     return silRemarkStreamer.get();
   }
-  void setSILRemarkStreamer(
-      std::unique_ptr<llvm::raw_fd_ostream> &&remarkStream,
-      std::unique_ptr<swift::SILRemarkStreamer> &&remarkStreamer);
+  void installSILRemarkStreamer();
 
   // This is currently limited to VarDecl because the visibility of global
   // variables and class properties is straightforward, while the visibility of

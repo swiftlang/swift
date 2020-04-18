@@ -52,6 +52,15 @@ static bool isAtomicOrderingDecl(StructDecl *structDecl) {
           structName == astContext.Id_AtomicUpdateOrdering);
 }
 
+/// Return true iff the given nominal type decl \p nominal has a name that
+/// matches one of the known OSLog types that need not be a constant in the new
+/// os_log APIs.
+static bool isOSLogDynamicObject(NominalTypeDecl *nominal) {
+  ASTContext &astContext = nominal->getASTContext();
+  Identifier name = nominal->getName();
+  return (name == astContext.Id_OSLog || name == astContext.Id_OSLogType);
+}
+
 /// Return true iff the parameter \p param of function \c funDecl is required to
 /// be a constant. This is true if either the function is an os_log function or
 /// it is an atomics operation and the parameter represents the ordering.
@@ -59,6 +68,14 @@ static bool isParamRequiredToBeConstant(FuncDecl *funcDecl, ParamDecl *param) {
   assert(funcDecl && param && "funcDecl and param must not be null");
   if (hasSemanticsAttr(funcDecl, semantics::OSLOG_REQUIRES_CONSTANT_ARGUMENTS))
     return true;
+  if (hasSemanticsAttr(funcDecl, semantics::OSLOG_LOG_WITH_LEVEL)) {
+    // We are looking at a top-level os_log function that accepts level and
+    // possibly custom log object. Those need not be constants, but every other
+    // parameter must be.
+    Type paramType = param->getType();
+    NominalTypeDecl *nominal = paramType->getNominalOrBoundGenericNominal();
+    return !nominal || !isOSLogDynamicObject(nominal);
+  }
   if (!hasSemanticsAttr(funcDecl,
                         semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS))
     return false;

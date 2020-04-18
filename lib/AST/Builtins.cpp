@@ -20,7 +20,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -28,8 +27,22 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/Support/ManagedStatic.h"
 #include <tuple>
+
 using namespace swift;
+
+// FIXME: The "Global Context" is a holdover from LLVM's removal of the global
+// context. LLVM's global context was used as scratch space to allocate some
+// attributes for the routines in this file, so we just made our own to work
+// around its removal. Really, it doesn't matter where we allocate these
+// attributes, but it's somewhat convenient for now that they're all in one
+// place instead of requiring a fresh context for every call. If we can
+// sequester ownership of a context (e.g. in SILModule) we could do away with
+// this, but there are callers of \c swift::getSwiftFunctionTypeForIntrinsic
+// all over the compiler.
+static llvm::ManagedStatic<llvm::LLVMContext> GlobalContext;
+static llvm::LLVMContext &getGlobalLLVMContext() { return *GlobalContext; }
 
 struct BuiltinExtraInfoTy {
   const char *Attributes;
