@@ -7,6 +7,8 @@
 // RUN: %swift_driver -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
 // RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
 
+// RUN: %swift_driver -print-target-info -target x86_64-apple-ios12.0 | %FileCheck -check-prefix CHECK-IOS-SIM %s
+
 // CHECK-IOS:   "target": {
 // CHECK-IOS:     "triple": "arm64-apple-ios12.0",
 // CHECK-IOS:     "unversionedTriple": "arm64-apple-ios",
@@ -50,3 +52,11 @@
 // CHECK-ZIPPERED:   "swiftRuntimeCompatibilityVersion": "5.1"
 // CHECK-ZIPPERED:   "librariesRequireRPath": false
 // CHECK-ZIPPERED: }
+
+// CHECK-IOS-SIM:   "target": {
+// CHECK-IOS-SIM:     "triple": "x86_64-apple-ios12.0-simulator",
+// CHECK-IOS-SIM:     "unversionedTriple": "x86_64-apple-ios-simulator",
+// CHECK-IOS-SIM:     "moduleTriple": "x86_64-apple-ios-simulator",
+// CHECK-IOS-SIM:     "swiftRuntimeCompatibilityVersion": "5.0",
+// CHECK-IOS-SIM:     "librariesRequireRPath": true
+// CHECK-IOS-SIM:   }

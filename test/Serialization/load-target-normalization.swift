@@ -112,15 +112,6 @@ import ForeignModule
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-tvos40-simulator 2>&1 | %FileCheck -DNORM=i386-apple-tvos-simulator %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-watchos9.1.1-simulator 2>&1 | %FileCheck -DNORM=i386-apple-watchos-simulator %s
 
-// simulator should be inferred when an Intel architecture is used with iOS, tvOS, or watchOS.
-
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target x86_64-apple-ios40.0 2>&1 | %FileCheck -DNORM=x86_64-apple-ios-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target x86_64-apple-tvos40 2>&1 | %FileCheck -DNORM=x86_64-apple-tvos-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target x86_64-apple-watchos9.1.1 2>&1 | %FileCheck -DNORM=x86_64-apple-watchos-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-ios40.0 2>&1 | %FileCheck -DNORM=i386-apple-ios-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-tvos40 2>&1 | %FileCheck -DNORM=i386-apple-tvos-simulator %s
-// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-watchos9.1.1 2>&1 | %FileCheck -DNORM=i386-apple-watchos-simulator %s
-
 // Other environments should be passed through.
 
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i386-apple-ios40.0-in_spaaaaaaace 2>&1 | %FileCheck -DNORM=i386-apple-ios-in_spaaaaaaace %s
