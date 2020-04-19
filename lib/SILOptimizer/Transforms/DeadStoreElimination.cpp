@@ -161,6 +161,8 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::EndAccessInst:
+  case SILInstructionKind::SetDeallocatingInst:
     return true;
   default:
     return false;
@@ -1140,6 +1142,28 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
     processStoreInst(I, Kind);
   } else if (isa<DebugValueAddrInst>(I)) {
     processDebugValueAddrInst(I, Kind);
+  } else if (isa<BeginAccessInst>(I)) {
+    // Do the same thing here as in RLE. Begin access writes/reads memory only
+    // if one of its users writes/reads memory. We will look at all of its users
+    // and we can project to the source memory location so, if there are any
+    // actual writes/reads of memory we will catch them there so, we can ignore
+    // begin_access here.
+    return;
+  } else if (auto *release = dyn_cast<StrongReleaseInst>(I)) {
+    // If the strong release operand type can't have a custom destructor it's
+    // OK.
+    if (release->getOperand()->getType().getClassOrBoundGenericClass() ==
+        nullptr)
+      return;
+    // For strong releases, we have to prove that the strong release won't
+    // envoke the destructor. For now, we just try to find a set_deallocating
+    // instruction that indicates the life-ending strong_release has been
+    // devirtualized. TODO: there should be a better way to do this.
+    for (auto *use : release->getOperand()->getUses()) {
+      if (isa<SetDeallocatingInst>(use->getUser()))
+        return;
+    }
+    processUnknownReadInst(I, Kind);
   } else if (I->mayReadFromMemory()) {
     processUnknownReadInst(I, Kind);
   }  
