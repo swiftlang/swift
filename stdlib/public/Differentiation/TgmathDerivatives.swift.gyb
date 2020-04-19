@@ -282,14 +282,18 @@ func _${derivative_kind}Erfc(_ x: ${T}) -> (value: ${T}, ${linear_map_kind}: (${
 @derivative(of: pow)
 func _vjpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T})) {
   let value = pow(x, y)
-  return (value, { v in (v * y * pow(x, y - 1), v * value * log(x)) })
+  return (value, { v in (
+    v * y * pow(x, y - 1), v * value * log(x.isLessThanOrEqualTo(0) ? ${T}(1) : x)
+  ) })
 }
 
 @inlinable
 @derivative(of: pow)
 func _jvpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, differential: (${T}, ${T}) -> ${T}) {
   let value = pow(x, y)
-  return (value, { (dx, dy) in dx * y * pow(x, y - 1) + dy * value * log(x) })
+  return (value, { (dx, dy) in
+    dx * y * pow(x, y - 1) + dy * value * log(x.isLessThanOrEqualTo(0) ? ${T}(1) : x)
+  })
 }
 %  if T == 'Float80':
 #endif
