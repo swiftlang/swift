@@ -80,6 +80,10 @@ OutputFile("o", llvm::cl::desc("Output file"),
            llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
+OutputDir("output-dir", llvm::cl::desc("Directory path to where we dump the generated Json files"),
+           llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
 SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
     llvm::cl::cat(Category));
 
@@ -2713,8 +2717,10 @@ static std::string getDefaultBaselinePath(const char *Main, StringRef Module,
   return BaselinePath.str();
 }
 
-static std::string getCustomBaselinePath(llvm::Triple Triple) {
+static std::string getCustomBaselinePath(llvm::Triple Triple, bool ABI) {
   llvm::SmallString<128> BaselinePath(options::BaselineDirPath);
+  // Look for ABI or API baseline
+  llvm::sys::path::append(BaselinePath, ABI? "ABI": "API");
   llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
   return BaselinePath.str();
 }
@@ -2736,7 +2742,8 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
          "Cannot find builtin baseline for more than one module");
   std::string Path;
   if (!options::BaselineDirPath.empty()) {
-    Path = getCustomBaselinePath(Invok.getLangOptions().Target);
+    Path = getCustomBaselinePath(Invok.getLangOptions().Target,
+                                 Ctx.checkingABI());
   } else if (options::UseEmptyBaseline) {
     Path = getEmptyBaselinePath(Main);
   } else {
@@ -2753,6 +2760,24 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
   }
   Collector.deSerialize(Path);
   return Collector.getSDKRoot();
+}
+
+static std::string getJsonOutputFilePath(llvm::Triple Triple, bool ABI) {
+  if (!options::OutputFile.empty())
+    return options::OutputFile;
+  if (!options::OutputDir.empty()) {
+    llvm::SmallString<128> OutputPath(options::OutputDir);
+    llvm::sys::path::append(OutputPath, ABI? "ABI": "API");
+    if (!llvm::sys::fs::exists(OutputPath.str())) {
+      llvm::errs() << "Baseline directory " << OutputPath.str()
+                   << " doesn't exist\n";
+      exit(1);
+    }
+    llvm::sys::path::append(OutputPath, getBaselineFilename(Triple));
+    return OutputPath.str();
+  }
+  llvm::errs() << "Unable to decide output file path\n";
+  exit(1);
 }
 
 int main(int argc, char *argv[]) {
@@ -2773,7 +2798,9 @@ int main(int argc, char *argv[]) {
   switch (options::Action) {
   case ActionType::DumpSDK:
     return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
+      dumpSDKContent(InitInvok, Modules,
+                     getJsonOutputFilePath(InitInvok.getLangOptions().Target, Opts.ABI),
+                     Opts);
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
     ComparisonInputMode Mode = checkComparisonInputMode();
