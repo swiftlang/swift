@@ -2008,25 +2008,3 @@ AbstractFunctionDecl *swift::getBaseMethod(AbstractFunctionDecl *FD) {
   }
   return FD;
 }
-
-LookUpSearchResult swift::lookUpForMatchingAddr(SILValue addr, SILValue match) {
-  if (!addr.getDefiningInstruction())
-    return {nullptr, nullptr};
-
-  for (;;) {
-    if (addr == match)
-      return {nullptr, addr};
-    switch (addr->getKind()) {
-    case ValueKind::RefElementAddrInst:
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-      addr = addr.getDefiningInstruction()->getOperand(0);
-      break;
-    case ValueKind::AllocRefInst:
-    case ValueKind::AllocStackInst:
-      return {addr, nullptr};
-    default:
-      return {nullptr, nullptr};
-    }
-  }
-}

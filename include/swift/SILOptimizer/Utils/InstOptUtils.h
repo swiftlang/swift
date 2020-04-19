@@ -574,13 +574,6 @@ findLocalApplySites(FunctionRefBaseInst *fri);
 /// Gets the base implementation of a method.
 AbstractFunctionDecl *getBaseMethod(AbstractFunctionDecl *FD);
 
-struct LookUpSearchResult {
-  SILValue objectEntry;
-  SILValue matched;
-};
-
-LookUpSearchResult lookUpForMatchingAddr(SILValue addr, SILValue match);
-
 bool tryOptimizeApplyOfPartialApply(
     PartialApplyInst *pai, SILBuilderContext &builderCtxt,
     InstModCallbacks callbacks = InstModCallbacks());
