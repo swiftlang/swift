@@ -977,6 +977,10 @@ void BlockState::processUnknownWriteInstForGenKillSet(RLEContext &Ctx,
     LSLocation &R = Ctx.getLocation(i);
     if (!AA->mayWriteToMemory(I, R.getBase()))
       continue;
+    if (llvm::all_of(I->getAllOperands(), [&AA, &R](Operand &op) {
+          return AA->isNoAlias(op.get(), R.getBase());
+        }))
+      continue;
     // MayAlias.
     stopTrackingLocation(BBGenSet, i);
     startTrackingLocation(BBKillSet, i);
@@ -995,6 +999,10 @@ void BlockState::processUnknownWriteInstForRLE(RLEContext &Ctx,
     // we should check may alias with base plus projection path.
     LSLocation &R = Ctx.getLocation(i);
     if (!AA->mayWriteToMemory(I, R.getBase()))
+      continue;
+    if (llvm::all_of(I->getAllOperands(), [&AA, &R](Operand &op) {
+          return AA->isNoAlias(op.get(), R.getBase());
+        }))
       continue;
     // MayAlias.
     stopTrackingLocation(ForwardSetIn, i);

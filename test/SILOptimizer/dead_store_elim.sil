@@ -1501,3 +1501,43 @@ bb0(%0 : $*foo):
   %20 = tuple()
   return %20 : $()
 }
+
+class Foo {
+  @_hasStorage @_hasInitialValue var x: Int { get set }
+  deinit
+  init()
+}
+
+class Bar {
+  @_hasStorage @_hasInitialValue var x: Int { get set }
+  deinit
+  init()
+}
+
+// CHECK-LABEL: @unknown_unrelated_read
+// CHECK: store
+// CHECK-NOT: store
+// CHECK-LABEL: end sil function 'unknown_unrelated_read'
+sil hidden @unknown_unrelated_read : $@convention(thin) (@inout Int) -> () {
+bb0(%0 : $*Int):
+  %1 = alloc_ref $Foo
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = struct $Int (%3 : $Builtin.Int64)
+  %5 = ref_element_addr %1 : $Foo, #Foo.x
+  store %4 to %5 : $*Int
+
+  %10 = alloc_ref [stack] $Bar
+  %12 = ref_element_addr %10 : $Bar, #Bar.x
+  %15 = integer_literal $Builtin.Int64, 1
+  %16 = struct $Int (%15 : $Builtin.Int64)
+  store %16 to %12 : $*Int
+
+  set_deallocating %10 : $Bar
+  dealloc_ref %10 : $Bar
+  dealloc_ref [stack] %10 : $Bar
+
+  copy_addr %5 to %0 : $*Int
+
+  %20 = tuple()
+  return %20 : $()
+}

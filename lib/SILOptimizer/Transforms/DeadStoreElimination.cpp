@@ -1087,7 +1087,12 @@ void DSEContext::processUnknownReadInstForGenKillSet(SILInstruction *I) {
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->BBMaxStoreSet.test(i))
       continue;
-    if (!AA->mayReadFromMemory(I, LocationVault[i].getBase()))
+    auto val = LocationVault[i].getBase();
+    if (!AA->mayReadFromMemory(I, val))
+      continue;
+    if (llvm::all_of(I->getAllOperands(), [&AA = AA, &val](Operand &op) {
+          return AA->isNoAlias(op.get(), val);
+        }))
       continue;
     // Update the genset and kill set.
     S->startTrackingLocation(S->BBKillSet, i);
@@ -1100,7 +1105,12 @@ void DSEContext::processUnknownReadInstForDSE(SILInstruction *I) {
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->isTrackingLocation(S->BBWriteSetMid, i))
       continue;
-    if (!AA->mayReadFromMemory(I, LocationVault[i].getBase()))
+    auto val = LocationVault[i].getBase();
+    if (!AA->mayReadFromMemory(I, val))
+      continue;
+    if (llvm::all_of(I->getAllOperands(), [&AA = AA, &val](Operand &op) {
+          return AA->isNoAlias(op.get(), val);
+        }))
       continue;
     S->stopTrackingLocation(S->BBWriteSetMid, i);
   }
