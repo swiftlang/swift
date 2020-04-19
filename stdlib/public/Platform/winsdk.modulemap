@@ -203,6 +203,13 @@ module WinSDK [system] {
     link "DnsAPI.Lib"
   }
 
+  module WinGDI {
+    header "wingdi.h"
+    export *
+
+    link "Gdi32.Lib"
+  }
+
   module WinReg {
     header "winreg.h"
     export *
