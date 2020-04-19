@@ -361,7 +361,7 @@ func testBuiltinGlobalStringTablePointerNoError() -> UnsafePointer<CChar> {
 }
 
 func testBuiltinGlobalStringTablePointerError(s: String) -> UnsafePointer<CChar> {
-  return _getGlobalStringTablePointer(s) // expected-error {{globalStringTablePointer builtin must used only on string literals}}
+  return _getGlobalStringTablePointer(s) // expected-error {{globalStringTablePointer builtin must be used only on string literals}}
 }
 
 @_transparent
