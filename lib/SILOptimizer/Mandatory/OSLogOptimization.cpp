@@ -108,6 +108,10 @@ using namespace Lowering;
 template <typename... T, typename... U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&... args) {
+  // The lifetime of StringRef arguments will be extended as necessary by this
+  // utility. The copy happens in onTentativeDiagnosticFlush at the bottom of
+  // DiagnosticEngine.cpp, which is called when the destructor of the
+  // InFlightDiagnostic returned by diagnose runs.
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
@@ -365,9 +369,8 @@ static bool diagnoseSpecialErrors(SILInstruction *unevaluableInst,
 
   if (unknownReason.getKind() == UnknownReason::Trap) {
     // We have an assertion failure or fatal error.
-    const char *message = unknownReason.getTrapMessage();
     diagnose(ctx, sourceLoc, diag::oslog_constant_eval_trap,
-             StringRef(message));
+             unknownReason.getTrapMessage());
     return true;
   }
   if (unknownReason.getKind() == UnknownReason::TooManyInstructions) {
@@ -1207,7 +1210,9 @@ static void deleteInstructionWithUsersAndFixLifetimes(
 /// Try to dead-code eliminate the OSLogMessage instance \c oslogMessage passed
 /// to the os log call and clean up its dependencies. If the instance cannot be
 /// eliminated, emit diagnostics.
-static void tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
+/// \returns true if elimination is successful and false if it is not successful
+/// and diagnostics is emitted.
+static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
   InstructionDeleter deleter;
   // List of instructions that are possibly dead.
   SmallVector<SILInstruction *, 4> worklist = {oslogMessage};
@@ -1246,13 +1251,15 @@ static void tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
     SILFunction *fun = oslogMessage->getFunction();
     diagnose(fun->getASTContext(), oslogMessage->getLoc().getSourceLoc(),
              diag::oslog_message_alive_after_opts);
+    return false;
   }
+  return true;
 }
 
 /// Constant evaluate instructions starting from \p start and fold the uses
 /// of the SIL value \p oslogMessage.
-/// \returns true if the body of the function containing \p oslogMessage is
-/// modified. Returns false otherwise.
+/// \returns true if folding is successful and false if it is not successful and
+/// diagnostics is emitted.
 static bool constantFold(SILInstruction *start,
                          SingleValueInstruction *oslogMessage,
                          unsigned assertConfig) {
@@ -1279,9 +1286,7 @@ static bool constantFold(SILInstruction *start,
     return false;
 
   substituteConstants(state);
-
-  tryEliminateOSLogMessage(oslogMessage);
-  return true;
+  return tryEliminateOSLogMessage(oslogMessage);
 }
 
 /// Given a call to the initializer of OSLogMessage, which conforms to
@@ -1431,19 +1436,28 @@ suppressGlobalStringTablePointerError(SingleValueInstruction *oslogMessage) {
   SmallVector<SILInstruction *, 8> users;
   getTransitiveUsers(oslogMessage, users);
 
+  // Collect all globalStringTablePointer instructions.
+  SmallVector<BuiltinInst *, 4> globalStringTablePointerInsts;
   for (SILInstruction *user : users) {
     BuiltinInst *bi = dyn_cast<BuiltinInst>(user);
-    if (!bi ||
-        bi->getBuiltinInfo().ID != BuiltinValueKind::GlobalStringTablePointer)
-      continue;
-    // Replace this builtin by a string_literal instruction for an empty string.
+    if (bi &&
+        bi->getBuiltinInfo().ID == BuiltinValueKind::GlobalStringTablePointer)
+      globalStringTablePointerInsts.push_back(bi);
+  }
+
+  // Replace the globalStringTablePointer builtins by a string_literal
+  // instruction for an empty string and clean up dead code.
+  InstructionDeleter deleter;
+  for (BuiltinInst *bi : globalStringTablePointerInsts) {
     SILBuilderWithScope builder(bi);
     StringLiteralInst *stringLiteral = builder.createStringLiteral(
         bi->getLoc(), StringRef(""), StringLiteralInst::Encoding::UTF8);
     bi->replaceAllUsesWith(stringLiteral);
-    // Here, the bulitin instruction is dead, so clean it up.
-    eliminateDeadInstruction(bi);
+    // The bulitin instruction is likely dead. But since we are iterating over
+    // many instructions, do the cleanup at the end.
+    deleter.trackIfDead(bi);
   }
+  deleter.cleanUpDeadInstructions();
 }
 
 /// If the SILInstruction is an initialization of OSLogMessage, return the
@@ -1536,14 +1550,14 @@ class OSLogOptimization : public SILFunctionTransform {
         // The log call is in unreachable code here.
         continue;
       }
-      bool bodyModified =
+      bool foldingSucceeded =
           constantFold(interpolationStart, oslogInit, assertConfig);
-      // If body was not modified, it implies that an error was diagnosed.
+      // If folding did not succeeded, it implies that an error was diagnosed.
       // However, this will also trigger a diagnostics later on since
       // _globalStringTablePointerBuiltin would not be passed a string literal.
       // Suppress this error by synthesizing a dummy string literal for the
       // builtin.
-      if (!bodyModified)
+      if (!foldingSucceeded)
         suppressGlobalStringTablePointerError(oslogInit);
       madeChange = true;
     }
