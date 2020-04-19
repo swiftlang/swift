@@ -884,10 +884,26 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
+
   Opts.UseColor |=
       Args.hasFlag(OPT_color_diagnostics,
                    OPT_no_color_diagnostics,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
+  // If no style options are specified, default to LLVM style.
+  Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
+  if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
+    StringRef contents = arg->getValue();
+    if (contents == "llvm") {
+      Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::LLVM;
+    } else if (contents == "swift") {
+      Opts.PrintedFormattingStyle = DiagnosticOptions::FormattingStyle::Swift;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                     arg->getOption().getPrefixedName(), arg->getValue());
+      return true;
+    }
+  }
+
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors = Args.hasFlag(options::OPT_warnings_as_errors,
@@ -895,8 +911,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                        false);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
-  Opts.EnableExperimentalFormatting |=
-      Args.hasArg(OPT_enable_experimental_diagnostic_formatting);
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();
   }

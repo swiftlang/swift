@@ -370,6 +370,13 @@ def debug_diagnostic_names : Flag<["-"], "debug-diagnostic-names">,
 def print_educational_notes : Flag<["-"], "print-educational-notes">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Include educational notes in printed diagnostic output, if available">;
+def diagnostic_style : Separate<["-"], "diagnostic-style">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  MetaVarName<"<style>">,
+  HelpText<"The formatting style used when printing diagnostics ('swift' or 'llvm')">;
+def diagnostic_style_EQ : Joined<["-"], "diagnostic-style=">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  MetaVarName<"<style>">, Alias<diagnostic_style>;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,

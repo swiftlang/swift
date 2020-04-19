@@ -131,10 +131,6 @@ def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
   
-def enable_experimental_diagnostic_formatting :
-  Flag<["-"], "enable-experimental-diagnostic-formatting">,
-  HelpText<"Enable experimental diagnostic formatting features.">;
-  
 def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
   HelpText<"Path to diagnostic documentation resources">;

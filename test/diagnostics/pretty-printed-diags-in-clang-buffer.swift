@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-diagnostic-formatting -I %S/Inputs/ -typecheck %s -module-cache-path %t.mcp 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -diagnostic-style=swift -I %S/Inputs/ -typecheck %s -module-cache-path %t.mcp 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
