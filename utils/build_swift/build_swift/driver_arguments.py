@@ -1088,7 +1088,8 @@ def create_argument_parser():
                 'Currently only armv7 and aarch64 are supported. '
                 '%(default)s is the default.')
 
-    in_group('Build settings for Android')
+    # -------------------------------------------------------------------------
+    in_group('Build settings for WebAssembly')
 
     option('--wasi-sdk', store_path,
            help='An absolute path to WASI SDK that will be used as a libc '
