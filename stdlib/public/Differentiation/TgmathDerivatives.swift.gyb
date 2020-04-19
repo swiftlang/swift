@@ -298,4 +298,4 @@ func _jvpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, differential: (${T}, ${T}) -
 %  if T == 'Float80':
 #endif
 %  end # if T == 'Float80':
-%end # for T in ['Float', 'Double', 'Float80']:
+%end # for T in ['Float', 'Float80']:
