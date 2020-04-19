@@ -162,6 +162,12 @@ static Expr *checkConstantness(Expr *expr) {
     if (!isa<ApplyExpr>(expr))
       return expr;
 
+    if (NominalTypeDecl *nominal =
+        expr->getType()->getNominalOrBoundGenericNominal()) {
+      if (nominal->getName() == nominal->getASTContext().Id_OSLogMessage)
+        return expr;
+    }
+
     ApplyExpr *apply = cast<ApplyExpr>(expr);
     ValueDecl *calledValue = apply->getCalledValue();
     if (!calledValue)
