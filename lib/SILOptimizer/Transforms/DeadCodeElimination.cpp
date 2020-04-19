@@ -40,6 +40,12 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
+  if (auto access = dyn_cast<BeginAccessInst>(I))
+    return access->getSingleUse() == nullptr && !access->use_empty();
+  
+  if (isa<EndAccessInst>(I))
+    return I->getOperand(0)->getSingleUse() == nullptr;
+  
   if (I->mayHaveSideEffects())
     return true;
 
