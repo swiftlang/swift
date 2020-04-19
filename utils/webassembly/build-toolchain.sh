@@ -61,7 +61,8 @@ cd $TMP_DIR/$TOOLCHAIN_NAME
 
 # Merge wasi-sdk and toolchain
 cp -r $WASI_SDK_PATH/lib/clang usr/lib
-cp $WASI_SDK_PATH/bin/* usr/bin
+cp -a $SOURCE_PATH/build/Ninja-ReleaseAssert/llvm-*/bin/clang* usr/bin
+cp -a $WASI_SDK_PATH/bin/*ld usr/bin
 cp -r $WASI_SDK_PATH/share/wasi-sysroot usr/share
 
 # Build SwiftPM and install it into toolchain
@@ -73,7 +74,7 @@ sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $TMP_DIR/$
 # Copy nightly-toolchain's host environment stdlib into toolchain
 
 if [[ "$(uname)" == "Linux" ]]; then
-  cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/linux $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
+  cp -a $NIGHTLY_TOOLCHAIN/usr/lib/* $TMP_DIR/$TOOLCHAIN_NAME/usr/lib || true
 else
   cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/macosx $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
 fi
