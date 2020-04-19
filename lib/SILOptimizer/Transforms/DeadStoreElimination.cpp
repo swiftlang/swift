@@ -890,8 +890,13 @@ bool DSEContext::processWriteForDSE(BlockState *S, unsigned bit) {
       continue;
     // If 2 locations may alias, we can still keep both stores.
     LSLocation &L = LocationVault[i];
-    if (!L.isMustAliasLSLocation(R, AA))
+    if (!L.isMustAliasLSLocation(R, AA)) {
+      // If this is a reference type, then the *live* store counts as an unkown
+      // read.
+      if (L.getBase()->getType().isAnyClassReferenceType())
+        S->stopTrackingLocation(S->BBWriteSetMid, i);
       continue;
+    }
     // There is a must alias store. No need to check further.
     StoreDead = true;
     break;
