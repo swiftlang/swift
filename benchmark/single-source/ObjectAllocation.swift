@@ -22,6 +22,11 @@ public var ObjectAllocation = BenchmarkInfo(
   tags: [.runtime, .cpubench]
 )
 
+@inline(never)
+func dummy<T>(_ x: T) -> T{
+  return x
+}
+
 final class XX {
   var xx: Int
 
@@ -40,37 +45,11 @@ final class TreeNode {
   }
 }
 
-final class LinkedNode {
-  var next: LinkedNode?
-  var xx: Int
-
-  init(_ x: Int, _ n: LinkedNode?) {
-    xx = x
-    next = n
-  }
-}
-
-@inline(never)
-func getInt(_ x: XX) -> Int {
-  return x.xx
-}
-
-@inline(never)
-func testSingleObject() -> Int {
-  var s = 0
-  for i in 0..<1000 {
-    let x = XX(i)
-    s += getInt(x)
-  }
-  return s
-}
-
 @inline(never)
 func addInts(_ t: TreeNode) -> Int {
   return t.left.xx + t.right.xx
 }
 
-@inline(never)
 func testTree() -> Int {
   var s = 0
   for i in 0..<300 {
@@ -81,59 +60,16 @@ func testTree() -> Int {
 }
 
 @inline(never)
-func addAllInts(_ n: LinkedNode) -> Int {
-  var s = 0
-  var iter: LinkedNode? = n
-  while let iter2 = iter {
-     s += iter2.xx
-     iter = iter2.next
-  }
-  return s
-}
-
-@inline(never)
-func testList() -> Int {
-  var s = 0
-  for i in 0..<250 {
-    let l = LinkedNode(i, LinkedNode(27, LinkedNode(42, nil)))
-    s += addAllInts(l)
-  }
-  return s
-}
-
-@inline(never)
-func identity(_ x: Int) -> Int {
-  return x
-}
-
-@inline(never)
-func testArray() -> Int {
-  var s = 0
-  for _ in 0..<1000 {
-    for i in [0, 1, 2] {
-      s += identity(i)
-    }
-  }
-  return s
-}
-
-@inline(never)
 public func run_ObjectAllocation(_ N: Int) {
 
-  var SingleObjectResult = 0
   var TreeResult = 0
-  var ListResult = 0
-  var ArrayResult = 0
+  
 
   for _ in 0..<N {
-    SingleObjectResult = testSingleObject()
-    TreeResult = testTree()
-    ListResult = testList()
-    ArrayResult = testArray()
-  }
 
-  CheckResults(SingleObjectResult == 499500)
-  CheckResults(TreeResult == 90000)
-  CheckResults(ListResult == 48375)
-  CheckResults(ArrayResult == 3000)
+    TreeResult = testTree()
+    
+  }
+  
+  _ = dummy(TreeResult == 90000)
 }

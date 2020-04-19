@@ -1086,77 +1086,35 @@ void DSEContext::processDebugValueAddrInst(SILInstruction *I, DSEKind Kind) {
 
 void DSEContext::processUnknownReadInstForGenKillSet(SILInstruction *I) {
   BlockState *S = getBlockState(I);
-  SmallVector<unsigned, 4> toStopTracking;
-  bool unknownWrite = false;
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->BBMaxStoreSet.test(i))
       continue;
     auto val = LocationVault[i].getBase();
-    for (auto &op : I->getAllOperands()) {
-      if (!op.get()->getType().isAddress())
-        continue;
-      auto projection = lookUpForMatchingAddr(op.get(), val);
-      if (projection.matched) {
-        if (!AA->mayWriteToMemory(I, val))
-          continue;
-        toStopTracking.push_back(i);
-      } else { // if (!projection.objectEntry)
-        unknownWrite = true;
-      }
-    }
-  }
-
-  if (unknownWrite) {
-    for (unsigned i = 0; i < S->LocationNum; ++i) {
-      if (!S->BBMaxStoreSet.test(i))
-        continue;
-      S->startTrackingLocation(S->BBKillSet, i);
-      S->stopTrackingLocation(S->BBGenSet, i);
-    }
-  } else {
-    for (auto i : toStopTracking) {
-      if (!S->BBMaxStoreSet.test(i))
-        continue;
-      S->startTrackingLocation(S->BBKillSet, i);
-      S->stopTrackingLocation(S->BBGenSet, i);
-    }
+    if (!AA->mayReadFromMemory(I, val))
+      continue;
+    if (llvm::all_of(I->getAllOperands(), [&AA = AA, &val](Operand &op) {
+      return AA->isNoAlias(op.get(), val);
+    }))
+      continue;
+    // Update the genset and kill set.
+    S->startTrackingLocation(S->BBKillSet, i);
+    S->stopTrackingLocation(S->BBGenSet, i);
   }
 }
 
 void DSEContext::processUnknownReadInstForDSE(SILInstruction *I) {
   BlockState *S = getBlockState(I);
-  SmallVector<unsigned, 4> toStopTracking;
-  bool unknownWrite = false;
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->isTrackingLocation(S->BBWriteSetMid, i))
       continue;
     auto val = LocationVault[i].getBase();
-    for (auto &op : I->getAllOperands()) {
-      if (!op.get()->getType().isAddress())
-        continue;
-      auto projection = lookUpForMatchingAddr(op.get(), val);
-      if (projection.matched) {
-        if (!AA->mayWriteToMemory(I, val))
-          continue;
-        toStopTracking.push_back(i);
-      } else { // if (!projection.objectEntry)
-        unknownWrite = true;
-      }
-    }
-  }
-
-  if (unknownWrite) {
-    for (unsigned i = 0; i < S->LocationNum; ++i) {
-      if (!S->isTrackingLocation(S->BBWriteSetMid, i))
-        continue;
-      S->stopTrackingLocation(S->BBWriteSetMid, i);
-    }
-  } else {
-    for (auto i : toStopTracking) {
-      if (!S->isTrackingLocation(S->BBWriteSetMid, i))
-        continue;
-      S->stopTrackingLocation(S->BBWriteSetMid, i);
-    }
+    if (!AA->mayReadFromMemory(I, val))
+      continue;
+    if (llvm::all_of(I->getAllOperands(), [&AA = AA, &val](Operand &op) {
+      return AA->isNoAlias(op.get(), val);
+    }))
+      continue;
+    S->stopTrackingLocation(S->BBWriteSetMid, i);
   }
 }
 
