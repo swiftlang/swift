@@ -54,7 +54,7 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty,
   }
   assert(Info.getStorageType() && "StorageType is a nullptr");
   return DebugTypeInfo(Ty.getPointer(), Info.getStorageType(), size,
-                       Info.getBestKnownAlignment(), hasDefaultAlignment(Ty),
+                       Info.getBestKnownAlignment(), ::hasDefaultAlignment(Ty),
                        false);
 }
 
@@ -112,7 +112,7 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
     if (DeclType->isEqual(LowTy))
       Type = DeclType.getPointer();
   }
-  DebugTypeInfo DbgTy(Type, StorageTy, size, align, hasDefaultAlignment(Type),
+  DebugTypeInfo DbgTy(Type, StorageTy, size, align, ::hasDefaultAlignment(Type),
                       false);
   assert(StorageTy && "StorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
@@ -167,6 +167,7 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   if (StorageType) {
     llvm::errs() << "StorageType=";
     StorageType->dump();
-  }
+  } else
+    llvm::errs() << "forward-declared\n";
 }
 #endif
