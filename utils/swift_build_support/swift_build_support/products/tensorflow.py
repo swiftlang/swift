@@ -205,6 +205,10 @@ class TensorFlow(product.Product):
                                   'xla_client'),
                      os.path.join(self.source_dir, 'tensorflow', 'compiler',
                                   'xla', 'xla_client'))
+            _symlink(os.path.join(self.source_dir, '..',
+                                  'tensorflow-swift-apis', 'Sources', 'x10',
+                                  'swift_bindings'),
+                     os.path.join(self.source_dir, 'swift_bindings'))
         with shell.pushd(self.source_dir):
             # Run the TensorFlow configure script: `yes "" | ./configure`.
             # NOTE: consider rewriting `subprocess` API usages using `shell`
