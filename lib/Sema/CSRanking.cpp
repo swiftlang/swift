@@ -252,8 +252,7 @@ computeSelfTypeRelationship(DeclContext *dc, ValueDecl *decl1,
   // unrelated.
   auto conformance = TypeChecker::conformsToProtocol(
                          modelTy, proto, dc,
-                         (ConformanceCheckFlags::InExpression|
-                          ConformanceCheckFlags::SkipConditionalRequirements));
+                          ConformanceCheckFlags::SkipConditionalRequirements);
   if (conformance.isInvalid())
     return {SelfTypeRelationship::Unrelated, conformance};
 

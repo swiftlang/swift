@@ -333,8 +333,6 @@ enum class RequirementCheckResult {
 
 /// Flags that control protocol conformance checking.
 enum class ConformanceCheckFlags {
-  /// Whether we're performing the check from within an expression.
-  InExpression = 0x01,
   /// Whether to suppress dependency tracking entirely.
   ///
   /// FIXME: This deals with some oddities with the

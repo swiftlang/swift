@@ -1738,10 +1738,10 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
 
     auto first =
         TypeChecker::conformsToProtocol(candidate.second, candidates[result].first,
-                                        CS.DC, ConformanceCheckFlags::InExpression);
+                                        CS.DC, None);
     auto second =
         TypeChecker::conformsToProtocol(candidates[result].second, candidate.first,
-                                        CS.DC, ConformanceCheckFlags::InExpression);
+                                        CS.DC, None);
     if (first.isInvalid() == second.isInvalid())
       return;
 
@@ -1967,8 +1967,7 @@ void ConstraintSystem::sortDesignatedTypes(
         ++nextType;
         break;
       } else if (auto *protoDecl = dyn_cast<ProtocolDecl>(nominalTypes[i])) {
-        if (TypeChecker::conformsToProtocol(
-                argType, protoDecl, DC, ConformanceCheckFlags::InExpression)) {
+        if (TypeChecker::conformsToProtocol(argType, protoDecl, DC, None)) {
           std::swap(nominalTypes[nextType], nominalTypes[i]);
           ++nextType;
           break;

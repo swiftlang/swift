@@ -3752,8 +3752,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
           auto protocolDecl =
               dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
           if (protocolDecl &&
-              !conformsToProtocol(toType, protocolDecl, dc,
-                                  ConformanceCheckFlags::InExpression)) {
+              !conformsToProtocol(toType, protocolDecl, dc, None)) {
             return failed();
           }
         }
@@ -3847,8 +3846,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     auto nsErrorTy = Context.getNSErrorType();
 
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-      if (!conformsToProtocol(toType, errorTypeProto, dc,
-                              ConformanceCheckFlags::InExpression)
+      if (!conformsToProtocol(toType, errorTypeProto, dc, None)
                .isInvalid()) {
         if (nsErrorTy) {
           if (isSubtypeOf(fromType, nsErrorTy, dc)
@@ -3859,8 +3857,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         }
       }
 
-      if (!conformsToProtocol(fromType, errorTypeProto, dc,
-                                     ConformanceCheckFlags::InExpression)
+      if (!conformsToProtocol(fromType, errorTypeProto, dc, None)
               .isInvalid()) {
         // Cast of an error-conforming type to NSError or NSObject.
         if ((nsObject && toType->isEqual(nsObject)) ||

@@ -551,8 +551,7 @@ namespace {
       if (otherArgTy && otherArgTy->getAnyNominal()) {
         if (otherArgTy->isEqual(paramTy) &&
             TypeChecker::conformsToProtocol(
-                otherArgTy, literalProto, CS.DC,
-                ConformanceCheckFlags::InExpression)) {
+                otherArgTy, literalProto, CS.DC, None)) {
           return true;
         }
       } else if (Type defaultType =

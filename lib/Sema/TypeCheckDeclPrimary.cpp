@@ -919,8 +919,7 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
 #define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
   if (auto proto = TypeChecker::getProtocol(                                   \
           type->getASTContext(), SourceLoc(), KnownProtocolKind::Kind)) {      \
-    if (TypeChecker::conformsToProtocol(type, proto, dc,                       \
-                                        ConformanceCheckFlags::InExpression))  \
+    if (TypeChecker::conformsToProtocol(type, proto, dc, None))                \
       return std::string(String);                                              \
   }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")

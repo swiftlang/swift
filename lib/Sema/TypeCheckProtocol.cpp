@@ -4481,7 +4481,6 @@ operator()(CanType dependentType, Type conformingReplacementType,
                          conformingReplacementType,
                          conformedProtocol,
                          dc,
-                         ConformanceCheckFlags::InExpression|
                          ConformanceCheckFlags::SkipConditionalRequirements);
 }
 
