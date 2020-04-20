@@ -3163,6 +3163,11 @@ static bool isStartOfLabelledTrailingClosure(Parser &P) {
   P.consumeToken();
   if (P.peekToken().is(tok::l_brace))
     return true;
+  // Parse editor placeholder as trailing closure so SourceKit can expand it to
+  // closure literal.
+  if (P.peekToken().is(tok::identifier) &&
+      Identifier::isEditorPlaceholder(P.peekToken().getText()))
+    return true;
   // Consider `label: <complete>` that the user is trying to write a closure.
   if (P.peekToken().is(tok::code_complete) && !P.peekToken().isAtStartOfLine())
     return true;
@@ -3230,6 +3235,14 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
     ParserResult<Expr> closure;
     if (Tok.is(tok::l_brace)) {
       closure = parseExprClosure();
+    } else if (Tok.is(tok::identifier)) {
+      // Parse editor placeholder as a closure literal.
+      assert(Identifier::isEditorPlaceholder(Tok.getText()));
+      SyntaxParsingContext IdCtx(SyntaxContext,
+                                 SyntaxKind::EditorPlaceholderExpr);
+      Identifier name = Context.getIdentifier(Tok.getText());
+      closure = makeParserResult(parseExprEditorPlaceholder(Tok, name));
+      consumeToken(tok::identifier);
     } else if (Tok.is(tok::code_complete)) {
       assert(!Tok.isAtStartOfLine() &&
              "isStartOfLabelledTrailingClosure() should return false");

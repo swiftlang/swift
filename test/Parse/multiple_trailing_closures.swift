@@ -84,6 +84,8 @@ func test_multiple_trailing_syntax_without_labels() {
 
   fn {} _: {} // expected-error {{extra argument in call}}
 
+  fn {} g: <#T##() -> Void#> // expected-error {{editor placeholder in source file}}
+
   func multiple(_: () -> Void, _: () -> Void) {}
 
   multiple {} _: { }
