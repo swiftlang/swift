@@ -589,7 +589,7 @@ class RefCountBitsT {
 
 typedef RefCountBitsT<RefCountIsInline> InlineRefCountBits;
 
-class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
+class alignas(sizeof(void*) * 2) SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
 {
   uint32_t weakBits;
 
