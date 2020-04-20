@@ -724,6 +724,9 @@ namespace {
       case clang::Type::Pipe:
         llvm_unreachable("OpenCL type in ABI lowering?");
 
+      case clang::Type::ExtInt:
+        llvm_unreachable("ExtInt type in ABI lowering?");
+
       case clang::Type::ConstantArray: {
         auto array = Ctx.getAsConstantArrayType(type);
         auto elt = Ctx.getCanonicalType(array->getElementType());
