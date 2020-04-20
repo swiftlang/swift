@@ -238,7 +238,8 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
     newSF.addImports(importsWithOptions);
   }
 
-  performTypeChecking(newSF);
+  performImportResolution(newSF);
+  bindExtensions(newSF);
 
   performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
 

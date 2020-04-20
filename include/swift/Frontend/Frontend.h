@@ -386,9 +386,25 @@ public:
 
   std::string getLdAddCFileOutputPathForWholeModule() const;
 
+public:
+  /// Given the current configuration of this frontend invocation, a set of
+  /// supplementary output paths, and a module, compute the appropriate set of
+  /// serialization options.
+  ///
+  /// FIXME: The \p module parameter supports the
+  /// \c SerializeOptionsForDebugging hack.
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                              bool moduleIsPublic) const;
+                              const ModuleDecl *module) const;
+
+  /// Returns an approximation of whether the given module could be
+  /// redistributed and consumed by external clients.
+  ///
+  /// FIXME: The scope of this computation should be limited entirely to
+  /// PrintAsObjC. Unfortunately, it has been co-opted to support the
+  /// \c SerializeOptionsForDebugging hack. Once this information can be
+  /// transferred from module files to the dSYMs, remove this.
+  bool isModuleExternallyConsumed(const ModuleDecl *mod) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -555,9 +571,7 @@ public:
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
-  const CompilerInvocation &getInvocation() {
-    return Invocation;
-  }
+  const CompilerInvocation &getInvocation() const { return Invocation; }
 
   /// If a code completion buffer has been set, returns the corresponding source
   /// file.

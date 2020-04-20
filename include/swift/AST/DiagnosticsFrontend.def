@@ -39,10 +39,6 @@ ERROR(error_unsupported_target_arch, none,
 ERROR(error_unsupported_opt_for_target, none,
       "unsupported option '%0' for target '%1'", (StringRef, StringRef))
 
-WARNING(warning_inferred_simulator_target,none,
-      "inferring simulator environment for target '%0'; "
-      "use '-target %1' instead", (StringRef, StringRef))
-
 ERROR(error_argument_not_allowed_with, none,
       "argument '%0' is not allowed with '%1'", (StringRef, StringRef))
 

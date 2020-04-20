@@ -553,22 +553,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
-  std::string TargetArgScratch;
-
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
-
-    // Backward compatibility hack: infer "simulator" environment for x86
-    // iOS/tvOS/watchOS. The driver takes care of this for the frontend
-    // most of the time, but loading of old .swiftinterface files goes
-    // directly to the frontend.
-    if (tripleInfersSimulatorEnvironment(Target)) {
-      // Set the simulator environment.
-      Target.setEnvironment(llvm::Triple::EnvironmentType::Simulator);
-      TargetArgScratch = Target.str();
-      TargetArg = TargetArgScratch;
-    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_target_variant)) {
@@ -773,7 +760,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
-  if (Args.hasArg(OPT_warnings_as_errors))
+  if (Args.hasFlag(options::OPT_warnings_as_errors,
+                   options::OPT_no_warnings_as_errors, false))
     Opts.ExtraArgs.push_back("-Werror");
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
@@ -858,7 +846,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
-  Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
+  Opts.WarningsAsErrors = Args.hasFlag(options::OPT_warnings_as_errors,
+                                       options::OPT_no_warnings_as_errors,
+                                       false);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
   Opts.EnableExperimentalFormatting |=
@@ -1713,4 +1703,31 @@ CompilerInvocation::setUpInputForSILTool(
     setInputKind(InputFileKind::SIL);
   }
   return fileBufOrErr;
+}
+
+bool CompilerInvocation::isModuleExternallyConsumed(
+    const ModuleDecl *mod) const {
+  // Modules for executables aren't expected to be consumed by other modules.
+  // This picks up all kinds of entrypoints, including script mode,
+  // @UIApplicationMain and @NSApplicationMain.
+  if (mod->hasEntryPoint()) {
+    return false;
+  }
+
+  // If an implicit Objective-C header was needed to construct this module, it
+  // must be the product of a library target.
+  if (!getFrontendOptions().ImplicitObjCHeaderPath.empty()) {
+    return false;
+  }
+
+  // App extensions are special beasts because they build without entrypoints
+  // like library targets, but they behave like executable targets because
+  // their associated modules are not suitable for distribution.
+  if (mod->getASTContext().LangOpts.EnableAppExtensionRestrictions) {
+    return false;
+  }
+
+  // FIXME: This is still a lousy approximation of whether the module file will
+  // be externally consumed.
+  return true;
 }

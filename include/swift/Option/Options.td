@@ -528,6 +528,10 @@ def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
   Flags<[FrontendOption]>,
   HelpText<"Treat warnings as errors">;
 
+def no_warnings_as_errors : Flag<["-"], "no-warnings-as-errors">,
+  Flags<[FrontendOption]>,
+  HelpText<"Don't treat warnings as errors">;
+
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Continue building, even after errors are encountered">;
