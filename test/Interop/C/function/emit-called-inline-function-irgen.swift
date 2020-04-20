@@ -10,13 +10,13 @@
 
 import EmitCalledInlineFunction
 
-// C99-DAG: define internal i32 @calledFromSwift() #{{[0-9]+}} {
-// C99-DAG: define internal i32 @calledTransitively() #{{[0-9]+}} {
+// C99-DAG: define internal i32 @calledFromSwift()
+// C99-DAG: define internal i32 @calledTransitively()
 
-// CXX-DAG: define linkonce_odr i32 @_Z15calledFromSwiftv() #{{[0-9]+}} comdat {
-// CXX-DAG: define linkonce_odr i32 @_Z18calledTransitivelyv() #{{[0-9]+}} comdat {
-// CXX-DAG: define linkonce_odr i32 @_ZN1C32memberFunctionCalledTransitivelyEv(%class.C* %this)
-// CXX-DAG: define linkonce_odr i32 @_Z29calledTransitivelyFromVarInitv() #{{[0-9]+}} comdat {
+// CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z15calledFromSwiftv|"\?calledFromSwift@@YAHXZ"}}()
+// CXX-DOG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z18calledTransitivelyv|"\?calledTransitively@@YAHXZ"}}()
+// CXX-DOG: define linkonce_odr{{( dso_local)?}} i32 @{{_ZN1C32memberFunctionCalledTransitivelyEv|"\?memberFunctionCalledTransitively@C@@QEAAHXZ"}}(%class.C* %this)
+// CXX-DOG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z29calledTransitivelyFromVarInitv|"\?calledTransitivelyFromVarInit@@YAHXZ"}}()
 
 calledFromSwift()
 
