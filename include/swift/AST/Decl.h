@@ -4953,7 +4953,7 @@ protected:
   PointerUnion<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
   VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
-          bool issCaptureList, SourceLoc nameLoc, Identifier name,
+          bool isCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
 
 public:

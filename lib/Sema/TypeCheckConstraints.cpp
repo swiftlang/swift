@@ -2991,15 +2991,14 @@ void Solution::dump(raw_ostream &out) const {
       out.indent(2);
       opened.first->dump(sm, out);
       out << " opens ";
-      interleave(opened.second.begin(), opened.second.end(),
-                 [&](OpenedType opened) {
-                   Type(opened.first).print(out, PO);
-                   out << " -> ";
-                   Type(opened.second).print(out, PO);
-                 },
-                 [&]() {
-                   out << ", ";
-                 });
+      llvm::interleave(
+          opened.second.begin(), opened.second.end(),
+          [&](OpenedType opened) {
+            Type(opened.first).print(out, PO);
+            out << " -> ";
+            Type(opened.second).print(out, PO);
+          },
+          [&]() { out << ", "; });
       out << "\n";
     }
   }
@@ -3188,15 +3187,14 @@ void ConstraintSystem::print(raw_ostream &out) const {
       out.indent(2);
       opened.first->dump(&getASTContext().SourceMgr, out);
       out << " opens ";
-      interleave(opened.second.begin(), opened.second.end(),
-                 [&](OpenedType opened) {
-                   Type(opened.first).print(out, PO);
-                   out << " -> ";
-                   Type(opened.second).print(out, PO);
-                 },
-                 [&]() {
-                   out << ", ";
-                 });
+      llvm::interleave(
+          opened.second.begin(), opened.second.end(),
+          [&](OpenedType opened) {
+            Type(opened.first).print(out, PO);
+            out << " -> ";
+            Type(opened.second).print(out, PO);
+          },
+          [&]() { out << ", "; });
       out << "\n";
     }
   }

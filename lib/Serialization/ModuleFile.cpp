@@ -274,6 +274,7 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
         break;
       }
 
+      result.miscVersion = blobData;
       versionSeen = true;
       break;
     }
@@ -1673,6 +1674,7 @@ ModuleFile::ModuleFile(
       TargetTriple = info.targetTriple;
       CompatibilityVersion = info.compatibilityVersion;
       IsSIB = extInfo->isSIB();
+      MiscVersion = info.miscVersion;
 
       hasValidControlBlock = true;
       break;

@@ -167,6 +167,8 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 void ModuleFile::fatal(llvm::Error error) {
   if (FileContext) {
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Name);
+    getContext().Diags.diagnose(SourceLoc(), diag::serialization_misc_version,
+      Name, MiscVersion);
 
     if (!CompatibilityVersion.empty()) {
       if (getContext().LangOpts.EffectiveLanguageVersion
@@ -3230,11 +3232,11 @@ public:
     TypeID interfaceTypeID;
     GenericSignatureID genericSigID;
     SubstitutionMapID underlyingTypeID;
-    
+    uint8_t rawAccessLevel;
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
                                               namingDeclID, interfaceSigID,
                                               interfaceTypeID, genericSigID,
-                                              underlyingTypeID);
+                                              underlyingTypeID, rawAccessLevel);
     
     auto declContext = MF.getDeclContext(contextID);
     auto interfaceSig = MF.getGenericSignature(interfaceSigID);
@@ -3253,6 +3255,11 @@ public:
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     opaqueDecl->setNamingDecl(namingDecl);
+
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
+      opaqueDecl->setAccess(*accessLevel);
+    else
+      MF.fatal();
 
     if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl)) {
       ctx.evaluator.cacheOutput(GenericParamListRequest{opaqueDecl},

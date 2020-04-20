@@ -127,16 +127,12 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
   // CHECK: [[DEST_WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]]
   %b = load_weak [take] %w : $*@sil_weak CP?
-  // Use the value so it's not optimized away.
-  store_weak %b to undef : $*@sil_weak CP?
 
   // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
   // CHECK: [[DEST_REF:%.*]] = call %objc_object* @swift_unknownObjectWeakLoadStrong(%swift.weak* [[SRC_REF_ADDR]])
   // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
   // CHECK: [[DEST_WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]]
   %c = load_weak        %w : $*@sil_weak CP?
-  // Use the value so it's not optimized away.
-  store_weak %c to undef : $*@sil_weak CP?
 
   // CHECK: call { %swift.weak, i8** }* @"$s17existentials_objc2CP_pSgXwWOb"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr [take] %w to [initialization] %v : $*@sil_weak CP?

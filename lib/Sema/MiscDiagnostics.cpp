@@ -1715,8 +1715,9 @@ bool TypeChecker::getDefaultGenericArgumentsString(
   // FIXME: We can potentially be in the middle of creating a generic signature
   // if we get here.  Break this cycle.
   if (typeDecl->hasComputedGenericSignature()) {
-    interleave(typeDecl->getInnermostGenericParamTypes(),
-               printGenericParamSummary, [&]{ genericParamText << ", "; });
+    llvm::interleave(typeDecl->getInnermostGenericParamTypes(),
+                     printGenericParamSummary,
+                     [&] { genericParamText << ", "; });
   }
   
   genericParamText << ">";

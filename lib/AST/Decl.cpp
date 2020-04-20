@@ -19,6 +19,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -2908,8 +2909,18 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
-  if (getOpaqueResultTypeRepr() == nullptr)
+  if (getOpaqueResultTypeRepr() == nullptr) {
+    if (isa<ModuleDecl>(this))
+      return nullptr;
+    auto file = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+    // Don't look up when the decl is from source, otherwise a cycle will happen.
+    if (file->getKind() == FileUnitKind::SerializedAST) {
+      Mangle::ASTMangler mangler;
+      auto name = mangler.mangleOpaqueTypeDecl(this);
+      return file->lookupOpaqueResultType(name);
+    }
     return nullptr;
+  }
 
   return evaluateOrDefault(getASTContext().evaluator,
     OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},

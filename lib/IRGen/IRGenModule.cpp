@@ -1017,7 +1017,7 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
     SmallString<64> allFeatures;
     // Sort so that the target features string is canonical.
     std::sort(Features.begin(), Features.end());
-    interleave(Features, [&](const std::string &s) {
+    llvm::interleave(Features, [&](const std::string &s) {
       allFeatures.append(s);
     }, [&]{
       allFeatures.push_back(',');

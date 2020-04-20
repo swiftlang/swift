@@ -285,12 +285,8 @@ sil @dynamic_project : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int
 entry(%e : $*EitherOr<T, Builtin.Int64>):
   // CHECK: bitcast [[EITHER_OR]]* %0 to %swift.opaque*
   %l = unchecked_take_enum_data_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Left!enumelt
-  // Dummy use of %l so that it's not optimized away.
-  copy_addr %l to undef : $*T
   // CHECK: bitcast [[EITHER_OR]]* %0 to i64*
   %r = unchecked_take_enum_data_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Right!enumelt
-  // Dummy use of %r so that it's not optimized away.
-  copy_addr %r to undef : $*Builtin.Int64
 
   return undef : $()
 }

@@ -352,7 +352,7 @@ class OpaqueArchetypeTypeRef final : public TypeRef {
                            StringRef description, unsigned ordinal,
                            ArrayRef<ArrayRef<const TypeRef *>> argumentLists) {
     TypeRefID ID;
-    ID.addString(idString);
+    ID.addString(idString.str());
     ID.addInteger(ordinal);
     for (auto argList : argumentLists) {
       ID.addInteger(0u);

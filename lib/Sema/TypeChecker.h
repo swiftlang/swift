@@ -1142,26 +1142,14 @@ public:
   ModuleDecl *getStdlibModule(const DeclContext *dc);
 
   /// \name Resilience diagnostics
-
-  /// Used in diagnostic %selects.
-  enum class FragileFunctionKind : unsigned {
-    Transparent,
-    Inlinable,
-    AlwaysEmitIntoClient,
-    DefaultArgument,
-    PropertyInitializer
-  };
-
   bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
-                                const DeclContext *DC, FragileFunctionKind Kind,
-                                bool TreatUsableFromInlineAsPublic);
+                                const DeclContext *DC, FragileFunctionKind Kind);
 
   Expr *buildDefaultInitializer(Type type);
 
   bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
                                       const DeclContext *DC,
-                                      FragileFunctionKind Kind,
-                                      bool TreatUsableFromInlineAsPublic);
+                                      FragileFunctionKind Kind);
 
   /// Given that a declaration is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if it cannot
@@ -1179,16 +1167,6 @@ public:
   /// that the declarations involved have already been checked elsewhere.
   void diagnoseGenericTypeExportability(SourceLoc loc, Type type,
                                         const DeclContext *DC);
-
-  /// Given that \p DC is within a fragile context for some reason, describe
-  /// why.
-  ///
-  /// The second element of the pair is true if references to @usableFromInline
-  /// declarations are permitted.
-  ///
-  /// \see FragileFunctionKind
-  std::pair<FragileFunctionKind, bool>
-  getFragileFunctionKind(const DeclContext *DC);
 
   /// \name Availability checking
   ///

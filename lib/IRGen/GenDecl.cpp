@@ -1729,7 +1729,9 @@ void IRGenModule::emitVTableStubs() {
       stub->setCallingConv(DefaultCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
       auto *errorFunc = getDeletedMethodErrorFn();
-      llvm::CallInst::Create(errorFunc, ArrayRef<llvm::Value *>(), "", entry);
+      llvm::CallInst::Create(cast<llvm::FunctionType>(
+                                 errorFunc->getType()->getPointerElementType()),
+                             errorFunc, ArrayRef<llvm::Value *>(), "", entry);
       new llvm::UnreachableInst(getLLVMContext(), entry);
     }
 

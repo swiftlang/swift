@@ -720,6 +720,12 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
   invocationArgStrs.push_back("-target");
   invocationArgStrs.push_back(triple.str());
 
+  if (ctx.LangOpts.SDKVersion) {
+    invocationArgStrs.push_back("-Xclang");
+    invocationArgStrs.push_back(
+        "-target-sdk-version=" + ctx.LangOpts.SDKVersion->getAsString());
+  }
+
   invocationArgStrs.push_back(ImporterImpl::moduleImportBufferName);
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
@@ -936,9 +942,9 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
 
   if (importerOpts.DumpClangDiagnostics) {
     llvm::errs() << "'";
-    interleave(invocationArgStrs,
-               [](StringRef arg) { llvm::errs() << arg; },
-               [] { llvm::errs() << "' '"; });
+    llvm::interleave(
+        invocationArgStrs, [](StringRef arg) { llvm::errs() << arg; },
+        [] { llvm::errs() << "' '"; });
     llvm::errs() << "'\n";
   }
 

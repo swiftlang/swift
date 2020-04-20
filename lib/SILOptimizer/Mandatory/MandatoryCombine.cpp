@@ -156,7 +156,6 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
       ++iterator;
 
       if (isInstructionTriviallyDead(instruction)) {
-        instModCallbacks.deleteInst(instruction);
         continue;
       }
 

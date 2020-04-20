@@ -621,8 +621,42 @@ void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const ResilienceExpansion &value) {
-  out << value;
+                           ResilienceExpansion value) {
+  switch (value) {
+  case ResilienceExpansion::Minimal:
+    out << "minimal";
+    break;
+  case ResilienceExpansion::Maximal:
+    out << "maximal";
+    break;
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           FragileFunctionKind value) {
+  switch (value.kind) {
+  case FragileFunctionKind::Transparent:
+    out << "transparent";
+    break;
+  case FragileFunctionKind::Inlinable:
+    out << "inlinable";
+    break;
+  case FragileFunctionKind::AlwaysEmitIntoClient:
+    out << "alwaysEmitIntoClient";
+    break;
+  case FragileFunctionKind::DefaultArgument:
+    out << "defaultArgument";
+    break;
+  case FragileFunctionKind::PropertyInitializer:
+    out << "propertyInitializer";
+    break;
+  case FragileFunctionKind::None:
+    out << "none";
+    break;
+  }
+
+  out << ", allowUsableFromInline: "
+      << (value.allowUsableFromInline ? "true" : "false");
 }
 
 //----------------------------------------------------------------------------//

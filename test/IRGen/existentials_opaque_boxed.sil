@@ -200,8 +200,6 @@ entry:
 sil @test_open_existential_addr_immutable :$@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
   %1 = open_existential_addr immutable_access %0 : $*Existential to $*@opened("01234567-89ab-cdef-0123-000000000000") Existential
-  // Use %1 so it's not optimized away.
-  copy_addr %1 to undef : $*@opened("01234567-89ab-cdef-0123-000000000000") Existential
 	%t = tuple()
   return %t : $()
 }
@@ -249,8 +247,6 @@ bb0(%0 : $*Existential):
 sil @test_open_existential_addr_mutable :$@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
   %1 = open_existential_addr mutable_access %0 : $*Existential to $*@opened("01234567-89ab-cdef-0123-000000000001") Existential
-  // Use %1 so it's not optimized away.
-  copy_addr %1 to undef : $*@opened("01234567-89ab-cdef-0123-000000000001") Existential
 	%t = tuple()
   return %t : $()
 }
