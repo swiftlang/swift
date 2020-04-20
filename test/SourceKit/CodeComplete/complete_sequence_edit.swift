@@ -44,12 +44,10 @@ func foo(arg: Foo) {
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %sourcekitd-test \
-// RUN:   -req=track-compiles == \
 // RUN:   -req=complete -pos=8:11 -name file.swift -text-input %t/State1.swift -- file.swift == \
 // RUN:   -req=complete -pos=11:13 -name file.swift -text-input %t/State2.swift -- file.swift == \
 // RUN:   -req=complete -pos=12:13 -name file.swift -text-input %t/State3.swift -- file.swift > %t.response
 // RUN: %FileCheck --check-prefix=RESULT  %s < %t.response
-// RUN: %FileCheck --check-prefix=TRACE  %s < %t.response
 
 // RESULT-LABEL: key.results: [
 // RESULT-NOT: key.name: "z"
@@ -58,6 +56,7 @@ func foo(arg: Foo) {
 // RESULT-DAG: key.name: "x"
 // RESULT-DAG: key.name: "y"
 // RESULT: ]
+// RESULT-NOT: key.reusingastcontext: 1
 
 // RESULT-LABEL: key.results: [
 // RESULT-NOT: key.name: "z"
@@ -66,6 +65,7 @@ func foo(arg: Foo) {
 // RESULT-DAG: key.name: "x"
 // RESULT-DAG: key.name: "y"
 // RESULT: ]
+// RESULT: key.reusingastcontext: 1
 
 // RESULT-LABEL: key.results: [
 // RESULT-DAG: key.name: "fooMethod()"
@@ -74,16 +74,4 @@ func foo(arg: Foo) {
 // RESULT-DAG: key.name: "y"
 // RESULT-DAG: key.name: "z"
 // RESULT: ]
-
-// TRACE:      key.notification: source.notification.compile-did-finish,
-// TRACE-NEXT: key.diagnostics: [
-// TRACE-NEXT: ]
-
-// TRACE:      key.notification: source.notification.compile-did-finish,
-// TRACE-NEXT: key.diagnostics: [
-// TRACE:          key.description: "completion reusing previous ASTContext (benign diagnostic)"
-// TRACE:      ]
-
-// TRACE:      key.notification: source.notification.compile-did-finish,
-// TRACE-NEXT: key.diagnostics: [
-// TRACE-NEXT: ]
+// RESULT-NOT: key.reusingastcontext: 1

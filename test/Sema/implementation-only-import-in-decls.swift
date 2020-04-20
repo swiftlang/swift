@@ -46,6 +46,10 @@ public struct TestInit {
   public init<T>(where _: T) where T: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
+public struct TestPropertyWrapper {
+  @BadWrapper public var BadProperty: Int // expected-error {{cannot use struct 'BadWrapper' as property wrapper here; 'BADLibrary' has been imported as implementation-only}}
+}
+
 public protocol TestInherited: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 public protocol TestConstraintBase {

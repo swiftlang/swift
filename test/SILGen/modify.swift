@@ -171,18 +171,19 @@ class HasDidSet : Base {
     didSet {}
   }
 
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s6modify9HasDidSetC6storedSivM : $@yield_once @convention(method) (@guaranteed HasDidSet) -> @yields @inout Int {
-// CHECK: bb0([[SELF:%.*]] : @guaranteed $HasDidSet):
-// CHECK:   [[ADDR:%.*]] = alloc_stack $Int
-// CHECK:   [[T0:%.*]] = function_ref @$s6modify9HasDidSetC6storedSivg
-// CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
-// CHECK:   store [[T1]] to [trivial] [[ADDR]] : $*Int
-// CHECK:   yield [[ADDR]]
-// CHECK:   [[T2:%.*]] = load [trivial] [[ADDR]]
-// CHECK:   [[T3:%.*]] = function_ref @$s6modify9HasDidSetC6storedSivs
-// CHECK:   apply [[T3]]([[T2]], [[SELF]])
-// CHECK:   dealloc_stack [[ADDR]]
-// CHECK:   return {{%.*}} : $()
+// CHECK-LABEL: sil hidden [ossa] @$s6modify9HasDidSetC6storedSivM : $@yield_once @convention(method) (@guaranteed HasDidSet) -> @yields @inout Int {
+// CHECK:      bb0([[SELF:%.*]] : @guaranteed $HasDidSet):
+// CHECK:        [[COPY_VAL:%.*]] = copy_value [[SELF]] : $HasDidSet
+// CHECK-NEXT:   [[UPCAST:%.*]] = upcast [[COPY_VAL]] : $HasDidSet to $Base
+// CHECK-NEXT:   [[BEGIN_BORROW:%.*]] = begin_borrow [[UPCAST]]
+// CHECK-NEXT:   // function_ref Base.stored.modify
+// CHECK-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s6modify4BaseC6storedSivM
+// CHECK-NEXT:   ([[VAL:%.*]], [[IGNORE:%.*]]) = begin_apply [[FUNC_REF]]([[BEGIN_BORROW]])
+// CHECK-NEXT:   yield [[VAL]] : $*Int, resume bb1, unwind bb2
+// CHECK:        [[DIDSET:%.*]] = function_ref @$s6modify9HasDidSetC6storedSivW
+// CHECK-NEXT:   apply [[DIDSET]]([[SELF]])
+// CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:   return [[TUPLE]]
 // CHECK: }
 
   override var computed: Int {
@@ -210,20 +211,15 @@ class HasStoredDidSet {
     didSet {}
   }
 
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s6modify15HasStoredDidSetC6storedSivM : $@yield_once @convention(method) (@guaranteed HasStoredDidSet) -> @yields @inout Int {
+// sil hidden [ossa] @$s6modify15HasStoredDidSetC6storedSivM : $@yield_once @convention(method) (@guaranteed HasStoredDidSet) -> @yields @inout Int {
 // CHECK: bb0([[SELF:%.*]] : @guaranteed $HasStoredDidSet):
-// CHECK:   [[ADDR:%.*]] = alloc_stack $Int
-// CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasStoredDidSet, #HasStoredDidSet.stored
-// CHECK:   [[T1:%.*]] = begin_access [read] [dynamic] [[T0]] : $*Int
-// CHECK:   [[T2:%.*]] = load [trivial] [[T1]]
-// CHECK:   end_access [[T1]] : $*Int
-// CHECK:   store [[T2]] to [trivial] [[ADDR]]
-// CHECK:   yield [[ADDR]]
-// CHECK:   [[T0:%.*]] = load [trivial] [[ADDR]]
-// CHECK:   [[SETTER:%.*]] = function_ref @$s6modify15HasStoredDidSetC6storedSivs
-// CHECK:   apply [[SETTER]]([[T0]], [[SELF]])
-// CHECK:   dealloc_stack [[ADDR]]
-// CHECK:   return {{%.*}} : $()
+// CHECK:   [[REF_ADDR:%.*]] = ref_element_addr [[SELF]] : $HasStoredDidSet, #HasStoredDidSet.stored
+// CHECK:   [[BEGIN_ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF_ADDR]] : $*Int
+// CHECK:   yield [[BEGIN_ACCESS]]
+// CHECK:   [[DIDSET:%.*]] = function_ref @$s6modify15HasStoredDidSetC6storedSivW
+// CHECK:   apply [[DIDSET]]([[SELF]])
+// CHECK:   [[TUPLE:%.*]] = tuple ()
+// CHECK:   return [[TUPLE]]
 // CHECK: }
 }
 

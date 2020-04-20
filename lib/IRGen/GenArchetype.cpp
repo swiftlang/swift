@@ -435,7 +435,7 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
           }
           types.push_back(args.back()->getType());
         });
-    auto bufTy = llvm::StructType::get(IGF.IGM.LLVMContext, types);
+    auto bufTy = llvm::StructType::get(IGF.IGM.getLLVMContext(), types);
     alloca = IGF.createAlloca(bufTy, IGF.IGM.getPointerAlignment());
     allocaSize = IGF.IGM.getPointerSize() * args.size();
     IGF.Builder.CreateLifetimeStart(alloca, allocaSize);

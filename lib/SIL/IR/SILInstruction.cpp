@@ -859,6 +859,21 @@ namespace {
       return true;
     }
 
+    bool
+    visitInitExistentialMetatypeInst(const InitExistentialMetatypeInst *RHS) {
+      auto *X = cast<InitExistentialMetatypeInst>(LHS);
+      ArrayRef<ProtocolConformanceRef> lhsConformances = X->getConformances();
+      ArrayRef<ProtocolConformanceRef> rhsConformances = RHS->getConformances();
+      if (lhsConformances.size() != rhsConformances.size())
+        return false;
+
+      for (unsigned i : indices(lhsConformances)) {
+        if (lhsConformances[i] != rhsConformances[i])
+          return false;
+      }
+      return true;
+    }
+
   private:
     const SILInstruction *LHS;
   };
@@ -963,13 +978,14 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
     // Handle LLVM intrinsic functions.
     const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
+      auto IAttrs = IInfo.getOrCreateAttributes(getModule().getASTContext());
       // Read-only.
-      if (IInfo.hasAttribute(llvm::Attribute::ReadOnly) &&
-          IInfo.hasAttribute(llvm::Attribute::NoUnwind))
+      if (IAttrs.hasFnAttribute(llvm::Attribute::ReadOnly) &&
+          IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind))
         return MemoryBehavior::MayRead;
       // Read-none?
-      return IInfo.hasAttribute(llvm::Attribute::ReadNone) &&
-                     IInfo.hasAttribute(llvm::Attribute::NoUnwind)
+      return IAttrs.hasFnAttribute(llvm::Attribute::ReadNone) &&
+                     IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind)
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }

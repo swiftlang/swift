@@ -50,6 +50,10 @@ namespace clang {
   class ObjCInterfaceDecl;
 }
 
+namespace llvm {
+  class LLVMContext;
+}
+
 namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
@@ -948,6 +952,11 @@ private:
   void registerGenericSignatureBuilder(GenericSignature sig,
                                        GenericSignatureBuilder &&builder);
   friend class GenericSignatureBuilder;
+
+private:
+  friend class IntrinsicInfo;
+  /// Retrieve an LLVMContext that is used for scratch space for intrinsic lookup.
+  llvm::LLVMContext &getIntrinsicScratchContext() const;
 
 public:
   /// Retrieve or create the stored generic signature builder for the given

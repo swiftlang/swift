@@ -91,7 +91,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11.4](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11.4](https://developer.apple.com/xcode/resources/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -158,7 +158,9 @@ First create a directory for all of the Swift sources:
 **Note:** This is important since update-checkout (see below) checks out
 repositories next to the Swift source directory. This means that if one clones
 Swift and has other unrelated repositories, update-checkout may not clone those
-repositories and will update them instead.
+repositories and will update them instead. Be aware that `update-checkout`
+currently does not support paths with non-ASCII characters. If such characters
+are present in the path to `swift-source`, `update-checkout` will fail.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 

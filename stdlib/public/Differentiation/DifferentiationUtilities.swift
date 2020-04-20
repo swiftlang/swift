@@ -17,6 +17,10 @@
 
 import Swift
 
+//===----------------------------------------------------------------------===//
+// Differentiable function creation
+//===----------------------------------------------------------------------===//
+
 /// Create a differentiable function from a vector-Jacobian products function.
 @inlinable
 public func differentiableFunction<T : Differentiable, R : Differentiable>(
@@ -70,6 +74,10 @@ public func differentiableFunction<T, U, V, R>(
     /*vjp*/ vjp)
 }
 
+//===----------------------------------------------------------------------===//
+// Derivative customization
+//===----------------------------------------------------------------------===//
+
 /// Returns `x` like an identity function. When used in a context where `x` is
 /// being differentiated with respect to, this function will not produce any 
 /// derivative at `x`.
@@ -91,6 +99,31 @@ public func withoutDerivative<T, R>(at x: T, in body: (T) -> R) -> R {
   body(x)
 }
 
+public extension Differentiable {
+  /// Applies the given closure to the derivative of `self`.
+  ///
+  /// Returns `self` like an identity function. When the return value is used in
+  /// a context where it is differentiated with respect to, applies the given
+  /// closure to the derivative of the return value.
+  @inlinable
+  @differentiable(wrt: self)
+  func withDerivative(_ body: @escaping (inout TangentVector) -> Void) -> Self {
+    return self
+  }
+
+  @inlinable
+  @derivative(of: withDerivative)
+  internal func _vjpWithDerivative(
+    _ body: @escaping (inout TangentVector) -> Void
+  ) -> (value: Self, pullback: (TangentVector) -> TangentVector) {
+    return (self, { grad in
+      var grad = grad
+      body(&grad)
+      return grad
+    })
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
@@ -101,23 +134,5 @@ public func _fatalErrorForwardModeDifferentiationDisabled() -> Never {
     JVP does not exist. Use \
     '-Xfrontend -enable-experimental-forward-mode-differentiation' to enable \
     differential-first differentiation APIs.
-    """)
-}
-
-// TODO(TF-1211): Remove this diagnostic helper function.
-@_silgen_name("_fatalErrorJVPNotGenerated")
-public func _fatalErrorJVPNotGenerated() -> Never {
-  fatalError("""
-    Forward-mode automatic differentiation has not yet been upstreamed from \
-    tensorflow branch. Tracked by https://bugs.swift.org/browse/TF-1211.
-    """)
-}
-
-// TODO(TF-1211): Remove this diagnostic helper function.
-@_silgen_name("_fatalErrorVJPNotGenerated")
-public func _fatalErrorVJPNotGenerated() -> Never {
-  fatalError("""
-    Reverse-mode automatic differentiation has not yet been upstreamed from \
-    tensorflow branch. Tracked by https://bugs.swift.org/browse/TF-1211.
     """)
 }

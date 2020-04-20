@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,6 +18,8 @@
 #include "../../public/runtime/CompatibilityOverride.h"
 
 #include <dlfcn.h>
+#include <mach-o/dyld.h>
+#include <mach-o/getsect.h>
 
 using namespace swift;
 
@@ -28,7 +30,7 @@ struct OverrideSection {
 #include "../../public/runtime/CompatibilityOverride.def"
 };
   
-OverrideSection Overrides
+OverrideSection Swift50Overrides
 __attribute__((used, section("__DATA,__swift_hooks"))) = {
   .version = 0,
   .conformsToProtocol = swift50override_conformsToProtocol,
@@ -70,8 +72,29 @@ getObjCClassByMangledName_untrusted(const char * _Nonnull typeName,
   return NO;
 }
 
+#if __POINTER_WIDTH__ == 64
+using mach_header_platform = mach_header_64;
+#else
+using mach_header_platform = mach_header;
+#endif
+
 __attribute__((constructor))
 static void installGetClassHook_untrusted() {
+  // swiftCompatibility* might be linked into multiple dynamic libraries because
+  // of build system reasons, but the copy in the main executable is the only
+  // one that should count. Bail early unless we're running out of the main
+  // executable.
+  //
+  // Newer versions of dyld add additional API that can determine this more
+  // efficiently, but we have to support back to OS X 10.9/iOS 7, so dladdr
+  // is the only API that reaches back that far.
+  Dl_info dlinfo;
+  if (dladdr((const void*)(uintptr_t)installGetClassHook_untrusted, &dlinfo) == 0)
+    return;
+  auto machHeader = (const mach_header_platform *)dlinfo.dli_fbase;
+  if (machHeader->filetype != MH_EXECUTE)
+    return;
+  
   // FIXME: delete this #if and dlsym once we don't
   // need to build with older libobjc headers
 #if !OBJC_GETCLASSHOOK_DEFINED

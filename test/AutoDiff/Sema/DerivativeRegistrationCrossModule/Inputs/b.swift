@@ -10,12 +10,4 @@ extension Struct: Differentiable {
   func vjpMethod(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     (x, { $0 })
   }
-
-  @usableFromInline
-  @derivative(of: +)
-  static func vjpAdd(_ lhs: Self, rhs: Self) -> (
-    value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
-  ) {
-    (lhs + rhs, { v in (v, v) })
-  }
 }

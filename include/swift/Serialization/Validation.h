@@ -77,6 +77,7 @@ struct ValidationInfo {
   StringRef name = {};
   StringRef targetTriple = {};
   StringRef shortVersion = {};
+  StringRef miscVersion = {};
   version::Version compatibilityVersion = {};
   size_t bytes = 0;
   Status status = Status::Malformed;

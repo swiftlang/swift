@@ -235,8 +235,6 @@ public:
       recurse = asImpl().checkDoCatch(doCatch);
     } else if (auto thr = dyn_cast<ThrowStmt>(S)) {
       recurse = asImpl().checkThrow(thr);
-    } else {
-      assert(!isa<CatchStmt>(S));
     }
     return {bool(recurse), S};
   }
@@ -629,7 +627,7 @@ private:
       return ThrowingKind::None;
     }
 
-    void checkCatch(CatchStmt *S, ThrowingKind doThrowingKind) {
+    void checkCatch(CaseStmt *S, ThrowingKind doThrowingKind) {
       if (doThrowingKind != ThrowingKind::None) {
         // This was an exhaustive do body, so bound our throwing kind by its
         // throwing kind.
@@ -927,11 +925,11 @@ public:
     return Context(Kind::NonExhaustiveCatch);
   }
 
-  static Context forCatchPattern(CatchStmt *S) {
+  static Context forCatchPattern(CaseStmt *S) {
     return Context(Kind::CatchPattern);
   }
 
-  static Context forCatchGuard(CatchStmt *S) {
+  static Context forCatchGuard(CaseStmt *S) {
     return Context(Kind::CatchGuard);
   }
 
@@ -1408,20 +1406,22 @@ private:
     // implicit do/catch in a debugger function.
     if (!Flags.has(ContextFlags::HasAnyThrowSite) &&
         !scope.wasTopLevelDebuggerFunction()) {
-      Ctx.Diags.diagnose(S->getCatches().front()->getCatchLoc(),
+      Ctx.Diags.diagnose(S->getCatches().front()->getStartLoc(),
                          diag::no_throw_in_do_with_catch);
     }
   }
 
-  void checkCatch(CatchStmt *S, ThrowingKind doThrowingKind) {
-    // The pattern and guard aren't allowed to throw.
-    {
-      ContextScope scope(*this, Context::forCatchPattern(S));
-      S->getErrorPattern()->walk(*this);
-    }
-    if (auto guard = S->getGuardExpr()) {
-      ContextScope scope(*this, Context::forCatchGuard(S));
-      guard->walk(*this);
+  void checkCatch(CaseStmt *S, ThrowingKind doThrowingKind) {
+    for (auto &LabelItem : S->getMutableCaseLabelItems()) {
+      // The pattern and guard aren't allowed to throw.
+      {
+        ContextScope scope(*this, Context::forCatchPattern(S));
+        LabelItem.getPattern()->walk(*this);
+      }
+      if (auto guard = LabelItem.getGuardExpr()) {
+        ContextScope scope(*this, Context::forCatchGuard(S));
+        guard->walk(*this);
+      }
     }
 
     auto savedContext = CurContext;

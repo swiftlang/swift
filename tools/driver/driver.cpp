@@ -74,7 +74,11 @@ extern int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 void *MainAddr);
 
-/// Determine if the given invocation should run as a subcommand.
+/// Determine if the given invocation should run as a "subcommand".
+///
+/// Examples of "subcommands" are 'swift build' or 'swift test', which are
+/// usually used to invoke the Swift package manager executables 'swift-build'
+/// and 'swift-test', respectively.
 ///
 /// \param ExecName The name of the argv[0] we were invoked as.
 /// \param SubcommandName On success, the full name of the subcommand to invoke.

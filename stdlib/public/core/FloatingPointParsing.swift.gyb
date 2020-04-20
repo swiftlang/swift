@@ -14,9 +14,11 @@ import SwiftShims
 
 %{
 
-allFloatBits = [32, 64, 80]
+allFloatBits = [16, 32, 64, 80]
 
 def floatName(bits):
+    if bits == 16:
+        return 'Float16'
     if bits == 32:
         return 'Float'
     if bits == 64:
@@ -24,7 +26,7 @@ def floatName(bits):
     if bits == 80:
         return 'Float80'
 
-cFuncSuffix2 = {32: 'f', 64: 'd', 80: 'ld'}
+cFuncSuffix2 = {16: 'f16', 32: 'f', 64: 'd', 80: 'ld'}
 
 }%
 
@@ -43,6 +45,9 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 % end
 
 //===--- Parsing ----------------------------------------------------------===//
+%if bits == 16:
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+%end
 extension ${Self}: LosslessStringConvertible {
   /// Creates a new instance from the given string.
   ///
@@ -126,6 +131,9 @@ extension ${Self}: LosslessStringConvertible {
   ///   is `nil`.
   @inlinable
   public init?<S: StringProtocol>(_ text: S) {
+  %if bits == 16:
+    self.init(Substring(text))
+  %else:
     if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
       self.init(Substring(text))
     } else {
@@ -149,6 +157,7 @@ extension ${Self}: LosslessStringConvertible {
         return nil
       }
     }
+  %end
   }
 
   // Caveat:  This implementation used to be inlineable.

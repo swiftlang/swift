@@ -328,8 +328,9 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body, caseBodyVarDecls));
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     labelItem, SourceLoc(), SourceLoc(), body,
+                                     caseBodyVarDecls));
   }
 
   // default: result = false
@@ -345,8 +346,9 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), defaultItem, SourceLoc(),
-                                     SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     defaultItem, SourceLoc(), SourceLoc(),
+                                     body,
                                      /*case body var decls*/ None));
   }
 
@@ -829,8 +831,9 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     }
 
     auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body, caseBodyVarDecls,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     labelItem, SourceLoc(), SourceLoc(), body,
+                                     caseBodyVarDecls,
                                      /*implicit*/ true));
   }
 

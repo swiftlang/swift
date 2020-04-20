@@ -110,6 +110,10 @@ public:
     InstList.splice(end(), Other->InstList);
   }
 
+  void spliceAtBegin(SILBasicBlock *Other) {
+    InstList.splice(begin(), Other->InstList);
+  }
+
   bool empty() const { return InstList.empty(); }
   iterator begin() { return InstList.begin(); }
   iterator end() { return InstList.end(); }
@@ -201,6 +205,8 @@ public:
   SILArgument *getArgument(unsigned i) { return ArgumentList[i]; }
 
   void cloneArgumentList(SILBasicBlock *Other);
+
+  void moveArgumentList(SILBasicBlock *from);
 
   /// Erase a specific argument from the arg list.
   void eraseArgument(int Index);

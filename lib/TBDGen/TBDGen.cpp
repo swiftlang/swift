@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -665,7 +666,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   for (const auto *derivativeAttr :
        AFD->getAttrs().getAttributes<DerivativeAttr>())
     addDerivativeConfiguration(
-        derivativeAttr->getOriginalFunction(),
+        derivativeAttr->getOriginalFunction(AFD->getASTContext()),
         AutoDiffConfig(derivativeAttr->getParameterIndices(),
                        IndexSubset::get(AFD->getASTContext(), 1, {0}),
                        AFD->getGenericSignature()));
@@ -1102,7 +1103,7 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
                                 /*forcePublicDecls*/ false);
 
   llvm::MachO::InterfaceFile file;
-  file.setFileType(llvm::MachO::FileType::TBD_V3);
+  file.setFileType(llvm::MachO::FileType::TBD_V4);
   file.setApplicationExtensionSafe(
     isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
@@ -1153,6 +1154,10 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
   if (auto *singleFile = desc.getSingleFile()) {
     assert(M == singleFile->getParentModule() && "mismatched file and module");
     visitFile(singleFile);
+    // Visit synthesized file, if it exists.
+    if (auto *SF = dyn_cast<SourceFile>(singleFile))
+      if (auto *synthesizedFile = SF->getSynthesizedFile())
+        visitFile(synthesizedFile);
   } else {
     llvm::SmallVector<ModuleDecl*, 4> Modules;
     Modules.push_back(M);

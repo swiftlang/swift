@@ -52,6 +52,8 @@ class DeclarationFragmentPrinter : public ASTPrinter {
     Identifier,
     TypeIdentifier,
     GenericParameter,
+    ExternalParam,
+    InternalParam,
     Text,
   };
 

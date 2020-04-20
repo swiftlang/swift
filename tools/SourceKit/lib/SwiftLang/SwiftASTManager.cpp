@@ -554,15 +554,20 @@ bool SwiftASTManager::initCompilerInvocation(
 
   // To save the time for module validation, consider the lifetime of ASTManager
   // as a single build session.
-  // NOTE: 'SessionTimestamp - 1' because clang compares it with '<=' that may
-  //       cause unnecessary validations if they happens within one second from
-  //       the SourceKit startup.
-  ImporterOpts.ExtraArgs.push_back("-fbuild-session-timestamp=" +
-                                   std::to_string(Impl.SessionTimestamp - 1));
-  ImporterOpts.ExtraArgs.push_back("-fmodules-validate-once-per-build-session");
-
+  // NOTE: Do this only if '-disable-modules-validate-system-headers' is *not*
+  //       explicitly enabled.
   auto &SearchPathOpts = Invocation.getSearchPathOptions();
-  SearchPathOpts.DisableModulesValidateSystemDependencies = true;
+  if (!SearchPathOpts.DisableModulesValidateSystemDependencies) {
+    // NOTE: 'SessionTimestamp - 1' because clang compares it with '<=' that may
+    //       cause unnecessary validations if they happens within one second
+    //       from the SourceKit startup.
+    ImporterOpts.ExtraArgs.push_back("-fbuild-session-timestamp=" +
+                                     std::to_string(Impl.SessionTimestamp - 1));
+    ImporterOpts.ExtraArgs.push_back(
+        "-fmodules-validate-once-per-build-session");
+
+    SearchPathOpts.DisableModulesValidateSystemDependencies = true;
+  }
 
   // Disable expensive SIL options to reduce time spent in SILGen.
   disableExpensiveSILOptions(Invocation.getSILOptions());

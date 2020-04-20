@@ -691,7 +691,8 @@ swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
       auto *arg = cast<SILPhiArgument>(currentValue);
       auto *termInst = arg->getSingleTerminator();
       assert(termInst && termInst->isTransformationTerminator());
-      assert(termInst->getNumOperands() == 1 &&
+      assert(termInst->getNumOperands()
+             - termInst->getNumTypeDependentOperands() == 1 &&
              "Transformation terminators should only have single operands");
       currentValue = termInst->getAllOperands()[0].get();
       continue;

@@ -18,10 +18,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/Utils.h"
@@ -30,8 +30,12 @@
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
@@ -223,6 +227,34 @@ public:
   
   void print(llvm::raw_ostream &out) const override;
 };
+} // end anonymous namespace
+
+namespace {
+static void linkerDiagnosticHandlerNoCtx(const llvm::DiagnosticInfo &DI) {
+  if (DI.getSeverity() != llvm::DS_Error)
+    return;
+
+  std::string MsgStorage;
+  {
+    llvm::raw_string_ostream Stream(MsgStorage);
+    llvm::DiagnosticPrinterRawOStream DP(Stream);
+    DI.print(DP);
+  }
+  llvm::errs() << "Error linking swift modules\n";
+  llvm::errs() << MsgStorage << "\n";
+}
+
+
+
+static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
+                                    void *Context) {
+  // This assert self documents our precondition that Context is always
+  // nullptr. It seems that parts of LLVM are using the flexibility of having a
+  // context. We don't really care about this.
+  assert(Context == nullptr && "We assume Context is always a nullptr");
+
+  return linkerDiagnosticHandlerNoCtx(DI);
+}
 } // end anonymous namespace
 
 /// EditLine wrapper that implements the user interface behavior for reading
@@ -732,13 +764,13 @@ static void printOrDumpDecl(Decl *d, PrintOrDump which) {
 
 /// The compiler and execution environment for the REPL.
 class REPLEnvironment {
+  std::unique_ptr<llvm::LLVMContext> LLVMContext;
   CompilerInstance &CI;
   ModuleDecl *MostRecentModule;
   ProcessCmdLine CmdLine;
   llvm::SmallPtrSet<swift::ModuleDecl *, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
   bool RanGlobalInitializers;
-  llvm::LLVMContext &LLVMContext;
   llvm::Module *Module;
   llvm::StringSet<> FuncsAlreadyGenerated;
   llvm::StringSet<> GlobalsAlreadyEmitted;
@@ -848,6 +880,44 @@ private:
     }
   }
 
+  bool linkLLVMModules(llvm::Module *Module,
+                       std::unique_ptr<llvm::Module> &&ModuleToLink) {
+    // EGREGIOUS HACKS AHEAD
+    //
+    // 1) LLVMContext does not support robust notions of identity rdar://61895075
+    // 2) llvm::Linker does not support modules allocated in separate contexts
+    //    rdar://61894890
+    // 3) Cloning modules across contexts is a known deficiency in LLVM
+    //    rdar://61896692
+    // 4) Round-tripping through the IR printer and parser is not guaranteed to
+    //    result in the same IR. It is heavily tested and implied that this is
+    //    the case, but LLVM makes no formal guarantees.
+    //
+    // So, work around 1) and do a naive pointer comparison to see if we
+    // allocated the module we're about to link in a separate context.
+    if (&Module->getContext() != &ModuleToLink->getContext()) {
+      // If so, work around 2) by round-tripping the IR and parsing back it
+      // into the original context. With module in-hand, we have successfully
+      // worked around 3).
+      llvm::SmallString<1024> scratch;
+      llvm::raw_svector_ostream PrintBuffer(scratch);
+      ModuleToLink->print(PrintBuffer, nullptr);
+      auto Buffer = llvm::MemoryBuffer::getMemBufferCopy(PrintBuffer.str());
+      llvm::SMDiagnostic Err;
+      // Finally, hope that 4) doesn't come back to bite us in the long run.
+      ModuleToLink = llvm::parseIR(Buffer->getMemBufferRef(), Err,
+                                   Module->getContext());
+    }
+
+    llvm::LLVMContext &Ctx = Module->getContext();
+    auto OldHandler = Ctx.getDiagnosticHandlerCallBack();
+    void *OldDiagnosticContext = Ctx.getDiagnosticContext();
+    Ctx.setDiagnosticHandlerCallBack(linkerDiagnosticHandler, nullptr);
+    bool Failed = llvm::Linker::linkModules(*Module, std::move(ModuleToLink));
+    Ctx.setDiagnosticHandlerCallBack(OldHandler, OldDiagnosticContext);
+    return !Failed;
+  }
+
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
     SWIFT_DEFER {
       // Always flush diagnostic consumers after executing a line.
@@ -891,20 +961,27 @@ private:
     DumpSource += Line;
 
     // IRGen the current line(s).
-    // FIXME: We shouldn't need to use the global context here, but
-    // something is persisting across calls to performIRGeneration.
-    auto LineModule = performIRGeneration(
+    auto GenModule = performIRGeneration(
         IRGenOpts, M, std::move(sil), "REPLLine", PrimarySpecificPaths(),
-        getGlobalLLVMContext(), /*parallelOutputFilenames*/{});
+        /*parallelOutputFilenames*/{});
 
     if (CI.getASTContext().hadError())
       return false;
 
+    assert(GenModule && "Emitted no diagnostics but IR generation failed?");
+
+    // Release the module and context because we are about to clone another
+    // module into the context which violates the exclusivity guarantees of
+    // GeneratedModule.
+    llvm::LLVMContext *Ctx;
+    llvm::Module *ModuleToLink;
+    std::tie(Ctx, ModuleToLink) = std::move(GenModule).release();
+
     // LineModule will get destroy by the following link process.
     // Make a copy of it to be able to correct produce DumpModule.
-    std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(*LineModule));
+    std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(*ModuleToLink));
     
-    if (!linkLLVMModules(Module, std::move(LineModule))) {
+    if (!linkLLVMModules(Module, std::unique_ptr<llvm::Module>(ModuleToLink))) {
       return false;
     }
 
@@ -941,21 +1018,23 @@ private:
     llvm::Function *EntryFn = TempModule->getFunction("main");
     EE->runFunctionAsMain(EntryFn, CmdLine, nullptr);
 
+    // Clean up the code generation context now that we're done cloning modules.
+    delete Ctx;
+
     return true;
   }
 
 public:
   REPLEnvironment(CompilerInstance &CI,
                   const ProcessCmdLine &CmdLine,
-                  llvm::LLVMContext &LLVMCtx,
                   bool ParseStdlib)
-    : CI(CI),
+    : LLVMContext(std::make_unique<llvm::LLVMContext>()),
+      CI(CI),
       MostRecentModule(CI.getMainModule()),
       CmdLine(CmdLine),
       RanGlobalInitializers(false),
-      LLVMContext(LLVMCtx),
-      Module(new llvm::Module("REPL", LLVMContext)),
-      DumpModule("REPL", LLVMContext),
+      Module(new llvm::Module("REPL", *LLVMContext.get())),
+      DumpModule("REPL", *LLVMContext.get()),
       IRGenOpts(),
       SILOpts(),
       Input(*this)
@@ -1200,7 +1279,7 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
 
 void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                     bool ParseStdlib) {
-  REPLEnvironment env(CI, CmdLine, getGlobalLLVMContext(), ParseStdlib);
+  REPLEnvironment env(CI, CmdLine, ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
   

@@ -802,7 +802,6 @@ public:
                                               Decl *attachingTo);
   void printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                                                 Decl *attachingTo);
-  void printTrailingWhereClause(TrailingWhereClause *whereClause);
 
   void printGenericSignature(GenericSignature genericSig,
                              unsigned flags);
@@ -1361,18 +1360,6 @@ void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
       });
 }
 
-void PrintAST::printTrailingWhereClause(TrailingWhereClause *whereClause) {
-  Printer << " " << tok::kw_where << " ";
-  interleave(
-      whereClause->getRequirements(),
-      [&](const RequirementRepr &req) {
-        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-        req.print(Printer);
-        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
-      },
-      [&] { Printer << ", "; });
-}
-
 /// A helper function to return the depth of a requirement.
 static unsigned getDepthOfRequirement(const Requirement &req) {
   switch (req.getKind()) {
@@ -1490,25 +1477,26 @@ void PrintAST::printSingleDepthOfGenericSignature(
   if (printParams) {
     // Print the generic parameters.
     Printer << "<";
-    interleave(genericParams,
-               [&](GenericTypeParamType *param) {
-                 if (!subMap.empty()) {
-                   if (auto argTy = substParam(param))
-                     printType(argTy);
-                   else
-                     printType(param);
-                 } else if (auto *GP = param->getDecl()) {
-                   Printer.callPrintStructurePre(
-                       PrintStructureKind::GenericParameter, GP);
-                   Printer.printName(GP->getName(),
-                                     PrintNameContext::GenericParameter);
-                   Printer.printStructurePost(
-                       PrintStructureKind::GenericParameter, GP);
-                 } else {
-                   printType(param);
-                 }
-               },
-               [&] { Printer << ", "; });
+    llvm::interleave(
+        genericParams,
+        [&](GenericTypeParamType *param) {
+          if (!subMap.empty()) {
+            if (auto argTy = substParam(param))
+              printType(argTy);
+            else
+              printType(param);
+          } else if (auto *GP = param->getDecl()) {
+            Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
+                                          GP);
+            Printer.printName(GP->getName(),
+                              PrintNameContext::GenericParameter);
+            Printer.printStructurePost(PrintStructureKind::GenericParameter,
+                                       GP);
+          } else {
+            printType(param);
+          }
+        },
+        [&] { Printer << ", "; });
   }
 
   if (printRequirements || printInherited) {
@@ -2566,9 +2554,9 @@ static bool isEscaping(Type type) {
 static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
                                 ParameterTypeFlags flags, bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
-    printer << "@autoclosure ";
+    printer.printAttrName("@autoclosure ");
   if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
-    printer << "@noDerivative ";
+    printer.printAttrName("@noDerivative ");
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
@@ -3038,7 +3026,7 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
   }
   Printer << tok::kw_case << " ";
 
-  interleave(elems.begin(), elems.end(),
+  llvm::interleave(elems.begin(), elems.end(),
     [&](EnumElementDecl *elt) {
       printEnumElement(elt);
     },
@@ -3373,20 +3361,8 @@ void PrintAST::visitDoCatchStmt(DoCatchStmt *stmt) {
   Printer << tok::kw_do << " ";
   visit(stmt->getBody());
   for (auto clause : stmt->getCatches()) {
-    visitCatchStmt(clause);
+    visitCaseStmt(clause);
   }
-}
-
-void PrintAST::visitCatchStmt(CatchStmt *stmt) {
-  Printer << tok::kw_catch << " ";
-  printPattern(stmt->getErrorPattern());
-  if (auto guard = stmt->getGuardExpr()) {
-    Printer << " " << tok::kw_where << " ";
-    // FIXME: print guard expression
-    (void) guard;
-  }
-  Printer << ' ';
-  visit(stmt->getBody());
 }
 
 void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
@@ -4463,9 +4439,9 @@ public:
       if (!T->getSubstitutions().empty()) {
         Printer << '<';
         auto replacements = T->getSubstitutions().getReplacementTypes();
-        interleave(replacements.begin(), replacements.end(),
-                   [&](Type t) { visit(t); },
-                   [&] { Printer << ", "; });
+        llvm::interleave(
+            replacements.begin(), replacements.end(), [&](Type t) { visit(t); },
+            [&] { Printer << ", "; });
         Printer << '>';
       }
       return;

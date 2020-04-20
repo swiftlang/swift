@@ -164,6 +164,23 @@ void RequirementRepr::print(ASTPrinter &out) const {
   printImpl(out, /*AsWritten=*/true);
 }
 
+static void printTrailingRequirements(ASTPrinter &Printer,
+                                      ArrayRef<RequirementRepr> Reqs,
+                                      bool printWhereKeyword) {
+  if (Reqs.empty()) return;
+
+  if (printWhereKeyword)
+    Printer << " where ";
+  interleave(
+      Reqs,
+      [&](const RequirementRepr &req) {
+        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
+        req.print(Printer);
+        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
+      },
+      [&] { Printer << ", "; });
+}
+
 void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '<';
   interleave(*this,
@@ -176,20 +193,22 @@ void GenericParamList::print(llvm::raw_ostream &OS) const {
              },
              [&] { OS << ", "; });
 
-  if (!getRequirements().empty()) {
-    OS << " where ";
-    interleave(getRequirements(),
-               [&](const RequirementRepr &req) {
-                 req.print(OS);
-               },
-               [&] { OS << ", "; });
-  }
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(),
+                            /*printWhereKeyword*/true);
   OS << '>';
 }
 
 void GenericParamList::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
+}
+
+void TrailingWhereClause::print(llvm::raw_ostream &OS,
+                                bool printWhereKeyword) const {
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(),
+                            printWhereKeyword);
 }
 
 static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
@@ -264,6 +283,10 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
+  case ReadWriteImplKind::StoredWithSimpleDidSet:
+    return "stored_simple_didset";
+  case ReadWriteImplKind::InheritedWithSimpleDidSet:
+    return "inherited_simple_didset";
   }
   llvm_unreachable("bad kind");
 }
@@ -660,9 +683,7 @@ namespace {
       }
       if (auto whereClause = decl->getTrailingWhereClause()) {
         OS << " where requirements: ";
-        interleave(whereClause->getRequirements(),
-                   [&](const RequirementRepr &req) { req.print(OS); },
-                   [&] { OS << ", "; });
+        whereClause->print(OS, /*printWhereKeyword*/false);
       }
       if (decl->overriddenDeclsComputed()) {
         OS << " overridden=";
@@ -1710,21 +1731,10 @@ public:
     Indent -= 2;
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitCatches(ArrayRef<CatchStmt*> clauses) {
+  void visitCatches(ArrayRef<CaseStmt *> clauses) {
     for (auto clause : clauses) {
-      visitCatchStmt(clause);
+      visitCaseStmt(clause);
     }
-  }
-  void visitCatchStmt(CatchStmt *clause) {
-    printCommon(clause, "catch") << '\n';
-    printRec(clause->getErrorPattern());
-    if (auto guard = clause->getGuardExpr()) {
-      OS << '\n';
-      printRec(guard);
-    }
-    OS << '\n';
-    printRec(clause->getBody());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };
 
@@ -2498,6 +2508,18 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
     printCommon(E, "opaque_value_expr") << " @ " << (void*)E;
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitPropertyWrapperValuePlaceholderExpr(
+      PropertyWrapperValuePlaceholderExpr *E) {
+    printCommon(E, "property_wrapper_value_placeholder_expr");
+    OS << '\n';
+    printRec(E->getOpaqueValuePlaceholder());
+    if (auto *value = E->getOriginalWrappedValue()) {
+      OS << '\n';
+      printRec(value);
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3297,9 +3319,12 @@ void ProtocolConformanceRef::dump() const {
   llvm::errs() << '\n';
 }
 
-void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
-                                  unsigned indent) const {
+void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
+                                  bool details) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  if (!details && isConcrete())
+    visited.insert(getConcrete());
+
   dumpProtocolConformanceRefRec(*this, out, indent, visited);
 }
 void ProtocolConformance::dump() const {

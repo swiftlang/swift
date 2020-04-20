@@ -3,6 +3,7 @@ set(swift_stubs_sources
     CommandLine.cpp
     GlobalObjects.cpp
     LibcShims.cpp
+    Metadata.cpp
     Random.cpp
     Stubs.cpp
     ThreadLocalStorage.cpp

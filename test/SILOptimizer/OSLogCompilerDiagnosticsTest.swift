@@ -3,62 +3,33 @@
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
 // Tests for the diagnostics produced by the OSLogOptimization pass that
-// performs compile-time analysis and optimization of the new os log prototype
-// APIs. The tests here check whether bad user inputs are diagnosed correctly.
-// The tests here model the possible invalid inputs to the os log methods.
-// TODO: diagnostics will be improved. globalStringTablePointer builtin error
-// must be suppressed.
+// performs compile-time analysis and optimization of the new os log APIs.
+// Note that many usage errors are caught by the Sema check: ConstantnessSemaDiagnostics.
+// The tests here check only those diagnostics that are enforced at the SIL level.
 
 import OSLogTestHelper
 
-func testDynamicLogMessage(message: OSLogMessage) {
-  _osLogTestHelper(message)
-    // expected-error @-1 {{globalStringTablePointer builtin must used only on string literals}}
+func testNonDecimalFormatOptionOnIntegers() {
+  _osLogTestHelper("Minimum integer value: \(Int.min, format: .hex)")
+  // expected-error @-1 {{Fatal error: Signed integers must be formatted using .decimal}}
 }
 
-func testNonconstantFormatOption(formatOpt: OSLogIntegerFormatting) {
-  _osLogTestHelper("Minimum integer value: \(Int.min, format: formatOpt)")
-  // expected-error @-1 {{interpolation arguments like format and privacy options must be constants}}
-  // expected-error @-2 {{globalStringTablePointer builtin must used only on string literals}}
+// Extending OSLogInterpolation (without the constant_evaluable attribute) would be an
+// error.
+struct A {
+  var i: Int
 }
-
-func testNonconstantPrivacyOption( privacyOpt: OSLogPrivacy) {
-  _osLogTestHelper("Minimum integer value: \(Int.min, privacy: privacyOpt)")
-  // expected-error @-1 {{interpolation arguments like format and privacy options must be constants}}
-  // expected-error @-2 {{globalStringTablePointer builtin must used only on string literals}}
-}
-
-func testNoninlinedOSLogMessage() {
-  let logMessage: OSLogMessage = "Minimum integer value: \(Int.min)"
-    // expected-error @-1 {{OSLogMessage instance must not be explicitly created and must be deletable}}
-  _osLogTestHelper(logMessage)
-}
-
-func testNoninlinedOSLogMessageComplex(b: Bool) {
-  let logMessage: OSLogMessage = "Maximum integer value: \(Int.max)"
-    // expected-error @-1 {{OSLogMessage instance must not be explicitly created and must be deletable}}
-  if !b {
-    return
+extension OSLogInterpolation {
+  mutating func appendInterpolation(a: A) {
+    self.appendInterpolation(a.i)
   }
-  _osLogTestHelper(logMessage)
-    // expected-error @-1 {{globalStringTablePointer builtin must used only on string literals}}
 }
 
-func testNoninlinedFormatOptions() {
-  let formatOption: OSLogIntegerFormatting = .hex(includePrefix: true)
-  _osLogTestHelper("Minimum integer value: \(Int.min, format: formatOption)")
-    // expected-error @-1 {{interpolation arguments like format and privacy options must be constants}}
-    // expected-error @-2 {{globalStringTablePointer builtin must used only on string literals}}
-}
-
-func testNoninlinedFormatOptionsComplex(b: Bool) {
-  let formatOption: OSLogIntegerFormatting = .hex(includePrefix: true)
-  if !b {
-    return
-  }
-  _osLogTestHelper("Minimum integer value: \(Int.min, format: formatOption)")
-    // expected-error @-1 {{interpolation arguments like format and privacy options must be constants}}
-    // expected-error @-2 {{globalStringTablePointer builtin must used only on string literals}}
+func testOSLogInterpolationExtension(a: A) {
+  _osLogTestHelper("Error at line: \(a: a)")
+    // expected-error @-1 {{invalid log message; extending types defined in the os module is not supported}}
+    // expected-note @-2 {{'OSLogInterpolation.appendLiteral(_:)' failed evaluation}}
+    // expected-note @-3 {{value mutable by an unevaluated instruction is not a constant}}
 }
 
 internal enum Color {
@@ -116,6 +87,6 @@ func testUnreachableLogCallComplex(c: Color)  {
   default: // expected-warning {{default will never be executed}}
     _osLogTestHelper("Some call \(c)")
       // expected-warning@-1 {{os log call will never be executed and may have undiagnosed errors}}
-      // expected-error@-2 {{globalStringTablePointer builtin must used only on string literals}}
+      // expected-error@-2 {{globalStringTablePointer builtin must be used only on string literals}}
   }
 }

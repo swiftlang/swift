@@ -72,7 +72,7 @@ function(is_darwin_based_sdk sdk_name out_var)
 endfunction()
 
 # Usage:
-# _add_variant_c_compile_link_flags(
+# _add_host_variant_c_compile_link_flags(
 #   SDK sdk
 #   ARCH arch
 #   BUILD_TYPE build_type
@@ -86,7 +86,7 @@ endfunction()
 #   DEPLOYMENT_VERSION_WATCHOS version
 #
 # )
-function(_add_variant_c_compile_link_flags)
+function(_add_host_variant_c_compile_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     MACCATALYST_BUILD_FLAVOR
@@ -189,7 +189,7 @@ function(_add_variant_c_compile_link_flags)
 endfunction()
 
 
-function(_add_variant_c_compile_flags)
+function(_add_host_variant_c_compile_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
     DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
     RESULT_VAR_NAME ENABLE_LTO
@@ -202,7 +202,7 @@ function(_add_variant_c_compile_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  _add_variant_c_compile_link_flags(
+  _add_host_variant_c_compile_link_flags(
     SDK "${CFLAGS_SDK}"
     ARCH "${CFLAGS_ARCH}"
     BUILD_TYPE "${CFLAGS_BUILD_TYPE}"
@@ -363,7 +363,7 @@ function(_add_variant_c_compile_flags)
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
-function(_add_variant_link_flags)
+function(_add_host_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
   DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
   RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME
@@ -382,7 +382,7 @@ function(_add_variant_link_flags)
   set(link_libraries ${${LFLAGS_LINK_LIBRARIES_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
 
-  _add_variant_c_compile_link_flags(
+  _add_host_variant_c_compile_link_flags(
     SDK "${LFLAGS_SDK}"
     ARCH "${LFLAGS_ARCH}"
     BUILD_TYPE "${LFLAGS_BUILD_TYPE}"
@@ -548,10 +548,6 @@ function(_add_swift_host_library_single target)
     message(FATAL_ERROR "Either SHARED or STATIC must be specified")
   endif()
 
-  # Determine the subdirectory where this library will be installed.
-  set(ASHLS_SUBDIR
-    "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
-
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
   if(SWIFT_EMBED_BITCODE_SECTION)
@@ -628,14 +624,9 @@ function(_add_swift_host_library_single target)
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
   elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
-    # Only set the install RPATH if cross-compiling the host tools, in which
-    # case both the NDK and Sysroot paths must be set.
-    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
-       NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
-      set_target_properties("${target}"
-        PROPERTIES
-        INSTALL_RPATH "$ORIGIN")
-    endif()
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN")
   endif()
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
@@ -656,21 +647,9 @@ function(_add_swift_host_library_single target)
   set(c_compile_flags ${ASHLS_C_COMPILE_FLAGS})
   set(link_flags)
 
-  set(library_search_subdir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-  set(library_search_directories
-    "${SWIFTLIB_DIR}/${ASHLS_SUBDIR}"
-    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${ASHLS_SUBDIR}"
-    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+  set(library_search_directories)
 
-  # In certain cases when building, the environment variable SDKROOT is set to override
-  # where the sdk root is located in the system. If that environment variable has been
-  # set by the user, respect it and add the specified SDKROOT directory to the
-  # library_search_directories so we are able to link against those libraries
-  if(DEFINED ENV{SDKROOT} AND EXISTS "$ENV{SDKROOT}/usr/lib/swift")
-      list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
-  endif()
-
-  _add_variant_c_compile_flags(
+  _add_host_variant_c_compile_flags(
     SDK "${SWIFT_HOST_VARIANT_SDK}"
     ARCH "${SWIFT_HOST_VARIANT_ARCH}"
     BUILD_TYPE ${CMAKE_BUILD_TYPE}
@@ -685,7 +664,7 @@ function(_add_swift_host_library_single target)
       list(APPEND c_compile_flags -D_WINDLL)
     endif()
   endif()
-  _add_variant_link_flags(
+  _add_host_variant_link_flags(
     SDK "${SWIFT_HOST_VARIANT_SDK}"
     ARCH "${SWIFT_HOST_VARIANT_ARCH}"
     BUILD_TYPE ${CMAKE_BUILD_TYPE}
@@ -824,120 +803,6 @@ function(add_swift_host_library name)
   endif()
 endfunction()
 
-# Add an executable compiled for a given variant.
-#
-# Don't use directly, use add_swift_executable and add_swift_target_executable
-# instead.
-#
-# See add_swift_executable for detailed documentation.
-#
-# Additional parameters:
-#   [SDK sdk]
-#     SDK to build for.
-#
-#   [ARCHITECTURE architecture]
-#     Architecture to build for.
-function(_add_swift_host_executable_single name)
-  set(options)
-  set(single_parameter_options
-    ARCHITECTURE
-    SDK)
-  set(multiple_parameter_options
-    COMPILE_FLAGS
-    DEPENDS
-    LLVM_LINK_COMPONENTS)
-  cmake_parse_arguments(SWIFTEXE_SINGLE
-    "${options}"
-    "${single_parameter_options}"
-    "${multiple_parameter_options}"
-    ${ARGN})
-
-  set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
-
-  # Check arguments.
-  precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
-  precondition(SWIFTEXE_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
-
-  # Determine compiler flags.
-  set(c_compile_flags)
-  set(link_flags)
-
-  # Prepare linker search directories.
-  set(library_search_directories
-        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
-
-  # Add variant-specific flags.
-  _add_variant_c_compile_flags(
-    SDK "${SWIFTEXE_SINGLE_SDK}"
-    ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
-    BUILD_TYPE "${CMAKE_BUILD_TYPE}"
-    ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
-    ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
-    RESULT_VAR_NAME c_compile_flags)
-  _add_variant_link_flags(
-    SDK "${SWIFTEXE_SINGLE_SDK}"
-    ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
-    BUILD_TYPE "${CMAKE_BUILD_TYPE}"
-    ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
-    LTO_OBJECT_NAME "${name}-${SWIFTEXE_SINGLE_SDK}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
-    ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
-    RESULT_VAR_NAME link_flags
-    LINK_LIBRARIES_VAR_NAME link_libraries
-    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
-
-  add_executable(${name}
-      ${SWIFTEXE_SINGLE_SOURCES}
-      ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
-
-  add_dependencies_multiple_targets(
-      TARGETS "${name}"
-      DEPENDS
-        ${LLVM_COMMON_DEPENDS}
-        ${SWIFTEXE_SINGLE_DEPENDS})
-  llvm_update_compile_flags("${name}")
-
-  if(SWIFTEXE_SINGLE_SDK STREQUAL WINDOWS)
-    swift_windows_include_for_arch(${SWIFTEXE_SINGLE_ARCHITECTURE}
-      ${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE)
-    target_include_directories(${name} SYSTEM PRIVATE
-      ${${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE})
-
-    if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
-      # MSVC doesn't support -Xclang. We don't need to manually specify
-      # the dependent libraries as `cl` does so.
-      target_compile_options(${name} PRIVATE
-        "SHELL:-Xclang --dependent-lib=oldnames"
-        # TODO(compnerd) handle /MT, /MTd
-        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
-    endif()
-  endif()
-  target_compile_options(${name} PRIVATE
-    ${c_compile_flags})
-  target_link_directories(${name} PRIVATE
-    ${library_search_directories})
-  target_link_options(${name} PRIVATE
-    ${link_flags})
-  target_link_libraries(${name} PRIVATE
-    ${link_libraries})
-  if (SWIFT_PARALLEL_LINK_JOBS)
-    set_property(TARGET ${name} PROPERTY JOB_POOL_LINK swift_link_job_pool)
-  endif()
-  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-    set_target_properties(${name} PROPERTIES
-      BUILD_WITH_INSTALL_RPATH YES
-      INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
-  endif()
-  set_output_directory(${name}
-      BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
-      LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
-
-  swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_LINK_COMPONENTS})
-
-  set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
-endfunction()
-
 macro(add_swift_tool_subdirectory name)
   add_llvm_subdirectory(SWIFT TOOL ${name})
 endmacro()
@@ -949,7 +814,7 @@ endmacro()
 function(add_swift_host_tool executable)
   set(options)
   set(single_parameter_options SWIFT_COMPONENT)
-  set(multiple_parameter_options)
+  set(multiple_parameter_options LLVM_LINK_COMPONENTS)
 
   cmake_parse_arguments(ASHT
     "${options}"
@@ -960,11 +825,79 @@ function(add_swift_host_tool executable)
   precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")
 
-  # Create the executable rule.
-  _add_swift_host_executable_single(${executable}
+  # Determine compiler flags.
+  set(c_compile_flags)
+  set(link_flags)
+  set(link_libraries)
+  set(library_search_directories
+    ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
+
+  _add_host_variant_c_compile_flags(
     SDK ${SWIFT_HOST_VARIANT_SDK}
-    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-    ${ASHT_UNPARSED_ARGUMENTS})
+    ARCH ${SWIFT_HOST_VARIANT_ARCH}
+    BUILD_TYPE ${CMAKE_BUILD_TYPE}
+    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
+    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
+    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
+    RESULT_VAR_NAME c_compile_flags)
+  _add_host_variant_link_flags(
+    SDK ${SWIFT_HOST_VARIANT_SDK}
+    ARCH ${SWIFT_HOST_VARIANT_ARCH}
+    BUILD_TYPE ${CMAKE_BUILD_TYPE}
+    ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS}
+    ENABLE_LTO ${SWIFT_TOOLS_ENABLE_LTO}
+    LTO_OBJECT_NAME "${executable}-${SWIFT_HOST_VARIANT_SDK}-${SWIFT_HOST_VARIANT_ARCH}"
+    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
+    RESULT_VAR_NAME link_flags
+    LINK_LIBRARIES_VAR_NAME link_libraries
+    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
+
+  add_executable(${executable} ${ASHT_UNPARSED_ARGUMENTS})
+  target_compile_options(${executable} PRIVATE
+    ${c_compile_flags})
+  target_link_directories(${executable} PRIVATE
+    ${library_search_directories})
+  target_link_options(${executable} PRIVATE
+    ${link_flags})
+  target_link_libraries(${executable} PRIVATE
+    ${link_libraries})
+
+  set_target_properties(${executable} PROPERTIES
+    FOLDER "Swift executables")
+  if(SWIFT_PARALLEL_LINK_JOBS)
+    set_target_properties(${executable} PROPERTIES
+      JOB_POOL_LINK swift_link_job_pool)
+  endif()
+  if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    set_target_properties(${executable} PROPERTIES
+      BUILD_WITH_INSTALL_RPATH YES
+      INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+  endif()
+
+  add_dependencies_multiple_targets(
+    TARGETS ${executable}
+    DEPENDS ${LLVM_COMMON_DEPENDS})
+  llvm_update_compile_flags(${executable})
+  swift_common_llvm_config(${executable} ${ASHT_LLVM_LINK_COMPONENTS})
+  set_output_directory(${executable}
+    BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
+    LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH}
+      ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
+    target_include_directories(${executable} SYSTEM PRIVATE
+      ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
+
+    if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
+      # MSVC doesn't support -Xclang. We don't need to manually specify
+      # the dependent libraries as `cl` does so.
+      target_compile_options(${executable} PRIVATE
+        "SHELL:-Xclang --dependent-lib=oldnames"
+        # TODO(compnerd) handle /MT, /MTd
+        "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
+    endif()
+  endif()
 
   add_dependencies(${ASHT_SWIFT_COMPONENT} ${executable})
   swift_install_in_component(TARGETS ${executable}

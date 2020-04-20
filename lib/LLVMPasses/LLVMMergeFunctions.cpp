@@ -44,7 +44,6 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/ValueHandle.h"
@@ -1126,7 +1125,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
                         cast<PointerType>(New->getType())->getAddressSpace());
 
     Value *Callee = ConstantExpr::getBitCast(New, FPtrType);
-    CallInst *NewCI = Builder.CreateCall(Callee, NewArgs);
+    CallInst *NewCI = Builder.CreateCall(FType, Callee, NewArgs);
     NewCI->setCallingConv(CI->getCallingConv());
     // Don't transfer attributes from the function to the callee. Function
     // attributes typically aren't relevant to the calling convention or ABI.

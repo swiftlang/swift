@@ -551,8 +551,10 @@ private:
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       if (!handleBraceStmt(DCS->getBody(), DCS->getDoLoc()))
         return Stop;
-    } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
-      if (!handleBraceStmt(CS->getBody(), CS->getCatchLoc()))
+    } else if (isa<CaseStmt>(S) &&
+               cast<CaseStmt>(S)->getParentKind() == CaseParentKind::DoCatch) {
+      auto CS = cast<CaseStmt>(S);
+      if (!handleBraceStmt(CS->getBody(), CS->getLoc()))
         return Stop;
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       if (!handleBraceStmt(RWS->getBody(), RWS->getRepeatLoc()))
@@ -1497,6 +1499,34 @@ private:
       return IndentContext {ContextLoc, false};
     }
 
+    if (auto *ECD = dyn_cast<EnumCaseDecl>(D)) {
+      SourceLoc CaseLoc = ECD->getLoc();
+
+      if (TrailingTarget)
+        return None;
+
+      ListAligner Aligner(SM, TargetLocation, CaseLoc, CaseLoc);
+      for (auto *Elem: ECD->getElements()) {
+        SourceRange ElemRange = Elem->getSourceRange();
+        Aligner.updateAlignment(ElemRange, Elem);
+      }
+      return Aligner.getContextAndSetAlignment(CtxOverride);
+    }
+
+    if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+      SourceLoc ContextLoc = EED->getStartLoc();
+      if (auto Ctx = getIndentContextFrom(EED->getParameterList()))
+        return Ctx;
+
+      if (TrailingTarget)
+        return None;
+
+      return IndentContext {
+        ContextLoc,
+        !OutdentChecker::hasOutdent(SM, EED)
+      };
+    }
+
     if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
       SourceLoc ContextLoc = SD->getStartLoc();
 
@@ -1805,10 +1835,8 @@ private:
       return IndentContext {ContextLoc, false};
     }
 
-    if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      if (TrailingTarget && !TrailingTarget->isEmpty())
-        return None;
-
+    auto *CS = dyn_cast<CaseStmt>(S);
+    if (CS && CS->getParentKind() == CaseParentKind::Switch) {
       SourceLoc CaseLoc = CS->getLoc();
       if (!SM.isBeforeInBuffer(CaseLoc, TargetLocation))
         return None;
@@ -1816,28 +1844,20 @@ private:
       SourceRange LabelItemsRange = CS->getLabelItemsRange();
       SourceLoc ColonLoc = getLocIfKind(SM, LabelItemsRange.End, tok::colon);
 
-      if (isTargetContext(CaseLoc, ColonLoc)) {
-        ListAligner Aligner(SM, TargetLocation, CaseLoc, CaseLoc, ColonLoc);
-        for (auto &Elem: CS->getCaseLabelItems()) {
-          SourceRange ElemRange = Elem.getSourceRange();
-          Aligner.updateAlignment(ElemRange, CS);
-          if (isTargetContext(ElemRange)) {
-            Aligner.setAlignmentIfNeeded(CtxOverride);
-            return IndentContext {
-              ElemRange.Start,
-              !OutdentChecker::hasOutdent(SM, ElemRange, CS)
-            };
-          }
-        }
-        return Aligner.getContextAndSetAlignment(CtxOverride);
-      }
-      if (ColonLoc.isValid() && isTargetContext(ColonLoc, SourceLoc())) {
+      if (auto Ctx = getIndentContextFromCaseItems(CS, /*CloseLoc=*/ColonLoc))
+        return Ctx;
+
+      if (ColonLoc.isValid() && isTargetContext(ColonLoc, SourceLoc()) &&
+          (!TrailingTarget || TrailingTarget->isEmpty())) {
         SourceRange ColonToEnd = SourceRange(ColonLoc, CS->getEndLoc());
         return IndentContext {
           CaseLoc,
           !OutdentChecker::hasOutdent(SM, ColonToEnd, CS)
         };
       }
+
+      if (TrailingTarget)
+        return None;
       return IndentContext {CaseLoc, false};
     }
 
@@ -1854,14 +1874,22 @@ private:
       return IndentContext {DS->getStartLoc(), false};
     }
 
-    if (auto *CS = dyn_cast<CatchStmt>(S)) {
-      if (auto *BS = dyn_cast<BraceStmt>(CS->getBody())) {
-        if (auto Ctx = getIndentContextFrom(BS, CS->getStartLoc()))
-          return Ctx;
-      }
+    if (CS && CS->getParentKind() == CaseParentKind::DoCatch) {
+      SourceLoc CatchLoc = CS->getLoc();
+      SourceLoc L;
+
+      auto *BS = dyn_cast<BraceStmt>(CS->getBody());
+      if (BS) L = getLocIfKind(SM, BS->getLBraceLoc(), tok::l_brace);
+
+      if (auto Ctx = getIndentContextFromCaseItems(CS, /*CloseLoc=*/L))
+        return Ctx;
+
+      if (auto Ctx = getIndentContextFrom(BS, CS->getStartLoc()))
+        return Ctx;
+
       if (TrailingTarget)
         return None;
-      return IndentContext {CS->getStartLoc(), true};
+      return IndentContext {CatchLoc, false};
     }
 
     if (auto *IS = dyn_cast<IfStmt>(S)) {
@@ -2081,6 +2109,33 @@ private:
         Bounds.widen(Next->getLoc());
     }
     return Bounds;
+  }
+
+  Optional<IndentContext>
+  getIndentContextFromCaseItems(CaseStmt *CS, SourceLoc CloseLoc) {
+    SourceLoc IntroducerLoc = CS->getLoc();
+    if (!isTargetContext(IntroducerLoc, CloseLoc))
+      return None;
+
+    ListAligner Aligner(SM, TargetLocation, IntroducerLoc, IntroducerLoc,
+                        CloseLoc);
+    for (auto &Elem: CS->getCaseLabelItems()) {
+      // Skip the implicit 'error' pattern for empty catch CaseStmts.
+      if ((!Elem.getPattern() || Elem.getPattern()->isImplicit()) &&
+          Elem.getWhereLoc().isInvalid())
+        continue;
+
+      SourceRange ElemRange = Elem.getSourceRange();
+      Aligner.updateAlignment(ElemRange, CS);
+      if (isTargetContext(ElemRange)) {
+        Aligner.setAlignmentIfNeeded(CtxOverride);
+        return IndentContext {
+          ElemRange.Start,
+          !OutdentChecker::hasOutdent(SM, ElemRange, CS)
+        };
+      }
+    }
+    return Aligner.getContextAndSetAlignment(CtxOverride);
   }
 
 #pragma mark Expression indent contexts
@@ -2564,18 +2619,18 @@ public:
   std::pair<LineRange, std::string> indent(unsigned LineIndex,
                                            FormatContext &FC,
                                            StringRef Text) {
+    if (FC.IsInStringLiteral()) {
+      return std::make_pair(
+          LineRange(LineIndex, 1),
+          swift::ide::getTextForLine(LineIndex, Text, /*Trim*/ false).str());
+    }
+
     if (FC.isExact()) {
       StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
       StringBuilder Builder;
       FC.padToExactColumn(Builder, FmtOptions);
       Builder.append(Line);
       return std::make_pair(LineRange(LineIndex, 1), Builder.str().str());
-    }
-
-    if (FC.IsInStringLiteral()) {
-      return std::make_pair(
-          LineRange(LineIndex, 1),
-          swift::ide::getTextForLine(LineIndex, Text, /*Trim*/ false).str());
     }
 
     // Take the current indent position of the context, then add the number of

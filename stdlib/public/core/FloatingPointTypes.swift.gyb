@@ -37,7 +37,16 @@ SignificandBitCount = self_type.significand_bits
 ExponentBitCount = self_type.exponent_bits
 RawSignificand = 'UInt' + str(SignificandSize)
 
-if Self == 'Float':
+def Availability(bits):
+    if bits == 16:
+        return '@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)'
+    return ''
+
+if Self == 'Float16':
+    SelfDocComment = '''\
+/// A half-precision (16b), floating-point value type.'''
+
+elif Self == 'Float':
     SelfDocComment = '''\
 /// A single-precision, floating-point value type.'''
 
@@ -58,6 +67,7 @@ else:
 % end
 
 ${SelfDocComment}
+${Availability(bits)}
 @frozen
 public struct ${Self} {
   public // @testable
@@ -76,6 +86,7 @@ public struct ${Self} {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: CustomStringConvertible {
   /// A textual representation of the value.
   public var description: String {
@@ -91,6 +102,7 @@ extension ${Self}: CustomStringConvertible {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   public var debugDescription: String {
@@ -102,6 +114,7 @@ extension ${Self}: CustomDebugStringConvertible {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: TextOutputStreamable {
   public func write<Target>(to target: inout Target) where Target: TextOutputStream {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
@@ -112,6 +125,7 @@ extension ${Self}: TextOutputStreamable {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: BinaryFloatingPoint {
 
   // Floating-point types are always symmetric, so Magnitude is Self.
@@ -431,7 +445,9 @@ extension ${Self}: BinaryFloatingPoint {
 
   @inlinable
   public static var pi: ${Self} {
-%if bits == 32:
+%if bits == 16:
+    return 0x1.92p1
+%elif bits == 32:
     // Note: this is not the correctly rounded (to nearest) value of pi,
     // because pi would round *up* in Float precision, which can result
     // in angles in the wrong quadrant if users aren't careful.  This is
@@ -487,18 +503,7 @@ extension ${Self}: BinaryFloatingPoint {
 
   @inlinable
   public static var leastNormalMagnitude: ${Self} {
-%if bits == 32:
-    return 0x1p-126
-%elif bits == 64:
-    return 0x1p-1022
-%elif bits == 80:
-    return 0x1p-16382
-%else:
-    return ${Self}(
-      sign: .plus,
-      exponentBitPattern: 1,
-      significandBitPattern: 0)
-%end
+    return 0x1.0p-${2**(ExponentBitCount-1)-2}
   }
 
   @inlinable
@@ -507,19 +512,7 @@ extension ${Self}: BinaryFloatingPoint {
     // On 32b arm, the default FPCR has subnormals flushed to zero.
     return leastNormalMagnitude
 #else
-%if bits == 32:
-    return 0x1p-149
-%elif bits == 64:
-    return 0x1p-1074
-%elif bits == 80:
-    return 0x1p-16445
-%else:
-    return ${Self}(
-      sign: .plus,
-      exponentBitPattern: 0,
-      significandBitPattern: 1
-    )
-%end
+    return leastNormalMagnitude * ulpOfOne
 #endif
   }
 
@@ -530,13 +523,7 @@ extension ${Self}: BinaryFloatingPoint {
   /// `FLT_EPSILON`, `DBL_EPSILON`, and others with a similar purpose.
   @inlinable
   public static var ulpOfOne: ${Self} {
-%if bits == 32:
-    return 0x1p-23
-%elif bits == 64:
-    return 0x1p-52
-%elif bits == 80:
-    return 0x1p-63
-%end
+    return 0x1.0p-${SignificandBitCount}
   }
 
   @inlinable
@@ -755,7 +742,11 @@ extension ${Self}: BinaryFloatingPoint {
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public mutating func formRemainder(dividingBy other: ${Self}) {
+% if bits == 16:
+    self = Float16(_stdlib_remainderf(Float(self), Float(other)))
+% else:
     self = _stdlib_remainder${cFuncSuffix}(self, other)
+% end
   }
 
   @inlinable // FIXME(inline-always)
@@ -766,7 +757,11 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func formSquareRoot( ) {
+% if bits == 16:
+    self = Float16(_stdlib_squareRootf(Float(self)))
+% else:
     self = _stdlib_squareRoot${cFuncSuffix}(self)
+% end
   }
 
   @_transparent
@@ -893,6 +888,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 }
 
+${Availability(bits)}
 extension ${Self}: _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
   @_transparent
   public
@@ -907,16 +903,20 @@ extension ${Self}: _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLite
 }
 
 % if bits != 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
 
 % builtinFloatLiteralBits = 80
+${Availability(bits)}
 extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
   @_transparent
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
     self = ${Self}(value)
+%   elif bits == 16:
+    // workaround missing __truncxfhf
+    self = ${Self}(Float80(value))
 %   elif bits < builtinFloatLiteralBits:
     self = ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   else:
@@ -930,6 +930,7 @@ extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
 #else
 
 % builtinFloatLiteralBits = 64
+${Availability(bits)}
 extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
   @_transparent
   public
@@ -949,6 +950,7 @@ extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
 #endif
 % end
 
+${Availability(bits)}
 extension ${Self}: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
@@ -978,19 +980,24 @@ extension ${Self}: Hashable {
     return hasher._finalize()
   %elif bits == 64:
     return Hasher._hash(seed: seed, v.bitPattern)
-  %elif bits == 32:
-    return Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: 4)
+  %elif bits < 64:
+    return Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: ${bits/8})
+  %else:
+    #error("Unimplemented")
   %end
   }
 }
 
+% if bits != 16:
 extension ${Self}: _HasCustomAnyHashableRepresentation {
   // Not @inlinable
   public func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _${Self}AnyHashableBox(self))
   }
 }
+% end
 
+${Availability(bits)}
 extension ${Self} {
   @inlinable // FIXME(inline-always)
   public var magnitude: ${Self} {
@@ -1001,6 +1008,7 @@ extension ${Self} {
   }
 }
 
+${Availability(bits)}
 extension ${Self} {
   @_transparent
   public static prefix func - (x: ${Self}) -> ${Self} {
@@ -1013,6 +1021,7 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 // Construction from other concrete types.
+${Availability(bits)}
 extension ${Self} {
 
   // We "shouldn't" need this, but the typechecker barfs on an expression
@@ -1072,17 +1081,37 @@ extension ${Self} {
   ///     // z.isNaN == true
   ///
   /// - Parameter other: The value to use for the new instance.
+  ${Availability(srcBits)}
+%   if srcBits == 80 and bits == 16:
+  public init(_ other: ${That}) {
+    // If we use the Builtin for this operation, LLVM emits a call to
+    // __truncxfhf, which would be a compiler-rt intrinsic but doesn't exist.
+    // Workaround this by doing conversion in two stages, with the first stage
+    // rounding to odd to avoid double-rounding.
+    var flt = Float(other)
+    if flt.isFinite {
+      if Float80(flt).magnitude > other.magnitude {
+        flt = Float(bitPattern: flt.bitPattern &- (~flt.bitPattern & 1))
+      }
+      else if Float80(flt).magnitude < other.magnitude {
+        flt = Float(bitPattern: flt.bitPattern | 1)
+      }
+    }
+    self = Float16(flt)
+  }
+%   else:
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public init(_ other: ${That}) {
-%   if srcBits > bits:
+%    if srcBits > bits:
     _value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
-%   elif srcBits < bits:
+%    elif srcBits < bits:
     _value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
-%   else:
+%    else:
     _value = other._value
-%   end
+%    end
   }
+%   end
 
   /// Creates a new instance initialized to the given value, if it can be
   /// represented without rounding.
@@ -1099,6 +1128,7 @@ extension ${Self} {
   ///     // z == nil
   ///
   /// - Parameter other: The value to use for the new instance.
+  ${Availability(srcBits)}
   @inlinable
   @inline(__always)
   public init?(exactly other: ${That}) {
@@ -1127,6 +1157,7 @@ extension ${Self} {
 //  tweaking the overload resolution rules, or by removing the other
 //  definitions in the standard lib, or both.
 
+${Availability(bits)}
 extension ${Self} {
   @_transparent
   public static func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
@@ -1161,6 +1192,7 @@ extension ${Self} {
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 
+${Availability(bits)}
 extension ${Self}: Strideable {
   @_transparent
   public func distance(to other: ${Self}) -> ${Self} {
@@ -1177,6 +1209,7 @@ extension ${Self}: Strideable {
 // AnyHashable
 //===----------------------------------------------------------------------===//
 
+% if bits != 16:
 internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   internal typealias Base = ${Self}
   internal let _value: Base
@@ -1253,6 +1286,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
     return true
   }
 }
+% end
 
 //===----------------------------------------------------------------------===//
 // Deprecated operators

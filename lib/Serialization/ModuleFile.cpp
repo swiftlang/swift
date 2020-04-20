@@ -274,6 +274,7 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
         break;
       }
 
+      result.miscVersion = blobData;
       versionSeen = true;
       break;
     }
@@ -594,6 +595,10 @@ public:
   using offset_type = unsigned;
 
   internal_key_type GetInternalKey(external_key_type ID) {
+    return ID;
+  }
+
+  external_key_type GetExternalKey(internal_key_type ID) {
     return ID;
   }
 
@@ -1669,6 +1674,7 @@ ModuleFile::ModuleFile(
       TargetTriple = info.targetTriple;
       CompatibilityVersion = info.compatibilityVersion;
       IsSIB = extInfo->isSIB();
+      MiscVersion = info.miscVersion;
 
       hasValidControlBlock = true;
       break;

@@ -170,6 +170,13 @@ module WinSDK [system] {
     link "ShLwApi.Lib"
   }
 
+  module ShellCore {
+    header "ShellScalingApi.h"
+    export *
+
+    link "shcore.lib"
+  }
+
   module OLE32 {
     header "oaidl.h"
     export *
@@ -194,6 +201,13 @@ module WinSDK [system] {
     export *
 
     link "DnsAPI.Lib"
+  }
+
+  module WinGDI {
+    header "wingdi.h"
+    export *
+
+    link "Gdi32.Lib"
   }
 
   module WinReg {

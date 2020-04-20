@@ -248,6 +248,9 @@ enum class FixKind : uint8_t {
   /// Member shadows a top-level name, such a name could only be accessed by
   /// prefixing it with a module name.
   AddQualifierToAccessTopLevelName,
+
+  /// A warning fix that allows a coercion to perform a force-cast.
+  AllowCoercionToForceCast,
 };
 
 class ConstraintFix {
@@ -291,7 +294,12 @@ public:
   virtual bool diagnose(const Solution &solution,
                         bool asNote = false) const = 0;
 
-  virtual bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const { return false; }
+  using CommonFixesArray =
+      ArrayRef<std::pair<const Solution *, const ConstraintFix *>>;
+
+  virtual bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
+    return false;
+  }
 
   void print(llvm::raw_ostream &Out) const;
 
@@ -847,11 +855,15 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclNameRef member, bool alreadyDiagnosed,
                                         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::DefineMemberBasedOnUse;
+  }
 };
 
 class AllowInvalidMemberRef : public ConstraintFix {
@@ -1117,8 +1129,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
-    return diagnose(solutions.front());
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
   }
 
   static AddMissingArguments *create(ConstraintSystem &cs,
@@ -1161,8 +1173,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
-    return diagnose(solutions.front());
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
   }
 
   /// FIXME(diagnostics): Once `resolveDeclRefExpr` is gone this
@@ -1371,8 +1383,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
-    return diagnose(solutions.front());
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
   }
 
   static DefaultGenericArgument *create(ConstraintSystem &cs,
@@ -1446,8 +1458,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(ArrayRef<Solution> solutions) const override {
-    return diagnose(solutions.front());
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
   }
 
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
@@ -1726,6 +1738,34 @@ public:
 
   static AllowNonClassTypeToConvertToAnyObject *
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
+};
+
+/// A warning fix to maintain compatibility with the following:
+///
+/// \code
+/// func foo(_ arr: [Any]?) {
+///  _ = (arr ?? []) as [NSObject]
+/// }
+/// \endcode
+///
+/// which performs a force-cast of the array's elements, despite being spelled
+/// as a coercion.
+class AllowCoercionToForceCast final : public ContextualMismatch {
+  AllowCoercionToForceCast(ConstraintSystem &cs, Type fromType, Type toType,
+                           ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowCoercionToForceCast, fromType,
+                           toType, locator, /*warning*/ true) {}
+
+public:
+  std::string getName() const {
+    return "allow coercion to be treated as a force-cast";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const;
+
+  static AllowCoercionToForceCast *create(ConstraintSystem &cs, Type fromType,
+                                          Type toType,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

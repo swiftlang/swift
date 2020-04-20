@@ -285,8 +285,8 @@ static llvm::Value *calcInitOffset(swift::irgen::IRGenFunction &IGF,
                                    const swift::irgen::HeapLayout &layout) {
   llvm::Value *offset = nullptr;
   if (i == 0) {
-    auto startoffset = layout.getSize();
-    offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, startoffset.getValue());
+    auto startOffset = layout.getHeaderSize();
+    offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, startOffset.getValue());
     return offset;
   }
   auto &prevElt = layout.getElement(i - 1);
@@ -1239,8 +1239,8 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
                             llvm::Attribute::NoInline);
 
   // Give the function an empty body.
-  auto entry = llvm::BasicBlock::Create(LLVMContext, "", fixLifetime);
-  llvm::ReturnInst::Create(LLVMContext, entry);
+  auto entry = llvm::BasicBlock::Create(getLLVMContext(), "", fixLifetime);
+  llvm::ReturnInst::Create(getLLVMContext(), entry);
   
   FixLifetimeFn = fixLifetime;
   return fixLifetime;

@@ -20,6 +20,15 @@ typedef long long __attribute__((ext_vector_type(8))) ll8;
 typedef unsigned long long __attribute__((ext_vector_type(4))) ull4;
 typedef unsigned long long __attribute__((ext_vector_type(16))) ull16;
 
+// We would prefer to use _Float16 for these typedefs, but that's not
+// yet implemented in clang on x86, so use __fp16 instead as a hack.
+// We want to be able to import both of them anyway.
+typedef __fp16 __attribute__((ext_vector_type(2))) half2;
+typedef __fp16 __attribute__((ext_vector_type(3))) half3;
+typedef __fp16 __attribute__((ext_vector_type(4))) half4;
+typedef __fp16 __attribute__((ext_vector_type(8))) half8;
+typedef __fp16 __attribute__((ext_vector_type(16))) half16;
+typedef __fp16 __attribute__((ext_vector_type(32))) half32;
 typedef float __attribute__((ext_vector_type(2))) float2;
 typedef float __attribute__((ext_vector_type(3))) float3;
 typedef float __attribute__((ext_vector_type(4))) float4;
@@ -58,6 +67,12 @@ ll3 makes_ll3();
 ll8 makes_ll8();
 ull4 makes_ull4();
 ull16 makes_ull16();
+half2 makes_half2();
+half3 makes_half3();
+half4 makes_half4();
+half8 makes_half8();
+half16 makes_half16();
+half32 makes_half32();
 float2 makes_float2();
 float3 makes_float3();
 float4 makes_float4();
@@ -94,6 +109,12 @@ takes_ll3(ll3);
 takes_ll8(ll8);
 takes_ull4(ull4);
 takes_ull16(ull16);
+takes_half2(half2);
+takes_half3(half3);
+takes_half4(half4);
+takes_half8(half8);
+takes_half16(half16);
+takes_half32(half32);
 takes_float2(float2);
 takes_float3(float3);
 takes_float4(float4);

@@ -641,11 +641,13 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
 
 static void
 collectAvailableRenameInfo(const ValueDecl *VD,
+                           Optional<RenameRefInfo> RefInfo,
                            std::vector<UIdent> &RefactoringIds,
                            DelayedStringRetriever &RefactroingNameOS,
                            DelayedStringRetriever &RefactoringReasonOS) {
   std::vector<ide::RenameAvailabiliyInfo> Scratch;
-  for (auto Info : ide::collectRenameAvailabilityInfo(VD, Scratch)) {
+  for (auto Info : ide::collectRenameAvailabilityInfo(VD, RefInfo,
+                                                      Scratch)){
     RefactoringIds.push_back(SwiftLangSupport::
       getUIDForRefactoringKind(Info.Kind));
     RefactroingNameOS.startPiece();
@@ -837,8 +839,13 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   std::vector<UIdent> RefactoringIds;
   DelayedStringRetriever RefactoringNameOS(SS);
   DelayedStringRetriever RefactoringReasonOS(SS);
+
   if (RetrieveRefactoring) {
-    collectAvailableRenameInfo(VD, RefactoringIds, RefactoringNameOS,
+    Optional<RenameRefInfo> RefInfo;
+    if (TheTok.IsRef)
+      RefInfo = {TheTok.SF, TheTok.Loc, TheTok.IsKeywordArgument};
+    collectAvailableRenameInfo(VD, RefInfo,
+                               RefactoringIds, RefactoringNameOS,
                                RefactoringReasonOS);
     collectAvailableRefactoringsOtherThanRename(SF, TheTok, RefactoringIds,
       RefactoringNameOS, RefactoringReasonOS);
@@ -1155,7 +1162,7 @@ class CursorRangeInfoConsumer : public SwiftASTConsumer {
 protected:
   SwiftLangSupport &Lang;
   SwiftInvocationRef ASTInvok;
-  StringRef InputFile;
+  std::string InputFile;
   unsigned Offset;
   unsigned Length;
 
@@ -1174,7 +1181,7 @@ public:
   CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                           SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
                           bool TryExistingAST, bool CancelOnSubsequentRequest)
-    : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile), Offset(Offset),
+    : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile.str()), Offset(Offset),
       Length(Length), TryExistingAST(TryExistingAST),
       CancelOnSubsequentRequest(CancelOnSubsequentRequest) {}
 

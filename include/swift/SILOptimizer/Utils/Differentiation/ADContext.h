@@ -19,6 +19,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 #include "swift/SILOptimizer/Utils/Differentiation/DifferentiationInvoker.h"
@@ -121,6 +122,11 @@ public:
   ASTContext &getASTContext() const { return module.getASTContext(); }
   SILPassManager &getPassManager() const { return passManager; }
   Lowering::TypeConverter &getTypeConverter() { return module.Types; }
+
+  /// Get or create the synthesized file for the given `SILFunction`.
+  /// Used by `LinearMapInfo` for adding generated linear map struct and
+  /// branching trace enum declarations.
+  SynthesizedFileUnit &getOrCreateSynthesizedFile(SILFunction *original);
 
   /// Returns true if the `differentiable_function` instruction worklist is
   /// empty.
