@@ -999,7 +999,11 @@ public:
                                       bool lookThroughApply = true) const;
 
   ConstraintLocator *
-  getConstraintLocator(Expr *anchor, ArrayRef<LocatorPathElt> path = {}) const;
+  getConstraintLocator(const Expr *anchor,
+                       ArrayRef<LocatorPathElt> path = {}) const;
+
+  ConstraintLocator *getConstraintLocator(ConstraintLocator *baseLocator,
+                                          ArrayRef<LocatorPathElt> path) const;
 
   void setExprTypes(Expr *expr) const;
 
