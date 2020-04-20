@@ -243,9 +243,9 @@ bool TempRValueOptPass::collectLoads(
       return false;
 
     auto beginApply = cast<BeginApplyInst>(user);
-    // Register 'eng_apply'/'abort_apply' as loads as well
+    // Register 'end_apply'/'abort_apply' as loads as well
     // 'checkNoSourceModification' should check instructions until
-    // 'end_apply'/'abort_apply' as well
+    // 'end_apply'/'abort_apply'.
     for (auto tokenUses : beginApply->getTokenResult()->getUses()) {
       loadInsts.insert(tokenUses->getUser());
     }
