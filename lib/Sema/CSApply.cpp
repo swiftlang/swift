@@ -6888,6 +6888,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 /// Adjust the given type to become the self type when referring to
 /// the given member.
 static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
+                                    Expr *baseExpr,
                                     AccessSemantics semantics,
                                     DeclContext *UseDC) {
   auto baseObjectTy = baseTy->getWithoutSpecifierType();
@@ -6911,9 +6912,40 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
   bool isSettableFromHere =
       SD->isSettable(UseDC) && SD->isSetterAccessibleFrom(UseDC);
 
-  // If neither the property's getter nor its setter are mutating, the base
-  // can be an rvalue.
-  if (!SD->isGetterMutating()
+
+  // Well actually if I am a PW inside a constructor and base expr is a 'self',
+  // Instead produce an inout.
+  // Do we know the base expression? Yes, plumb it in from the caller.
+  bool NonMutatingSetterPWAssignInsideInit = false;
+  if (!SD->isSetterMutating()) {
+    bool memberIsAWrappedProperty = false;
+    bool baseExprIsAnExprOnSelf = false;
+    bool isInsideConstructor = false;
+    // 1. This is on a PW
+    if (auto *VD = dyn_cast<VarDecl>(member))
+      if (VD->hasAttachedPropertyWrapper())
+        memberIsAWrappedProperty = true;
+
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(UseDC->getAsDecl())) {
+      // 2. This is an assignment on a self.
+      if (baseExpr->isSelfExprOf(AFD))
+        baseExprIsAnExprOnSelf = true;
+      // 3. This is inside a constructor
+      if (isa<ConstructorDecl>(AFD))
+          isInsideConstructor = true;
+    }
+
+    // If neither the property's getter nor its setter are mutating, the base
+    // can be an rvalue.
+    if (memberIsAWrappedProperty &&
+        baseExprIsAnExprOnSelf &&
+        isInsideConstructor) {
+      NonMutatingSetterPWAssignInsideInit = true;
+    }
+  }
+
+  if (!NonMutatingSetterPWAssignInsideInit
+      && !SD->isGetterMutating()
       && (!isSettableFromHere || !SD->isSetterMutating()))
     return baseObjectTy;
 
@@ -6944,7 +6976,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
                                          Type baseTy, ValueDecl *member,
                                          AccessSemantics semantics,
                                          ConstraintLocatorBuilder locator) {
-  Type toType = adjustSelfTypeForMember(baseTy, member, semantics, dc);
+  Type toType = adjustSelfTypeForMember(baseTy, member, expr, semantics, dc);
 
   // If our expression already has the right type, we're done.
   Type fromType = cs.getType(expr);

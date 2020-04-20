@@ -1310,16 +1310,6 @@ namespace {
         if (!wrapperInfo.initializeFromOriginal)
           return false;
 
-        // If we have a nonmutating setter on a value type, the call
-        // captures all of 'self' and we cannot rewrite an assignment
-        // into an initialization.
-        if (!VD->isSetterMutating() &&
-            VD->getDeclContext()->getSelfNominalTypeDecl() &&
-            VD->isInstanceMember() &&
-            !VD->getDeclContext()->getDeclaredInterfaceType()
-                ->hasReferenceSemantics()) {
-          return false;
-        }
 
         // If this property wrapper uses autoclosure in it's initializer,
         // the argument types of the setter and initializer shall be
@@ -1475,6 +1465,16 @@ namespace {
           capturedBase = base.getValue();
         } else {
           capturedBase = base.copy(SGF, loc).forward(SGF);
+        }
+
+        // If the base is a reference and the setter expects a value, load.
+        // This pattern is emitted for property wrappers with a nonmutating
+        // setter, for example.
+        if (capturedBase->getType().isAddress() &&
+            capturedBase->getType().getObjectType() ==
+                setterConv.getSILArgumentType(argIdx)) {
+          capturedBase = SGF.B.createLoad(loc, capturedBase,
+                                          LoadOwnershipQualifier::Trivial);
         }
 
         PartialApplyInst *setterPAI =
