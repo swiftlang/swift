@@ -6,13 +6,13 @@
 
 // RUN: not %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 | %FileCheck -check-prefix=SIMPLE_STATIC %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1-simulator %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-tvos9.0-simulator %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-tvos9.0 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix tvOS_SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target i386-apple-watchos2.0-simulator %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -driver-print-jobs -target i386-apple-watchos2.0 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix watchOS_SIMPLE %s < %t.simple.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
@@ -47,7 +47,7 @@
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1-simulator -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.simple.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS-linker-order %s < %t.simple.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.linux.txt

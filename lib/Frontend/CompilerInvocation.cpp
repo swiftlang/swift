@@ -553,22 +553,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
-  std::string TargetArgScratch;
-
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
-
-    // Backward compatibility hack: infer "simulator" environment for x86
-    // iOS/tvOS/watchOS. The driver takes care of this for the frontend
-    // most of the time, but loading of old .swiftinterface files goes
-    // directly to the frontend.
-    if (tripleInfersSimulatorEnvironment(Target)) {
-      // Set the simulator environment.
-      Target.setEnvironment(llvm::Triple::EnvironmentType::Simulator);
-      TargetArgScratch = Target.str();
-      TargetArg = TargetArgScratch;
-    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_target_variant)) {
