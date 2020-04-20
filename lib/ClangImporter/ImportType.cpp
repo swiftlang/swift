@@ -341,6 +341,11 @@ namespace {
       llvm_unreachable("Invalid BuiltinType.");
     }
 
+    ImportResult VisitExtIntType(const clang::ExtIntType *) {
+      // ExtInt is not supported in Swift.
+      return Type();
+    }
+
     ImportResult VisitPipeType(const clang::PipeType *) {
       // OpenCL types are not supported in Swift.
       return Type();
