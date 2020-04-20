@@ -1,4 +1,3 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop -o %t/output.ir
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
 
 import ExternVar
