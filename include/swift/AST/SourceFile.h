@@ -470,8 +470,7 @@ public:
   /// else reference dependencies will not be registered.
   void createReferencedNameTracker();
 
-  /// Retrieves the name tracker instance corresponding to
-  /// \c EnableRequestBasedIncrementalDependencies
+  /// Retrieves the appropriate referenced name tracker instance.
   ///
   /// If incremental dependencies tracking is not enabled or \c createReferencedNameTracker()
   /// has not been invoked on this source file, the result is \c nullptr.
