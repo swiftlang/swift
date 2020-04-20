@@ -19,8 +19,8 @@ public protocol _PrimitiveAtomicOptional: _PrimitiveAtomic {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension Optional: AtomicProtocol
-where Wrapped: AtomicProtocol, Wrapped._AtomicStorage: _PrimitiveAtomicOptional
+extension Optional: AtomicValue
+where Wrapped: AtomicValue, Wrapped._AtomicStorage: _PrimitiveAtomicOptional
 {
   public typealias _AtomicStorage = Wrapped._AtomicStorage
 

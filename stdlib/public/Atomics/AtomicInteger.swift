@@ -13,7 +13,7 @@
 import Swift
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public protocol AtomicInteger: AtomicProtocol, FixedWidthInteger
+public protocol AtomicInteger: AtomicValue, FixedWidthInteger
 where _AtomicStorage: _PrimitiveAtomicInteger {}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

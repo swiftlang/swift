@@ -13,7 +13,7 @@
 add_swift_target_library(swiftAtomics ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   AtomicInteger.swift
   AtomicMemoryOrderings.swift
-  AtomicProtocol.swift
+  AtomicValue.swift
   AtomicOptional.swift
   PrimitiveAtomic.swift
   UnsafeAtomicLazyReference.swift

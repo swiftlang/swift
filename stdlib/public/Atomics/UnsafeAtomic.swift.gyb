@@ -37,7 +37,7 @@ import Swift
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct UnsafeAtomic<Value: AtomicProtocol> {
+public struct UnsafeAtomic<Value: AtomicValue> {
   @frozen
   public struct Storage {
     @usableFromInline

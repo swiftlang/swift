@@ -7,7 +7,7 @@ import Atomics
 let suite = TestSuite("AtomicRawRepresentable")
 defer { runAllTests() }
 
-enum State: Int, AtomicProtocol {
+enum State: Int, AtomicValue {
   case starting
   case running
   case stopped

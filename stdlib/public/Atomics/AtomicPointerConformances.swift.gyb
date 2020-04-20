@@ -81,7 +81,7 @@ extension ${swiftType} {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension ${swiftType}: AtomicProtocol {
+extension ${swiftType}: AtomicValue {
   @inlinable @inline(__always)
   public static func _prepareAtomicStorage(for value: Self) -> _AtomicStorage {
     return _encodeAtomicStorage(for: value)

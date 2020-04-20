@@ -13,7 +13,7 @@
 import Swift
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public protocol AtomicProtocol {
+public protocol AtomicValue {
   associatedtype _AtomicStorage: _PrimitiveAtomic
 
   /// Convert `value` to its atomic storage representation. Note that the act of
@@ -31,7 +31,7 @@ public protocol AtomicProtocol {
   /// For example, here is how these methods can be used to create a temporary
   /// atomic variable for the duration of a closure call:
   ///
-  ///     extension AtomicProtocol {
+  ///     extension AtomicValue {
   ///        mutating func withTemporaryAtomicValue(
   ///           _ body: (UnsafeAtomic<Self>) -> Void
   ///        ) {
@@ -72,9 +72,9 @@ public protocol AtomicProtocol {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicProtocol where
+extension AtomicValue where
   Self: RawRepresentable,
-  RawValue: AtomicProtocol,
+  RawValue: AtomicValue,
   _AtomicStorage == RawValue._AtomicStorage
 {
   @inlinable
@@ -107,7 +107,7 @@ extension AtomicProtocol where
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicProtocol where _AtomicStorage == Self {
+extension AtomicValue where _AtomicStorage == Self {
   @_transparent @_alwaysEmitIntoClient
   public static func _prepareAtomicStorage(for value: __owned Self) -> Self {
     value
