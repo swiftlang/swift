@@ -2676,13 +2676,13 @@ static std::string getDefaultBaselineDir(const char *Main) {
   llvm::sys::path::remove_filename(BaselineDir); // Remove /swift-api-digester
   llvm::sys::path::remove_filename(BaselineDir); // Remove /bin
   llvm::sys::path::append(BaselineDir, "lib", "swift", "FrameworkABIBaseline");
-  return BaselineDir.str();
+  return BaselineDir.str().str();
 }
 
 static std::string getEmptyBaselinePath(const char *Main) {
   llvm::SmallString<128> BaselinePath(getDefaultBaselineDir(Main));
   llvm::sys::path::append(BaselinePath, "nil.json");
-  return BaselinePath.str();
+  return BaselinePath.str().str();
 }
 
 static StringRef getBaselineFilename(llvm::Triple Triple) {
@@ -2710,13 +2710,13 @@ static std::string getDefaultBaselinePath(const char *Main, StringRef Module,
   // Look for ABI or API baseline
   llvm::sys::path::append(BaselinePath, ABI? "ABI": "API");
   llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
-  return BaselinePath.str();
+  return BaselinePath.str().str();
 }
 
 static std::string getCustomBaselinePath(llvm::Triple Triple) {
   llvm::SmallString<128> BaselinePath(options::BaselineDirPath);
   llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
-  return BaselinePath.str();
+  return BaselinePath.str().str();
 }
 
 static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
