@@ -2759,6 +2759,9 @@ MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
+  if (auto MT = T->getAs<MetatypeType>())
+    return MT;
+
   unsigned reprKey;
   if (Repr.hasValue())
     reprKey = static_cast<unsigned>(*Repr) + 1;

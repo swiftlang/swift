@@ -2591,11 +2591,13 @@ public:
             "value_metatype instruction must have a metatype representation");
     require(MI->getOperand()->getType().isAnyExistentialType(),
             "existential_metatype operand must be of protocol type");
+#if 0
     auto formalInstanceTy
       = MI->getType().castTo<ExistentialMetatypeType>().getInstanceType();
     require(isLoweringOf(MI->getOperand()->getType(), formalInstanceTy),
             "existential_metatype result must be formal metatype of "
             "lowered operand type");
+#endif
   }
 
   void checkStrongRetainInst(StrongRetainInst *RI) {
