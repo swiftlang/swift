@@ -4465,10 +4465,7 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 // - mapTypeIntoContext will be a nop.
 ProtocolConformanceRef
 ModuleDecl::conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol) {
-
-  auto flags = ConformanceCheckFlags::SuppressDependencyTracking;
-
-  return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this, flags);
+  return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this, None);
 }
 
 ProtocolConformanceRef TypeChecker::LookUpConformance::
