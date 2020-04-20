@@ -132,11 +132,6 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<DebugValueInst>(inst) || isa<DebugValueAddrInst>(inst))
     return false;
 
-  // These invalidate enums so "write" memory, but that is not an essential
-  // operation so we can remove these if they are trivially dead.
-  if (isa<UncheckedTakeEnumDataAddrInst>(inst))
-    return true;
-
   if (!inst->mayHaveSideEffects())
     return true;
 

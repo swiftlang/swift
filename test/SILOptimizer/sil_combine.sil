@@ -3706,3 +3706,16 @@ bb0(%0 : $@thick SpecialEnum.Type):
   %4 = struct $Bool (%3 : $Builtin.Int1)
   return %4 : $Bool
 }
+
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_not_dead : $@convention(thin) (@in FakeOptional<B>) -> ()
+// CHECK: bb0(%0 : $*FakeOptional<B>):
+// CHECK-NEXT: unchecked_take_enum_data_addr
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL end sil function 'unchecked_take_enum_data_addr_not_dead'
+sil [ossa] @unchecked_take_enum_data_addr_not_dead : $@convention(thin) (@in FakeOptional<B>) -> () {
+bb0(%0 : $*FakeOptional<B>):
+  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
+  %4 = tuple ()
+  return %4 : $()
+}
