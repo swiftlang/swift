@@ -198,15 +198,6 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
   PrimaryBufferIDs.insert(BufID);
 }
 
-void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
-  assert(MainModule && "main module not created yet");
-  PrimarySourceFiles.push_back(SF);
-  SF->enableInterfaceHash();
-  SF->createReferencedNameTracker();
-  if (SF->getBufferID().hasValue())
-    recordPrimaryInputBuffer(SF->getBufferID().getValue());
-}
-
 bool CompilerInstance::setUpASTContextIfNeeded() {
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::CompileModuleFromInterface) {
@@ -966,8 +957,11 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
                  Invocation.getLangOptions().BuildSyntaxTree, opts);
   MainModule->addFile(*inputFile);
 
-  if (isPrimary)
-    recordPrimarySourceFile(inputFile);
+  if (isPrimary) {
+    PrimarySourceFiles.push_back(inputFile);
+    inputFile->enableInterfaceHash();
+    inputFile->createReferencedNameTracker();
+  }
 
   if (bufferID == SourceMgr.getCodeCompletionBufferID()) {
     assert(!CodeCompletionFile && "Multiple code completion files?");
