@@ -42,11 +42,8 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
   auto *module = ModuleDecl::create(stdlibID, Ctx);
   Ctx.LoadedModules[stdlibID] = module;
 
-  using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
   FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
-                                        /*buffer*/None,
-                                        ImplicitModuleImportKind::None,
-                                        /*keeps token*/false);
+                                        /*buffer*/ None, /*keeps token*/ false);
   module->addFile(*FileForLookups);
 
   if (optionals == DeclareOptionalTypes) {

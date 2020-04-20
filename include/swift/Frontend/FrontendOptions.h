@@ -33,6 +33,9 @@ namespace swift {
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
 
+  /// A list of arbitrary modules to import and make implicitly visible.
+  std::vector<std::string> ImplicitImportModuleNames;
+
 public:
   FrontendInputsAndOutputs InputsAndOutputs;
 
@@ -43,9 +46,6 @@ public:
                          llvm::function_ref<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
-
-  /// A list of arbitrary modules to import and make implicitly visible.
-  std::vector<std::string> ImplicitImportModuleNames;
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
@@ -321,6 +321,12 @@ public:
   getPrimarySpecificPathsForAtMostOnePrimary() const;
   const PrimarySpecificPaths &
       getPrimarySpecificPathsForPrimary(StringRef) const;
+
+  /// Retrieves the list of arbitrary modules to import and make implicitly
+  /// visible.
+  ArrayRef<std::string> getImplicitImportModuleNames() const {
+    return ImplicitImportModuleNames;
+  }
 
 private:
   static bool canActionEmitDependencies(ActionType);
