@@ -697,7 +697,7 @@ namespace {
     void printLineEllipsis(raw_ostream &Out) {
       Out.changeColor(ColoredStream::Colors::CYAN, true);
       Out << llvm::formatv("{0}...\n",
-                           llvm::fmt_repeat(" ", getLineNumberIndent()));
+                           llvm::fmt_repeat(" ", getPreferredLineNumberIndent()));
       Out.resetColor();
     }
 
