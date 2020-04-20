@@ -1147,8 +1147,15 @@ swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
-    if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha))
-      return tryDevirtualizeClassMethod(fas, instance, cd, ore);
+    if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha)) {
+      // Update the classDecl, because we are stripping casts more aggressively
+      // in getInstanceWithExactDynamicType than in stripUpCasts.
+      CanType classType = getSelfInstanceType(instance->getType().getASTType());
+      // This should never be null - make the check just to be on the safe side.
+      if (ClassDecl *cd = classType.getClassOrBoundGenericClass())
+        return tryDevirtualizeClassMethod(fas, instance, cd, ore);
+      return {ApplySite(), false};
+    }
 
     if (auto exactTy = getExactDynamicType(cmi->getOperand(), cha)) {
       if (exactTy == cmi->getOperand()->getType())
@@ -1207,8 +1214,11 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
-    if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha))
-      return canDevirtualizeClassMethod(applySite, cd);
+    if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha)) {
+      CanType classType = getSelfInstanceType(instance->getType().getASTType());
+      ClassDecl *cd = classType.getClassOrBoundGenericClass();
+      return cd && canDevirtualizeClassMethod(applySite, cd);
+    }
 
     if (auto exactTy = getExactDynamicType(cmi->getOperand(), cha)) {
       if (exactTy == cmi->getOperand()->getType())
