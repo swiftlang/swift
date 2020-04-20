@@ -929,10 +929,6 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   SourceFile &MainFile =
       MainModule->getMainSourceFile(Invocation.getSourceFileKind());
 
-  auto &Diags = MainFile.getASTContext().Diags;
-  auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  Diags.setSuppressWarnings(DidSuppressWarnings || !mainIsPrimary);
-
   // For a primary, perform type checking if needed. Otherwise, just do import
   // resolution.
   if (mainIsPrimary && LimitStage >= SourceFile::TypeChecked) {
@@ -947,8 +943,6 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     SILParserState SILContext(TheSILModule.get());
     parseSourceFileSIL(MainFile, &SILContext);
   }
-
-  Diags.setSuppressWarnings(DidSuppressWarnings);
 
   if (mainIsPrimary && !Context->hadError() &&
       Invocation.getFrontendOptions().DebuggerTestingTransform) {
