@@ -7802,9 +7802,10 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return SolutionKind::Unsolved;
   };
 
-  // When locator points to a KeyPathDynamicMemberLookup, skip the
+  // When locator points to a KeyPathDynamicMemberLookup, reject the
   // key path application.
-  if (locator.getBaseLocator()->isForKeyPathDynamicMemberLookup()) {
+  auto last = locator.last();
+  if (last && last->isKeyPathDynamicMember()) {
     return SolutionKind::Error;
   }
   
