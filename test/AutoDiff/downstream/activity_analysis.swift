@@ -1,3 +1,5 @@
+// TODO: Delete when https://github.com/apple/swift/pull/31114 is available in this branch.
+
 // RUN: %target-swift-emit-sil -verify -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s
 // REQUIRES: asserts
 
