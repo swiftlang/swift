@@ -105,6 +105,7 @@ ErrorTests.test("default domain and code") {
 
 enum SillyError: Error { case JazzHands }
 
+#if !os(WASI)
 ErrorTests.test("try!")
   .skip(.custom({ _isFastAssertConfiguration() },
                 reason: "trap is not guaranteed to happen in -Ounchecked"))
@@ -127,6 +128,7 @@ ErrorTests.test("try!/location")
     expectCrashLater()
     let _: () = try! { throw SillyError.JazzHands }()
 }
+#endif
 
 ErrorTests.test("try?") {
   var value = try? { () throws -> Int in return 1 }()
@@ -191,6 +193,7 @@ ErrorTests.test("test dealloc empty error box") {
   }
 }
 
+#if !os(WASI)
 var errors: [Error] = []
 ErrorTests.test("willThrow") {
   if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
@@ -215,6 +218,7 @@ ErrorTests.test("willThrow") {
     expectEqual(SillyError.self, type(of: errors.last!))
   }
 }
+#endif
 
 runAllTests()
 

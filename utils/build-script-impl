@@ -116,6 +116,14 @@ KNOWN_SETTINGS=(
     darwin-toolchain-version                      ""                "Version for xctoolchain info plist and installer pkg"
     darwin-xcrun-toolchain                        "default"         "the name of the toolchain to use on Darwin"
 
+    ## WebAssembly/WASI Options
+    wasi-sdk                                      ""                "An absolute path to the WASI SDK that will be used as a libc implementation for Wasm builds"
+    wasi-icu-uc                                   ""                "Path to libicuuc.so"
+    wasi-icu-uc-include                           ""                "Path to a directory containing headers for libicuuc"
+    wasi-icu-i18n                                 ""                "Path to libicui18n.so"
+    wasi-icu-i18n-include                         ""                "Path to a directory containing headers libicui18n"
+    wasi-icu-data                                 ""                "Path to libicudata.so"
+
     ## Build Types for Components
     swift-stdlib-build-type                       "Debug"           "the CMake build variant for Swift"
 
@@ -136,6 +144,7 @@ KNOWN_SETTINGS=(
     skip-build-osx                                ""                "set to skip building Swift stdlibs for OS X"
     skip-build-tvos-device                        ""                "set to skip building Swift stdlibs for tvOS devices (i.e. build simulators only)"
     skip-build-tvos-simulator                     ""                "set to skip building Swift stdlibs for tvOS simulators (i.e. build devices only)"
+    skip-build-wasm                               ""                "set to skip building Swift stdlibs for WebAssembly"
     skip-build-watchos-device                     ""                "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator                  ""                "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
 
@@ -153,6 +162,8 @@ KNOWN_SETTINGS=(
     skip-test-osx                                 ""                "set to skip testing Swift stdlibs for OS X"
     skip-test-tvos-host                           ""                "set to skip testing the host parts of the tvOS toolchain"
     skip-test-tvos-simulator                      ""                "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
+    skip-test-wasm                                ""                "set to skip testing Swift stdlibs for WebAssembly"
+    skip-test-wasm-host                           ""                "set to skip testing the host parts of the WebAssembly toolchain"
     skip-test-watchos-host                        ""                "set to skip testing the host parts of the watchOS toolchain"
     skip-test-watchos-simulator                   ""                "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-benchmarks                          ""                "set to skip running Swift Benchmark Suite"
@@ -427,7 +438,8 @@ function verify_host_is_supported() {
       | watchsimulator-i386     \
       | watchos-armv7k          \
       | android-armv7           \
-      | android-aarch64)
+      | android-aarch64         \
+      | wasi-wasm32)
         ;;
       *)
         echo "Unknown host tools target: ${host}"
@@ -1202,6 +1214,9 @@ function common_cross_c_flags() {
         watchos-*)
             echo -n " -arch ${arch}  -mwatchos-version-min=${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             ;;
+        wasi-wasm32)
+            echo -n " -arch wasm32"
+            ;;
     esac
 
     local build_type=$2
@@ -1587,6 +1602,18 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_DATA:STRING="${ANDROID_ICU_DATA}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
                         -DSWIFT_SDK_ANDROID_ARCHITECTURES:STRING="${ANDROID_ARCH}"
+                    )
+                fi
+
+                if [[ ! "${SKIP_BUILD_WASM}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_WASI_SDK_PATH:STRING="${WASI_SDK}"
+                        -DSWIFT_WASI_wasm32_ICU_UC:STRING="${WASI_ICU_UC}"
+                        -DSWIFT_WASI_wasm32_ICU_UC_INCLUDE:STRING="${WASI_ICU_UC_INCLUDE}"
+                        -DSWIFT_WASI_wasm32_ICU_I18N:STRING="${WASI_ICU_I18N}"
+                        -DSWIFT_WASI_wasm32_ICU_I18N_INCLUDE:STRING="${WASI_ICU_I18N_INCLUDE}"
+                        -DSWIFT_WASI_wasm32_ICU_DATA:STRING="${WASI_ICU_DATA}"
                     )
                 fi
 

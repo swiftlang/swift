@@ -637,6 +637,7 @@ llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 //// define what these will be.
 /// \returns the demangled name. Returns nullptr if the input String is not a
 /// Swift mangled name.
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 char *swift_demangle(const char *mangledName,
                      size_t mangledNameLength,

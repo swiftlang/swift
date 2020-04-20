@@ -284,6 +284,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "WASI")
+    list(APPEND result "-D_WASI_EMULATED_MMAN")
+  endif()
+
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
     if(${CFLAGS_ARCH} STREQUAL x86_64)
       # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
@@ -1410,6 +1414,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_HAIKU
 #   Swift modules this library depends on when built for Haiku.
 #
+# SWIFT_MODULE_DEPENDS_WASI
+#   Swift modules this library depends on when built for WASI.
+#
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
 #
@@ -1527,6 +1534,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_OSX
         SWIFT_MODULE_DEPENDS_TVOS
         SWIFT_MODULE_DEPENDS_WATCHOS
+	    SWIFT_MODULE_DEPENDS_WASI
         SWIFT_MODULE_DEPENDS_WINDOWS
         SWIFT_MODULE_DEPENDS_FROM_SDK
         TARGET_SDKS
@@ -1691,6 +1699,9 @@ function(add_swift_target_library name)
     elseif(${sdk} STREQUAL HAIKU)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_HAIKU})
+    elseif(${sdk} STREQUAL WASI)
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WASI})
     elseif(${sdk} STREQUAL WINDOWS)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WINDOWS})

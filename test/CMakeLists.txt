@@ -95,7 +95,8 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "OPENBSD") OR
      ("${SDK}" STREQUAL "ANDROID") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
-     ("${SDK}" STREQUAL "HAIKU"))
+     ("${SDK}" STREQUAL "HAIKU") OR
+     ("${SDK}" STREQUAL "WASI"))
     # No extra dependencies.
   else()
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
@@ -242,7 +243,7 @@ foreach(SDK ${SWIFT_SDKS})
     set(test_dependencies)
     get_test_dependencies("${SDK}" test_dependencies)
 
-    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+    if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS AND NOT ${SDK} STREQUAL "WASI")
       # NOTE create a stub BlocksRuntime library that can be used for the
       # reflection tests
       file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
@@ -275,7 +276,11 @@ _Block_release(void) { }\n")
         # doesn't need to be build for macCatalyst.
         list(APPEND test_dependencies
             "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
-      else()
+
+      endif()
+
+      if(NOT "${SDK}" STREQUAL "WASI")
+        # wasm: Avoid to build swift-reflection-test because it uses unsupported linker flags for wasm-ld
         list(APPEND test_dependencies
             "swift-reflection-test${VARIANT_SUFFIX}_signed")
       endif()

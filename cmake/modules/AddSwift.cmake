@@ -437,6 +437,8 @@ function(_add_host_variant_link_flags)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
       list(APPEND library_search_directories ${path})
     endforeach()
+  elseif("${LFLAGS_SDK}" STREQUAL "WASI")
+    list(APPEND result "-Wl,wasi-emulated-mman")
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not
@@ -662,6 +664,12 @@ function(_add_swift_host_library_single target)
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     if(libkind STREQUAL SHARED)
       list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+  endif()
+  # Double-check that we're not trying to build a dynamic library for WASM.
+  if(SWIFTLIB_SINGLE_SDK MATCHES WASM)
+    if(libkind STREQUAL SHARED)
+      message(FATAL_ERROR "WASM does not support shared libraries.")
     endif()
   endif()
   _add_host_variant_link_flags(

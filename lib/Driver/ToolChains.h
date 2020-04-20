@@ -110,6 +110,23 @@ public:
                                       bool shared = true) const override;
 };
 
+class LLVM_LIBRARY_VISIBILITY WebAssembly : public ToolChain {
+protected:
+  InvocationInfo constructInvocation(const AutolinkExtractJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const StaticLinkJobAction &job,
+                                     const JobContext &context) const override;
+
+public:
+  WebAssembly(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  ~WebAssembly() = default;
+  std::string sanitizerRuntimeLibName(StringRef Sanitizer,
+                                      bool shared = true) const override;
+};
+
+
 class LLVM_LIBRARY_VISIBILITY GenericUnix : public ToolChain {
 protected:
   InvocationInfo constructInvocation(const InterpretJobAction &job,

@@ -211,6 +211,8 @@ function(_add_target_variant_swift_compile_flags
     foreach(path IN LISTS ${arch}_swift_include)
       list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
     endforeach()
+  elseif("${sdk}" STREQUAL "WASI")
+    list(APPEND result "-Xcc" "-D_WASI_EMULATED_MMAN")
   endif()
 
   if(NOT BUILD_STANDALONE)

@@ -265,31 +265,17 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
 std::unique_ptr<ToolChain>
 Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
 
-  if (const Arg *A = ArgList.getLastArg(options::OPT_target)) {
+  if (const Arg *A = ArgList.getLastArg(options::OPT_target))
     DefaultTargetTriple = llvm::Triple::normalize(A->getValue());
-  }
 
-  llvm::Triple target(DefaultTargetTriple);
-
-  // Backward compatibility hack: infer "simulator" environment for x86
-  // iOS/tvOS/watchOS.
-  if (tripleInfersSimulatorEnvironment(target)) {
-    // Set the simulator environment.
-    target.setEnvironment(llvm::Triple::EnvironmentType::Simulator);
-
-    auto newTargetTriple = target.normalize();
-    Diags.diagnose(SourceLoc(), diag::warning_inferred_simulator_target,
-                   DefaultTargetTriple, newTargetTriple);
-
-    DefaultTargetTriple = newTargetTriple;
-  }
+  const llvm::Triple target(DefaultTargetTriple);
 
   switch (target.getOS()) {
+  case llvm::Triple::Darwin:
+  case llvm::Triple::MacOSX:
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
-  case llvm::Triple::WatchOS:
-  case llvm::Triple::Darwin:
-  case llvm::Triple::MacOSX: {
+  case llvm::Triple::WatchOS: {
     Optional<llvm::Triple> targetVariant;
     if (const Arg *A = ArgList.getLastArg(options::OPT_target_variant))
       targetVariant = llvm::Triple(llvm::Triple::normalize(A->getValue()));
@@ -311,7 +297,7 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::Haiku:
     return std::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::WASI:
-    return std::make_unique<toolchains::GenericUnix>(*this, target);
+    return std::make_unique<toolchains::WebAssembly>(*this, target);
   default:
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList.getLastArg(options::OPT_target)->getValue());
@@ -1473,13 +1459,18 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_Object;
       break;
 
-    case options::OPT_emit_library:
-      OI.LinkAction = Args.hasArg(options::OPT_static) ?
-                      LinkKind::StaticLibrary :
-                      LinkKind::DynamicLibrary;
+    case options::OPT_emit_library: {
+      // WebAssembly only support static library
+      if (TC.getTriple().isOSBinFormatWasm()) {
+        OI.LinkAction = LinkKind::StaticLibrary;
+      } else {
+        OI.LinkAction = Args.hasArg(options::OPT_static) ?
+                        LinkKind::StaticLibrary :
+                        LinkKind::DynamicLibrary;
+      }
       OI.CompilerOutputType = file_types::TY_Object;
       break;
-
+    }
     case options::OPT_static:
       break;
 
