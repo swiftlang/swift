@@ -166,10 +166,17 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
 }
 
 ConstraintLocator *
-Solution::getConstraintLocator(Expr *anchor,
+Solution::getConstraintLocator(const Expr *anchor,
                                ArrayRef<LocatorPathElt> path) const {
   auto &cs = getConstraintSystem();
-  return cs.getConstraintLocator(anchor, path);
+  return cs.getConstraintLocator(const_cast<Expr *>(anchor), path);
+}
+
+ConstraintLocator *
+Solution::getConstraintLocator(ConstraintLocator *base,
+                               ArrayRef<LocatorPathElt> path) const {
+  auto &cs = getConstraintSystem();
+  return cs.getConstraintLocator(base, path);
 }
 
 /// Return the implicit access kind for a MemberRefExpr with the
