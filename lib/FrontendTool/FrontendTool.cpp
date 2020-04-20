@@ -1069,11 +1069,13 @@ static bool writeLdAddCFileIfNeeded(const CompilerInvocation &Invocation,
   return false;
 }
 
-static bool performCompileStepsPostSILGen(
-    CompilerInstance &Instance, const CompilerInvocation &Invocation,
-    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
-    ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
-    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer);
+static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
+                                          const CompilerInvocation &Invocation,
+                                          std::unique_ptr<SILModule> SM,
+                                          ModuleOrSourceFile MSF,
+                                          const PrimarySpecificPaths &PSPs,
+                                          bool moduleIsPublic, int &ReturnValue,
+                                          FrontendObserver *observer);
 
 static bool
 performCompileStepsPostSema(const CompilerInvocation &Invocation,
@@ -1085,28 +1087,19 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForAtMostOnePrimary();
     return performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
-                                         /*ASTGuaranteedToCorrespondToSIL=*/false,
                                          mod, PSPs, moduleIsPublic,
                                          ReturnValue, observer);
   }
 
   const SILOptions &SILOpts = Invocation.getSILOptions();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
-  auto fileIsSIB = [](const FileUnit *File) -> bool {
-    auto SASTF = dyn_cast<SerializedASTFile>(File);
-    return SASTF && SASTF->isSIB();
-  };
-
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.
     auto SM = performSILGeneration(mod, Instance.getSILTypes(), SILOpts);
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
-    bool astGuaranteedToCorrespondToSIL =
-        llvm::none_of(mod->getFiles(), fileIsSIB);
     return performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
-                                         astGuaranteedToCorrespondToSIL,
                                          mod, PSPs, moduleIsPublic,
                                          ReturnValue, observer);
   }
@@ -1120,7 +1113,6 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
       result |= performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
-                                              /*ASTGuaranteedToCorrespondToSIL*/true,
                                               PrimaryFile, PSPs, moduleIsPublic,
                                               ReturnValue, observer);
     }
@@ -1139,7 +1131,6 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         result |= performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
-                                                !fileIsSIB(SASTF),
                                                 mod, PSPs, moduleIsPublic,
                                                 ReturnValue, observer);
       }
@@ -1422,44 +1413,76 @@ static bool processCommandLineAndRunImmediately(const CompilerInvocation &Invoca
 
 static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
                                 ModuleOrSourceFile MSF,
-                                bool astGuaranteedToCorrespondToSIL,
                                 const llvm::Module &IRModule) {
-  if (!astGuaranteedToCorrespondToSIL ||
-      !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
-    return false;
-    
-  if (Invocation.getSILOptions().CrossModuleOptimization)
-    return false;
+  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+  const bool canPerformTBDValidation = [&]() {
+    // If the user has requested we skip validation, honor it.
+    if (mode == FrontendOptions::TBDValidationMode::None) {
+      return false;
+    }
 
-  const auto &frontendOpts = Invocation.getFrontendOptions();
-  auto mode = frontendOpts.ValidateTBDAgainstIR;
-  // Ensure all cases are covered by using a switch here.
-  switch (mode) {
-  case FrontendOptions::TBDValidationMode::Default:
+    // Cross-module optimization does not yet support TBD validation.
+    if (Invocation.getSILOptions().CrossModuleOptimization) {
+      return false;
+    }
+
+    // If we can't validate the given input file, bail early. This covers cases
+    // like passing raw SIL as a primary file.
+    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind())) {
+      return false;
+    }
+
+    // Modules with SIB files cannot be validated. This is because SIB files
+    // may have serialized hand-crafted SIL definitions that are invisible to
+    // TBDGen as it is an AST-only traversal.
+    if (auto *mod = MSF.dyn_cast<ModuleDecl *>()) {
+      return llvm::none_of(mod->getFiles(), [](const FileUnit *File) -> bool {
+        auto SASTF = dyn_cast<SerializedASTFile>(File);
+        return SASTF && SASTF->isSIB();
+      });
+    }
+
+    // "Default" mode's behavior varies if using a debug compiler.
+    if (mode == FrontendOptions::TBDValidationMode::Default) {
 #ifndef NDEBUG
-    // With a debug compiler, we do some validation by default.
-    mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
-    break;
+      // With a debug compiler, we do some validation by default.
+      return true;
 #else
-    // Otherwise, the default is to do nothing.
-    LLVM_FALLTHROUGH;
+      // Otherwise, the default is to do nothing.
+      return false;
 #endif
-  case FrontendOptions::TBDValidationMode::None:
+    }
+
+    
+    return true;
+  }();
+
+  if (!canPerformTBDValidation) {
     return false;
-  case FrontendOptions::TBDValidationMode::All:
-  case FrontendOptions::TBDValidationMode::MissingFromTBD:
-    break;
   }
 
-  const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
-  // We should ignore embeded symbols from external modules for validation.
+  const bool diagnoseExtraSymbolsInTBD = [mode]() {
+    switch (mode) {
+    case FrontendOptions::TBDValidationMode::None:
+      llvm_unreachable("Handled Above!");
+    case FrontendOptions::TBDValidationMode::Default:
+    case FrontendOptions::TBDValidationMode::MissingFromTBD:
+      return false;
+    case FrontendOptions::TBDValidationMode::All:
+      return true;
+    }
+  }();
+
   TBDGenOptions Opts = Invocation.getTBDGenOptions();
+  // Ignore embedded symbols from external modules for validation to remove
+  // noise from e.g. statically-linked libraries.
   Opts.embedSymbolsFromModules.clear();
-  return MSF.is<SourceFile *>()
-             ? validateTBD(MSF.get<SourceFile *>(), IRModule,
-                           Opts, allSymbols)
-             : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
-                           Opts, allSymbols);
+  if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
+    return validateTBD(SF, IRModule, Opts, diagnoseExtraSymbolsInTBD);
+  } else {
+    return validateTBD(MSF.get<ModuleDecl *>(), IRModule, Opts,
+                       diagnoseExtraSymbolsInTBD);
+  }
 }
 
 enum class DeallocatableResources {
@@ -1547,11 +1570,13 @@ static void collectLinkerDirectives(const CompilerInvocation &Invocation,
     enumeratePublicSymbols(MSF.get<ModuleDecl*>(), Symbols, tbdOpts);
 }
 
-static bool performCompileStepsPostSILGen(
-    CompilerInstance &Instance, const CompilerInvocation &Invocation,
-    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
-    ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
-    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer) {
+static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
+                                          const CompilerInvocation &Invocation,
+                                          std::unique_ptr<SILModule> SM,
+                                          ModuleOrSourceFile MSF,
+                                          const PrimarySpecificPaths &PSPs,
+                                          bool moduleIsPublic, int &ReturnValue,
+                                          FrontendObserver *observer) {
 
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -1690,8 +1715,7 @@ static bool performCompileStepsPostSILGen(
   if (!IRModule)
     return HadError;
 
-  if (validateTBDIfNeeded(Invocation, MSF, astGuaranteedToCorrespondToSIL,
-                          *IRModule.getModule()))
+  if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
     return true;
 
   return generateCode(Invocation, Instance, OutputFilename,
