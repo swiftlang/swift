@@ -760,7 +760,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
-  if (Args.hasArg(OPT_warnings_as_errors))
+  if (Args.hasFlag(options::OPT_warnings_as_errors,
+                   options::OPT_no_warnings_as_errors, false))
     Opts.ExtraArgs.push_back("-Werror");
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
@@ -845,7 +846,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
-  Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
+  Opts.WarningsAsErrors = Args.hasFlag(options::OPT_warnings_as_errors,
+                                       options::OPT_no_warnings_as_errors,
+                                       false);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
   Opts.EnableExperimentalFormatting |=

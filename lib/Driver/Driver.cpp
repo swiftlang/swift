@@ -140,7 +140,8 @@ static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
 static void validateWarningControlArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
   if (args.hasArg(options::OPT_suppress_warnings) &&
-      args.hasArg(options::OPT_warnings_as_errors)) {
+      args.hasFlag(options::OPT_warnings_as_errors,
+                   options::OPT_no_warnings_as_errors, false)) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-warnings-as-errors", "-suppress-warnings");
   }
