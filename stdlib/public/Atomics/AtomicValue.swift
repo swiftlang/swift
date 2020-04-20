@@ -77,28 +77,28 @@ extension AtomicValue where
   RawValue: AtomicValue,
   _AtomicStorage == RawValue._AtomicStorage
 {
-  @inlinable
+  @_transparent @_alwaysEmitIntoClient
   public static func _prepareAtomicStorage(
     for value: __owned Self
   ) -> RawValue._AtomicStorage {
     return RawValue._prepareAtomicStorage(for: value.rawValue)
   }
 
-  @inlinable
+  @_transparent @_alwaysEmitIntoClient
   public static func _disposeAtomicStorage(
     _ storage: inout RawValue._AtomicStorage
   ) -> Self {
     return Self(rawValue: RawValue._disposeAtomicStorage(&storage))!
   }
 
-  @inlinable
+  @_transparent @_alwaysEmitIntoClient
   public static func _encodeAtomicStorage(
     for value: __owned Self
   ) -> RawValue._AtomicStorage {
     return RawValue._encodeAtomicStorage(for: value.rawValue)
   }
 
-  @inlinable
+  @_transparent @_alwaysEmitIntoClient
   public static func _decodeAtomicStorage(
     _ storage: __owned RawValue._AtomicStorage
   ) -> Self {

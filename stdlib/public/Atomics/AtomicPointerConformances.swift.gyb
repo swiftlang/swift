@@ -82,19 +82,19 @@ extension ${swiftType} {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension ${swiftType}: AtomicValue {
-  @inlinable @inline(__always)
+  @_transparent @_alwaysEmitIntoClient
   public static func _prepareAtomicStorage(for value: Self) -> _AtomicStorage {
     return _encodeAtomicStorage(for: value)
   }
 
-  @inlinable @inline(__always)
+  @_transparent @_alwaysEmitIntoClient
   public static func _disposeAtomicStorage(
     _ storage: inout _AtomicStorage
   ) -> Self {
     return _decodeAtomicStorage(storage)
   }
 
-  @inlinable @inline(__always)
+  @_transparent @_alwaysEmitIntoClient
   public static func _encodeAtomicStorage(for value: Self) -> _AtomicStorage {
     % if swiftType == "Unmanaged":
     return _AtomicStorage(
@@ -104,7 +104,7 @@ extension ${swiftType}: AtomicValue {
     % end
   }
 
-  @inlinable @inline(__always)
+  @_transparent @_alwaysEmitIntoClient
   public static func _decodeAtomicStorage(_ storage: _AtomicStorage) -> Self {
     % if swiftType == "Unmanaged":
     let raw = UnsafeRawPointer(bitPattern: Int(storage._word))
