@@ -152,7 +152,7 @@ CompilerInvocation::getPrivateModuleInterfaceOutputPathForWholeModule() const {
 }
 
 SerializationOptions CompilerInvocation::computeSerializationOptions(
-    const SupplementaryOutputPaths &outs, bool moduleIsPublic) const {
+    const SupplementaryOutputPaths &outs, const ModuleDecl *module) const {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
@@ -171,7 +171,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   // so only serialize them if the module isn't going to be shipped to
   // the public.
   serializationOpts.SerializeOptionsForDebugging =
-      opts.SerializeOptionsForDebugging.getValueOr(!moduleIsPublic);
+      opts.SerializeOptionsForDebugging.getValueOr(
+          !isModuleExternallyConsumed(module));
 
   return serializationOpts;
 }

@@ -1074,20 +1074,19 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
                                           const PrimarySpecificPaths &PSPs,
-                                          bool moduleIsPublic, int &ReturnValue,
+                                          int &ReturnValue,
                                           FrontendObserver *observer);
 
-static bool
-performCompileStepsPostSema(const CompilerInvocation &Invocation,
-                            CompilerInstance &Instance,
-                            bool moduleIsPublic, int &ReturnValue,
-                            FrontendObserver *observer) {
+static bool performCompileStepsPostSema(const CompilerInvocation &Invocation,
+                                        CompilerInstance &Instance,
+                                        int &ReturnValue,
+                                        FrontendObserver *observer) {
   auto mod = Instance.getMainModule();
   if (auto SM = Instance.takeSILModule()) {
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForAtMostOnePrimary();
     return performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
-                                         mod, PSPs, moduleIsPublic,
+                                         mod, PSPs,
                                          ReturnValue, observer);
   }
 
@@ -1100,7 +1099,7 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
     return performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
-                                         mod, PSPs, moduleIsPublic,
+                                         mod, PSPs,
                                          ReturnValue, observer);
   }
   // If there are primary source files, build a separate SILModule for
@@ -1113,7 +1112,7 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
       result |= performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
-                                              PrimaryFile, PSPs, moduleIsPublic,
+                                              PrimaryFile, PSPs,
                                               ReturnValue, observer);
     }
 
@@ -1131,7 +1130,7 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         result |= performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
-                                                mod, PSPs, moduleIsPublic,
+                                                mod, PSPs,
                                                 ReturnValue, observer);
       }
   }
@@ -1158,8 +1157,7 @@ emitIndexData(const CompilerInvocation &Invocation, const CompilerInstance &Inst
 /// `-typecheck`, but skipped for any mode that runs SIL diagnostics if there's
 /// an error found there (to get those diagnostics back to the user faster).
 static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
-    CompilerInstance &Instance, const CompilerInvocation &Invocation,
-    bool moduleIsPublic) {
+    CompilerInstance &Instance, const CompilerInvocation &Invocation) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
   // Record whether we failed to emit any of these outputs, but keep going; one
@@ -1182,7 +1180,8 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     }
     hadAnyError |= printAsObjCIfNeeded(
         Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), BridgingHeaderPathForPrint, moduleIsPublic);
+        Instance.getMainModule(), BridgingHeaderPathForPrint,
+        Invocation.isModuleExternallyConsumed(Instance.getMainModule()));
   }
 
   if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
@@ -1315,13 +1314,6 @@ static bool performCompile(CompilerInstance &Instance,
   (void)emitLoadedModuleTraceForAllPrimariesIfNeeded(
       Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
-  // FIXME: This is still a lousy approximation of whether the module file will
-  // be externally consumed.
-  bool moduleIsPublic =
-      !Instance.getMainModule()->hasEntryPoint() &&
-      opts.ImplicitObjCHeaderPath.empty() &&
-      !Context.LangOpts.EnableAppExtensionRestrictions;
-
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
     if (emitIndexData(Invocation, Instance))
@@ -1336,8 +1328,7 @@ static bool performCompile(CompilerInstance &Instance,
     // guarding the emission of whole-module supplementary outputs.
     if (opts.InputsAndOutputs.isWholeModule()) {
       if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
-                                                              Invocation,
-                                                              moduleIsPublic)) {
+                                                              Invocation)) {
         return true;
       }
     }
@@ -1347,8 +1338,8 @@ static bool performCompile(CompilerInstance &Instance,
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
 
-  return performCompileStepsPostSema(Invocation, Instance, moduleIsPublic,
-                                     ReturnValue, observer);
+  return performCompileStepsPostSema(Invocation, Instance, ReturnValue,
+                                     observer);
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
@@ -1575,9 +1566,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
                                           const PrimarySpecificPaths &PSPs,
-                                          bool moduleIsPublic, int &ReturnValue,
+                                          int &ReturnValue,
                                           FrontendObserver *observer) {
-
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
   const ASTContext &Context = Instance.getASTContext();
@@ -1618,7 +1608,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       return;
 
     SerializationOptions serializationOpts =
-        Invocation.computeSerializationOptions(outs, moduleIsPublic);
+        Invocation.computeSerializationOptions(outs, Instance.getMainModule());
     serialize(MSF, serializationOpts, SM.get());
   };
 
@@ -1633,8 +1623,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILProcessing(*SM);
 
-  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation,
-                                                      moduleIsPublic);
+  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Context, MSF);
