@@ -1,6 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -I %S/Inputs -emit-sil -o %t/extern-var.sil -Xfrontend -enable-cxx-interop
-// RUN: %FileCheck < %t/extern-var.sil %s
+// RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-cxx-interop | %FileCheck %s
 
 import ExternVar
 

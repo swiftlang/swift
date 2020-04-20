@@ -1,4 +1,4 @@
-int counter = 0;
+int counter = 12;
 
 int getCounterFromCxx() {
   return counter;
@@ -9,7 +9,7 @@ void setCounterFromCxx(int c) {
 }
 
 namespace Namespaced {
-  int counter = 0;
+  int counter = 12;
 
   int getCounterFromCxx() {
     return counter;

@@ -11,11 +11,6 @@ import StdlibUnittest
 
 var ExternVarTestSuite = TestSuite("ExternVarTestSuite")
 
-ExternVarTestSuite.test("read") {
-  expectEqual(0, counter)
-  expectEqual(0, getCounterFromCxx())
-}
-
 ExternVarTestSuite.test("write-from-swift") {
   counter = 42
   expectEqual(42, counter)
@@ -27,12 +22,6 @@ ExternVarTestSuite.test("write-from-cxx") {
   expectEqual(84, counter)
   expectEqual(84, getCounterFromCxx())
 }
-
-//FIXME mangle non-top-level var names to prevent name collisions
-// ExternVarTestSuite.test("namespaced-read") {
-//   expectEqual(0, Namespaced.counter)
-//   expectEqual(0, Namespaced.getCounterFromCxx())
-// }
 
 //FIXME mangle non-top-level var names to prevent name collisions
 // ExternVarTestSuite.test("namespaced-write-from-swift") {
