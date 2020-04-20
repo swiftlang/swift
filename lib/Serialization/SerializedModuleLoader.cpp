@@ -36,7 +36,7 @@ using swift::version::Version;
 namespace {
 
 /// Apply \c body for each target-specific module file base name to search from
-/// most to least desiable.
+/// most to least desirable.
 void forEachTargetModuleBasename(const ASTContext &Ctx,
                                  llvm::function_ref<void(StringRef)> body) {
   auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
