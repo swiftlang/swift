@@ -58,10 +58,10 @@ func testUnreachableLogCall(c: Color)  {
 
 // Passing InOut values to the logger should not crash the compiler.
 func foo(_ mutableValue: inout String) {
+  // expected-note@-1 {{parameter 'mutableValue' is declared 'inout'}}
    _osLogTestHelper("FMFLabelledLocation: initialized with coder \(mutableValue)")
-    // expected-error@-1 {{escaping closure captures 'inout' parameter 'mutableValue'}}
-    // expected-note@-3 {{parameter 'mutableValue' is declared 'inout'}}
-    // expected-note@-3 {{captured here}}
+    // expected-error@-1 {{escaping autoclosure captures 'inout' parameter 'mutableValue'}}
+    // expected-note@-2 {{pass a copy of 'mutableValue'}}
 }
 
 // This is an extension used only for testing a diagnostic that doesn't arise
