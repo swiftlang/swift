@@ -564,7 +564,13 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {
   using namespace options;
   for (const Arg *A : Args.filtered(OPT_import_module)) {
-    Opts.ImplicitImportModuleNames.push_back(A->getValue());
+    auto *moduleStr = A->getValue();
+    if (!Lexer::isIdentifier(moduleStr)) {
+      Diags.diagnose(SourceLoc(), diag::error_bad_module_name, moduleStr,
+                     /*suggestModuleNameFlag*/ false);
+      continue;
+    }
+    Opts.ImplicitImportModuleNames.push_back(moduleStr);
   }
 }
 void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
