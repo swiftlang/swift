@@ -7802,6 +7802,13 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return SolutionKind::Unsolved;
   };
 
+  // When locator points to a KeyPathDynamicMemberLookup, reject the
+  // key path application.
+  auto last = locator.last();
+  if (last && last->isKeyPathDynamicMember()) {
+    return SolutionKind::Error;
+  }
+  
   if (auto clas = keyPathTy->getAs<NominalType>()) {
     if (clas->getDecl() == getASTContext().getAnyKeyPathDecl()) {
       // Read-only keypath, whose projected value is upcast to `Any?`.
