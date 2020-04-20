@@ -492,9 +492,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   if (!currentFile || currentDC->isLocalContext())
     return std::make_tuple<>();
 
-  ReferencedNameTracker *tracker = currentFile->getLegacyReferencedNameTracker();
-  bool isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
-
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
   if (currentDC->isTypeContext()) {
@@ -502,20 +499,12 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
       auto found = nominal->lookupDirect(current->getBaseName());
       otherDefinitions.append(found.begin(), found.end());
-      // FIXME(Evaluator Incremental Dependencies): Remove this. The direct
-      // lookup registers this edge, and so does the redeclaration request.
-      if (tracker)
-        tracker->addUsedMember({nominal, current->getBaseName()}, isCascading);
     }
   } else {
     // Look within a module context.
     currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
                                                 otherDefinitions);
-    // FIXME(Evaluator Incremental Dependencies): Remove this. The redeclaration
-    // request itself registers this edge.
-    if (tracker)
-      tracker->addTopLevelName(current->getBaseName(), isCascading);
   }
 
   // Compare this signature against the signature of other
@@ -1956,19 +1945,6 @@ public:
 
     if (auto superclassTy = CD->getSuperclass()) {
       ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
-
-      if (auto *SF = CD->getParentSourceFile()) {
-        // FIXME(Evaluator Incremental Dependencies): Remove this. Type lookup
-        // for the superclass will run (un)qualified lookup which will register
-        // the appropriate edge, then SuperclassTypeRequest registers the
-        // potential member edge.
-        if (auto *tracker = SF->getLegacyReferencedNameTracker()) {
-          bool isPrivate =
-              CD->getFormalAccess() <= AccessLevel::FilePrivate;
-          tracker->addUsedMember({Super, Identifier()}, !isPrivate);
-        }
-      }
-
       bool isInvalidSuperclass = false;
 
       if (Super->isFinal()) {
@@ -2065,17 +2041,6 @@ public:
 
     // Check for circular inheritance within the protocol.
     (void)PD->hasCircularInheritedProtocols();
-
-    if (SF) {
-      if (auto *tracker = SF->getLegacyReferencedNameTracker()) {
-        bool isNonPrivate = (PD->getFormalAccess() > AccessLevel::FilePrivate);
-        // FIXME(Evaluator Incremental Dependencies): Remove this. Type lookup
-        // for the ancestor protocols will run (un)qualified lookup which will
-        // register the appropriate edge.
-        for (auto *parentProto : PD->getInheritedProtocols())
-          tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
-      }
-    }
 
     // Check the members.
     for (auto Member : PD->getMembers())
