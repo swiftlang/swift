@@ -555,9 +555,7 @@ public:
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
-  const CompilerInvocation &getInvocation() {
-    return Invocation;
-  }
+  const CompilerInvocation &getInvocation() const { return Invocation; }
 
   /// If a code completion buffer has been set, returns the corresponding source
   /// file.
