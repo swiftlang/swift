@@ -5,22 +5,34 @@
 // CHECK: sil_global @counter : $Int32
 
 // CHECK: sil hidden @$s4main10getCounters5Int32VyF : $@convention(thin) () -> Int32
-// CHECK: %0 = global_addr @counter : $*Int32
-// CHECK: begin_access [read] [dynamic] %0 : $*Int32
+// CHECK: [[COUNTER:%.*]] = global_addr @counter : $*Int32
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[COUNTER]] : $*Int32
+// CHECK: [[LOAD:%.*]] = load [[ACCESS]] : $*Int32
+// CHECK: return [[LOAD]] : $Int32
 
 // CHECK: sil hidden @$s4main10setCounteryys5Int32VF : $@convention(thin) (Int32) -> ()
-// CHECK: %1 = global_addr @counter : $*Int32
-// CHECK: %3 = begin_access [modify] [dynamic] %1 : $*Int32
+// CHECK: [[COUNTER:%.*]] = global_addr @counter : $*Int32
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[COUNTER]] : $*Int32
+// CHECK: store %0 to [[ACCESS]] : $*Int32
 
 // sil hidden @$s4main20getNamespacedCounters5Int32VyF : $@convention(thin) () -> Int32
 //FIXME mangle non-top-level var names to prevent name collisions
 // %0 = global_addr @Namespaced.counter : $*Int32
-// CHECK: begin_access [read] [dynamic] %0 : $*Int32
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] %0 : $*Int32
+// CHECK: [[LOAD:%.*]] = load [[ACCESS]] : $*Int32
+// CHECK: return [[LOAD]] : $Int32
 
 // CHECK: sil hidden @$s4main20setNamespacedCounteryys5Int32VF : $@convention(thin) (Int32) -> ()
 //FIXME mangle non-top-level var names to prevent name collisions
 // %1 = global_addr @Namespaced.counter : $*Int32
-// CHECK: %4 = begin_access [modify] [dynamic] %1 : $*Int32
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %1 : $*Int32
+// CHECK: store %0 to [[ACCESS]] : $*Int32
+
+// CHECK: sil hidden @$s4main17passingVarAsInoutyyF : $@convention(thin) () -> ()
+// CHECK: [[COUNTER:%.*]] = global_addr @counter : $*Int32
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[COUNTER]] : $*Int32
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s4main11modifyInoutyys5Int32VzF : $@convention(thin) (@inout Int32) -> ()
+// CHECK: apply [[FUNCTION]]([[ACCESS]]) : $@convention(thin) (@inout Int32) -> ()
 
 import ExternVar
 
@@ -38,4 +50,12 @@ func getNamespacedCounter() -> CInt {
 
 func setNamespacedCounter(_ c: CInt) {
   Namespaced.counter = c
+}
+
+func modifyInout(_ c: inout CInt) {
+  c = 42
+}
+
+func passingVarAsInout() {
+  modifyInout(&counter)
 }

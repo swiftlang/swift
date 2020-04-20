@@ -5,7 +5,8 @@
 // CHECK: @counter = external global i32, align 4
 
 // CHECK: define hidden swiftcc i32 @"$s4main10getCounters5Int32VyF"() #0
-// CHECK: load i32, i32* getelementptr inbounds (%Ts5Int32V, %Ts5Int32V* bitcast (i32* @counter to %Ts5Int32V*), i32 0, i32 0), align 4
+// CHECK: [[LOAD:%.*]] = load i32, i32* getelementptr inbounds (%Ts5Int32V, %Ts5Int32V* bitcast (i32* @counter to %Ts5Int32V*), i32 0, i32 0), align 4
+// CHECK: ret i32 [[LOAD]]
 
 // CHECK: define hidden swiftcc void @"$s4main10setCounteryys5Int32VF"(i32 %0) #0
 // CHECK: store i32 %0, i32* getelementptr inbounds (%Ts5Int32V, %Ts5Int32V* bitcast (i32* @counter to %Ts5Int32V*), i32 0, i32 0), align 4
@@ -13,9 +14,14 @@
 // CHECK: define hidden swiftcc i32 @"$s4main20getNamespacedCounters5Int32VyF"() #0
 //FIXME mangle non-top-level var names to prevent name collisions and check:
 // load i32, i32* getelementptr inbounds (%Ts5Int32V, %Ts5Int32V* bitcast (i32* @Namespaced.counter to %Ts5Int32V*), i32 0, i32 0), align 4
+// CHECK: ret i32 %1
+
 // CHECK: define hidden swiftcc void @"$s4main20setNamespacedCounteryys5Int32VF"(i32 %0) #0
 //FIXME mangle non-top-level var names to prevent name collisions and check:
 // store i32 %0, i32* getelementptr inbounds (%Ts5Int32V, %Ts5Int32V* bitcast (i32* @Namespaced.counter to %Ts5Int32V*), i32 0, i32 0), align 4
+
+// CHECK: define hidden swiftcc void @"$s4main17passingVarAsInoutyyF"() #0
+// CHECK: call swiftcc void @"$s4main11modifyInoutyys5Int32VzF"(%Ts5Int32V* nocapture dereferenceable(4) bitcast (i32* @counter to %Ts5Int32V*))
 
 import ExternVar
 
@@ -33,4 +39,12 @@ func getNamespacedCounter() -> CInt {
 
 func setNamespacedCounter(_ c: CInt) {
   Namespaced.counter = c
+}
+
+func modifyInout(_ c: inout CInt) {
+  c = 42
+}
+
+func passingVarAsInout() {
+  modifyInout(&counter)
 }
