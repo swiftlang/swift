@@ -789,3 +789,31 @@ func test_combination_of_keypath_and_string_lookups() {
     _ = outer.hello.world // Ok
   }
 }
+
+// SR-12626
+@dynamicMemberLookup
+struct SR12626 {
+  var i: Int
+
+  subscript(dynamicMember member: KeyPath<SR12626, Int>) -> Int {
+    get { self[keyPath: member] }
+    set { self[keyPath: member] = newValue } // expected-error {{cannot assign through subscript: 'member' is a read-only key path}}
+  }
+}
+
+// SR-12245
+public struct SR12425_S {}
+
+@dynamicMemberLookup
+public struct SR12425_R {}
+
+internal var rightStructInstance: SR12425_R = SR12425_R()
+
+public extension SR12425_R {
+  subscript<T>(dynamicMember member: WritableKeyPath<SR12425_S, T>) -> T {
+      // TODO(Diagnostics): bad diagnostic for member assign.
+      // A better diagnostic would be: key path of type WritableKeyPath<SR12425_S, T> cannot be applied to a base of type SR12425_R
+      get { rightStructInstance[keyPath: member] } // expected-error {{cannot convert return expression of type 'Any?' to return type 'T'}}
+      set { rightStructInstance[keyPath: member] = newValue } // expected-error {{type of expression is ambiguous without more context}}
+  }
+}
