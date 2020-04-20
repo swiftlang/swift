@@ -774,6 +774,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
     assert(!InputSourceCodeBufferIDs.empty());
     assert(InputSourceCodeBufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
+    assert(isPrimaryInput(MainBufferID) || isWholeModuleCompilation());
     createSILModule();
   }
 
@@ -829,7 +830,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
     SourceFile::ASTStage_t limitStage) {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-check-types");
 
-  bool hadLoadError = parsePartialModulesAndLibraryFiles();
+  bool hadLoadError = parsePartialModulesAndInputFiles();
   if (Invocation.isCodeCompletion()) {
     // When we are doing code completion, make sure to emit at least one
     // diagnostic, so that ASTContext is marked as erroneous.  In this case
@@ -839,14 +840,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   }
   if (hadLoadError)
     return;
-
-  // Type-check main file after parsing all other files so that
-  // it can use declarations from other files.
-  // In addition, in SIL mode the main file has parsing and
-  // type-checking interwined.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    parseAndTypeCheckMainFileUpTo(limitStage);
-  }
 
   assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
     auto *SF = dyn_cast<SourceFile>(File);
@@ -864,17 +857,24 @@ void CompilerInstance::parseAndCheckTypesUpTo(
 
     performTypeChecking(SF);
 
-    if (!Context->hadError() && Invocation.getFrontendOptions().PCMacro) {
-      performPCMacro(SF);
+    // Parse the SIL decls if needed.
+    // TODO: Requestify SIL parsing.
+    if (TheSILModule) {
+      SILParserState SILContext(TheSILModule.get());
+      parseSourceFileSIL(SF, &SILContext);
     }
+
+    auto &opts = Invocation.getFrontendOptions();
+    if (!Context->hadError() && opts.DebuggerTestingTransform)
+      performDebuggerTestingTransform(SF);
+
+    if (!Context->hadError() && opts.PCMacro)
+      performPCMacro(SF);
 
     // Playground transform knows to look out for PCMacro's changes and not
     // to playground log them.
-    if (!Context->hadError() &&
-        Invocation.getFrontendOptions().PlaygroundTransform) {
-      performPlaygroundTransform(
-          SF, Invocation.getFrontendOptions().PlaygroundHighPerformance);
-    }
+    if (!Context->hadError() && opts.PlaygroundTransform)
+      performPlaygroundTransform(SF, opts.PlaygroundHighPerformance);
   });
 
   // If the limiting AST stage is import resolution, we're done.
@@ -885,19 +885,9 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   finishTypeChecking();
 }
 
-void CompilerInstance::parseLibraryFile(unsigned BufferID) {
-  FrontendStatsTracer tracer(getStatsReporter(), "parse-library-file");
-
-  auto *NextInput =
-      createSourceFileForMainModule(SourceFileKind::Library, BufferID);
-
-  // Import resolution will lazily trigger parsing of the file.
-  performImportResolution(*NextInput);
-}
-
-bool CompilerInstance::parsePartialModulesAndLibraryFiles() {
+bool CompilerInstance::parsePartialModulesAndInputFiles() {
   FrontendStatsTracer tracer(getStatsReporter(),
-                             "parse-partial-modules-and-library-files");
+                             "parse-partial-modules-and-input-files");
   bool hadLoadError = false;
   // Parse all the partial modules first.
   for (auto &PM : PartialModules) {
@@ -909,45 +899,20 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles() {
       hadLoadError = true;
   }
 
-  // Then parse all the library files.
+  // Then parse all the input files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
-    if (BufferID != MainBufferID) {
-      parseLibraryFile(BufferID);
+    SourceFile *SF;
+    if (BufferID == MainBufferID) {
+      // If this is the main file, we've already created it.
+      SF = &getMainModule()->getMainSourceFile(Invocation.getSourceFileKind());
+    } else {
+      // Otherwise create a library file.
+      SF = createSourceFileForMainModule(SourceFileKind::Library, BufferID);
     }
+    // Import resolution will lazily trigger parsing of the file.
+    performImportResolution(*SF);
   }
   return hadLoadError;
-}
-
-void CompilerInstance::parseAndTypeCheckMainFileUpTo(
-    SourceFile::ASTStage_t LimitStage) {
-  assert(LimitStage >= SourceFile::ImportsResolved);
-  FrontendStatsTracer tracer(getStatsReporter(),
-                             "parse-and-typecheck-main-file");
-  bool mainIsPrimary =
-      (isWholeModuleCompilation() || isPrimaryInput(MainBufferID));
-
-  SourceFile &MainFile =
-      MainModule->getMainSourceFile(Invocation.getSourceFileKind());
-
-  // For a primary, perform type checking if needed. Otherwise, just do import
-  // resolution.
-  if (mainIsPrimary && LimitStage >= SourceFile::TypeChecked) {
-    performTypeChecking(MainFile);
-  } else {
-    assert(!TheSILModule && "Should perform type checking for SIL");
-    performImportResolution(MainFile);
-  }
-
-  // Parse the SIL decls if needed.
-  if (TheSILModule) {
-    SILParserState SILContext(TheSILModule.get());
-    parseSourceFileSIL(MainFile, &SILContext);
-  }
-
-  if (mainIsPrimary && !Context->hadError() &&
-      Invocation.getFrontendOptions().DebuggerTestingTransform) {
-    performDebuggerTestingTransform(MainFile);
-  }
 }
 
 static void
@@ -1030,35 +995,28 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
   if (!CanDelayBodies)
     parsingOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
 
-  // Make sure the main file is the first file in the module but parse it last,
-  // to match the parsing logic used when performing Sema.
+  // Make sure the main file is the first file in the module.
   if (MainBufferID != NO_SUCH_BUFFER) {
     assert(Kind == InputFileKind::Swift ||
            Kind == InputFileKind::SwiftModuleInterface);
-    createSourceFileForMainModule(Invocation.getSourceFileKind(),
-                                  MainBufferID, parsingOpts);
+    auto *mainFile = createSourceFileForMainModule(
+        Invocation.getSourceFileKind(), MainBufferID, parsingOpts);
+    mainFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
   }
 
-  // Parse all the library files.
-  for (auto BufferID : InputSourceCodeBufferIDs) {
-    if (BufferID == MainBufferID)
-      continue;
-
-    SourceFile *NextInput = createSourceFileForMainModule(
-        SourceFileKind::Library, BufferID, parsingOpts);
-
+  // Parse all of the input files.
+  for (auto bufferID : InputSourceCodeBufferIDs) {
+    SourceFile *SF;
+    if (bufferID == MainBufferID) {
+      // If this is the main file, we've already created it.
+      SF = &MainModule->getMainSourceFile(Invocation.getSourceFileKind());
+    } else {
+      // Otherwise create a library file.
+      SF = createSourceFileForMainModule(SourceFileKind::Library, bufferID,
+                                         parsingOpts);
+    }
     // Force the parsing of the top level decls.
-    (void)NextInput->getTopLevelDecls();
-  }
-
-  // Now parse the main file.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    SourceFile &MainFile =
-        MainModule->getMainSourceFile(Invocation.getSourceFileKind());
-    MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
-
-    // Force the parsing of the top level decls.
-    (void)MainFile.getTopLevelDecls();
+    (void)SF->getTopLevelDecls();
   }
 
   assert(Context->LoadedModules.size() == 1 &&

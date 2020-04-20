@@ -674,14 +674,10 @@ private:
   void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
   void parseAndCheckTypesUpTo(SourceFile::ASTStage_t LimitStage);
 
-  void parseLibraryFile(unsigned BufferID);
-
   /// Return true if had load error
-  bool parsePartialModulesAndLibraryFiles();
+  bool parsePartialModulesAndInputFiles();
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
-
-  void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage);
 
   void finishTypeChecking();
 
