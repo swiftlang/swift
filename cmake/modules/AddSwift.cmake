@@ -635,14 +635,9 @@ function(_add_swift_host_library_single target)
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
   elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
-    # Only set the install RPATH if cross-compiling the host tools, in which
-    # case both the NDK and Sysroot paths must be set.
-    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
-       NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
-      set_target_properties("${target}"
-        PROPERTIES
-        INSTALL_RPATH "$ORIGIN")
-    endif()
+    set_target_properties("${target}"
+      PROPERTIES
+      INSTALL_RPATH "$ORIGIN")
   endif()
 
   # SWIFT_ENABLE_TENSORFLOW

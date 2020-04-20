@@ -476,6 +476,11 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
                                          LibraryKind::Library,
                                          /*forceLoad*/ true));
       }
+      if (*compatibilityVersion <= llvm::VersionTuple(5, 1)) {
+        this->addLinkLibrary(LinkLibrary("swiftCompatibility51",
+                                         LibraryKind::Library,
+                                         /*forceLoad*/ true));
+      }
     }
 
     if (auto compatibilityVersion =
@@ -4440,7 +4445,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   *toPtr = 0;
   ArrayRef<llvm::UTF16> utf16(&buffer[0], utf16Length + 1);
 
-  auto init = llvm::ConstantDataArray::get(LLVMContext, utf16);
+  auto init = llvm::ConstantDataArray::get(getLLVMContext(), utf16);
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
                                          init);

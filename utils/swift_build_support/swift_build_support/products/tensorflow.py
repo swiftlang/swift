@@ -64,7 +64,7 @@ class TensorFlowSwiftAPIs(product.Product):
     def build(self, host_target):
         toolchain_path = targets.toolchain_path(self.args.install_destdir,
                                                 self.args.install_prefix)
-        swiftc = os.path.join(toolchain_path, 'usr', 'bin', 'swiftc')
+        swiftc = os.path.join(toolchain_path, 'bin', 'swiftc')
 
         tensorflow_source_dir = os.path.join(self.source_dir, '..',
                                              'tensorflow')
@@ -91,7 +91,7 @@ class TensorFlowSwiftAPIs(product.Product):
                 self.toolchain.cmake,
                 '-G', 'Ninja',
                 '-D', 'BUILD_SHARED_LIBS=YES',
-                '-D', 'CMAKE_INSTALL_PREFIX={}/usr'.format(
+                '-D', 'CMAKE_INSTALL_PREFIX={}'.format(
                     self.install_toolchain_path()),
                 '-D', 'CMAKE_MAKE_PROGRAM={}'.format(self.toolchain.ninja),
                 '-D', 'CMAKE_Swift_COMPILER={}'.format(swiftc),

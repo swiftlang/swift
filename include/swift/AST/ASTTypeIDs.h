@@ -49,6 +49,7 @@ class PrefixOperatorDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
 enum class CtorInitializerKind;
+struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class ProtocolDecl;
 class Requirement;

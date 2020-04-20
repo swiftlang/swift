@@ -1580,6 +1580,7 @@ public:
   void completePlatformCondition() override;
   void completeGenericRequirement() override;
   void completeAfterIfStmt(bool hasElse) override;
+  void completeStmtLabel(StmtKind ParentKind) override;
 
   void doneParsing() override;
 
@@ -4356,6 +4357,52 @@ public:
     for (auto PGD: precedenceGroups)
       addPrecedenceGroupRef(PGD);
   }
+
+  void getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
+    class LabelFinder : public ASTWalker {
+      SourceManager &SM;
+      SourceLoc TargetLoc;
+      bool IsContinue;
+
+    public:
+      SmallVector<Identifier, 2> Result;
+
+      LabelFinder(SourceManager &SM, SourceLoc TargetLoc, bool IsContinue)
+          : SM(SM), TargetLoc(TargetLoc), IsContinue(IsContinue) {}
+
+      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+        if (SM.isBeforeInBuffer(S->getEndLoc(), TargetLoc))
+          return {false, S};
+
+        if (LabeledStmt *LS = dyn_cast<LabeledStmt>(S)) {
+          if (LS->getLabelInfo()) {
+            if (!IsContinue || LS->isPossibleContinueTarget()) {
+              auto label = LS->getLabelInfo().Name;
+              if (!llvm::is_contained(Result, label))
+                Result.push_back(label);
+            }
+          }
+        }
+
+        return {true, S};
+      }
+
+      Stmt *walkToStmtPost(Stmt *S) override { return nullptr; }
+
+      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+        if (SM.isBeforeInBuffer(E->getEndLoc(), TargetLoc))
+          return {false, E};
+        return {true, E};
+      }
+    } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);
+    const_cast<DeclContext *>(CurrDeclContext)->walkContext(Finder);
+    for (auto name : Finder.Result) {
+      CodeCompletionResultBuilder Builder(
+          Sink, CodeCompletionResult::ResultKind::Pattern,
+          SemanticContextKind::Local, {});
+      Builder.addTextChunk(name.str());
+    }
+  }
 };
 
 class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
@@ -5139,6 +5186,12 @@ void CodeCompletionCallbacksImpl::completeAccessorBeginning(
   CodeCompleteTokenExpr = E;
 }
 
+void CodeCompletionCallbacksImpl::completeStmtLabel(StmtKind ParentKind) {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::StmtLabel;
+  ParentStmtKind = ParentKind;
+}
+
 static bool isDynamicLookup(Type T) {
   return T->getRValueType()->isAnyObject();
 }
@@ -5258,6 +5311,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::KeyPathExprObjC:
   case CompletionKind::KeyPathExprSwift:
   case CompletionKind::PrecedenceGroup:
+  case CompletionKind::StmtLabel:
     break;
 
   case CompletionKind::AccessorBeginning: {
@@ -5856,6 +5910,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::PrecedenceGroup:
     Lookup.getPrecedenceGroupCompletions(SyntxKind);
     break;
+  case CompletionKind::StmtLabel: {
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.getStmtLabelCompletions(Loc, ParentStmtKind == StmtKind::Continue);
+    break;
+  }
   case CompletionKind::AfterIfStmtElse:
   case CompletionKind::CaseStmtKeyword:
     // Handled earlier by keyword completions.

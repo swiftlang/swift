@@ -53,11 +53,11 @@ llvm::Constant *irgen::emitConstantInt(IRGenModule &IGM,
     assert(width.isFixedWidth() && "impossible width value");
   }
 
-  return llvm::ConstantInt::get(IGM.LLVMContext, value);
+  return llvm::ConstantInt::get(IGM.getLLVMContext(), value);
 }
 
 llvm::Constant *irgen::emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI) {
-  return llvm::ConstantFP::get(IGM.LLVMContext, FLI->getValue());
+  return llvm::ConstantFP::get(IGM.getLLVMContext(), FLI->getValue());
 }
 
 llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
