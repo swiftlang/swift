@@ -508,6 +508,11 @@ bool SymbolGraph::isImplicitlyPrivate(const ValueDecl *VD) const {
     return true;
   }
 
+  // Don't include declarations with the @_spi attribute for now.
+  if (VD->getAttrs().getAttribute(DeclAttrKind::DAK_SPIAccessControl)) {
+    return true;
+  }
+
   // Symbols must meet the minimum access level to be included in the graph.
   if (VD->getFormalAccess() < Walker.Options.MinimumAccessLevel) {
     return true;
