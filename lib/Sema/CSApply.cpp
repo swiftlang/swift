@@ -5820,9 +5820,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       // We already had a ParenExpr, so replace it's sub-expression.
       argParen->setSubExpr(newArgs[0]);
     } else {
+      bool isImplicit = arg->isImplicit();
       arg = new (ctx)
           ParenExpr(lParenLoc, newArgs[0], rParenLoc, hasTrailingClosure);
-      arg->setImplicit();
+      arg->setImplicit(isImplicit);
     }
   } else {
     assert(isa<TupleType>(paramType.getPointer()));
@@ -5837,7 +5838,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       // Build a new TupleExpr, re-using source location information.
       arg = TupleExpr::create(ctx, lParenLoc, newArgs, newLabels, newLabelLocs,
                               rParenLoc, hasTrailingClosure,
-                              /*implicit=*/true);
+                              /*implicit=*/arg->isImplicit());
     }
   }
 
