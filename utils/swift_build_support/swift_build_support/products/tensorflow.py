@@ -11,9 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import re
-import shutil
-import subprocess
 
 from . import product
 from .. import shell
@@ -50,10 +47,6 @@ class TensorFlowSwiftAPIs(product.Product):
         target = ''
         if host_target.startswith('macosx'):
             target = '-DCMAKE_Swift_COMPILER_TARGET=x86_64-apple-macosx10.13'
-        x10_inc = ''
-        if self.args.enable_x10:
-            x10_inc = os.path.join(self.install_toolchain_path(), 'usr', 'lib',
-                                   'swift', 'x10', 'include')
         # SWIFT_ENABLE_TENSORFLOW END
 
         with shell.pushd(self.build_dir):
@@ -95,4 +88,3 @@ class TensorFlowSwiftAPIs(product.Product):
             '--build', self.build_dir,
             '--target', 'install',
         ])
-
