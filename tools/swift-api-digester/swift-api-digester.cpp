@@ -2774,7 +2774,7 @@ static std::string getJsonOutputFilePath(llvm::Triple Triple, bool ABI) {
       exit(1);
     }
     llvm::sys::path::append(OutputPath, getBaselineFilename(Triple));
-    return OutputPath.str();
+    return OutputPath.str().str();
   }
   llvm::errs() << "Unable to decide output file path\n";
   exit(1);
