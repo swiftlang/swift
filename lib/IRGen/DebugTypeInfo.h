@@ -36,7 +36,6 @@ class TypeInfo;
 /// This data structure holds everything needed to emit debug info
 /// for a type.
 class DebugTypeInfo {
-public:
   /// The type we need to emit may be different from the type
   /// mentioned in the Decl, for example, stripped of qualifiers.
   TypeBase *Type = nullptr;
@@ -48,7 +47,8 @@ public:
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
 
-  DebugTypeInfo() {}
+public:
+  DebugTypeInfo() = default;
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size SizeInBytes,
                 Alignment AlignInBytes, bool HasDefaultAlignment,
                 bool IsMetadataType);
@@ -62,6 +62,9 @@ public:
   /// Create type for an artificial metadata variable.
   static DebugTypeInfo getArchetype(swift::Type Ty, llvm::Type *StorageTy,
                                     Size size, Alignment align);
+
+  /// Create a forward declaration for a type whose size is unknown.
+  static DebugTypeInfo getForwardDecl(swift::Type Ty);
 
   /// Create a standalone type from a TypeInfo object.
   static DebugTypeInfo getFromTypeInfo(swift::Type Ty, const TypeInfo &Info);
@@ -88,11 +91,24 @@ public:
     return false;
   }
 
+  llvm::Type *getStorageType() const {
+    assert((StorageType || size.isZero()) &&
+           "only defined types may have a size");
+    return StorageType;
+  }
+  Size getSize() const { return size; }
+  void setSize(Size NewSize) { size = NewSize; }
+  Alignment getAlignment() const { return align; }
   bool isNull() const { return Type == nullptr; }
+  bool isForwardDecl() const { return StorageType == nullptr; }
+  bool isMetadataType() const { return IsMetadataType; }
+  bool hasDefaultAlignment() const { return DefaultAlignment; }
+  
   bool operator==(DebugTypeInfo T) const;
   bool operator!=(DebugTypeInfo T) const;
-
-  void dump() const;
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  LLVM_DUMP_METHOD void dump() const;
+#endif
 };
 }
 }

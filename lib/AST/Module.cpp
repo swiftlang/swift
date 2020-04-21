@@ -2042,15 +2042,22 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
 void SourceFile::setImports(ArrayRef<ImportedModuleDesc> imports) {
   assert(!Imports && "Already computed imports");
   Imports = getASTContext().AllocateCopy(imports);
+}
 
-  // Update the HasImplementationOnlyImports flag.
-  // TODO: Requestify this.
-  if (!HasImplementationOnlyImports) {
-    for (auto &desc : imports) {
-      if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
-        HasImplementationOnlyImports = true;
-    }
-  }
+bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
+                                                   SourceFile *SF) const {
+  using ModuleDesc = SourceFile::ImportedModuleDesc;
+  return llvm::any_of(SF->getImports(), [](ModuleDesc desc) {
+    return desc.importOptions.contains(
+        SourceFile::ImportFlags::ImplementationOnly);
+  });
+}
+
+bool SourceFile::hasImplementationOnlyImports() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, HasImplementationOnlyImportsRequest{mutableThis}, false);
 }
 
 bool SourceFile::hasTestableOrPrivateImport(

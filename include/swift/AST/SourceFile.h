@@ -157,10 +157,6 @@ private:
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
 
-  /// Does this source file have any implementation-only imports?
-  /// If not, we can fast-path module checks.
-  bool HasImplementationOnlyImports = false;
-
   /// The parsing options for the file.
   ParsingOptions ParsingOpts;
 
@@ -338,6 +334,9 @@ public:
 
   ~SourceFile();
 
+  /// Retrieve an immutable view of the source file's imports.
+  ArrayRef<ImportedModuleDesc> getImports() const { return *Imports; }
+
   /// Set the imports for this source file. This gets called by import
   /// resolution.
   void setImports(ArrayRef<ImportedModuleDesc> imports);
@@ -355,9 +354,9 @@ public:
   hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
                              ImportQueryKind kind = TestableAndPrivate) const;
 
-  bool hasImplementationOnlyImports() const {
-    return HasImplementationOnlyImports;
-  }
+  /// Does this source file have any implementation-only imports?
+  /// If not, we can fast-path module checks.
+  bool hasImplementationOnlyImports() const;
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
