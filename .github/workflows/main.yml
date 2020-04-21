@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - swiftwasm
+      - swiftwasm-release/5.3
   pull_request:
     branches:
       - swiftwasm
+      - swiftwasm-release/5.3
 
 jobs:
   linux_build:
