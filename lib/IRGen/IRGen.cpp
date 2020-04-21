@@ -911,8 +911,8 @@ static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
                                                              "standard-library"),
                                          llvm::ConstantAsMetadata::get(Value)}));
 
-  if (auto streamer = SIL.takeSILRemarkStreamer()) {
-    std::move(streamer)->intoLLVMContext(Module->getContext());
+  if (auto *streamer = SIL.getSILRemarkStreamer()) {
+    streamer->intoLLVMContext(Module->getContext());
   }
 }
 

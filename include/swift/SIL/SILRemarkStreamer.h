@@ -26,10 +26,19 @@ namespace swift {
 
 class SILRemarkStreamer {
 private:
+  enum class Owner {
+    SILModule,
+    LLVM,
+  } owner;
+
   /// The underlying LLVM streamer.
   ///
   /// If owned by a SILModule, this will be non-null.
   std::unique_ptr<llvm::remarks::RemarkStreamer> streamer;
+  /// The owning LLVM context.
+  ///
+  /// If owned by LLVM, this will be non-null.
+  llvm::LLVMContext *context;
 
   /// The remark output stream used to record SIL remarks to a file.
   std::unique_ptr<llvm::raw_fd_ostream> remarkStream;
