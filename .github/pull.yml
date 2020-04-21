@@ -6,4 +6,7 @@ rules:
   - base: master
     upstream: apple:master
     mergeMethod: hardreset
+  - base: release/5.3
+    upstream: apple:release/5.3
+    mergeMethod: hardreset
 label: ":arrow_heading_down: Upstream Tracking"
