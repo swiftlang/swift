@@ -387,9 +387,11 @@ option(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING
   "Build stdlibCore with exclusivity checking enabled"
   FALSE)
 
+# True for testing purposes. Compiler invocations that do not use differentiable
+# programming features should not be affected.
 option(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING
   "Enable experimental Swift differentiable programming features"
-  FALSE)
+  TRUE)
 
 #
 # End of user-configurable options.
