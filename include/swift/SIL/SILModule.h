@@ -523,6 +523,9 @@ public:
   swift::SILRemarkStreamer *getSILRemarkStreamer() {
     return silRemarkStreamer.get();
   }
+  std::unique_ptr<swift::SILRemarkStreamer> takeSILRemarkStreamer() {
+    return std::move(silRemarkStreamer);
+  }
   void installSILRemarkStreamer();
 
   // This is currently limited to VarDecl because the visibility of global

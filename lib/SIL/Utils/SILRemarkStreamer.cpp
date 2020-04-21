@@ -19,18 +19,20 @@ using namespace swift;
 SILRemarkStreamer::SILRemarkStreamer(
     std::unique_ptr<llvm::remarks::RemarkStreamer> &&streamer,
     std::unique_ptr<llvm::raw_fd_ostream> &&stream, const ASTContext &Ctx)
-    : streamerContext(std::make_unique<llvm::LLVMContext>()),
-      remarkStream(std::move(stream)), ctx(Ctx) {
-  streamerContext->setMainRemarkStreamer(std::move(streamer));
-}
+    : streamer(std::move(streamer)),
+      remarkStream(std::move(stream)), ctx(Ctx) { }
 
 llvm::remarks::RemarkStreamer &SILRemarkStreamer::getLLVMStreamer() {
-  return *streamerContext->getMainRemarkStreamer();
+  return *streamer.get();
 }
 
 const llvm::remarks::RemarkStreamer &
 SILRemarkStreamer::getLLVMStreamer() const {
-  return *streamerContext->getMainRemarkStreamer();
+  return *streamer.get();
+}
+
+void SILRemarkStreamer::intoLLVMContext(llvm::LLVMContext &Ctx) & {
+  Ctx.setMainRemarkStreamer(std::move(streamer));
 }
 
 std::unique_ptr<SILRemarkStreamer>
