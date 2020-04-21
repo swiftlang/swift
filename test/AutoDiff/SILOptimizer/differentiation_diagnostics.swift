@@ -170,3 +170,57 @@ extension TF_691: Differentiable where Scalar: Differentiable {}
 func identity<T>(_ x: TF_691<T>) -> TF_691<T> { x }
 let _: @differentiable (Float) -> TF_691<Float> = { x in identity(TF_691(x)) }
 let _: @differentiable (Float) -> TF_691<Float> = { x in id(TF_691(x)) }
+
+//===----------------------------------------------------------------------===//
+// Property wrappers
+//===----------------------------------------------------------------------===//
+
+@propertyWrapper
+struct Wrapper<Value> {
+  var wrappedValue: Value
+  var projectedValue: Self { self }
+}
+
+@propertyWrapper
+struct DifferentiableWrapper<Value> {
+  var wrappedValue: Value
+  var projectedValue: Self { self }
+}
+extension DifferentiableWrapper: Differentiable where Value: Differentiable {}
+// Note: property wrapped value differentiation works even if wrapper types do
+// not conform to `Differentiable`. The conformance here tests projected value
+// accesses.
+
+struct Struct: Differentiable {
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{property cannot be differentiated because 'Struct.TangentVector' does not have a member named '_x'}}
+  @DifferentiableWrapper @DifferentiableWrapper var x: Float = 10
+
+  @Wrapper var y: Float = 20
+  var z: Float = 30
+}
+
+@differentiable
+func differentiableProjectedValueAccess(_ s: Struct) -> Float {
+  s.$x.wrappedValue.wrappedValue
+}
+
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func projectedValueAccess(_ s: Struct) -> Float {
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
+  s.$y.wrappedValue
+}
+
+// SR-12640: Test `wrapperValue.modify` differentiation.
+
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable
+func modify(_ s: Struct, _ x: Float) -> Float {
+  var s = s
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  s.x *= x * s.z
+  return s.x
+}
