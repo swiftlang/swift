@@ -2384,6 +2384,23 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks whether a file performs an implementation-only import.
+class HasImplementationOnlyImportsRequest
+    : public SimpleRequest<HasImplementationOnlyImportsRequest,
+                           bool(SourceFile *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
