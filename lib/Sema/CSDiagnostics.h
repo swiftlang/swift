@@ -45,7 +45,7 @@ public:
   FailureDiagnostic(const Solution &solution, ConstraintLocator *locator)
       : S(solution), Locator(locator) {}
 
-  FailureDiagnostic(const Solution &solution, const Expr *anchor)
+  FailureDiagnostic(const Solution &solution, TypedNode anchor)
       : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
 
   virtual ~FailureDiagnostic();
@@ -490,7 +490,8 @@ class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {
   ArrayRef<OverloadChoice> Choices;
 
 public:
-  TrailingClosureAmbiguityFailure(ArrayRef<Solution> solutions, Expr *anchor,
+  TrailingClosureAmbiguityFailure(ArrayRef<Solution> solutions,
+                                  TypedNode anchor,
                                   ArrayRef<OverloadChoice> choices)
       : FailureDiagnostic(solutions.front(), anchor), Choices(choices) {}
 
