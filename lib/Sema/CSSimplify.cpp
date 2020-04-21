@@ -7802,6 +7802,13 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return SolutionKind::Unsolved;
   };
 
+  // When locator points to a KeyPathDynamicMemberLookup, reject the
+  // key path application.
+  auto last = locator.last();
+  if (last && last->isKeyPathDynamicMember()) {
+    return SolutionKind::Error;
+  }
+  
   if (auto clas = keyPathTy->getAs<NominalType>()) {
     if (clas->getDecl() == getASTContext().getAnyKeyPathDecl()) {
       // Read-only keypath, whose projected value is upcast to `Any?`.
@@ -10080,22 +10087,13 @@ void ConstraintSystem::simplifyDisjunctionChoice(Constraint *choice) {
   case ConstraintSystem::SolutionKind::Error:
     if (!failedConstraint)
       failedConstraint = choice;
-    if (solverState)
-      solverState->retireConstraint(choice);
     break;
 
   case ConstraintSystem::SolutionKind::Solved:
-    if (solverState)
-      solverState->retireConstraint(choice);
     break;
 
   case ConstraintSystem::SolutionKind::Unsolved:
-    InactiveConstraints.push_back(choice);
-    CG.addConstraint(choice);
+    addUnsolvedConstraint(choice);
     break;
   }
-
-  // Record this as a generated constraint.
-  if (solverState)
-    solverState->addGeneratedConstraint(choice);
 }

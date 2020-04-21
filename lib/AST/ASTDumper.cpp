@@ -631,7 +631,7 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       PrintWithColorRAII(OS, TypeColor) << " type='";
-      if (auto underlying = TAD->getUnderlyingType()) {
+      if (auto underlying = TAD->getCachedUnderlyingType()) {
         PrintWithColorRAII(OS, TypeColor)
           << underlying.getString();
       } else {

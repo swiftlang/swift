@@ -128,6 +128,8 @@ SWIFT_REQUEST(TypeChecker, ValidatePrecedenceGroupRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
               std::string(const TypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ModuleImplicitImportsRequest,
+              ArrayRef<ImplicitImport>(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, NamingPatternRequest,
               NamedPattern *(VarDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,

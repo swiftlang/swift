@@ -1932,24 +1932,6 @@ private:
       generatedConstraints.push_back(constraint);
     }
 
-    /// Erase given constraint from the list of generated constraints
-    /// along the current solver path. Note that this operation doesn't
-    /// guarantee any ordering of the after it's application.
-    ///
-    /// \param constraint The constraint to erase.
-    void removeGeneratedConstraint(Constraint *constraint) {
-      for (auto *&generated : generatedConstraints) {
-        // When we find the constraint we're erasing, overwrite its
-        // value with the last element in the generated constraints
-        // vector and then pop that element from the vector.
-        if (generated == constraint) {
-          generated = generatedConstraints.back();
-          generatedConstraints.pop_back();
-          return;
-        }
-      }
-    }
-
     /// Register given scope to be tracked by the current solver state,
     /// this helps to make sure that all of the retired/generated constraints
     /// are dealt with correctly when the life time of the scope ends.
@@ -2954,14 +2936,8 @@ public:
   /// Add a new constraint that we know fails.
   void addNewFailingConstraint(Constraint *constraint) {
     assert(shouldAddNewFailingConstraint());
+    assert(!constraint->isActive());
     failedConstraint = constraint;
-    failedConstraint->setActive(false);
-
-    // Record this as a newly-generated constraint.
-    if (solverState) {
-      solverState->addGeneratedConstraint(constraint);
-      solverState->retireConstraint(constraint);
-    }
   }
 
   /// Add a newly-generated constraint that is known not to be solvable
@@ -4215,7 +4191,8 @@ private:
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
 
-    /// Whether this type variable is fully bound by one of its constraints.
+    /// Whether these bindings should be delayed until the rest of the
+    /// constraint system is considered "fully bound".
     bool FullyBound = false;
 
     /// Whether the bindings of this type involve other type variables.
