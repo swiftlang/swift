@@ -240,6 +240,7 @@ def log_output_to_file(content, module_name, interface_base, label, log_path):
 def looks_like_iosmac(interface_base):
     return 'ios-macabi' in interface_base
 
+
 def process_module(module_file):
     global args, shared_output_lock
     try:
