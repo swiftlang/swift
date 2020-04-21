@@ -1504,3 +1504,13 @@ TypeCheckFunctionBodyUntilRequest::readDependencySource(Evaluator &e) const {
     evaluator::DependencyScope::Private
   };
 }
+
+//----------------------------------------------------------------------------//
+// ModuleImplicitImportsRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ImplicitImport &import) {
+  out << "implicit import of ";
+  simple_display(out, import.Module);
+}

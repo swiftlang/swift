@@ -3032,6 +3032,10 @@ public:
   Type getUnderlyingType() const;
   void setUnderlyingType(Type type);
 
+  /// Returns the interface type of the underlying type if computed, null
+  /// otherwise. Should only be used for dumping.
+  Type getCachedUnderlyingType() const { return UnderlyingTy.getType(); }
+
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
 

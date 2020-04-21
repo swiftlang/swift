@@ -692,57 +692,13 @@ std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
   return std::move(TheSILModule);
 }
 
-ModuleDecl *CompilerInstance::getMainModule() const {
-  if (!MainModule) {
-    Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    MainModule = ModuleDecl::create(ID, *Context);
-    if (Invocation.getFrontendOptions().EnableTesting)
-      MainModule->setTestingEnabled();
-    if (Invocation.getFrontendOptions().EnablePrivateImports)
-      MainModule->setPrivateImportsEnabled();
-    if (Invocation.getFrontendOptions().EnableImplicitDynamic)
-      MainModule->setImplicitDynamicEnabled();
-
-    if (Invocation.getFrontendOptions().EnableLibraryEvolution)
-      MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-  }
-  return MainModule;
-}
-
-void CompilerInstance::addAdditionalInitialImportsTo(
-    SourceFile *SF, const CompilerInstance::ImplicitImports &implicitImports) {
-  SmallVector<SourceFile::ImportedModuleDesc, 4> additionalImports;
-
-  if (implicitImports.objCModuleUnderlyingMixedFramework)
-    additionalImports.push_back(SourceFile::ImportedModuleDesc(
-        ModuleDecl::ImportedModule(
-            /*accessPath=*/{},
-            implicitImports.objCModuleUnderlyingMixedFramework),
-        SourceFile::ImportFlags::Exported));
-  if (implicitImports.headerModule)
-    additionalImports.push_back(SourceFile::ImportedModuleDesc(
-        ModuleDecl::ImportedModule(/*accessPath=*/{},
-                                   implicitImports.headerModule),
-        SourceFile::ImportFlags::Exported));
-  if (!implicitImports.modules.empty()) {
-    for (auto &importModule : implicitImports.modules) {
-      additionalImports.push_back(SourceFile::ImportedModuleDesc(
-          ModuleDecl::ImportedModule(/*accessPath=*/{}, importModule),
-          SourceFile::ImportOptions()));
-    }
-  }
-
-  SF->addImports(additionalImports);
-}
-
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
 /// execute much faster.
-static bool
-shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
-  if (Invocation.getImplicitModuleImportKind() !=
-      SourceFile::ImplicitModuleImportKind::Stdlib)
+static bool shouldImplicityImportSwiftOnoneSupportModule(
+    const CompilerInvocation &Invocation) {
+  if (Invocation.getImplicitStdlibKind() != ImplicitStdlibKind::Stdlib)
     return false;
   if (Invocation.getSILOptions().shouldOptimize())
     return false;
@@ -762,6 +718,40 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
   const auto &options = Invocation.getFrontendOptions();
   return options.TrackSystemDeps
       || FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
+}
+
+ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
+  auto &frontendOpts = Invocation.getFrontendOptions();
+
+  ImplicitImportInfo imports;
+  imports.StdlibKind = Invocation.getImplicitStdlibKind();
+
+  for (auto &moduleStr : frontendOpts.getImplicitImportModuleNames())
+    imports.ModuleNames.push_back(Context->getIdentifier(moduleStr));
+
+  if (shouldImplicityImportSwiftOnoneSupportModule(Invocation))
+    imports.ModuleNames.push_back(Context->getIdentifier(SWIFT_ONONE_SUPPORT));
+
+  imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
+  imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
+  return imports;
+}
+
+ModuleDecl *CompilerInstance::getMainModule() const {
+  if (!MainModule) {
+    Identifier ID = Context->getIdentifier(Invocation.getModuleName());
+    MainModule = ModuleDecl::create(ID, *Context, getImplicitImportInfo());
+    if (Invocation.getFrontendOptions().EnableTesting)
+      MainModule->setTestingEnabled();
+    if (Invocation.getFrontendOptions().EnablePrivateImports)
+      MainModule->setPrivateImportsEnabled();
+    if (Invocation.getFrontendOptions().EnableImplicitDynamic)
+      MainModule->setImplicitDynamicEnabled();
+
+    if (Invocation.getFrontendOptions().EnableLibraryEvolution)
+      MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
+  }
+  return MainModule;
 }
 
 void CompilerInstance::performParseAndResolveImportsOnly() {
@@ -787,49 +777,33 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
     createSILModule();
   }
 
-  if (Invocation.getImplicitModuleImportKind() ==
-      SourceFile::ImplicitModuleImportKind::Stdlib) {
+  if (Invocation.getImplicitStdlibKind() == ImplicitStdlibKind::Stdlib) {
     if (!loadStdlib())
       return;
   }
-  if (shouldImplicityImportSwiftOnoneSupportModule(Invocation)) {
-    Invocation.getFrontendOptions().ImplicitImportModuleNames.push_back(
-        SWIFT_ONONE_SUPPORT.str());
-  }
 
-  const ImplicitImports implicitImports(*this);
+  // Force loading implicit imports. This is currently needed to allow
+  // deserialization to resolve cross references into bridging headers.
+  // FIXME: Once deserialization loads all the modules it needs for cross
+  // references, this can be removed.
+  (void)MainModule->getImplicitImports();
 
   if (Invocation.getInputKind() == InputFileKind::SwiftREPL) {
     // Create the initial empty REPL file. This only exists to feed in the
     // implicit imports such as the standard library.
-    auto *replFile = createSourceFileForMainModule(
-        SourceFileKind::REPL, implicitImports.kind, /*BufferID*/ None);
-    addAdditionalInitialImportsTo(replFile, implicitImports);
-
-    // Given this file is empty, we can go ahead and just mark it as having been
-    // type checked.
-    replFile->ASTStage = SourceFile::TypeChecked;
+    auto *replFile =
+        createSourceFileForMainModule(SourceFileKind::REPL, /*BufferID*/ None);
+    performImportResolution(*replFile);
     return;
   }
 
   // Make sure the main file is the first file in the module, so do this now.
-  if (MainBufferID != NO_SUCH_BUFFER)
-    addMainFileToModule(implicitImports);
+  if (MainBufferID != NO_SUCH_BUFFER) {
+    (void)createSourceFileForMainModule(Invocation.getSourceFileKind(),
+                                        MainBufferID);
+  }
 
-  parseAndCheckTypesUpTo(implicitImports, LimitStage);
-}
-
-CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
-  kind = compiler.Invocation.getImplicitModuleImportKind();
-
-  objCModuleUnderlyingMixedFramework =
-      compiler.Invocation.getFrontendOptions().ImportUnderlyingModule
-          ? compiler.importUnderlyingModule()
-          : nullptr;
-
-  compiler.getImplicitlyImportedModules(modules);
-
-  headerModule = compiler.importBridgingHeader();
+  parseAndCheckTypesUpTo(LimitStage);
 }
 
 bool CompilerInstance::loadStdlib() {
@@ -851,72 +825,11 @@ bool CompilerInstance::loadStdlib() {
   return true;
 }
 
-ModuleDecl *CompilerInstance::importUnderlyingModule() {
-  FrontendStatsTracer tracer(getStatsReporter(), "import-underlying-module");
-  ModuleDecl *objCModuleUnderlyingMixedFramework =
-      static_cast<ClangImporter *>(Context->getClangModuleLoader())
-          ->loadModule(SourceLoc(),
-                       { Located<Identifier>(MainModule->getName(), SourceLoc()) });
-  if (objCModuleUnderlyingMixedFramework)
-    return objCModuleUnderlyingMixedFramework;
-  Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
-                       MainModule->getName());
-  return nullptr;
-}
-
-ModuleDecl *CompilerInstance::importBridgingHeader() {
-  FrontendStatsTracer tracer(getStatsReporter(), "import-bridging-header");
-  const StringRef implicitHeaderPath =
-      Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
-  auto clangImporter =
-      static_cast<ClangImporter *>(Context->getClangModuleLoader());
-  if (implicitHeaderPath.empty() ||
-      clangImporter->importBridgingHeader(implicitHeaderPath, MainModule))
-    return nullptr;
-  ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
-  assert(importedHeaderModule);
-  return importedHeaderModule;
-}
-
-void CompilerInstance::getImplicitlyImportedModules(
-    SmallVectorImpl<ModuleDecl *> &importModules) {
-  FrontendStatsTracer tracer(getStatsReporter(), "get-implicitly-imported-modules");
-  for (auto &ImplicitImportModuleName :
-       Invocation.getFrontendOptions().ImplicitImportModuleNames) {
-    if (Lexer::isIdentifier(ImplicitImportModuleName)) {
-      auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
-      ModuleDecl *importModule =
-        Context->getModule({ Located<Identifier>(moduleID, SourceLoc()) });
-      if (importModule) {
-        importModules.push_back(importModule);
-      } else {
-        Diagnostics.diagnose(SourceLoc(), diag::sema_no_import,
-                             ImplicitImportModuleName);
-        if (Invocation.getSearchPathOptions().SDKPath.empty() &&
-            llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
-          Diagnostics.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
-          Diagnostics.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
-        }
-      }
-    } else {
-      Diagnostics.diagnose(SourceLoc(), diag::error_bad_module_name,
-                           ImplicitImportModuleName, false);
-    }
-  }
-}
-
-void CompilerInstance::addMainFileToModule(
-    const ImplicitImports &implicitImports) {
-  auto *MainFile = createSourceFileForMainModule(
-      Invocation.getSourceFileKind(), implicitImports.kind, MainBufferID);
-  addAdditionalInitialImportsTo(MainFile, implicitImports);
-}
-
 void CompilerInstance::parseAndCheckTypesUpTo(
-    const ImplicitImports &implicitImports, SourceFile::ASTStage_t limitStage) {
+    SourceFile::ASTStage_t limitStage) {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-check-types");
 
-  bool hadLoadError = parsePartialModulesAndLibraryFiles(implicitImports);
+  bool hadLoadError = parsePartialModulesAndLibraryFiles();
   if (Invocation.isCodeCompletion()) {
     // When we are doing code completion, make sure to emit at least one
     // diagnostic, so that ASTContext is marked as erroneous.  In this case
@@ -972,20 +885,17 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   finishTypeChecking();
 }
 
-void CompilerInstance::parseLibraryFile(
-    unsigned BufferID, const ImplicitImports &implicitImports) {
+void CompilerInstance::parseLibraryFile(unsigned BufferID) {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-library-file");
 
-  auto *NextInput = createSourceFileForMainModule(
-      SourceFileKind::Library, implicitImports.kind, BufferID);
-  addAdditionalInitialImportsTo(NextInput, implicitImports);
+  auto *NextInput =
+      createSourceFileForMainModule(SourceFileKind::Library, BufferID);
 
   // Import resolution will lazily trigger parsing of the file.
   performImportResolution(*NextInput);
 }
 
-bool CompilerInstance::parsePartialModulesAndLibraryFiles(
-    const ImplicitImports &implicitImports) {
+bool CompilerInstance::parsePartialModulesAndLibraryFiles() {
   FrontendStatsTracer tracer(getStatsReporter(),
                              "parse-partial-modules-and-library-files");
   bool hadLoadError = false;
@@ -1002,7 +912,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   // Then parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID != MainBufferID) {
-      parseLibraryFile(BufferID, implicitImports);
+      parseLibraryFile(BufferID);
     }
   }
   return hadLoadError;
@@ -1077,8 +987,8 @@ void CompilerInstance::finishTypeChecking() {
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
-    SourceFileKind fileKind, SourceFile::ImplicitModuleImportKind importKind,
-    Optional<unsigned> bufferID, SourceFile::ParsingOptions opts) {
+    SourceFileKind fileKind, Optional<unsigned> bufferID,
+    SourceFile::ParsingOptions opts) {
   ModuleDecl *mainModule = getMainModule();
 
   auto isPrimary = bufferID && isPrimaryInput(*bufferID);
@@ -1092,7 +1002,7 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   }
 
   SourceFile *inputFile = new (*Context)
-      SourceFile(*mainModule, fileKind, bufferID, importKind,
+      SourceFile(*mainModule, fileKind, bufferID,
                  Invocation.getLangOptions().CollectParsedToken,
                  Invocation.getLangOptions().BuildSyntaxTree, opts);
   MainModule->addFile(*inputFile);
@@ -1132,7 +1042,6 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     assert(Kind == InputFileKind::Swift ||
            Kind == InputFileKind::SwiftModuleInterface);
     createSourceFileForMainModule(Invocation.getSourceFileKind(),
-                                  SourceFile::ImplicitModuleImportKind::None,
                                   MainBufferID, parsingOpts);
   }
 
@@ -1142,8 +1051,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
       continue;
 
     SourceFile *NextInput = createSourceFileForMainModule(
-        SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
-        BufferID, parsingOpts);
+        SourceFileKind::Library, BufferID, parsingOpts);
 
     // Force the parsing of the top level decls.
     (void)NextInput->getTopLevelDecls();

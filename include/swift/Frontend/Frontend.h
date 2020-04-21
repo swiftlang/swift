@@ -335,14 +335,15 @@ public:
   /// in generating a cached PCH file for the bridging header.
   std::string getPCHHash() const;
 
-  SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() const {
+  /// Retrieve the stdlib kind to implicitly import.
+  ImplicitStdlibKind getImplicitStdlibKind() const {
     if (getInputKind() == InputFileKind::SIL) {
-      return SourceFile::ImplicitModuleImportKind::None;
+      return ImplicitStdlibKind::None;
     }
     if (getParseStdlib()) {
-      return SourceFile::ImplicitModuleImportKind::Builtin;
+      return ImplicitStdlibKind::Builtin;
     }
-    return SourceFile::ImplicitModuleImportKind::Stdlib;
+    return ImplicitStdlibKind::Stdlib;
   }
 
   /// Performs input setup common to these tools:
@@ -654,7 +655,6 @@ public:
 private:
   SourceFile *
   createSourceFileForMainModule(SourceFileKind FileKind,
-                                SourceFile::ImplicitModuleImportKind ImportKind,
                                 Optional<unsigned> BufferID,
                                 SourceFile::ParsingOptions options = {});
 
@@ -667,38 +667,17 @@ public:
 private:
   /// Load stdlib & return true if should continue, i.e. no error
   bool loadStdlib();
-  ModuleDecl *importUnderlyingModule();
-  ModuleDecl *importBridgingHeader();
 
-  void
-  getImplicitlyImportedModules(SmallVectorImpl<ModuleDecl *> &importModules);
-
-public: // for static functions in Frontend.cpp
-  struct ImplicitImports {
-    SourceFile::ImplicitModuleImportKind kind;
-    ModuleDecl *objCModuleUnderlyingMixedFramework;
-    ModuleDecl *headerModule;
-    SmallVector<ModuleDecl *, 4> modules;
-
-    explicit ImplicitImports(CompilerInstance &compiler);
-  };
-
-  static void addAdditionalInitialImportsTo(
-    SourceFile *SF, const ImplicitImports &implicitImports);
-
-private:
-  void addMainFileToModule(const ImplicitImports &implicitImports);
+  /// Retrieve a description of which modules should be implicitly imported.
+  ImplicitImportInfo getImplicitImportInfo() const;
 
   void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
-  void parseAndCheckTypesUpTo(const ImplicitImports &implicitImports,
-                              SourceFile::ASTStage_t LimitStage);
+  void parseAndCheckTypesUpTo(SourceFile::ASTStage_t LimitStage);
 
-  void parseLibraryFile(unsigned BufferID,
-                        const ImplicitImports &implicitImports);
+  void parseLibraryFile(unsigned BufferID);
 
   /// Return true if had load error
-  bool
-  parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports);
+  bool parsePartialModulesAndLibraryFiles();
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
