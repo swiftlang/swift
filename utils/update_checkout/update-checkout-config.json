@@ -53,7 +53,7 @@
     "default-branch-scheme": "wasm",
     "branch-schemes": {
         "wasm": {
-            "aliases": ["wasm"],
+            "aliases": ["wasm", "swiftwasm"],
             "repos": {
                 "llvm-project": "swiftwasm",
                 "swift": "swiftwasm",
@@ -68,10 +68,33 @@
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
-                "icu": "release-61-1",
-                "cmake": "v3.15.1",               
+                "icu": "release-65-1",
+                "cmake": "v3.16.5",               
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
+                "swift-format": "master"
+            }
+        },
+        "wasm/5.3": {
+            "aliases": ["wasm/5.3", "swiftwasm-release/5.3"],
+            "repos": {
+                "llvm-project": "swiftwasm-release/5.3",
+                "swift": "swiftwasm-release/5.3",
+                "cmark": "release/5.3",
+                "llbuild": "release/5.3",
+                "swiftpm": "swiftwasm-release/5.3",
+                "swift-syntax": "release/5.3",
+                "swift-stress-tester": "release/5.3",
+                "swift-corelibs-xctest": "release/5.3",
+                "swift-corelibs-foundation": "release/5.3",
+                "swift-corelibs-libdispatch": "release/5.3",
+                "swift-integration-tests": "release/5.3",
+                "swift-xcode-playground-support": "release/5.3",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "cmake": "v3.16.5",               
+                "indexstore-db": "release/5.3",
+                "sourcekit-lsp": "release/5.3",
                 "swift-format": "master"
             }
         },
