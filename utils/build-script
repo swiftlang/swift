@@ -545,11 +545,6 @@ class BuildScriptInvocation(object):
                     args.host_target, product_name))
             cmake_opts = product.cmake_options
 
-            # SWIFT_ENABLE_TENSORFLOW
-            # TensorFlow is not built using CMake and has no CMake options.
-            if product_class is products.TensorFlow:
-                continue
-
             # FIXME: We should be using pipes.quote here but we run into issues
             # with build-script-impl/cmake not being happy with all of the
             # extra "'" in the strings. To fix this easily, we really need to
@@ -916,7 +911,6 @@ class BuildScriptInvocation(object):
         if self.args.build_pythonkit:
             product_classes.append(products.PythonKit)
         if self.args.build_tensorflow_swift_apis:
-            product_classes.append(products.TensorFlow)
             product_classes.append(products.TensorFlowSwiftAPIs)
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
