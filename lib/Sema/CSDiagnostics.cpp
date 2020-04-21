@@ -72,30 +72,6 @@ TypedNode FailureDiagnostic::getAnchor() const {
   return anchor;
 }
 
-SourceLoc FailureDiagnostic::getLoc(TypedNode anchor) {
-  if (auto *E = anchor.dyn_cast<const Expr *>()) {
-    return E->getLoc();
-  } else if (auto *T = anchor.dyn_cast<const TypeLoc *>()) {
-    return T->getLoc();
-  } else if (auto *V = anchor.dyn_cast<const VarDecl *>()) {
-    return V->getNameLoc();
-  } else {
-    return anchor.get<const Pattern *>()->getLoc();
-  }
-}
-
-SourceRange FailureDiagnostic::getSourceRange(TypedNode anchor) {
-  if (auto *E = anchor.dyn_cast<const Expr *>()) {
-    return E->getSourceRange();
-  } else if (auto *T = anchor.dyn_cast<const TypeLoc *>()) {
-    return T->getSourceRange();
-  } else if (auto *V = anchor.dyn_cast<const VarDecl *>()) {
-    return V->getSourceRange();
-  } else {
-    return anchor.get<const Pattern *>()->getSourceRange();
-  }
-}
-
 Type FailureDiagnostic::getType(TypedNode node, bool wantRValue) const {
   return resolveType(S.getType(node), /*reconstituteSugar=*/false, wantRValue);
 }
@@ -734,7 +710,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   if (!diagnostic)
     return false;
 
-  emitDiagnosticAt(getLoc(anchor), *diagnostic, fromType, toType);
+  emitDiagnosticAt(::getLoc(anchor), *diagnostic, fromType, toType);
   emitNotesForMismatches();
   return true;
 }
@@ -2580,7 +2556,7 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     if (conformsToKnownProtocol(CS, fromType, KnownProtocolKind::OptionSet) &&
         isExpr<IntegerLiteralExpr>(anchor) &&
         castToExpr<IntegerLiteralExpr>(anchor)->getDigitsText() == "0") {
-      diagnostic.fixItReplace(getSourceRange(anchor), "[]");
+      diagnostic.fixItReplace(::getSourceRange(anchor), "[]");
       return true;
     }
     if (auto rawTy = isRawRepresentable(CS, toType, rawRepresentableProtocol)) {
@@ -3045,7 +3021,7 @@ TypedNode MissingCallFailure::getAnchor() const {
 
 bool MissingCallFailure::diagnoseAsError() {
   auto anchor = getAnchor();
-  SourceLoc insertLoc = getSourceRange(anchor).End;
+  SourceLoc insertLoc = getSourceRange().End;
 
   // Calls are not yet supported by key path, but it
   // is useful to record this fix to diagnose chaining
@@ -3063,7 +3039,7 @@ bool MissingCallFailure::diagnoseAsError() {
     case ConstraintLocator::ApplyArgToParam: {
       auto fnType = getType(anchor)->castTo<FunctionType>();
       emitDiagnostic(diag::missing_nullary_call, fnType->getResult())
-          .fixItInsertAfter(getSourceRange().End, "()");
+          .fixItInsertAfter(insertLoc, "()");
       return true;
     }
 
@@ -3142,7 +3118,7 @@ bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
 }
 
 bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
-  auto endLoc = getLoc(getAnchor()).getAdvancedLoc(1);
+  auto endLoc = getLoc().getAdvancedLoc(1);
 
   if (auto *member = getReferencedMember()) {
     emitDiagnostic(diag::incorrect_property_wrapper_reference_member,
@@ -3238,7 +3214,7 @@ bool MissingMemberFailure::diagnoseAsError() {
 
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
-  DeclNameLoc nameLoc(FailureDiagnostic::getLoc(anchor));
+  DeclNameLoc nameLoc(::getLoc(anchor));
   if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
     nameLoc = UDE->getNameLoc();
   } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
@@ -3336,8 +3312,7 @@ bool MissingMemberFailure::diagnoseAsError() {
       emitBasicError(baseType);
     }
   } else if (auto moduleTy = baseType->getAs<ModuleType>()) {
-    emitDiagnosticAt(FailureDiagnostic::getLoc(memberBase),
-                     diag::no_member_of_module,
+    emitDiagnosticAt(::getLoc(memberBase), diag::no_member_of_module,
                      moduleTy->getModule()->getName(), getName())
         .highlight(getSourceRange())
         .highlight(nameLoc.getSourceRange());
@@ -4740,7 +4715,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
       return false;
   }
 
-  auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : getLoc(anchor);
+  auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
   auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
   if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
     emitDiagnosticAt(loc, diag::init_candidate_inaccessible,
@@ -4764,7 +4739,7 @@ SourceLoc AnyObjectKeyPathRootFailure::getLoc() const {
       return rootTyRepr->getLoc();
   }
 
-  return FailureDiagnostic::getLoc(anchor);
+  return ::getLoc(anchor);
 }
 
 SourceRange AnyObjectKeyPathRootFailure::getSourceRange() const {
@@ -4775,7 +4750,7 @@ SourceRange AnyObjectKeyPathRootFailure::getSourceRange() const {
       return rootTyRepr->getSourceRange();
   }
 
-  return FailureDiagnostic::getSourceRange(anchor);
+  return ::getSourceRange(anchor);
 }
 
 bool AnyObjectKeyPathRootFailure::diagnoseAsError() {
@@ -4813,7 +4788,7 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
     return KPE->getComponents()[component->getIndex()].getLoc();
   }
 
-  return FailureDiagnostic::getLoc(anchor);
+  return ::getLoc(anchor);
 }
 
 bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
@@ -4840,7 +4815,7 @@ SourceLoc InvalidUseOfAddressOf::getLoc() const {
   if (auto *assign = getAsExpr<AssignExpr>(anchor))
     return assign->getSrc()->getLoc();
 
-  return FailureDiagnostic::getLoc(anchor);
+  return ::getLoc(anchor);
 }
 
 bool InvalidUseOfAddressOf::diagnoseAsError() {
@@ -5509,7 +5484,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (getType(argument, /*wantRValue=*/false)->is<LValueType>()) {
     auto elementTy = paramType->getAnyPointerElementType();
     if (elementTy && argType->isEqual(elementTy)) {
-      diag.fixItInsert(getSourceRange(argument).Start, "&");
+      diag.fixItInsert(::getSourceRange(argument).Start, "&");
       return true;
     }
   }
@@ -5965,8 +5940,8 @@ bool NonEphemeralConversionFailure::diagnosePointerInit() const {
                     : diag::cannot_construct_dangling_pointer;
 
   auto anchor = getRawAnchor();
-  emitDiagnosticAt(getLoc(anchor), diagID, constructedTy, constructorKind)
-      .highlight(getSourceRange(anchor));
+  emitDiagnosticAt(::getLoc(anchor), diagID, constructedTy, constructorKind)
+      .highlight(::getSourceRange(anchor));
 
   emitSuggestionNotes();
   return true;
@@ -6155,7 +6130,7 @@ getImportModuleAndDefaultType(const ASTContext &ctx,
 }
 
 SourceLoc UnableToInferProtocolLiteralType::getLoc() const {
-  return FailureDiagnostic::getLoc(getRawAnchor());
+  return ::getLoc(getRawAnchor());
 }
 
 bool UnableToInferProtocolLiteralType::diagnoseAsError() {

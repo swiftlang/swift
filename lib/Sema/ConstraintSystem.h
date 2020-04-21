@@ -455,6 +455,27 @@ public:
 
 namespace constraints {
 
+template <typename T = Expr> T *castToExpr(TypedNode node) {
+  return cast<T>(const_cast<Expr *>(node.get<const Expr *>()));
+}
+
+template <typename T = Expr> T *getAsExpr(TypedNode node) {
+  if (const auto *E = node.dyn_cast<const Expr *>())
+    return dyn_cast_or_null<T>(const_cast<Expr *>(E));
+  return nullptr;
+}
+
+template <typename T> bool isExpr(TypedNode node) {
+  if (node.isNull() || !node.is<const Expr *>())
+    return false;
+
+  auto *E = node.get<const Expr *>();
+  return isa<T>(E);
+}
+
+SourceLoc getLoc(TypedNode node);
+SourceRange getSourceRange(TypedNode node);
+
 /// The result of comparing two constraint systems that are a solutions
 /// to the given set of constraints.
 enum class SolutionCompareResult {

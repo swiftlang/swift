@@ -50,10 +50,10 @@ public:
 
   virtual ~FailureDiagnostic();
 
-  virtual SourceLoc getLoc() const { return getLoc(getAnchor()); }
+  virtual SourceLoc getLoc() const { return constraints::getLoc(getAnchor()); }
 
   virtual SourceRange getSourceRange() const {
-    return getSourceRange(getAnchor());
+    return constraints::getSourceRange(getAnchor());
   }
 
   /// Try to diagnose a problem given affected expression,
@@ -201,24 +201,6 @@ protected:
       Type type,
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
-
-  static SourceLoc getLoc(TypedNode node);
-  static SourceRange getSourceRange(TypedNode node);
-
-  template <typename T> static const T *castToExpr(TypedNode node) {
-    return cast<T>(node.get<const Expr *>());
-  }
-
-  template <typename T> static T *getAsExpr(TypedNode node) {
-    if (const auto *E = node.dyn_cast<const Expr *>())
-      return dyn_cast<T>(const_cast<Expr *>(E));
-    return nullptr;
-  }
-
-  template <typename T> static bool isExpr(TypedNode node) {
-    auto *E = node.get<const Expr *>();
-    return isa<T>(E);
-  }
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -1065,7 +1047,7 @@ public:
 
   SourceLoc getLoc() const override {
     // Diagnostic should point to the member instead of its base expression.
-    return FailureDiagnostic::getLoc(getRawAnchor());
+    return constraints::getLoc(getRawAnchor());
   }
 
   bool diagnoseAsError() override;

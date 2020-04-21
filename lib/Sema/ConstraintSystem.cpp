@@ -4447,3 +4447,27 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
 
   ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
 }
+
+SourceLoc constraints::getLoc(TypedNode anchor) {
+  if (auto *E = anchor.dyn_cast<const Expr *>()) {
+    return E->getLoc();
+  } else if (auto *T = anchor.dyn_cast<const TypeLoc *>()) {
+    return T->getLoc();
+  } else if (auto *V = anchor.dyn_cast<const VarDecl *>()) {
+    return V->getNameLoc();
+  } else {
+    return anchor.get<const Pattern *>()->getLoc();
+  }
+}
+
+SourceRange constraints::getSourceRange(TypedNode anchor) {
+  if (auto *E = anchor.dyn_cast<const Expr *>()) {
+    return E->getSourceRange();
+  } else if (auto *T = anchor.dyn_cast<const TypeLoc *>()) {
+    return T->getSourceRange();
+  } else if (auto *V = anchor.dyn_cast<const VarDecl *>()) {
+    return V->getSourceRange();
+  } else {
+    return anchor.get<const Pattern *>()->getSourceRange();
+  }
+}
