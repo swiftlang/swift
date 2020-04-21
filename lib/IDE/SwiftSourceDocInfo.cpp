@@ -102,7 +102,7 @@ std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, Arra
 
   // handle any unresolved locs past the end of the last AST node or comment
   std::vector<ResolvedLoc> Remaining(Locs.size() - ResolvedLocs.size(), {
-    ASTWalker::ParentTy(), CharSourceRange(), {}, LabelRangeType::None,
+    ASTWalker::ParentTy(), CharSourceRange(), {}, None, LabelRangeType::None,
     /*isActice*/true, /*isInSelector*/false});
   ResolvedLocs.insert(ResolvedLocs.end(), Remaining.begin(), Remaining.end());
 
@@ -236,15 +236,15 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
       LabelRanges = getLabelRanges(ParamList, getSourceMgr());
     }
     tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::Param,
-               LabelRanges);
+               LabelRanges, None);
   } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
     tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::NoncollapsibleParam,
-               getLabelRanges(SD->getIndices(), getSourceMgr()));
+               getLabelRanges(SD->getIndices(), getSourceMgr()), None);
   } else if (EnumElementDecl *EED = dyn_cast<EnumElementDecl>(D)) {
     if (auto *ParamList = EED->getParameterList()) {
       auto LabelRanges = getEnumParamListInfo(getSourceMgr(), ParamList);
       tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::CallArg,
-                 LabelRanges);
+                 LabelRanges, None);
     } else {
       tryResolve(ASTWalker::ParentTy(D), D->getLoc());
     }
@@ -360,7 +360,8 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
 
         auto Labels = getCallArgLabelRanges(getSourceMgr(), SubExpr->getIndex(),
                                             LabelRangeEndAt::BeforeElemStart);
-        tryResolve(ASTWalker::ParentTy(E), E->getLoc(), LabelRangeType::CallArg, Labels);
+        tryResolve(ASTWalker::ParentTy(E), E->getLoc(), LabelRangeType::CallArg,
+                   Labels.first, Labels.second);
         if (isDone())
             break;
         if (!SubExpr->getIndex()->walk(*this))
@@ -377,7 +378,7 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
         auto Labels = getCallArgLabelRanges(getSourceMgr(), P,
                                             LabelRangeEndAt::BeforeElemStart);
         tryResolve(ASTWalker::ParentTy(E), P->getLParenLoc(),
-                   LabelRangeType::CallArg, Labels);
+                   LabelRangeType::CallArg, Labels.first, Labels.second);
         break;
       }
       case ExprKind::Tuple: {
@@ -386,7 +387,7 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
         auto Labels = getCallArgLabelRanges(getSourceMgr(), T,
                                             LabelRangeEndAt::BeforeElemStart);
         tryResolve(ASTWalker::ParentTy(E), T->getLParenLoc(),
-                   LabelRangeType::CallArg, Labels);
+                   LabelRangeType::CallArg, Labels.first, Labels.second);
         if (isDone())
           break;
 
@@ -483,8 +484,10 @@ bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
     // If we're walking a CustomAttr's type we may have an associated call
     // argument to resolve with from its semantic initializer.
     if (CustomAttrArg.hasValue() && CustomAttrArg->Loc == T->getLoc()) {
+      auto Labels = getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->Item,
+                                          LabelRangeEndAt::BeforeElemStart);
       tryResolve(ASTWalker::ParentTy(T), T->getLoc(), LabelRangeType::CallArg,
-                 getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->Item, LabelRangeEndAt::BeforeElemStart));
+                 Labels.first, Labels.second);
     } else {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc());
     }
@@ -525,7 +528,7 @@ void NameMatcher::skipLocsBefore(SourceLoc Start) {
     if (!checkComments()) {
       LocsToResolve.pop_back();
       ResolvedLocs.push_back({ASTWalker::ParentTy(), CharSourceRange(), {},
-        LabelRangeType::None, isActive(), isInSelector()});
+        None, LabelRangeType::None, isActive(), isInSelector()});
     }
   }
 }
@@ -590,7 +593,7 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
   if (NameLoc.isCompound()) {
     auto Labels = getSelectorLabelRanges(getSourceMgr(), NameLoc);
     bool Resolved = tryResolve(Node, NameLoc.getBaseNameLoc(),
-                               LabelRangeType::Selector, Labels);
+                               LabelRangeType::Selector, Labels, None);
     if (!isDone()) {
       for (auto Label: Labels) {
         if (tryResolve(Node, Label.getStart())) {
@@ -604,10 +607,12 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
   }
 
   if (LocsToResolve.back().ResolveArgLocs) {
-    if (Arg)
+    if (Arg) {
+      auto Labels = getCallArgLabelRanges(getSourceMgr(), Arg,
+                                          LabelRangeEndAt::BeforeElemStart);
       return tryResolve(Node, NameLoc.getBaseNameLoc(), LabelRangeType::CallArg,
-                        getCallArgLabelRanges(getSourceMgr(), Arg,
-                                              LabelRangeEndAt::BeforeElemStart));
+                        Labels.first, Labels.second);
+    }
   }
 
   return tryResolve(Node, NameLoc.getBaseNameLoc());
@@ -615,12 +620,13 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
 
 bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc) {
   assert(!isDone());
-  return tryResolve(Node, NameLoc, LabelRangeType::None, None);
+  return tryResolve(Node, NameLoc, LabelRangeType::None, None, None);
 }
 
 bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
                              LabelRangeType RangeType,
-                             ArrayRef<CharSourceRange> LabelRanges) {
+                             ArrayRef<CharSourceRange> LabelRanges,
+                             Optional<unsigned> FirstTrailingLabel) {
   skipLocsBefore(NameLoc);
   if (isDone())
     return false;
@@ -632,8 +638,8 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
   if (Range.isValid()) {
     if (NameLoc == Next.Loc) {
       LocsToResolve.pop_back();
-      ResolvedLocs.push_back({Node, Range, LabelRanges, RangeType,
-        isActive(), isInSelector()});
+      ResolvedLocs.push_back({Node, Range, LabelRanges, FirstTrailingLabel,
+        RangeType, isActive(), isInSelector()});
       if (isDone())
         return true;
       WasResolved = true;
@@ -647,7 +653,7 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
                                       Range.getByteLength() - 1);
       if (NewRange.getStart() == Next.Loc) {
         LocsToResolve.pop_back();
-        ResolvedLocs.push_back({Node, NewRange, {}, LabelRangeType::None,
+        ResolvedLocs.push_back({Node, NewRange, {}, None, LabelRangeType::None,
           isActive(), isInSelector()});
         WasResolved = true;
       }
@@ -879,6 +885,7 @@ std::vector<CallArgInfo> swift::ide::
 getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   std::vector<CallArgInfo> InfoVec;
   if (auto *TE = dyn_cast<TupleExpr>(Arg)) {
+    auto FirstTrailing = TE->getUnlabeledTrailingClosureIndexOfPackedArgument();
     for (size_t ElemIndex: range(TE->getNumElements())) {
       Expr *Elem = TE->getElement(ElemIndex);
       if (isa<DefaultArgumentExpr>(Elem))
@@ -887,14 +894,14 @@ getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
       SourceLoc LabelStart(Elem->getStartLoc());
       SourceLoc LabelEnd(LabelStart);
 
-      auto NameIdentifier = TE->getElementName(ElemIndex);
-      if (!NameIdentifier.empty()) {
-        LabelStart = TE->getElementNameLoc(ElemIndex);
-        if (EndKind == LabelRangeEndAt::LabelNameOnly)
-          LabelEnd = LabelStart.getAdvancedLoc(NameIdentifier.getLength());
+      bool IsTrailingClosure = FirstTrailing && ElemIndex >= *FirstTrailing;
+      SourceLoc NameLoc = TE->getElementNameLoc(ElemIndex);
+      if (NameLoc.isValid()) {
+        LabelStart = NameLoc;
+        if (EndKind == LabelRangeEndAt::LabelNameOnly || IsTrailingClosure) {
+          LabelEnd = Lexer::getLocForEndOfToken(SM, NameLoc);
+        }
       }
-      bool IsTrailingClosure = TE->hasTrailingClosure() &&
-        ElemIndex == TE->getNumElements() - 1;
       InfoVec.push_back({getSingleNonImplicitChild(Elem),
         CharSourceRange(SM, LabelStart, LabelEnd), IsTrailingClosure});
     }
@@ -909,17 +916,19 @@ getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   return InfoVec;
 }
 
-std::vector<CharSourceRange> swift::ide::
+std::pair<std::vector<CharSourceRange>, Optional<unsigned>> swift::ide::
 getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   std::vector<CharSourceRange> Ranges;
   auto InfoVec = getCallArgInfo(SM, Arg, EndKind);
 
-  auto EndWithoutTrailing = std::remove_if(InfoVec.begin(), InfoVec.end(),
-                                           [](CallArgInfo &Info) {
-                                             return Info.IsTrailingClosure;
-                                           });
-  std::transform(InfoVec.begin(), EndWithoutTrailing,
-                 std::back_inserter(Ranges),
+  Optional<unsigned> FirstTrailing;
+  auto I = std::find_if(InfoVec.begin(), InfoVec.end(), [](CallArgInfo &Info) {
+    return Info.IsTrailingClosure;
+  });
+  if (I != InfoVec.end())
+    FirstTrailing = std::distance(InfoVec.begin(), I);
+
+  std::transform(InfoVec.begin(), InfoVec.end(), std::back_inserter(Ranges),
                  [](CallArgInfo &Info) { return Info.LabelRange; });
-  return Ranges;
+  return {Ranges, FirstTrailing};
 }
