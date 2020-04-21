@@ -58,12 +58,14 @@ swift::createIncrementBefore(SILValue ptr, SILInstruction *insertPt) {
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
   if (ptr->getType().isReferenceCounted(builder.getModule())) {
-    if (ptr->getType().is<UnownedStorageType>())
-      return builder.createUnownedRetain(loc, ptr,
-                                         builder.getDefaultAtomicity());
-    else
-      return builder.createStrongRetain(loc, ptr,
-                                        builder.getDefaultAtomicity());
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+    if (ptr->getType().is<Name##StorageType>())                                \
+      return builder.create##Name##Retain(loc, ptr,                            \
+                                          builder.getDefaultAtomicity());
+#include "swift/AST/ReferenceStorage.def"
+
+    return builder.createStrongRetain(loc, ptr,
+                                      builder.getDefaultAtomicity());
   }
 
   // Otherwise, create the retain_value.
@@ -85,12 +87,14 @@ swift::createDecrementBefore(SILValue ptr, SILInstruction *insertPt) {
 
   // If ptr has reference semantics itself, create a strong_release.
   if (ptr->getType().isReferenceCounted(builder.getModule())) {
-    if (ptr->getType().is<UnownedStorageType>())
-      return builder.createUnownedRelease(loc, ptr,
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+    if (ptr->getType().is<Name##StorageType>())                                \
+      return builder.create##Name##Release(loc, ptr,                           \
                                           builder.getDefaultAtomicity());
-    else
-      return builder.createStrongRelease(loc, ptr,
-                                         builder.getDefaultAtomicity());
+#include "swift/AST/ReferenceStorage.def"
+
+    return builder.createStrongRelease(loc, ptr,
+                                       builder.getDefaultAtomicity());
   }
 
   // Otherwise create a release value.
