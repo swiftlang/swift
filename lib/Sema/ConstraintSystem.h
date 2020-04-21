@@ -917,7 +917,7 @@ public:
   llvm::MapVector<TypedNode, Type> nodeTypes;
 
   /// Contextual types introduced by this solution.
-  std::vector<std::pair<const Expr *, ContextualTypeInfo>> contextualTypes;
+  std::vector<std::pair<TypedNode, ContextualTypeInfo>> contextualTypes;
 
   /// Maps AST nodes to their solution application targets.
   llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
@@ -1719,7 +1719,7 @@ private:
 
   /// Contextual type information for expressions that are part of this
   /// constraint system.
-  llvm::MapVector<const Expr *, ContextualTypeInfo> contextualTypes;
+  llvm::MapVector<TypedNode, ContextualTypeInfo> contextualTypes;
 
   /// Information about each case label item tracked by the constraint system.
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
@@ -2527,37 +2527,37 @@ public:
     return E;
   }
 
-  void setContextualType(
-      const Expr *expr, TypeLoc T, ContextualTypePurpose purpose) {
-    assert(expr != nullptr && "Expected non-null expression!");
-    assert(contextualTypes.count(expr) == 0 &&
+  void setContextualType(TypedNode node, TypeLoc T,
+                         ContextualTypePurpose purpose) {
+    assert(bool(node) && "Expected non-null expression!");
+    assert(contextualTypes.count(node) == 0 &&
            "Already set this contextual type");
-    contextualTypes[expr] = { T, purpose };
+    contextualTypes[node] = {T, purpose};
   }
 
-  Optional<ContextualTypeInfo> getContextualTypeInfo(const Expr *expr) const {
-    auto known = contextualTypes.find(expr);
+  Optional<ContextualTypeInfo> getContextualTypeInfo(TypedNode node) const {
+    auto known = contextualTypes.find(node);
     if (known == contextualTypes.end())
       return None;
     return known->second;
   }
 
-  Type getContextualType(const Expr *expr) const {
-    auto result = getContextualTypeInfo(expr);
+  Type getContextualType(TypedNode node) const {
+    auto result = getContextualTypeInfo(node);
     if (result)
       return result->typeLoc.getType();
     return Type();
   }
 
-  TypeLoc getContextualTypeLoc(const Expr *expr) const {
-    auto result = getContextualTypeInfo(expr);
+  TypeLoc getContextualTypeLoc(TypedNode node) const {
+    auto result = getContextualTypeInfo(node);
     if (result)
       return result->typeLoc;
     return TypeLoc();
   }
 
-  ContextualTypePurpose getContextualTypePurpose(const Expr *expr) const {
-    auto result = getContextualTypeInfo(expr);
+  ContextualTypePurpose getContextualTypePurpose(TypedNode node) const {
+    auto result = getContextualTypeInfo(node);
     if (result)
       return result->purpose;
     return CTP_Unused;

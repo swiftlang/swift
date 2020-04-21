@@ -119,17 +119,17 @@ protected:
 
   Type getContextualType(TypedNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualType(anchor.get<const Expr *>());
+    return cs.getContextualType(anchor);
   }
 
   TypeLoc getContextualTypeLoc(TypedNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualTypeLoc(anchor.get<const Expr *>());
+    return cs.getContextualTypeLoc(anchor);
   }
 
   ContextualTypePurpose getContextualTypePurpose(TypedNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualTypePurpose(anchor.get<const Expr *>());
+    return cs.getContextualTypePurpose(anchor);
   }
 
   DeclContext *getDC() const {

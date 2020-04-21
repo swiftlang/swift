@@ -189,8 +189,7 @@ bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
 
   if (IsContextual) {
     auto &cs = solution.getConstraintSystem();
-    auto context =
-        cs.getContextualTypePurpose(locator->getAnchor().get<const Expr *>());
+    auto context = cs.getContextualTypePurpose(locator->getAnchor());
     MissingContextualConformanceFailure failure(
         solution, context, NonConformingType, ProtocolType, locator);
     return failure.diagnose(asNote);
@@ -265,7 +264,7 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
            locator->isLastElement<LocatorPathElt::FunctionArgument>());
 
     auto &cs = solution.getConstraintSystem();
-    auto *anchor = locator->getAnchor().get<const Expr *>();
+    auto anchor = locator->getAnchor();
     auto contextualType = cs.getContextualType(anchor);
     auto exprType = cs.getType(anchor);
     return std::make_tuple(cs.getContextualTypePurpose(anchor), exprType,
@@ -314,8 +313,7 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
   Type toType;
 
   if (getFromType()->is<TupleType>() && getToType()->is<TupleType>()) {
-    purpose =
-        cs.getContextualTypePurpose(locator->getAnchor().get<const Expr *>());
+    purpose = cs.getContextualTypePurpose(locator->getAnchor());
     fromType = getFromType();
     toType = getToType();
   } else if (auto contextualTypeInfo =
