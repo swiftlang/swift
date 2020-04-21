@@ -593,7 +593,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   using namespace constraints;
   auto dc = var->getInnermostDeclContext();
   ConstraintSystem cs(dc, None);
-  auto emptyLocator = cs.getConstraintLocator(nullptr);
+  auto emptyLocator = cs.getConstraintLocator({});
   
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Type valueMemberType;

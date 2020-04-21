@@ -802,11 +802,6 @@ struct Score {
 
 };
 
-/// An AST node that can gain type information while solving.
-using TypedNode =
-    llvm::PointerUnion<const Expr *, const TypeLoc *,
-                       const VarDecl *, const Pattern *>;
-
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
@@ -1020,7 +1015,7 @@ public:
                                       bool lookThroughApply = true) const;
 
   ConstraintLocator *
-  getConstraintLocator(const Expr *anchor,
+  getConstraintLocator(TypedNode anchor,
                        ArrayRef<LocatorPathElt> path = {}) const;
 
   ConstraintLocator *getConstraintLocator(ConstraintLocator *baseLocator,
@@ -1867,11 +1862,7 @@ private:
         if (!locator)
           continue;
 
-        if (auto *anchor = locator->getAnchor()) {
-          auto *OSR = dyn_cast<OverloadSetRefExpr>(anchor);
-          if (!OSR)
-            continue;
-
+        if (auto *OSR = getAsExpr<OverloadSetRefExpr>(locator->getAnchor())) {
           if (shrunkExprs.count(OSR) > 0)
             --unsolvedDisjunctions;
         }
@@ -2606,34 +2597,29 @@ public:
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
   ConstraintLocator *
-  getConstraintLocator(Expr *anchor,
+  getConstraintLocator(TypedNode anchor,
                        ArrayRef<ConstraintLocator::PathElement> path,
                        unsigned summaryFlags);
 
   /// Retrive the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags
   ConstraintLocator *
-  getConstraintLocator(Expr *anchor,
+  getConstraintLocator(TypedNode anchor,
                        ArrayRef<ConstraintLocator::PathElement> path);
 
   /// Retrieve the constraint locator for the given anchor and
   /// an empty path, uniqued.
-  ConstraintLocator *getConstraintLocator(Expr *anchor) {
+  ConstraintLocator *getConstraintLocator(TypedNode anchor) {
     return getConstraintLocator(anchor, {}, 0);
   }
 
   /// Retrieve the constraint locator for the given anchor and
   /// path element.
   ConstraintLocator *
-  getConstraintLocator(Expr *anchor, ConstraintLocator::PathElement pathElt) {
+  getConstraintLocator(TypedNode anchor,
+                       ConstraintLocator::PathElement pathElt) {
     return getConstraintLocator(anchor, llvm::makeArrayRef(pathElt),
                                 pathElt.getNewSummaryFlags());
-  }
-
-  ConstraintLocator *
-  getConstraintLocator(const Expr *anchor,
-                       ConstraintLocator::PathElement pathElt) {
-    return getConstraintLocator(const_cast<Expr *>(anchor), pathElt);
   }
 
   /// Extend the given constraint locator with a path element.
@@ -4967,8 +4953,7 @@ ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
                                    ConstraintLocator *locator,
                                    SourceRange &range);
 
-void simplifyLocator(Expr *&anchor,
-                     ArrayRef<LocatorPathElt> &path,
+void simplifyLocator(TypedNode &anchor, ArrayRef<LocatorPathElt> &path,
                      SourceRange &range);
 
 /// Simplify the given locator down to a specific anchor expression,
@@ -4976,14 +4961,14 @@ void simplifyLocator(Expr *&anchor,
 ///
 /// \returns the anchor expression if it fully describes the locator, or
 /// null otherwise.
-Expr *simplifyLocatorToAnchor(ConstraintLocator *locator);
+TypedNode simplifyLocatorToAnchor(ConstraintLocator *locator);
 
-/// Retrieve argument at specified index from given expression.
+/// Retrieve argument at specified index from given node.
 /// The expression could be "application", "subscript" or "member" call.
 ///
 /// \returns argument expression or `nullptr` if given "base" expression
 /// wasn't of one of the kinds listed above.
-Expr *getArgumentExpr(Expr *expr, unsigned index);
+Expr *getArgumentExpr(TypedNode node, unsigned index);
 
 /// Determine whether given locator points to one of the arguments
 /// associated with the call to an operator. If the operator name
