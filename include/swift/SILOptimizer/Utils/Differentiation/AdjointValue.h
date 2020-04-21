@@ -164,6 +164,7 @@ public:
       break;
     }
   }
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); };
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
