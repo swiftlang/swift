@@ -186,15 +186,15 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   // a C++ standard library if it's not needed, in particular because the
   // standard library that `clang++` selects by default may not be the one that
   // is desired.
-  const char *Clang =
+  const char *LinkerDriver =
       context.Args.hasArg(options::OPT_enable_experimental_cxx_interop) ?
       "clang++" : "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
-    // If there is a clang in the toolchain folder, use that instead.
-    if (auto tool = llvm::sys::findProgramByName(Clang, {toolchainPath})) {
-      Clang = context.Args.MakeArgString(tool.get());
+    // If there is a linker driver in the toolchain folder, use that instead.
+    if (auto tool = llvm::sys::findProgramByName(LinkerDriver, {toolchainPath})) {
+      LinkerDriver = context.Args.MakeArgString(tool.get());
     }
 
     // Look for binutils in the toolchain folder.
@@ -350,7 +350,7 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  InvocationInfo II{Clang, Arguments};
+  InvocationInfo II{LinkerDriver, Arguments};
   II.allowsResponseFiles = true;
 
   return II;
