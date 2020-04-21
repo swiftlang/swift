@@ -467,6 +467,11 @@ if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
       expectEqual("Int", _typeName(Int.self, qualified: false))
     }
   }
+
+  DemangleToMetadataTests.test("Check _mangledTypeName with Any.Type") {
+    let type: Any.Type = Int.self
+    expectEqual("Si", _mangledTypeName(type))
+  }
 }
 
 

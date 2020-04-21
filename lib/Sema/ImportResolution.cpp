@@ -172,15 +172,13 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   /// The list of fully bound imports.
   SmallVector<ImportedModuleDesc, 16> boundImports;
 
-  /// All imported modules, including by re-exports, and including submodules.
-  llvm::DenseSet<ImportedModuleDesc> visibleModules;
-
-  /// \c visibleModules but without the submodules.
+  /// All imported modules which should be considered when cross-importing.
+  /// This is basically the transitive import graph, but with only top-level
+  /// modules and without reexports from Objective-C modules.
   ///
   /// We use a \c SmallSetVector here because this doubles as the worklist for
   /// cross-importing, so we want to keep it in order; this is feasible
-  /// because this set is usually fairly small, while \c visibleModules is
-  /// often enormous.
+  /// because this set is usually fairly small.
   SmallSetVector<ImportedModuleDesc, 64> crossImportableModules;
 
   /// The subset of \c crossImportableModules which may declare cross-imports.
@@ -223,7 +221,7 @@ private:
 
   /// Adds \p desc and everything it re-exports to \c visibleModules using
   /// the settings from \c desc.
-  void addVisibleModules(ImportedModuleDesc desc);
+  void addCrossImportableModules(ImportedModuleDesc desc);
 
   /// * If \p I is a cross-import overlay, registers \p M as overlaying
   ///   \p I.underlyingModule in \c SF.
@@ -341,7 +339,7 @@ void ImportResolver::bindImport(UnboundImport &&I) {
 
 void ImportResolver::addImport(const UnboundImport &I, ModuleDecl *M) {
   auto importDesc = I.makeDesc(M);
-  addVisibleModules(importDesc);
+  addCrossImportableModules(importDesc);
   boundImports.push_back(importDesc);
 }
 
@@ -914,6 +912,11 @@ void ImportResolver::findCrossImports(
                          declaringImport.module.second->getName(),
                          bystandingImport.module.second->getName(), name);
 
+    if (ctx.LangOpts.EnableCrossImportRemarks)
+      ctx.Diags.diagnose(I.importLoc, diag::cross_import_added,
+                         declaringImport.module.second->getName(),
+                         bystandingImport.module.second->getName(), name);
+
     LLVM_DEBUG({
       auto &crossImportOptions = unboundImports.back().options;
       llvm::dbgs() << "  ";
@@ -931,7 +934,7 @@ static bool isSubmodule(ModuleDecl* M) {
   return clangMod && clangMod->Parent;
 }
 
-void ImportResolver::addVisibleModules(ImportedModuleDesc importDesc) {
+void ImportResolver::addCrossImportableModules(ImportedModuleDesc importDesc) {
   // FIXME: namelookup::getAllImports() doesn't quite do what we need (mainly
   // w.r.t. scoped imports), but it seems like we could extend it to do so, and
   // then eliminate most of this.
@@ -948,19 +951,34 @@ void ImportResolver::addVisibleModules(ImportedModuleDesc importDesc) {
                                       nextImport.first))
       continue;
 
+    // If we are importing a submodule, treat it as though we imported its
+    // top-level module (or rather, the top-level module's clang overlay if it
+    // has one).
+    if (isSubmodule(nextImport.second)) {
+      nextImport.second =
+          nextImport.second->getTopLevelModule(/*overlay=*/true);
+
+      // If the rewritten import is now for our own parent module, this was an
+      // import of our own clang submodule in a mixed-language module. We don't
+      // want to process our own cross-imports.
+      if (nextImport.second == SF.getParentModule())
+        continue;
+    }
+
     // Drop this module into the ImportDesc so we treat it as imported with the
     // same options and scope as `I`.
     importDesc.module.second = nextImport.second;
 
-    // If we've already imported it, we've also already imported its
-    // imports.
-    if (!visibleModules.insert(importDesc).second)
+    // Add it to the list of cross-importable modules. If it's already there,
+    // we've already done the rest of the work of this loop iteration and can
+    // skip it.
+    if (!crossImportableModules.insert(importDesc))
       continue;
 
-    // We don't cross-import submodules, so we shouldn't add them to the
-    // visibility set. (However, we do consider their reexports.)
-    if(!isSubmodule(importDesc.module.second))
-      crossImportableModules.insert(importDesc);
+    // We don't consider the re-exports of ObjC modules because ObjC re-exports
+    // everything, so there isn't enough signal there to work from.
+    if (nextImport.second->isNonSwiftModule())
+      continue;
 
     // Add the module's re-exports to worklist.
     nextImport.second->getImportedModules(importsWorklist,

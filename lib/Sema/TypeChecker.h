@@ -258,33 +258,6 @@ enum class FreeTypeVariableBinding {
   UnresolvedType
 };
 
-/// An abstract interface that can interact with the type checker during
-/// the type checking of a particular expression.
-class ExprTypeCheckListener {
-public:
-  virtual ~ExprTypeCheckListener();
-
-  /// Callback invoked once the constraint system has been constructed.
-  ///
-  /// \param cs The constraint system that has been constructed.
-  ///
-  /// \param expr The pre-checked expression from which the constraint system
-  /// was generated.
-  ///
-  /// \returns true if an error occurred that is not itself part of the
-  /// constraint system, or false otherwise.
-  virtual bool builtConstraints(constraints::ConstraintSystem &cs, Expr *expr);
-
-  /// Callback invokes once the chosen solution has been applied to the
-  /// expression.
-  ///
-  /// The callback may further alter the expression, returning either a
-  /// new expression (to replace the result) or a null pointer to indicate
-  /// failure.
-  virtual Expr *appliedSolution(constraints::Solution &solution,
-                                Expr *expr);
-};
-
 /// A conditional conformance that implied some other requirements. That is, \c
 /// ConformingType conforming to \c Protocol may have required additional
 /// requirements to be satisfied.
@@ -757,23 +730,17 @@ Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 ///
 /// \param options Options that control how type checking is performed.
 ///
-/// \param listener If non-null, a listener that will be notified of important
-/// events in the type checking of this expression, and which can introduce
-/// additional constraints.
-///
 /// \returns The type of the top-level expression, or Type() if an
 ///          error occurred.
 Type typeCheckExpression(Expr *&expr, DeclContext *dc,
                          TypeLoc convertType = TypeLoc(),
                          ContextualTypePurpose convertTypePurpose = CTP_Unused,
-                         TypeCheckExprOptions options = TypeCheckExprOptions(),
-                         ExprTypeCheckListener *listener = nullptr);
+                         TypeCheckExprOptions options = TypeCheckExprOptions());
 
 Optional<constraints::SolutionApplicationTarget>
 typeCheckExpression(constraints::SolutionApplicationTarget &target,
                     bool &unresolvedTypeExprs,
-                    TypeCheckExprOptions options = TypeCheckExprOptions(),
-                    ExprTypeCheckListener *listener = nullptr);
+                    TypeCheckExprOptions options = TypeCheckExprOptions());
 
 /// Type check the given expression and return its type without
 /// applying the solution.
@@ -786,17 +753,12 @@ typeCheckExpression(constraints::SolutionApplicationTarget &target,
 /// \param allowFreeTypeVariables Whether free type variables are allowed in
 /// the solution, and what to do with them.
 ///
-/// \param listener If non-null, a listener that will be notified of important
-/// events in the type checking of this expression, and which can introduce
-/// additional constraints.
-///
 /// \returns the type of \p expr on success, Type() otherwise.
 /// FIXME: expr may still be modified...
 Type getTypeOfExpressionWithoutApplying(
     Expr *&expr, DeclContext *dc, ConcreteDeclRef &referencedDecl,
     FreeTypeVariableBinding allowFreeTypeVariables =
-        FreeTypeVariableBinding::Disallow,
-    ExprTypeCheckListener *listener = nullptr);
+        FreeTypeVariableBinding::Disallow);
 
 /// Return the type of operator function for specified LHS, or a null
 /// \c Type on error.
@@ -896,7 +858,7 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 /// unbound generic types.
 Type typeCheckPattern(ContextualPattern pattern);
 
-bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
+bool typeCheckCatchPattern(CaseStmt *S, DeclContext *dc);
 
 /// Coerce a pattern to the given type.
 ///
@@ -1180,26 +1142,14 @@ public:
   ModuleDecl *getStdlibModule(const DeclContext *dc);
 
   /// \name Resilience diagnostics
-
-  /// Used in diagnostic %selects.
-  enum class FragileFunctionKind : unsigned {
-    Transparent,
-    Inlinable,
-    AlwaysEmitIntoClient,
-    DefaultArgument,
-    PropertyInitializer
-  };
-
   bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
-                                const DeclContext *DC, FragileFunctionKind Kind,
-                                bool TreatUsableFromInlineAsPublic);
+                                const DeclContext *DC, FragileFunctionKind Kind);
 
   Expr *buildDefaultInitializer(Type type);
 
   bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
                                       const DeclContext *DC,
-                                      FragileFunctionKind Kind,
-                                      bool TreatUsableFromInlineAsPublic);
+                                      FragileFunctionKind Kind);
 
   /// Given that a declaration is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if it cannot
@@ -1217,16 +1167,6 @@ public:
   /// that the declarations involved have already been checked elsewhere.
   void diagnoseGenericTypeExportability(SourceLoc loc, Type type,
                                         const DeclContext *DC);
-
-  /// Given that \p DC is within a fragile context for some reason, describe
-  /// why.
-  ///
-  /// The second element of the pair is true if references to @usableFromInline
-  /// declarations are permitted.
-  ///
-  /// \see FragileFunctionKind
-  std::pair<FragileFunctionKind, bool>
-  getFragileFunctionKind(const DeclContext *DC);
 
   /// \name Availability checking
   ///
@@ -1481,14 +1421,15 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 /// (which will produce the original property type). If not specified, defaults to the maximum.
 Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
                              Optional<unsigned> limit = None);
-  
+
 /// Build a call to the init(wrappedValue:) initializers of the property
-/// wrappers, filling in the given \c value as the original value.
-Expr *buildPropertyWrapperWrappedValueCall(VarDecl *var,
-                                           Type backingStorageType,
-                                           Expr *value,
-                                           bool ignoreAttributeArgs);
-  
+/// wrappers, filling in the given \c value as the original value. Optionally
+/// pass a callback that will get invoked with the innermost init(wrappedValue:)
+/// call.
+Expr *buildPropertyWrapperWrappedValueCall(
+    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+    llvm::function_ref<void(ApplyExpr *)> callback = [](ApplyExpr *) {});
+
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {
   /// The keyword is never required.
@@ -1519,9 +1460,6 @@ bool isMemberOperator(FuncDecl *decl, Type type);
 
 /// Complain if @objc or dynamic is used without importing Foundation.
 void diagnoseAttrsRequiringFoundation(SourceFile &SF);
-
-/// Returns `true` iff differentiable programming is enabled.
-bool isDifferentiableProgrammingEnabled(SourceFile &SF);
 
 /// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
 bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);

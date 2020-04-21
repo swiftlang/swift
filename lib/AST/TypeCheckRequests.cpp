@@ -573,6 +573,11 @@ bool PropertyWrapperMutabilityRequest::isCached() const {
   return !var->getAttrs().isEmpty();
 }
 
+bool PropertyWrapperLValuenessRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const PropertyWrapperTypeInfo &propertyWrapper) {
   out << "{ ";
@@ -615,9 +620,51 @@ void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
   os << "getter " << names[m.Getter] << ", setter " << names[m.Setter];
 }
 
+void swift::simple_display(llvm::raw_ostream &out, PropertyWrapperLValueness l) {
+  out << "is lvalue for get: {";
+  simple_display(out, l.isLValueForGetAccess);
+  out << "}, is lvalue for set: {";
+  simple_display(out, l.isLValueForSetAccess);
+  out << "}";
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
-                           const ResilienceExpansion &value) {
-  out << value;
+                           ResilienceExpansion value) {
+  switch (value) {
+  case ResilienceExpansion::Minimal:
+    out << "minimal";
+    break;
+  case ResilienceExpansion::Maximal:
+    out << "maximal";
+    break;
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           FragileFunctionKind value) {
+  switch (value.kind) {
+  case FragileFunctionKind::Transparent:
+    out << "transparent";
+    break;
+  case FragileFunctionKind::Inlinable:
+    out << "inlinable";
+    break;
+  case FragileFunctionKind::AlwaysEmitIntoClient:
+    out << "alwaysEmitIntoClient";
+    break;
+  case FragileFunctionKind::DefaultArgument:
+    out << "defaultArgument";
+    break;
+  case FragileFunctionKind::PropertyInitializer:
+    out << "propertyInitializer";
+    break;
+  case FragileFunctionKind::None:
+    out << "none";
+    break;
+  }
+
+  out << ", allowUsableFromInline: "
+      << (value.allowUsableFromInline ? "true" : "false");
 }
 
 //----------------------------------------------------------------------------//
@@ -908,7 +955,7 @@ void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 }
 
 void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
-
+  
 }
 
 //----------------------------------------------------------------------------//

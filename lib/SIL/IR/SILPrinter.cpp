@@ -601,31 +601,41 @@ public:
     if (BB->args_empty())
       return;
 
-    for (SILValue V : BB->getArguments()) {
-      if (V->use_empty())
+    for (SILArgument *arg : BB->getArguments()) {
+      StringRef name;
+      if (arg->getDecl() && arg->getDecl()->hasName())
+        name = arg->getDecl()->getBaseName().userFacingName();
+
+      if (arg->use_empty() && name.empty())
         continue;
-      *this << "// " << Ctx.getID(V);
-      PrintState.OS.PadToColumn(50);
-      *this << "// user";
-      if (std::next(V->use_begin()) != V->use_end())
-        *this << 's';
-      *this << ": ";
 
-      llvm::SmallVector<ID, 32> UserIDs;
-      for (auto *Op : V->getUses())
-        UserIDs.push_back(Ctx.getID(Op->getUser()));
-
-      // Display the user ids sorted to give a stable use order in the
-      // printer's output if we are asked to do so. This makes diffing large
-      // sections of SIL significantly easier at the expense of not showing
-      // the _TRUE_ order of the users in the use list.
-      if (Ctx.sortSIL()) {
-        std::sort(UserIDs.begin(), UserIDs.end());
+      *this << "// " << Ctx.getID(arg);
+      if (!name.empty()) {
+        *this << " \"" << name << '\"';
       }
+      if (!arg->use_empty()) {
+        PrintState.OS.PadToColumn(50);
+        *this << "// user";
+        if (std::next(arg->use_begin()) != arg->use_end())
+          *this << 's';
+        *this << ": ";
 
-      interleave(UserIDs.begin(), UserIDs.end(),
-                 [&] (ID id) { *this << id; },
-                 [&] { *this << ", "; });
+        llvm::SmallVector<ID, 32> UserIDs;
+        for (auto *Op : arg->getUses())
+          UserIDs.push_back(Ctx.getID(Op->getUser()));
+
+        // Display the user ids sorted to give a stable use order in the
+        // printer's output if we are asked to do so. This makes diffing large
+        // sections of SIL significantly easier at the expense of not showing
+        // the _TRUE_ order of the users in the use list.
+        if (Ctx.sortSIL()) {
+          std::sort(UserIDs.begin(), UserIDs.end());
+        }
+
+        llvm::interleave(
+            UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
+            [&] { *this << ", "; });
+      }
       *this << '\n';
     }
   }
@@ -784,9 +794,20 @@ public:
       std::sort(UserIDs.begin(), UserIDs.end());
     }
 
-    interleave(UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
+        [&] { *this << ", "; });
     return true;
+  }
+
+  void printConformances(ArrayRef<ProtocolConformanceRef> conformances) {
+    // FIXME: conformances should always be printed and parsed!
+    if (!Ctx.printVerbose()) {
+      return;
+    }
+    *this << " // ";
+    for (ProtocolConformanceRef conformance : conformances)
+      conformance.dump(PrintState.OS, /*indent*/ 0, /*details*/ false);
   }
 
   void printDebugLocRef(SILLocation Loc, const SourceManager &SM,
@@ -1034,15 +1055,16 @@ public:
       *this << "**" << Ctx.getID(result) << "** = ";
     } else {
       *this << '(';
-      interleave(result->getParent()->getResults(),
-                 [&](SILValue value) {
-                   if (value == SILValue(result)) {
-                     *this << "**" << Ctx.getID(result) << "**";
-                     return;
-                   }
-                   *this << Ctx.getID(value);
-                 },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          result->getParent()->getResults(),
+          [&](SILValue value) {
+            if (value == SILValue(result)) {
+              *this << "**" << Ctx.getID(result) << "**";
+              return;
+            }
+            *this << Ctx.getID(value);
+          },
+          [&] { *this << ", "; });
       *this << ')';
     }
 
@@ -1170,9 +1192,10 @@ public:
     printSubstitutions(AI->getSubstitutionMap(),
                        AI->getOrigCalleeType()->getInvocationGenericSignature());
     *this << '(';
-    interleave(AI->getArguments(),
-               [&](const SILValue &arg) { *this << Ctx.getID(arg); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        AI->getArguments(),
+        [&](const SILValue &arg) { *this << Ctx.getID(arg); },
+        [&] { *this << ", "; });
     *this << ") : ";
     if (auto callee = AI->getCallee())
       *this << callee->getType();
@@ -1248,7 +1271,7 @@ public:
     printSubstitutions(BI->getSubstitutions());
     *this << "(";
     
-    interleave(BI->getArguments(), [&](SILValue v) {
+    llvm::interleave(BI->getArguments(), [&](SILValue v) {
       *this << getIDAndType(v);
     }, [&]{
       *this << ", ";
@@ -1427,9 +1450,9 @@ public:
   }
 
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
-    interleave(MFE->getElements(),
-               [&](SILValue Var) { *this << getIDAndType(Var); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        MFE->getElements(), [&](SILValue Var) { *this << getIDAndType(Var); },
+        [&] { *this << ", "; });
   }
 
   void visitDebugValueInst(DebugValueInst *DVI) {
@@ -1645,22 +1668,24 @@ public:
 
   void visitStructInst(StructInst *SI) {
     *this << SI->getType() << " (";
-    interleave(SI->getElements(),
-               [&](const SILValue &V) { *this << getIDAndType(V); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        SI->getElements(), [&](const SILValue &V) { *this << getIDAndType(V); },
+        [&] { *this << ", "; });
     *this << ')';
   }
 
   void visitObjectInst(ObjectInst *OI) {
     *this << OI->getType() << " (";
-    interleave(OI->getBaseElements(),
-               [&](const SILValue &V) { *this << getIDAndType(V); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        OI->getBaseElements(),
+        [&](const SILValue &V) { *this << getIDAndType(V); },
+        [&] { *this << ", "; });
     if (!OI->getTailElements().empty()) {
       *this << ", [tail_elems] ";
-      interleave(OI->getTailElements(),
-                 [&](const SILValue &V) { *this << getIDAndType(V); },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          OI->getTailElements(),
+          [&](const SILValue &V) { *this << getIDAndType(V); },
+          [&] { *this << ", "; });
     }
     *this << ')';
   }
@@ -1680,16 +1705,17 @@ public:
     // If the type is simple, just print the tuple elements.
     if (SimpleType) {
       *this << '(';
-      interleave(TI->getElements(),
-                 [&](const SILValue &V){ *this << getIDAndType(V); },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          TI->getElements(),
+          [&](const SILValue &V) { *this << getIDAndType(V); },
+          [&] { *this << ", "; });
       *this << ')';
     } else {
       // Otherwise, print the type, then each value.
       *this << TI->getType() << " (";
-      interleave(TI->getElements(),
-                 [&](const SILValue &V) { *this << Ctx.getID(V); },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          TI->getElements(), [&](const SILValue &V) { *this << Ctx.getID(V); },
+          [&] { *this << ", "; });
       *this << ')';
     }
   }
@@ -1797,6 +1823,7 @@ public:
       *this << getIDAndType(WMI->getTypeDependentOperands()[0].get());
     }
     *this << " : " << WMI->getType();
+    printConformances({WMI->getConformance()});
   }
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *OI) {
     if (OI->getAccessKind() == OpenedExistentialAccess::Immutable)
@@ -1823,21 +1850,26 @@ public:
   void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType();
+    printConformances(AEI->getConformances());
   }
   void visitInitExistentialValueInst(InitExistentialValueInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
+    printConformances(AEI->getConformances());
   }
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << " : $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
+    printConformances(AEI->getConformances());
   }
-  void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *AEI) {
-    *this << getIDAndType(AEI->getOperand()) << ", " << AEI->getType();
+  void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *EMI) {
+    *this << getIDAndType(EMI->getOperand()) << ", " << EMI->getType();
+    printConformances(EMI->getConformances());
   }
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
     *this << AEBI->getExistentialType() << ", $"
           << AEBI->getFormalConcreteType();
+    printConformances(AEBI->getConformances());
   }
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
     *this << getIDAndType(DEI->getOperand());
@@ -1998,9 +2030,9 @@ public:
   void visitYieldInst(YieldInst *YI) {
     auto values = YI->getYieldedValues();
     if (values.size() != 1) *this << '(';
-    interleave(values,
-               [&](SILValue value) { *this << getIDAndType(value); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        values, [&](SILValue value) { *this << getIDAndType(value); },
+        [&] { *this << ", "; });
     if (values.size() != 1) *this << ')';
     *this << ", resume " << Ctx.getID(YI->getResumeBB())
           << ", unwind " << Ctx.getID(YI->getUnwindBB());
@@ -2093,9 +2125,9 @@ public:
     if (args.empty()) return;
 
     *this << '(';
-    interleave(args,
-               [&](SILValue v) { *this << getIDAndType(v); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        args, [&](SILValue v) { *this << getIDAndType(v); },
+        [&] { *this << ", "; });
     *this << ')';
   }
   

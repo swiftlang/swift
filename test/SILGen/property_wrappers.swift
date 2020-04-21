@@ -32,6 +32,9 @@ struct HasMemberwiseInit<T: DefaultInit> {
 
   @WrapperWithInitialValue(wrappedValue: 17)
   var z: Int
+
+  @WrapperWithInitialValue
+  private var p: Bool = true
 }
 
 func forceHasMemberwiseInit() {
@@ -76,6 +79,11 @@ func forceHasMemberwiseInit() {
 // CHECK-NOT: return
 // CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07wrappedF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
 
+// variable initialization expression of HasMemberwiseInit._p
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_p33_{{.*}}23WrapperWithInitialValueVySbGvpfi : $@convention(thin) <T where T : DefaultInit> () -> Bool {
+// CHECK: function_ref @$sSb22_builtinBooleanLiteralSbBi1__tcfC : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+// CHECK: return {{%.*}} : $Bool
+
 // default argument 0 of HasMemberwiseInit.init(x:y:z:)
 // CHECK: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA_ : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool> 
 
@@ -90,7 +98,7 @@ func forceHasMemberwiseInit() {
 // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitVACyxGycfC : $@convention(method) <T where T : DefaultInit> (@thin HasMemberwiseInit<T>.Type) -> @out HasMemberwiseInit<T> {
 
 // Initialization of x
-// CHECK-NOT: return
+// CHECK-NOT: return %
 // CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_x33_{{.*}}7WrapperVySbGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> Wrapper<Bool>
 
 // Initialization of y
@@ -103,7 +111,32 @@ func forceHasMemberwiseInit() {
 // CHECK-NOT: return
 // CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> WrapperWithInitialValue<Int>
 
+// Initialization of p
+// CHECK-NOT: return
+// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_p33_{{.*}}23WrapperWithInitialValueVySbGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> Bool
+// CHECK-NOT: return
+// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV1p33_{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (Bool) -> WrapperWithInitialValue<Bool>
+
 // CHECK: return
+
+// Non-generic struct with private property wrapper
+struct HasMemberwiseInitWithPrivateWrapper {
+  @WrapperWithInitialValue
+  var z: Int = 17
+
+  @WrapperWithInitialValue
+  private var p: Bool = true
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers35HasMemberwiseInitWithPrivateWrapperV1zACSi_tcfC : $@convention(method) (Int, @thin HasMemberwiseInitWithPrivateWrapper.Type) -> HasMemberwiseInitWithPrivateWrapper {
+  // CHECK: function_ref @$s17property_wrappers35HasMemberwiseInitWithPrivateWrapperV1zSivpfP : $@convention(thin) (Int) -> WrapperWithInitialValue<Int>
+  // CHECK: function_ref @$s17property_wrappers35HasMemberwiseInitWithPrivateWrapperV1p33_{{.*}} : $@convention(thin) (Bool) -> WrapperWithInitialValue<Bool>
+  // CHECK: return {{%.*}} : $HasMemberwiseInitWithPrivateWrapper
+}
+
+func forceHasMemberwiseInitWithPrivateWrapper() {
+  _ = HasMemberwiseInitWithPrivateWrapper(z: 42)
+}
+
 
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers9HasNestedV2_y33_{{.*}}14PrivateWrapperAELLVyx_SayxGGvpfi : $@convention(thin) <T> () -> @owned Array<T> {
 // CHECK: bb0:
@@ -421,6 +454,20 @@ struct MutatingGet<T> {
   }
 }
 
+@propertyWrapper
+struct MutatingGetNonMutatingSet<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    mutating get { fixed }
+    nonmutating set { }
+  }
+
+  init(wrappedValue initialValue: T) {
+    fixed = initialValue
+  }
+}
+
 struct ObservingTest {
 	// ObservingTest.text.setter
 	// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers13ObservingTestV4textSSvs : $@convention(method) (@owned String, @guaranteed ObservingTest) -> ()
@@ -440,6 +487,151 @@ struct ObservingTest {
   @MutatingGet var integer2: Int = 17 {
     willSet { }
   }
+
+  @MutatingGetNonMutatingSet var text3: String = "" {
+    didSet { }
+  }
+
+  @MutatingGetNonMutatingSet var integer3: Int = 17 {
+    willSet { }
+  }
+}
+
+struct NonObservingTest {
+  @NonMutatingSet var text: String = ""
+  @MutatingGet var text2: String = ""
+  @MutatingGetNonMutatingSet var text3: String = ""
+}
+
+class NonObservingClassTest {
+  @NonMutatingSet var text: String = ""
+  @MutatingGet var text2: String = ""
+  @MutatingGetNonMutatingSet var text3: String = ""
+}
+
+// Projected value with non-default mutatingness
+struct Projection<T> {
+  var value: T
+  init(of value: T) {
+    self.value = value
+  }
+}
+
+@propertyWrapper
+struct WrapperWithStorage<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    get { fixed }
+    set { }
+  }
+
+  var projectedValue: Projection<T> {
+    get { Projection(of: fixed) }
+    set { }
+  }
+
+  init(wrappedValue: T) {
+    fixed = wrappedValue
+  }
+}
+
+@propertyWrapper
+struct MutatingGetWithStorage<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    mutating get { fixed }
+    set { }
+  }
+
+  var projectedValue: Projection<T> {
+    mutating get { Projection(of: fixed) }
+    set { }
+  }
+
+  init(wrappedValue: T) {
+    fixed = wrappedValue
+  }
+}
+
+@propertyWrapper
+struct NonMutatingSetWithStorage<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    get { fixed }
+    nonmutating set { }
+  }
+
+  var projectedValue: Projection<T> {
+    get { Projection(of: fixed) }
+    nonmutating set { }
+  }
+
+  init(wrappedValue: T) {
+    fixed = wrappedValue
+  }
+}
+
+@propertyWrapper
+struct MutatingGetNonMutatingSetWithStorage<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    mutating get { fixed }
+    nonmutating set { }
+  }
+
+  var projectedValue: Projection<T> {
+    mutating get { Projection(of: fixed) }
+    nonmutating set { }
+  }
+
+  init(wrappedValue: T) {
+    fixed = wrappedValue
+  }
+}
+
+struct ProjectedValueWithNonDefaultMutatingnessTest {
+  @WrapperWithStorage var n1: Int = 0
+  @NonMutatingSetWithStorage var n2: Int = 0
+  @MutatingGetWithStorage var n3: Int = 0
+  @MutatingGetNonMutatingSetWithStorage var n4: Int = 0
+}
+
+class ProjectedValueWithNonDefaultMutatingnessClassTest {
+  @WrapperWithStorage var n1: Int = 0
+  @NonMutatingSetWithStorage var n2: Int = 0
+  @MutatingGetWithStorage var n3: Int = 0
+  @MutatingGetNonMutatingSetWithStorage var n4: Int = 0
+}
+
+// Composition with non-default mutatingness
+struct CompositionWithNonDefaultMutatingnessTest {
+
+  // Two wrappers, all combinations
+  @WrapperA @WrapperB var n1: Int
+  @WrapperA @MutatingGet var n2: Int
+  @WrapperA @NonMutatingSet var n3: Int
+  @WrapperA @MutatingGetNonMutatingSet var n4: Int
+  @MutatingGetWithStorage @WrapperB var n5: Int
+  @MutatingGetWithStorage @MutatingGet var n6: Int
+  @MutatingGetWithStorage @NonMutatingSet var n7: Int
+  @MutatingGetWithStorage @MutatingGetNonMutatingSet var n8: Int
+  @NonMutatingSetWithStorage @WrapperB var n9: Int
+  @NonMutatingSetWithStorage @MutatingGet var n10: Int
+  @NonMutatingSetWithStorage @NonMutatingSet var n11: Int
+  @NonMutatingSetWithStorage @MutatingGetNonMutatingSet var n12: Int
+  @MutatingGetNonMutatingSetWithStorage @WrapperB var n13: Int
+  @MutatingGetNonMutatingSetWithStorage @MutatingGet var n14: Int
+  @MutatingGetNonMutatingSetWithStorage @NonMutatingSet var n15: Int
+  @MutatingGetNonMutatingSetWithStorage @MutatingGetNonMutatingSet var n16: Int
+
+  // Three wrappers, non-standard mutability in the middle
+  @WrapperA @MutatingGet @WrapperB var m1: Int
+  @WrapperA @NonMutatingSet @WrapperB var m2: Int
+  @WrapperA @MutatingGetNonMutatingSet @WrapperB var m3: Int
 }
 
 // Tuple initial values.
@@ -669,12 +861,10 @@ class Somesubclass : Someclass {
     // to the superclass' accessors.
     // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12SomesubclassC0A0Sivs : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
     // CHECK: bb0([[NEW:%.+]] : $Int, {{%.+}} : @guaranteed $Somesubclass):
-    // CHECK:   [[GETTER:%.+]] = function_ref @$s17property_wrappers9SomeclassC0A0Sivg : $@convention(method) (@guaranteed Someclass) -> Int
-    // CHECK:   [[OLD:%.+]] = apply [[GETTER]]({{%.+}}) : $@convention(method) (@guaranteed Someclass) -> Int
     // CHECK:   [[SETTER:%.+]] = function_ref @$s17property_wrappers9SomeclassC0A0Sivs : $@convention(method) (Int, @guaranteed Someclass) -> ()
     // CHECK:   apply [[SETTER]]([[NEW]], {{%.+}}) : $@convention(method) (Int, @guaranteed Someclass) -> ()
-    // CHECK:   [[DIDSET:%.+]] = function_ref @$s17property_wrappers12SomesubclassC0A0SivW : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
-    // CHECK:   apply [[DIDSET]]([[OLD]], {{%.+}}) : $@convention(method) (Int, @guaranteed Somesubclass) -> ()
+    // CHECK:   [[DIDSET:%.+]] = function_ref @$s17property_wrappers12SomesubclassC0A0SivW : $@convention(method) (@guaranteed Somesubclass) -> ()
+    // CHECK:   apply [[DIDSET]]({{%.+}}) : $@convention(method) (@guaranteed Somesubclass) -> ()
     didSet {
       print("Subclass")
     }

@@ -101,7 +101,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 /// type.
 static ConstructorDecl *
 findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
-                        VarDecl *valueVar, PropertyWrapperInitKind initKind) {
+                        VarDecl *valueVar, PropertyWrapperInitKind initKind,
+                        const SmallVectorImpl<ValueDecl *> &decls) {
   enum class NonViableReason {
     Failable,
     ParameterTypeMismatch,
@@ -111,7 +112,6 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
   SmallVector<std::tuple<ConstructorDecl *, NonViableReason, Type>, 2>
       nonviable;
   SmallVector<ConstructorDecl *, 2> viableInitializers;
-  SmallVector<ValueDecl *, 2> decls;
 
   Identifier argumentLabel;
   switch (initKind) {
@@ -125,8 +125,6 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     break;
   }
 
-  nominal->lookupQualified(nominal, DeclNameRef::createConstructor(),
-                           NL_QualifiedDefault, decls);
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);
     if (!init || init->getDeclContext() != nominal || init->isGeneric())
@@ -156,6 +154,14 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     if (hasExtraneousParam)
       continue;
 
+    if (initKind != PropertyWrapperInitKind::Default) {
+      if (!argumentParam)
+        continue;
+
+      if (argumentParam->isInOut() || argumentParam->isVariadic())
+        continue;
+    }
+
     // Failable initializers cannot be used.
     if (init->isFailable()) {
       nonviable.push_back(
@@ -172,12 +178,6 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
 
     // Additional checks for initial-value and wrapped-value initializers
     if (initKind != PropertyWrapperInitKind::Default) {
-      if (!argumentParam)
-        continue;
-
-      if (argumentParam->isInOut() || argumentParam->isVariadic())
-        continue;
-
       auto paramType = argumentParam->getInterfaceType();
       if (paramType->is<ErrorType>())
         continue;
@@ -345,18 +345,22 @@ PropertyWrapperTypeInfoRequest::evaluate(
   if (!valueVar)
     return PropertyWrapperTypeInfo();
 
-  // FIXME: Remove this one
-  (void)valueVar->getInterfaceType();
-  
+  TypeChecker::addImplicitConstructors(nominal);
+
+  SmallVector<ValueDecl *, 2> decls;
+  nominal->lookupQualified(nominal, DeclNameRef::createConstructor(),
+                           NL_QualifiedDefault, decls);
+
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
   if (auto init = findSuitableWrapperInit(ctx, nominal, valueVar,
-                              PropertyWrapperInitKind::WrappedValue)) {
+                              PropertyWrapperInitKind::WrappedValue, decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasWrappedValueInit;
     result.isWrappedValueInitUsingEscapingAutoClosure =
       isEscapingAutoclosureArgument(init, ctx.Id_wrappedValue);
   } else if (auto init = findSuitableWrapperInit(
-               ctx, nominal, valueVar, PropertyWrapperInitKind::InitialValue)) {
+               ctx, nominal, valueVar, PropertyWrapperInitKind::InitialValue,
+               decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasInitialValueInit;
     result.isWrappedValueInitUsingEscapingAutoClosure =
       isEscapingAutoclosureArgument(init, ctx.Id_initialValue);
@@ -376,7 +380,7 @@ PropertyWrapperTypeInfoRequest::evaluate(
   }
 
   if (findSuitableWrapperInit(ctx, nominal, /*valueVar=*/nullptr,
-                              PropertyWrapperInitKind::Default)) {
+                              PropertyWrapperInitKind::Default, decls)) {
     result.defaultInit = PropertyWrapperTypeInfo::HasDefaultValueInit;
   }
 
@@ -669,11 +673,11 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
 }
 
 static bool isOpaquePlaceholderClosure(const Expr *value) {
-  auto ove = dyn_cast<OpaqueValueExpr>(value);
-  if (!ove || !ove->isPlaceholder())
+  auto *placeholder = dyn_cast<PropertyWrapperValuePlaceholderExpr>(value);
+  if (!placeholder)
     return false;
 
-  if (auto valueFnTy = ove->getType()->getAs<FunctionType>()) {
+  if (auto valueFnTy = placeholder->getType()->getAs<FunctionType>()) {
     return (valueFnTy->getNumParams() == 0);
   }
 
@@ -681,12 +685,13 @@ static bool isOpaquePlaceholderClosure(const Expr *value) {
 }
 
 Expr *swift::buildPropertyWrapperWrappedValueCall(
-    VarDecl *var, Type backingStorageType, Expr *value,
-    bool ignoreAttributeArgs) {
+    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+    llvm::function_ref<void(ApplyExpr *)> innermostInitCallback) {
   // From the innermost wrapper type out, form init(wrapperValue:) calls.
   ASTContext &ctx = var->getASTContext();
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Expr *initializer = value;
+  ApplyExpr *innermostInit = nullptr;
   if (var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure() &&
       isOpaquePlaceholderClosure(value)) {
     // We can't pass the opaque closure directly as an autoclosure arg.
@@ -727,10 +732,14 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
       if (endLoc.isInvalid() && startLoc.isValid())
         endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
-      initializer = CallExpr::create(
+      auto *init = CallExpr::create(
          ctx, typeExpr, startLoc, {initializer}, {argName},
          {initializer->getStartLoc()}, endLoc,
          nullptr, /*implicit=*/true);
+      initializer = init;
+
+      if (!innermostInit)
+        innermostInit = init;
       continue;
     }
 
@@ -759,10 +768,17 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
     if (endLoc.isInvalid() && startLoc.isValid())
       endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
-    initializer = CallExpr::create(
+    auto *init = CallExpr::create(
         ctx, typeExpr, startLoc, elements, elementNames, elementLocs,
         endLoc, nullptr, /*implicit=*/true);
+    initializer = init;
+
+    if (!innermostInit)
+      innermostInit = init;
   }
-  
+
+  // Invoke the callback, passing in the innermost init(wrappedValue:) call
+  innermostInitCallback(innermostInit);
+
   return initializer;
 }

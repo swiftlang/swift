@@ -15,7 +15,7 @@ func foo(x: FooStruct1) -> S1 {}
 // RUN: %sourcekitd-test -req=cursor -usr "s:10cursor_usr2S1V" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %s > %t.from_usr.txt
 // RUN: %FileCheck %s -check-prefix=CHECK_SANITY1 < %t.from_offset.txt
 // RUN: %FileCheck %s -check-prefix=CHECK_SANITY1 < %t.from_usr.txt
-// RUN: diff -u %t.from_usr.txt %t.from_offset.txt
+// RUN: %diff -u %t.from_usr.txt %t.from_offset.txt
 // CHECK_SANITY1: source.lang.swift.decl.struct (5:8-5:10)
 // CHECK_SANITY1-NEXT: S1
 // CHECK_SANITY1-NEXT: s:10cursor_usr2S1

@@ -37,10 +37,9 @@ func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
 // CHECK-LABEL: sil hidden [ossa] @$s10multi_file34finalVarsDontNeedMaterializeForSetyyAA27ObservingPropertyFinalClassCF
 func finalVarsDontNeedMaterializeForSet(_ obj: ObservingPropertyFinalClass) {
   obj.foo += 1
-  // CHECK: [[T0:%.*]] = ref_element_addr %0 : $ObservingPropertyFinalClass, #ObservingPropertyFinalClass.foo
-  // CHECK-NEXT: [[T1:%.*]] = begin_access [read] [dynamic] [[T0]] : $*Int
-  // CHECK-NEXT: load [trivial] [[T1]] : $*Int
-  // CHECK: function_ref @$s10multi_file27ObservingPropertyFinalClassC3fooSivs
+  // CHECK: bb0([[CLASS:%.*]] : @guaranteed $ObservingPropertyFinalClass):
+  // CHECK: [[REF:%.*]] = function_ref @$s10multi_file27ObservingPropertyFinalClassC3fooSivM : $@yield_once @convention(method) (@guaranteed ObservingPropertyFinalClass) -> @yields @inout Int
+  // CHECK-NEXT: ([[ONE:%.*]], [[TWO:%.*]]) = begin_apply [[REF]]([[CLASS]]) : $@yield_once @convention(method) (@guaranteed ObservingPropertyFinalClass) -> @yields @inout Int
 }
 
 // rdar://18503960

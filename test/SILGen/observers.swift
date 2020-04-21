@@ -63,13 +63,12 @@ public struct DidSetWillSetTests {
 
     // CHECK-LABEL: sil private [ossa] @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
     didSet {
-      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
-      // CHECK-NEXT: debug
-      // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
+      // CHECK: bb0(%0 : $*DidSetWillSetTests):
+      // CHECK-NEXT: debug_value_addr %0 : $*DidSetWillSetTests
 
       takeInt(a)
 
-      // CHECK: [[READ:%.*]] = begin_access [read] [unknown] %1
+      // CHECK: [[READ:%.*]] = begin_access [read] [unknown] %0
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[READ]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [trivial] [[AADDR]] : $*Int
       // CHECK-NEXT: end_access [[READ]]
@@ -86,7 +85,7 @@ public struct DidSetWillSetTests {
       // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
       // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
       // CHECK-NEXT: end_access [[READ]] : $*Int
-      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
+      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
     }
@@ -100,30 +99,29 @@ public struct DidSetWillSetTests {
     // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
 
 
-    // CHECK-LABEL: sil [ossa] @$s9observers010DidSetWillC5TestsV1aSivs
-    // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
-    // CHECK-NEXT: debug_value %0
+    // CHECK-LABEL: sil [ossa] @$s9observers010DidSetWillC5TestsV1aSivs : $@convention(method) (Int, @inout DidSetWillSetTests) -> () {
+    // CHECK: bb0([[NEWVALUE:%.*]] : $Int, %1 : $*DidSetWillSetTests):
+    // CHECK-NEXT: debug_value [[NEWVALUE]] : $Int, let, name "value", argno 1
     // CHECK-NEXT: debug_value_addr %1
 
-    // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] %1
-    // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[READ]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-    // CHECK-NEXT: [[OLDVAL:%.*]] = load [trivial] [[AADDR]] : $*Int
-    // CHECK-NEXT: end_access [[READ]]
-    // CHECK-NEXT: debug_value [[OLDVAL]] : $Int, let, name "tmp"
+    // CHECK-NEXT: [[MODIFY_ONE:%.*]] = begin_access [modify] [unknown] %1 : $*DidSetWillSetTests
+    // CHECK-NEXT: // function_ref observers.DidSetWillSetTests.a.willset : Swift.Int
+    // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1aSivw : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+    // CHECK-NEXT: [[RESULT:%.*]] = apply [[WILLSETFN]]([[NEWVALUE]], [[MODIFY_ONE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+    // CHECK-NEXT: end_access [[MODIFY_ONE]] : $*DidSetWillSetTests
 
-    // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
-    // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
-    // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
-    // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-    // CHECK-NEXT: end_access [[WRITE]]
-    // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
-    // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-    // CHECK-NEXT: assign %0 to [[AADDR]] : $*Int
-    // CHECK-NEXT: end_access [[WRITE]]
-    // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
-    // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
-    // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-    // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+    // CHECK-NEXT: [[MODIFY_TWO:%.*]] = begin_access [modify] [unknown] %1 : $*DidSetWillSetTests
+    // CHECK-NEXT: [[ADDR:%.*]] = struct_element_addr [[MODIFY_TWO]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+    // CHECK-NEXT: assign [[NEWVALUE]] to [[ADDR]] : $*Int
+    // CHECK-NEXT: end_access [[MODIFY_TWO]] : $*DidSetWillSetTests
+
+    // CHECK-NEXT: [[MODIFY_THREE:%.*]] = begin_access [modify] [unknown] %1 : $*DidSetWillSetTests
+    // CHECK-NEXT: // function_ref observers.DidSetWillSetTests.a.didset : Swift.Int
+    // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1aSivW : $@convention(method) (@inout DidSetWillSetTests) -> ()
+    // CHECK-NEXT: [[RESULT:%.*]] = apply [[DIDSETFN]]([[MODIFY_THREE]]) : $@convention(method) (@inout DidSetWillSetTests) -> ()
+    // CHECK-NEXT: end_access [[MODIFY_THREE]] : $*DidSetWillSetTests
+    // CHECK-NEXT: [[TUPLE:%.*]] = tuple ()
+    // CHECK-NEXT: return [[TUPLE]] : $()
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s9observers010DidSetWillC5TestsV8testReadSiyF
@@ -248,8 +246,8 @@ func local_observing_property(_ arg: Int) {
 // Ensure that setting the variable from within its own didSet doesn't recursively call didSet.
 
 // CHECK-LABEL: sil private [ossa] @$s9observers24local_observing_property{{[_0-9a-zA-Z]*}}SiF13localproperty{{[_0-9a-zA-Z]*}}SivW
-// CHECK: bb0(%0 : $Int, %1 : @guaranteed ${ var Int })
-// CHECK: [[POINTER:%.*]] = project_box %1 : ${ var Int }, 0
+// CHECK: bb0(%0 : @guaranteed ${ var Int })
+// CHECK: [[POINTER:%.*]] = project_box %0 : ${ var Int }, 0
 // CHECK: // function_ref observers.zero.unsafeMutableAddressor : Swift.Int
 // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s9observers4zero{{[_0-9a-zA-Z]*}}vau
 // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
@@ -347,7 +345,7 @@ struct ObservingPropertiesWithOwnershipTypes {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s9observers37ObservingPropertiesWithOwnershipTypesV13alwaysPresentAA3RefCvW : $@convention(method) (@guaranteed Ref, @inout ObservingPropertiesWithOwnershipTypes) -> () {
+// CHECK-LABEL: sil private [ossa] @$s9observers37ObservingPropertiesWithOwnershipTypesV13alwaysPresentAA3RefCvW : $@convention(method) (@inout ObservingPropertiesWithOwnershipTypes) -> () {
 
 struct ObservingPropertiesWithOwnershipTypesInferred {
   unowned var alwaysPresent = Ref() {
@@ -361,7 +359,7 @@ struct ObservingPropertiesWithOwnershipTypesInferred {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s9observers45ObservingPropertiesWithOwnershipTypesInferredV13alwaysPresentAA3RefCvW : $@convention(method) (@guaranteed Ref, @inout ObservingPropertiesWithOwnershipTypesInferred) -> () {
+// CHECK-LABEL: sil private [ossa] @$s9observers45ObservingPropertiesWithOwnershipTypesInferredV13alwaysPresentAA3RefCvW : $@convention(method) (@inout ObservingPropertiesWithOwnershipTypesInferred) -> () {
 // CHECK-LABEL: sil private [ossa] @$s9observers45ObservingPropertiesWithOwnershipTypesInferredV12maybePresentAA3RefCSgvw : $@convention(method) (@guaranteed Optional<Ref>, @inout ObservingPropertiesWithOwnershipTypesInferred) -> () {
 
 //<rdar://problem/16620121> Initializing constructor tries to initialize computed property overridden with willSet/didSet
@@ -375,7 +373,7 @@ class ObservedDerived : ObservedBase {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s9observers15ObservedDerivedC9printInfoAA3RefCSgvW : $@convention(method) (@guaranteed Optional<Ref>, @guaranteed ObservedDerived) -> () {
+// CHECK-LABEL: sil private [ossa] @$s9observers15ObservedDerivedC9printInfoAA3RefCSgvW : $@convention(method) (@guaranteed ObservedDerived) -> () {
 
 
 /// <rdar://problem/26408353> crash when overriding internal property with
@@ -393,13 +391,13 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s9observers29BaseClassWithInternalPropertyC1xytvg
 
-// CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s9observers30DerivedClassWithPublicPropertyC1xytvg
+// CHECK-LABEL: sil [ossa] @$s9observers30DerivedClassWithPublicPropertyC1xytvg
 // CHECK:       bb0([[SELF:%.*]] : @guaranteed $DerivedClassWithPublicProperty):
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]] : $DerivedClassWithPublicProperty
 // CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF_COPY]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
 // CHECK-NEXT:    [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER]]
-// CHECK-NEXT:    [[DOWNCAST_BORROWED_SUPER:%.*]] = unchecked_ref_cast [[BORROWED_SUPER]] : $BaseClassWithInternalProperty to $DerivedClassWithPublicProperty
-// CHECK-NEXT:    [[METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_SUPER]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter : (BaseClassWithInternalProperty) -> () -> (), $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
+// CHECK-NEXT:    // function_ref observers.BaseClassWithInternalProperty.x.getter : ()
+// CHECK-NEXT:    [[METHOD:%.*]] = function_ref @$s9observers29BaseClassWithInternalPropertyC1xytvg : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[BORROWED_SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    end_borrow [[BORROWED_SUPER]]
 // CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
@@ -418,7 +416,7 @@ public class ConcreteDerived : GenericBase<Int> {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s9observers15ConcreteDerivedC7storageSiSgvW : $@convention(method) (Optional<Int>, @guaranteed ConcreteDerived) -> () {
+// CHECK-LABEL: sil private [ossa] @$s9observers15ConcreteDerivedC7storageSiSgvW : $@convention(method) (@guaranteed ConcreteDerived) -> () {
 
 
 // Make sure we upcast properly when the overridden property is in an ancestor
@@ -435,4 +433,4 @@ public class DerivedObserved : MiddleObserved {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s9observers15DerivedObservedC1xSivW : $@convention(method) (Int, @guaranteed DerivedObserved) -> () {
+// CHECK-LABEL: sil private [ossa] @$s9observers15DerivedObservedC1xSivW : $@convention(method) (@guaranteed DerivedObserved) -> () {

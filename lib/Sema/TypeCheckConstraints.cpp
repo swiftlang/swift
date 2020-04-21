@@ -1774,15 +1774,30 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
   auto traversePath = [&](Expr *expr, bool isInParsedPath,
                           bool emitErrors = true) {
     Expr *outermostExpr = expr;
+    // We can end up in scenarios where the key path has contextual type,
+    // but is missing a leading dot. This can happen when we have an
+    // implicit TypeExpr or an implicit DeclRefExpr.
+    auto diagnoseMissingDot = [&]() {
+      DE.diagnose(expr->getLoc(),
+                  diag::expr_swift_keypath_not_starting_with_dot)
+          .fixItInsert(expr->getStartLoc(), ".");
+    };
     while (1) {
       // Base cases: we've reached the top.
       if (auto TE = dyn_cast<TypeExpr>(expr)) {
         assert(!isInParsedPath);
         rootType = TE->getTypeRepr();
+        if (TE->isImplicit() && !KPE->expectsContextualRoot())
+          diagnoseMissingDot();
         return;
       } else if (isa<KeyPathDotExpr>(expr)) {
         assert(isInParsedPath);
         // Nothing here: the type is either the root, or is inferred.
+        return;
+      } else if (!KPE->expectsContextualRoot() && expr->isImplicit() &&
+                 isa<DeclRefExpr>(expr)) {
+        assert(!isInParsedPath);
+        diagnoseMissingDot();
         return;
       }
 
@@ -1958,16 +1973,6 @@ bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc) {
   return true;
 }
 
-ExprTypeCheckListener::~ExprTypeCheckListener() { }
-
-bool ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
-  return false;
-}
-
-Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
-  return expr;
-}
-
 void ParentConditionalConformance::diagnoseConformanceStack(
     DiagnosticEngine &diags, SourceLoc loc,
     ArrayRef<ParentConditionalConformance> conformances) {
@@ -1999,14 +2004,13 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeLoc convertType,
                                       ContextualTypePurpose convertTypePurpose,
-                                      TypeCheckExprOptions options,
-                                      ExprTypeCheckListener *listener) {
+                                      TypeCheckExprOptions options) {
   SolutionApplicationTarget target(
       expr, dc, convertTypePurpose, convertType,
       options.contains(TypeCheckExprFlags::IsDiscarded));
   bool unresolvedTypeExprs = false;
   auto resultTarget = typeCheckExpression(
-      target, unresolvedTypeExprs, options, listener);
+      target, unresolvedTypeExprs, options);
   if (!resultTarget) {
     expr = target.getAsExpr();
     return Type();
@@ -2027,8 +2031,7 @@ Optional<SolutionApplicationTarget>
 TypeChecker::typeCheckExpression(
     SolutionApplicationTarget &target,
     bool &unresolvedTypeExprs,
-    TypeCheckExprOptions options,
-    ExprTypeCheckListener *listener) {
+    TypeCheckExprOptions options) {
   unresolvedTypeExprs = false;
   Expr *expr = target.getAsExpr();
   DeclContext *dc = target.getDeclContext();
@@ -2076,7 +2079,7 @@ TypeChecker::typeCheckExpression(
     allowFreeTypeVariables = FreeTypeVariableBinding::UnresolvedType;
 
   // Attempt to solve the constraint system.
-  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
+  auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable) {
     target.setExpr(expr);
     return None;
@@ -2107,13 +2110,6 @@ TypeChecker::typeCheckExpression(
   }
   Expr *result = resultTarget->getAsExpr();
 
-  // Notify listener that we've applied the solution.
-  if (listener) {
-    result = listener->appliedSolution(solution, result);
-    if (!result)
-      return None;
-  }
-
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
   if (!cs.shouldSuppressDiagnostics()) {
@@ -2137,8 +2133,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 Type TypeChecker::
 getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
                                    ConcreteDeclRef &referencedDecl,
-                                 FreeTypeVariableBinding allowFreeTypeVariables,
-                                   ExprTypeCheckListener *listener) {
+                                 FreeTypeVariableBinding allowFreeTypeVariables) {
   auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-expr-no-apply", expr);
@@ -2162,7 +2157,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
     expr->setType(Type());
   SolutionApplicationTarget target(
       expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
-  auto viable = cs.solve(target, listener, allowFreeTypeVariables);
+  auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable) {
     recoverOriginalType();
     return Type();
@@ -2468,244 +2463,29 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 }
 
 bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
-  /// Type checking listener for for-each binding.
-  class BindingListener : public ExprTypeCheckListener {
-    /// The for-each statement.
-    ForEachStmt *Stmt;
-
-    /// The declaration context in which this for-each statement resides.
-    DeclContext *DC;
-
-    /// The locator we're using.
-    ConstraintLocator *Locator;
-
-    /// The contextual locator we're using.
-    ConstraintLocator *ContextualLocator;
-
-    /// The Sequence protocol.
-    ProtocolDecl *SequenceProto;
-
-    /// The IteratorProtocol.
-    ProtocolDecl *IteratorProto;
-
-    /// The type of the initializer.
-    Type InitType;
-
-    /// The type of the sequence.
-    Type SequenceType;
-
-    /// The conformance of the sequence type to the Sequence protocol.
-    ProtocolConformanceRef SequenceConformance;
-
-    /// The type of the element.
-    Type ElementType;
-
-    /// The type of the iterator.
-    Type IteratorType;
-
-  public:
-    explicit BindingListener(ForEachStmt *stmt, DeclContext *dc)
-        : Stmt(stmt), DC(dc) { }
-
-    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-      // Save the locator we're using for the expression.
-      Locator = cs.getConstraintLocator(expr);
-      ContextualLocator =
-          cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
-
-      // The expression type must conform to the Sequence protocol.
-      SequenceProto = TypeChecker::getProtocol(
-          cs.getASTContext(), Stmt->getForLoc(), KnownProtocolKind::Sequence);
-      if (!SequenceProto) {
-        return true;
-      }
-
-      SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
-      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       SequenceType, Locator);
-      cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
-                       SequenceProto->getDeclaredType(), ContextualLocator);
-
-      auto elementLocator = cs.getConstraintLocator(
-          ContextualLocator, ConstraintLocator::SequenceElementType);
-
-      // Check the element pattern.
-      ASTContext &ctx = cs.getASTContext();
-      if (auto *P = TypeChecker::resolvePattern(Stmt->getPattern(), DC,
-                                                /*isStmtCondition*/false)) {
-        Stmt->setPattern(P);
-      } else {
-        Stmt->getPattern()->setType(ErrorType::get(ctx));
-        return true;
-      }
-
-      auto contextualPattern =
-          ContextualPattern::forRawPattern(Stmt->getPattern(), DC);
-      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-      if (patternType->hasError()) {
-        // FIXME: Handle errors better.
-        Stmt->getPattern()->setType(ErrorType::get(ctx));
-        return true;
-      }
-
-      // Collect constraints from the element pattern.
-      auto pattern = Stmt->getPattern();
-      InitType = cs.generateConstraints(
-          pattern, elementLocator, /*bindPatternVarsOneWay=*/false,
-          /*patternBinding=*/nullptr, /*patternBindingIndex=*/0);
-      if (!InitType)
-        return true;
-
-      // Add a conversion constraint between the element type of the sequence
-      // and the type of the element pattern.
-      auto elementAssocType =
-          SequenceProto->getAssociatedType(cs.getASTContext().Id_Element);
-      ElementType = DependentMemberType::get(SequenceType, elementAssocType);
-      cs.addConstraint(ConstraintKind::Conversion, ElementType, InitType,
-                       elementLocator);
-
-      // Determine the iterator type.
-      auto iteratorAssocType =
-          SequenceProto->getAssociatedType(cs.getASTContext().Id_Iterator);
-      IteratorType = DependentMemberType::get(SequenceType, iteratorAssocType);
-
-      // The iterator type must conform to IteratorProtocol.
-      IteratorProto = TypeChecker::getProtocol(
-          cs.getASTContext(), Stmt->getForLoc(),
-          KnownProtocolKind::IteratorProtocol);
-      if (!IteratorProto) {
-        return true;
-      }
-
-      // Reference the makeIterator witness.
-      FuncDecl *makeIterator = ctx.getSequenceMakeIterator();
-      Type makeIteratorType =
-          cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
-      cs.addValueWitnessConstraint(
-          LValueType::get(SequenceType), makeIterator,
-          makeIteratorType, DC, FunctionRefKind::Compound,
-          ContextualLocator);
-
-      Stmt->setSequence(expr);
-      return false;
-    }
-
-    Expr *appliedSolution(Solution &solution, Expr *expr) override {
-      // Figure out what types the constraints decided on.
-      auto &cs = solution.getConstraintSystem();
-      ASTContext &ctx = cs.getASTContext();
-      InitType = solution.simplifyType(InitType);
-      SequenceType = solution.simplifyType(SequenceType);
-      ElementType = solution.simplifyType(ElementType);
-      IteratorType = solution.simplifyType(IteratorType);
-
-      // If the type doesn't conform to Sequence we'll get its element type
-      // bound to `UnresolvedType` since fixes are allowed.
-      if (InitType->is<UnresolvedType>())
-        return nullptr;
-
-      cs.cacheExprTypes(expr);
-      Stmt->setSequence(expr);
-      solution.setExprTypes(expr);
-
-      // Apply the solution to the iteration pattern as well.
-      Pattern *pattern = Stmt->getPattern();
-      TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
-      options |= TypeResolutionFlags::OverrideType;
-      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
-      pattern = TypeChecker::coercePatternToType(contextualPattern,
-                                                 InitType, options);
-      if (!pattern)
-        return nullptr;
-      Stmt->setPattern(pattern);
-
-      // Get the conformance of the sequence type to the Sequence protocol.
-      SequenceConformance = solution.resolveConformance(
-          ContextualLocator, SequenceProto);
-      assert(!SequenceConformance.isInvalid() &&
-             "Couldn't find sequence conformance");
-      Stmt->setSequenceConformance(SequenceConformance);
-
-      // Check the filtering condition.
-      // FIXME: This should be pulled into the constraint system itself.
-      if (auto *Where = Stmt->getWhere()) {
-        if (!TypeChecker::typeCheckCondition(Where, DC))
-          Stmt->setWhere(Where);
-      }
-
-      // Invoke iterator() to get an iterator from the sequence.
-      VarDecl *iterator;
-      Type nextResultType = OptionalType::get(ElementType);
-      {
-        // Create a local variable to capture the iterator.
-        std::string name;
-        if (auto np = dyn_cast_or_null<NamedPattern>(Stmt->getPattern()))
-          name = "$"+np->getBoundName().str().str();
-        name += "$generator";
-
-        iterator = new (ctx) VarDecl(
-            /*IsStatic*/ false, VarDecl::Introducer::Var,
-            /*IsCaptureList*/ false, Stmt->getInLoc(),
-            ctx.getIdentifier(name), DC);
-        iterator->setInterfaceType(IteratorType->mapTypeOutOfContext());
-        iterator->setImplicit();
-        Stmt->setIteratorVar(iterator);
-
-        auto genPat = new (ctx) NamedPattern(iterator);
-        genPat->setImplicit();
-
-        // TODO: test/DebugInfo/iteration.swift requires this extra info to
-        // be around.
-        PatternBindingDecl::createImplicit(
-            ctx, StaticSpellingKind::None, genPat,
-            new (ctx) OpaqueValueExpr(Stmt->getInLoc(), nextResultType),
-            DC, /*VarLoc*/ Stmt->getForLoc());
-      }
-
-      // Create the iterator variable.
-      auto *varRef = TypeChecker::buildCheckedRefExpr(
-          iterator, DC, DeclNameLoc(Stmt->getInLoc()), /*implicit*/ true);
-      if (varRef)
-        Stmt->setIteratorVarRef(varRef);
-
-      // Convert that Optional<Element> value to the type of the pattern.
-      auto optPatternType = OptionalType::get(Stmt->getPattern()->getType());
-      if (!optPatternType->isEqual(nextResultType)) {
-        OpaqueValueExpr *elementExpr =
-            new (ctx) OpaqueValueExpr(Stmt->getInLoc(), nextResultType,
-                                      /*isPlaceholder=*/true);
-        Expr *convertElementExpr = elementExpr;
-        if (TypeChecker::typeCheckExpression(
-                convertElementExpr, DC,
-                TypeLoc::withoutLoc(optPatternType),
-                CTP_CoerceOperand).isNull()) {
-          return nullptr;
-        }
-        elementExpr->setIsPlaceholder(false);
-        Stmt->setElementExpr(elementExpr);
-        Stmt->setConvertElementExpr(convertElementExpr);
-      }
-
-      return expr;
-    }
-  };
-
-  BindingListener listener(stmt, dc);
-  Expr *seq = stmt->getSequence();
-  assert(seq && "type-checking an uninitialized for-each statement?");
-
   auto sequenceProto = TypeChecker::getProtocol(
       dc->getASTContext(), stmt->getForLoc(), KnownProtocolKind::Sequence);
   if (!sequenceProto)
     return true;
 
-  // Type-check the for-each loop sequence and element pattern.
-  auto resultTy = TypeChecker::typeCheckExpression(
-      seq, dc, TypeLoc::withoutLoc(sequenceProto->getDeclaredType()),
-      CTP_ForEachStmt, None, &listener);
-  if (!resultTy)
+  // Precheck the sequence.
+  Expr *sequence = stmt->getSequence();
+  if (ConstraintSystem::preCheckExpression(sequence, dc))
     return true;
-  return false;
+  stmt->setSequence(sequence);
+
+  // Precheck the filtering condition.
+  if (Expr *whereExpr = stmt->getWhere()) {
+    if (ConstraintSystem::preCheckExpression(whereExpr, dc))
+      return true;
+
+    stmt->setWhere(whereExpr);
+  }
+
+  auto target = SolutionApplicationTarget::forForEachStmt(
+      stmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/false);
+  bool unresolvedTypeExprs = false;
+  return !typeCheckExpression(target, unresolvedTypeExprs);
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
@@ -3211,15 +2991,14 @@ void Solution::dump(raw_ostream &out) const {
       out.indent(2);
       opened.first->dump(sm, out);
       out << " opens ";
-      interleave(opened.second.begin(), opened.second.end(),
-                 [&](OpenedType opened) {
-                   Type(opened.first).print(out, PO);
-                   out << " -> ";
-                   Type(opened.second).print(out, PO);
-                 },
-                 [&]() {
-                   out << ", ";
-                 });
+      llvm::interleave(
+          opened.second.begin(), opened.second.end(),
+          [&](OpenedType opened) {
+            Type(opened.first).print(out, PO);
+            out << " -> ";
+            Type(opened.second).print(out, PO);
+          },
+          [&]() { out << ", "; });
       out << "\n";
     }
   }
@@ -3408,15 +3187,14 @@ void ConstraintSystem::print(raw_ostream &out) const {
       out.indent(2);
       opened.first->dump(&getASTContext().SourceMgr, out);
       out << " opens ";
-      interleave(opened.second.begin(), opened.second.end(),
-                 [&](OpenedType opened) {
-                   Type(opened.first).print(out, PO);
-                   out << " -> ";
-                   Type(opened.second).print(out, PO);
-                 },
-                 [&]() {
-                   out << ", ";
-                 });
+      llvm::interleave(
+          opened.second.begin(), opened.second.end(),
+          [&](OpenedType opened) {
+            Type(opened.first).print(out, PO);
+            out << " -> ";
+            Type(opened.second).print(out, PO);
+          },
+          [&]() { out << ", "; });
       out << "\n";
     }
   }

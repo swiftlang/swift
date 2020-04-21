@@ -48,6 +48,11 @@ protected:
   void addDeploymentTargetArgs(llvm::opt::ArgStringList &Arguments,
                                const JobContext &context) const;
 
+  void addCommonFrontendArgs(
+      const OutputInfo &OI, const CommandOutput &output,
+      const llvm::opt::ArgList &inputArgs,
+      llvm::opt::ArgStringList &arguments) const override;
+
   InvocationInfo constructInvocation(const InterpretJobAction &job,
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
@@ -65,6 +70,10 @@ protected:
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
   bool shouldStoreInvocationInDebugInfo() const override;
+
+  /// Retrieve the target SDK version for the given target triple.
+  Optional<llvm::VersionTuple>
+  getTargetSDKVersion(const llvm::Triple &triple) const ;
 
   /// Information about the SDK that the application is being built against.
   /// This information is only used by the linker, so it is only populated

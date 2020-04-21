@@ -1294,4 +1294,21 @@ bb0:
   return %35 : $Int64
 }
 
+// Test init_existential_metatype combining.
+protocol SomeP {}
 
+public enum SpecialEnum : SomeP {}
+
+// CHECK-LABEL: sil @testCSEInitExistentialMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+// CHECK:   [[EMT:%.*]] = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK-NOT: init_existential_metatype
+// CHECK:   builtin "is_same_metatype"([[EMT]] : $@thick Any.Type, [[EMT]] : $@thick Any.Type) : $Builtin.Int1
+// CHECK-LABEL: }  // end sil function 'testCSEInitExistentialMetatype'
+sil @testCSEInitExistentialMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+bb0(%0 : $@thick SpecialEnum.Type):
+  %1 = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+  %2 = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+  %3 = builtin "is_same_metatype"(%1 : $@thick Any.Type, %2 : $@thick Any.Type) : $Builtin.Int1
+  %4 = struct $Bool (%3 : $Builtin.Int1)
+  return %4 : $Bool
+}

@@ -812,6 +812,27 @@ struct CaseLabelItemInfo {
   Expr *guardExpr;
 };
 
+/// Describes information about a for-each loop that needs to be tracked
+/// within the constraint system.
+struct ForEachStmtInfo {
+  ForEachStmt *stmt;
+
+  /// The type of the sequence.
+  Type sequenceType;
+
+  /// The type of the iterator.
+  Type iteratorType;
+
+  /// The type of an element in the sequence.
+  Type elementType;
+
+  /// The type of the pattern that matches the elements.
+  Type initType;
+
+  /// The "where" expression, if there is one.
+  Expr *whereExpr;
+};
+
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
 /// solution application targets.
 using SolutionApplicationTargetsKey =
@@ -1202,6 +1223,10 @@ class SolutionApplicationTarget {
       /// this is an initialization involving a property wrapper.
       VarDecl *wrappedVar;
 
+      /// The innermost call to \c init(wrappedValue:), if this is an
+      /// initialization involving a property wrapper.
+      ApplyExpr *innermostWrappedValueInit;
+
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
 
@@ -1209,11 +1234,17 @@ class SolutionApplicationTarget {
       /// fresh type variables via one-way constraints.
       bool bindPatternVarsOneWay;
 
-      /// The pattern binding declaration for an initialization, if any.
-      PatternBindingDecl *patternBinding;
+      union {
+        struct {
+          /// The pattern binding declaration for an initialization, if any.
+          PatternBindingDecl *patternBinding;
 
-      /// The index into the pattern binding declaration, if any.
-      unsigned patternBindingIndex;
+          /// The index into the pattern binding declaration, if any.
+          unsigned patternBindingIndex;
+        } initialization;
+
+        ForEachStmtInfo forEachStmt;
+      };
     } expression;
 
     struct {
@@ -1280,6 +1311,11 @@ public:
   static SolutionApplicationTarget forInitialization(
       Expr *initializer, DeclContext *dc, Type patternType,
       PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
+      bool bindPatternVarsOneWay);
+
+  /// Form a target for a for-each loop.
+  static SolutionApplicationTarget forForEachStmt(
+      ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
       bool bindPatternVarsOneWay);
 
   Expr *getAsExpr() const {
@@ -1367,7 +1403,7 @@ public:
   }
 
   /// For a pattern initialization target, retrieve the contextual pattern.
-  ContextualPattern getInitializationContextualPattern() const;
+  ContextualPattern getContextualPattern() const;
 
   /// Whether this is an initialization for an Optional.Some pattern.
   bool isOptionalSomePatternInit() const {
@@ -1379,9 +1415,21 @@ public:
   /// Whether to bind the types of any variables within the pattern via
   /// one-way constraints.
   bool shouldBindPatternVarsOneWay() const {
-    return kind == Kind::expression &&
-        expression.contextualPurpose == CTP_Initialization &&
-        expression.bindPatternVarsOneWay;
+    return kind == Kind::expression && expression.bindPatternVarsOneWay;
+  }
+
+  /// Whether or not an opaque value placeholder should be injected into the
+  /// first \c wrappedValue argument of an apply expression.
+  bool shouldInjectWrappedValuePlaceholder(ApplyExpr *apply) const {
+    if (kind != Kind::expression ||
+        expression.contextualPurpose != CTP_Initialization)
+      return false;
+
+    auto *wrappedVar = expression.wrappedVar;
+    if (!wrappedVar || wrappedVar->isStatic())
+      return false;
+
+    return expression.innermostWrappedValueInit == apply;
   }
 
   /// Retrieve the wrapped variable when initializing a pattern with a
@@ -1395,13 +1443,25 @@ public:
   PatternBindingDecl *getInitializationPatternBindingDecl() const {
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
-    return expression.patternBinding;
+    return expression.initialization.patternBinding;
   }
 
   unsigned getInitializationPatternBindingIndex() const {
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization);
-    return expression.patternBindingIndex;
+    return expression.initialization.patternBindingIndex;
+  }
+
+  const ForEachStmtInfo &getForEachStmtInfo() const {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_ForEachStmt);
+    return expression.forEachStmt;
+  }
+
+  ForEachStmtInfo &getForEachStmtInfo() {
+    assert(kind == Kind::expression);
+    assert(expression.contextualPurpose == CTP_ForEachStmt);
+    return expression.forEachStmt;
   }
 
   /// Whether this context infers an opaque return type.
@@ -1422,7 +1482,8 @@ public:
 
   void setPattern(Pattern *pattern) {
     assert(kind == Kind::expression);
-    assert(expression.contextualPurpose == CTP_Initialization);
+    assert(expression.contextualPurpose == CTP_Initialization ||
+           expression.contextualPurpose == CTP_ForEachStmt);
     expression.pattern = pattern;
   }
 
@@ -2266,8 +2327,7 @@ private:
   friend Optional<SolutionApplicationTarget>
   swift::TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
                                           bool &unresolvedTypeExprs,
-                                          TypeCheckExprOptions options,
-                                          ExprTypeCheckListener *listener);
+                                          TypeCheckExprOptions options);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
@@ -2861,9 +2921,12 @@ public:
   /// \param rememberChoice Whether the conversion disjunction should record its
   /// choice.
   /// \param locator The locator.
+  /// \param compatFix A compatibility fix that can be applied if the conversion
+  /// fails.
   void addExplicitConversionConstraint(Type fromType, Type toType,
                                        RememberChoice_t rememberChoice,
-                                       ConstraintLocatorBuilder locator);
+                                       ConstraintLocatorBuilder locator,
+                                       ConstraintFix *compatFix = nullptr);
 
   /// Add a disjunction constraint.
   void
@@ -3357,9 +3420,37 @@ private:
       llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
           verifyThatArgumentIsHashable);
 
-public:
+  /// Describes a direction of optional wrapping, either increasing optionality
+  /// or decreasing optionality.
+  enum class OptionalWrappingDirection {
+    /// Unwrap an optional type T? to T.
+    Unwrap,
+
+    /// Promote a type T to optional type T?.
+    Promote
+  };
+
+  /// Attempts to find a constraint that involves \p typeVar and satisfies
+  /// \p predicate, looking through optional object constraints if necessary. If
+  /// multiple candidates are found, returns the first one.
+  ///
+  /// \param optionalDirection The direction to travel through optional object
+  /// constraints, either increasing or decreasing optionality.
+  ///
+  /// \param predicate Checks whether a given constraint is the one being
+  /// searched for. The type variable passed is the current representative
+  /// after looking through the optional object constraints.
+  ///
+  /// \returns The constraint found along with the number of optional object
+  /// constraints looked through, or \c None if no constraint was found.
+  Optional<std::pair<Constraint *, unsigned>> findConstraintThroughOptionals(
+      TypeVariableType *typeVar, OptionalWrappingDirection optionalDirection,
+      llvm::function_ref<bool(Constraint *, TypeVariableType *)> predicate);
+
   /// Attempt to simplify the set of overloads corresponding to a given
   /// function application constraint.
+  ///
+  /// \param disjunction The disjunction for the set of overloads.
   ///
   /// \param fnTypeVar The type variable that describes the set of
   /// overloads for the function.
@@ -3368,11 +3459,38 @@ public:
   /// (as the function parameters) and the expected result type of the
   /// call.
   ///
-  /// \returns \c fnType, or some simplified form of it if this function
-  /// was able to find a single overload or derive some common structure
-  /// among the overloads.
-  Type simplifyAppliedOverloads(TypeVariableType *fnTypeVar,
-                                const FunctionType *argFnType,
+  /// \param numOptionalUnwraps The number of unwraps required to get the
+  /// underlying function from the overload choice.
+  ///
+  /// \returns \c true if an error was encountered, \c false otherwise.
+  bool simplifyAppliedOverloadsImpl(Constraint *disjunction,
+                                    TypeVariableType *fnTypeVar,
+                                    const FunctionType *argFnType,
+                                    unsigned numOptionalUnwraps,
+                                    ConstraintLocatorBuilder locator);
+
+public:
+  /// Attempt to simplify the set of overloads corresponding to a given
+  /// bind overload disjunction.
+  ///
+  /// \param disjunction The disjunction for the set of overloads.
+  ///
+  /// \returns \c true if an error was encountered, \c false otherwise.
+  bool simplifyAppliedOverloads(Constraint *disjunction,
+                                ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the set of overloads corresponding to a given
+  /// function application constraint.
+  ///
+  /// \param fnType The type that describes the set of overloads for the
+  /// function.
+  ///
+  /// \param argFnType The call signature, which includes the call arguments
+  /// (as the function parameters) and the expected result type of the
+  /// call.
+  ///
+  /// \returns \c true if an error was encountered, \c false otherwise.
+  bool simplifyAppliedOverloads(Type fnType, const FunctionType *argFnType,
                                 ConstraintLocatorBuilder locator);
 
   /// Retrieve the type that will be used when matching the given overload.
@@ -4410,11 +4528,9 @@ private:
   /// Solve the system of constraints generated from provided expression.
   ///
   /// \param target The target to generate constraints from.
-  /// \param listener The callback to check solving progress.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   SolutionResult solveImpl(SolutionApplicationTarget &target,
-                           ExprTypeCheckListener *listener,
                            FreeTypeVariableBinding allowFreeTypeVariables
                              = FreeTypeVariableBinding::Disallow);
 
@@ -4427,7 +4543,6 @@ public:
   ///
   /// \param target The target that we'll generate constraints from, which
   /// may be updated by the solving process.
-  /// \param listener The callback to check solving progress.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
@@ -4435,7 +4550,6 @@ public:
   /// error occurred. When \c None, an error has been emitted.
   Optional<std::vector<Solution>> solve(
       SolutionApplicationTarget &target,
-      ExprTypeCheckListener *listener,
       FreeTypeVariableBinding allowFreeTypeVariables
         = FreeTypeVariableBinding::Disallow);
 

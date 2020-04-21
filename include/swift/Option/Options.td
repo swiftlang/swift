@@ -338,6 +338,9 @@ def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-pa
 def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   Alias<emit_loaded_module_trace_path>;
+def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit a remark if a cross-import of a module is triggered.">;
 
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,

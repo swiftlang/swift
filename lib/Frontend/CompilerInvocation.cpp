@@ -449,6 +449,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
+  Opts.EnableExperimentalForwardModeDifferentiation |=
+      Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
+
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
@@ -546,6 +549,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    OPT_disable_cross_import_overlays,
                    Opts.EnableCrossImportOverlays);
 
+  Opts.EnableCrossImportRemarks = Args.hasArg(OPT_emit_cross_import_remarks);
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   if (const Arg *A = Args.getLastArg(OPT_target)) {
@@ -587,6 +592,30 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (UnsupportedOS) {
     auto TargetArgOS = TargetComponents.size() > 2 ? TargetComponents[2] : "";
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
+  }
+
+  // Parse the SDK version.
+  if (Arg *A = Args.getLastArg(options::OPT_target_sdk_version)) {
+    auto vers = version::Version::parseVersionString(
+      A->getValue(), SourceLoc(), &Diags);
+    if (vers.hasValue()) {
+      Opts.SDKVersion = *vers;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
+
+  // Parse the target variant SDK version.
+  if (Arg *A = Args.getLastArg(options::OPT_target_variant_sdk_version)) {
+    auto vers = version::Version::parseVersionString(
+      A->getValue(), SourceLoc(), &Diags);
+    if (vers.hasValue()) {
+      Opts.VariantSDKVersion = *vers;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;
@@ -979,6 +1008,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
+  Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
@@ -1407,6 +1437,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = None;
       } else if (version.equals("5.0")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
+      } else if (version.equals("5.1")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);
@@ -1428,6 +1460,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
         getRuntimeCompatVersion();
   }
+
   return false;
 }
 
@@ -1667,4 +1700,31 @@ CompilerInvocation::setUpInputForSILTool(
     setInputKind(InputFileKind::SIL);
   }
   return fileBufOrErr;
+}
+
+bool CompilerInvocation::isModuleExternallyConsumed(
+    const ModuleDecl *mod) const {
+  // Modules for executables aren't expected to be consumed by other modules.
+  // This picks up all kinds of entrypoints, including script mode,
+  // @UIApplicationMain and @NSApplicationMain.
+  if (mod->hasEntryPoint()) {
+    return false;
+  }
+
+  // If an implicit Objective-C header was needed to construct this module, it
+  // must be the product of a library target.
+  if (!getFrontendOptions().ImplicitObjCHeaderPath.empty()) {
+    return false;
+  }
+
+  // App extensions are special beasts because they build without entrypoints
+  // like library targets, but they behave like executable targets because
+  // their associated modules are not suitable for distribution.
+  if (mod->getASTContext().LangOpts.EnableAppExtensionRestrictions) {
+    return false;
+  }
+
+  // FIXME: This is still a lousy approximation of whether the module file will
+  // be externally consumed.
+  return true;
 }

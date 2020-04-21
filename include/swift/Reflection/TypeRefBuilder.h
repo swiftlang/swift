@@ -372,7 +372,7 @@ public:
                     unsigned ordinal) {
     // TODO: Produce a type ref for the opaque type if the underlying type isn't
     // available.
-    
+
     // Try to resolve to the underlying type, if we can.
     if (opaqueDescriptor->getKind() ==
                             Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
@@ -392,7 +392,15 @@ public:
       
       return underlyingTy->subst(*this, subs);
     }
-    return nullptr;
+    
+    // Otherwise, build a type ref that represents the opaque type.
+    return OpaqueArchetypeTypeRef::create(*this,
+                                          mangleNode(opaqueDescriptor,
+                                                     SymbolicResolver(),
+                                                     Dem),
+                                          nodeToString(opaqueDescriptor),
+                                          ordinal,
+                                          genericArgs);
   }
 
   const TupleTypeRef *

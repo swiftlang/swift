@@ -415,6 +415,7 @@ public:
 } // end anonymous namespace
 
 namespace {
+
 class PrettySourceFileEmission : public llvm::PrettyStackTraceEntry {
   const SourceFile &SF;
 public:
@@ -424,6 +425,19 @@ public:
     os << "While emitting IR for source file " << SF.getFilename() << '\n';
   }
 };
+
+class PrettySynthesizedFileUnitEmission : public llvm::PrettyStackTraceEntry {
+  const SynthesizedFileUnit &SFU;
+
+public:
+  explicit PrettySynthesizedFileUnitEmission(const SynthesizedFileUnit &SFU)
+      : SFU(SFU) {}
+
+  void print(raw_ostream &os) const override {
+    os << "While emitting IR for synthesized file" << &SFU << "\n";
+  }
+};
+
 } // end anonymous namespace
 
 /// Emit all the top-level code in the source file.
@@ -462,6 +476,11 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
                                          LibraryKind::Library,
                                          /*forceLoad*/ true));
       }
+      if (*compatibilityVersion <= llvm::VersionTuple(5, 1)) {
+        this->addLinkLibrary(LinkLibrary("swiftCompatibility51",
+                                         LibraryKind::Library,
+                                         /*forceLoad*/ true));
+      }
     }
 
     if (auto compatibilityVersion =
@@ -473,6 +492,13 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
       }
     }
   }
+}
+
+/// Emit all the top-level code in the synthesized file unit.
+void IRGenModule::emitSynthesizedFileUnit(SynthesizedFileUnit &SFU) {
+  PrettySynthesizedFileUnitEmission StackEntry(SFU);
+  for (auto *decl : SFU.getTopLevelDecls())
+    emitGlobalDecl(decl);
 }
 
 /// Collect elements of an already-existing global list with the given
@@ -1708,7 +1734,9 @@ void IRGenModule::emitVTableStubs() {
       stub->setCallingConv(DefaultCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
       auto *errorFunc = getDeletedMethodErrorFn();
-      llvm::CallInst::Create(errorFunc, ArrayRef<llvm::Value *>(), "", entry);
+      llvm::CallInst::Create(cast<llvm::FunctionType>(
+                                 errorFunc->getType()->getPointerElementType()),
+                             errorFunc, ArrayRef<llvm::Value *>(), "", entry);
       new llvm::UnreachableInst(getLLVMContext(), entry);
     }
 
@@ -4419,7 +4447,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   *toPtr = 0;
   ArrayRef<llvm::UTF16> utf16(&buffer[0], utf16Length + 1);
 
-  auto init = llvm::ConstantDataArray::get(LLVMContext, utf16);
+  auto init = llvm::ConstantDataArray::get(getLLVMContext(), utf16);
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
                                          init);

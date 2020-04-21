@@ -220,6 +220,21 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
         // Cleanup after this initialization.
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+
+        // If this is a property wrapper backing storage var that isn't
+        // memberwise initialized and has an original wrapped value, apply
+        // the property wrapper backing initializer.
+        if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
+          auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
+          if (wrappedInfo.originalInitialValue) {
+            auto arg = SGF.emitRValue(wrappedInfo.originalInitialValue);
+            maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
+                                                  std::move(arg))
+              .forwardInto(SGF, Loc, init.get());
+            continue;
+          }
+        }
+
         SGF.emitExprInto(field->getParentInitializer(), init.get());
       }
     }
@@ -235,26 +250,36 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   for (VarDecl *field : decl->getStoredProperties()) {
     auto fieldTy =
         selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
-    SILValue v;
+    RValue value;
 
     // If it's memberwise initialized, do so now.
     if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/false)) {
-      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      v = maybeEmitPropertyWrapperInitFromValue(
-          SGF, Loc, field, subs, std::move(*elti))
-        .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+      value = std::move(*elti);
       ++elti;
     } else {
       // Otherwise, use its initializer.
       assert(field->isParentInitialized());
+      Expr *init = field->getParentInitializer();
 
-      // Cleanup after this initialization.
-      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-      v = SGF.emitRValue(field->getParentInitializer())
-             .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+      // If this is a property wrapper backing storage var that isn't
+      // memberwise initialized, use the original wrapped value if it exists.
+      if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
+        auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
+        if (wrappedInfo.originalInitialValue) {
+          init = wrappedInfo.originalInitialValue;
+        }
+      }
+
+      value = SGF.emitRValue(init);
     }
+
+    // Cleanup after this initialization.
+    FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+    SILValue v = maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
+                                                       std::move(value))
+        .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
 
     eltValues.push_back(v);
   }

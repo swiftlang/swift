@@ -253,6 +253,7 @@ protected:
   IRGenModule &IGM;
   SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
+  Size headerSize = Size(0);
 private:
   Alignment CurAlignment = Alignment(1);
   SmallVector<SpareBitVector, 8> CurSpareBits;
@@ -314,6 +315,9 @@ public:
   /// Return the size of the structure built so far.
   Size getSize() const { return CurSize; }
 
+  // Return the size of the header.
+  Size getHeaderSize() const { return headerSize; }
+
   /// Return the alignment of the structure built so far.
   Alignment getAlignment() const { return CurAlignment; }
 
@@ -350,6 +354,9 @@ class StructLayout {
 
   /// The statically-known minimum bound on the size.
   Size MinimumSize;
+
+  /// The size of a header if present.
+  Size headerSize;
   
   /// The statically-known spare bit mask.
   SpareBitVector SpareBits;
@@ -386,6 +393,7 @@ public:
                ArrayRef<ElementLayout> elements)
     : MinimumAlign(builder.getAlignment()),
       MinimumSize(builder.getSize()),
+      headerSize(builder.getHeaderSize()),
       SpareBits(builder.getSpareBits()),
       IsFixedLayout(builder.isFixedLayout()),
       IsKnownPOD(builder.isPOD()),
@@ -401,6 +409,7 @@ public:
   
   llvm::Type *getType() const { return Ty; }
   Size getSize() const { return MinimumSize; }
+  Size getHeaderSize() const { return headerSize; }
   Alignment getAlignment() const { return MinimumAlign; }
   const SpareBitVector &getSpareBits() const { return SpareBits; }
   SpareBitVector &getSpareBits() { return SpareBits; }

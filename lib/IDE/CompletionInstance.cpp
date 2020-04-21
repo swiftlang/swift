@@ -16,8 +16,10 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -162,11 +164,13 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
 
 } // namespace
 
-bool CompletionInstance::performCachedOperaitonIfPossible(
+bool CompletionInstance::performCachedOperationIfPossible(
     const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+  llvm::PrettyStackTraceString trace(
+      "While performing cached completion if possible");
 
   if (!CachedCI)
     return false;
@@ -218,7 +222,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
 
   auto &newInfo = newState->getCodeCompletionDelayedDeclState();
   unsigned newBufferID;
-
+  DeclContext *traceDC = nullptr;
   switch (newInfo.Kind) {
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     // If the interface has changed, AST must be refreshed.
@@ -285,6 +289,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     if (AFD->isBodySkipped())
       AFD->setBodyDelayed(AFD->getBodySourceRange());
 
+    traceDC = AFD;
     break;
   }
   case CodeCompletionDelayedDeclKind::Decl:
@@ -329,6 +334,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     performImportResolution(*newSF);
     bindExtensions(*newSF);
 
+    traceDC = newM;
 #ifndef NDEBUG
     const auto *reparsedState = newSF->getDelayedParserState();
     assert(reparsedState->hasCodeCompletionDelayedDeclState() &&
@@ -341,16 +347,17 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   }
   }
 
-  if (DiagC)
-    CI.addDiagnosticConsumer(DiagC);
+  {
+    PrettyStackTraceDeclContext trace("performing cached completion", traceDC);
 
-  CI.getDiags().diagnose(SM.getLocForOffset(newBufferID, newInfo.StartOffset),
-                         diag::completion_reusing_astcontext);
+    if (DiagC)
+      CI.addDiagnosticConsumer(DiagC);
 
-  Callback(CI);
+    Callback(CI, /*reusingASTContext=*/true);
 
-  if (DiagC)
-    CI.removeDiagnosticConsumer(DiagC);
+    if (DiagC)
+      CI.removeDiagnosticConsumer(DiagC);
+  }
 
   CachedReuseCount += 1;
 
@@ -362,7 +369,8 @@ bool CompletionInstance::performNewOperation(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+  llvm::PrettyStackTraceString trace("While performing new completion");
 
   auto TheInstance = std::make_unique<CompilerInstance>();
   {
@@ -399,7 +407,7 @@ bool CompletionInstance::performNewOperation(
     if (!state->hasCodeCompletionDelayedDeclState())
       return true;
 
-    Callback(CI);
+    Callback(CI, /*reusingASTContext=*/false);
   }
 
   if (ArgsHash.hasValue()) {
@@ -416,7 +424,7 @@ bool swift::ide::CompletionInstance::performOperation(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &)> Callback) {
+    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
 
   // Always disable source location resolutions from .swiftsourceinfo file
   // because they're somewhat heavy operations and aren't needed for completion.
@@ -446,7 +454,7 @@ bool swift::ide::CompletionInstance::performOperation(
     // the cached completion instance.
     std::lock_guard<std::mutex> lock(mtx);
 
-    if (performCachedOperaitonIfPossible(Invocation, ArgsHash, completionBuffer,
+    if (performCachedOperationIfPossible(Invocation, ArgsHash, completionBuffer,
                                          Offset, DiagC, Callback))
       return true;
 

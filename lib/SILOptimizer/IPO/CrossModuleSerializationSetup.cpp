@@ -15,14 +15,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
+#include "swift/AST/Module.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SIL/ApplySite.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILCloner.h"
-#include "swift/AST/Module.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -181,12 +182,19 @@ makeSubstUsableFromInline(const SubstitutionMap &substs) {
     }
   }
 }
+static llvm::cl::opt<bool> SerializeEverything(
+    "sil-cross-module-serialize-all", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Serialize everything when performing cross module optimization in "
+        "order to investigate performance differences caused by different "
+        "@inlinable, @usableFromInline choices."),
+    llvm::cl::Hidden);
 
 /// Decide whether to serialize a function.
 static bool shouldSerialize(SILFunction *F) {
   // The basic heursitic: serialize all generic functions, because it makes a
   // huge difference if generic functions can be specialized or not.
-  if (!F->getLoweredFunctionType()->isPolymorphic())
+  if (!F->getLoweredFunctionType()->isPolymorphic() && !SerializeEverything)
     return false;
 
   // Check if we already handled this function before.

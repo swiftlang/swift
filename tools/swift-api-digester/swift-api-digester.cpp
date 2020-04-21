@@ -244,6 +244,11 @@ BaselineFilePath("baseline-path",
                  llvm::cl::desc("The path to the Json file that we should use as the baseline"),
                  llvm::cl::cat(Category));
 
+static llvm::cl::opt<std::string>
+BaselineDirPath("baseline-dir",
+                 llvm::cl::desc("The path to a directory containing baseline files: macos.json, iphoneos.json, appletvos.json, watchos.json, and iosmac.json"),
+                 llvm::cl::cat(Category));
+
 static llvm::cl::opt<bool>
 UseEmptyBaseline("empty-baseline",
                 llvm::cl::desc("Use empty baseline for diagnostics"),
@@ -1112,6 +1117,28 @@ public:
     UpdateMap(Ctx.getNodeUpdateMap()),
     ProtocolReqWhitelist(std::move(prWhitelist)) {}
 
+  void diagnoseMissingAvailable(SDKNodeDecl *D) {
+    // For extensions of external types, we diagnose individual member's missing
+    // available attribute instead of the extension itself.
+    // The reason is we may merge several extensions into a single one; some
+    // attributes are missing.
+    if (auto *DT = dyn_cast<SDKNodeDeclType>(D)) {
+      if (DT->isExtension()) {
+        for(auto MD: DT->getChildren()) {
+          diagnoseMissingAvailable(cast<SDKNodeDecl>(MD));
+        }
+        return;
+      }
+    }
+    // Diagnose the missing of @available attributes.
+    // Decls with @_alwaysEmitIntoClient aren't required to have an
+    // @available attribute.
+    if (!Ctx.getOpts().SkipOSCheck &&
+        !D->getIntroducingVersion().hasOSAvailability() &&
+        !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
+      D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
+    }
+  }
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
     if (options::DebugMapping)
       debugMatch(Left, Right, Reason, llvm::errs());
@@ -1125,14 +1152,7 @@ public:
           if (D->hasFixedBinaryOrder()) {
             D->emitDiag(D->getLoc(), diag::decl_added);
           }
-          // Diagnose the missing of @available attributes.
-          // Decls with @_alwaysEmitIntoClient aren't required to have an
-          // @available attribute.
-          if (!Ctx.getOpts().SkipOSCheck &&
-              !D->getIntroducingVersion().hasOSAvailability() &&
-              !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
-            D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
-          }
+          diagnoseMissingAvailable(D);
         }
       }
       // Complain about added protocol requirements
@@ -2647,6 +2667,58 @@ static ComparisonInputMode checkComparisonInputMode() {
     return ComparisonInputMode::BaselineJson;
 }
 
+static std::string getDefaultBaselineDir(const char *Main) {
+  llvm::SmallString<128> BaselineDir;
+  // The path of the swift-api-digester executable.
+  std::string ExePath = llvm::sys::fs::getMainExecutable(Main,
+    reinterpret_cast<void *>(&anchorForGetMainExecutable));
+  BaselineDir.append(ExePath);
+  llvm::sys::path::remove_filename(BaselineDir); // Remove /swift-api-digester
+  llvm::sys::path::remove_filename(BaselineDir); // Remove /bin
+  llvm::sys::path::append(BaselineDir, "lib", "swift", "FrameworkABIBaseline");
+  return BaselineDir.str().str();
+}
+
+static std::string getEmptyBaselinePath(const char *Main) {
+  llvm::SmallString<128> BaselinePath(getDefaultBaselineDir(Main));
+  llvm::sys::path::append(BaselinePath, "nil.json");
+  return BaselinePath.str().str();
+}
+
+static StringRef getBaselineFilename(llvm::Triple Triple) {
+  if (Triple.isMacCatalystEnvironment())
+    return "iosmac.json";
+  else if (Triple.isMacOSX())
+    return "macos.json";
+  else if (Triple.isiOS())
+    return "iphoneos.json";
+  else if (Triple.isTvOS())
+    return "appletvos.json";
+  else if (Triple.isWatchOS())
+    return "watchos.json";
+  else {
+    llvm::errs() << "Unsupported triple target\n";
+    exit(1);
+  }
+}
+
+static std::string getDefaultBaselinePath(const char *Main, StringRef Module,
+                                          llvm::Triple Triple,
+                                          bool ABI) {
+  llvm::SmallString<128> BaselinePath(getDefaultBaselineDir(Main));
+  llvm::sys::path::append(BaselinePath, Module);
+  // Look for ABI or API baseline
+  llvm::sys::path::append(BaselinePath, ABI? "ABI": "API");
+  llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
+  return BaselinePath.str().str();
+}
+
+static std::string getCustomBaselinePath(llvm::Triple Triple) {
+  llvm::SmallString<128> BaselinePath(options::BaselineDirPath);
+  llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
+  return BaselinePath.str().str();
+}
+
 static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
   SwiftDeclCollector Collector(Ctx);
   // If the baseline path has been given, honor that.
@@ -2662,41 +2734,16 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
 
   assert(Modules.size() == 1 &&
          "Cannot find builtin baseline for more than one module");
-  // The path of the swift-api-digester executable.
-  std::string ExePath = llvm::sys::fs::getMainExecutable(Main,
-    reinterpret_cast<void *>(&anchorForGetMainExecutable));
-  llvm::SmallString<128> BaselinePath(ExePath);
-  llvm::sys::path::remove_filename(BaselinePath); // Remove /swift-api-digester
-  llvm::sys::path::remove_filename(BaselinePath); // Remove /bin
-  llvm::sys::path::append(BaselinePath, "lib", "swift", "FrameworkABIBaseline");
-  if (options::UseEmptyBaseline) {
-    // Use the empty baseline for comparison.
-    llvm::sys::path::append(BaselinePath, "nil.json");
+  std::string Path;
+  if (!options::BaselineDirPath.empty()) {
+    Path = getCustomBaselinePath(Invok.getLangOptions().Target);
+  } else if (options::UseEmptyBaseline) {
+    Path = getEmptyBaselinePath(Main);
   } else {
-    llvm::sys::path::append(BaselinePath, Modules.begin()->getKey());
-    // Look for ABI or API baseline
-    if (Ctx.checkingABI())
-      llvm::sys::path::append(BaselinePath, "ABI");
-    else
-      llvm::sys::path::append(BaselinePath, "API");
-    // Look for deployment target specific baseline files.
-    auto Triple = Invok.getLangOptions().Target;
-    if (Triple.isMacCatalystEnvironment())
-      llvm::sys::path::append(BaselinePath, "iosmac.json");
-    else if (Triple.isMacOSX())
-      llvm::sys::path::append(BaselinePath, "macos.json");
-    else if (Triple.isiOS())
-      llvm::sys::path::append(BaselinePath, "iphoneos.json");
-    else if (Triple.isTvOS())
-      llvm::sys::path::append(BaselinePath, "appletvos.json");
-    else if (Triple.isWatchOS())
-      llvm::sys::path::append(BaselinePath, "watchos.json");
-    else {
-      llvm::errs() << "Unsupported triple target\n";
-      exit(1);
-    }
+    Path = getDefaultBaselinePath(Main, Modules.begin()->getKey(),
+                                  Invok.getLangOptions().Target,
+                                  Ctx.checkingABI());
   }
-  StringRef Path = BaselinePath.str();
   if (!fs::exists(Path)) {
     llvm::errs() << "Baseline at " << Path << " does not exist\n";
     exit(1);

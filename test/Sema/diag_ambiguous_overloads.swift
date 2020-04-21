@@ -40,6 +40,14 @@ struct S {
   }
 }
 
+struct School {
+  var name: String
+}
+func testDiagnoseForAmbiguityCrash(schools: [School]) {
+  schools.map({ $0.name }).sorted(by: { $0.nothing < $1.notAThing })
+  // expected-error@-1 {{value of type 'String' has no member 'nothing'}}
+  // expected-error@-2 {{value of type 'String' has no member 'notAThing'}}
+}
 
 class DefaultValue {
   static func foo(_ a: Int) {}

@@ -2932,9 +2932,15 @@ substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
 static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
                                   OpaqueSubstitutionKind kind,
                                   bool isContextWholeModule) {
-  auto nominal = ty->getAnyNominal();
-  if (!nominal)
+  TypeDecl *typeDecl = ty->getAnyNominal();
+  if (!typeDecl) {
+    // We also need to check that the opaque type descriptor is accessible.
+    if (auto opaqueTy = ty->getAs<OpaqueTypeArchetypeType>())
+      typeDecl = opaqueTy->getDecl();
+  }
+  if (!typeDecl) {
     return true;
+  }
 
   switch (kind) {
   case OpaqueSubstitutionKind::DontSubstitute:
@@ -2950,14 +2956,18 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
 
     // In the same file any visibility is okay.
     if (!dc->isModuleContext() &&
-        nominal->getDeclContext()->getParentSourceFile() ==
+        typeDecl->getDeclContext()->getParentSourceFile() ==
         dc->getParentSourceFile())
       return true;
-    return nominal->getEffectiveAccess() > AccessLevel::FilePrivate;
+
+    return typeDecl->getEffectiveAccess() > AccessLevel::FilePrivate;
 
   case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
-    return nominal->getEffectiveAccess() > AccessLevel::Internal;
+    if (dc->getParentModule() == typeDecl->getDeclContext()->getParentModule())
+      return true;
+
+    return typeDecl->getEffectiveAccess() > AccessLevel::Internal;
   }
 }
 

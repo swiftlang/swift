@@ -29,13 +29,13 @@
 using namespace swift;
 
 void ConformanceAccessPath::print(raw_ostream &out) const {
-  interleave(begin(), end(),
-             [&](const Entry &entry) {
-               entry.first.print(out);
-               out << ": " << entry.second->getName();
-             }, [&] {
-               out << " -> ";
-             });
+  llvm::interleave(
+      begin(), end(),
+      [&](const Entry &entry) {
+        entry.first.print(out);
+        out << ": " << entry.second->getName();
+      },
+      [&] { out << " -> "; });
 }
 
 void ConformanceAccessPath::dump() const {

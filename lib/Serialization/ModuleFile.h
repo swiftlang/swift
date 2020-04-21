@@ -100,6 +100,10 @@ class ModuleFile
   /// modules, which are assumed to contain canonical SIL for an entire module.
   bool IsSIB = false;
 
+  // Full blob from the misc. version field of the metadata block. This should
+  // include the version string of the compiler that built the module.
+  StringRef MiscVersion;
+
 public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
@@ -881,6 +885,10 @@ public:
   virtual ValueDecl *
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override;
+
+  virtual AbstractFunctionDecl *
+  loadReferencedFunctionDecl(const DerivativeAttr *DA,
+                             uint64_t contextData) override;
 
   virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
                                   uint64_t contextData) override;

@@ -49,6 +49,9 @@ SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
 SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
               IndexSubset *(DifferentiableAttr *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DerivativeAttrOriginalDeclRequest,
+              AbstractFunctionDecl *(DerivativeAttr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
               bool(TypeEraserAttr *, ProtocolDecl *),
               Cached, NoLocationInfo)
@@ -147,6 +150,9 @@ SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyTypeRequest,
               Type(VarDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PropertyWrapperLValuenessRequest,
+              Optional<PropertyWrapperLValueness>(VarDecl *), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperMutabilityRequest,
               Optional<PropertyWrapperMutability>(VarDecl *), Cached,
               NoLocationInfo)
@@ -165,8 +171,8 @@ SWIFT_REQUEST(TypeChecker, RequiresOpaqueAccessorsRequest, bool(VarDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RequiresOpaqueModifyCoroutineRequest,
               bool(AbstractStorageDecl *), SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ResilienceExpansionRequest,
-              ResilienceExpansion(DeclContext *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, FragileFunctionKindRequest,
+              FragileFunctionKind(DeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SelfAccessKindRequest, SelfAccessKind(FuncDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StorageImplInfoRequest,
@@ -246,3 +252,5 @@ SWIFT_REQUEST(TypeChecker, ClosureHasExplicitResultRequest,
 SWIFT_REQUEST(TypeChecker, LookupAllConformancesInContextRequest,
               ProtocolConformanceLookupResult(const DeclContext *),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest, 
+              bool(AccessorDecl *), Cached, NoLocationInfo)

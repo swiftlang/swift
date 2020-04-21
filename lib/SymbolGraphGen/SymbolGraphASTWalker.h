@@ -60,8 +60,29 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   // MARK: - Utilities
 
-  /// Get a "sub" symbol graph for the parent module of a type that the main module `M` is extending.
-  SymbolGraph *getModuleSymbolGraph(ModuleDecl *M);
+  /// Get a "sub" symbol graph for the appropriate module concerning a declaration.
+  ///
+  /// This will get the "rootmost" module responsible for a declaration's
+  /// documentation. For example:
+  ///
+  /// Module A:
+  ///
+  /// ```swift
+  /// public struct AStruct {}
+  /// ```
+  ///
+  /// Module B:
+  ///
+  /// ```swift
+  /// import A
+  /// extension AStruct {
+  ///   public struct BStruct {}
+  /// }
+  ///
+  /// `BStruct` will go in module A's extension symbol graph, because `BStruct`
+  /// is a member of `AStruct`, and module A owns `AStruct`, and so on for
+  /// further nestings.
+  SymbolGraph *getModuleSymbolGraph(const Decl *D);
 
   // MARK: - SourceEntityWalker
 

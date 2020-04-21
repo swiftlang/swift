@@ -202,6 +202,10 @@ struct SymbolGraph {
   /// Returns `true` if the declaration should be included as a node
   /// in the graph.
   bool canIncludeDeclAsNode(const Decl *D) const;
+
+  /// Returns `true` if the declaration is a requirement of a protocol
+  /// or is a default implementation of a protocol
+  bool isRequirementOrDefaultImplementation(const ValueDecl *VD) const;
 };
 
 } // end namespace symbolgraphgen

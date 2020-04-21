@@ -626,7 +626,11 @@ bool Parser::parseSpecializeAttributeArguments(
                  ParamLabel);
       }
       if (ParamLabel == "exported") {
+        auto trueLoc = Tok.getLoc();
         bool isTrue = consumeIf(tok::kw_true);
+        if (isTrue) {
+          diagnose(trueLoc, diag::attr_specialize_export_true_no_op);
+        }
         bool isFalse = consumeIf(tok::kw_false);
         if (!isTrue && !isFalse) {
           diagnose(Tok.getLoc(), diag::attr_specialize_expected_bool_value);
@@ -877,7 +881,7 @@ bool Parser::parseDifferentiabilityParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &parameters, StringRef attrName,
     bool allowNamedParameters) {
   SyntaxParsingContext DiffParamsClauseContext(
-      SyntaxContext, SyntaxKind::DifferentiationParamsClause);
+      SyntaxContext, SyntaxKind::DifferentiabilityParamsClause);
   consumeToken(tok::identifier);
   if (!consumeIf(tok::colon)) {
     diagnose(Tok, diag::expected_colon_after_label, "wrt");
@@ -887,8 +891,8 @@ bool Parser::parseDifferentiabilityParametersClause(
   // Function that parses a parameter into `parameters`. Returns true if error
   // occurred.
   auto parseParam = [&](bool parseTrailingComma = true) -> bool {
-    SyntaxParsingContext DiffParamContext(
-        SyntaxContext, SyntaxKind::DifferentiationParam);
+    SyntaxParsingContext DiffParamContext(SyntaxContext,
+                                          SyntaxKind::DifferentiabilityParam);
     SourceLoc paramLoc;
     switch (Tok.getKind()) {
     case tok::identifier: {
@@ -932,8 +936,8 @@ bool Parser::parseDifferentiabilityParametersClause(
 
   // Parse opening '(' of the parameter list.
   if (Tok.is(tok::l_paren)) {
-    SyntaxParsingContext DiffParamsContext(
-        SyntaxContext, SyntaxKind::DifferentiationParams);
+    SyntaxParsingContext DiffParamsContext(SyntaxContext,
+                                           SyntaxKind::DifferentiabilityParams);
     consumeToken(tok::l_paren);
     // Parse first parameter. At least one is required.
     if (parseParam())
@@ -942,7 +946,7 @@ bool Parser::parseDifferentiabilityParametersClause(
     while (Tok.isNot(tok::r_paren))
       if (parseParam())
         return errorAndSkipUntilConsumeRightParen(*this, attrName, 2);
-    SyntaxContext->collectNodesInPlace(SyntaxKind::DifferentiationParamList);
+    SyntaxContext->collectNodesInPlace(SyntaxKind::DifferentiabilityParamList);
     // Parse closing ')' of the parameter list.
     consumeToken(tok::r_paren);
   }
@@ -6605,8 +6609,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     // Handle the likely case someone typed 'case X, case Y'.
     if (Tok.is(tok::kw_case) && CommaLoc.isValid()) {
       diagnose(Tok, diag::expected_identifier_after_case_comma);
-      Status.setIsParseError();
-      return Status;
+      break;
     }
 
     if (Tok.is(tok::identifier)) {
@@ -6651,8 +6654,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         }
       } else if (CommaLoc.isValid()) {
         diagnose(Tok, diag::expected_identifier_after_case_comma);
-        Status.setIsParseError();
-        return Status;
+        break;
       } else {
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }

@@ -29,6 +29,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_GENERICRESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_ROOT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_NONROOT | %FileCheck %s -check-prefix=OBJ-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_INOUT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_FUNC_VARIADIC | %FileCheck %s -check-prefix=ARRAYTYPE-DOT
 
 class Person {
     var name: String
@@ -163,10 +165,16 @@ func recvFuncGeneric<T>(_ fn: (Person) -> T) {
 
 struct Wrap<T> {
   func map<U>(_ fn: (T) -> U) -> U { fatalError() }
+  func _inout<U>(_ fn: (inout T) -> U) -> U { fatalError() }
+  func variadic<U>(_ fn: (T...) -> U) -> U { fatalError() }
 }
 func testKeyPathAsFunctions(wrapped: Wrap<Person>) {
   let _ = wrapped.map(\.#^CONTEXT_FUNC_ROOT^#)
   // Same as TYPE_DOT.
   let _ = wrapped.map(\.friends[0].#^CONTEXT_FUNC_NONROOT^#)
   // Same as OBJ_DOT.
+  let _ = wrapped._inout(\.#^CONTEXT_FUNC_INOUT^#)
+  // Same as TYPE_DOT.
+  let _ = wrapped.variadic(\.#^CONTEXT_FUNC_VARIADIC^#)
+  // Same as ARRAYTYPE_DOT.
 }

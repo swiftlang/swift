@@ -624,9 +624,183 @@ int swift_decompose_double(double d,
 }
 #endif
 
+#if SWIFT_DTOA_FLOAT16_SUPPORT
+// Decompose an IEEE 754 binary16 half-precision float
+// into decimal digits and a corresponding decimal exponent.
+
+// See swift_decompose_double for detailed comments on the algorithm here
+// This can almost certainly be simplified a great deal.  This
+// first iteration just copies the code from float.
+int swift_decompose_float16(const __fp16 *f,
+    int8_t *digits, size_t digits_length, int *decimalExponent)
+{
+    static const int significandBitCount = 10;
+    static const uint32_t significandMask
+        = ((uint32_t)1 << significandBitCount) - 1;
+    static const int exponentBitCount = 5;
+    static const int exponentMask = (1 << exponentBitCount) - 1;
+    // See comments in swift_decompose_double
+    static const int64_t exponentBias = (1 << (exponentBitCount - 1)) - 2; // 14
+
+    // Step 0: Deconstruct IEEE 754 binary16 format
+    uint32_t raw = *(const uint16_t *)f;
+    int exponentBitPattern = (raw >> significandBitCount) & exponentMask;
+    uint32_t significandBitPattern = raw & significandMask;
+
+    // Step 1: Handle the various input cases:
+    int binaryExponent;
+    uint32_t significand;
+    if (digits_length < 5) {
+        // Ensure we have space for 5 digits
+        return 0;
+    } else if (exponentBitPattern == exponentMask) { // NaN or Infinity
+        // Return no digits
+        return 0;
+    } else if (exponentBitPattern == 0) {
+        if (significandBitPattern == 0) { // Zero
+            // Return one zero digit and decimalExponent = 0.
+            digits[0] = 0;
+            *decimalExponent = 0;
+            return 1;
+        } else { // Subnormal
+            binaryExponent = 1 - exponentBias;
+            significand = significandBitPattern << (32 - significandBitCount - 1);
+        }
+    } else { // normal
+        binaryExponent = exponentBitPattern - exponentBias;
+        uint32_t hiddenBit = (uint32_t)1 << (uint32_t)significandBitCount;
+        uint32_t fullSignificand = significandBitPattern + hiddenBit;
+        significand = fullSignificand << (32 - significandBitCount - 1);
+    }
+
+    // These numbers will typically get printed as 4- or 5-digit
+    // integers anyway, so we may as well provide that many digits,
+    // even though that's technically more digits than necessary.
+    if (binaryExponent >= 13) {
+      uint16_t intval = significand >> (32 - binaryExponent);
+      int8_t *digit_p = digits;
+      if (intval > 9999) {
+  *digit_p++ = intval / 10000;
+      }
+      digit_p[0] = (intval / 1000) % 10;
+      digit_p[1] = (intval / 100) % 10;
+      digit_p[2] = (intval / 10) % 10;
+      digit_p[3] = intval % 10;
+      int digit_count = digit_p + 4 - digits;
+      *decimalExponent = digit_count;
+      return digit_count;
+    }
+
+    // Step 2: Determine the exact unscaled target interval
+    static const uint32_t halfUlp = (uint32_t)1 << (32 - significandBitCount - 2);
+    uint32_t upperMidpointExact = significand + halfUlp;
+
+    int isBoundary = significandBitPattern == 0;
+    static const uint32_t quarterUlp = halfUlp >> 1;
+    uint32_t lowerMidpointExact
+        = significand - (isBoundary ? quarterUlp : halfUlp);
+
+    // Step 3: Estimate the base 10 exponent
+    int base10Exponent = decimalExponentFor2ToThe(binaryExponent);
+
+    // Step 4: Compute a power-of-10 scale factor
+    uint64_t powerOfTenRoundedDown = 0;
+    uint64_t powerOfTenRoundedUp = 0;
+    int powerOfTenExponent = 0;
+    intervalContainingPowerOf10_Float(-base10Exponent,
+                                      &powerOfTenRoundedDown,
+                                      &powerOfTenRoundedUp,
+                                      &powerOfTenExponent);
+    const int extraBits = binaryExponent + powerOfTenExponent;
+
+    // Step 5: Scale the interval (with rounding)
+    static const int integerBits = 5;
+    const int shift = integerBits - extraBits;
+    const int roundUpBias = (1 << shift) - 1;
+    static const int fractionBits = 64 - integerBits;
+    uint64_t u, l;
+    if (significandBitPattern & 1) {
+        // Narrow the interval (odd significand)
+        uint64_t u1 = multiply64x32RoundingDown(powerOfTenRoundedDown,
+                                                upperMidpointExact);
+        u = u1 >> shift; // Rounding down
+
+        uint64_t l1 = multiply64x32RoundingUp(powerOfTenRoundedUp,
+                                              lowerMidpointExact);
+        l = (l1 + roundUpBias) >> shift; // Rounding Up
+    } else {
+        // Widen the interval (even significand)
+        uint64_t u1 = multiply64x32RoundingUp(powerOfTenRoundedUp,
+                                              upperMidpointExact);
+        u = (u1 + roundUpBias) >> shift; // Rounding Up
+
+        uint64_t l1 = multiply64x32RoundingDown(powerOfTenRoundedDown,
+                                                lowerMidpointExact);
+        l = l1 >> shift; // Rounding down
+    }
+
+    // Step 6: Align first digit, adjust exponent
+    // In particular, this prunes leading zeros from subnormals
+    static const uint64_t fixedPointOne = (uint64_t)1 << fractionBits;
+    static const uint64_t fixedPointMask = fixedPointOne - 1;
+    uint64_t t = u;
+    uint64_t delta = u - l;
+    int exponent = base10Exponent + 1;
+
+    while (t < fixedPointOne) {
+        exponent -= 1;
+        delta *= 10;
+        t *= 10;
+    }
+
+    // Step 7: Generate digits
+    int8_t *digit_p = digits;
+    int nextDigit = (int)(t >> fractionBits);
+    t &= fixedPointMask;
+
+    // Generate one digit at a time...
+    while (t > delta) {
+        *digit_p++ = nextDigit;
+        delta *= 10;
+        t *= 10;
+        nextDigit = (int)(t >> fractionBits);
+        t &= fixedPointMask;
+    }
+
+    // Adjust the final digit to be closer to the original value
+    if (delta > t + fixedPointOne) {
+        uint64_t skew;
+        if (isBoundary) {
+            skew = delta - delta / 3 - t;
+        } else {
+            skew = delta / 2 - t;
+        }
+        uint64_t one = (uint64_t)(1) << (64 - integerBits);
+        uint64_t lastAccurateBit = 1ULL << 24;
+        uint64_t fractionMask = (one - 1) & ~(lastAccurateBit - 1);
+        uint64_t oneHalf = one >> 1;
+        if (((skew + (lastAccurateBit >> 1)) & fractionMask) == oneHalf) {
+            // If the skew is exactly integer + 1/2, round the last
+            // digit even after adjustment
+            int adjust = (int)(skew >> (64 - integerBits));
+            nextDigit = (nextDigit - adjust) & ~1;
+        } else {
+            // Else round to nearest...
+            int adjust = (int)((skew + oneHalf) >> (64 - integerBits));
+            nextDigit = (nextDigit - adjust);
+        }
+    }
+    *digit_p++ = nextDigit;
+
+    *decimalExponent = exponent;
+    return digit_p - digits;
+}
+#endif
+
+
 #if SWIFT_DTOA_FLOAT_SUPPORT
 // Return raw bits encoding the float
-static uint64_t bitPatternForFloat(float f) {
+static uint32_t bitPatternForFloat(float f) {
     union { float f; uint32_t u; } converter;
     converter.f = f;
     return converter.u;
@@ -982,7 +1156,7 @@ int swift_decompose_float80(long double d,
 // These handle various exception cases (infinity, Nan, zero)
 // before invoking the general base-10 conversion.
 
-#if SWIFT_DTOA_FLOAT_SUPPORT || SWIFT_DTOA_DOUBLE_SUPPORT || SWIFT_DTOA_FLOAT80_SUPPORT
+#if SWIFT_DTOA_FLOAT16_SUPPORT || SWIFT_DTOA_FLOAT_SUPPORT || SWIFT_DTOA_DOUBLE_SUPPORT || SWIFT_DTOA_FLOAT80_SUPPORT
 static size_t swift_format_constant(char *dest, size_t length, const char *s) {
     const size_t l = strlen(s);
     if (length <= l) {
@@ -990,6 +1164,57 @@ static size_t swift_format_constant(char *dest, size_t length, const char *s) {
     }
     strcpy(dest, s);
     return l;
+}
+#endif
+
+#if SWIFT_DTOA_FLOAT16_SUPPORT
+size_t swift_format_float16(const __fp16 *d, char *dest, size_t length)
+{
+    uint16_t raw = *(const uint16_t *)d;
+    if ((raw & 0x7c00) == 0x7c00) { // Infinite or NaN
+        if (raw == 0x7c00) {
+            return swift_format_constant(dest, length, "inf");
+        } else if (raw == 0xfc00) {
+            return swift_format_constant(dest, length, "-inf");
+        } else {
+            // NaN
+            static const int significandBitCount = 10;
+            const char *sign = (raw & 0x8000) ? "-" : "";
+            const char *signaling = ((raw >> (significandBitCount - 1)) & 1) ? "" : "s";
+            uint32_t payload = raw & ((1L << (significandBitCount - 2)) - 1);
+            char buff[32];
+            if (payload != 0) {
+                snprintf(buff, sizeof(buff), "%s%snan(0x%x)",
+                         sign, signaling, payload);
+            } else {
+                snprintf(buff, sizeof(buff), "%s%snan",
+                         sign, signaling);
+            }
+            return swift_format_constant(dest, length, buff);
+        }
+    }
+
+    // zero
+    if (raw == 0x8000) {
+        return swift_format_constant(dest, length, "-0.0");
+    }
+    if (raw == 0x0000) {
+        return swift_format_constant(dest, length, "0.0");
+    }
+
+    // Decimal numeric formatting
+    int decimalExponent;
+    int8_t digits[9];
+    bool negative = raw & 0x8000;
+    int digitCount =
+        swift_decompose_float16(d, digits, sizeof(digits), &decimalExponent);
+    if (decimalExponent < -3) {
+        return swift_format_exponential(dest, length, negative,
+                 digits, digitCount, decimalExponent);
+    } else {
+        return swift_format_decimal(dest, length, negative,
+                 digits, digitCount, decimalExponent);
+    }
 }
 #endif
 

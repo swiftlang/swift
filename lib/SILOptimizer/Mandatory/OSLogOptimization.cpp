@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,16 +11,16 @@
 //===----------------------------------------------------------------------===//
 ///
 /// This pass implements SIL-level optimizations and diagnostics for the
-/// os log APIs based on string interpolations. The APIs are implemented
-/// in the files: OSLogMessage.swift, OSLog.swift. This pass constant evaluates
-/// the log calls along with the auto-generated calls to the custom string
-/// interpolation methods, which processes the string interpolation
+/// os log APIs based on string interpolations. A mock version of the APIs
+/// are available in the private module: OSLogTestHelper. This pass constant
+/// evaluates the log calls along with the auto-generated calls to the custom
+/// string interpolation methods, which processes the string interpolation
 /// passed to the log calls, and folds the constants found during the
-/// evaluation. The constants that are folded include the C format string that
-/// is constructed by the custom string interpolation methods from the string
-/// interpolation, and the size and headers of the byte buffer into which
-/// arguments are packed. This pass is closely tied to the implementation of
-/// the log APIs.
+/// evaluation. The constants that are folded include the printf-style format
+/// string that is constructed by the custom string interpolation methods from
+/// the string interpolation, and the size and headers of the byte buffer into
+/// which arguments are packed. This pass is closely tied to the implementation
+/// of the log APIs.
 ///
 /// Pass Dependencies:  This pass depends on MandatoryInlining and Mandatory
 /// Linking happening before this pass and ConstantPropagation happening after
@@ -51,7 +51,6 @@
 ///     The errors discovered here may arise from the implementation of the
 ///     log APIs in the  overlay or could be because of wrong usage of the
 ///     log APIs.
-///     TODO: these errors will be diagnosed by a separate, dedicated pass.
 ///
 ///  4. The constant instructions that were found in step 2 are folded by
 ///     generating SIL code that produces the constants. This also removes
@@ -109,6 +108,10 @@ using namespace Lowering;
 template <typename... T, typename... U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&... args) {
+  // The lifetime of StringRef arguments will be extended as necessary by this
+  // utility. The copy happens in onTentativeDiagnosticFlush at the bottom of
+  // DiagnosticEngine.cpp, which is called when the destructor of the
+  // InFlightDiagnostic returned by diagnose runs.
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
@@ -159,6 +162,8 @@ public:
         dyn_cast<MetatypeInst>(inst->getOperand(4)->getDefiningInstruction());
     this->stringMetatype = stringMetatypeInst->getType();
   }
+
+  bool isInitialized() { return stringInitIntrinsic != nullptr; }
 
   SILFunction *getStringInitIntrinsic() const {
     assert(stringInitIntrinsic);
@@ -353,59 +358,69 @@ static bool isSILValueFoldable(SILValue value) {
            isFoldableArray(value, astContext) || isFoldableClosure(value)));
 }
 
-/// Diagnose failure during evaluation of a call to a constant-evaluable
-/// function. Note that all auto-generated 'appendInterpolation' calls are
-/// constant evaluable. This function detects and specially handles such
-/// functions to present better diagnostic messages.
-static void diagnoseErrorInConstantEvaluableFunction(ApplyInst *call,
-                                                     SymbolicValue errorInfo) {
-  SILNode *unknownNode = errorInfo.getUnknownNode();
+/// Diagnose traps and instruction-limit exceeded errors. These have customized
+/// error messages. \returns true if the given error is diagnosed. Otherwise,
+/// returns false.
+static bool diagnoseSpecialErrors(SILInstruction *unevaluableInst,
+                                  SymbolicValue errorInfo) {
+  SourceLoc sourceLoc = unevaluableInst->getLoc().getSourceLoc();
+  ASTContext &ctx = unevaluableInst->getFunction()->getASTContext();
   UnknownReason unknownReason = errorInfo.getUnknownReason();
 
+  if (unknownReason.getKind() == UnknownReason::Trap) {
+    // We have an assertion failure or fatal error.
+    diagnose(ctx, sourceLoc, diag::oslog_constant_eval_trap,
+             unknownReason.getTrapMessage());
+    return true;
+  }
+  if (unknownReason.getKind() == UnknownReason::TooManyInstructions) {
+    // This should not normally happen. But could be because of extensions
+    // defined by users, or very rarely due to unknown bugs in the os_log API
+    // implementation. These errors may get hidden during testing as it is input
+    // specific.
+    diagnose(ctx, sourceLoc, diag::oslog_too_many_instructions);
+    return true;
+  }
+  return false;
+}
+
+/// Diagnose failure during evaluation of a call to a constant-evaluable
+/// function that is not a specially-handled error. These are errors that
+/// happen within  'appendInterpolation' calls, which must be constant
+/// evaluable by the definition of APIs.
+static void diagnoseErrorInConstantEvaluableFunction(ApplyInst *call,
+                                                     SymbolicValue errorInfo) {
   SILFunction *callee = call->getCalleeFunction();
   assert(callee);
   SILLocation loc = call->getLoc();
   SourceLoc sourceLoc = loc.getSourceLoc();
   ASTContext &astContext = callee->getASTContext();
 
+  // Here, we know very little about what actually went wrong. It could be due
+  // to bugs in the library implementation or in extensions created by users.
+  // Emit a general message here and some diagnostic notes.
   std::string demangledCalleeName = Demangle::demangleSymbolAsString(
       callee->getName(),
       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
-
-  // If an 'appendInterpolation' evaluation failed, it is probably due to
-  // invalid privacy or format specifiers. These are the only possible errors
-  // that the users of the log API could make. The rest are for library authors
-  // or users who extend the log APIs.
-  if (unknownReason.getKind() == UnknownReason::CallArgumentUnknown &&
-      dyn_cast<ApplyInst>(unknownNode) == call) {
-    if (StringRef(demangledCalleeName)
-            .contains(astContext.Id_appendInterpolation.str())) {
-      // TODO: extract and report the label of the parameter that is not a
-      // constant.
-      diagnose(astContext, sourceLoc,
-               diag::oslog_non_const_interpolation_options);
-      return;
-    }
-  }
+  diagnose(astContext, sourceLoc, diag::oslog_invalid_log_message);
   diagnose(astContext, sourceLoc, diag::oslog_const_evaluable_fun_error,
            demangledCalleeName);
   errorInfo.emitUnknownDiagnosticNotes(loc);
-  return;
 }
 
 /// Detect and emit diagnostics for errors found during evaluation. Errors
-/// can happen due to incorrect implementation of the os log API in the
-/// overlay or due to incorrect use of the os log API.
-/// TODO: errors due to incorrect use of the API should be diagnosed by a
-/// dedicated diagnostics pass that will happen before this optimization starts.
+/// can happen due to bugs in the implementation of the os log API, or
+/// due to incorrect use of the os log API.
 static bool detectAndDiagnoseErrors(SymbolicValue errorInfo,
                                     SILInstruction *unevaluableInst) {
+  // TODO: fix the globalStrinTableBuiltin error after emitting diagnostics.
   SILFunction *parentFun = unevaluableInst->getFunction();
   ASTContext &astContext = parentFun->getASTContext();
 
-  // If evaluation of any other constant_evaluable function call fails, point
-  // to that failed function along with a reason: such as that a parameter is
-  // non-constant parameter or that body is not constant evaluable.
+  if (diagnoseSpecialErrors(unevaluableInst, errorInfo))
+    return true;
+  // If evaluation of any constant_evaluable function call fails, point
+  // to that failed function along with a reason.
   ApplyInst *call = dyn_cast<ApplyInst>(unevaluableInst);
   if (call) {
     SILFunction *callee = call->getCalleeFunction();
@@ -414,17 +429,14 @@ static bool detectAndDiagnoseErrors(SymbolicValue errorInfo,
       return true; // abort evaluation.
     }
   }
-
-  // Every other error must happen in the body of the os_log function which
-  // is inlined in the 'parentFun' before this pass. In this case, if we have a
+  // Every other error must happen in the top-level code containing the string
+  // interpolation construction and body of the log methods. If we have a
   // fail-stop error, point to the error and abort evaluation. Otherwise, just
   // ignore the error and continue evaluation as this error might not affect the
   // constant value of the OSLogMessage instance.
   if (isFailStopError(errorInfo)) {
-    assert(errorInfo.getKind() == SymbolicValue::Unknown);
     SILLocation loc = unevaluableInst->getLoc();
-    SourceLoc sourceLoc = loc.getSourceLoc();
-    diagnose(astContext, sourceLoc, diag::oslog_fail_stop_error);
+    diagnose(astContext, loc.getSourceLoc(), diag::oslog_invalid_log_message);
     errorInfo.emitUnknownDiagnosticNotes(loc);
     return true;
   }
@@ -444,7 +456,8 @@ static Optional<SymbolicValue> collectConstants(FoldState &foldState) {
   auto &endInstructions = foldState.endInstructions;
 
   // The loop will break when it sees a return instruction or an instruction in
-  // endInstructions.
+  // endInstructions or when the next instruction to evaluate cannot be
+  // determined (which may happend due to non-constant branches).
   while (true) {
     SILInstruction *currInst = &(*currI);
     if (endInstructions.count(currInst))
@@ -728,17 +741,22 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     SILModule &module = builder.getModule();
     SymbolicClosure *closure = symVal.getClosure();
     SILValue resultVal;
-    if (!closure->hasOnlyConstantCaptures()) {
-      // If the closure captures a value that is not a constant, it should only
-      // come from the caller of the log call. Therefore, assert this and reuse
-      // the closure value.
-      SingleValueInstruction *originalClosureInst = closure->getClosureInst();
-      SILFunction &fun = builder.getFunction();
-      assert(originalClosureInst->getFunction() == &fun &&
-             "closure with non-constant captures not defined in this function");
-      // Copy the closure, since the returned value must be owned.
+
+    // If the closure was created in the context of this function where the code
+    // is generated, reuse the original closure value (after extending its
+    // lifetime by copying).
+    SingleValueInstruction *originalClosureInst = closure->getClosureInst();
+    SILFunction &fun = builder.getFunction();
+    if (originalClosureInst->getFunction() == &fun) {
+      // Copy the closure, since the returned value must be owned and the
+      // closure's lifetime must be extended until this point.
       resultVal = makeOwnedCopyOfSILValue(originalClosureInst, fun);
     } else {
+      // If the closure captures a value that is not a constant, it should only
+      // come from the caller of the log call. It should be handled by the then
+      // case and we should never reach here. Assert this.
+      assert(closure->hasOnlyConstantCaptures() &&
+             "closure with non-constant captures not defined in this function");
       SubstitutionMap callSubstMap = closure->getCallSubstitutionMap();
       ArrayRef<SymbolicClosureArgument> captures = closure->getCaptures();
       // Recursively emit code for all captured values which must be mapped to a
@@ -1004,7 +1022,7 @@ static void substituteConstants(FoldState &foldState) {
 
 /// Check whether OSLogMessage and OSLogInterpolation instances and all their
 /// stored properties are constants. If not, it indicates errors that are due to
-/// incorrect implementation of OSLogMessage either in the overlay or in the
+/// incorrect implementation of OSLogMessage either in the os module or in the
 /// extensions created by users. Detect and emit diagnostics for such errors.
 /// The diagnostics here are for os log library authors.
 static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
@@ -1053,6 +1071,8 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
       osLogInterpolationValue.getAggregateMembers();
   auto propValueI = propertyValues.begin();
   bool errorDetected = false;
+  // Also, track if there is a string-valued property.
+  bool hasStringValuedProperty = false;
 
   for (auto *propDecl : propertyDecls) {
     SymbolicValue propertyValue = *(propValueI++);
@@ -1062,6 +1082,15 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
       errorDetected = true;
       break;
     }
+    hasStringValuedProperty = propertyValue.getKind() == SymbolicValue::String;
+  }
+
+  // If we have a string-valued property but don't have the stringInfo
+  // initialized here, it means the initializer OSLogInterpolation is explicitly
+  // called, which should be diagnosed.
+  if (hasStringValuedProperty && !foldState.stringInfo.isInitialized()) {
+    diagnose(astContext, sourceLoc, diag::oslog_message_explicitly_created);
+    errorDetected = true;
   }
   return errorDetected;
 }
@@ -1180,10 +1209,10 @@ static void deleteInstructionWithUsersAndFixLifetimes(
 
 /// Try to dead-code eliminate the OSLogMessage instance \c oslogMessage passed
 /// to the os log call and clean up its dependencies. If the instance cannot be
-/// eliminated, it implies that either the instance is not auto-generated or the
-/// implementation of the os log overlay is incorrect. Therefore emit
-/// diagnostics in such cases.
-static void tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
+/// eliminated, emit diagnostics.
+/// \returns true if elimination is successful and false if it is not successful
+/// and diagnostics is emitted.
+static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
   InstructionDeleter deleter;
   // List of instructions that are possibly dead.
   SmallVector<SILInstruction *, 4> worklist = {oslogMessage};
@@ -1209,17 +1238,28 @@ static void tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
         });
   }
   deleter.cleanUpDeadInstructions();
-  // If the OSLogMessage instance is not deleted, the overlay implementation
-  // (or its extensions by users) is incorrect.
+  // If the OSLogMessage instance is not deleted, either we couldn't see the
+  // body of the log call or there is a bug in the library implementation.
+  // Assuming that the library implementation is correct, it means that either
+  // OSLogMessage is used in a context where it is not supposed to be used, or
+  // we somehow saw a conditional branch with a non-constant argument before
+  // completing evaluation (this can happen with the os_log(_:log:type)
+  // overload, when log or type is an optional unwrapping). Report an error
+  // that covers both contexts. (Note that it is very hard to distinguish these
+  // error cases in the current state.)
   if (!deletedInstructions.count(oslogMessage)) {
     SILFunction *fun = oslogMessage->getFunction();
     diagnose(fun->getASTContext(), oslogMessage->getLoc().getSourceLoc(),
              diag::oslog_message_alive_after_opts);
+    return false;
   }
+  return true;
 }
 
-/// Constant evaluate instructions starting from 'start' and fold the uses
-/// of the value 'oslogMessage'. Stop when oslogMessageValue is released.
+/// Constant evaluate instructions starting from \p start and fold the uses
+/// of the SIL value \p oslogMessage.
+/// \returns true if folding is successful and false if it is not successful and
+/// diagnostics is emitted.
 static bool constantFold(SILInstruction *start,
                          SingleValueInstruction *oslogMessage,
                          unsigned assertConfig) {
@@ -1246,9 +1286,7 @@ static bool constantFold(SILInstruction *start,
     return false;
 
   substituteConstants(state);
-
-  tryEliminateOSLogMessage(oslogMessage);
-  return true;
+  return tryEliminateOSLogMessage(oslogMessage);
 }
 
 /// Given a call to the initializer of OSLogMessage, which conforms to
@@ -1389,6 +1427,39 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
   return startInst;
 }
 
+/// Replace every _globalStringTablePointer builtin in the transitive users of
+/// oslogMessage with an empty string literal. This would suppress the errors
+/// emitted by a later pass on _globalStringTablePointerBuiltins. This utility
+/// shoud be called only when this pass emits diagnostics.
+static void
+suppressGlobalStringTablePointerError(SingleValueInstruction *oslogMessage) {
+  SmallVector<SILInstruction *, 8> users;
+  getTransitiveUsers(oslogMessage, users);
+
+  // Collect all globalStringTablePointer instructions.
+  SmallVector<BuiltinInst *, 4> globalStringTablePointerInsts;
+  for (SILInstruction *user : users) {
+    BuiltinInst *bi = dyn_cast<BuiltinInst>(user);
+    if (bi &&
+        bi->getBuiltinInfo().ID == BuiltinValueKind::GlobalStringTablePointer)
+      globalStringTablePointerInsts.push_back(bi);
+  }
+
+  // Replace the globalStringTablePointer builtins by a string_literal
+  // instruction for an empty string and clean up dead code.
+  InstructionDeleter deleter;
+  for (BuiltinInst *bi : globalStringTablePointerInsts) {
+    SILBuilderWithScope builder(bi);
+    StringLiteralInst *stringLiteral = builder.createStringLiteral(
+        bi->getLoc(), StringRef(""), StringLiteralInst::Encoding::UTF8);
+    bi->replaceAllUsesWith(stringLiteral);
+    // The bulitin instruction is likely dead. But since we are iterating over
+    // many instructions, do the cleanup at the end.
+    deleter.trackIfDead(bi);
+  }
+  deleter.cleanUpDeadInstructions();
+}
+
 /// If the SILInstruction is an initialization of OSLogMessage, return the
 /// initialization call as an ApplyInst. Otherwise, return nullptr.
 static ApplyInst *getAsOSLogMessageInit(SILInstruction *inst) {
@@ -1479,10 +1550,17 @@ class OSLogOptimization : public SILFunctionTransform {
         // The log call is in unreachable code here.
         continue;
       }
-      madeChange |= constantFold(interpolationStart, oslogInit, assertConfig);
+      bool foldingSucceeded =
+          constantFold(interpolationStart, oslogInit, assertConfig);
+      // If folding did not succeeded, it implies that an error was diagnosed.
+      // However, this will also trigger a diagnostics later on since
+      // _globalStringTablePointerBuiltin would not be passed a string literal.
+      // Suppress this error by synthesizing a dummy string literal for the
+      // builtin.
+      if (!foldingSucceeded)
+        suppressGlobalStringTablePointerError(oslogInit);
+      madeChange = true;
     }
-
-    // TODO: Can we be more conservative here with our invalidation?
     if (madeChange) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }

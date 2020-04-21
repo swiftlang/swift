@@ -8,9 +8,9 @@
 -Xlinker
 --defsym=__import_pthread_key_create=pthread_key_create
 -lpthread
--licui18n
--licuuc
--licudata
+-licui18nswift
+-licuucswift
+-licudataswift
 -ldl
 -lstdc++
 -lm

@@ -489,10 +489,13 @@ bool DefineMemberBasedOnUse::diagnose(const Solution &solution,
 }
 
 bool
-DefineMemberBasedOnUse::diagnoseForAmbiguity(ArrayRef<Solution> solutions) const {
+DefineMemberBasedOnUse::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
   Type concreteBaseType;
-  for (const auto &solution: solutions) {
-    auto baseType = solution.simplifyType(BaseType);
+  for (const auto &solutionAndFix : commonFixes) {
+    const auto *solution = solutionAndFix.first;
+    const auto *fix = solutionAndFix.second->getAs<DefineMemberBasedOnUse>();
+
+    auto baseType = solution->simplifyType(fix->BaseType);
     if (!concreteBaseType)
       concreteBaseType = baseType;
 
@@ -503,7 +506,7 @@ DefineMemberBasedOnUse::diagnoseForAmbiguity(ArrayRef<Solution> solutions) const
     }
   }
 
-  return diagnose(solutions.front());
+  return diagnose(*commonFixes.front().first);
 }
 
 DefineMemberBasedOnUse *
@@ -1275,4 +1278,18 @@ AddQualifierToAccessTopLevelName *
 AddQualifierToAccessTopLevelName::create(ConstraintSystem &cs,
                                          ConstraintLocator *locator) {
   return new (cs.getAllocator()) AddQualifierToAccessTopLevelName(cs, locator);
+}
+
+bool AllowCoercionToForceCast::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  CoercionAsForceCastFailure failure(solution, getFromType(), getToType(),
+                                     getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowCoercionToForceCast *
+AllowCoercionToForceCast::create(ConstraintSystem &cs, Type fromType,
+                                 Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowCoercionToForceCast(cs, fromType, toType, locator);
 }

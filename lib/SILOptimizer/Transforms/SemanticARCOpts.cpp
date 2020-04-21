@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-semantic-arc-opts"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/FrozenMultiMap.h"
+#include "swift/Basic/MultiMapCache.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -477,35 +478,13 @@ LiveRange::hasUnknownConsumingUse(bool assumingAtFixPoint) const {
 //                        Address Written To Analysis
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-/// A simple analysis that checks if a specific def (in our case an inout
-/// argument) is ever written to. This is conservative, local and processes
-/// recursively downwards from def->use.
-struct IsAddressWrittenToDefUseAnalysis {
-  llvm::SmallDenseMap<SILValue, bool, 8> isWrittenToCache;
-
-  bool operator()(SILValue value) {
-    auto iter = isWrittenToCache.try_emplace(value, true);
-
-    // If we are already in the map, just return that.
-    if (!iter.second)
-      return iter.first->second;
-
-    // Otherwise, compute our value, cache it and return.
-    bool result = isWrittenToHelper(value);
-    iter.first->second = result;
-    return result;
-  }
-
-private:
-  bool isWrittenToHelper(SILValue value);
-};
-
-} // end anonymous namespace
-
-bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) {
+/// Returns true if we were able to ascertain that either the initialValue has
+/// no write uses or all of the write uses were writes that we could understand.
+static bool
+constructCacheValue(SILValue initialValue,
+                    SmallVectorImpl<Operand *> &wellBehavedWriteAccumulator) {
   SmallVector<Operand *, 8> worklist(initialValue->getUses());
+
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
     SILInstruction *user = op->getUser();
@@ -521,11 +500,17 @@ bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) 
     if (auto *oeai = dyn_cast<OpenExistentialAddrInst>(user)) {
       // Mutable access!
       if (oeai->getAccessKind() != OpenedExistentialAccess::Immutable) {
-        return true;
+        wellBehavedWriteAccumulator.push_back(op);
       }
 
       //  Otherwise, look through it and continue.
       llvm::copy(oeai->getUses(), std::back_inserter(worklist));
+      continue;
+    }
+
+    // Add any destroy_addrs to the resultAccumulator.
+    if (isa<DestroyAddrInst>(user)) {
+      wellBehavedWriteAccumulator.push_back(op);
       continue;
     }
 
@@ -536,9 +521,9 @@ bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) 
 
     // Look through immutable begin_access.
     if (auto *bai = dyn_cast<BeginAccessInst>(user)) {
-      // If we do not have a read, return true.
+      // If we do not have a read, mark this as a write.
       if (bai->getAccessKind() != SILAccessKind::Read) {
-        return true;
+        wellBehavedWriteAccumulator.push_back(op);
       }
 
       // Otherwise, add the users to the worklist and continue.
@@ -546,10 +531,10 @@ bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) 
       continue;
     }
 
-    // As long as we do not have a load [take], we are fine.
+    // If we have a load, we just need to mark the load [take] as a write.
     if (auto *li = dyn_cast<LoadInst>(user)) {
       if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-        return true;
+        wellBehavedWriteAccumulator.push_back(op);
       }
       continue;
     }
@@ -559,24 +544,28 @@ bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) 
     // interprocedural analysis that we do not perform here.
     if (auto fas = FullApplySite::isa(user)) {
       if (fas.getArgumentConvention(*op) ==
-          SILArgumentConvention::Indirect_In_Guaranteed)
+          SILArgumentConvention::Indirect_In_Guaranteed) {
         continue;
+      }
 
-      // Otherwise, be conservative and return true.
-      return true;
+      // Otherwise, be conservative and return that we had a write that we did
+      // not understand.
+      return false;
     }
 
     // Copy addr that read are just loads.
     if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
       // If our value is the destination, this is a write.
       if (cai->getDest() == op->get()) {
-        return true;
+        wellBehavedWriteAccumulator.push_back(op);
+        continue;
       }
 
       // Ok, so we are Src by process of elimination. Make sure we are not being
       // taken.
       if (cai->isTakeOfSrc()) {
-        return true;
+        wellBehavedWriteAccumulator.push_back(op);
+        continue;
       }
 
       // Otherwise, we are safe and can continue.
@@ -584,16 +573,16 @@ bool IsAddressWrittenToDefUseAnalysis::isWrittenToHelper(SILValue initialValue) 
     }
 
     // If we did not recognize the user, just return conservatively that it was
-    // written to.
+    // written to in a way we did not understand.
     LLVM_DEBUG(llvm::dbgs()
                << "Function: " << user->getFunction()->getName() << "\n");
     LLVM_DEBUG(llvm::dbgs() << "Value: " << op->get());
     LLVM_DEBUG(llvm::dbgs() << "Unknown instruction!: " << *user);
-    return true;
+    return false;
   }
 
   // Ok, we finished our worklist and this address is not being written to.
-  return false;
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -623,7 +612,7 @@ struct SemanticARCOptVisitor
   SILFunction &F;
   Optional<DeadEndBlocks> TheDeadEndBlocks;
   ValueLifetimeAnalysis::Frontier lifetimeFrontier;
-  IsAddressWrittenToDefUseAnalysis isAddressWrittenToDefUseAnalysis;
+  SmallMultiMapCache<SILValue, Operand *> addressToExhaustiveWriteListCache;
 
   /// Are we assuming that we reached a fix point and are re-processing to
   /// prepare to use the phiToIncomingValueMultiMap.
@@ -658,7 +647,8 @@ struct SemanticARCOptVisitor
   using FrozenMultiMapRange =
       decltype(joinedOwnedIntroducerToConsumedOperands)::PairToSecondEltRange;
 
-  explicit SemanticARCOptVisitor(SILFunction &F) : F(F) {}
+  explicit SemanticARCOptVisitor(SILFunction &F)
+      : F(F), addressToExhaustiveWriteListCache(constructCacheValue) {}
 
   DeadEndBlocks &getDeadEndBlocks() {
     if (!TheDeadEndBlocks)
@@ -1663,7 +1653,8 @@ public:
 
     // If we have a modify, check if our value is /ever/ written to. If it is
     // never actually written to, then we convert to a load_borrow.
-    return answer(ARCOpt.isAddressWrittenToDefUseAnalysis(access));
+    auto result = ARCOpt.addressToExhaustiveWriteListCache.get(access);
+    return answer(!result.hasValue() || result.getValue().size());
   }
   
   void visitArgumentAccess(SILFunctionArgument *arg) {
@@ -1676,7 +1667,8 @@ public:
     // If we have an inout parameter that isn't ever actually written to, return
     // false.
     if (arg->getKnownParameterInfo().isIndirectMutating()) {
-      return answer(ARCOpt.isAddressWrittenToDefUseAnalysis(arg));
+      auto result = ARCOpt.addressToExhaustiveWriteListCache.get(arg);
+      return answer(!result.hasValue() || result.getValue().size());
     }
 
     // TODO: This should be extended:

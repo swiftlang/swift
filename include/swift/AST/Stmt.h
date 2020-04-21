@@ -559,105 +559,6 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Do; }
 };
 
-/// An individual 'catch' clause.
-/// 
-/// This isn't really an independent statement any more than CaseStmt
-/// is; it's just a structural part of a DoCatchStmt.
-class CatchStmt : public Stmt {
-  SourceLoc CatchLoc;
-  SourceLoc WhereLoc;
-  Pattern *ErrorPattern;
-  Expr *GuardExpr;
-  Stmt *CatchBody;
-
-public:
-  CatchStmt(SourceLoc catchLoc, Pattern *errorPattern,
-            SourceLoc whereLoc, Expr *guardExpr, Stmt *body,
-            Optional<bool> implicit = None)
-    : Stmt(StmtKind::Catch, getDefaultImplicitFlag(implicit, catchLoc)),
-      CatchLoc(catchLoc), WhereLoc(whereLoc),
-      ErrorPattern(nullptr), GuardExpr(guardExpr), CatchBody(body) {
-    setErrorPattern(errorPattern);
-  }
-
-  SourceLoc getCatchLoc() const { return CatchLoc; }
-
-  /// The location of the 'where' keyword if there's a guard expression.
-  SourceLoc getWhereLoc() const { return WhereLoc; }
-
-  SourceLoc getStartLoc() const { return CatchLoc; }
-  SourceLoc getEndLoc() const { return CatchBody->getEndLoc(); }
-
-  Stmt *getBody() const { return CatchBody; }
-  void setBody(Stmt *body) { CatchBody = body; }
-
-  Pattern *getErrorPattern() { return ErrorPattern; }
-  const Pattern *getErrorPattern() const { return ErrorPattern; }
-  void setErrorPattern(Pattern *pattern);
-
-  /// Is this catch clause "syntactically exhaustive"?
-  bool isSyntacticallyExhaustive() const;
-
-  /// Return the guard expression if present, or null if the catch has
-  /// no guard.
-  Expr *getGuardExpr() const { return GuardExpr; }
-  void setGuardExpr(Expr *guard) { GuardExpr = guard; }
-
-  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Catch; }
-};
-
-/// DoCatchStmt - do statement with trailing 'catch' clauses.
-class DoCatchStmt final : public LabeledStmt,
-    private llvm::TrailingObjects<DoCatchStmt, CatchStmt *> {
-  friend TrailingObjects;
-
-  SourceLoc DoLoc;
-  Stmt *Body;
-
-  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
-              Stmt *body, ArrayRef<CatchStmt*> catches,
-              Optional<bool> implicit)
-    : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
-                  labelInfo), DoLoc(doLoc), Body(body) {
-    Bits.DoCatchStmt.NumCatches = catches.size();
-    std::uninitialized_copy(catches.begin(), catches.end(),
-                            getTrailingObjects<CatchStmt *>());
-  }
-
-public:
-  static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
-                             SourceLoc doLoc, Stmt *body,
-                             ArrayRef<CatchStmt*> catches,
-                             Optional<bool> implicit = None);
-
-  SourceLoc getDoLoc() const { return DoLoc; }
-
-  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
-  SourceLoc getEndLoc() const { return getCatches().back()->getEndLoc(); }
-
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *s) { Body = s; }
-
-  ArrayRef<CatchStmt*> getCatches() const {
-    return {getTrailingObjects<CatchStmt*>(), Bits.DoCatchStmt.NumCatches};
-  }
-  MutableArrayRef<CatchStmt*> getMutableCatches() {
-    return {getTrailingObjects<CatchStmt*>(), Bits.DoCatchStmt.NumCatches};
-  }
-
-  /// Does this statement contain a syntactically exhaustive catch
-  /// clause?
-  ///
-  /// Note that an exhaustive do/catch statement can still throw
-  /// errors out of its catch block(s).
-  bool isSyntacticallyExhaustive() const;
-
-  static bool classof(const Stmt *S) {
-    return S->getKind() == StmtKind::DoCatch;
-  }
-};
-
-
 /// Either an "if let" case or a simple boolean expression can appear as the
 /// condition of an 'if' or 'while' statement.
 using StmtCondition = MutableArrayRef<StmtConditionElement>;
@@ -962,6 +863,8 @@ public:
   bool isDefault() const {
     return GuardExprAndKind.getInt() == Kind::Default;
   }
+
+  bool isSyntacticallyExhaustive() const;
 };
 
 /// FallthroughStmt - The keyword "fallthrough".
@@ -1003,9 +906,12 @@ public:
   }
 };
 
-/// A 'case' or 'default' block of a switch statement.  Only valid as the
-/// substatement of a SwitchStmt.  A case block begins either with one or more
-/// CaseLabelItems or a single 'default' label.
+enum CaseParentKind { Switch, DoCatch };
+
+/// A 'case' or 'default' block of a switch statement, or a 'catch' clause of a
+/// do-catch statement.  Only valid as the substatement of a SwitchStmt or
+/// DoCatchStmt.  A case block begins either with one or more CaseLabelItems or
+/// a single 'default' label.
 ///
 /// Some examples:
 /// \code
@@ -1023,27 +929,31 @@ class CaseStmt final
   friend TrailingObjects;
 
   SourceLoc UnknownAttrLoc;
-  SourceLoc CaseLoc;
-  SourceLoc ColonLoc;
+  SourceLoc ItemIntroducerLoc;
+  SourceLoc ItemTerminatorLoc;
+  CaseParentKind ParentKind;
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasFallthrough;
 
   Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
 
-  CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
-           SourceLoc UnknownAttrLoc, SourceLoc ColonLoc, Stmt *Body,
+  CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
+           ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
+           SourceLoc ItemTerminatorLoc, Stmt *Body,
            Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
            Optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
 
 public:
   static CaseStmt *
-  create(ASTContext &C, SourceLoc CaseLoc,
+  create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
-         SourceLoc ColonLoc, Stmt *Body,
+         SourceLoc ItemTerminatorLoc, Stmt *Body,
          Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
          Optional<bool> Implicit = None,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
+
+  CaseParentKind getParentKind() const { return ParentKind; }
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
@@ -1073,8 +983,9 @@ public:
   /// True if the case block declares any patterns with local variable bindings.
   bool hasBoundDecls() const { return CaseBodyVariables.hasValue(); }
 
-  /// Get the source location of the 'case' or 'default' of the first label.
-  SourceLoc getLoc() const { return CaseLoc; }
+  /// Get the source location of the 'case', 'default', or 'catch' of the first
+  /// label.
+  SourceLoc getLoc() const { return ItemIntroducerLoc; }
 
   SourceLoc getStartLoc() const {
     if (UnknownAttrLoc.isValid())
@@ -1082,8 +993,28 @@ public:
     return getLoc();
   }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
+
   SourceRange getLabelItemsRange() const {
-    return ColonLoc.isValid() ? SourceRange(getLoc(), ColonLoc) : getSourceRange();
+    switch (ParentKind) {
+    case CaseParentKind::Switch:
+      // The range extends from 'case' to the colon at the end.
+      return ItemTerminatorLoc.isValid()
+                 ? SourceRange(getLoc(), ItemTerminatorLoc)
+                 : getSourceRange();
+    case CaseParentKind::DoCatch: {
+      // The range extends from 'catch' to the end of the last non-implicit
+      // item.
+      auto items = getCaseLabelItems();
+      for (auto item = items.rbegin(), end = items.rend(); item != end;
+           ++item) {
+        auto itemEndLoc = item->getEndLoc();
+        if (itemEndLoc.isValid())
+          return SourceRange(getLoc(), itemEndLoc);
+      }
+      // Handle the 'catch {' case.
+      return SourceRange(getLoc(), getLoc());
+    }
+    }
   }
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }
@@ -1210,6 +1141,58 @@ public:
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Switch;
+  }
+};
+
+/// DoCatchStmt - do statement with trailing 'catch' clauses.
+class DoCatchStmt final
+    : public LabeledStmt,
+      private llvm::TrailingObjects<DoCatchStmt, CaseStmt *> {
+  friend TrailingObjects;
+
+  SourceLoc DoLoc;
+  Stmt *Body;
+
+  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, Stmt *body,
+              ArrayRef<CaseStmt *> catches, Optional<bool> implicit)
+      : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
+                    labelInfo),
+        DoLoc(doLoc), Body(body) {
+    Bits.DoCatchStmt.NumCatches = catches.size();
+    std::uninitialized_copy(catches.begin(), catches.end(),
+                            getTrailingObjects<CaseStmt *>());
+  }
+
+public:
+  static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
+                             SourceLoc doLoc, Stmt *body,
+                             ArrayRef<CaseStmt *> catches,
+                             Optional<bool> implicit = None);
+
+  SourceLoc getDoLoc() const { return DoLoc; }
+
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
+  SourceLoc getEndLoc() const { return getCatches().back()->getEndLoc(); }
+
+  Stmt *getBody() const { return Body; }
+  void setBody(Stmt *s) { Body = s; }
+
+  ArrayRef<CaseStmt *> getCatches() const {
+    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+  }
+  MutableArrayRef<CaseStmt *> getMutableCatches() {
+    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+  }
+
+  /// Does this statement contain a syntactically exhaustive catch
+  /// clause?
+  ///
+  /// Note that an exhaustive do/catch statement can still throw
+  /// errors out of its catch block(s).
+  bool isSyntacticallyExhaustive() const;
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::DoCatch;
   }
 };
 

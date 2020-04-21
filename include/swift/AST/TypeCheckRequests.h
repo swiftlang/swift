@@ -41,6 +41,7 @@ class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
 class SpecializeAttr;
@@ -632,6 +633,26 @@ public:
   bool isCached() const;
 };
 
+/// Request information about the l-valueness of composed property wrappers.
+class PropertyWrapperLValuenessRequest :
+    public SimpleRequest<PropertyWrapperLValuenessRequest,
+                         Optional<PropertyWrapperLValueness> (VarDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Optional<PropertyWrapperLValueness>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+};
+
 /// Request information about the backing property for properties that have
 /// attached property wrappers.
 class PropertyWrapperBackingPropertyInfoRequest :
@@ -672,10 +693,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request the most optimal resilience expansion for the code in the context.
-class ResilienceExpansionRequest :
-    public SimpleRequest<ResilienceExpansionRequest,
-                         ResilienceExpansion(DeclContext*),
+/// Request the fragile function kind for the context.
+class FragileFunctionKindRequest :
+    public SimpleRequest<FragileFunctionKindRequest,
+                         FragileFunctionKind(DeclContext*),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -684,15 +705,16 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ResilienceExpansion evaluate(Evaluator &eval, DeclContext *context) const;
+  FragileFunctionKind evaluate(Evaluator &eval, DeclContext *context) const;
 
 public:
   // Caching.
   bool isCached() const { return true; }
 };
 
-void simple_display(llvm::raw_ostream &out,
-                    const ResilienceExpansion &value);
+void simple_display(llvm::raw_ostream &out, FragileFunctionKind value);
+
+void simple_display(llvm::raw_ostream &out, ResilienceExpansion value);
 
 /// Request the custom attribute which attaches a function builder to the
 /// given declaration.
@@ -2130,6 +2152,26 @@ public:
   void cacheResult(IndexSubset *value) const;
 };
 
+/// Resolves the referenced original declaration for a `@derivative` attribute.
+class DerivativeAttrOriginalDeclRequest
+    : public SimpleRequest<DerivativeAttrOriginalDeclRequest,
+                           AbstractFunctionDecl *(DerivativeAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator,
+                                 DerivativeAttr *attr) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether a type eraser has a viable initializer.
 class TypeEraserHasViableInitRequest
     : public SimpleRequest<TypeEraserHasViableInitRequest,
@@ -2279,6 +2321,27 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+};
+
+/// Determines whether this is a "simple" didSet i.e one that either does not
+/// use the implicit oldValue parameter in the body or does not take an explicit
+/// parameter (ex: 'didSet(oldValue)').
+class SimpleDidSetRequest
+    : public SimpleRequest<SimpleDidSetRequest, bool(AccessorDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, AccessorDecl *decl) const;
+
+public:
+  bool isCached() const {
+    return std::get<0>(getStorage())->getAccessorKind() == AccessorKind::DidSet;
+  }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

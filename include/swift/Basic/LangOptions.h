@@ -75,6 +75,12 @@ namespace swift {
     /// performed.
     llvm::Optional<llvm::Triple> TargetVariant;
 
+    /// The SDK version, if known.
+    Optional<llvm::VersionTuple> SDKVersion;
+
+    /// The target variant SDK version, if known.
+    Optional<llvm::VersionTuple> VariantSDKVersion;
+
     ///
     /// Language features
     ///
@@ -111,6 +117,10 @@ namespace swift {
 
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
+
+    /// Emit a remark when import resolution implicitly adds a cross-import
+    /// overlay.
+    bool EnableCrossImportRemarks = false;
 
     ///
     /// Support for alternate usage modes

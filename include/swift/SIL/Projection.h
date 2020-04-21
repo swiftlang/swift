@@ -255,6 +255,8 @@ public:
   unsigned getIndex() const {
     return Value.getIndex();
   }
+  
+  unsigned getHash() const { return (unsigned)Value.getStorage(); }
 
   /// Determine if I is a value projection instruction whose corresponding
   /// projection equals this projection.
@@ -689,7 +691,7 @@ static inline llvm::hash_code hash_value(const ProjectionPath &P) {
 
 /// Returns the hashcode for the projection path.
 static inline llvm::hash_code hash_value(const Projection &P) {
-  return llvm::hash_combine(static_cast<unsigned>(P.getKind()));
+  return llvm::hash_combine(P.getHash());
 }
 
 class ProjectionTree;

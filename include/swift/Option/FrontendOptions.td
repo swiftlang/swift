@@ -550,6 +550,9 @@ def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
   
+def sil_verify_none : Flag<["-"], "sil-verify-none">,
+  HelpText<"Completely disable SIL verification">;
+  
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;
 
@@ -698,5 +701,11 @@ def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
 
 def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
     HelpText<"Directory for bridging header to be printed in compatibility header">;
+
+def target_sdk_version : Separate<["-"], "target-sdk-version">,
+  HelpText<"The version of target SDK used for compilation">;
+
+def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
+  HelpText<"The version of target variant SDK used for compilation">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
