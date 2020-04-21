@@ -3577,11 +3577,12 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  case ConstraintLocator::KeyPathRoot:
+  case ConstraintLocator::KeyPathRoot: {
     conversionsOrFixes.push_back(AllowKeyPathRootTypeMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
 
     break;
+  }
 
   case ConstraintLocator::FunctionArgument: {
     auto *argLoc = getConstraintLocator(
