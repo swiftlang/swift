@@ -3122,7 +3122,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\n";
   }
 
-  if (solverState && !solverState->hasRetiredConstraints()) {
+  if (solverState && solverState->hasRetiredConstraints()) {
     out << "\nRetired Constraints:\n";
     solverState->forEachRetired([&](Constraint &constraint) {
       out.indent(2);
