@@ -5,6 +5,8 @@
 // RUN: %empty-directory(%t.baseline)
 // RUN: %empty-directory(%t.baseline/ABI)
 
+// REQUIRES: rdar62111064
+
 // RUN: %swift -emit-module -o %t.mod1/cake.swiftmodule %S/Inputs/cake_baseline/cake.swift -parse-as-library -enable-library-evolution -I %S/Inputs/APINotesLeft %clang-importer-sdk-nosource -emit-module-source-info -emit-module-source-info-path %t.mod1/cake.swiftsourceinfo 2> %t.compiler-diags
 // RUN: %swift -emit-module -o %t.mod2/cake.swiftmodule %S/Inputs/cake_current/cake.swift -parse-as-library -enable-library-evolution -I %S/Inputs/APINotesRight %clang-importer-sdk-nosource -emit-module-source-info -emit-module-source-info-path %t.mod2/cake.swiftsourceinfo
 // RUN: %api-digester -dump-sdk -module cake -output-dir %t.baseline -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %t.mod1 -I %S/Inputs/APINotesLeft -abi
