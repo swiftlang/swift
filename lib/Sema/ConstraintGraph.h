@@ -333,10 +333,6 @@ private:
   /// classes until a fixed point is reached.
   bool contractEdges();
 
-  /// To support edge contraction, remove a constraint from both the constraint
-  /// graph and its enclosing constraint system.
-  void removeEdge(Constraint *constraint);
-
   /// The constraint system.
   ConstraintSystem &CS;
 
