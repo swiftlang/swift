@@ -42,14 +42,11 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
   for (auto *vd : nominal->getStoredProperties()) {
     // Peer through property wrappers: use original wrapped properties instead.
     if (auto *originalProperty = vd->getOriginalWrappedProperty()) {
-      // Skip property wrappers that do not define `wrappedValue.set`.
+      // Skip wrapped properties that do not define a setter. They define a setter
+      // only if property wrappers define a setter for `var wrappedValue`.
       // `mutating func move(along:)` cannot be synthesized to update these
       // properties.
-      auto *wrapperDecl =
-          vd->getInterfaceType()->getNominalOrBoundGenericNominal();
-      auto *wrappedValueDecl =
-          wrapperDecl->getPropertyWrapperTypeInfo().valueVar;
-      if (!wrappedValueDecl->getAccessor(AccessorKind::Set))
+      if (!originalProperty->getAccessor(AccessorKind::Set))
         continue;
       // Use the original wrapped property.
       vd = originalProperty;
