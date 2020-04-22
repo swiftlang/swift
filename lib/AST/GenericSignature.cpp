@@ -592,7 +592,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
 }
 
 SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
-                                                 GenericSignature otherSig) {
+                                            GenericSignature otherSig) const {
   SmallVector<Requirement, 4> result;
 
   // If the signatures match by pointer, all requirements are satisfied.
