@@ -1326,6 +1326,19 @@ void Remangler::mangleImplConvention(Node *node) {
   }
 }
 
+void Remangler::mangleImplDifferentiability(Node *node) {
+  assert(node->getKind() == Node::Kind::ImplDifferentiability);
+  StringRef text = node->getText();
+  // Empty string represents default differentiability.
+  if (text.empty())
+    return;
+  if (text == "@noDerivative") {
+    Buffer << 'w';
+    return;
+  }
+  unreachable("Invalid impl differentiability");
+}
+
 void Remangler::mangleDynamicSelf(Node *node) {
   Buffer << 'D';
   mangleSingleChildNode(node); // type
