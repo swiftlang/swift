@@ -155,3 +155,60 @@ bb9(%29 : $Optional<AA>):
 
 }
 
+enum FakeOptional<T> {
+case some(T)
+case none
+}
+
+struct S {
+}
+
+struct T {
+    let s: S
+}
+
+class C {
+    func method() -> Any
+    func f() -> FakeOptional<T>
+}
+
+// This test used to crash because we were not properly updating SSA.
+
+sil hidden @dont_crash : $@convention(method) (@guaranteed C) -> @out Any {
+bb0(%0 : $*Any, %1 : $C):
+  %3 = class_method %1 : $C, #C.f : (C) -> () -> FakeOptional<T>, $@convention(method) (@guaranteed C) -> FakeOptional<T>
+  %4 = apply %3(%1) : $@convention(method) (@guaranteed C) -> FakeOptional<T>
+  switch_enum %4 : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = struct $Int64 (%7 : $Builtin.Int64)
+  %9 = enum $FakeOptional<Int64>, #FakeOptional.some!enumelt, %8 : $Int64
+  br bb3(%9 : $FakeOptional<Int64>)
+
+bb2:
+  %11 = enum $FakeOptional<Int64>, #FakeOptional.none!enumelt
+  br bb3(%11 : $FakeOptional<Int64>)
+
+bb3(%13 : $FakeOptional<Int64>):
+  %15 = init_existential_addr %0 : $*Any, $(FakeOptional<Int64>, FakeOptional<S>)
+  %16 = tuple_element_addr %15 : $*(FakeOptional<Int64>, FakeOptional<S>), 0
+  %17 = tuple_element_addr %15 : $*(FakeOptional<Int64>, FakeOptional<S>), 1
+  store %13 to %16 : $*FakeOptional<Int64>
+  switch_enum %4 : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
+
+bb4(%20 : $T):
+  %21 = struct_extract %20 : $T, #T.s
+  %22 = enum $FakeOptional<S>, #FakeOptional.some!enumelt, %21 : $S
+  store %22 to %17 : $*FakeOptional<S>
+  br bb5
+
+bb5:
+  %25 = tuple ()
+  return %25 : $()
+
+bb6:
+  %27 = enum $FakeOptional<S>, #FakeOptional.none!enumelt
+  store %27 to %17 : $*FakeOptional<S>
+  br bb5
+}
