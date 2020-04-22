@@ -188,74 +188,6 @@ cloning over SSH may provide a better experience (which requires
     ./swift/utils/update-checkout --clone-with-ssh --scheme tensorflow
     cd swift
 
-### Building Swift with TensorFlow support
-
-The `build-script` is a high-level build automation script that supports basic
-options such as building a Swift-compatible LLDB, building the Swift Package
-Manager, building for various platforms, running tests after builds, and more.
-TensorFlow support is enabled by the `--enable-tensorflow` flag. TensorFlow will
-be automatically cloned from GitHub and built from source using Bazel when this
-flag is specified.
-
-There are two primary build systems to use: Xcode and Ninja. The Xcode build
-system allows you to work in Xcode, but Ninja is a bit faster and supports
-more environments.
-
-First, make sure that you're in the swift directory:
-
-    cd swift
-
-To build using Ninja, run:
-
-    swift/utils/build-script --enable-tensorflow --release-debuginfo
-
-When developing Swift, it helps to build what you're working on in a debug
-configuration while building the rest of the project with optimizations. Below
-are some examples of using debug variants:
-
-    swift/utils/build-script --enable-tensorflow --release-debuginfo --debug-swift # Swift frontend built in debug
-    swift/utils/build-script --enable-tensorflow --release-debuginfo --debug-swift-stdlib # Standard library built in debug
-    swift/utils/build-script --enable-tensorflow --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
-
-Limiting the amount of debug code in the compiler has a very large impact on
-Swift compile times, and in turn the test execution time. If you want to build
-the entire project in debug, you can run:
-
-    swift/utils/build-script  --enable-tensorflow --debug
-
-For documentation of all available arguments, as well as additional usage
-information, see the inline help:
-
-    utils/build-script -h
-
-### Customize TensorFlow support
-
- If you want to build with custom TensorFlow headers and shared libraries, please specify the `--tensorflow-host-include-dir` and `--tensorflow-host-lib-dir` arguments:
-
-    utils/build-script --enable-tensorflow --tensorflow-host-include-dir=<path_to_tensorflow_headers> --tensorflow-host-lib-dir=<path_to_tensorflow_libraries>
-
-You can assign specific values to these arguments after a double-dash `--` in
-your build-script command. For example:
-
-    utils/build-script -- enable-tensorflow=True
-
-Below is more information about TensorFlow-related build arguments.
-
-* `enable-tensorflow`: If true, enables TensorFlow support for Swift.
-    * Default value: `False`.
-* `build-tensorflow`: If true, automatically clone and build TensorFlow from source.
-    * Default value: If `enable-tensorflow` is `True` and `tensorflow-host-lib-dir` and `tensorflow-host-include-dir` are not specified, then `True`. Otherwise, `False`.
-* `host-bazel`: The absolute path to Bazel, used to build TensorFlow.
-    * By default, the path is auto detected.
-* `tensorflow-bazel-options`: Comma separated options passed to Bazel when building TensorFlow, e.g. `--copt=-mavx,--copt=-msse4.2`.
-    * Default: None.
-* `tensorflow-host-include-dir`: A directory containing custom TensorFlow headers.
-    * Default value: None.
-* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so`).
-    * Default value: None.
-* `tensorflow-swift-apis`: A path to the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) deep learning library repository.
-    * Default value: `tensorflow-swift-apis` if the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) repository is cloned. Otherwise, none.
-
 ### Build systems
 
 #### Xcode
@@ -335,8 +267,8 @@ following (non-exhaustive) set of useful options:
 
 - ``--dry-run``: Perform a dry run build. This is off by default.
 - ``--test``: Test the toolchain after it has been compiled. This is off by default.
-- ``--gpu`` (Linux only): Build with GPU support. This is off by default.
 - ``--pkg`` (macOS only): Build a toolchain installer package (`.pkg`). This is off by default.
+- ``-x10``: Built with x10 support.
 
 More options may be added over time. Please pass ``--help`` to
 ``build-toolchain-tensorflow`` to see the full set of options.
@@ -379,26 +311,8 @@ described above.
 
 ## Testing Swift
 
-The simplest way to run the Swift test suite is using the `tensorflow_test`
-build preset, which runs the entire Swift test suite (including new TensorFlow
-tests):
-
-    utils/build-script --preset=tensorflow_test
-
-Swift for TensorFlow adds the following new test suites:
-
-- [test/AutoDiff](test/AutoDiff): tests for
-  [automatic differentiation](https://github.com/tensorflow/swift/blob/master/docs/AutomaticDifferentiation.md).
-- [test/TensorFlow](test/TensorFlow): TensorFlow infrastructure tests that don't
-  depend on the TensorFlow runtime.
-- [test/TensorFlowRuntime](test/TensorFlowRuntime): TensorFlow runtime tests.
-
-
-Before submitting pull requests involving large code changes, please run the
-command above locally to ensure all tests pass.
-
-For more details on testing, see [docs/Testing.md](docs/Testing.md), in
-particular the section on [lit.py](docs/Testing.md#using-litpy).
+See [docs/Testing.md](docs/Testing.md), in particular the section on
+[lit.py](docs/Testing.md#using-litpy).
 
 ## Build Dependencies
 
