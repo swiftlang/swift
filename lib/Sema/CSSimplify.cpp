@@ -2353,11 +2353,11 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 static bool isStringCompatiblePointerBaseType(ASTContext &ctx,
                                               Type baseType) {
   // Allow strings to be passed to pointer-to-byte or pointer-to-void types.
-  if (baseType->isEqual(TypeChecker::getInt8Type(ctx)))
+  if (baseType->isInt8())
     return true;
-  if (baseType->isEqual(TypeChecker::getUInt8Type(ctx)))
+  if (baseType->isUInt8())
     return true;
-  if (baseType->isEqual(ctx.TheEmptyTupleType))
+  if (baseType->isVoid())
     return true;
   
   return false;
@@ -4595,7 +4595,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     // T -> AnyHashable.
-    if (isAnyHashableType(desugar2)) {
+    if (desugar2->isAnyHashable()) {
       // Don't allow this in operator contexts or we'll end up allowing
       // 'T() == U()' for unrelated T and U that just happen to be Hashable.
       // We can remove this special case when we implement operator hiding.
@@ -4778,7 +4778,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
                 auto &ctx = getASTContext();
-                if (type1->isEqual(TypeChecker::getStringType(ctx))) {
+                if (type1->isString()) {
                   auto baseTy = getFixedTypeRecursive(pointeeTy, false);
 
                   if (baseTy->isTypeVariableOrMember() ||
@@ -5836,7 +5836,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedType;
-  if (baseObjTy->getAnyNominal() == ctx.getStringDecl()) {
+  if (baseObjTy->isString()) {
     if (Type classType = ctx.getBridgedToObjC(DC, instanceTy)) {
       bridgedType = classType;
     }
@@ -7385,13 +7385,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // FIXME: This should be an associated type of the protocol.
       auto &ctx = getASTContext();
       if (auto fromBGT = unwrappedToType->getAs<BoundGenericType>()) {
-        if (fromBGT->getDecl() == ctx.getArrayDecl()) {
+        if (fromBGT->isArray()) {
           // [AnyObject]
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
                         ctx.getAnyObjectType(),
                         getConstraintLocator(locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
-        } else if (fromBGT->getDecl() == ctx.getDictionaryDecl()) {
+        } else if (fromBGT->isDictionary()) {
           // [NSObject : AnyObject]
           auto nsObjectType = ctx.getNSObjectType();
           if (!nsObjectType) {
@@ -7410,7 +7410,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(1))));
-        } else if (fromBGT->getDecl() == ctx.getSetDecl()) {
+        } else if (fromBGT->isSet()) {
           auto nsObjectType = ctx.getNSObjectType();
           if (!nsObjectType) {
             // Not a bridging case. Should we detect this earlier?
@@ -8958,11 +8958,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         auto &ctx = getASTContext();
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2,
-                                          TypeChecker::getInt8Type(ctx),
+                                          ctx.getInt8Type(),
                                           getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
                                            baseType2,
-                                           TypeChecker::getUInt8Type(ctx),
+                                           ctx.getUInt8Type(),
                                            getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2, ctx.TheEmptyTupleType,
@@ -9075,8 +9075,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::HashableToAnyHashable: {
     // We never want to do this if the LHS is already AnyHashable.
     type1 = simplifyType(type1);
-    if (isAnyHashableType(
-            type1->getRValueType()->lookThroughAllOptionalTypes())) {
+    if (type1->getRValueType()->lookThroughAllOptionalTypes()
+        ->isAnyHashable()) {
       return SolutionKind::Error;
     }
 

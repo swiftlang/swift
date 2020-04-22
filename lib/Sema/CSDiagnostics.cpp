@@ -2694,16 +2694,10 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   if (!getASTContext().getStdlibModule())
     return false;
 
-  auto String = TypeChecker::getStringType(getASTContext());
-  auto Substring = TypeChecker::getSubstringType(getASTContext());
-
-  if (!String || !Substring)
-    return false;
-
   // Substring -> String conversion
   // Wrap in String.init
-  if (getFromType()->isEqual(Substring)) {
-    if (getToType()->isEqual(String)) {
+  if (getFromType()->isSubstring()) {
+    if (getToType()->isString()) {
       auto anchor =
           getAnchor().get<const Expr *>()->getSemanticsProvidingExpr();
       if (auto *CE = dyn_cast<CoerceExpr>(anchor)) {

@@ -173,7 +173,7 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   bool isNilInitialized =
     var->getAttrs().hasAttribute<LazyAttr>() ||
     (!isExplicitlyInitialized && isDefaultInitializable &&
-     var->getValueInterfaceType()->getAnyNominal() == ctx.getOptionalDecl() &&
+     var->getValueInterfaceType()->isOptional() &&
      (var->getAttachedPropertyWrappers().empty() ||
       var->isPropertyMemberwiseInitializedWithWrappedType()));
   if (isNilInitialized) {
@@ -325,9 +325,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   auto staticStringType = staticStringDecl->getDeclaredType();
   auto staticStringInit = ctx.getStringBuiltinInitDecl(staticStringDecl);
 
-  auto *uintDecl = ctx.getUIntDecl();
-  auto uintType = uintDecl->getDeclaredType();
-  auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
+  auto uintInit = ctx.getIntBuiltinInitDecl(ctx.getUIntDecl());
 
   // Create a call to Swift._unimplementedInitializer
   auto loc = classDecl->getLoc();
@@ -361,12 +359,12 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
 
   auto *line = new (ctx) MagicIdentifierLiteralExpr(
     MagicIdentifierLiteralExpr::Line, loc, /*Implicit=*/true);
-  line->setType(uintType);
+  line->setType(ctx.getUIntType());
   line->setBuiltinInitializer(uintInit);
 
   auto *column = new (ctx) MagicIdentifierLiteralExpr(
     MagicIdentifierLiteralExpr::Column, loc, /*Implicit=*/true);
-  column->setType(uintType);
+  column->setType(ctx.getUIntType());
   column->setBuiltinInitializer(uintInit);
 
   auto *call = CallExpr::createImplicit(

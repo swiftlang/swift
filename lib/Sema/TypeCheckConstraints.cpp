@@ -3814,10 +3814,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  if (ConstraintSystem::isAnyHashableType(toType) ||
-      ConstraintSystem::isAnyHashableType(fromType)) {
+  if (toType->isAnyHashable() || fromType->isAnyHashable())
     return CheckedCastKind::ValueCast;
-  }
 
   // If the destination type can be a supertype of the source type, we are
   // performing what looks like an upcast except it rebinds generic

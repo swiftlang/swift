@@ -78,7 +78,7 @@ deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
   auto *rawValueDecl = new (C) ParamDecl(
       SourceLoc(), SourceLoc(), C.Id_rawValue,
       SourceLoc(), C.Id_rawValue, parentDC);
-  rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
+  rawValueDecl->setInterfaceType(C.getIntType());
   rawValueDecl->setSpecifier(ParamSpecifier::Default);
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
@@ -332,9 +332,7 @@ static bool canSynthesizeCodingKey(DerivedConformance &derived) {
     auto *parentDC = derived.getConformanceContext();
     rawType = parentDC->mapTypeIntoContext(rawType);
 
-    auto &C = derived.Context;
-    auto *nominal = rawType->getCanonicalType()->getAnyNominal();
-    if (nominal != C.getStringDecl() && nominal != C.getIntDecl())
+    if (!rawType->isString() && !rawType->isInt())
       return false;
   }
 
@@ -363,9 +361,8 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
   auto name = requirement->getBaseName();
   if (name == Context.Id_stringValue) {
     // Synthesize `var stringValue: String { get }`
-    auto stringType = Context.getStringDecl()->getDeclaredType();
-    auto synth = [rawType, stringType](AbstractFunctionDecl *getterDecl) {
-      if (rawType && rawType->isEqual(stringType)) {
+    auto synth = [rawType](AbstractFunctionDecl *getterDecl) {
+      if (rawType && rawType->isString()) {
         // enum SomeStringEnum : String {
         //   case A, B, C
         //   @derived var stringValue: String {
@@ -390,15 +387,15 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
       }
     };
 
-    return deriveProperty(*this, stringType, Context.Id_stringValue, synth);
+    return deriveProperty(*this, Context.getStringType(), Context.Id_stringValue,
+                          synth);
 
   } else if (name == Context.Id_intValue) {
     // Synthesize `var intValue: Int? { get }`
-    auto intType = Context.getIntDecl()->getDeclaredType();
-    auto optionalIntType = OptionalType::get(intType);
+    auto optionalIntType = OptionalType::get(Context.getIntType());
 
-    auto synth = [rawType, intType](AbstractFunctionDecl *getterDecl) {
-      if (rawType && rawType->isEqual(intType)) {
+    auto synth = [rawType](AbstractFunctionDecl *getterDecl) {
+      if (rawType && rawType->isInt()) {
         // enum SomeIntEnum : Int {
         //   case A = 1, B = 2, C = 3
         //   @derived var intValue: Int? {
@@ -423,9 +420,8 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
     if (argumentNames.size() == 1) {
       if (argumentNames[0] == Context.Id_stringValue) {
         // Derive `init?(stringValue:)`
-        auto stringType = Context.getStringDecl()->getDeclaredType();
-        auto synth = [rawType, stringType](AbstractFunctionDecl *initDecl) {
-          if (rawType && rawType->isEqual(stringType)) {
+        auto synth = [rawType](AbstractFunctionDecl *initDecl) {
+          if (rawType && rawType->isString()) {
             // enum SomeStringEnum : String {
             //   case A = "a", B = "b", C = "c"
             //   @derived init?(stringValue: String) {
@@ -453,12 +449,12 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
           }
         };
 
-        return deriveInitDecl(*this, stringType, Context.Id_stringValue, synth);
+        return deriveInitDecl(*this, Context.getStringType(),
+                              Context.Id_stringValue, synth);
       } else if (argumentNames[0] == Context.Id_intValue) {
         // Synthesize `init?(intValue:)`
-        auto intType = Context.getIntDecl()->getDeclaredType();
-        auto synthesizer = [rawType, intType](AbstractFunctionDecl *initDecl) {
-          if (rawType && rawType->isEqual(intType)) {
+        auto synthesizer = [rawType](AbstractFunctionDecl *initDecl) {
+          if (rawType && rawType->isInt()) {
             // enum SomeIntEnum : Int {
             //   case A = 1, B = 2, C = 3
             //   @derived init?(intValue: Int) {
@@ -477,7 +473,8 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
           }
         };
 
-        return deriveInitDecl(*this, intType, Context.Id_intValue, synthesizer);
+        return deriveInitDecl(*this, Context.getIntType(), Context.Id_intValue,
+                              synthesizer);
       }
     }
   }

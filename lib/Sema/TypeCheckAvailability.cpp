@@ -2145,19 +2145,18 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
 
   // The subscripts taking T<Int> do not return Substring, and our
   // special fixit does not help here.
-  auto intDecl = Context.getIntDecl();
   auto nominalTypeParam = genericArgs[0]->getAs<NominalType>();
   if (!nominalTypeParam)
     return false;
 
-  if (nominalTypeParam->getDecl() == intDecl)
+  if (nominalTypeParam->isInt())
     return false;
 
   auto resultTy = fnTy->getResult()->getAs<NominalType>();
   if (!resultTy)
     return false;
 
-  return resultTy->getDecl() == stringDecl;
+  return resultTy->isString();
 }
 
 bool swift::diagnoseExplicitUnavailability(

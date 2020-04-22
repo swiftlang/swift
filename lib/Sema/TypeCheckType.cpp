@@ -378,41 +378,6 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
-Type TypeChecker::getStringType(ASTContext &Context) {
-  if (auto typeDecl = Context.getStringDecl())
-    return typeDecl->getDeclaredInterfaceType();
-
-  return Type();
-}
-
-Type TypeChecker::getSubstringType(ASTContext &Context) {
-  if (auto typeDecl = Context.getSubstringDecl())
-    return typeDecl->getDeclaredInterfaceType();
-
-  return Type();
-}
-
-Type TypeChecker::getIntType(ASTContext &Context) {
-  if (auto typeDecl = Context.getIntDecl())
-    return typeDecl->getDeclaredInterfaceType();
-
-  return Type();
-}
-
-Type TypeChecker::getInt8Type(ASTContext &Context) {
-  if (auto typeDecl = Context.getInt8Decl())
-    return typeDecl->getDeclaredInterfaceType();
-
-  return Type();
-}
-
-Type TypeChecker::getUInt8Type(ASTContext &Context) {
-  if (auto typeDecl = Context.getUInt8Decl())
-    return typeDecl->getDeclaredInterfaceType();
-
-  return Type();
-}
-
 Type
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,

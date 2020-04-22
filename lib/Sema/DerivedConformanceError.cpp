@@ -90,18 +90,18 @@ deriveBridgedNSError_enum_nsErrorDomain(
   //   }
   // }
 
-  auto stringTy = derived.Context.getStringDecl()->getDeclaredType();
+  ASTContext &ctx = derived.Context;
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      derived.Context.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
-      /*isFinal=*/true);
+      ctx.Id_nsErrorDomain, ctx.getStringType(), ctx.getStringType(),
+      /*isStatic=*/true, /*isFinal=*/true);
 
   // Define the getter.
   auto getterDecl = derived.addGetterToReadOnlyDerivedProperty(
-      propDecl, stringTy);
+      propDecl, ctx.getStringType());
   getterDecl->setBodySynthesizer(synthesizer);
 
   derived.addMembersToConformanceContext({propDecl, pbDecl});

@@ -303,12 +303,12 @@ ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
     // Handle Int and UInt specially. On Apple platforms, these correspond to
     // the NSInteger and NSUInteger typedefs, so map them back to those typedefs
     // if they're available, to ensure we get consistent ObjC @encode strings.
-    if (swiftType->getAnyNominal() == IGM.Context.getIntDecl()) {
+    if (swiftType->isInt()) {
       if (auto NSIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSInteger")){
         Cache.insert({swiftType, NSIntegerTy});
         return;
       }
-    } else if (swiftType->getAnyNominal() == IGM.Context.getUIntDecl()) {
+    } else if (swiftType->isUInt()) {
       if (auto NSUIntegerTy =
             getClangBuiltinTypeFromTypedef(sema, "NSUInteger")) {
         Cache.insert({swiftType, NSUIntegerTy});

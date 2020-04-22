@@ -621,12 +621,9 @@ protected:
   }
 
   Expr *buildSomeExpr(Expr *arg) {
-    auto optionalDecl = ctx.getOptionalDecl();
-    auto optionalType = optionalDecl->getDeclaredType();
-
     auto loc = arg->getStartLoc();
     auto optionalTypeExpr =
-      TypeExpr::createImplicitHack(loc, optionalType, ctx);
+      TypeExpr::createImplicitHack(loc, ctx.getOptionalType(), ctx);
     auto someRef = new (ctx) UnresolvedDotExpr(
         optionalTypeExpr, loc, DeclNameRef(ctx.getIdentifier("some")),
         DeclNameLoc(loc), /*implicit=*/true);
@@ -634,11 +631,8 @@ protected:
   }
 
   Expr *buildNoneExpr(SourceLoc endLoc) {
-    auto optionalDecl = ctx.getOptionalDecl();
-    auto optionalType = optionalDecl->getDeclaredType();
-
     auto optionalTypeExpr =
-      TypeExpr::createImplicitHack(endLoc, optionalType, ctx);
+      TypeExpr::createImplicitHack(endLoc, ctx.getOptionalType(), ctx);
     return new (ctx) UnresolvedDotExpr(
         optionalTypeExpr, endLoc, DeclNameRef(ctx.getIdentifier("none")),
         DeclNameLoc(endLoc), /*implicit=*/true);

@@ -854,7 +854,8 @@ static void emitFatalError(ADContext &context, SILFunction *f,
       builder.emitDestroyOperation(loc, arg);
   // Fatal error with a nice message.
   auto neverResultInfo =
-      SILResultInfo(context.getModule().getASTContext().getNeverType(),
+      SILResultInfo(context.getModule().getASTContext().getNeverType()
+                           ->getCanonicalType(),
                     ResultConvention::Unowned);
   // Fatal error function must have type `@convention(thin) () -> Never`.
   auto fatalErrorFnType = SILFunctionType::get(

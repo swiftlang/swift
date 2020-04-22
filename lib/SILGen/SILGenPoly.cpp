@@ -608,9 +608,7 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // - T : Hashable to AnyHashable
-  if (isa<StructType>(outputSubstType) &&
-      outputSubstType->getAnyNominal() ==
-        SGF.getASTContext().getAnyHashableDecl()) {
+  if (outputSubstType->isAnyHashable()) {
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);
     auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(

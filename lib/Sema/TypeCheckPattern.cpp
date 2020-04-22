@@ -1171,7 +1171,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Expr: {
     assert(cast<ExprPattern>(P)->isResolved()
            && "coercing unresolved expr pattern!");
-    if (type->getAnyNominal() == Context.getBoolDecl()) {
+    if (type->isBool()) {
       // The type is Bool.
       // Check if the pattern is a Bool literal
       auto EP = cast<ExprPattern>(P);
@@ -1228,7 +1228,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     if (numExtraOptionals > 0) {
       Pattern *sub = IP;
       for (int i = 0; i < numExtraOptionals; ++i) {
-        auto some = Context.getOptionalDecl()->getUniqueElement(/*hasVal*/true);
+        auto some = Context.getOptionalSomeDecl();
         sub = new (Context) EnumElementPattern(TypeLoc(),
                                                IP->getStartLoc(),
                                                DeclNameLoc(IP->getEndLoc()),
@@ -1320,7 +1320,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
           // so we have to do this check here. Additionally, .Some
           // isn't a static VarDecl, so the existing mechanics in
           // extractEnumElement won't work.
-          if (type->getAnyNominal() == Context.getOptionalDecl()) {
+          if (type->isOptional()) {
             if (EEP->getName().isSimpleName("None") ||
                 EEP->getName().isSimpleName("Some")) {
               SmallString<4> Rename;

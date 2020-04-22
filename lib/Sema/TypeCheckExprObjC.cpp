@@ -95,10 +95,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // We're updating to a property. Determine whether we're looking
     // into a bridged Swift collection of some sort.
     if (auto boundGeneric = newType->getAs<BoundGenericType>()) {
-      auto nominal = boundGeneric->getDecl();
-
       // Array<T>
-      if (nominal == Context.getArrayDecl()) {
+      if (boundGeneric->isArray()) {
         // Further lookups into the element type.
         state = ResolvingArray;
         currentType = boundGeneric->getGenericArgs()[0];
@@ -106,7 +104,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       }
 
       // Set<T>
-      if (nominal == Context.getSetDecl()) {
+      if (boundGeneric->isSet()) {
         // Further lookups into the element type.
         state = ResolvingSet;
         currentType = boundGeneric->getGenericArgs()[0];
@@ -114,7 +112,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       }
 
       // Dictionary<K, V>
-      if (nominal == Context.getDictionaryDecl()) {
+      if (boundGeneric->isDictionary()) {
         // Key paths look into the keys of a dictionary; further
         // lookups into the value type.
         state = ResolvingDictionary;

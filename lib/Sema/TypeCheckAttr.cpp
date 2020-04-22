@@ -531,13 +531,13 @@ isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
     return diag::iboutlet_nonobjc_class;
   }
 
-  if (nominal == ctx.getStringDecl()) {
+  if (type->isString()) {
     // String is okay because it is bridged to NSString.
     // FIXME: BridgesTypes.def is almost sufficient for this.
     return None;
   }
 
-  if (nominal == ctx.getArrayDecl()) {
+  if (type->isArray()) {
     // Arrays of arrays are not allowed.
     if (isArray)
       return diag::iboutlet_nonobject_type;

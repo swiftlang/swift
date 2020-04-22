@@ -921,11 +921,6 @@ public:
   }
 };
 
-static bool hasArrayType(SILValue Value, SILModule &M) {
-  return Value->getType().getNominalOrBoundGenericNominal() ==
-           M.getASTContext().getArrayDecl();
-}
-
 /// Hoist bounds check in the loop to the loop preheader.
 static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
                               ABCAnalysis &ABC, InductionAnalysis &IndVars,
@@ -998,7 +993,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     // Check if the loop iterates from 0 to the count of this array.
     if (F.isZeroToCount(ArrayVal) &&
         // This works only for Arrays but not e.g. for ArraySlice.
-        hasArrayType(ArrayVal, Header->getModule())) {
+        ArrayVal->getType().getASTType()->isArray()) {
       // We can remove the check. This is even possible if the block does not
       // dominate the loop exit block.
       Changed = true;

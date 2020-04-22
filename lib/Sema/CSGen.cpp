@@ -2935,13 +2935,12 @@ namespace {
     
     Type visitIfExpr(IfExpr *expr) {
       // Condition must convert to Bool.
-      auto boolDecl = CS.getASTContext().getBoolDecl();
-      if (!boolDecl)
+      if (!CS.getASTContext().getBoolDecl())
         return Type();
 
       CS.addConstraint(
           ConstraintKind::Conversion, CS.getType(expr->getCondExpr()),
-          boolDecl->getDeclaredType(),
+          CS.getASTContext().getBoolType(),
           CS.getConstraintLocator(expr, ConstraintLocator::Condition));
 
       // The branches must be convertible to a common type.
@@ -3091,15 +3090,13 @@ namespace {
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType,
                        CS.getConstraintLocator(expr));
 
-      // The result is Bool.
-      auto boolDecl = ctx.getBoolDecl();
-
-      if (!boolDecl) {
+      if (!ctx.getBoolDecl()) {
         ctx.Diags.diagnose(SourceLoc(), diag::broken_bool);
         return Type();
       }
 
-      return boolDecl->getDeclaredType();
+      // The result is Bool.
+      return ctx.getBoolType();
     }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
@@ -3276,7 +3273,7 @@ namespace {
     }
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
-      return CS.getASTContext().getBoolDecl()->getDeclaredType();
+      return CS.getASTContext().getBoolType();
     }
 
     Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {

@@ -1268,8 +1268,8 @@ static ValueDecl *getLinearFunctionConstructor(
 static ValueDecl *getGlobalStringTablePointer(ASTContext &Context,
                                               Identifier Id) {
   // String -> Builtin.RawPointer
-  auto stringType = NominalType::get(Context.getStringDecl(), Type(), Context);
-  return getBuiltinFunction(Id, {stringType}, Context.TheRawPointerType);
+  return getBuiltinFunction(Id, {Context.getStringType()},
+                            Context.TheRawPointerType);
 }
 
 static ValueDecl *getConvertStrongToUnownedUnsafe(ASTContext &ctx,

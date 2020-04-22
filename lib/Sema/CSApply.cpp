@@ -2576,7 +2576,7 @@ namespace {
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
         LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
-        cs.setType(expr, TypeChecker::getIntType(ctx));
+        cs.setType(expr, ctx.getIntType());
         return handleIntegerLiteralExpr(expr);
       };
 
@@ -3671,13 +3671,12 @@ namespace {
         // Match the optional value against its `Some` case.
         auto *someDecl = ctx.getOptionalSomeDecl();
         auto isSomeExpr = new (ctx) EnumIsCaseExpr(result, someDecl);
-        auto boolDecl = ctx.getBoolDecl();
 
-        if (!boolDecl) {
+        if (!ctx.getBoolDecl()) {
           ctx.Diags.diagnose(SourceLoc(), diag::broken_bool);
         }
 
-        cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
+        cs.setType(isSomeExpr, ctx.getBoolType());
         return isSomeExpr;
       }
 
@@ -4790,7 +4789,7 @@ namespace {
                                  StringRef(stringCopy, compatStringBuf.size()),
                                  SourceRange(),
                                  /*implicit*/ true);
-          cs.setType(stringExpr, TypeChecker::getStringType(cs.getASTContext()));
+          cs.setType(stringExpr, cs.getASTContext().getStringType());
           E->setObjCStringLiteralExpr(stringExpr);
         }
       }

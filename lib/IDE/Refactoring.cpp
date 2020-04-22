@@ -1814,20 +1814,19 @@ findConcatenatedExpressions(ResolvedRangeInfo Info, ASTContext &Ctx) {
       // FIXME: we should have ErrorType instead of null.
       if (E->getType().isNull())
         return true;
-      auto ExprType = E->getType()->getNominalOrBoundGenericNominal();
       //Only binary concatenation operators should exist in expression
       if (E->getKind() == ExprKind::Binary) {
         auto *BE = dyn_cast<BinaryExpr>(E);
         auto *OperatorDeclRef = BE->getSemanticFn()->getMemberOperatorRef();
         if (!(isConcatenationExpr(OperatorDeclRef)
-            && ExprType == Ctx.getStringDecl())) {
+            && E->getType()->isString())) {
           IsValidInterpolation = false;
           return false;
         }
         return true;
       }
       // Everything that evaluates to string should be gathered.
-      if (ExprType == Ctx.getStringDecl()) {
+      if (E->getType()->isString()) {
         Bucket->insert(E);
         return false;
       }

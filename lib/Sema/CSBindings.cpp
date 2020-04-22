@@ -347,7 +347,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     if (locator->isKeyPathType()) {
       auto *BGT =
           type->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
-      if (!BGT || !isKnownKeyPathDecl(getASTContext(), BGT->getDecl()))
+      if (!BGT || !isKnownKeyPathType(BGT))
         return None;
     }
   }

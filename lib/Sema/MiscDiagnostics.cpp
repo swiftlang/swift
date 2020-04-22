@@ -4434,9 +4434,6 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     return "";
 
   ASTContext &ctx = type->getASTContext();
-  Type boolType;
-  if (auto boolDecl = ctx.getBoolDecl())
-    boolType = boolDecl->getDeclaredInterfaceType();
   auto objcBoolType = ctx.getObjCBoolType();
 
   /// Determine the options associated with the given type.
@@ -4445,7 +4442,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     OmissionTypeOptions options;
 
     // Look for Boolean types.
-    if (boolType && type->isEqual(boolType)) {
+    if (ctx.getBoolType() && type->isBool()) {
       // Swift.Bool
       options |= OmissionTypeFlags::Boolean;
     } else if (objcBoolType && type->isEqual(objcBoolType)) {
@@ -4493,11 +4490,8 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   if (auto nominal = type->getAnyNominal()) {
     // If we have a collection, get the element type.
     if (auto bound = type->getAs<BoundGenericType>()) {
-      ASTContext &ctx = nominal->getASTContext();
       auto args = bound->getGenericArgs();
-      if (!args.empty() &&
-          (bound->getDecl() == ctx.getArrayDecl() ||
-           bound->getDecl() == ctx.getSetDecl())) {
+      if (!args.empty() && (bound->isArray() || bound->isSet())) {
         return OmissionTypeName(nominal->getName().str(),
                                 getOptions(bound),
                                 getTypeNameForOmission(args[0]).Name);

@@ -378,11 +378,6 @@ namespace TypeChecker {
 Type getArraySliceType(SourceLoc loc, Type elementType);
 Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
 Type getOptionalType(SourceLoc loc, Type elementType);
-Type getStringType(ASTContext &ctx);
-Type getSubstringType(ASTContext &ctx);
-Type getIntType(ASTContext &ctx);
-Type getInt8Type(ASTContext &ctx);
-Type getUInt8Type(ASTContext &ctx);
 
 /// Try to resolve an IdentTypeRepr, returning either the referenced
 /// Type or an ErrorType in case of error.

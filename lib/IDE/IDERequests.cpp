@@ -464,7 +464,7 @@ private:
 
   /// Collect the type that an ASTNode should be evaluated to.
   ReturnInfo resolveNodeType(ASTNode N, RangeKind Kind) {
-    auto *VoidTy = Ctx.getVoidDecl()->getDeclaredInterfaceType().getPointer();
+    auto *VoidTy = Ctx.TheEmptyTupleType.getPointer();
     if (N.isNull())
       return {VoidTy, ExitState::Negative};
     switch(Kind) {

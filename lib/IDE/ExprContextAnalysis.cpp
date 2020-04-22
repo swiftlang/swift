@@ -670,7 +670,7 @@ class ExprContextAnalyzer {
         if (auto boundGenericT = arrayT->getAs<BoundGenericType>()) {
           // let _: [Element] = [#HERE#]
           // In this case, 'Element' is the expected type.
-          if (boundGenericT->getDecl() == Context.getArrayDecl())
+          if (boundGenericT->isArray())
             recordPossibleType(boundGenericT->getGenericArgs()[0]);
 
           // let _: [Key : Value] = [#HERE#]
@@ -789,7 +789,7 @@ class ExprContextAnalyzer {
       if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
         if (containsTarget(SEQ)) {
           recordPossibleType(
-              Context.getSequenceDecl()->getDeclaredInterfaceType());
+              Context.getSequenceType());
         }
       }
       break;
@@ -798,7 +798,7 @@ class ExprContextAnalyzer {
     case StmtKind::While:
     case StmtKind::Guard:
       if (isBoolConditionOf(Parent)) {
-        recordPossibleType(Context.getBoolDecl()->getDeclaredInterfaceType());
+        recordPossibleType(Context.getBoolType());
       }
       break;
     default:

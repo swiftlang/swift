@@ -3217,9 +3217,6 @@ public:
   /// Determine if the type in question is one of the known collection types.
   static bool isCollectionType(Type t);
 
-  /// Determine if the type in question is AnyHashable.
-  static bool isAnyHashableType(Type t);
-
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
   /// type from the ConstraintSystem expression type map.
@@ -5257,10 +5254,6 @@ public:
 /// Determine whether given type is a known one
 /// for a key path `{Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathType(Type type);
-
-/// Determine whether given declaration is one for a key path
-/// `{Writable, ReferenceWritable}KeyPath`.
-bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 
 /// Determine whether givne closure has any explicit `return`
 /// statements that could produce non-void result.

@@ -479,8 +479,6 @@ deriveEquatable_eq(
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredType();
-
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {
     generatedIdentifier = C.Id_EqualsOperator;
@@ -499,7 +497,7 @@ deriveEquatable_eq(
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
                      params,
-                     TypeLoc::withoutLoc(boolTy),
+                     TypeLoc::withoutLoc(C.getBoolType()),
                      parentDC);
   eqDecl->setImplicit();
   eqDecl->setUserAccessible(false);
@@ -949,21 +947,20 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
-  Type intType = C.getIntDecl()->getDeclaredType();
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (TypeChecker::conformsToProtocol(
-          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC, None)
-          .isInvalid()) {
+  if (TypeChecker::conformsToProtocol(C.getIntType(),
+                                      C.getProtocol(KnownProtocolKind::Hashable),
+                                      parentDC, None).isInvalid()) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC, None)
-          .isInvalid()) {
+  if (TypeChecker::conformsToProtocol(C.getIntType(), intLiteralProto, parentDC,
+                                      None).isInvalid()) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
@@ -973,7 +970,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
     new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                     /*IsCaptureList*/false, SourceLoc(),
                     C.Id_hashValue, parentDC);
-  hashValueDecl->setInterfaceType(intType);
+  hashValueDecl->setInterfaceType(C.getIntType());
 
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -983,7 +980,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,
-      TypeLoc::withoutLoc(intType), parentDC);
+      TypeLoc::withoutLoc(C.getIntType()), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setIsTransparent(false);
@@ -993,16 +990,16 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   // Finish creating the property.
   hashValueDecl->setImplicit();
-  hashValueDecl->setInterfaceType(intType);
+  hashValueDecl->setInterfaceType(C.getIntType());
   hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 
   Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
-  hashValuePat->setType(intType);
-  hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
-  hashValuePat->setType(intType);
+  hashValuePat->setType(C.getIntType());
+  hashValuePat = TypedPattern::createImplicit(C, hashValuePat, C.getIntType());
+  hashValuePat->setType(C.getIntType());
 
   auto *patDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,

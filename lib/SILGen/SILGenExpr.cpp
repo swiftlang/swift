@@ -1387,13 +1387,12 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto toCollection = E->getType()->getCanonicalType();
 
   // Get the intrinsic function.
-  auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromCollection->getAnyNominal() == ctx.getArrayDecl()) {
+  if (fromCollection->isArray()) {
     fn = SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->getAnyNominal() == ctx.getDictionaryDecl()) {
+  } else if (fromCollection->isDictionary()) {
     fn = SGF.SGM.getDictionaryUpCast(loc);
-  } else if (fromCollection->getAnyNominal() == ctx.getSetDecl()) {
+  } else if (fromCollection->isSet()) {
     fn = SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
@@ -1863,7 +1862,7 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
   auto convertFn = SGM.getConvertToAnyHashable(loc);
   if (!convertFn)
     return emitUndefRValue(
-        loc, getASTContext().getAnyHashableDecl()->getDeclaredType());
+        loc, getASTContext().getAnyHashableType());
 
   // Construct the substitution for T: Hashable.
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
@@ -3027,8 +3026,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   auto &C = SGM.getASTContext();
   auto unsafeRawPointerTy = C.getUnsafeRawPointerDecl()->getDeclaredType()
                                                        ->getCanonicalType();
-  auto boolTy = C.getBoolDecl()->getDeclaredType()->getCanonicalType();
-  auto intTy = C.getIntDecl()->getDeclaredType()->getCanonicalType();
+  auto boolTy = CanType(C.getBoolType());
+  auto intTy = CanType(C.getIntType());
 
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
 
@@ -3823,7 +3822,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   } else {
     arrayType = E->getType()->getCanonicalType();
     auto genericType = cast<BoundGenericStructType>(arrayType);
-    assert(genericType->getDecl() == SGF.getASTContext().getArrayDecl());
+    assert(genericType->isArray());
     elementType = genericType.getGenericArgs()[0];
   }
 

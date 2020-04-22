@@ -3940,7 +3940,7 @@ public:
       builder.addRightBracket();
     });
 
-    auto floatType = context.getFloatDecl()->getDeclaredType();
+    auto floatType = context.getFloatType();
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
       builder.addBaseName("#colorLiteral");
       builder.addLeftParen();
@@ -3954,12 +3954,11 @@ public:
       builder.addRightParen();
     });
 
-    auto stringType = context.getStringDecl()->getDeclaredType();
     addFromProto(LK::ImageLiteral, "", [&](Builder &builder) {
       builder.addBaseName("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
-                               stringType);
+                               context.getStringType());
       builder.addRightParen();
     });
 
@@ -4004,7 +4003,7 @@ public:
         }
       }
 
-      if (!addedKeyPath && T->getAnyNominal() == Ctx.getStringDecl()) {
+      if (!addedKeyPath && T->isString()) {
         addPoundKeyPath(needPound);
         if (addedSelector)
           break;

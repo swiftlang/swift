@@ -174,9 +174,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(substEqualsType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substEqualsType->getResults()[0].getInterfaceType()
-                               ->getAnyNominal()
-                  == C.getBoolDecl(),
+        require(substEqualsType->getResults()[0].getInterfaceType()->isBool(),
                 "result should be Bool");
       }
       {
@@ -205,9 +203,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(substHashType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substHashType->getResults()[0].getInterfaceType()
-                             ->getAnyNominal()
-                  == C.getIntDecl(),
+        require(substHashType->getResults()[0].getInterfaceType()->isInt(),
                 "result should be Int");
       }
     } else {

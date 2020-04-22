@@ -805,7 +805,7 @@ FunctionType *ConstraintSystem::openFunctionType(
 
 Optional<Type> ConstraintSystem::isArrayType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() == type->getASTContext().getArrayDecl())
+    if (boundStruct->isArray())
       return boundStruct->getGenericArgs()[0];
   }
 
@@ -814,7 +814,7 @@ Optional<Type> ConstraintSystem::isArrayType(Type type) {
 
 Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() == type->getASTContext().getDictionaryDecl()) {
+    if (boundStruct->isDictionary()) {
       auto genericArgs = boundStruct->getGenericArgs();
       return std::make_pair(genericArgs[0], genericArgs[1]);
     }
@@ -825,7 +825,7 @@ Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
 
 Optional<Type> ConstraintSystem::isSetType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() == type->getASTContext().getSetDecl())
+    if (boundStruct->isSet())
       return boundStruct->getGenericArgs()[0];
   }
 
@@ -834,20 +834,9 @@ Optional<Type> ConstraintSystem::isSetType(Type type) {
 
 bool ConstraintSystem::isCollectionType(Type type) {
   if (auto *structType = type->getAs<BoundGenericStructType>()) {
-    auto &ctx = type->getASTContext();
-    auto *decl = structType->getDecl();
-    if (decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
-        decl == ctx.getSetDecl())
+    if (structType->isArray() || structType->isDictionary() ||
+        structType->isSet())
       return true;
-  }
-
-  return false;
-}
-
-bool ConstraintSystem::isAnyHashableType(Type type) {
-  if (auto st = type->getAs<StructType>()) {
-    auto &ctx = type->getASTContext();
-    return st->getDecl() == ctx.getAnyHashableDecl();
   }
 
   return false;
@@ -2068,7 +2057,7 @@ void ConstraintSystem::bindOverloadType(
         fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
-    assert(isKnownKeyPathDecl(getASTContext(), keyPathDecl) &&
+    assert(isKnownKeyPathType(keyPathTy) &&
            "parameter is supposed to be a keypath");
 
     auto *keyPathLoc = getConstraintLocator(
@@ -3855,15 +3844,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 }
 
 bool constraints::isKnownKeyPathType(Type type) {
-  if (auto *BGT = type->getAs<BoundGenericType>())
-    return isKnownKeyPathDecl(type->getASTContext(), BGT->getDecl());
-  return false;
-}
-
-bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
-  return decl == ctx.getKeyPathDecl() || decl == ctx.getWritableKeyPathDecl() ||
-         decl == ctx.getReferenceWritableKeyPathDecl() ||
-         decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
+  return type->isKeyPath() || type->isWritableKeyPath() ||
+         type->isReferenceWritableKeyPath() || type->isPartialKeyPath() ||
+         type->isAnyKeyPath();
 }
 
 bool constraints::hasExplicitResult(ClosureExpr *closure) {

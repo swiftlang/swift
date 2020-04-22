@@ -1042,7 +1042,7 @@ private:
       ty = unwrapped;
 
     auto genericTy = ty->getAs<BoundGenericStructType>();
-    if (!genericTy || genericTy->getDecl() != getASTContext().getArrayDecl())
+    if (!genericTy || !genericTy->isArray())
       return false;
 
     assert(genericTy->getGenericArgs().size() == 1);
@@ -1149,14 +1149,12 @@ private:
 
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
       if (nominal && isa<StructDecl>(nominal)) {
-        if (nominal == ctx.getArrayDecl() ||
-            nominal == ctx.getDictionaryDecl() ||
-            nominal == ctx.getSetDecl() ||
-            nominal == ctx.getStringDecl() ||
+        if (copyTy->isArray() || copyTy->isDictionary() || copyTy->isSet() ||
+            copyTy->isString() ||
             (!getKnownTypeInfo(nominal) && getObjCBridgedClass(nominal))) {
           // We fast-path the most common cases in the condition above.
           os << ", copy";
-        } else if (nominal == ctx.getUnmanagedDecl()) {
+        } else if (copyTy->isUnmanaged()) {
           os << ", unsafe_unretained";
           // Don't print unsafe_unretained twice.
           if (auto boundTy = copyTy->getAs<BoundGenericType>()) {
@@ -1669,9 +1667,7 @@ private:
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
     if (ty->isAny()) {
       ty = ctx.getAnyObjectType();
-    } else if (SD != ctx.getArrayDecl() &&
-        SD != ctx.getDictionaryDecl() &&
-        SD != ctx.getSetDecl() &&
+    } else if (!ty->isArray() && !ty->isDictionary() && !ty->isSet() &&
         !isSwiftNewtype(SD)) {
       ty = ctx.getBridgedToObjC(&owningPrinter.M, ty);
     }

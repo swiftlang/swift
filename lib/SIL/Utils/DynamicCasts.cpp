@@ -152,7 +152,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
 
   // AnyHashable is a special case: although it's a struct, there maybe another
   // type conforming to it and to the TargetProtocol at the same time.
-  if (SourceNominalTy == SourceNominalTy->getASTContext().getAnyHashableDecl())
+  if (source->isAnyHashable())
     return DynamicCastFeasibility::MaySucceed;
 
   // If we are in a whole-module compilation and
@@ -372,26 +372,22 @@ swift::classifyDynamicCast(ModuleDecl *M,
   }
 
   // Casts from AnyHashable.
-  if (auto sourceStruct = dyn_cast<StructType>(source)) {
-    if (sourceStruct->getDecl() == M->getASTContext().getAnyHashableDecl()) {
-      if (auto hashable = getHashableExistentialType(M)) {
-        // Succeeds if Hashable can be cast to the target type.
-        return classifyDynamicCastFromProtocol(M, hashable, target,
-                                               isWholeModuleOpts);
-      }
+  if (source->isAnyHashable()) {
+    if (auto hashable = getHashableExistentialType(M)) {
+      // Succeds if Hashable can be cast to the target type.
+      return classifyDynamicCastFromProtocol(M, hashable, target,
+                                             isWholeModuleOpts);
     }
   }
 
   // Casts to AnyHashable.
-  if (auto targetStruct = dyn_cast<StructType>(target)) {
-    if (targetStruct->getDecl() == M->getASTContext().getAnyHashableDecl()) {
-      // Succeeds if the source type can be dynamically cast to Hashable.
-      // Hashable is not actually a legal existential type right now, but
-      // the check doesn't care about that.
-      if (auto hashable = getHashableExistentialType(M)) {
-        return classifyDynamicCastToProtocol(M, source, hashable,
-                                             isWholeModuleOpts);
-      }
+  if (target->isAnyHashable()) {
+    // Succeeds if the source type can be dynamically cast to Hashable.
+    // Hashable is not actually a legal existential type right now, but
+    // the check doesn't care about that.
+    if (auto hashable = getHashableExistentialType(M)) {
+      return classifyDynamicCastToProtocol(M, source, hashable,
+                                           isWholeModuleOpts);
     }
   }
 
@@ -693,15 +689,14 @@ swift::classifyDynamicCast(ModuleDecl *M,
         // a cast can always succeed on an empty collection.
 
         // Arrays and sets.
-        if (typeDecl == M->getASTContext().getArrayDecl() ||
-            typeDecl == M->getASTContext().getSetDecl()) {
+        if (targetStruct->isArray() || targetStruct->isSet()) {
           auto valueFeasibility =
             classifyDynamicCast(M, sourceArgs[0], targetArgs[0]);
           return atWorst(valueFeasibility,
                          DynamicCastFeasibility::MaySucceed);
 
         // Dictionaries.
-        } else if (typeDecl == M->getASTContext().getDictionaryDecl()) {
+        } else if (targetStruct->isDictionary()) {
           auto keyFeasibility =
             classifyDynamicCast(M, sourceArgs[0], targetArgs[0]);
           auto valueFeasibility =

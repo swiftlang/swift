@@ -290,8 +290,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   assert(rawTy);
   rawTy = initDecl->mapTypeIntoContext(rawTy);
 
-  bool isStringEnum =
-    (rawTy->getNominalOrBoundGenericNominal() == C.getStringDecl());
+  bool isStringEnum = rawTy->isString();
   llvm::SmallVector<Expr *, 16> stringExprs;
 
   Type enumType = parentDC->getDeclaredTypeInContext();

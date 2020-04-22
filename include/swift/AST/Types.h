@@ -774,11 +774,13 @@ public:
   /// These are the types of the Swift type system.
   bool isLegalFormalType();
 
-  /// Check if this type is equal to the empty tuple type.
+  // Whether or not this is equal to ()
   bool isVoid();
 
-  /// Check if this type is equal to Swift.Bool.
-  bool isBool();
+  #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+  /** Whether or not this is equal to Swift.NAME. */ \
+  bool is##NAME();
+  #include "swift/AST/KnownStdlibTypes.def"
 
   /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);

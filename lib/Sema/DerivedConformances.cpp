@@ -111,11 +111,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
       case KnownDerivableProtocolKind::CodingKey: {
         Type rawType = enumDecl->getRawType();
         if (rawType) {
-          auto parentDC = enumDecl->getDeclContext();
-          ASTContext &C = parentDC->getASTContext();
-
-          auto nominal = rawType->getAnyNominal();
-          return nominal == C.getStringDecl() || nominal == C.getIntDecl();
+          return rawType->isString() || rawType->isInt();
         }
 
         // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;

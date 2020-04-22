@@ -703,15 +703,12 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   //                         output: ()
   // Create from the inside out:
 
-  auto encoderType = C.getEncoderDecl()->getDeclaredInterfaceType();
-  auto returnType = TupleType::getEmpty(C);
-
   // Params: (Encoder)
   auto *encoderParam = new (C)
       ParamDecl(SourceLoc(), SourceLoc(), C.Id_to,
                 SourceLoc(), C.Id_encoder, conformanceDC);
   encoderParam->setSpecifier(ParamSpecifier::Default);
-  encoderParam->setInterfaceType(encoderType);
+  encoderParam->setInterfaceType(C.getEncoderType());
 
   ParameterList *params = ParameterList::createWithoutLoc(encoderParam);
 
@@ -720,7 +717,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   auto *encodeDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), name, SourceLoc(),
       /*Throws=*/true, SourceLoc(), nullptr, params,
-      TypeLoc::withoutLoc(returnType), conformanceDC);
+      TypeLoc::withoutLoc(C.TheEmptyTupleType), conformanceDC);
   encodeDecl->setImplicit();
   encodeDecl->setSynthesized();
   encodeDecl->setBodySynthesizer(deriveBodyEncodable_encode);
@@ -1032,13 +1029,12 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   // Compute from the inside out:
 
   // Params: (Decoder)
-  auto decoderType = C.getDecoderDecl()->getDeclaredInterfaceType();
   auto *decoderParamDecl = new (C) ParamDecl(
       SourceLoc(), SourceLoc(), C.Id_from,
       SourceLoc(), C.Id_decoder, conformanceDC);
   decoderParamDecl->setImplicit();
   decoderParamDecl->setSpecifier(ParamSpecifier::Default);
-  decoderParamDecl->setInterfaceType(decoderType);
+  decoderParamDecl->setInterfaceType(C.getDecoderType());
 
   auto *paramList = ParameterList::createWithoutLoc(decoderParamDecl);
 
