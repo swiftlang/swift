@@ -155,6 +155,17 @@ bb9(%29 : $Optional<AA>):
 
 }
 
+// -----------------------------------------------------------------------------
+// Test jump-threading through a non-pure address producer.
+//
+// BB3 cannot (currently) be cloned because the block cloner does not
+// know how to sink address producers unless they are pure address
+// projections. init_existential_addr is not a pure projection. It's
+// address is transitively used outside bb3 via %17 =
+// tuple_element_addr. Test that cloning is inhibited. If cloning did
+// happen, then it would either need to sink init_existential_addr, or
+// SSA would be incorrectly updated.
+
 enum FakeOptional<T> {
 case some(T)
 case none
@@ -172,9 +183,16 @@ class C {
     func f() -> FakeOptional<T>
 }
 
-// This test used to crash because we were not properly updating SSA.
-
-sil hidden @dont_crash : $@convention(method) (@guaranteed C) -> @out Any {
+// Make BB3 is not jump-threaded. And init_existential_addr is not cloned
+//
+// CHECK-LABEL: sil hidden @nonPureAddressProducer : $@convention(method) (@guaranteed C) -> @out Any {
+// CHECK: bb0(%0 : $*Any, %1 : $C):
+// CHECK:   switch_enum %{{.*}} : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+// CHECK: bb3(%{{.*}} : $FakeOptional<Int64>):
+// CHECK:   init_existential_addr %0 : $*Any, $(FakeOptional<Int64>, FakeOptional<S>)
+// CHECK:   switch_enum %{{.*}} : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
+// CHECK-LABEL: } // end sil function 'nonPureAddressProducer'
+sil hidden @nonPureAddressProducer : $@convention(method) (@guaranteed C) -> @out Any {
 bb0(%0 : $*Any, %1 : $C):
   %3 = class_method %1 : $C, #C.f : (C) -> () -> FakeOptional<T>, $@convention(method) (@guaranteed C) -> FakeOptional<T>
   %4 = apply %3(%1) : $@convention(method) (@guaranteed C) -> FakeOptional<T>
