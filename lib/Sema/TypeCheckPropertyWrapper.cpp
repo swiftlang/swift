@@ -534,14 +534,13 @@ Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   // If there isn't an attached property wrapper at this index, we're done.
   if (index >= customAttrVal.size())
     return Type();
-                                               
+
   auto customAttr = customAttrVal[index];
   if (!customAttr)
     return Type();
 
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
-
   auto resolution =
       TypeResolution::forContextual(var->getDeclContext(), options);
   if (TypeChecker::validateType(var->getASTContext(),
