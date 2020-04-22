@@ -1279,10 +1279,6 @@ OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
   if (!result.hasValue())
     return nullptr;
 
-  if (!result.getValue() ||
-      result.getValue()->getDeclContext()->getModuleScopeContext() != file) {
-    namelookup::recordLookupOfTopLevelName(file, desc.name, desc.isCascading);
-  }
   if (!result.getValue()) {
     result = lookupOperatorDeclForName<OperatorType>(file->getParentModule(),
                                                      desc.diagLoc, desc.name,
@@ -2605,19 +2601,13 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 }
 
 void SourceFile::createReferencedNameTracker() {
-  assert(!ReferencedNames && "This file already has a name tracker.");
   assert(!RequestReferencedNames && "This file already has a name tracker.");
-  ReferencedNames.emplace(ReferencedNameTracker());
   RequestReferencedNames.emplace(ReferencedNameTracker());
 }
 
 const ReferencedNameTracker *
 SourceFile::getConfiguredReferencedNameTracker() const {
-  if (getASTContext().LangOpts.EnableRequestBasedIncrementalDependencies) {
-    return getRequestBasedReferencedNameTracker();
-  } else {
-    return getLegacyReferencedNameTracker();
-  }
+  return getRequestBasedReferencedNameTracker();
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {

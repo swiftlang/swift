@@ -3864,30 +3864,6 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
-static void recordConformanceDependency(DeclContext *DC,
-                                        NominalTypeDecl *Adoptee,
-                                        ProtocolConformance *Conformance,
-                                        bool InExpression) {
-  if (!Conformance)
-    return;
-
-  auto *topLevelContext = DC->getModuleScopeContext();
-  auto *SF = dyn_cast<SourceFile>(topLevelContext);
-  if (!SF)
-    return;
-
-  auto *tracker = SF->getLegacyReferencedNameTracker();
-  if (!tracker)
-    return;
-
-  if (SF->getParentModule() !=
-      Conformance->getDeclContext()->getParentModule())
-    return;
-
-  tracker->addUsedMember({Adoptee, Identifier()},
-                         DC->isCascadingContextForLookup(InExpression));
-}
-
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
@@ -4200,12 +4176,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses(Kind);
 
-  // Ensure the conforming type is used.
-  //
-  // FIXME: This feels like the wrong place for this, but if we don't put
-  // it here, extensions don't end up depending on the extended type.
-  recordConformanceDependency(DC, Adoptee->getAnyNominal(), Conformance, false);
-
   // If we complain about any associated types, there is no point in continuing.
   // FIXME: Not really true. We could check witnesses that don't involve the
   // failed associated types.
@@ -4432,31 +4402,14 @@ ProtocolConformanceRef
 TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
                                 ConformanceCheckOptions options,
                                 SourceLoc ComplainLoc) {
-  bool InExpression = options.contains(ConformanceCheckFlags::InExpression);
-
-  auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
-    if (!options.contains(ConformanceCheckFlags::SuppressDependencyTracking))
-      if (auto nominal = T->getAnyNominal())
-        recordConformanceDependency(DC, nominal, conformance, InExpression);
-  };
-
   // Look up conformance in the module.
   ModuleDecl *M = DC->getParentModule();
   auto lookupResult = M->lookupConformance(T, Proto);
   if (lookupResult.isInvalid()) {
-    if (ComplainLoc.isValid())
+    if (ComplainLoc.isValid()) {
       diagnoseConformanceFailure(T, Proto, DC, ComplainLoc);
-    else
-      recordDependency();
-
+    }
     return ProtocolConformanceRef::forInvalid();
-  }
-
-  // Store the conformance and record the dependency.
-  if (lookupResult.isConcrete()) {
-    recordDependency(lookupResult.getConcrete());
-  } else {
-    recordDependency();
   }
 
   if (options.contains(ConformanceCheckFlags::SkipConditionalRequirements))
@@ -4512,10 +4465,7 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 // - mapTypeIntoContext will be a nop.
 ProtocolConformanceRef
 ModuleDecl::conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol) {
-
-  auto flags = ConformanceCheckFlags::SuppressDependencyTracking;
-
-  return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this, flags);
+  return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this, None);
 }
 
 ProtocolConformanceRef TypeChecker::LookUpConformance::
@@ -4528,7 +4478,6 @@ operator()(CanType dependentType, Type conformingReplacementType,
                          conformingReplacementType,
                          conformedProtocol,
                          dc,
-                         ConformanceCheckFlags::InExpression|
                          ConformanceCheckFlags::SkipConditionalRequirements);
 }
 
@@ -5126,11 +5075,6 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     currentDecl = cast<NominalTypeDecl>(dc);
   }
 
-  SourceFile *SF = dc->getParentSourceFile();
-  ReferencedNameTracker *tracker = nullptr;
-  if (SF)
-    tracker = SF->getLegacyReferencedNameTracker();
-
   // Check each of the conformances associated with this context.
   auto conformances =
       evaluateOrDefault(dc->getASTContext().evaluator,
@@ -5146,13 +5090,6 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
       groupChecker.addConformance(normal);
     }
-
-    // FIXME(Evaluator Incremental Dependencies): Remove this. It is duplicating
-    // both the manual and automatic edges registered when lookup runs for the
-    // protocol named in the conformance.
-    if (tracker)
-      tracker->addUsedMember({conformance->getProtocol(), Identifier()},
-                             defaultAccess > AccessLevel::FilePrivate);
 
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
     // have unstable archival names.
@@ -5293,6 +5230,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // If there were any unsatisfied requirements, check whether there
   // are any near-matches we should diagnose.
   if (!unsatisfiedReqs.empty() && !anyInvalid) {
+    SourceFile *SF = dc->getParentSourceFile();
     if (SF && SF->Kind != SourceFileKind::Interface) {
       // Find all of the members that aren't used to satisfy
       // requirements, and check whether they are close to an

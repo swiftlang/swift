@@ -138,7 +138,6 @@ private:
   TypeRefinementContext *TRC = nullptr;
 
   /// If non-null, used to track name lookups that happen within this file.
-  Optional<ReferencedNameTracker> ReferencedNames;
   Optional<ReferencedNameTracker> RequestReferencedNames;
 
   /// The class in this file marked \@NS/UIApplicationMain.
@@ -452,13 +451,6 @@ public:
 
   virtual bool walk(ASTWalker &walker) override;
 
-  ReferencedNameTracker *getLegacyReferencedNameTracker() {
-    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
-  }
-  const ReferencedNameTracker *getLegacyReferencedNameTracker() const {
-    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
-  }
-
   ReferencedNameTracker *getRequestBasedReferencedNameTracker() {
     return RequestReferencedNames ? RequestReferencedNames.getPointer() : nullptr;
   }
@@ -472,8 +464,7 @@ public:
   /// else reference dependencies will not be registered.
   void createReferencedNameTracker();
 
-  /// Retrieves the name tracker instance corresponding to
-  /// \c EnableRequestBasedIncrementalDependencies
+  /// Retrieves the appropriate referenced name tracker instance.
   ///
   /// If incremental dependencies tracking is not enabled or \c createReferencedNameTracker()
   /// has not been invoked on this source file, the result is \c nullptr.

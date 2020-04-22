@@ -99,11 +99,6 @@ namespace {
     /// from the innermost scope with results)
     void add(ValueDecl *found, DeclContext *baseDC, Type foundInType,
              bool isOuter) {
-      ConformanceCheckOptions conformanceOptions;
-      if (Options.contains(NameLookupFlags::KnownPrivate))
-        conformanceOptions |= ConformanceCheckFlags::InExpression;
-      conformanceOptions |= ConformanceCheckFlags::SkipConditionalRequirements;
-
       DeclContext *foundDC = found->getDeclContext();
 
       auto addResult = [&](ValueDecl *result) {
@@ -159,7 +154,7 @@ namespace {
       auto *foundProto = cast<ProtocolDecl>(foundDC);
       auto conformance = TypeChecker::conformsToProtocol(conformingType,
                                                          foundProto, DC,
-                                                         conformanceOptions);
+                                                         ConformanceCheckFlags::SkipConditionalRequirements);
       if (conformance.isInvalid()) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
@@ -481,18 +476,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (!result) {
     // We couldn't find any normal declarations. Let's try inferring
     // associated types.
-    ConformanceCheckOptions conformanceOptions;
-    if (options.contains(NameLookupFlags::KnownPrivate))
-      conformanceOptions |= ConformanceCheckFlags::InExpression;
-    conformanceOptions |= ConformanceCheckFlags::SkipConditionalRequirements;
-
     for (AssociatedTypeDecl *assocType : inferredAssociatedTypes) {
       // If the type does not actually conform to the protocol, skip this
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
       auto conformance = conformsToProtocol(type, protocol, dc,
-                                            conformanceOptions);
+                                            ConformanceCheckFlags::SkipConditionalRequirements);
       if (!conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
