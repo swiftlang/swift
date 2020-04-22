@@ -49,14 +49,10 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
   // names checked in "#if arch(...)". Fall back to that name in the one case
   // where it's different from what Swift 4.2 supported:
   // - 32-bit ARM platforms (formerly "arm")
-  // - arm64e (formerly shared with "arm64")
   // We should be able to drop this once there's an Xcode that supports the
   // new names.
-  if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
+  if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm) {
     body("arm");
-  else if (Ctx.LangOpts.Target.getSubArch() ==
-           llvm::Triple::SubArchType::AArch64SubArch_E) {
-    body("arm64");
   }
 }
 

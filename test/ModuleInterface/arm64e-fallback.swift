@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift %s -target arm64e-apple-ios13.0 -F %S/Inputs
+// RUN: not %target-typecheck-verify-swift -target arm64e-apple-ios13.0 -F %S/Inputs 2>&1 | %FileCheck %s
 
 // REQUIRES: OS=ios
 
 import DummyFramework
+// CHECK: no such module 'DummyFramework'
