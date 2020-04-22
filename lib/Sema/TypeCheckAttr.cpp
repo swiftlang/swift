@@ -34,6 +34,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -217,6 +218,7 @@ public:
 
   void visitNSApplicationMainAttr(NSApplicationMainAttr *attr);
   void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
+  void visitMainTypeAttr(MainTypeAttr *attr);
 
   void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
   void visitSwiftNativeObjCRuntimeBaseAttr(
@@ -1678,7 +1680,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   // Register the class as the main class in the module. If there are multiples
   // they will be diagnosed.
-  if (SF->registerMainClass(CD, attr->getLocation()))
+  if (SF->registerMainDecl(CD, attr->getLocation()))
     attr->setInvalid();
 }
 
@@ -1695,6 +1697,195 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
                                 C.getIdentifier("UIApplicationDelegate"),
                                 C.getIdentifier("UIKit"),
                                 C.getIdentifier("UIApplicationMain"));
+}
+
+void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
+  auto *extension = dyn_cast<ExtensionDecl>(D);
+
+  IterableDeclContext *iterableDeclContext;
+  DeclContext *declContext;
+  NominalTypeDecl *nominal;
+  SourceRange braces;
+
+  if (extension) {
+    nominal = extension->getExtendedNominal();
+    iterableDeclContext = extension;
+    declContext = extension;
+    braces = extension->getBraces();
+  } else {
+    nominal = dyn_cast<NominalTypeDecl>(D);
+    iterableDeclContext = nominal;
+    declContext = nominal;
+    braces = nominal->getBraces();
+  }
+
+  if (!nominal) {
+    assert(false && "Should have already recognized that the MainType decl "
+                    "isn't applicable to decls other than NominalTypeDecls");
+    return;
+  }
+  assert(iterableDeclContext);
+  assert(declContext);
+
+  // The type cannot be generic.
+  if (nominal->isGenericContext()) {
+    diagnose(attr->getLocation(),
+             diag::attr_generic_ApplicationMain_not_supported, 2);
+    attr->setInvalid();
+    return;
+  }
+
+  SourceFile *file = cast<SourceFile>(declContext->getModuleScopeContext());
+  assert(file);
+
+  // Create a function
+  //
+  //     func $main() {
+  //         return MainType.main()
+  //     }
+  //
+  // to be called as the entry point.  The advantage of setting up such a
+  // function is that we get full type-checking for mainType.main() as part of
+  // usual type-checking.  The alternative would be to directly call
+  // mainType.main() from the entry point, and that would require fully
+  // type-checking the call to mainType.main().
+  auto &context = D->getASTContext();
+  auto location = attr->getLocation();
+
+  auto resolution = resolveValueMember(
+      *declContext, nominal->getInterfaceType(), context.Id_main);
+
+  FuncDecl *mainFunction = nullptr;
+
+  if (resolution.hasBestOverload()) {
+    auto best = resolution.getBestOverload();
+    if (auto function = dyn_cast<FuncDecl>(best)) {
+      if (function->isMainTypeMainMethod()) {
+        mainFunction = function;
+      }
+    }
+  }
+
+  if (mainFunction == nullptr) {
+    SmallVector<FuncDecl *, 4> viableCandidates;
+
+    for (auto *candidate : resolution.getMemberDecls(Viable)) {
+      if (auto func = dyn_cast<FuncDecl>(candidate)) {
+        if (func->isMainTypeMainMethod()) {
+          viableCandidates.push_back(func);
+        }
+      }
+    }
+
+    if (viableCandidates.size() != 1) {
+      diagnose(attr->getLocation(), diag::attr_MainType_without_main,
+               nominal->getBaseName());
+      attr->setInvalid();
+      return;
+    }
+    mainFunction = viableCandidates[0];
+  }
+
+  bool mainFunctionThrows = mainFunction->hasThrows();
+
+  auto voidToVoidFunctionType =
+      FunctionType::get({}, context.TheEmptyTupleType,
+                        FunctionType::ExtInfo().withThrows(mainFunctionThrows));
+  auto nominalToVoidToVoidFunctionType = FunctionType::get({AnyFunctionType::Param(nominal->getInterfaceType())}, voidToVoidFunctionType);
+  auto *func = FuncDecl::create(
+      context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::KeywordStatic,
+      /*FuncLoc*/ SourceLoc(),
+      DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
+               ParameterList::createEmpty(context)),
+      /*NameLoc*/ SourceLoc(), /*Throws=*/mainFunctionThrows,
+      /*ThrowsLoc=*/SourceLoc(),
+      /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
+      /*FnRetType=*/TypeLoc::withoutLoc(TupleType::getEmpty(context)),
+      declContext);
+  func->setImplicit(true);
+  func->setSynthesized(true);
+
+  auto *typeExpr = TypeExpr::createImplicit(nominal->getDeclaredType(), context);
+
+  SubstitutionMap substitutionMap;
+  if (auto *environment = mainFunction->getGenericEnvironment()) {
+    substitutionMap = SubstitutionMap::get(
+      environment->getGenericSignature(),
+      [&](SubstitutableType *type) { return nominal->getDeclaredType(); },
+      LookUpConformanceInModule(nominal->getModuleContext()));
+  } else {
+    substitutionMap = SubstitutionMap();
+  }
+
+  auto funcDeclRef = ConcreteDeclRef(mainFunction, substitutionMap);
+  auto *funcDeclRefExpr = new (context) DeclRefExpr(
+      funcDeclRef, DeclNameLoc(location), /*Implicit*/ true);
+  funcDeclRefExpr->setImplicit(true);
+  funcDeclRefExpr->setType(mainFunction->getInterfaceType());
+
+  auto *dotSyntaxCallExpr = new (context) DotSyntaxCallExpr(
+      funcDeclRefExpr, /*DotLoc*/ SourceLoc(), typeExpr, voidToVoidFunctionType);
+  dotSyntaxCallExpr->setImplicit(true);
+  dotSyntaxCallExpr->setThrows(mainFunctionThrows);
+
+  auto *callExpr = CallExpr::createImplicit(context, dotSyntaxCallExpr, {}, {});
+  callExpr->setImplicit(true);
+  callExpr->setThrows(mainFunctionThrows);
+  callExpr->setType(context.TheEmptyTupleType);
+
+  Expr *returnedExpr;
+
+  if (mainFunctionThrows) {
+    auto *tryExpr = new (context) TryExpr(
+        SourceLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
+    returnedExpr = tryExpr;
+  } else {
+    returnedExpr = callExpr;
+  }
+
+  auto *returnStmt =
+      new (context) ReturnStmt(SourceLoc(), callExpr, /*Implicit=*/true);
+
+  SmallVector<ASTNode, 1> stmts;
+  stmts.push_back(returnStmt);
+  auto *body = BraceStmt::create(context, SourceLoc(), stmts,
+                                SourceLoc(), /*Implicit*/true);
+  func->setBodyParsed(body);
+  func->setInterfaceType(nominalToVoidToVoidFunctionType);
+
+  iterableDeclContext->addMember(func);
+
+  // This function must be type-checked. Why?  Consider the following scenario:
+  //
+  //     protocol AlmostMainable {}
+  //     protocol ReallyMainable {}
+  //     extension AlmostMainable where Self : ReallyMainable {
+  //         static func main() {}
+  //     }
+  //     @main struct Main : AlmostMainable {}
+  //
+  // Note in particular that Main does not conform to ReallyMainable.
+  //
+  // In this case, resolveValueMember will find the function main in the 
+  // extension, and so, since there is one candidate, the function $main will
+  // accordingly be formed as usual:
+  //
+  //     func $main() {
+  //         return Main.main()
+  //     }
+  //
+  // Of course, this function's body does not type-check.
+  //
+  // FIXME: Stop using the legacy type checker here.  However, it will still be
+  //        necessary to type-check the function at that point.
+  file->DelayedFunctions.push_back(func);
+
+  // Register the func as the main decl in the module. If there are multiples
+  // they will be diagnosed.
+  if (file->registerMainDecl(func, attr->getLocation())) {
+    attr->setInvalid();
+    return;
+  }
 }
 
 /// Determine whether the given context is an extension to an Objective-C class

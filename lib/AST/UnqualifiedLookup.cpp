@@ -1048,7 +1048,6 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
 
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
     DeclContext *topLevelContext, DeclNameRef name, bool isCascadingUse) {
-  recordLookupOfTopLevelName(topLevelContext, Name.getFullName(), isCascadingUse);
   recordedSF = dyn_cast<SourceFile>(topLevelContext);
   recordedIsCascadingUse = isCascadingUse;
 }

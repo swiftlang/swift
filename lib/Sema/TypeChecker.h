@@ -333,20 +333,13 @@ enum class RequirementCheckResult {
 
 /// Flags that control protocol conformance checking.
 enum class ConformanceCheckFlags {
-  /// Whether we're performing the check from within an expression.
-  InExpression = 0x01,
-  /// Whether to suppress dependency tracking entirely.
-  ///
-  /// FIXME: This deals with some oddities with the
-  /// _ObjectiveCBridgeable conformances.
-  SuppressDependencyTracking = 0x02,
   /// Whether to skip the check for any conditional conformances.
   ///
   /// When set, the caller takes responsibility for any
   /// conditional requirements required for the conformance to be
   /// correctly used. Otherwise (the default), all of the conditional
   /// requirements will be checked.
-  SkipConditionalRequirements = 0x04,
+  SkipConditionalRequirements = 0x01,
 };
 
 /// Options that control protocol conformance checking.

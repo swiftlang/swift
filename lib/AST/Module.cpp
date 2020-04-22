@@ -1279,10 +1279,6 @@ OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
   if (!result.hasValue())
     return nullptr;
 
-  if (!result.getValue() ||
-      result.getValue()->getDeclContext()->getModuleScopeContext() != file) {
-    namelookup::recordLookupOfTopLevelName(file, desc.name, desc.isCascading);
-  }
   if (!result.getValue()) {
     result = lookupOperatorDeclForName<OperatorType>(file->getParentModule(),
                                                      desc.diagLoc, desc.name,
@@ -1566,16 +1562,17 @@ bool ModuleDecl::isBuiltinModule() const {
   return this == getASTContext().TheBuiltinModule;
 }
 
-bool SourceFile::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
-  if (mainClass == MainClass)
+bool SourceFile::registerMainDecl(Decl *mainDecl, SourceLoc diagLoc) {
+  if (mainDecl == MainDecl)
     return false;
 
-  ArtificialMainKind kind = mainClass->getArtificialMainKind();
+  ArtificialMainKind kind = mainDecl->getArtificialMainKind();
   if (getParentModule()->registerEntryPointFile(this, diagLoc, kind))
     return true;
 
-  MainClass = mainClass;
-  MainClassDiagLoc = diagLoc;
+  MainDecl = mainDecl;
+  MainDeclDiagLoc = diagLoc;
+
   return false;
 }
 
@@ -1595,53 +1592,59 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   enum : unsigned {
     UIApplicationMainClass = 0,
     NSApplicationMainClass = 1,
-  } mainClassDiagKind;
+    MainType = 2,
+  } mainTypeDiagKind;
 
   switch (kind.getValue()) {
   case ArtificialMainKind::UIApplicationMain:
-    mainClassDiagKind = UIApplicationMainClass;
+    mainTypeDiagKind = UIApplicationMainClass;
     break;
   case ArtificialMainKind::NSApplicationMain:
-    mainClassDiagKind = NSApplicationMainClass;
+    mainTypeDiagKind = NSApplicationMainClass;
+    break;
+  case ArtificialMainKind::TypeMain:
+    mainTypeDiagKind = MainType;
     break;
   }
 
   FileUnit *existingFile = EntryPointInfo.getEntryPointFile();
-  const ClassDecl *existingClass = existingFile->getMainClass();
+  const Decl *existingDecl = existingFile->getMainDecl();
   SourceLoc existingDiagLoc;
 
   if (auto *sourceFile = dyn_cast<SourceFile>(existingFile)) {
-    if (existingClass) {
-      existingDiagLoc = sourceFile->getMainClassDiagLoc();
+    if (existingDecl) {
+      existingDiagLoc = sourceFile->getMainDeclDiagLoc();
     } else {
       if (auto bufID = sourceFile->getBufferID())
         existingDiagLoc = getASTContext().SourceMgr.getLocForBufferStart(*bufID);
     }
   }
 
-  if (existingClass) {
+  if (existingDecl) {
     if (EntryPointInfo.markDiagnosedMultipleMainClasses()) {
-      // If we already have a main class, and we haven't diagnosed it,
+      // If we already have a main type, and we haven't diagnosed it,
       // do so now.
       if (existingDiagLoc.isValid()) {
-        getASTContext().Diags.diagnose(existingDiagLoc, diag::attr_ApplicationMain_multiple,
-                           mainClassDiagKind);
+        getASTContext().Diags.diagnose(existingDiagLoc,
+                                       diag::attr_ApplicationMain_multiple,
+                                       mainTypeDiagKind);
       } else {
-        getASTContext().Diags.diagnose(existingClass, diag::attr_ApplicationMain_multiple,
-                           mainClassDiagKind);
+        getASTContext().Diags.diagnose(existingDecl,
+                                       diag::attr_ApplicationMain_multiple,
+                                       mainTypeDiagKind);
       }
     }
 
     // Always diagnose the new class.
     getASTContext().Diags.diagnose(diagLoc, diag::attr_ApplicationMain_multiple,
-                       mainClassDiagKind);
+                                   mainTypeDiagKind);
 
   } else {
     // We don't have an existing class, but we /do/ have a file in script mode.
     // Diagnose that.
     if (EntryPointInfo.markDiagnosedMainClassWithScript()) {
-      getASTContext().Diags.diagnose(diagLoc, diag::attr_ApplicationMain_with_script,
-                         mainClassDiagKind);
+      getASTContext().Diags.diagnose(
+          diagLoc, diag::attr_ApplicationMain_with_script, mainTypeDiagKind);
 
       if (existingDiagLoc.isValid()) {
         getASTContext().Diags.diagnose(existingDiagLoc,
@@ -2605,19 +2608,13 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 }
 
 void SourceFile::createReferencedNameTracker() {
-  assert(!ReferencedNames && "This file already has a name tracker.");
   assert(!RequestReferencedNames && "This file already has a name tracker.");
-  ReferencedNames.emplace(ReferencedNameTracker());
   RequestReferencedNames.emplace(ReferencedNameTracker());
 }
 
 const ReferencedNameTracker *
 SourceFile::getConfiguredReferencedNameTracker() const {
-  if (getASTContext().LangOpts.EnableRequestBasedIncrementalDependencies) {
-    return getRequestBasedReferencedNameTracker();
-  } else {
-    return getLegacyReferencedNameTracker();
-  }
+  return getRequestBasedReferencedNameTracker();
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
