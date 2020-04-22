@@ -2080,7 +2080,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     printChildren(Node, " ");
     return nullptr;
   case Node::Kind::ImplParameter:
-    // Cihldren: `convention, differentiability?, type`
+    // Children: `convention, differentiability?, type`
     // Print convention.
     print(Node->getChild(0));
     Printer << " ";
