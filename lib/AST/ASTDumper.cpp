@@ -1259,6 +1259,10 @@ namespace {
 
     void visitModuleDecl(ModuleDecl *MD) {
       printCommon(MD, "module");
+
+      if (MD->isNonSwiftModule())
+        OS << " non_swift";
+      
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
