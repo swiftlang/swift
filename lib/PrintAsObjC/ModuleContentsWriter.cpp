@@ -400,6 +400,9 @@ public:
   }
 
   bool writeExtension(const ExtensionDecl *ED) {
+    if (printer.isEmptyExtensionDecl(ED))
+      return true;
+
     bool allRequirementsSatisfied = true;
 
     const ClassDecl *CD = ED->getSelfClassDecl();

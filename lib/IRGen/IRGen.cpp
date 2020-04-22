@@ -34,6 +34,7 @@
 #include "swift/LLVMPasses/Passes.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -891,7 +892,7 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   NewUsed->setSection("llvm.metadata");
 }
 
-static void initLLVMModule(const IRGenModule &IGM, ModuleDecl &M) {
+static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
   
@@ -909,12 +910,17 @@ static void initLLVMModule(const IRGenModule &IGM, ModuleDecl &M) {
 
   auto *MDNode = IGM.getModule()->getOrInsertNamedMetadata("swift.module.flags");
   auto &Context = IGM.getModule()->getContext();
-  auto *Value = M.isStdlibModule() ? llvm::ConstantInt::getTrue(Context)
-                                   : llvm::ConstantInt::getFalse(Context);
+  auto *Value = SIL.getSwiftModule()->isStdlibModule()
+              ? llvm::ConstantInt::getTrue(Context)
+              : llvm::ConstantInt::getFalse(Context);
   MDNode->addOperand(llvm::MDTuple::get(Context,
                                         {llvm::MDString::get(Context,
                                                              "standard-library"),
                                          llvm::ConstantAsMetadata::get(Value)}));
+
+  if (auto *streamer = SIL.getSILRemarkStreamer()) {
+    streamer->intoLLVMContext(Module->getContext());
+  }
 }
 
 std::pair<IRGenerator *, IRGenModule *>
@@ -933,7 +939,7 @@ swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
       *irgen, std::move(targetMachine), nullptr, "", OutputFilename,
       MainInputFilenameForDebugInfo, PrivateDiscriminator);
 
-  initLLVMModule(*IGM, *SILMod->getSwiftModule());
+  initLLVMModule(*IGM, *SILMod);
 
   return std::pair<IRGenerator *, IRGenModule *>(irgen, IGM);
 }
@@ -976,7 +982,7 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                   PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
                   PrivateDiscriminator);
 
-  initLLVMModule(IGM, *SILMod->getSwiftModule());
+  initLLVMModule(IGM, *SILMod);
 
   // Run SIL level IRGen preparation passes.
   runIRGenPreparePasses(*SILMod, IGM);
@@ -1224,7 +1230,7 @@ static void performParallelIRGeneration(
                         nextSF->getPrivateDiscriminator().str());
     IGMcreated = true;
 
-    initLLVMModule(*IGM, *SILMod->getSwiftModule());
+    initLLVMModule(*IGM, *SILMod);
     if (!DidRunSILCodeGenPreparePasses) {
       // Run SIL level IRGen preparation passes on the module the first time
       // around.
@@ -1438,7 +1444,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
                   OutputPath, OutputPath, "", "");
-  initLLVMModule(IGM, *SILMod.getSwiftModule());
+  initLLVMModule(IGM, SILMod);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
       llvm::ConstantDataArray::getString(IGM.getLLVMContext(),
