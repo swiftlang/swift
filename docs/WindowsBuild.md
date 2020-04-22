@@ -101,7 +101,7 @@ cmake -B "S:\b\toolchain" -G Ninja -S S:\toolchain\llvm ^
   -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\toolchain\swift-corelibs-libdispatch ^
   -DLLVM_ENABLE_PDB=YES ^
   -DLLVM_ENABLE_LIBEDIT=NO ^
-  -DLLDB_DISABLE_PYTHON=YES ^
+  -DLLDB_ENABLE_PYTHON=NO ^
   -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-64/usr/include" ^
   -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-64/usr/lib/icuuc64.lib" ^
   -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include" ^
