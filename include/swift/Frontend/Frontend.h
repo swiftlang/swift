@@ -466,10 +466,6 @@ class CompilerInstance {
   /// If \p BufID is already in the set, do nothing.
   void recordPrimaryInputBuffer(unsigned BufID);
 
-  /// Record in PrimarySourceFiles the fact that \p SF is a primary, and
-  /// call recordPrimaryInputBuffer on \p SF's buffer (if it exists).
-  void recordPrimarySourceFile(SourceFile *SF);
-
   bool isWholeModuleCompilation() { return PrimaryBufferIDs.empty(); }
 
 public:
@@ -674,14 +670,10 @@ private:
   void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
   void parseAndCheckTypesUpTo(SourceFile::ASTStage_t LimitStage);
 
-  void parseLibraryFile(unsigned BufferID);
-
   /// Return true if had load error
-  bool parsePartialModulesAndLibraryFiles();
+  bool parsePartialModulesAndInputFiles();
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
-
-  void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage);
 
   void finishTypeChecking();
 
