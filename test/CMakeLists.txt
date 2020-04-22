@@ -343,15 +343,6 @@ _Block_release(void) { }\n")
             "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
       endif()
 
-      if(SWIFT_ENABLE_TENSORFLOW)
-        list(APPEND LIT_ARGS
-            "--param" "swift_tensorflow_path=${SWIFT_TENSORFLOW_TARGET_LIB_DIR}")
-      endif()
-      if(SWIFT_ENABLE_TENSORFLOW_GPU)
-        list(APPEND LIT_ARGS
-            "--param" "swift_tensorflow_gpu")
-      endif()
-
       execute_process(COMMAND
           $<TARGET_FILE:Python2::Interpreter> "-c" "import psutil"
           RESULT_VARIABLE python_psutil_status
