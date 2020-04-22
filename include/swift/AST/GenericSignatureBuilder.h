@@ -1546,17 +1546,10 @@ class GenericSignatureBuilder::PotentialArchetype {
   llvm::MapVector<Identifier, StoredNestedType> NestedTypes;
 
   /// Construct a new potential archetype for a concrete declaration.
-  PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
-      : parentOrContext(parent), identifier(assocType) {
-    assert(parent != nullptr && "Not a nested type?");
-    assert(assocType->getOverriddenDecls().empty());
-  }
+  PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType);
 
   /// Construct a new potential archetype for a generic parameter.
-  PotentialArchetype(ASTContext &ctx, GenericParamKey genericParam)
-    : parentOrContext(&ctx), identifier(genericParam)
-  {
-  }
+  PotentialArchetype(ASTContext &ctx, GenericParamKey genericParam);
 
 public:
   /// Retrieve the representative for this archetype, performing
