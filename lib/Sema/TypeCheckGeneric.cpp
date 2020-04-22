@@ -754,13 +754,9 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
     LookupConformanceFn conformances,
-    ConformanceCheckOptions conformanceOptions,
     GenericRequirementsCheckListener *listener,
     SubstOptions options) {
   bool valid = true;
-
-  // We handle any conditional requirements ourselves.
-  conformanceOptions |= ConformanceCheckFlags::SkipConditionalRequirements;
 
   struct RequirementSet {
     ArrayRef<Requirement> Requirements;
@@ -819,14 +815,12 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       case RequirementKind::Conformance: {
         // Protocol conformance requirements.
         auto proto = secondType->castTo<ProtocolType>();
-        // FIXME: This should track whether this should result in a private
-        // or non-private dependency.
-        // FIXME: Do we really need "used" at this point?
         // FIXME: Poor location information. How much better can we do here?
         // FIXME: This call should support listener to be able to properly
         //        diagnose problems with conformances.
         auto conformance = conformsToProtocol(firstType, proto->getDecl(), dc,
-                                              conformanceOptions, loc);
+                                              ConformanceCheckFlags::SkipConditionalRequirements,
+                                              loc);
 
         if (conformance) {
           // Report the conformance.

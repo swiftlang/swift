@@ -2695,8 +2695,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
           genericSignature->getGenericParams(),
           genericSignature->getRequirements(),
           QuerySubstitutionMap{subMap},
-          TypeChecker::LookUpConformance(dc),
-          None);
+          TypeChecker::LookUpConformance(dc));
 
     if (result != RequirementCheckResult::Success) {
       unviable.push_back(
@@ -4383,20 +4382,14 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
         if (!source)
           return false;
         // Check if target's requirements are satisfied by source.
-        // Cancel diagnostics using `DiagnosticTransaction`.
-        // Diagnostics should not be emitted because this function is used to
-        // check candidates; if no candidates match, a separate diagnostic will
-        // be produced.
-        DiagnosticTransaction transaction(Ctx.Diags);
-        SWIFT_DEFER { transaction.abort(); };
+        // Use invalid 'SourceLoc's to suppress diagnostics.
         return TypeChecker::checkGenericArguments(
-                   derivative, originalName.Loc.getBaseNameLoc(),
-                   originalName.Loc.getBaseNameLoc(), Type(),
+                   derivative, SourceLoc(), SourceLoc(), Type(),
                    source->getGenericParams(), target->getRequirements(),
                    [](SubstitutableType *dependentType) {
                      return Type(dependentType);
                    },
-                   lookupConformance, None) == RequirementCheckResult::Success;
+                   lookupConformance) == RequirementCheckResult::Success;
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
@@ -4926,20 +4919,17 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
         if (!source)
           return false;
         // Check if target's requirements are satisfied by source.
-        // Cancel diagnostics using `DiagnosticTransaction`.
+        // Use invalid 'SourceLoc's to suppress diagnostics.
         // Diagnostics should not be emitted because this function is used to
         // check candidates; if no candidates match, a separate diagnostic will
         // be produced.
-        DiagnosticTransaction transaction(Ctx.Diags);
-        SWIFT_DEFER { transaction.abort(); };
         return TypeChecker::checkGenericArguments(
-            transpose, originalName.Loc.getBaseNameLoc(),
-            originalName.Loc.getBaseNameLoc(), Type(),
+            transpose, SourceLoc(), SourceLoc(), Type(),
             source->getGenericParams(), target->getRequirements(),
             [](SubstitutableType *dependentType) {
               return Type(dependentType);
             },
-            lookupConformance, None) == RequirementCheckResult::Success;
+            lookupConformance) == RequirementCheckResult::Success;
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {

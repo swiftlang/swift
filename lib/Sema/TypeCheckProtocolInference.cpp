@@ -1098,7 +1098,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                        sanitizedRequirements,
                                        QuerySubstitutionMap{substitutions},
                                        TypeChecker::LookUpConformance(dc),
-                                       None, nullptr, options);
+                                       nullptr, options);
   switch (result) {
   case RequirementCheckResult::Failure:
     ++NumSolutionStatesFailedCheck;
@@ -1146,7 +1146,6 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
                        ext->getGenericSignature()->getRequirements(),
                        QueryTypeSubstitutionMap{subs},
                        LookUpConformanceInModule(ext->getModuleContext()),
-                       None,
                        nullptr, options)) {
   case RequirementCheckResult::Success:
   case RequirementCheckResult::SubstitutionFailure:

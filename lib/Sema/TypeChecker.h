@@ -681,8 +681,6 @@ std::string gatherGenericParamBindingsText(
 /// \param requirements The requirements against which the generic arguments
 /// should be checked.
 /// \param substitutions Substitutions from interface types of the signature.
-/// \param conformanceOptions The flags to use when checking conformance
-/// requirement.
 /// \param listener The generic check listener used to pick requirements and
 /// notify callers about diagnosed errors.
 RequirementCheckResult checkGenericArguments(
@@ -690,7 +688,6 @@ RequirementCheckResult checkGenericArguments(
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
     LookupConformanceFn conformances,
-    ConformanceCheckOptions conformanceOptions,
     GenericRequirementsCheckListener *listener = nullptr,
     SubstOptions options = None);
 
