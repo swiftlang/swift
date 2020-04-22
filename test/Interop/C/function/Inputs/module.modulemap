@@ -1,0 +1,4 @@
+module EmitCalledInlineFunction {
+  header "emit-called-inline-function.h"
+  export *
+}
