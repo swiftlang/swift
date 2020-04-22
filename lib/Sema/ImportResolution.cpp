@@ -282,6 +282,17 @@ void swift::performImportResolution(SourceFile &SF) {
 
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "Import resolution");
+
+  // If we're silencing parsing warnings, then also silence import warnings.
+  // This is necessary for secondary files as they can be parsed and have their
+  // imports resolved multiple times.
+  auto &diags = SF.getASTContext().Diags;
+  auto didSuppressWarnings = diags.getSuppressWarnings();
+  auto shouldSuppress = SF.getParsingOptions().contains(
+      SourceFile::ParsingFlags::SuppressWarnings);
+  diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
+  SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
+
   ImportResolver resolver(SF);
 
   // Resolve each import declaration.

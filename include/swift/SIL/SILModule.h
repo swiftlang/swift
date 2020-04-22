@@ -523,6 +523,7 @@ public:
   swift::SILRemarkStreamer *getSILRemarkStreamer() {
     return silRemarkStreamer.get();
   }
+
   void installSILRemarkStreamer();
 
   // This is currently limited to VarDecl because the visibility of global

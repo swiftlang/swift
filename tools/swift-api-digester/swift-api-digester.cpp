@@ -2700,6 +2700,10 @@ static StringRef getBaselineFilename(llvm::Triple Triple) {
     return "appletvos.json";
   else if (Triple.isWatchOS())
     return "watchos.json";
+  else if (Triple.isOSLinux())
+    return "linux.json";
+  else if (Triple.isOSWindows())
+    return "windows.json";
   else {
     llvm::errs() << "Unsupported triple target\n";
     exit(1);

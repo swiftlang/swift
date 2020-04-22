@@ -8049,7 +8049,7 @@ retry_after_fail:
     ASTContext &ctx = getASTContext();
     if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+      log.indent(solverState ? solverState->depth * 2 : 0)
         << "(common result type for $T" << fnTypeVar->getID() << " is "
         << commonResultType.getString()
         << ")\n";
@@ -9191,7 +9191,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   auto &ctx = getASTContext();
   if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
-    log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+    log.indent(solverState ? solverState->depth * 2 : 0)
       << "(attempting fix ";
     fix->print(log);
     log << ")\n";
@@ -9639,12 +9639,12 @@ ConstraintSystem::addKeyPathApplicationConstraint(Type keypath,
                                                TMF_GenerateConstraints,
                                                locator)) {
   case SolutionKind::Error:
-    if (shouldAddNewFailingConstraint()) {
+    if (shouldRecordFailedConstraint()) {
       auto c = Constraint::create(*this, ConstraintKind::KeyPathApplication,
                                   keypath, root, value,
                                   getConstraintLocator(locator));
       if (isFavored) c->setFavored();
-      addNewFailingConstraint(c);
+      recordFailedConstraint(c);
     }
     return;
   
@@ -9668,13 +9668,13 @@ ConstraintSystem::addKeyPathConstraint(
                                     TMF_GenerateConstraints,
                                     locator)) {
   case SolutionKind::Error:
-    if (shouldAddNewFailingConstraint()) {
+    if (shouldRecordFailedConstraint()) {
       auto c = Constraint::create(*this, ConstraintKind::KeyPath,
                                   keypath, root, value,
                                   getConstraintLocator(locator),
                                   componentTypeVars);
       if (isFavored) c->setFavored();
-      addNewFailingConstraint(c);
+      recordFailedConstraint(c);
     }
     return;
   
@@ -9731,11 +9731,11 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   switch (addConstraintImpl(kind, first, second, locator, isFavored)) {
   case SolutionKind::Error:
     // Add a failing constraint, if needed.
-    if (shouldAddNewFailingConstraint()) {
+    if (shouldRecordFailedConstraint()) {
       auto c = Constraint::create(*this, kind, first, second,
                                   getConstraintLocator(locator));
       if (isFavored) c->setFavored();
-      addNewFailingConstraint(c);
+      recordFailedConstraint(c);
     }
     return;
 
@@ -9838,11 +9838,11 @@ void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
   switch (simplifyFixConstraint(fix, first, second, kind, subflags, locator)) {
   case SolutionKind::Error:
     // Add a failing constraint, if needed.
-    if (shouldAddNewFailingConstraint()) {
+    if (shouldRecordFailedConstraint()) {
       auto c = Constraint::createFixed(*this, kind, fix, first, second,
                                        getConstraintLocator(locator));
       if (isFavored) c->setFavored();
-      addNewFailingConstraint(c);
+      recordFailedConstraint(c);
     }
     return;
 
@@ -10085,24 +10085,14 @@ void ConstraintSystem::simplifyDisjunctionChoice(Constraint *choice) {
   // Simplify this term in the disjunction.
   switch (simplifyConstraint(*choice)) {
   case ConstraintSystem::SolutionKind::Error:
-    if (!failedConstraint)
-      failedConstraint = choice;
-    if (solverState)
-      solverState->retireConstraint(choice);
+    recordFailedConstraint(choice);
     break;
 
   case ConstraintSystem::SolutionKind::Solved:
-    if (solverState)
-      solverState->retireConstraint(choice);
     break;
 
   case ConstraintSystem::SolutionKind::Unsolved:
-    InactiveConstraints.push_back(choice);
-    CG.addConstraint(choice);
+    addUnsolvedConstraint(choice);
     break;
   }
-
-  // Record this as a generated constraint.
-  if (solverState)
-    solverState->addGeneratedConstraint(choice);
 }

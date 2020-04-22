@@ -26,8 +26,20 @@ namespace swift {
 
 class SILRemarkStreamer {
 private:
-  /// The \c LLVMContext the underlying streamer uses for scratch space.
-  std::unique_ptr<llvm::LLVMContext> streamerContext;
+  enum class Owner {
+    SILModule,
+    LLVM,
+  } owner;
+
+  /// The underlying LLVM streamer.
+  ///
+  /// If owned by a SILModule, this will be non-null.
+  std::unique_ptr<llvm::remarks::RemarkStreamer> streamer;
+  /// The owning LLVM context.
+  ///
+  /// If owned by LLVM, this will be non-null.
+  llvm::LLVMContext *context;
+
   /// The remark output stream used to record SIL remarks to a file.
   std::unique_ptr<llvm::raw_fd_ostream> remarkStream;
 
@@ -53,6 +65,12 @@ public:
 
   const ASTContext &getASTContext() const { return ctx; }
 
+public:
+  /// Perform a one-time ownership transfer to associate the underlying
+  /// \c llvm::remarks::RemarkStreamer with the given \c LLVMContext.
+  void intoLLVMContext(llvm::LLVMContext &Ctx) &;
+
+public:
   /// Emit a remark through the streamer.
   template <typename RemarkT>
   void emit(const OptRemark::Remark<RemarkT> &remark);

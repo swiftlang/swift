@@ -444,6 +444,16 @@ getParameterConvention(ImplParameterConvention conv) {
   llvm_unreachable("covered switch");
 }
 
+static SILParameterDifferentiability
+getParameterDifferentiability(ImplParameterDifferentiability diffKind) {
+  switch (diffKind) {
+  case ImplParameterDifferentiability::DifferentiableOrNotApplicable:
+    return SILParameterDifferentiability::DifferentiableOrNotApplicable;
+  case ImplParameterDifferentiability::NotDifferentiable:
+    return SILParameterDifferentiability::NotDifferentiable;
+  }
+}
+
 static ResultConvention getResultConvention(ImplResultConvention conv) {
   switch (conv) {
   case Demangle::ImplResultConvention::Indirect:
@@ -526,7 +536,8 @@ Type ASTBuilder::createImplFunctionType(
   for (const auto &param : params) {
     auto type = param.getType()->getCanonicalType();
     auto conv = getParameterConvention(param.getConvention());
-    funcParams.emplace_back(type, conv);
+    auto diffKind = getParameterDifferentiability(param.getDifferentiability());
+    funcParams.emplace_back(type, conv, diffKind);
   }
 
   for (const auto &result : results) {

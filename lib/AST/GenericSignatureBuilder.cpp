@@ -80,6 +80,8 @@ namespace llvm {
 
 #define DEBUG_TYPE "Generic signature builder"
 STATISTIC(NumPotentialArchetypes, "# of potential archetypes");
+STATISTIC(NumEquivalenceClassesAllocated, "# of equivalence classes allocated");
+STATISTIC(NumEquivalenceClassesFreed, "# of equivalence classes freed");
 STATISTIC(NumConformances, "# of conformances tracked");
 STATISTIC(NumConformanceConstraints, "# of conformance constraints tracked");
 STATISTIC(NumSameTypeConstraints, "# of same-type constraints tracked");
@@ -529,6 +531,9 @@ GenericSignatureBuilder::Implementation::allocateEquivalenceClass(
 
   auto equivClass = new (mem) EquivalenceClass(representative);
   EquivalenceClasses.push_back(equivClass);
+
+  ++NumEquivalenceClassesAllocated;
+
   return equivClass;
 }
 
@@ -536,6 +541,8 @@ void GenericSignatureBuilder::Implementation::deallocateEquivalenceClass(
                                                EquivalenceClass *equivClass) {
   EquivalenceClasses.erase(equivClass);
   FreeEquivalenceClasses.push_back(equivClass);
+
+  ++NumEquivalenceClassesFreed;
 }
 
 namespace {
@@ -1620,9 +1627,22 @@ bool FloatingRequirementSource::isRecursive(
   return false;
 }
 
-GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
+GenericSignatureBuilder::PotentialArchetype::PotentialArchetype(
+    PotentialArchetype *parent, AssociatedTypeDecl *assocType)
+    : parentOrContext(parent), identifier(assocType) {
   ++NumPotentialArchetypes;
+  assert(parent != nullptr && "Not a nested type?");
+  assert(assocType->getOverriddenDecls().empty());
+}
 
+
+GenericSignatureBuilder::PotentialArchetype::PotentialArchetype(
+    ASTContext &ctx, GenericParamKey genericParam)
+  : parentOrContext(&ctx), identifier(genericParam) {
+  ++NumPotentialArchetypes;
+}
+
+GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
   for (const auto &nested : NestedTypes) {
     for (auto pa : nested.second) {
       pa->~PotentialArchetype();
@@ -7138,11 +7158,8 @@ void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
     case RequirementKind::SameType:
       out << "\n  ";
       out << type.getString() << " == " ;
-      if (auto secondType = constraint.dyn_cast<Type>()) {
-        out << secondType.getString();
-      } else {
-        out << constraint.get<PotentialArchetype *>()->getDebugName();
-      }
+      auto secondType = constraint.get<Type>();
+      out << secondType.getString();
       out << " [";
       source->print(out, &Context.SourceMgr);
       out << "]";
