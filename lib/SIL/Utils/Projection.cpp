@@ -169,6 +169,11 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     assert(getKind() == ProjectionKind::BitwiseCast);
     break;
   }
+  case SILInstructionKind::BeginAccessInst: {
+    Value = ValueTy(ProjectionKind::Access, uintptr_t(0));
+    assert(getKind() == ProjectionKind::Access);
+    break;
+  }
   }
 }
 
@@ -196,6 +201,7 @@ SILType Projection::getType(SILType BaseType, SILModule &M,
   case ProjectionKind::BitwiseCast:
   case ProjectionKind::TailElems:
     return getCastType(BaseType);
+  case ProjectionKind::Access:
   case ProjectionKind::Index:
     // Index types do not change the underlying type.
     return BaseType;
@@ -237,6 +243,8 @@ Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
     return B.createUncheckedRefCast(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::BitwiseCast:
     return B.createUncheckedBitwiseCast(Loc, Base, getCastType(BaseTy));
+  case ProjectionKind::Access:
+    return nullptr;
   }
 
   llvm_unreachable("Unhandled ProjectionKind in switch.");
@@ -281,6 +289,8 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
   case ProjectionKind::RefCast:
   case ProjectionKind::BitwiseCast:
     return B.createUncheckedAddrCast(Loc, Base, getCastType(BaseTy));
+  case ProjectionKind::Access:
+    return nullptr;
   }
 
   llvm_unreachable("Unhandled ProjectionKind in switch.");
@@ -835,6 +845,10 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
         }
       }
       break;
+    case ProjectionKind::Access:
+      if (auto access = dyn_cast<BeginAccessInst>(I))
+        return access->getOperand();
+      break;
     case ProjectionKind::Class:
     case ProjectionKind::TailElems:
     case ProjectionKind::Box:
@@ -892,6 +906,7 @@ static bool isSupportedProjection(const Projection &p) {
   switch (p.getKind()) {
   case ProjectionKind::Struct:
   case ProjectionKind::Tuple:
+  case ProjectionKind::Access:
     return true;
   case ProjectionKind::Class:
   case ProjectionKind::Enum:

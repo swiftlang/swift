@@ -106,6 +106,7 @@ enum class ProjectionKind : unsigned {
   Class = PointerIntEnumIndexKindValue<3, ProjectionKind>::value,
   Enum = PointerIntEnumIndexKindValue<4, ProjectionKind>::value,
   Box = PointerIntEnumIndexKindValue<5, ProjectionKind>::value,
+  Access = PointerIntEnumIndexKindValue<6, ProjectionKind>::value,
   LastIndexKind = Enum,
 };
 
@@ -129,6 +130,7 @@ static inline bool isCastProjectionKind(ProjectionKind Kind) {
   case ProjectionKind::Enum:
   case ProjectionKind::Box:
   case ProjectionKind::TailElems:
+  case ProjectionKind::Access:
     return false;
   }
 }
@@ -428,6 +430,7 @@ public:
     case ProjectionKind::TailElems:
     case ProjectionKind::Enum:
     case ProjectionKind::Box:
+    case ProjectionKind::Access:
       return false;
     }
 
@@ -439,6 +442,7 @@ public:
     case ProjectionKind::Class:
     case ProjectionKind::Enum:
     case ProjectionKind::Struct:
+    case ProjectionKind::Access:
       return true;
     case ProjectionKind::BitwiseCast:
     case ProjectionKind::Index:
