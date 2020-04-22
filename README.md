@@ -268,7 +268,6 @@ following (non-exhaustive) set of useful options:
 - ``--dry-run``: Perform a dry run build. This is off by default.
 - ``--test``: Test the toolchain after it has been compiled. This is off by default.
 - ``--pkg`` (macOS only): Build a toolchain installer package (`.pkg`). This is off by default.
-- ``-x10``: Built with x10 support.
 
 More options may be added over time. Please pass ``--help`` to
 ``build-toolchain-tensorflow`` to see the full set of options.
