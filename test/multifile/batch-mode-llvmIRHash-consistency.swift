@@ -10,7 +10,7 @@
 
 // RUN: cp %t/main{,-old}.o
 // RUN: cp %t/other{,-old}.o
-// RUN: touch %t/*.swift
+// RUN: %{python} %S/Inputs/make-old.py %t/*.swift
 
 // RUN: cd %t; %target-swift-frontend -c -g -enable-batch-mode -module-name main -primary-file ./main.swift -primary-file other.swift
 
