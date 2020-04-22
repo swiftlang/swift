@@ -297,7 +297,7 @@ namespace {
 
   static void printNumberedGutter(unsigned LineNumber,
                                   unsigned LineNumberIndent, raw_ostream &Out) {
-    Out.changeColor(ColoredStream::Colors::BLUE, true);
+    Out.changeColor(ColoredStream::Colors::CYAN);
     Out << llvm::formatv(
         "{0} | ",
         llvm::fmt_align(LineNumber, llvm::AlignStyle::Right, LineNumberIndent));
@@ -305,7 +305,7 @@ namespace {
   }
 
   static void printEmptyGutter(unsigned LineNumberIndent, raw_ostream &Out) {
-    Out.changeColor(ColoredStream::Colors::BLUE, true);
+    Out.changeColor(ColoredStream::Colors::CYAN);
     Out << std::string(LineNumberIndent + 1, ' ') << "| ";
     Out.resetColor();
   }
@@ -402,7 +402,7 @@ namespace {
       if (shouldDelete != Deleted) {
         Out.resetColor();
         if (shouldDelete) {
-          Out.changeColor(ColoredStream::Colors::RED);
+          Out.changeColor(ColoredStream::Colors::RED, /*bold*/ true);
         }
       }
       Deleted = shouldDelete;
@@ -604,15 +604,16 @@ namespace {
         printEmptyGutter(LineNumberIndent, Out);
         if (isASCII) {
           Out << std::string(byteToColumnMap[msg.Byte], ' ') << "^ ";
-          printDiagnosticKind(msg.Kind, Out);
-          Out << " " << msg.Text << "\n";
         } else {
-          Out.changeColor(ColoredStream::Colors::BLUE, /*bold*/true);
+          Out.changeColor(ColoredStream::Colors::CYAN);
           Out << "--> ";
           Out.resetColor();
-          printDiagnosticKind(msg.Kind, Out);
-          Out << " " << msg.Text << "\n";
         }
+        printDiagnosticKind(msg.Kind, Out);
+        Out.resetColor();
+        Out.changeColor(ColoredStream::Colors::WHITE, /*bold*/ true);
+        Out << " " << msg.Text << "\n";
+        Out.resetColor();
       }
       delete[] byteToColumnMap;
     }
@@ -646,13 +647,6 @@ namespace {
       } else {
         return *iter;
       }
-    }
-
-    unsigned getLineNumberIndent() {
-      // The lines are already in sorted ascending order, and we render one line
-      // after the last one for context. Use the last line number plus one to
-      // determine the indent.
-      return floor(1 + log10(AnnotatedLines.back().getLineNumber() + 1));
     }
 
     void printNumberedLine(SourceManager &SM, unsigned BufferID,
@@ -698,6 +692,13 @@ namespace {
                          SourceLoc PrimaryLoc)
         : SM(SM), BufferID(BufferID), PrimaryLoc(PrimaryLoc) {}
 
+    unsigned getPreferredLineNumberIndent() {
+      // The lines are already in sorted ascending order, and we render one line
+      // after the last one for context. Use the last line number plus one to
+      // determine the indent.
+      return floor(1 + log10(AnnotatedLines.back().getLineNumber() + 1));
+    }
+
     void addMessage(SourceLoc Loc, DiagnosticKind Kind, StringRef Message) {
       lineForLoc(Loc).addMessage(SM, Loc, Kind, Message);
     }
@@ -720,20 +721,22 @@ namespace {
         lineForLoc(lineRange.getStart()).addFixIt(SM, lineRange, "");
     }
 
-    void render(raw_ostream &Out) {
+    void render(unsigned MinimumLineNumberIndent, raw_ostream &Out) {
       // Tha maximum number of intermediate lines without annotations to render
       // between annotated lines before using an ellipsis.
       static const unsigned maxIntermediateLines = 3;
 
       assert(!AnnotatedLines.empty() && "File excerpt has no lines");
-      unsigned lineNumberIndent = getLineNumberIndent();
+      unsigned lineNumberIndent =
+          std::max(getPreferredLineNumberIndent(), MinimumLineNumberIndent);
 
       // Print the file name at the top of each excerpt.
       auto primaryLineAndColumn = SM.getLineAndColumn(PrimaryLoc);
-      Out.changeColor(ColoredStream::Colors::MAGENTA, /*bold*/ true);
-      Out << SM.getIdentifierForBuffer(BufferID) << ":"
+      Out.changeColor(ColoredStream::Colors::CYAN);
+      Out << std::string(lineNumberIndent + 1, '=') << " "
+          << SM.getIdentifierForBuffer(BufferID) << ":"
           << primaryLineAndColumn.first << ":" << primaryLineAndColumn.second
-          << "\n";
+          << " " << std::string(lineNumberIndent + 1, '=') << "\n";
       Out.resetColor();
 
       // Print one extra line at the top for context.
@@ -755,7 +758,7 @@ namespace {
           // Use an ellipsis to denote an ommitted part of the file.
           printNumberedLine(SM, BufferID, lastLineNumber + 1, lineNumberIndent,
                             Out);
-          Out.changeColor(ColoredStream::Colors::BLUE, true);
+          Out.changeColor(ColoredStream::Colors::CYAN);
           Out << llvm::formatv("{0}...\n",
                                llvm::fmt_repeat(" ", lineNumberIndent));
           Out.resetColor();
@@ -820,19 +823,32 @@ public:
 
   void render(raw_ostream &Out) {
     // Print the excerpt for each file.
+    unsigned lineNumberIndent =
+        std::max_element(FileExcerpts.begin(), FileExcerpts.end(),
+                         [](auto &a, auto &b) {
+                           return a.second.getPreferredLineNumberIndent() <
+                                  b.second.getPreferredLineNumberIndent();
+                         })
+            ->second.getPreferredLineNumberIndent();
     for (auto excerpt : FileExcerpts)
-      excerpt.second.render(Out);
+      excerpt.second.render(lineNumberIndent, Out);
 
     // Handle messages with invalid locations.
-    if (!UnknownLocationMessages.empty()) {
-      Out.changeColor(ColoredStream::Colors::MAGENTA, /*bold*/ true);
+    if (UnknownLocationMessages.size() == 1) {
+      Out.changeColor(ColoredStream::Colors::CYAN);
+      Out << "Unknown Location: ";
+      Out.resetColor();
+      printDiagnosticKind(UnknownLocationMessages[0].first, Out);
+      Out << " " << UnknownLocationMessages[0].second << "\n";
+    } else if (UnknownLocationMessages.size() > 1) {
+      Out.changeColor(ColoredStream::Colors::CYAN);
       Out << "Unknown Location\n";
       Out.resetColor();
-    }
-    for (auto unknownMessage : UnknownLocationMessages) {
-      printEmptyGutter(2, Out);
-      printDiagnosticKind(unknownMessage.first, Out);
-      Out << " " << unknownMessage.second << "\n";
+      for (auto unknownMessage : UnknownLocationMessages) {
+        printEmptyGutter(2, Out);
+        printDiagnosticKind(unknownMessage.first, Out);
+        Out << " " << unknownMessage.second << "\n";
+      }
     }
   }
 };
@@ -931,12 +947,12 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
       ColoredStream colorStream{Stream};
       currentSnippet->render(colorStream);
       if (includeTrailingBreak)
-        colorStream << "\n\n";
+        colorStream << "\n";
     } else {
       NoColorStream noColorStream{Stream};
       currentSnippet->render(noColorStream);
       if (includeTrailingBreak)
-        noColorStream << "\n\n";
+        noColorStream << "\n";
     }
     currentSnippet.reset();
   }
