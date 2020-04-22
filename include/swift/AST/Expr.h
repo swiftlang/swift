@@ -4490,8 +4490,7 @@ class ExplicitCastExpr : public Expr {
   TypeLoc CastTy;
 
 protected:
-  ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc, TypeLoc castTy,
-                   Type resultTy)
+  ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc, TypeLoc castTy)
     : Expr(kind, /*Implicit=*/false), SubExpr(sub), AsLoc(AsLoc), CastTy(castTy)
   {}
 
@@ -4547,8 +4546,8 @@ StringRef getCheckedCastKindName(CheckedCastKind kind);
 class CheckedCastExpr : public ExplicitCastExpr {
 public:
   CheckedCastExpr(ExprKind kind,
-                  Expr *sub, SourceLoc asLoc, TypeLoc castTy, Type resultTy)
-    : ExplicitCastExpr(kind, sub, asLoc, castTy, resultTy)
+                  Expr *sub, SourceLoc asLoc, TypeLoc castTy)
+    : ExplicitCastExpr(kind, sub, asLoc, castTy)
   {
     Bits.CheckedCastExpr.CastKind = unsigned(CheckedCastKind::Unresolved);
   }
@@ -4583,7 +4582,7 @@ public:
   ForcedCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc exclaimLoc,
                         TypeLoc type)
     : CheckedCastExpr(ExprKind::ForcedCheckedCast,
-                      sub, asLoc, type, type.getType()),
+                      sub, asLoc, type),
       ExclaimLoc(exclaimLoc)
   {
   }
@@ -4612,7 +4611,7 @@ public:
   ConditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc questionLoc,
                              TypeLoc type)
     : CheckedCastExpr(ExprKind::ConditionalCheckedCast,
-                      sub, asLoc, type, type.getType()),
+                      sub, asLoc, type),
       QuestionLoc(questionLoc)
   { }
   
@@ -4637,8 +4636,7 @@ public:
 class IsExpr : public CheckedCastExpr {
 public:
   IsExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
-    : CheckedCastExpr(ExprKind::Is,
-                      sub, isLoc, type, Type())
+    : CheckedCastExpr(ExprKind::Is, sub, isLoc, type)
   {}
   
   IsExpr(SourceLoc isLoc, TypeLoc type)
@@ -4661,7 +4659,7 @@ class CoerceExpr : public ExplicitCastExpr {
 
 public:
   CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
-    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type, type.getType())
+    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type)
   { }
 
   CoerceExpr(SourceLoc asLoc, TypeLoc type)
@@ -4671,7 +4669,7 @@ public:
 private:
   CoerceExpr(SourceRange initRange, Expr *literal, TypeLoc type)
     : ExplicitCastExpr(ExprKind::Coerce, literal, initRange.Start,
-                       type, type.getType()), InitRangeEnd(initRange.End)
+                       type), InitRangeEnd(initRange.End)
   { setImplicit(); }
 
 public:
