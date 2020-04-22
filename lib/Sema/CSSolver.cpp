@@ -706,10 +706,10 @@ void ConstraintSystem::Candidate::applySolutions(
 
       auto anchor = choice.getFirst()->getAnchor();
       // Anchor is not available or expression is not an overload set.
-      if (!anchor || !isa<OverloadSetRefExpr>(anchor))
+      if (!anchor || !isExpr<OverloadSetRefExpr>(anchor))
         continue;
 
-      auto OSR = cast<OverloadSetRefExpr>(anchor);
+      auto *OSR = castToExpr<OverloadSetRefExpr>(anchor);
       auto overload = choice.getSecond().choice;
       auto type = overload.getDecl()->getInterfaceType();
 

@@ -61,11 +61,11 @@ TypedNode FailureDiagnostic::getAnchor() const {
   if (!resolved || !resolved->getAnchor())
     return locator->getAnchor();
 
-  Expr *anchor = resolved->getAnchor();
+  auto anchor = resolved->getAnchor();
   // FIXME: Work around an odd locator representation that doesn't separate the
   // base of a subscript member from the member access.
   if (locator->isLastElement<LocatorPathElt::SubscriptMember>()) {
-    if (auto subscript = dyn_cast<SubscriptExpr>(anchor))
+    if (auto subscript = getAsExpr<SubscriptExpr>(anchor))
       anchor = subscript->getBase();
   }
 
@@ -105,7 +105,7 @@ FailureDiagnostic::getArgumentListExprFor(ConstraintLocator *locator) const {
   // to get the argument list.
   auto newPath = ArrayRef<LocatorPathElt>(path.begin(), iter + 1);
   auto argListLoc = getConstraintLocator(locator->getAnchor(), newPath);
-  return simplifyLocatorToAnchor(argListLoc);
+  return getAsExpr(simplifyLocatorToAnchor(argListLoc));
 }
 
 Expr *FailureDiagnostic::getBaseExprFor(const Expr *anchor) const {
@@ -409,8 +409,12 @@ bool MissingConformanceFailure::diagnoseAsError() {
 
       auto &cs = getConstraintSystem();
       llvm::SmallPtrSet<Expr *, 4> anchors;
-      for (const auto *fix : cs.getFixes())
-        anchors.insert(fix->getAnchor());
+      for (const auto *fix : cs.getFixes()) {
+        if (auto anchor = fix->getAnchor()) {
+          if (anchor.is<const Expr *>())
+            anchors.insert(getAsExpr(anchor));
+        }
+      }
 
       bool hasFix = false;
       caseExpr->forEachChildExpr([&](Expr *expr) -> Expr * {
@@ -4215,7 +4219,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   if (!(fnType && fnType->getNumParams() == 2))
     return false;
 
-  auto *anchor = locator->getAnchor();
+  auto anchor = locator->getAnchor();
 
   auto hasFixFor = [&](FixKind kind, ConstraintLocator *locator) -> bool {
     auto fix = llvm::find_if(solution.Fixes, [&](const ConstraintFix *fix) {
@@ -4241,9 +4245,9 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
     return false;
 
   Expr *argExpr = nullptr;
-  if (auto *call = dyn_cast<CallExpr>(anchor)) {
+  if (auto *call = getAsExpr<CallExpr>(anchor)) {
     argExpr = call->getArg();
-  } else if (auto *subscript = dyn_cast<SubscriptExpr>(anchor)) {
+  } else if (auto *subscript = getAsExpr<SubscriptExpr>(anchor)) {
     argExpr = subscript->getIndex();
   } else {
     return false;
@@ -5742,8 +5746,7 @@ bool ExtraneousCallFailure::diagnoseAsError() {
     auto *argLoc =
         getConstraintLocator(getRawAnchor(), ConstraintLocator::ApplyArgument);
 
-    if (auto *TE =
-            dyn_cast_or_null<TupleExpr>(simplifyLocatorToAnchor(argLoc))) {
+    if (auto *TE = getAsExpr<TupleExpr>(simplifyLocatorToAnchor(argLoc))) {
       if (TE->getNumElements() == 0) {
         diagnostic.fixItRemove(TE->getSourceRange());
       }
