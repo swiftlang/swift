@@ -94,8 +94,6 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
     }
 
     if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
-      // Ambiguities should be ruled out by parsing.
-      assert(!foundElement && "ambiguity in enum case name lookup?!");
       foundElement = oe;
       continue;
     }

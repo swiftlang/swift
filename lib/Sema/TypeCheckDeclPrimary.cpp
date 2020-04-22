@@ -571,7 +571,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     if (currentOverride && currentOverride == otherOverride) {
       current->diagnose(diag::multiple_override, current->getFullName());
       other->diagnose(diag::multiple_override_prev, other->getFullName());
-      current->setInvalid();
       break;
     }
 
@@ -718,7 +717,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
             other->diagnose(diag::invalid_redecl_prev, other->getFullName());
           });
         }
-        current->setInvalid();
       }
 
       // Make sure we don't do this checking again for the same decl. We also

@@ -328,8 +328,8 @@ enum RawTypeMismatch : Int { // expected-error {{'RawTypeMismatch' declares raw 
 }
 
 enum DuplicateMembers1 {
-  case Foo // expected-note {{'Foo' previously declared here}}
-  case Foo // expected-error {{invalid redeclaration of 'Foo'}}
+  case Foo // expected-note {{'Foo' previously declared here}} // expected-note {{found this candidate}}
+  case Foo // expected-error {{invalid redeclaration of 'Foo'}} // expected-note {{found this candidate}}
 }
 
 enum DuplicateMembers2 {
@@ -343,12 +343,12 @@ enum DuplicateMembers3 {
   case Foo(Int) // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
-enum DuplicateMembers4 : Int { // expected-error {{'DuplicateMembers4' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum DuplicateMembers4 : Int {
   case Foo = 1 // expected-note {{'Foo' previously declared here}}
   case Foo = 2 // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
-enum DuplicateMembers5 : Int { // expected-error {{'DuplicateMembers5' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum DuplicateMembers5 : Int {
   case Foo = 1 // expected-note {{'Foo' previously declared here}}
   case Foo = 1 + 1 // expected-error {{invalid redeclaration of 'Foo'}} expected-error {{raw value for enum case must be a literal}}
 }
@@ -359,7 +359,7 @@ enum DuplicateMembers6 {
   case Foo // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
-enum DuplicateMembers7 : String { // expected-error {{'DuplicateMembers7' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum DuplicateMembers7 : String {
   case Foo // expected-note {{'Foo' previously declared here}}
   case Foo = "Bar" // expected-error {{invalid redeclaration of 'Foo'}}
 }
@@ -367,7 +367,7 @@ enum DuplicateMembers7 : String { // expected-error {{'DuplicateMembers7' declar
 // Refs to duplicated enum cases shouldn't crash the compiler.
 // rdar://problem/20922401
 func check20922401() -> String {
-  let x: DuplicateMembers1 = .Foo 
+  let x: DuplicateMembers1 = .Foo //  expected-error{{ambiguous use of 'Foo'}} 
   switch x {
     case .Foo:
       return "Foo"
