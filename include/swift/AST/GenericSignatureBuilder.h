@@ -95,7 +95,7 @@ public:
       llvm::PointerUnion<Type, PotentialArchetype *, LayoutConstraint>;
 
   using RequirementRHS =
-    llvm::PointerUnion<Type, PotentialArchetype *, LayoutConstraint>;
+    llvm::PointerUnion<Type, LayoutConstraint>;
 
   /// The location of a requirement as written somewhere in the source.
   typedef llvm::PointerUnion<const TypeRepr *, const RequirementRepr *>

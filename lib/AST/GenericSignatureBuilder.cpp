@@ -7138,11 +7138,8 @@ void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
     case RequirementKind::SameType:
       out << "\n  ";
       out << type.getString() << " == " ;
-      if (auto secondType = constraint.dyn_cast<Type>()) {
-        out << secondType.getString();
-      } else {
-        out << constraint.get<PotentialArchetype *>()->getDebugName();
-      }
+      auto secondType = constraint.get<Type>();
+      out << secondType.getString();
       out << " [";
       source->print(out, &Context.SourceMgr);
       out << "]";
