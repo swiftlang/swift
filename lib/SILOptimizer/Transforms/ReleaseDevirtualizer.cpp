@@ -70,11 +70,13 @@ void ReleaseDevirtualizer::run() {
   SILFunction *F = getFunction();
   RCIA = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
 
-  // The last release_value or strong_release instruction before the
-  // deallocation.
-  SILInstruction *LastRelease = nullptr;
   bool Changed = false;
   for (SILBasicBlock &BB : *F) {
+
+    // The last release_value or strong_release instruction before the
+    // deallocation.
+    SILInstruction *LastRelease = nullptr;
+
     for (SILInstruction &I : BB) {
       if (LastRelease) {
         if (auto *DRI = dyn_cast<DeallocRefInst>(&I)) {
