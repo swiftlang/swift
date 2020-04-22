@@ -414,7 +414,7 @@ namespace {
 
       return SubstitutionMap::get(sig,
                                   QueryTypeSubstitutionMap{subs},
-                                  TypeChecker::LookUpConformance(cs.DC));
+                                  LookUpConformanceInModule(cs.DC->getParentModule()));
     }
 
   public:

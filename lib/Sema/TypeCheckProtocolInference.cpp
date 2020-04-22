@@ -1097,7 +1097,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                        { proto->getSelfInterfaceType() },
                                        sanitizedRequirements,
                                        QuerySubstitutionMap{substitutions},
-                                       TypeChecker::LookUpConformance(dc),
+                                       LookUpConformanceInModule(dc->getParentModule()),
                                        nullptr, options);
   switch (result) {
   case RequirementCheckResult::Failure:

@@ -2687,7 +2687,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
           return getSubstitution(type);
         },
-        TypeChecker::LookUpConformance(dc));
+        LookUpConformanceInModule(dc->getParentModule()));
 
     // Use invalid 'SourceLoc's to suppress diagnostics.
     auto result = TypeChecker::checkGenericArguments(
@@ -2695,7 +2695,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
           genericSignature->getGenericParams(),
           genericSignature->getRequirements(),
           QuerySubstitutionMap{subMap},
-          TypeChecker::LookUpConformance(dc));
+          LookUpConformanceInModule(dc->getParentModule()));
 
     if (result != RequirementCheckResult::Success) {
       unviable.push_back(

@@ -3956,7 +3956,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       { proto->getSelfInterfaceType() },
       proto->getRequirementSignature(),
       QuerySubstitutionMap{substitutions},
-      TypeChecker::LookUpConformance(DC),
+      LookUpConformanceInModule(DC->getParentModule()),
       &listener);
 
   switch (result) {
@@ -4435,7 +4435,7 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
         DC, ComplainLoc, noteLoc, T,
         {lookupResult.getRequirement()->getSelfInterfaceType()}, *condReqs,
         [](SubstitutableType *dependentType) { return Type(dependentType); },
-        LookUpConformance(DC));
+        LookUpConformanceInModule(M));
     switch (conditionalCheckResult) {
     case RequirementCheckResult::Success:
       break;
@@ -4449,36 +4449,12 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
   return lookupResult;
 }
 
-// Exposes TypeChecker functionality for querying protocol conformance.
-//
-// Invoking TypeChecker::conformsToProtocol from the ModuleDecl bypasses
-// certain functionality that only applies to the diagnostic type checker:
-//
-// - ConformanceCheckFlags skips dependence checking.
-//
-// - Passing an invalid SourceLoc skips diagnostics.
-//
-// - Type::subst will be a nop, because 'source' type is already fully
-// substituted in SIL. Consequently, TypeChecker::LookUpConformance, which
-// is only valid during type checking, will never be invoked.
-//
-// - mapTypeIntoContext will be a nop.
+/// Exposes TypeChecker functionality for querying protocol conformance.
+/// Returns a valid ProtocolConformanceRef only if all conditional
+/// requirements are successfully resolved.
 ProtocolConformanceRef
 ModuleDecl::conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol) {
   return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this, None);
-}
-
-ProtocolConformanceRef TypeChecker::LookUpConformance::
-operator()(CanType dependentType, Type conformingReplacementType,
-           ProtocolDecl *conformedProtocol) const {
-  if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol);
-
-  return TypeChecker::conformsToProtocol(
-                         conformingReplacementType,
-                         conformedProtocol,
-                         dc,
-                         ConformanceCheckFlags::SkipConditionalRequirements);
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {

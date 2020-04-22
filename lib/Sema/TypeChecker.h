@@ -954,19 +954,6 @@ ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
                                           ConformanceCheckOptions options,
                                           SourceLoc ComplainLoc = SourceLoc());
 
-/// Functor class suitable for use as a \c LookupConformanceFn to look up a
-/// conformance through a particular declaration context.
-class LookUpConformance {
-  DeclContext *dc;
-
-public:
-  explicit LookUpConformance(DeclContext *dc) : dc(dc) {}
-
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
-  };
-
   /// Completely check the given conformance.
   void checkConformance(NormalProtocolConformance *conformance);
 

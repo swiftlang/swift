@@ -675,7 +675,7 @@ static Type checkContextualRequirements(Type type,
         genericSig->getGenericParams(),
         genericSig->getRequirements(),
         QueryTypeSubstitutionMap{subMap},
-        TypeChecker::LookUpConformance(dc));
+        LookUpConformanceInModule(dc->getParentModule()));
 
   switch (result) {
   case RequirementCheckResult::Failure:
@@ -906,6 +906,8 @@ Type TypeChecker::applyUnboundGenericArguments(
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   auto dc = resolution.getDeclContext();
+  auto *module = dc->getParentModule();
+
   if (!skipRequirementsCheck &&
       resolution.getStage() > TypeResolutionStage::Structural) {
     auto result =
@@ -913,7 +915,7 @@ Type TypeChecker::applyUnboundGenericArguments(
                             genericSig->getGenericParams(),
                             genericSig->getRequirements(),
                             QueryTypeSubstitutionMap{subs},
-                            LookUpConformance(dc));
+                            LookUpConformanceInModule(module));
 
     switch (result) {
     case RequirementCheckResult::Failure:
@@ -933,7 +935,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformance(dc));
+                                LookUpConformanceInModule(module));
 
   // Form a sugared typealias reference.
   Type parentType = unboundType->getParent();
@@ -941,7 +943,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto genericSig = typealias->getGenericSignature();
     auto subMap = SubstitutionMap::get(genericSig,
                                        QueryTypeSubstitutionMap{subs},
-                                       LookUpConformance(dc));
+                                       LookUpConformanceInModule(module));
     resultType = TypeAliasType::get(typealias, parentType,
                                     subMap, resultType);
   }
@@ -2858,7 +2860,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     subMap = SubstitutionMap::get(
       genericSig,
       QueryTypeSubstitutionMap{genericArgMap},
-      TypeChecker::LookUpConformance(DC));
+      LookUpConformanceInModule(DC->getParentModule()));
   }
   
   auto layout = SILLayout::get(Context, genericSig, fields);
@@ -2949,7 +2951,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       subsMap.insert({params[i], resolved->getCanonicalType()});
     }
     return SubstitutionMap::get(sig, QueryTypeSubstitutionMap{subsMap},
-                                TypeChecker::LookUpConformance(DC))
+                                LookUpConformanceInModule(DC->getParentModule()))
       .getCanonical();
   };
 
