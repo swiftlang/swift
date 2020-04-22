@@ -1569,6 +1569,17 @@ static char getParamConvention(ParameterConvention conv) {
   llvm_unreachable("bad parameter convention");
 };
 
+static Optional<char>
+getParamDifferentiability(SILParameterDifferentiability diffKind) {
+  switch (diffKind) {
+  case swift::SILParameterDifferentiability::DifferentiableOrNotApplicable:
+    return None;
+  case swift::SILParameterDifferentiability::NotDifferentiable:
+    return 'w';
+  }
+  llvm_unreachable("bad parameter convention");
+};
+
 static char getResultConvention(ResultConvention conv) {
   switch (conv) {
     case ResultConvention::Indirect: return 'r';
@@ -1658,6 +1669,8 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
+    if (auto diffKind = getParamDifferentiability(param.getDifferentiability()))
+      OpArgs.push_back(*diffKind);
     appendType(param.getInterfaceType());
   }
 
