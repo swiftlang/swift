@@ -395,6 +395,8 @@ public:
     overlays.append(value.begin(), value.end());
   }
 
+  SWIFT_DEBUG_DUMPER(dumpSeparatelyImportedOverlays());
+
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
