@@ -394,7 +394,7 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 }
 
 bool MissingConformanceFailure::diagnoseAsError() {
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto *anchor = castToExpr(getAnchor());
   auto nonConformingType = getLHS();
   auto protocolType = getRHS();
 
@@ -905,7 +905,7 @@ TypedNode MissingExplicitConversionFailure::getAnchor() const {
 
 bool MissingExplicitConversionFailure::diagnoseAsError() {
   auto *DC = getDC();
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto *anchor = castToExpr(getAnchor());
 
   auto fromType = getFromType();
   auto toType = getToType();
@@ -1000,7 +1000,7 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
     DeclContext *DC, const Expr *expr) const {
   assert(expr);
 
-  auto *anchor = getAnchor().dyn_cast<const Expr *>();
+  auto *anchor = getAsExpr(getAnchor());
   // If anchor is n explicit address-of, or expression which produces
   // an l-value (e.g. first argument of `+=` operator), let's not
   // suggest default value here because that would produce r-value type.
@@ -1089,7 +1089,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
       return true;
   }
 
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto *anchor = castToExpr(getAnchor());
 
   // If this is an unresolved member expr e.g. `.foo` its
   // base type is going to be the same as result type minus
@@ -1197,7 +1197,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Diag<StringRef> subElementDiagID;
   Diag<Type> rvalueDiagID = diag::assignment_lhs_not_lvalue;
-  auto diagExpr = getRawAnchor().get<const Expr *>();
+  auto diagExpr = castToExpr(getRawAnchor());
   SourceLoc loc = diagExpr->getLoc();
 
   // Assignment is not allowed inside of a condition,
@@ -1398,7 +1398,7 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
 }
 
 bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto *anchor = castToExpr(getAnchor());
   const auto *expr = findParentExpr(anchor);
   auto *callExpr = dyn_cast_or_null<CallExpr>(expr);
   if (!callExpr)
@@ -2161,7 +2161,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
     // It could be e.g. an argument to a subscript/call, assignment
     // source like `s[0] = nil` or an array element like `[nil]` or
     // `[nil: 42]` as a sub-expression to a larger one.
-    auto *parentExpr = findParentExpr(anchor.dyn_cast<const Expr *>());
+    auto *parentExpr = findParentExpr(getAsExpr(anchor));
 
     // Looks like it's something similar to `let _ = nil`.
     if (!parentExpr) {
@@ -2194,9 +2194,8 @@ bool ContextualFailure::diagnoseConversionToNil() const {
         // out whether nil is a "key" or a "value".
         if (isa<DictionaryExpr>(enclosingExpr)) {
           assert(TE->getNumElements() == 2);
-          CTP = TE->getElement(0) == anchor.get<const Expr *>()
-                    ? CTP_DictionaryKey
-                    : CTP_DictionaryValue;
+          CTP = TE->getElement(0) == castToExpr(anchor) ? CTP_DictionaryKey
+                                                        : CTP_DictionaryValue;
         } else {
           // Can't initialize one of the tuple elements with `nil`.
           CTP = CTP_Initialization;
@@ -2342,7 +2341,7 @@ bool ContextualFailure::diagnoseConversionToBool() const {
   if (!toType->isBool())
     return false;
 
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto *anchor = castToExpr(getAnchor());
   // Check for "=" converting to Bool.  The user probably meant ==.
   if (auto *AE = dyn_cast<AssignExpr>(anchor->getValueProvidingExpr())) {
     emitDiagnosticAt(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
@@ -2587,7 +2586,7 @@ bool ContextualFailure::tryRawRepresentableFixIts(
         convWrapAfter += ")";
       }
 
-      if (auto *E = anchor.dyn_cast<const Expr *>())
+      if (auto *E = getAsExpr(anchor))
         fixIt(convWrapBefore, convWrapAfter, E);
       return true;
     }
@@ -2614,7 +2613,7 @@ bool ContextualFailure::tryRawRepresentableFixIts(
         convWrapAfter += ")";
       }
 
-      if (auto *E = anchor.dyn_cast<const Expr *>())
+      if (auto *E = getAsExpr(anchor))
         fixIt(convWrapBefore, convWrapAfter, E);
       return true;
     }
@@ -2646,7 +2645,7 @@ bool ContextualFailure::tryIntegerCastFixIts(
     return parenE->getSubExpr();
   };
 
-  if (auto *anchor = getAnchor().dyn_cast<const Expr *>()) {
+  if (auto *anchor = getAsExpr(getAnchor())) {
     if (Expr *innerE = getInnerCastedExpr(anchor)) {
       Type innerTy = getType(innerE);
       if (TypeChecker::isConvertibleTo(innerTy, toType, getDC())) {
@@ -2683,8 +2682,7 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   // Wrap in String.init
   if (getFromType()->isEqual(Substring)) {
     if (getToType()->isEqual(String)) {
-      auto anchor =
-          getAnchor().get<const Expr *>()->getSemanticsProvidingExpr();
+      auto *anchor = castToExpr(getAnchor())->getSemanticsProvidingExpr();
       if (auto *CE = dyn_cast<CoerceExpr>(anchor)) {
         anchor = CE->getSubExpr();
       }
@@ -3237,7 +3235,7 @@ bool MissingMemberFailure::diagnoseAsError() {
       diagnostic = diag::could_not_find_tuple_member;
 
     bool hasUnresolvedPattern = false;
-    if (auto *E = anchor.dyn_cast<const Expr *>()) {
+    if (auto *E = getAsExpr(anchor)) {
       const_cast<Expr *>(E)->forEachChildExpr([&](Expr *expr) {
         hasUnresolvedPattern |= isa<UnresolvedPatternExpr>(expr);
         return hasUnresolvedPattern ? nullptr : expr;
@@ -3440,7 +3438,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   if (!anchor.is<const Expr *>())
     return false;
 
-  Expr *expr = findParentExpr(anchor.get<const Expr *>());
+  Expr *expr = findParentExpr(castToExpr(anchor));
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
 
   // If the base is an implicit self type reference, and we're in a
@@ -3544,7 +3542,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       }
     }
 
-    if (auto *maybeCallExpr = getRawAnchor().dyn_cast<const Expr *>()) {
+    if (auto *maybeCallExpr = getAsExpr(getRawAnchor())) {
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(maybeCallExpr)) {
         maybeCallExpr = UDE->getBase();
       }
@@ -3686,8 +3684,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
     // Check if the expression is the matching operator ~=, most often used in
     // case statements. If so, try to provide a single dot fix-it
-    const Expr *contextualTypeNode =
-        getRootExpr(getAnchor().dyn_cast<const Expr *>());
+    const Expr *contextualTypeNode = getRootExpr(getAsExpr(getAnchor()));
 
     // The '~=' operator is an overloaded decl ref inside a binaryExpr
     if (auto binaryExpr = dyn_cast<BinaryExpr>(contextualTypeNode)) {
@@ -4980,7 +4977,7 @@ bool MissingGenericArgumentsFailure::diagnoseAsError() {
       });
 
   if (!isScoped)
-    return diagnoseForAnchor(getAnchor().get<const Expr *>(), Parameters);
+    return diagnoseForAnchor(castToExpr(getAnchor()), Parameters);
 
   bool diagnosed = false;
   for (const auto &scope : scopedParameters)
@@ -5238,7 +5235,7 @@ bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsNote() {
 }
 
 bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
-  auto *anchor = getRawAnchor().get<const Expr *>();
+  auto *anchor = castToExpr(getRawAnchor());
   auto baseExpr = getBaseExprFor(anchor);
   if (!baseExpr)
     return false;
@@ -5377,7 +5374,7 @@ bool InOutConversionFailure::diagnoseAsError() {
 }
 
 void InOutConversionFailure::fixItChangeArgumentType() const {
-  auto *argExpr = getAnchor().get<const Expr *>();
+  auto *argExpr = castToExpr(getAnchor());
   auto *DC = getDC();
 
   if (auto *IOE = dyn_cast<InOutExpr>(argExpr))
@@ -5528,8 +5525,7 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // If both arguments where incorrect e.g. both are function types,
   // let's avoid producing a diagnostic second time, because first
   // one would cover both arguments.
-  if (getAnchor().dyn_cast<const Expr *>() == rhs &&
-      rhsType->is<FunctionType>()) {
+  if (getAsExpr(getAnchor()) == rhs && rhsType->is<FunctionType>()) {
     auto &cs = getConstraintSystem();
     if (cs.hasFixFor(getConstraintLocator(
             binaryOp, {ConstraintLocator::ApplyArgument,
@@ -5711,7 +5707,7 @@ void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(
 }
 
 bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
-  if (auto *anchor = getAnchor().dyn_cast<const Expr *>()) {
+  if (auto *anchor = getAsExpr(getAnchor())) {
     emitDiagnostic(diag::cannot_convert_array_to_variadic, getFromType(),
                    getToType());
     tryDropArrayBracketsFixIt(anchor);
@@ -5723,7 +5719,7 @@ bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
 
 bool ExpandArrayIntoVarargsFailure::diagnoseAsNote() {
   auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
-  auto *anchor = getAnchor().dyn_cast<const Expr *>();
+  auto *anchor = getAsExpr(getAnchor());
   if (!overload || !anchor)
     return false;
 
@@ -6054,7 +6050,7 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
 }
 
 bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
-  auto *anchor = getAnchor().get<const Expr *>();
+  auto *anchor = castToExpr(getAnchor());
   // Member reference could be wrapped into a number of parens
   // e.g. `((.foo))`.
   auto *parentExpr = findParentExpr(anchor);
