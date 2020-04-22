@@ -815,8 +815,9 @@ DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
 
   TypeRepr *defaultDefinition = assocType->getDefaultDefinitionTypeRepr();
   if (defaultDefinition) {
-    auto resolution = TypeResolution::forInterface(assocType->getDeclContext());
-    return resolution.resolveType(defaultDefinition, None);
+    auto resolution =
+        TypeResolution::forInterface(assocType->getDeclContext(), None);
+    return resolution.resolveType(defaultDefinition);
   }
 
   return Type();
@@ -1435,8 +1436,8 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (TypeChecker::validateType(Ctx, typeLoc,
-                                TypeResolution::forInterface(DC), options))
+  if (TypeChecker::validateType(
+          Ctx, typeLoc, TypeResolution::forInterface(DC, options), options))
     return nullptr;
 
   return typeLoc.getType()->getAnyNominal();
@@ -1769,9 +1770,9 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   auto underlyingLoc = TypeLoc(typeAlias->getUnderlyingTypeRepr());
-  if (TypeChecker::validateType(typeAlias->getASTContext(), underlyingLoc,
-                                TypeResolution::forInterface(typeAlias),
-                                options)) {
+  if (TypeChecker::validateType(
+          typeAlias->getASTContext(), underlyingLoc,
+          TypeResolution::forInterface(typeAlias, options), options)) {
     typeAlias->setInvalid();
     return ErrorType::get(typeAlias->getASTContext());
   }
@@ -2019,9 +2020,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   }
 
   auto *dc = decl->getInnermostDeclContext();
-  auto resolution = TypeResolution::forInterface(dc);
-  return resolution.resolveType(
-      resultTyRepr, TypeResolverContext::FunctionResult);
+  auto resolution =
+      TypeResolution::forInterface(dc, TypeResolverContext::FunctionResult);
+  return resolution.resolveType(resultTyRepr);
 }
 
 ParamSpecifier
@@ -2097,8 +2098,6 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
 
 static Type validateParameterType(ParamDecl *decl) {
   auto *dc = decl->getDeclContext();
-  auto resolution = TypeResolution::forInterface(dc);
-
   TypeResolutionOptions options(None);
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
@@ -2124,6 +2123,7 @@ static Type validateParameterType(ParamDecl *decl) {
   auto TL = TypeLoc(decl->getTypeRepr());
 
   auto &ctx = dc->getASTContext();
+  auto resolution = TypeResolution::forInterface(dc, options);
   if (TypeChecker::validateType(ctx, TL, resolution, options)) {
     decl->setInvalid();
     return ErrorType::get(ctx);
@@ -2545,8 +2545,8 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   // Compute the extended type.
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
-  auto tr = TypeResolution::forStructural(ext->getDeclContext());
-  auto extendedType = tr.resolveType(extendedRepr, options);
+  auto tr = TypeResolution::forStructural(ext->getDeclContext(), options);
+  auto extendedType = tr.resolveType(extendedRepr);
 
   if (extendedType->hasError())
     return error();

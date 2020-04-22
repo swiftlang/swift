@@ -527,7 +527,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
-  auto resolution = TypeResolution::forContextual(DC, GenericEnv);
+  auto resolution = TypeResolution::forContextual(DC, GenericEnv, options);
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);

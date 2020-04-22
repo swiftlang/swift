@@ -54,6 +54,8 @@ struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
+class TypeResolution;
+class TypeRepr;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -2400,6 +2402,22 @@ public:
   // Cached.
   bool isCached() const { return true; }
 };
+
+class ValidateTypeRequest
+    : public SimpleRequest<ValidateTypeRequest,
+                           Type(TypeResolution *, TypeRepr *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, TypeResolution *, TypeRepr *) const;
+};
+
+void simple_display(llvm::raw_ostream &out, const TypeResolution *);
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.

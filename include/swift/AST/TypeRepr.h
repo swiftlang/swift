@@ -1202,6 +1202,10 @@ inline bool TypeRepr::isSimple() const {
   llvm_unreachable("bad TypeRepr kind");
 }
 
+inline SourceLoc extractNearestSourceLoc(const TypeRepr *repr) {
+  return repr->getLoc();
+}
+
 } // end namespace swift
 
 namespace llvm {

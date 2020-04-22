@@ -1509,3 +1509,8 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "implicit import of ";
   simple_display(out, import.Module);
 }
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const TypeResolution *resolution) {
+  out << "resolving types";
+}

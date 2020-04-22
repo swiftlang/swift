@@ -1093,7 +1093,7 @@ namespace {
         if (!PlaceholderE->getTypeLoc().isNull()) {
           if (!TypeChecker::validateType(
                   getASTContext(), PlaceholderE->getTypeLoc(),
-                  TypeResolution::forContextual(DC), None))
+                  TypeResolution::forContextual(DC, None), None))
             expr->setType(PlaceholderE->getTypeLoc().getType());
         }
         return finish(true, expr);
@@ -1317,7 +1317,8 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   if (closure->hasExplicitResultType() &&
       TypeChecker::validateType(getASTContext(),
                                 closure->getExplicitResultTypeLoc(),
-                                TypeResolution::forContextual(closure),
+                                TypeResolution::forContextual(
+                                    closure, TypeResolverContext::InExpression),
                                 TypeResolverContext::InExpression)) {
     return false;
   }
@@ -1402,8 +1403,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::AllowUnavailable;
-    auto resolution = TypeResolution::forContextual(DC);
-    auto BaseTy = resolution.resolveType(InnerTypeRepr, options);
+    auto resolution = TypeResolution::forContextual(DC, options);
+    auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy && BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
@@ -1935,7 +1936,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
     auto &typeLoc = typeExpr->getTypeLoc();
     bool hadError = TypeChecker::validateType(
-        getASTContext(), typeLoc, TypeResolution::forContextual(DC), options);
+        getASTContext(), typeLoc, TypeResolution::forContextual(DC, options),
+        options);
 
     if (hadError)
       return nullptr;
