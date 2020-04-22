@@ -630,17 +630,16 @@ namespace {
 
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
-      PrintWithColorRAII(OS, TypeColor) << " type='";
+      PrintWithColorRAII(OS, TypeColor) << " type=";
       if (auto underlying = TAD->getCachedUnderlyingType()) {
         PrintWithColorRAII(OS, TypeColor)
-          << underlying.getString();
+          << "'" << underlying.getString() << "'";
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
-      printInherited(TAD->getInherited());
-      OS << "')";
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    
+
     void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
       printCommon(OTD, "opaque_type");
       OS << " naming_decl=";
@@ -3470,9 +3469,10 @@ namespace {
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon(label, "type_alias_type");
       printField("decl", T->getDecl()->printRef());
-      PrintWithColorRAII(OS, TypeColor) << " underlying='";
+      PrintWithColorRAII(OS, TypeColor) << " underlying=";
       if (auto underlying = T->getSinglyDesugaredType()) {
-        PrintWithColorRAII(OS, TypeColor) << underlying->getString();
+        PrintWithColorRAII(OS, TypeColor)
+          << "'" << underlying->getString() << "'";
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
