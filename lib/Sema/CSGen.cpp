@@ -1462,20 +1462,19 @@ namespace {
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      auto &typeLoc = E->getTypeLoc();
-      if (typeLoc.wasValidated()) {
-        type = typeLoc.getType();
-      } else if (typeLoc.hasLocation()) {
-        type = resolveTypeReferenceInExpression(typeLoc);
-      } else if (E->isImplicit() && CS.hasType(&typeLoc)) {
-        type = CS.getType(typeLoc);
+      if (E->isImplicit()) {
+        type = CS.getInstanceType(CS.cacheType(E));
+        assert(type && "Implicit type expr must have type set!");
+      } else {
+        auto *repr = E->getTypeRepr();
+        assert(repr && "Explicit node has no type repr!");
+        type = resolveTypeReferenceInExpression(repr);
       }
 
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
       type = CS.openUnboundGenericType(type, locator);
-      CS.setType(E->getTypeLoc(), type);
       return MetatypeType::get(type);
     }
 
@@ -4020,11 +4019,11 @@ namespace {
             // result of the join.
             auto joinMetaTy =
                 CG.resultOfTypeOperation(typeOperation, apply->getArg());
-            auto joinTy = joinMetaTy->castTo<MetatypeType>()->getInstanceType();
+            auto joinTy = joinMetaTy->castTo<MetatypeType>();
 
-            auto *TE = TypeExpr::createImplicit(joinTy, CS.getASTContext());
+            auto *TE = TypeExpr::createImplicit(joinTy->getInstanceType(),
+                                                CS.getASTContext());
             CS.cacheType(TE);
-            CS.setType(TE->getTypeLoc(), joinTy);
 
             auto *DSE = new (CS.getASTContext())
                 DotSelfExpr(TE, SourceLoc(), SourceLoc(), CS.getType(TE));

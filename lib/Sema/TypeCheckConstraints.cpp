@@ -550,8 +550,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           if (typeContext->getSelfClassDecl())
             SelfType = DynamicSelfType::get(SelfType, Context);
           SelfType = DC->mapTypeIntoContext(SelfType);
-          return new (Context) TypeExpr(TypeLoc(new (Context)
-                                                FixedTypeRepr(SelfType, Loc)));
+          return new (Context) TypeExpr(new (Context)
+                                        FixedTypeRepr(SelfType, Loc));
         }
       }
 
@@ -1384,7 +1384,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (Name.isSimpleName(getASTContext().Id_Protocol)) {
     auto *NewTypeRepr =
         new (getASTContext()) ProtocolTypeRepr(InnerTypeRepr, NameLoc);
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold 'T.Type' into an existential metatype if 'T' is a protocol,
@@ -1392,7 +1392,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (Name.isSimpleName(getASTContext().Id_Type)) {
     auto *NewTypeRepr =
         new (getASTContext()) MetatypeTypeRepr(InnerTypeRepr, NameLoc);
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold 'T.U' into a nested type.
@@ -1487,7 +1487,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     auto *NewTypeRepr =
         new (getASTContext()) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold T! into an IUO type when T is a TypeExpr.
@@ -1503,7 +1503,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto *NewTypeRepr = new (getASTContext())
         ImplicitlyUnwrappedOptionalTypeRepr(InnerTypeRepr,
                                             FVE->getExclaimLoc());
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold (T) into a type T with parens around it.
@@ -1518,7 +1518,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     auto *NewTypeRepr = TupleTypeRepr::create(getASTContext(), InnerTypeRepr,
                                               PE->getSourceRange());
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
   
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
@@ -1551,7 +1551,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     }
     auto *NewTypeRepr = TupleTypeRepr::create(
         getASTContext(), Elts, TE->getSourceRange(), SourceLoc(), Elts.size());
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
   
 
@@ -1567,7 +1567,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto *NewTypeRepr = new (getASTContext())
         ArrayTypeRepr(TyExpr->getTypeRepr(),
                       SourceRange(AE->getLBracketLoc(), AE->getRBracketLoc()));
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold [K : V] into a dictionary type.
@@ -1608,7 +1608,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         keyTypeRepr, valueTypeRepr,
         /*FIXME:colonLoc=*/SourceLoc(),
         SourceRange(DE->getLBracketLoc(), DE->getRBracketLoc()));
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Reinterpret arrow expr T1 -> T2 as function type.
@@ -1700,7 +1700,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto NewTypeRepr = new (ctx)
         FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getThrowsLoc(),
                          AE->getArrowLoc(), ResultTypeRepr);
-    return new (ctx) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (ctx) TypeExpr(NewTypeRepr);
   }
   
   // Fold 'P & Q' into a composition type
@@ -1752,7 +1752,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       auto CompRepr = CompositionTypeRepr::create(getASTContext(), Types,
                                                   lhsExpr->getStartLoc(),
                                                   binaryExpr->getSourceRange());
-      return new (getASTContext()) TypeExpr(TypeLoc(CompRepr, Type()));
+      return new (getASTContext()) TypeExpr(CompRepr);
     }
   }
 
@@ -1928,21 +1928,16 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     return nullptr;
 
   Type type;
-  if (typeExpr->getTypeLoc().wasValidated()) {
-    type = typeExpr->getTypeLoc().getType();
+  if (auto precheckedTy = typeExpr->getInstanceType()) {
+    type = precheckedTy;
   } else {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-
-    auto &typeLoc = typeExpr->getTypeLoc();
-    bool hadError = TypeChecker::validateType(
-        getASTContext(), typeLoc, TypeResolution::forContextual(DC, options),
-        options);
-
-    if (hadError)
+    options |= TypeResolutionFlags::SilenceErrors;
+    type = TypeResolution::forContextual(DC, options)
+              .resolveType(typeExpr->getTypeRepr());
+    if (type->hasError())
       return nullptr;
-
-    type = typeLoc.getType();
   }
 
   if (!type || !type->getAnyNominal())
@@ -1959,7 +1954,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   return NTD->lookupConformance(DC->getParentModule(), protocol, conformances)
              ? CoerceExpr::forLiteralInit(getASTContext(), argExpr,
                                           call->getSourceRange(),
-                                          typeExpr->getTypeLoc())
+                                          TypeLoc(typeExpr->getTypeRepr(), type))
              : nullptr;
 }
 

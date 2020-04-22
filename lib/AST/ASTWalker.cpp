@@ -481,8 +481,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) { return E; }
   Expr *visitTypeExpr(TypeExpr *E) {
     if (!E->isImplicit())
-      if (doIt(E->getTypeLoc()))
-        return nullptr;
+      if (auto *typerepr = E->getTypeRepr())
+        if (doIt(typerepr))
+          return nullptr;
 
     return E;
   }

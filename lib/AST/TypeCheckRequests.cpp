@@ -1514,3 +1514,12 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const TypeResolution *resolution) {
   out << "resolving types";
 }
+
+//----------------------------------------------------------------------------//
+// ValidateTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void ValidateTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  // Clients of this request are better at noting cycle steps. Just suppress
+  // this note.
+}

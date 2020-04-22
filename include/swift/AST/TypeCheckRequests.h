@@ -2415,6 +2415,10 @@ private:
 
   // Evaluation.
   Type evaluate(Evaluator &evaluator, TypeResolution *, TypeRepr *) const;
+
+public:
+  // Cycle handling.
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 void simple_display(llvm::raw_ostream &out, const TypeResolution *);
