@@ -1187,9 +1187,6 @@ def main_normal():
         toolchain.libtool = args.host_libtool
     if args.cmake is not None:
         toolchain.cmake = args.cmake
-    # SWIFT_ENABLE_TENSORFLOW
-    if args.host_bazel is not None:
-        toolchain.bazel = args.host_bazel
 
     cmake = CMake(args=args, toolchain=toolchain)
     # Check the CMake version is sufficient on Linux and build from source

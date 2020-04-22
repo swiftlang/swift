@@ -380,10 +380,6 @@ def create_argument_parser():
            help='the absolute path to lipo. Default is auto detected.')
     option('--host-libtool', store_path(executable=True),
            help='the absolute path to libtool. Default is auto detected.')
-    # SWIFT_ENABLE_TENSORFLOW
-    option('--host-bazel', store_path(executable=True),
-           help='the absolute path to bazel, used to build TensorFlow. Default '
-                'is auto detected.')
     option('--distcc', toggle_true,
            default=os.environ.get('USE_DISTCC') == '1',
            help='use distcc in pump mode')
@@ -941,10 +937,6 @@ def create_argument_parser():
 
     option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
            help='skip building Swift Benchmark Suite')
-
-    # SWIFT_ENABLE_TENSORFLOW
-    option('--build-tensorflow', toggle_true,
-           help='build TensorFlow from source')
 
     option('--build-external-benchmarks', toggle_true,
            help='skip building Swift Benchmark Suite')
