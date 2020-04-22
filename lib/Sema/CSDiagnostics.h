@@ -2023,7 +2023,7 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose n key path root type that cannot be applied to an instance
+/// Diagnose a key path root type that cannot be applied to an instance
 /// base that has another type.
 ///
 /// \code

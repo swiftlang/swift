@@ -6226,21 +6226,13 @@ bool CoercionAsForceCastFailure::diagnoseAsError() {
 }
 
 bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
   auto locator = getLocator();
-  auto anchor = locator->getAnchor();
-
   assert(locator->isKeyPathRoot() && "Expect a key path root");
+  
+  auto baseType = getFromType();
+  auto rootType = getToType();
 
-  if (auto *subscriptExpr = dyn_cast_or_null<SubscriptExpr>(anchor)) {
-    auto *tupleExpr = cast<TupleExpr>(subscriptExpr->getIndex());
-    auto keyPathType = cs.getType(tupleExpr->getElement(0));
-    auto baseType = cs.getType(subscriptExpr->getBase());
-
-    emitDiagnosticAt(anchor->getLoc(),
-                     diag::expr_smart_keypath_application_type_mismatch,
-                     keyPathType, baseType->getRValueType());
-    return true;
-  }
-  return false;
+  emitDiagnostic(diag::expr_keypath_root_type_mismatch,
+                 rootType, baseType);
+  return true;
 }
