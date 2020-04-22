@@ -215,7 +215,8 @@ bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
       return false;
 
     for (SILValue operandVal : projections[idx]->getOperandValues())
-      pushOperandVal(operandVal);
+      if (!pushOperandVal(operandVal))
+        return false;
   }
   return true;
 }
