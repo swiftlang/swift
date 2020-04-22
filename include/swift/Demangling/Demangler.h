@@ -518,6 +518,7 @@ protected:
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
+  NodePointer demangleImplDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleMetatype();
   NodePointer demanglePrivateContextDescriptor();

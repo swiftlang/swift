@@ -394,6 +394,7 @@ private:
     case Node::Kind::ImplLinear:
     case Node::Kind::ImplEscaping:
     case Node::Kind::ImplConvention:
+    case Node::Kind::ImplDifferentiability:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionType:
     case Node::Kind::ImplInvocationSubstitutions:
@@ -2060,6 +2061,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
     return nullptr;
+  case Node::Kind::ImplDifferentiability:
+    // Skip if text is empty.
+    if (Node->getText().empty())
+      return nullptr;
+    // Otherwise, print with trailing space.
+    Printer << Node->getText() << ' ';
+    return nullptr;
   case Node::Kind::ImplFunctionAttribute:
     Printer << Node->getText();
     return nullptr;
@@ -2072,6 +2080,16 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     printChildren(Node, " ");
     return nullptr;
   case Node::Kind::ImplParameter:
+    // Children: `convention, differentiability?, type`
+    // Print convention.
+    print(Node->getChild(0));
+    Printer << " ";
+    // Print differentiability, if it exists.
+    if (Node->getNumChildren() == 3)
+      print(Node->getChild(1));
+    // Print type.
+    print(Node->getLastChild());
+    return nullptr;
   case Node::Kind::ImplResult:
     printChildren(Node, " ");
     return nullptr;
