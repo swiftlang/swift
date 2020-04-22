@@ -166,6 +166,15 @@ public:
   void operator =(const Context &) = delete;
   void operator =(Context &&) = delete;
 
+  bool operator==(const TypeResolutionOptions &rhs) const {
+    return getBaseContext() == rhs.getBaseContext() &&
+           getContext() == rhs.getContext() && getFlags() == rhs.getFlags();
+  }
+
+  bool operator!=(const TypeResolutionOptions &rhs) const {
+    return !(*this == rhs);
+  }
+
   // NOTE: "None" might be more permissive than one wants, therefore no
   // reasonable default context is possible.
   TypeResolutionOptions() = delete;
