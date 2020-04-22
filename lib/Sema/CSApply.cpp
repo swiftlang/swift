@@ -2650,9 +2650,9 @@ namespace {
     }
 
     Expr *visitTypeExpr(TypeExpr *expr) {
-      auto toType = simplifyType(cs.getType(expr->getTypeLoc()));
-      expr->getTypeLoc().setType(toType);
-      cs.setType(expr, MetatypeType::get(toType));
+      auto toType = simplifyType(cs.getType(expr));
+      assert(toType->is<MetatypeType>());
+      cs.setType(expr, toType);
       return expr;
     }
 
@@ -3887,16 +3887,14 @@ namespace {
             if (!TE)
               return subExpr;
 
-            auto type = TE->getInstanceType(
-                [&](const Expr *expr) { return cs.hasType(expr); },
-                [&](const Expr *expr) { return cs.getType(expr); });
+            auto type = cs.getInstanceType(TE);
 
             assert(!type->hasError());
 
             if (!type->isEqual(toType))
               return subExpr;
 
-            return cs.cacheType(new (ctx) TypeExpr(expr->getCastTypeLoc()));
+            return cs.cacheType(TypeExpr::createImplicitHack(expr->getLoc(), toType, ctx));
           });
         }
 

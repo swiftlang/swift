@@ -5163,7 +5163,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
 
   TypeLoc typeLoc;
   if (auto *TE = getAsExpr<TypeExpr>(anchor))
-    typeLoc = TE->getTypeLoc();
+    typeLoc = TE->getTypeRepr();
   else if (auto *ECE = getAsExpr<ExplicitCastExpr>(anchor))
     typeLoc = ECE->getCastTypeLoc();
 

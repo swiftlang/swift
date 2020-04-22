@@ -497,9 +497,7 @@ public:
   bool isImplicit() const {
     return Bits.Expr.Implicit;
   }
-  void setImplicit(bool Implicit = true) {
-    Bits.Expr.Implicit = Implicit;
-  }
+  void setImplicit(bool Implicit = true);
 
   /// Retrieves the declaration that is being referenced by this
   /// expression, if any.
@@ -1337,11 +1335,10 @@ public:
 ///
 /// The type of this expression is always \c MetaTypeType.
 class TypeExpr : public Expr {
-  TypeLoc Info;
-  TypeExpr(Type Ty);
+  TypeRepr *Repr;
 public:
   // Create a TypeExpr with location information.
-  TypeExpr(TypeLoc Ty);
+  TypeExpr(TypeRepr *Ty);
 
   // The type of a TypeExpr is always a metatype type.  Return the instance
   // type, ErrorType if an error, or null if not set yet.
@@ -1353,9 +1350,7 @@ public:
                        }) const;
 
   // Create an implicit TypeExpr, which has no location information.
-  static TypeExpr *createImplicit(Type Ty, ASTContext &C) {
-    return new (C) TypeExpr(Ty);
-  }
+  static TypeExpr *createImplicit(Type Ty, ASTContext &C);
 
   // Create an implicit TypeExpr, with location information even though it
   // shouldn't have one.  This is presently used to work around other location
@@ -1389,13 +1384,11 @@ public:
                                             SourceRange AngleLocs,
                                             ASTContext &C);
 
-  TypeLoc &getTypeLoc() { return Info; }
-  TypeLoc getTypeLoc() const { return Info; }
-  TypeRepr *getTypeRepr() const { return Info.getTypeRepr(); }
+  TypeRepr *getTypeRepr() const { return Repr; }
   // NOTE: TypeExpr::getType() returns the type of the expr node, which is the
   // metatype of what is stored as an operand type.
   
-  SourceRange getSourceRange() const { return Info.getSourceRange(); }
+  SourceRange getSourceRange() const { return TypeLoc(Repr).getSourceRange(); }
   // TODO: optimize getStartLoc() and getEndLoc() when TypeLoc allows it.
 
   static bool classof(const Expr *E) {

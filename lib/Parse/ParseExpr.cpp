@@ -395,7 +395,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       ParserResult<TypeRepr> ty = parseType();
       if (ty.isNonNull())
         return makeParserResult(
-            new (Context) TypeExpr(TypeLoc(ty.get(), Type())));
+            new (Context) TypeExpr(ty.get()));
       checkForInputIncomplete();
       return nullptr;
     }
@@ -1534,7 +1534,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::kw_Any: { // Any
     ExprContext.setCreateSyntax(SyntaxKind::TypeExpr);
     auto TyR = parseAnyType();
-    return makeParserResult(new (Context) TypeExpr(TypeLoc(TyR.get())));
+    return makeParserResult(new (Context) TypeExpr(TyR.get()));
   }
 
   case tok::dollarident: // $1

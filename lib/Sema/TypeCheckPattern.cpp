@@ -615,7 +615,9 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
       Context.Diags.diagnose(TE->getStartLoc(), diag::type_pattern_missing_is)
         .fixItInsert(TE->getStartLoc(), "is ");
       
-      P = new (Context) IsPattern(TE->getStartLoc(), TE->getTypeLoc(),
+      P = new (Context) IsPattern(TE->getStartLoc(),
+                                  TypeLoc(TE->getTypeRepr(),
+                                          TE->getInstanceType()),
                                   /*subpattern*/nullptr,
                                   CheckedCastKind::Unresolved);
     }
