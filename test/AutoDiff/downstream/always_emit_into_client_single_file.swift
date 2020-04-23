@@ -2,7 +2,7 @@
 // cross_module_derivative_attr_e2e.swift.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-cross-file-derivative-registration -parse-as-library -emit-module -module-name SingleFileModule -emit-module-path %t/SingleFileModule.swiftmodule -emit-library -o %t/%target-library-name(SingleFileModule) %S/Inputs/always_emit_into_client/SingleFileModule/file.swift
+// RUN: %target-build-swift -Xfrontend -parse-as-library -emit-module -module-name SingleFileModule -emit-module-path %t/SingleFileModule.swiftmodule -emit-library -o %t/%target-library-name(SingleFileModule) %S/Inputs/always_emit_into_client/SingleFileModule/file.swift
 // RUN: not %target-build-swift -I%t -L%t %s -o %t/a.out -lm -lSingleFileModule 2>&1 | %FileCheck %s
 
 import StdlibUnittest
