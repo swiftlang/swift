@@ -1492,9 +1492,8 @@ static Expr *maybeWrapInOutExpr(Expr *expr, ASTContext &ctx) {
 /// setter which calls them.
 static std::pair<BraceStmt *, bool>
 synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
-                             ASTContext &Ctx) {
+                             ASTContext &Ctx, bool isLazy = false) {
   auto VD = cast<VarDecl>(Set->getStorage());
-  bool isLazy = !VD->isStatic() && VD->getAttrs().hasAttribute<LazyAttr>();
 
   SourceLoc Loc = VD->getLoc();
 
@@ -1621,7 +1620,8 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
       // Lazy property setters write to the underlying storage.
       if (var->hasObservers()) {
-        return synthesizeObservedSetterBody(setter, TargetImpl::Storage, ctx);
+        return synthesizeObservedSetterBody(setter, TargetImpl::Storage, ctx,
+                                            /*isLazy=*/true);
       }
       auto *storage = var->getLazyStorageProperty();
       return synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Storage,
