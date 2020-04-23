@@ -1732,6 +1732,14 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
                          createNode(Node::Kind::ImplConvention, attr));
 }
 
+NodePointer Demangler::demangleImplDifferentiability() {
+  // Empty string represents default differentiability.
+  const char *attr = "";
+  if (nextIf('w'))
+    attr = "@noDerivative";
+  return createNode(Node::Kind::ImplDifferentiability, attr);
+}
+
 NodePointer Demangler::demangleImplFunctionType() {
   NodePointer type = createNode(Node::Kind::ImplFunctionType);
 
@@ -1817,8 +1825,10 @@ NodePointer Demangler::demangleImplFunctionType() {
 
   int NumTypesToAdd = 0;
   while (NodePointer Param =
-           demangleImplParamConvention(Node::Kind::ImplParameter)) {
+             demangleImplParamConvention(Node::Kind::ImplParameter)) {
     type = addChild(type, Param);
+    if (NodePointer Diff = demangleImplDifferentiability())
+      Param = addChild(Param, Diff);
     NumTypesToAdd++;
   }
   while (NodePointer Result = demangleImplResultConvention(

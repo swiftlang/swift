@@ -3602,8 +3602,7 @@ bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                                           KnownProtocolKind protocol) {
   if (auto *proto =
           TypeChecker::getProtocol(cs.getASTContext(), SourceLoc(), protocol))
-    return (bool)TypeChecker::conformsToProtocol(
-        type, proto, cs.DC, ConformanceCheckFlags::InExpression);
+    return (bool)TypeChecker::conformsToProtocol(type, proto, cs.DC, None);
   return false;
 }
 
@@ -3617,8 +3616,7 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   if (!rawReprType)
     return Type();
 
-  auto conformance = TypeChecker::conformsToProtocol(
-      type, rawReprType, DC, ConformanceCheckFlags::InExpression);
+  auto conformance = TypeChecker::conformsToProtocol(type, rawReprType, DC, None);
   if (conformance.isInvalid())
     return Type();
 

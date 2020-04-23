@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Devirtualized differentiability witnesses whose bodies are availabe, by
-// turning "differentiability_witness_function" instructions into "function_ref"
-// instructions referencing the appropriate function.
+// Devirtualizes `differentiability_witness_function` instructions into
+// `function_ref` instructions for differentiability witness definitions.
 //
 //===----------------------------------------------------------------------===//
 
@@ -26,7 +25,7 @@ using namespace swift;
 namespace {
 class DifferentiabilityWitnessDevirtualizer : public SILFunctionTransform {
 
-  /// Returns true if and changes were made.
+  /// Returns true if any changes were made.
   bool devirtualizeDifferentiabilityWitnessesInFunction(SILFunction &f);
 
   /// The entry point to the transformation.
@@ -50,17 +49,17 @@ bool DifferentiabilityWitnessDevirtualizer::
     }
   }
   for (auto *inst : insts) {
-    auto *wit = inst->getWitness();
-    if (wit->isDeclaration())
-      f.getModule().loadDifferentiabilityWitness(wit);
-    if (wit->isDeclaration())
+    auto *witness = inst->getWitness();
+    if (witness->isDeclaration())
+      f.getModule().loadDifferentiabilityWitness(witness);
+    if (witness->isDeclaration())
       continue;
     changed = true;
     SILBuilderWithScope builder(inst);
     auto kind = inst->getWitnessKind().getAsDerivativeFunctionKind();
     assert(kind.hasValue());
     auto *newInst = builder.createFunctionRefFor(inst->getLoc(),
-                                                 wit->getDerivative(*kind));
+                                                 witness->getDerivative(*kind));
     inst->replaceAllUsesWith(newInst);
     inst->getParent()->erase(inst);
   }

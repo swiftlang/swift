@@ -984,9 +984,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
   if (protocol) {
     auto conformanceRef = TypeChecker::conformsToProtocol(
         parentTy, protocol, dc,
-        (ConformanceCheckFlags::InExpression |
-         ConformanceCheckFlags::SuppressDependencyTracking |
-         ConformanceCheckFlags::SkipConditionalRequirements));
+         ConformanceCheckFlags::SkipConditionalRequirements);
     if (conformanceRef.isConcrete())
       conformance = conformanceRef.getConcrete();
   }

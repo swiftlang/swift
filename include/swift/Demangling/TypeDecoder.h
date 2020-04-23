@@ -88,15 +88,31 @@ enum class ImplParameterConvention {
   Direct_Guaranteed,
 };
 
+enum class ImplParameterDifferentiability {
+  DifferentiableOrNotApplicable,
+  NotDifferentiable
+};
+
+static inline Optional<ImplParameterDifferentiability>
+getDifferentiabilityFromString(StringRef string) {
+  if (string.empty())
+    return ImplParameterDifferentiability::DifferentiableOrNotApplicable;
+  if (string == "@noDerivative")
+    return ImplParameterDifferentiability::NotDifferentiable;
+  return None;
+}
+
 /// Describe a lowered function parameter, parameterized on the type
 /// representation.
 template <typename BuiltType>
 class ImplFunctionParam {
   ImplParameterConvention Convention;
+  ImplParameterDifferentiability Differentiability;
   BuiltType Type;
 
 public:
   using ConventionType = ImplParameterConvention;
+  using DifferentiabilityType = ImplParameterDifferentiability;
 
   static Optional<ConventionType>
   getConventionFromString(StringRef conventionString) {
@@ -120,10 +136,15 @@ public:
     return None;
   }
 
-  ImplFunctionParam(ImplParameterConvention convention, BuiltType type)
-      : Convention(convention), Type(type) {}
+  ImplFunctionParam(ImplParameterConvention convention,
+                    ImplParameterDifferentiability diffKind, BuiltType type)
+      : Convention(convention), Differentiability(diffKind), Type(type) {}
 
   ImplParameterConvention getConvention() const { return Convention; }
+
+  ImplParameterDifferentiability getDifferentiability() const {
+    return Differentiability;
+  }
 
   BuiltType getType() const { return Type; }
 };
@@ -625,10 +646,8 @@ class TypeDecoder {
               ImplFunctionDifferentiabilityKind::Linear);
         } else if (child->getKind() == NodeKind::ImplEscaping) {
           flags = flags.withEscaping();
-        } else if (child->getKind() == NodeKind::ImplEscaping) {
-          flags = flags.withEscaping();
         } else if (child->getKind() == NodeKind::ImplParameter) {
-          if (decodeImplFunctionPart(child, parameters))
+          if (decodeImplFunctionParam(child, parameters))
             return BuiltType();
         } else if (child->getKind() == NodeKind::ImplResult) {
           if (decodeImplFunctionPart(child, results))
@@ -905,6 +924,45 @@ private:
       return true;
 
     results.emplace_back(*convention, type);
+    return false;
+  }
+
+  bool decodeImplFunctionParam(
+      Demangle::NodePointer node,
+      SmallVectorImpl<ImplFunctionParam<BuiltType>> &results) {
+    // Children: `convention, differentiability?, type`
+    if (node->getNumChildren() != 2 && node->getNumChildren() != 3)
+      return true;
+
+    auto *conventionNode = node->getChild(0);
+    auto *typeNode = node->getLastChild();
+    if (conventionNode->getKind() != Node::Kind::ImplConvention ||
+        typeNode->getKind() != Node::Kind::Type)
+      return true;
+
+    StringRef conventionString = conventionNode->getText();
+    auto convention =
+        ImplFunctionParam<BuiltType>::getConventionFromString(conventionString);
+    if (!convention)
+      return true;
+    BuiltType type = decodeMangledType(typeNode);
+    if (!type)
+      return true;
+
+    auto diffKind =
+        ImplParameterDifferentiability::DifferentiableOrNotApplicable;
+    if (node->getNumChildren() == 3) {
+      auto diffKindNode = node->getChild(1);
+      if (diffKindNode->getKind() != Node::Kind::ImplDifferentiability)
+        return true;
+      auto optDiffKind =
+          getDifferentiabilityFromString(diffKindNode->getText());
+      if (!optDiffKind)
+        return true;
+      diffKind = *optDiffKind;
+    }
+
+    results.emplace_back(*convention, diffKind, type);
     return false;
   }
 

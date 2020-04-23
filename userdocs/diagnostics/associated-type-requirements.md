@@ -1,6 +1,7 @@
 # Using Protocols with `Self` or Associated Type Requirements
 Protocols in Swift may be used as types, as part of a generic constraint, or as part of an opaque result type.
-```
+
+```swift
 // CustomStringConvertible can be used as a type.
 func foo(bar: CustomStringConvertible) { /* ... */ }
 
@@ -12,7 +13,8 @@ func baz() -> some CustomStringConvertible { /* ... */ }
 ```
 
 While all Swift protocols can be used as generic constraints and as part of opaque result types, not all protocols can be used as types in general. Specifically, if a protocol has a requirement which references `Self` or an associated type, it cannot be used as a type. One such protocol is `Identifiable`, which has the requirement `var id: ID { get }`, where `ID` is an associated type. As a result, the following code is not allowed:
-```
+
+```swift
 func foo(bar: Identifiable) { /* ... */ }
 // error: protocol 'Identifiable' can only be used as a generic constraint because it has Self or associated type requirements
 ```

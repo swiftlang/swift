@@ -2,13 +2,13 @@
 
 // Has a lot of invalid 'appendInterpolation' methods
 public struct BadStringInterpolation: StringInterpolationProtocol {
-  // expected-error@-1{{type conforming to 'StringInterpolationProtocol' does not implement a valid 'appendInterpolation' method}}
+  // expected-error@-1{{type conforming to 'StringInterpolationProtocol' does not implement a valid 'appendInterpolation' method}} {{educational-notes=string-interpolation-conformance}}
   
   public init(literalCapacity: Int, interpolationCount: Int) {}
   public mutating func appendLiteral(_: String) {}
   
   public static func appendInterpolation(static: ()) {
-    // expected-warning@-1{{'appendInterpolation' method will never be used because it is static}} {{10-17=}}
+    // expected-warning@-1{{'appendInterpolation' method will never be used because it is static}} {{10-17=}} {{educational-notes=string-interpolation-conformance}}
   }
   
   private func appendInterpolation(private: ()) {
@@ -20,7 +20,7 @@ public struct BadStringInterpolation: StringInterpolationProtocol {
   }
   
   public func appendInterpolation(intResult: ()) -> Int {
-    // expected-warning@-1{{'appendInterpolation' method does not return 'Void' or have a discardable result}} {{10-10=@discardableResult }}
+    // expected-warning@-1{{'appendInterpolation' method does not return 'Void' or have a discardable result}} {{10-10=@discardableResult }} {{educational-notes=string-interpolation-conformance}}
   }
 }
 
