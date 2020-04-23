@@ -2306,7 +2306,7 @@ Expr *Parser::parseExprIdentifier() {
     // global or local declarations here.
     assert(!TD->getDeclContext()->isTypeContext() ||
            isa<GenericTypeParamDecl>(TD));
-    E = TypeExpr::createForDecl(loc, TD, /*DC*/nullptr, /*implicit*/false);
+    E = TypeExpr::createForDecl(loc, TD, /*DC*/ nullptr);
   } else {
     E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
   }

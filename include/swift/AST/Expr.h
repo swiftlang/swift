@@ -1359,9 +1359,10 @@ public:
 
   
   /// Create a TypeExpr for a TypeDecl at the specified location.
-  static TypeExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D,
-                                 DeclContext *DC,
-                                 bool isImplicit);
+  static TypeExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D, DeclContext *DC);
+
+  static TypeExpr *createImplicitForDecl(DeclNameLoc Loc, TypeDecl *D,
+                                         DeclContext *DC, Type ty);
 
   /// Create a TypeExpr for a member TypeDecl of the given parent TypeDecl.
   static TypeExpr *createForMemberDecl(DeclNameLoc ParentNameLoc,

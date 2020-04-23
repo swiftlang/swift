@@ -1950,19 +1950,25 @@ Type TypeExpr::getInstanceType(
   return ErrorType::get(getType(this)->getASTContext());
 }
 
-
 TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
-                                  DeclContext *DC,
-                                  bool isImplicit) {
+                                  DeclContext *DC) {
   ASTContext &C = Decl->getASTContext();
-  assert(Loc.isValid() || isImplicit);
+  assert(Loc.isValid());
   auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
   Repr->setValue(Decl, DC);
   auto result = new (C) TypeExpr(Repr);
-  if (isImplicit) {
-    result->setType(DC->mapTypeIntoContext(Decl->getInterfaceType()));
-    result->setImplicit();
-  }
+  return result;
+}
+
+TypeExpr *TypeExpr::createImplicitForDecl(DeclNameLoc Loc, TypeDecl *Decl,
+                                          DeclContext *DC, Type ty) {
+  ASTContext &C = Decl->getASTContext();
+  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
+  Repr->setValue(Decl, DC);
+  auto result = new (C) TypeExpr(Repr);
+  assert(ty && !ty->hasTypeParameter());
+  result->setType(ty);
+  result->setImplicit();
   return result;
 }
 
