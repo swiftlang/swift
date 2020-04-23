@@ -242,6 +242,13 @@ public:
     }
   }
 
+  /// Precompute all analyses.
+  void forcePrecomputeAnalyses(SILFunction *F) {
+    for (auto *A : Analyses) {
+      A->forcePrecompute(F);
+    }
+  }
+
   /// Verify all analyses, limiting the verification to just this one function
   /// if possible.
   ///
