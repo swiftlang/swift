@@ -811,9 +811,16 @@ internal var rightStructInstance: SR12425_R = SR12425_R()
 
 public extension SR12425_R {
   subscript<T>(dynamicMember member: WritableKeyPath<SR12425_S, T>) -> T {
-      // TODO(Diagnostics): bad diagnostic for member assign.
-      // A better diagnostic would be: key path of type WritableKeyPath<SR12425_S, T> cannot be applied to a base of type SR12425_R
-      get { rightStructInstance[keyPath: member] } // expected-error {{cannot convert return expression of type 'Any?' to return type 'T'}}
-      set { rightStructInstance[keyPath: member] = newValue } // expected-error {{type of expression is ambiguous without more context}}
+      get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+      set { rightStructInstance[keyPath: member] = newValue } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+  }
+}
+
+@dynamicMemberLookup
+public struct SR12425_R1 {}
+
+public extension SR12425_R1 {
+  subscript<T>(dynamicMember member: KeyPath<SR12425_R1, T>) -> T {
+    get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_R1' cannot be applied to a base of type 'SR12425_R'}}
   }
 }
