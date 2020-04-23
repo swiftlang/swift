@@ -521,7 +521,7 @@ def enable_experimental_concise_pound_file : Flag<["-"],
 
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
-  HelpText<"Enable C++ interop code generation and config directives">;
+  HelpText<"Allow importing C++ modules into Swift (experimental feature)">;
 
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
