@@ -429,6 +429,9 @@ getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
   auto NewEnd = std::partition(Decls.begin(), Decls.end(), [&](Decl *D) {
     if (auto *ID = dyn_cast<ImportDecl>(D)) {
       ModuleDecl *Imported = ID->getModule();
+      if (!Imported)
+        return true;
+
       // Ignore imports of the underlying module, or any cross-import
       // that would map back to it.
       if (Imported == Declaring || Imported->isCrossImportOverlayOf(Declaring))
@@ -497,8 +500,13 @@ static void printCrossImportOverlays(ModuleDecl *Declaring, ASTContext &Ctx,
       continue;
 
     Bystanders.clear();
-    Overlay->getRequiredBystandersIfCrossImportOverlay(Declaring, Bystanders);
-    assert(!Bystanders.empty() && "Overlay with no bystanders?");
+    auto BystandersValid =
+      Overlay->getRequiredBystandersIfCrossImportOverlay(Declaring, Bystanders);
+
+    // Ignore badly formed overlays that don't import their declaring module.
+    if (!BystandersValid)
+      continue;
+
     std::sort(Bystanders.begin(), Bystanders.end(),
               [](Identifier LHS, Identifier RHS) {
       return LHS.str() < RHS.str();

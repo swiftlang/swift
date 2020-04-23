@@ -351,12 +351,16 @@ private:
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
 
+  ///  If this is a traditional (non-cross-import) overlay, get its underlying
+  ///  module if one exists.
+  ModuleDecl *getUnderlyingModuleIfOverlay() const;
+
 public:
 
   /// Returns true if this module is an underscored cross import overlay
-  /// declared by \p other, either directly or transitively (via intermediate
-  /// cross-import overlays - for cross-imports involving more than two
-  /// modules).
+  /// declared by \p other or its underlying clang module, either directly or
+  /// transitively (via intermediate cross-import overlays - for cross-imports
+  /// involving more than two modules).
   bool isCrossImportOverlayOf(ModuleDecl *other);
 
   /// If this module is an underscored cross-import overlay, returns the
@@ -365,16 +369,18 @@ public:
   /// cross-imports involving more than two modules).
   ModuleDecl *getDeclaringModuleIfCrossImportOverlay();
 
-  /// If this module is an underscored cross-import overlay of \p declaring
-  /// either directly or transitively, populates \p bystanderNames with the set
-  /// of bystander modules that must be present alongside \p declaring for
-  /// the overlay to be imported and returns true. Returns false otherwise.
+  /// If this module is an underscored cross-import overlay of \p declaring or
+  /// its underlying clang module, either directly or transitively, populates
+  /// \p bystanderNames with the set of bystander modules that must be present
+  /// alongside \p declaring for the overlay to be imported and returns true.
+  /// Returns false otherwise.
   bool getRequiredBystandersIfCrossImportOverlay(
       ModuleDecl *declaring, SmallVectorImpl<Identifier> &bystanderNames);
 
 
   /// Walks and loads the declared, underscored cross-import overlays of this
-  /// module, transitively, to find all overlays this module underlies.
+  /// module and its underlying clang module, transitively, to find all cross
+  /// import overlays this module underlies.
   ///
   /// This is used by tooling to present these overlays as part of this module.
   void findDeclaredCrossImportOverlaysTransitive(
