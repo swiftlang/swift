@@ -46,6 +46,14 @@ class TestClass {
     willSet {}
   }
 
+  lazy var m : Int = 42 { // Okay
+    didSet {}
+  }
+
+  lazy var n : Int = 42 {
+    willSet {} // Okay
+  }
+
   init() {
     lazy var localvar = 42  // expected-error {{lazy is only valid for members of a struct or class}} {{5-10=}}
     localvar += 1
