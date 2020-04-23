@@ -84,15 +84,15 @@ git -C "%source_root%\swift" config --local core.autocrlf input
 git -C "%source_root%\swift" config --local core.symlink true
 git -C "%source_root%\swift" checkout-index --force --all
 
-git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %exitOnError%
-git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
+git clone --depth 1 --single-branch --branch release/5.3 https://github.com/apple/swift-cmark cmark %exitOnError%
+git clone --depth 1 --single-branch --branch swift/release/5.3 https://github.com/apple/llvm-project llvm-project %exitOnError%
 mklink /D "%source_root%\clang" "%source_root%\llvm-project\clang"
 mklink /D "%source_root%\llvm" "%source_root%\llvm-project\llvm"
 mklink /D "%source_root%\lldb" "%source_root%\llvm-project\lldb"
 mklink /D "%source_root%\compiler-rt" "%source_root%\llvm-project\compiler-rt"
 mklink /D "%source_root%\libcxx" "%source_root%\llvm-project\libcxx"
 mklink /D "%source_root%\clang-tools-extra" "%source_root%\llvm-project\clang-tools-extra"
-git clone --depth 1 --single-branch https://github.com/apple/swift-corelibs-libdispatch %exitOnError%
+git clone --depth 1 --single-branch --branch release/5.3 https://github.com/apple/swift-corelibs-libdispatch %exitOnError%
 
 goto :eof
 endlocal
