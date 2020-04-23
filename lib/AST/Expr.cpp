@@ -1938,16 +1938,15 @@ TypeExpr *TypeExpr::createImplicit(Type Ty, ASTContext &C) {
 
 // The type of a TypeExpr is always a metatype type.  Return the instance
 // type or null if not set yet.
-Type TypeExpr::getInstanceType(
-    llvm::function_ref<bool(const Expr *)> hasType,
-    llvm::function_ref<Type(const Expr *)> getType) const {
-  if (!hasType(this))
+Type TypeExpr::getInstanceType() const {
+  auto ty = getType();
+  if (!ty)
     return Type();
 
-  if (auto metaType = getType(this)->getAs<MetatypeType>())
+  if (auto metaType = ty->getAs<MetatypeType>())
     return metaType->getInstanceType();
 
-  return ErrorType::get(getType(this)->getASTContext());
+  return ErrorType::get(ty->getASTContext());
 }
 
 TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
@@ -1956,8 +1955,7 @@ TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
   assert(Loc.isValid());
   auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
   Repr->setValue(Decl, DC);
-  auto result = new (C) TypeExpr(Repr);
-  return result;
+  return new (C) TypeExpr(Repr);
 }
 
 TypeExpr *TypeExpr::createImplicitForDecl(DeclNameLoc Loc, TypeDecl *Decl,
@@ -2084,6 +2082,11 @@ TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
   Res->setType(MetatypeType::get(Ty, C));
   Res->setImplicit();
   return Res;
+}
+
+SourceRange TypeExpr::getSourceRange() const {
+  if (!getTypeRepr()) return SourceRange();
+  return getTypeRepr()->getSourceRange();
 }
 
 bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {

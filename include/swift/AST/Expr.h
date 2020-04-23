@@ -1340,14 +1340,13 @@ public:
   // Create a TypeExpr with location information.
   TypeExpr(TypeRepr *Ty);
 
-  // The type of a TypeExpr is always a metatype type.  Return the instance
-  // type, ErrorType if an error, or null if not set yet.
-  Type getInstanceType(llvm::function_ref<bool(const Expr *)> hasType =
-                           [](const Expr *E) -> bool { return !!E->getType(); },
-                       llvm::function_ref<Type(const Expr *)> getType =
-                           [](const Expr *E) -> Type {
-                         return E->getType();
-                       }) const;
+  /// Retrieves the corresponding instance type of the type referenced by this
+  /// expression.
+  ///
+  /// If this node has no type, the resulting instance type is also the
+  /// null \c Type(). If the type of this node is not a \c MetatypeType, the
+  /// resulting instance type is \c ErrorType.
+  Type getInstanceType() const;
 
   // Create an implicit TypeExpr, which has no location information.
   static TypeExpr *createImplicit(Type Ty, ASTContext &C);
@@ -1389,7 +1388,7 @@ public:
   // NOTE: TypeExpr::getType() returns the type of the expr node, which is the
   // metatype of what is stored as an operand type.
   
-  SourceRange getSourceRange() const { return TypeLoc(Repr).getSourceRange(); }
+  SourceRange getSourceRange() const;
   // TODO: optimize getStartLoc() and getEndLoc() when TypeLoc allows it.
 
   static bool classof(const Expr *E) {

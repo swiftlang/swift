@@ -183,8 +183,13 @@ bool ConstraintSystem::isStaticallyDerivedMetatype(const Expr *E) {
 }
 
 Type ConstraintSystem::getInstanceType(const TypeExpr *E) {
-  return E->getInstanceType([&](const Expr *E) -> bool { return hasType(E); },
-                            [&](const Expr *E) -> Type { return getType(E); });
+  if (!hasType(E))
+    return Type();
+
+  if (auto metaType = getType(E)->getAs<MetatypeType>())
+    return metaType->getInstanceType();
+
+  return ErrorType::get(getType(E)->getASTContext());
 }
 
 Type ConstraintSystem::getResultType(const AbstractClosureExpr *E) {
