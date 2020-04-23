@@ -6224,3 +6224,15 @@ bool CoercionAsForceCastFailure::diagnoseAsError() {
       .highlight(getSourceRange());
   return true;
 }
+
+bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
+  auto locator = getLocator();
+  assert(locator->isKeyPathRoot() && "Expected a key path root");
+  
+  auto baseType = getFromType();
+  auto rootType = getToType();
+
+  emitDiagnostic(diag::expr_keypath_root_type_mismatch,
+                 rootType, baseType);
+  return true;
+}

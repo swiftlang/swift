@@ -1293,3 +1293,17 @@ AllowCoercionToForceCast::create(ConstraintSystem &cs, Type fromType,
   return new (cs.getAllocator())
       AllowCoercionToForceCast(cs, fromType, toType, locator);
 }
+
+bool AllowKeyPathRootTypeMismatch::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  KeyPathRootTypeMismatchFailure failure(solution, getFromType(), getToType(),
+                                         getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowKeyPathRootTypeMismatch *
+AllowKeyPathRootTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowKeyPathRootTypeMismatch(cs, lhs, rhs, locator);
+}
