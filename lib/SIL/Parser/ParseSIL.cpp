@@ -327,6 +327,8 @@ namespace {
       return parseSILIdentifierSwitch(OwnershipKind, AllOwnershipKinds,
                                       diag::expected_sil_value_ownership_kind);
     }
+    /// Set generic environments for box types and functions.
+    void recursivelyHandleTypeRepr(TypeRepr *type);
     bool parseSILType(SILType &Result,
                       GenericEnvironment *&parsedGenericEnv,
                       bool IsFuncDecl = false,
@@ -1171,6 +1173,52 @@ bool SILParser::parseASTType(CanType &result, GenericEnvironment *env) {
   return false;
 }
 
+void SILParser::recursivelyHandleTypeRepr(TypeRepr *type) {
+  if (auto fnType = dyn_cast<FunctionTypeRepr>(type)) {
+    if (auto generics = fnType->getGenericParams()) {
+      auto env = handleSILGenericParams(generics, &P.SF);
+      fnType->setGenericEnvironment(env);
+    }
+    if (auto generics = fnType->getPatternGenericParams()) {
+      auto env = handleSILGenericParams(generics, &P.SF);
+      fnType->setPatternGenericEnvironment(env);
+    }
+    recursivelyHandleTypeRepr(fnType->getResultTypeRepr());
+    recursivelyHandleTypeRepr(fnType->getArgsTypeRepr());
+  }
+  if (auto boxType = dyn_cast<SILBoxTypeRepr>(type)) {
+    if (auto generics = boxType->getGenericParams()) {
+      auto env = handleSILGenericParams(generics, &P.SF);
+      boxType->setGenericEnvironment(env);
+    }
+    for (auto &field : boxType->getFields()) {
+      recursivelyHandleTypeRepr(field.getFieldType());
+    }
+    for (auto &arg : boxType->getGenericArguments()) {
+      recursivelyHandleTypeRepr(arg);
+    }
+  }
+  if (auto tupleType = dyn_cast<TupleTypeRepr>(type)) {
+    for (auto &elem : tupleType->getElements())
+      recursivelyHandleTypeRepr(elem.Type);
+  }
+  if (auto attr = dyn_cast<AttributedTypeRepr>(type)) {
+    recursivelyHandleTypeRepr(attr->getTypeRepr());
+  }
+  if (auto gen = dyn_cast<GenericIdentTypeRepr>(type)) {
+    for (auto genArg : gen->getGenericArgs())
+      recursivelyHandleTypeRepr(genArg);
+  }
+  if (auto composition = dyn_cast<CompositionTypeRepr>(type)) {
+    for (auto comp : composition->getTypes())
+      recursivelyHandleTypeRepr(comp);
+  }
+  if (auto compound = dyn_cast<CompoundIdentTypeRepr>(type)) {
+    for (auto comp : compound->getComponents())
+      recursivelyHandleTypeRepr(comp);
+  }
+}
+
 ///   sil-type:
 ///     '$' '*'? attribute-list (generic-params)? type
 ///
@@ -1212,33 +1260,7 @@ bool SILParser::parseSILType(SILType &Result,
     return true;
   
   // Resolve the generic environments for parsed generic function and box types.
-  class HandleSILGenericParamsWalker : public ASTWalker {
-    SourceFile *SF;
-  public:
-    HandleSILGenericParamsWalker(SourceFile *SF) : SF(SF) {}
-
-    bool walkToTypeReprPre(TypeRepr *T) override {
-      if (auto fnType = dyn_cast<FunctionTypeRepr>(T)) {
-        if (auto generics = fnType->getGenericParams()) {
-          auto env = handleSILGenericParams(generics, SF);
-          fnType->setGenericEnvironment(env);
-        }
-        if (auto generics = fnType->getPatternGenericParams()) {
-          auto env = handleSILGenericParams(generics, SF);
-          fnType->setPatternGenericEnvironment(env);
-        }
-      }
-      if (auto boxType = dyn_cast<SILBoxTypeRepr>(T)) {
-        if (auto generics = boxType->getGenericParams()) {
-          auto env = handleSILGenericParams(generics, SF);
-          boxType->setGenericEnvironment(env);
-        }
-      }
-      return true;
-    }
-  };
-
-  TyR.get()->walk(HandleSILGenericParamsWalker(&P.SF));
+  recursivelyHandleTypeRepr(TyR.get());
 
   // Save the top-level function generic environment if there was one.
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get()))
