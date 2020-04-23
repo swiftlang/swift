@@ -76,7 +76,7 @@ func testTypeIncorrectLogCalls() {
   _osLogTestHelper(message)
   // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'OSLogMessage'}}
   _osLogTestHelper("prefix" + "\(x)")
-  // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'OSLogMessage'}}
+  // expected-error@-1 {{binary operator '+' cannot be applied to two 'String' operands}}
   _osLogTestHelper("prefix", "\(x)")
   // expected-error@-1 {{cannot convert value of type 'String' to expected argument type '(String, UnsafeBufferPointer<UInt8>) -> Void'}}
   // expected-error@-2 {{missing argument label 'assertion:' in call}}

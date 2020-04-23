@@ -1522,7 +1522,7 @@ namespace {
     /// \returns The coerced closure expression.
     ///
     ClosureExpr *coerceClosureExprFromNever(ClosureExpr *expr);
-    
+
     /// Coerce the given expression to the given type.
     ///
     /// This operation cannot fail.
@@ -5879,7 +5879,8 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   return closureExpr;
 }
 
-ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) {
+ClosureExpr *
+ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) {
   // Re-write the single-expression closure to drop the 'return'.
   assert(closureExpr->hasSingleExpressionBody());
 
@@ -5903,7 +5904,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
                           /*implicit*/ true);
 
     closureExpr->setImplicit();
-    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
+    closureExpr->setBody(braceStmt, /*isSingleExpression*/ true);
   }
 
   return closureExpr;
@@ -6548,6 +6549,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       return cs.cacheType(new (ctx)
                               ForeignObjectConversionExpr(result, toType));
+    }
+    case ConversionRestrictionKind::FromUninhabited: {
+      return cs.cacheType(new (ctx) FromUninhabitedExpr(expr, toType));
     }
     }
   }
@@ -7739,7 +7743,7 @@ namespace {
             } else if (cs.getType(body)->isUninhabited()) {
               closure = Rewriter.coerceClosureExprFromNever(closure);
             } else {
-            
+
               body = Rewriter.coerceToType(body,
                                            fnType->getResult(),
                                            cs.getConstraintLocator(

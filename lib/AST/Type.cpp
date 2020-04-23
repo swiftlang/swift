@@ -155,6 +155,13 @@ bool TypeBase::isStructurallyUninhabited() {
   return false;
 }
 
+bool TypeBase::isBottom() {
+  if (auto neverTy = getASTContext().getNeverType())
+    return isEqual(neverTy);
+
+  return false;
+}
+
 bool TypeBase::isAny() {
   return isEqual(getASTContext().TheAnyType);
 }
@@ -2684,6 +2691,10 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   if (matchMode.contains(TypeMatchFlags::AllowOverride))
     if (t2->isExactSuperclassOf(t1))
       return true;
+
+  // Bottom-to-anything.
+  if (matchMode.contains(TypeMatchFlags::AllowOverride) && t1->isBottom())
+    return true;
 
   if (matchMode.contains(TypeMatchFlags::AllowABICompatible))
     if (isABICompatibleEvenAddingOptional(t1, t2))

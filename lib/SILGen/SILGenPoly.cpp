@@ -471,6 +471,11 @@ ManagedValue Transform::transform(ManagedValue v,
 
   // Subtype conversions:
 
+  // Uninhabited-to-anything.
+  if (inputSubstType->isBottom()) {
+    return SGF.emitUndef(outputSubstType);
+  }
+
   // A base class method returning Self can be used in place of a derived
   // class method returning Self.
   if (auto inputSelfType = dyn_cast<DynamicSelfType>(inputSubstType)) {
@@ -2963,11 +2968,13 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   // Plan the results.  This builds argument values for all the
   // inner indirect results.
   ResultPlanner resultPlanner(SGF, loc);
-  resultPlanner.plan(inputOrigType.getFunctionResultType(),
-                     inputSubstType.getResult(),
-                     outputOrigType.getFunctionResultType(),
-                     outputSubstType.getResult(),
-                     fnType, thunkType, argValues);
+  if (!inputSubstType.getResult()->isBottom()) {
+    resultPlanner.plan(inputOrigType.getFunctionResultType(),
+                       inputSubstType.getResult(),
+                       outputOrigType.getFunctionResultType(),
+                       outputSubstType.getResult(),
+                       fnType, thunkType, argValues);
+  }
 
   // Add the rest of the arguments.
   forwardFunctionArguments(SGF, loc, fnType, args, argValues);
@@ -2979,11 +2986,16 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
                                /*substFnType*/ fnValue.getType(),
                                /*substitutions*/ {}, argValues);
 
-  // Reabstract the result.
-  SILValue outerResult = resultPlanner.execute(innerResult);
+  if (!inputSubstType.getResult()->isBottom()) {
+    // Reabstract the result.
+    SILValue outerResult = resultPlanner.execute(innerResult);
 
-  scope.pop();
-  SGF.B.createReturn(loc, outerResult);
+    scope.pop();
+    SGF.B.createReturn(loc, outerResult);
+  } else {
+    scope.pop();
+    SGF.B.createUnreachable(loc);
+  }
 }
 
 /// Build a generic signature and environment for a re-abstraction thunk.

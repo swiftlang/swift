@@ -226,7 +226,7 @@ func ff_stubExplicitReturnNever() -> Never {
 }
 
 func ff_stubExplicitReturnNeverAsMyOwnNever() -> MyOwnNever {
-    return fatalError() // expected-error {{cannot convert return expression of type 'Never' to return type 'MyOwnNever'}}
+    return fatalError()
 }
 
 func ff_stubExplicitReturnMyOwnNeverAsNever() -> Never {
@@ -645,7 +645,7 @@ var fv_stubExplicitReturnNever: Never {
 }
 
 var fv_stubExplicitReturnNeverAsMyOwnNever: MyOwnNever {
-    return fatalError() // expected-error {{cannot convert return expression of type 'Never' to return type 'MyOwnNever'}}
+    return fatalError()
 }
 
 var fv_stubExplicitReturnMyOwnNeverAsNever: Never {
@@ -852,7 +852,7 @@ var fvg_stubExplicitReturnNever: Never {
 
 var fvg_stubExplicitReturnNeverAsMyOwnNever: MyOwnNever {
     get {
-        return fatalError() // expected-error {{cannot convert return expression of type 'Never' to return type 'MyOwnNever'}}
+        return fatalError()
     }
 }
 
@@ -1198,7 +1198,7 @@ enum S_stubExplicitReturnNever {
 
 enum S_stubExplicitReturnNeverAsMyOwnNever {
     subscript() -> MyOwnNever {
-        return fatalError() // expected-error {{cannot convert return expression of type 'Never' to return type 'MyOwnNever'}}
+        return fatalError()
     }
 }
 
@@ -1457,7 +1457,7 @@ enum SRO_stubExplicitReturnNever {
 enum SRO_stubExplicitReturnNeverAsMyOwnNever {
     subscript() -> MyOwnNever {
         get {
-            return fatalError() // expected-error {{cannot convert return expression of type 'Never' to return type 'MyOwnNever'}}
+            return fatalError()
         }
     }
 }

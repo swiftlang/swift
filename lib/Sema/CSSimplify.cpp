@@ -4555,6 +4555,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   if (kind >= ConstraintKind::Subtype) {
+    // Bottom-to-anything conversion.
+    if (type1->isBottom()) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::FromUninhabited);
+    }
+
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass() &&
@@ -4845,13 +4850,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // expression functions.
   if (auto elt = locator.last()) {
     if (kind >= ConstraintKind::Subtype &&
-        (type1->isUninhabited() || type2->isVoid())) {
+        ((type1->isUninhabited()) || type2->isVoid()) && !type1->isBottom()) {
       // A conversion from closure body type to its signature result type.
       if (auto resultElt = elt->getAs<LocatorPathElt::ClosureBody>()) {
         // If a single statement closure has explicit `return` let's
         // forbid conversion to `Void` and report an error instead to
         // honor user's intent.
-        if (type1->isUninhabited() || !resultElt->hasExplicitReturn()) {
+        if ((type1->isUninhabited()) ||
+            !resultElt->hasExplicitReturn()) {
           increaseScore(SK_FunctionConversion);
           return getTypeMatchSuccess();
         }
@@ -9133,6 +9139,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       bridgedObjCClass->getDeclaredInterfaceType(),
                       ConstraintKind::Subtype, subflags, locator);
   }
+  case ConversionRestrictionKind::FromUninhabited:
+    // Nothing more to solve.
+    addContextualScore();
+    return SolutionKind::Solved;
   }
   
   llvm_unreachable("bad conversion restriction");

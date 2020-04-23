@@ -3364,6 +3364,16 @@ public:
   }
 };
 
+class FromUninhabitedExpr : public ImplicitConversionExpr {
+public:
+  FromUninhabitedExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::FromUninhabited, subExpr, type) {}
+
+   static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::FromUninhabited;
+  }
+};
+
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,

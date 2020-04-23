@@ -446,6 +446,7 @@ namespace {
              SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
+    RValue visitFromUninhabitedExpr(FromUninhabitedExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                               SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
@@ -1477,6 +1478,12 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
                                              loweredResultTy, C);
   return RValue(SGF, E, result);
 }
+
+RValue RValueEmitter::visitFromUninhabitedExpr(FromUninhabitedExpr *E,
+                                                SGFContext C) {
+   SGF.emitIgnoredExpr(E->getSubExpr());
+   return SGF.emitUndefRValue(E, E->getType());
+ }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
                                                 SGFContext C) {
