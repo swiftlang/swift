@@ -5,6 +5,10 @@
 // rdar://61814566
 // XFAIL: use_os_stdlib
 
+// This test uses raw pointers and so fails on arm64e which authenticates some
+// pointers.
+// XFAIL: arm64e
+
 import SwiftShims
 
 struct MetadataAccessFunction {
