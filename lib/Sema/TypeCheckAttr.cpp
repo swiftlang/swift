@@ -4380,14 +4380,8 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
         // requirements are not satisfied.
         if (!source)
           return false;
-        // Check if target's requirements are satisfied by source.
-        // Use invalid 'SourceLoc's to suppress diagnostics.
-        return TypeChecker::checkGenericArguments(
-                   derivative, SourceLoc(), SourceLoc(), Type(),
-                   source->getGenericParams(), target->getRequirements(),
-                   [](SubstitutableType *dependentType) {
-                     return Type(dependentType);
-                   }) == RequirementCheckResult::Success;
+
+        return target->requirementsNotSatisfiedBy(source).empty();
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
@@ -4914,17 +4908,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
         // requirements are not satisfied.
         if (!source)
           return false;
-        // Check if target's requirements are satisfied by source.
-        // Use invalid 'SourceLoc's to suppress diagnostics.
-        // Diagnostics should not be emitted because this function is used to
-        // check candidates; if no candidates match, a separate diagnostic will
-        // be produced.
-        return TypeChecker::checkGenericArguments(
-            transpose, SourceLoc(), SourceLoc(), Type(),
-            source->getGenericParams(), target->getRequirements(),
-            [](SubstitutableType *dependentType) {
-              return Type(dependentType);
-            }) == RequirementCheckResult::Success;
+
+        return target->requirementsNotSatisfiedBy(source).empty();
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
