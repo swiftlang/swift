@@ -471,7 +471,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     compared across translation units to determine, e.g., when references in
     one translation refer to an entity defined in another translation unit.
 
-  value witness table
+  VWT (value witness table)
     A runtime structure that describes how to do basic operations on an unknown
     value, like "assign", "copy", and "destroy". (For example, does copying
     this value require any retains?)
@@ -496,7 +496,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     `vtable <vtable (virtual dispatch table)>` but for a protocol instead of
     a class.
 
-    Only conceptually related to a `value witness table`.
+    Only conceptually related to a `value witness table <VWT (value witness table)>`.
 
   WMO (whole-module optimization)
     A compilation mode where all files in a module are compiled in a single
