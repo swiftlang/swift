@@ -167,8 +167,8 @@ ArrayRef<Decl *> ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   return ctx.AllocateCopy(decls);
 }
 
-evaluator::DependencySource
-ParseSourceFileRequest::readDependencySource(Evaluator &e) const {
+evaluator::DependencySource ParseSourceFileRequest::readDependencySource(
+    const evaluator::DependencyCollector &e) const {
   return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
 }
 
@@ -195,7 +195,8 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const CodeCompletionCallbacksFactory *factory) { }
 
 evaluator::DependencySource
-CodeCompletionSecondPassRequest::readDependencySource(Evaluator &e) const {
+CodeCompletionSecondPassRequest::readDependencySource(
+    const evaluator::DependencyCollector &e) const {
   return {std::get<0>(getStorage()), e.getActiveSourceScope()};
 }
 

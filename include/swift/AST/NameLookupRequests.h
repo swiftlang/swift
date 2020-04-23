@@ -188,8 +188,9 @@ public:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &e) const;
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &e) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ArrayRef<ProtocolDecl *> result) const;
 };
 
@@ -239,7 +240,7 @@ public:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            NominalTypeDecl *result) const;
 };
 
@@ -328,7 +329,8 @@ public:
 
 public:
   // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 class GenericParamListRequest :
@@ -431,8 +433,9 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            LookupResult res) const;
 };
 
@@ -477,7 +480,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            QualifiedLookupResult l) const;
 };
 
@@ -502,8 +505,9 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            QualifiedLookupResult lookupResult) const;
 };
 
@@ -528,7 +532,8 @@ private:
 
 public:
   // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 /// The input type for a direct lookup request.
@@ -580,7 +585,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            TinyPtrVector<ValueDecl *> result) const;
 };
 
@@ -665,7 +670,7 @@ public:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            OperatorType *o) const;
 };
 
@@ -755,7 +760,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceRef result) const;
 };
 
