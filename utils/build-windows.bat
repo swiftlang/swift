@@ -236,7 +236,6 @@ cmake^
     -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=YES^
     -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
-    -DPYTHON_EXECUTABLE:PATH=%PYTHON_HOME%\python.exe^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^

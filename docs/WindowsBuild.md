@@ -107,7 +107,6 @@ cmake -B "S:\b\toolchain" -G Ninja -S S:\toolchain\llvm ^
   -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include" ^
   -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-64/usr/lib/icuin64.lib" ^
   -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr" ^
-  -DPYTHON_EXECUTABLE=C:\Python27\python.exe ^
   -DSWIFT_BUILD_DYNAMIC_STDLIB=YES ^
   -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES
 
@@ -150,7 +149,7 @@ path S:\b\foundation\Foundation;%PATH%
 ## Build swift-corelibs-xctest
 
 ```cmd
-cmake -B S:\b\xctest -G Ninja -S S:\toolchain\swift-corelibs-xctest -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -Ddispatch_DIR=S:\b\dispatch\cmake\modules -DFoundation_DIR=S:\b\foundation\cmake\modules -DLIT_COMMAND=S:\toolchain\llvm\utils\lit\lit.py -DPYTHON_EXECUTABLE=C:\Python27\python.exe
+cmake -B S:\b\xctest -G Ninja -S S:\toolchain\swift-corelibs-xctest -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -Ddispatch_DIR=S:\b\dispatch\cmake\modules -DFoundation_DIR=S:\b\foundation\cmake\modules -DLIT_COMMAND=S:\toolchain\llvm\utils\lit\lit.py
 ninja -C S:\b\xctest
 ```
 

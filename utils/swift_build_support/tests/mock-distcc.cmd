@@ -1,3 +1,3 @@
 @ echo off
-IF NOT DEFINED PYTHON_EXECUTABLE SET PYTHON_EXECUTABLE=python
-"%PYTHON_EXECUTABLE%" "%~dp0\mock-distcc" %*
+IF NOT DEFINED PYTHON SET PYTHON=python
+"%PYTHON%" "%~dp0\mock-distcc" %*
