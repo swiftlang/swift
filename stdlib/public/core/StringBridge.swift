@@ -413,10 +413,42 @@ private func _getCocoaStringPointer(
   return .none
 }
 
+#if arch(arm64)
+//11000000..payload..111
+private var constantTagMask:UInt {
+  0b1111_1111_1000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0111
+}
+private var expectedConstantTagValue:UInt {
+  0b1100_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0111
+}
+#endif
+
+@inline(__always)
+private func formConstantTaggedCocoaString(
+  untaggedCocoa: _CocoaString
+) -> AnyObject? {
+#if !arch(arm64)
+  return nil
+#else
+
+  let constantPtr:UnsafeRawPointer = Builtin.reinterpretCast(untaggedCocoa)
+
+  // Check if what we're pointing to is actually a valid tagged constant
+  guard _swift_stdlib_dyld_is_objc_constant_string(constantPtr) == 1 else {
+    return nil
+  }
+
+  let retaggedPointer = UInt(bitPattern: constantPtr) | expectedConstantTagValue
+
+  return unsafeBitCast(retaggedPointer, to: AnyObject.self)
+#endif
+}
 
 @inline(__always)
 private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
-    (utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>?)? {
+    (utf16Length: Int,
+     asciiContentsPointer: UnsafePointer<UInt8>,
+     untaggedCocoa: _CocoaString)? {
 #if !arch(arm64)
   return nil
 #else
@@ -427,34 +459,33 @@ private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
 
   let taggedValue = unsafeBitCast(cocoaString, to: UInt.self)
   
-  //11000000..payload..111
-  let tagMask:UInt =
-    0b1111_1111_1000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0111
-  let expectedValue:UInt =
-    0b1100_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0111
 
-  guard taggedValue & tagMask == expectedValue else {
+
+  guard taggedValue & constantTagMask == expectedConstantTagValue else {
     return nil
   }
 
-  guard _swift_stdlib_dyld_is_objc_constant_string(
-    cocoaString as! UnsafeRawPointer
-  ) == 1 else {
-    return nil
-  }
-
-  let payloadMask = ~tagMask
+  let payloadMask = ~constantTagMask
   let payload = taggedValue & payloadMask
   let ivarPointer = UnsafePointer<_swift_shims_builtin_CFString>(
     bitPattern: payload
   )!
+
+  guard _swift_stdlib_dyld_is_objc_constant_string(
+    unsafeBitCast(ivarPointer, to: UnsafeRawPointer.self)
+  ) == 1 else {
+    return nil
+  }
+
   let length = ivarPointer.pointee.length
   let isUTF16Mask:UInt = 0x0000_0000_0000_0004 //CFStringFlags bit 4: isUnicode
   let isASCII = ivarPointer.pointee.flags & isUTF16Mask == 0
+  precondition(isASCII) // we don't currently support non-ASCII here
   let contentsPtr = ivarPointer.pointee.str
   return (
     utf16Length: Int(length),
-    asciiContentsPointer: isASCII ? contentsPtr : nil
+    asciiContentsPointer: contentsPtr,
+    untaggedCocoa: Builtin.reinterpretCast(ivarPointer)
   )
 #endif
 }
@@ -476,9 +507,9 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   case .constantTagged:
     let taggedContents = getConstantTaggedCocoaContents(cocoaString)!
     return _StringGuts(
-      cocoa: cocoaString,
+      cocoa: taggedContents.untaggedCocoa,
       providesFastUTF8: false, //TODO: if contentsPtr is UTF8 compatible, use it
-      isASCII: taggedContents.asciiContentsPointer != nil,
+      isASCII: true,
       length: taggedContents.utf16Length
     )
 #endif
@@ -590,7 +621,8 @@ extension String {
 
     _internalInvariant(_guts._object.hasObjCBridgeableObject,
       "Unknown non-bridgeable object case")
-    return _guts._object.objCBridgeableObject
+    let result = _guts._object.objCBridgeableObject
+    return formConstantTaggedCocoaString(untaggedCocoa: result) ?? result
   }
 }
 
