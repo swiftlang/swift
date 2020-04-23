@@ -1331,13 +1331,13 @@ public:
   }
 };
 
-/// A reference to a type in expression context, spelled out as a TypeLoc.
+/// A reference to a type in expression context.
 ///
-/// The type of this expression is always \c MetaTypeType.
+/// The type of this expression is always \c MetatypeType.
 class TypeExpr : public Expr {
   TypeRepr *Repr;
 public:
-  // Create a TypeExpr with location information.
+  /// Create a \c TypeExpr from a parsed \c TypeRepr.
   TypeExpr(TypeRepr *Ty);
 
   /// Retrieves the corresponding instance type of the type referenced by this
@@ -1348,20 +1348,46 @@ public:
   /// resulting instance type is \c ErrorType.
   Type getInstanceType() const;
 
-  // Create an implicit TypeExpr, which has no location information.
+public:
+  /// Create an implicit \c TypeExpr.
+  ///
+  /// The given type is required to be non-null and must be not be
+  /// a \c MetatypeType as this function will wrap the given type in one.
+  ///
+  /// FIXME: This behavior is bizarre.
   static TypeExpr *createImplicit(Type Ty, ASTContext &C);
 
-  // Create an implicit TypeExpr, with location information even though it
-  // shouldn't have one.  This is presently used to work around other location
-  // processing bugs.  If you have an implicit location, use createImplicit.
+  /// Create an implicit \c TypeExpr that has artificial
+  /// location information attached.
+  ///
+  /// The given type is required to be non-null and must be not be
+  /// a \c MetatypeType as this function will wrap the given type in one.
+  ///
+  /// FIXME: This behavior is bizarre.
+  ///
+  /// Due to limitations in the modeling of certain AST elements, implicit
+  /// \c TypeExpr nodes are often the only source of location information the
+  /// expression checker has when it comes time to diagnose an error.
   static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C);
 
-  
-  /// Create a TypeExpr for a TypeDecl at the specified location.
-  static TypeExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D, DeclContext *DC);
-
+  /// Create an implicit \c TypeExpr for a given \c TypeDecl at the specified location.
+  ///
+  /// The given type is required to be non-null and must be not be
+  /// a \c MetatypeType as this function will wrap the given type in one.
+  ///
+  /// FIXME: This behavior is bizarre.
+  ///
+  /// Unlike the non-implicit case, the given location is not required to be
+  /// valid.
   static TypeExpr *createImplicitForDecl(DeclNameLoc Loc, TypeDecl *D,
                                          DeclContext *DC, Type ty);
+
+public:
+  /// Create a \c TypeExpr for a given \c TypeDecl at the specified location.
+  ///
+  /// The given location must be valid. If it is not, you must use
+  /// \c TypeExpr::createImplicitForDecl instead.
+  static TypeExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D, DeclContext *DC);
 
   /// Create a TypeExpr for a member TypeDecl of the given parent TypeDecl.
   static TypeExpr *createForMemberDecl(DeclNameLoc ParentNameLoc,
