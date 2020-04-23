@@ -803,9 +803,17 @@ void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
   if (!SF.shouldCrossImport())
     return;
 
-  if (I.getUnderlyingModule())
+  if (I.getUnderlyingModule()) {
+    auto underlying = I.getUnderlyingModule().get();
+
+    // If this is a clang module, and it has a clang overlay, we want the
+    // separately-imported overlay to sit on top of the clang overlay.
+    if (underlying->isNonSwiftModule())
+      underlying = underlying->getTopLevelModule(true);
+
     // FIXME: Should we warn if M doesn't reexport underlyingModule?
-    SF.addSeparatelyImportedOverlay(M, I.getUnderlyingModule().get());
+    SF.addSeparatelyImportedOverlay(M, underlying);
+  }
 
   auto newImports = crossImportableModules.getArrayRef()
                         .drop_front(nextModuleToCrossImport);

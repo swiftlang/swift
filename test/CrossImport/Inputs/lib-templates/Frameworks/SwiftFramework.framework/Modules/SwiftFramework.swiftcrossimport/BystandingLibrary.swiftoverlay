@@ -1,0 +1,5 @@
+%YAML 1.2
+---
+version: 1
+modules:
+  - name: _SwiftFramework_BystandingLibrary

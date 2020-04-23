@@ -1418,6 +1418,22 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
   }
 }
 
+void SourceFile::dumpSeparatelyImportedOverlays() const {
+  for (auto &pair : separatelyImportedOverlays) {
+    auto &underlying = std::get<0>(pair);
+    auto &overlays = std::get<1>(pair);
+
+    llvm::errs() << (void*)underlying << " ";
+    underlying->dump(llvm::errs());
+
+    for (auto overlay : overlays) {
+      llvm::errs() << "- ";
+      llvm::errs() << (void*)overlay << " ";
+      overlay->dump(llvm::errs());
+    }
+  }
+}
+
 void ModuleDecl::getImportedModulesForLookup(
     SmallVectorImpl<ImportedModule> &modules) const {
   FORWARD(getImportedModulesForLookup, (modules));
