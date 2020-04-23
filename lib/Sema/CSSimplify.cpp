@@ -9211,22 +9211,32 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   if (isAugmentingFix(fix)) {
     Fixes.push_back(fix);
-  } else if (auto *anchor = getAsExpr(fix->getAnchor())) {
-    // Only useful to record if no pre-existing fix in the subexpr tree.
-    llvm::SmallDenseSet<Expr *> fixExprs;
-    for (auto fix : Fixes) {
-      if (auto *E = getAsExpr(fix->getAnchor()))
-        fixExprs.insert(E);
-    }
+    return false;
+  }
 
-    bool found = false;
-    anchor->forEachChildExpr([&](Expr *subExpr) -> Expr * {
-      found |= fixExprs.count(subExpr) > 0;
+  auto anchor = fix->getAnchor();
+  assert(bool(anchor) && "non-augmenting fix without an anchor?");
+
+  // Only useful to record if no pre-existing fix is associated with
+  // current anchor or, in case of anchor being an expression, any of
+  // its sub-expressions.
+  llvm::SmallDenseSet<TypedNode> anchors;
+  for (const auto *fix : Fixes)
+    anchors.insert(fix->getAnchor());
+
+  bool found = false;
+  if (auto *expr = getAsExpr(anchor)) {
+    expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+      found |= anchors.count(subExpr);
       return subExpr;
     });
-    if (!found)
-      Fixes.push_back(fix);
+  } else {
+    found = anchors.count(anchor);
   }
+
+  if (!found)
+    Fixes.push_back(fix);
+
   return false;
 }
 
