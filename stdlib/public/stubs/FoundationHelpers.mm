@@ -112,6 +112,7 @@ swift::_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
 
 __swift_uint8_t
 swift::_swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
+  initializeBridgingFunctions();
   if (!dyld_is_objc_constant) return false;
   return dyld_is_objc_constant(dyld_objc_string_kind, addr) ? 1 : 0;
 }
