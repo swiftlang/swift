@@ -501,7 +501,7 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
   };
 
   CRState = ConditionalRequirementsState::Computing;
-  auto success = [this](ArrayRef<Requirement> reqs) {
+  auto success = [this](ArrayRef<Requirement> reqs = {}) {
     ConditionalRequirements = reqs;
     assert(CRState == ConditionalRequirementsState::Computing);
     CRState = ConditionalRequirementsState::Complete;
@@ -510,30 +510,23 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     assert(CRState == ConditionalRequirementsState::Computing);
     CRState = ConditionalRequirementsState::Uncomputed;
   };
-  
-  auto &ctxt = getProtocol()->getASTContext();
-  auto DC = getDeclContext();
+
   // A non-extension conformance won't have conditional requirements.
-  if (!isa<ExtensionDecl>(DC)) {
-    success({});
-    return;
-  }
-
-  auto *ext = cast<ExtensionDecl>(DC);
-  auto nominal = ext->getExtendedNominal();
-  auto typeSig = nominal->getGenericSignature();
-
-  // A non-generic type won't have conditional requirements.
-  if (!typeSig) {
-    success({});
-    return;
+  const auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
+  if (!ext) {
+    return success();
   }
 
   // If the extension is invalid, it won't ever get a signature, so we
   // "succeed" with an empty result instead.
   if (ext->isInvalid()) {
-    success({});
-    return;
+    return success();
+  }
+
+  // A non-generic type won't have conditional requirements.
+  const auto typeSig = ext->getExtendedNominal()->getGenericSignature();
+  if (!typeSig) {
+    return success();
   }
 
   // Recursively validating the signature comes up frequently as expanding
@@ -542,28 +535,26 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
   //
   // FIXME: In the long run, break this cycle in a more principled way.
   if (ext->isComputingGenericSignature()) {
-    failure();
-    return;
+    return failure();
   }
 
-  auto extensionSig = ext->getGenericSignature();
-  auto canExtensionSig = extensionSig.getCanonicalSignature();
-  auto canTypeSig = typeSig.getCanonicalSignature();
-  if (canTypeSig == canExtensionSig) {
-    success({});
-    return;
-  }
+  const auto extensionSig = ext->getGenericSignature();
 
   // The extension signature should be a superset of the type signature, meaning
   // every thing in the type signature either is included too or is implied by
   // something else. The most important bit is having the same type
   // parameters. (NB. if/when Swift gets parameterized extensions, this needs to
   // change.)
-  assert(canTypeSig.getGenericParams() == canExtensionSig.getGenericParams());
+  assert(typeSig->getCanonicalSignature().getGenericParams() ==
+         extensionSig->getCanonicalSignature().getGenericParams());
 
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.
-  success(ctxt.AllocateCopy(extensionSig->requirementsNotSatisfiedBy(typeSig)));
+  const auto unsatReqs = extensionSig->requirementsNotSatisfiedBy(typeSig);
+  if (unsatReqs.empty())
+    return success();
+
+  return success(getProtocol()->getASTContext().AllocateCopy(unsatReqs));
 }
 
 void NormalProtocolConformance::setSignatureConformances(
