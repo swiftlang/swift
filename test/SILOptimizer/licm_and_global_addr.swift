@@ -3,6 +3,8 @@
 // RUN: %target-build-swift -O %S/Inputs/licm_and_global_addr/main.swift %s -I%t %t/test.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: executable_test
+
 import Test
 
 // Check that LICM does not move a global_addr above an alloc_global in case
