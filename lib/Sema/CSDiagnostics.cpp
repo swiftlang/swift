@@ -6227,7 +6227,7 @@ bool CoercionAsForceCastFailure::diagnoseAsError() {
 
 bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
   auto locator = getLocator();
-  assert(locator->isKeyPathRoot() && "Expect a key path root");
+  assert(locator->isKeyPathRoot() && "Expected a key path root");
   
   auto baseType = getFromType();
   auto rootType = getToType();

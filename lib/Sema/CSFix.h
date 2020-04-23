@@ -252,7 +252,7 @@ enum class FixKind : uint8_t {
   /// A warning fix that allows a coercion to perform a force-cast.
   AllowCoercionToForceCast,
   
-  /// Allow key path root type mismatch when applying a key path with a 
+  /// Allow key path root type mismatch when applying a key path that has a
   /// root type not convertible to the type of the base instance.
   AllowKeyPathRootTypeMismatch,
 };
@@ -1776,7 +1776,7 @@ public:
 /// applied to a base instance of another type.
 ///
 /// \code
-/// func f (_ bar: Bar , keyPath: KeyPath<Foo, Int> ) {
+/// func f(_ bar: Bar , keyPath: KeyPath<Foo, Int> ) {
 ///   bar[keyPath: keyPath]
 /// }
 /// \endcode

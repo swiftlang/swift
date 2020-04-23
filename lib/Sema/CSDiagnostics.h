@@ -2027,7 +2027,7 @@ public:
 /// base that has another type.
 ///
 /// \code
-/// func f (_ bar: Bar , keyPath: KeyPath<Foo, Int> ) {
+/// func f(_ bar: Bar , keyPath: KeyPath<Foo, Int> ) {
 ///   bar[keyPath: keyPath]
 /// }
 /// \endcode
