@@ -43,6 +43,8 @@ enum MetadataAllocatorTags : uint16_t {
   GenericMetadataCacheTag,
   ForeignMetadataCacheTag,
   GenericWitnessTableCacheTag,
+  GenericClassMetadataTag,
+  GenericValueMetadataTag,
 };
 
 /// The buffer used by a yield-once coroutine (such as the generalized
