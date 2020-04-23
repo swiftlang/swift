@@ -114,6 +114,7 @@ include(SwiftHandleGybSources)
 include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(DarwinSDKs)
+include(FindPython)
 
 
 # Without this line, installing components is broken. This needs refactoring.
