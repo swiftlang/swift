@@ -331,25 +331,6 @@ enum class RequirementCheckResult {
   Success, Failure, SubstitutionFailure
 };
 
-/// Flags that control protocol conformance checking.
-enum class ConformanceCheckFlags {
-  /// Whether to skip the check for any conditional conformances.
-  ///
-  /// When set, the caller takes responsibility for any
-  /// conditional requirements required for the conformance to be
-  /// correctly used. Otherwise (the default), all of the conditional
-  /// requirements will be checked.
-  SkipConditionalRequirements = 0x01,
-};
-
-/// Options that control protocol conformance checking.
-using ConformanceCheckOptions = OptionSet<ConformanceCheckFlags>;
-
-inline ConformanceCheckOptions operator|(ConformanceCheckFlags lhs,
-                                         ConformanceCheckFlags rhs) {
-  return ConformanceCheckOptions(lhs) | rhs;
-}
-
 /// Describes the kind of checked cast operation being performed.
 enum class CheckedCastContextKind {
   /// None: we're just establishing how to perform the checked cast. This
@@ -923,13 +904,11 @@ Expr *addImplicitLoadExpr(
 /// \param DC The context in which to check conformance. This affects, for
 /// example, extension visibility.
 ///
-/// \param options Options that control the conformance check.
-///
 /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
 /// an empty optional.
 ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
                                         DeclContext *DC,
-                                        ConformanceCheckOptions options);
+                                        bool skipConditionalRequirements=false);
 
 /// Determine whether the given type conforms to the given protocol.
 ///
@@ -938,8 +917,6 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
 ///
 /// \param DC The context in which to check conformance. This affects, for
 /// example, extension visibility.
-///
-/// \param options Options that control the conformance check.
 ///
 /// \param ComplainLoc If valid, then this function will emit diagnostics if
 /// T does not conform to the given protocol. The primary diagnostic will
@@ -950,7 +927,6 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
 /// protocol \c Proto, or \c None.
 ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
                                           DeclContext *DC,
-                                          ConformanceCheckOptions options,
                                           SourceLoc ComplainLoc = SourceLoc());
 
   /// Completely check the given conformance.

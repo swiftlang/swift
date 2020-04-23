@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -818,12 +819,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       case RequirementKind::Conformance: {
         // Protocol conformance requirements.
         auto proto = secondType->castTo<ProtocolType>();
-        // FIXME: Poor location information. How much better can we do here?
-        // FIXME: This call should support listener to be able to properly
-        //        diagnose problems with conformances.
-        auto conformance = conformsToProtocol(firstType, proto->getDecl(), dc,
-                                              ConformanceCheckFlags::SkipConditionalRequirements,
-                                              loc);
+        auto conformance = module->lookupConformance(firstType, proto->getDecl());
 
         if (conformance) {
           // Report the conformance.
@@ -841,7 +837,9 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
           continue;
         }
 
-        // A failure at the top level is diagnosed elsewhere.
+        if (loc.isValid())
+          diagnoseConformanceFailure(firstType, proto->getDecl(), module, loc);
+
         if (current.Parents.empty())
           return RequirementCheckResult::Failure;
 

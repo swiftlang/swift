@@ -981,9 +981,8 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
   if (protocol) {
-    auto conformanceRef = TypeChecker::conformsToProtocol(
-        parentTy, protocol, dc,
-         ConformanceCheckFlags::SkipConditionalRequirements);
+    auto conformanceRef = dc->getParentModule()->lookupConformance(
+        parentTy, protocol);
     if (conformanceRef.isConcrete())
       conformance = conformanceRef.getConcrete();
   }
@@ -3054,7 +3053,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
 
     witnessMethodConformance = TypeChecker::conformsToProtocol(
-        selfType, protocolType->getDecl(), DC, ConformanceCheckOptions());
+        selfType, protocolType->getDecl(), DC);
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }

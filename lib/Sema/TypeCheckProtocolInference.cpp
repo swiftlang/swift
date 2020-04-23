@@ -949,17 +949,17 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
 
       SWIFT_DEFER { recursionCheck.erase(assocType); };
 
+      auto *module = dc->getParentModule();
+
       // Try to substitute into the base type.
-      Type result = depMemTy->substBaseType(dc->getParentModule(), baseTy);
+      Type result = depMemTy->substBaseType(module, baseTy);
       if (!result->hasError())
         return result;
 
       // If that failed, check whether it's because of the conformance we're
       // evaluating.
       auto localConformance
-        = TypeChecker::conformsToProtocol(
-                          baseTy, assocType->getProtocol(), dc,
-                          ConformanceCheckFlags::SkipConditionalRequirements);
+        = module->lookupConformance(baseTy, assocType->getProtocol());
       if (localConformance.isInvalid() || localConformance.isAbstract() ||
           (localConformance.getConcrete()->getRootConformance() !=
            conformance)) {

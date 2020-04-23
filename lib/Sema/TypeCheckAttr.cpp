@@ -1117,8 +1117,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   if (!hasKeywordArguments) {
     auto arrayLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    return (bool)TypeChecker::conformsToProtocol(argType, arrayLitProto, DC,
-                                                 ConformanceCheckOptions());
+    return (bool)TypeChecker::conformsToProtocol(argType, arrayLitProto, DC);
   }
   // If keyword arguments, check that argument type conforms to
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
@@ -1127,13 +1126,11 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
     ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
     ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC,
-                                                  ConformanceCheckOptions());
+  auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC);
   if (dictConf.isInvalid())
     return false;
   auto keyType = dictConf.getTypeWitnessByName(argType, ctx.Id_Key);
-  return (bool)TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
-                                               ConformanceCheckOptions());
+  return (bool)TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC);
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -1226,8 +1223,7 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
     ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
 
   // If this is `subscript(dynamicMember: String*)`
-  return (bool)TypeChecker::conformsToProtocol(paramType, stringLitProto, DC,
-                                               ConformanceCheckOptions());
+  return (bool)TypeChecker::conformsToProtocol(paramType, stringLitProto, DC);
 }
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
@@ -1668,7 +1664,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   if (!ApplicationDelegateProto ||
       !TypeChecker::conformsToProtocol(CD->getDeclaredType(),
-                                       ApplicationDelegateProto, CD, None)) {
+                                       ApplicationDelegateProto, CD)) {
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_not_ApplicationDelegate,
              applicationMainKind);
@@ -2632,7 +2628,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   }
 
   // The type eraser must conform to the annotated protocol
-  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc, None)) {
+  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc)) {
     diags.diagnose(attr->getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
@@ -3353,7 +3349,7 @@ static ProtocolConformanceRef getDifferentiableConformance(Type type,
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
   auto conf =
-      TypeChecker::conformsToProtocol(type, differentiableProto, DC, None);
+      TypeChecker::conformsToProtocol(type, differentiableProto, DC);
   if (!conf)
     return ProtocolConformanceRef();
   // Try to get the `TangentVector` type witness, in case the conformance has
