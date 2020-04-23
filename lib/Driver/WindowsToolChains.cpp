@@ -84,18 +84,6 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
       Arguments.push_back("/DEBUG");
   }
 
-  // Configure the toolchain.
-  const char *LinkerDriver =
-      context.Args.hasArg(options::OPT_enable_experimental_cxx_interop) ?
-      "clang++" : "clang";
-  if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
-    StringRef toolchainPath(A->getValue());
-
-    // If there is a linker driver in the toolchain folder, use that instead.
-    if (auto tool = llvm::sys::findProgramByName(LinkerDriver, {toolchainPath}))
-      LinkerDriver = context.Args.MakeArgString(tool.get());
-  }
-
   // Rely on `-libc` to correctly identify the MSVC Runtime Library.  We use
   // `-nostartfiles` as that limits the difference to just the
   // `-defaultlib:libcmt` which is passed unconditionally with the `clang++`
@@ -189,7 +177,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  InvocationInfo II{LinkerDriver, Arguments};
+  InvocationInfo II{getClangLinkerDriver(context.Args), Arguments};
   II.allowsResponseFiles = true;
 
   return II;

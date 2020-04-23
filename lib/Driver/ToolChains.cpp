@@ -1332,6 +1332,26 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
   }
 }
 
+const char *ToolChain::getClangLinkerDriver(
+    const llvm::opt::ArgList &Args) const {
+  // We don't use `clang++` unconditionally because we want to avoid pulling in
+  // a C++ standard library if it's not needed, in particular because the
+  // standard library that `clang++` selects by default may not be the one that
+  // is desired.
+  const char *LinkerDriver =
+      Args.hasArg(options::OPT_enable_experimental_cxx_interop) ?
+      "clang++" : "clang";
+  if (const Arg *A = Args.getLastArg(options::OPT_tools_directory)) {
+    StringRef toolchainPath(A->getValue());
+
+    // If there is a linker driver in the toolchain folder, use that instead.
+    if (auto tool = llvm::sys::findProgramByName(LinkerDriver, {toolchainPath}))
+      LinkerDriver = Args.MakeArgString(tool.get());
+  }
+
+  return LinkerDriver;
+}
+
 bool ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
                                           StringRef sanitizerName,
                                           bool shared) const {
