@@ -20,14 +20,15 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/AST/DiagnosticsSIL.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -541,15 +542,17 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitEpilog(ace);
 }
 
-void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
+void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   // Load argc and argv from the entry point arguments.
   SILValue argc = F.begin()->getArgument(0);
   SILValue argv = F.begin()->getArgument(1);
 
-  switch (mainClass->getArtificialMainKind()) {
+  switch (mainDecl->getArtificialMainKind()) {
   case ArtificialMainKind::UIApplicationMain: {
     // Emit a UIKit main.
     // return UIApplicationMain(C_ARGC, C_ARGV, nil, ClassName);
+
+    auto *mainClass = cast<NominalTypeDecl>(mainDecl);
 
     CanType NSStringTy = SGM.Types.getNSStringType();
     CanType OptNSStringTy
@@ -676,6 +679,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // Emit an AppKit main.
     // return NSApplicationMain(C_ARGC, C_ARGV);
 
+    auto *mainClass = cast<NominalTypeDecl>(mainDecl);
+
     SILParameterInfo argTypes[] = {
       SILParameterInfo(argc->getType().getASTType(),
                        ParameterConvention::Direct_Unowned),
@@ -713,6 +718,76 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     if (r->getType() != rType)
       r = B.createStruct(mainClass, rType, r);
     B.createReturn(mainClass, r);
+    return;
+  }
+
+  case ArtificialMainKind::TypeMain: {
+    // Emit a call to the main static function.
+    // return Module.$main();
+    auto *mainFunc = cast<FuncDecl>(mainDecl);
+    auto moduleLoc = RegularLocation::getModuleLocation();
+    auto *entryBlock = B.getInsertionBB();
+
+    SILDeclRef mainFunctionDeclRef(mainFunc, SILDeclRef::Kind::Func);
+    SILFunction *mainFunction =
+        SGM.getFunction(mainFunctionDeclRef, NotForDefinition);
+
+    ExtensionDecl *mainExtension =
+        dyn_cast<ExtensionDecl>(mainFunc->getDeclContext());
+
+    NominalTypeDecl *mainType;
+    if (mainExtension) {
+      mainType = mainExtension->getExtendedNominal();
+    } else {
+      mainType = cast<NominalTypeDecl>(mainFunc->getDeclContext());
+    }
+    auto metatype = B.createMetatype(mainType, getLoweredType(mainType->getInterfaceType()));
+
+    auto mainFunctionRef = B.createFunctionRef(moduleLoc, mainFunction);
+
+    auto builtinInt32Type = SILType::getBuiltinIntegerType(32, getASTContext());
+
+    auto *exitBlock = createBasicBlock();
+    B.setInsertionPoint(exitBlock);
+    SILValue exitCode = exitBlock->createPhiArgument(builtinInt32Type,
+                                                     ValueOwnershipKind::None);
+    auto returnType = F.getConventions().getSingleSILResultType();
+    if (exitCode->getType() != returnType)
+      exitCode = B.createStruct(moduleLoc, returnType, exitCode);
+    B.createReturn(moduleLoc, exitCode);
+
+    if (mainFunc->hasThrows()) {
+      auto *successBlock = createBasicBlock();
+      B.setInsertionPoint(successBlock);
+      successBlock->createPhiArgument(SGM.Types.getEmptyTupleType(),
+                                      ValueOwnershipKind::None);
+      SILValue zeroReturnValue =
+          B.createIntegerLiteral(moduleLoc, builtinInt32Type, 0);
+      B.createBranch(moduleLoc, exitBlock, {zeroReturnValue});
+
+      auto *failureBlock = createBasicBlock();
+      B.setInsertionPoint(failureBlock);
+      SILValue error = failureBlock->createPhiArgument(
+          SILType::getExceptionType(getASTContext()),
+          ValueOwnershipKind::Owned);
+      // Log the error.
+      B.createBuiltin(moduleLoc, getASTContext().getIdentifier("errorInMain"),
+                      SGM.Types.getEmptyTupleType(), {}, {error});
+      B.createEndLifetime(moduleLoc, error);
+      SILValue oneReturnValue =
+          B.createIntegerLiteral(moduleLoc, builtinInt32Type, 1);
+      B.createBranch(moduleLoc, exitBlock, {oneReturnValue});
+
+      B.setInsertionPoint(entryBlock);
+      B.createTryApply(moduleLoc, mainFunctionRef, SubstitutionMap(),
+                       {metatype}, successBlock, failureBlock);
+    } else {
+      B.setInsertionPoint(entryBlock);
+      B.createApply(moduleLoc, mainFunctionRef, SubstitutionMap(), {metatype});
+      SILValue returnValue =
+          B.createIntegerLiteral(moduleLoc, builtinInt32Type, 0);
+      B.createBranch(moduleLoc, exitBlock, {returnValue});
+    }
     return;
   }
   }

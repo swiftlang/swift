@@ -148,11 +148,12 @@ private:
   Optional<ReferencedNameTracker> ReferencedNames;
   Optional<ReferencedNameTracker> RequestReferencedNames;
 
-  /// The class in this file marked \@NS/UIApplicationMain.
-  ClassDecl *MainClass = nullptr;
+  /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
+  /// that calls main on the type marked @main.
+  Decl *MainDecl = nullptr;
 
-  /// The source location of the main class.
-  SourceLoc MainClassDiagLoc;
+  /// The source location of the main type.
+  SourceLoc MainDeclDiagLoc;
 
   /// A hash of all interface-contributing tokens that have been lexed for
   /// this source file so far.
@@ -555,26 +556,28 @@ public:
     llvm_unreachable("bad SourceFileKind");
   }
 
-  ClassDecl *getMainClass() const override {
-    return MainClass;
+  Decl *getMainDecl() const override { return MainDecl; }
+  SourceLoc getMainDeclDiagLoc() const {
+    assert(hasMainDecl());
+    return MainDeclDiagLoc;
   }
   SourceLoc getMainClassDiagLoc() const {
     assert(hasMainClass());
-    return MainClassDiagLoc;
+    return getMainDeclDiagLoc();
   }
 
   /// Register a "main" class for the module, complaining if there is more than
   /// one.
   ///
   /// Should only be called during type-checking.
-  bool registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc);
+  bool registerMainDecl(Decl *mainDecl, SourceLoc diagLoc);
 
   /// True if this source file has an application entry point.
   ///
   /// This is true if the source file either is in script mode or contains
   /// a designated main class.
   bool hasEntryPoint() const override {
-    return isScriptMode() || hasMainClass();
+    return isScriptMode() || hasMainDecl();
   }
 
   /// Get the root refinement context for the file. The root context may be

@@ -79,6 +79,7 @@ struct MyStruct {}
 // KEYWORD3-NEXT:             Keyword/None:                       available[#Class Attribute#]; name=available{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc[#Class Attribute#]; name=objc{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       dynamicCallable[#Class Attribute#]; name=dynamicCallable{{$}}
+// KEYWORD3-NEXT:             Keyword/None:                       main[#Class Attribute#]; name=main
 // KEYWORD3-NEXT:             Keyword/None:                       dynamicMemberLookup[#Class Attribute#]; name=dynamicMemberLookup{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       IBDesignable[#Class Attribute#]; name=IBDesignable{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       UIApplicationMain[#Class Attribute#]; name=UIApplicationMain{{$}}
@@ -98,6 +99,7 @@ struct MyStruct {}
 // KEYWORD4-NEXT:             Keyword/None:                       available[#Enum Attribute#]; name=available{{$}}
 // KEYWORD4-NEXT:             Keyword/None:                       objc[#Enum Attribute#]; name=objc{{$}}
 // KEYWORD4-NEXT:             Keyword/None:                       dynamicCallable[#Enum Attribute#]; name=dynamicCallable
+// KEYWORD4-NEXT:             Keyword/None:                       main[#Enum Attribute#]; name=main
 // KEYWORD4-NEXT:             Keyword/None:                       dynamicMemberLookup[#Enum Attribute#]; name=dynamicMemberLookup
 // KEYWORD4-NEXT:             Keyword/None:                       usableFromInline[#Enum Attribute#]; name=usableFromInline
 // KEYWORD4-NEXT:             Keyword/None:                       frozen[#Enum Attribute#]; name=frozen
@@ -110,6 +112,7 @@ struct MyStruct {}
 // KEYWORD5:                  Begin completions
 // KEYWORD5-NEXT:             Keyword/None:                       available[#Struct Attribute#]; name=available{{$}}
 // KEYWORD5-NEXT:             Keyword/None:                       dynamicCallable[#Struct Attribute#]; name=dynamicCallable
+// KEYWORD5-NEXT:             Keyword/None:                       main[#Struct Attribute#]; name=main
 // KEYWORD5-NEXT:             Keyword/None:                       dynamicMemberLookup[#Struct Attribute#]; name=dynamicMemberLookup
 // KEYWORD5-NEXT:             Keyword/None:                       usableFromInline[#Struct Attribute#]; name=usableFromInline
 // KEYWORD5-NEXT:             Keyword/None:                       frozen[#Struct Attribute#]; name=frozen
@@ -219,6 +222,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available
 // ON_MEMBER_LAST-DAG: Keyword/None:                       objc[#Declaration Attribute#]; name=objc
 // ON_MEMBER_LAST-DAG: Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
+// ON_MEMBER_LAST-DAG: Keyword/None:                       main[#Declaration Attribute#]; name=main
 // ON_MEMBER_LAST-DAG: Keyword/None:                       dynamicMemberLookup[#Declaration Attribute#]; name=dynamicMemberLookup
 // ON_MEMBER_LAST-DAG: Keyword/None:                       NSCopying[#Declaration Attribute#]; name=NSCopying
 // ON_MEMBER_LAST-DAG: Keyword/None:                       IBAction[#Declaration Attribute#]; name=IBAction
@@ -265,6 +269,7 @@ func dummy2() {}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
+// KEYWORD_LAST-NEXT:             Keyword/None:                       main[#Declaration Attribute#]; name=main
 // KEYWORD_LAST-NEXT:             Keyword/None:                       dynamicMemberLookup[#Declaration Attribute#]; name=dynamicMemberLookup
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSCopying[#Declaration Attribute#]; name=NSCopying{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       IBAction[#Declaration Attribute#]; name=IBAction{{$}}
