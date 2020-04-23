@@ -24,6 +24,15 @@ class Foo {
   }
 }
 
+struct Foo1 {
+  lazy var bar = 1 {
+    didSet(oldValue) {}
+  }
+}
+
+var foo1 = Foo1()
+foo1.bar = 2
+
 // Setter which calls willSet and didSet (which fetches the oldValue) //
 
 // CHECK-LABEL: sil hidden [ossa] @$s28lazy_property_with_observers3FooC3barSivs : $@convention(method) (Int, @guaranteed Foo) -> () {
@@ -122,6 +131,32 @@ class Foo {
 // CHECK-NEXT:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF_ELEM]] : $*Optional<Int>
 // CHECK-NEXT:  assign [[ENUM]] to [[BEGIN_ACCESS]] : $*Optional<Int>
 // CHECK-NEXT:  end_access [[BEGIN_ACCESS]] : $*Optional<Int>
+// CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:  return [[TUPLE]] : $()
+// CHECK-END: }
+
+// Setter which calls a didSet (which fetches the oldValue) and uses a mutating getter
+
+// CHECK-LABEL: sil hidden [ossa] @$s28lazy_property_with_observers4Foo1V3barSivs : $@convention(method) (Int, @inout Foo1) -> () {
+// CHECK: bb0([[VALUE:%.*]] : $Int, [[FOO1:%.*]] : $*Foo1):
+// CHECK-NEXT:  debug_value [[VALUE]] : $Int, let, name "value", argno 1
+// CHECK-NEXT:  debug_value_addr [[FOO1]] : $*Foo1, var, name "self", argno 2
+// CHECK-NEXT:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [unknown] %1 : $*Foo1
+// CHECK-NEXT: // function_ref Foo1.bar.getter
+// CHECK-NEXT:  [[GETTER:%.*]] = function_ref @$s28lazy_property_with_observers4Foo1V3barSivg : $@convention(method) (@inout Foo1) -> Int
+// CHECK-NEXT:  [[OLDVALUE:%.*]] = apply [[GETTER]]([[BEGIN_ACCESS]]) : $@convention(method) (@inout Foo1) -> Int
+// CHECK-NEXT:  debug_value [[OLDVALUE]] : $Int, let, name "tmp"
+// CHECK-NEXT:  end_access [[BEGIN_ACCESS]] : $*Foo1
+// CHECK-NEXT:  [[ENUM:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, [[VALUE]] : $Int
+// CHECK-NEXT:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [unknown] [[FOO1]] : $*Foo1
+// CHECK-NEXT:  [[REF_ELEM:%.*]] = struct_element_addr [[BEGIN_ACCESS]] : $*Foo1, #Foo1.$__lazy_storage_$_bar
+// CHECK-NEXT:  assign [[ENUM]] to [[REF_ELEM]] : $*Optional<Int>
+// CHECK-NEXT:  end_access [[BEGIN_ACCESS]] : $*Foo1
+// CHECK-NEXT:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [unknown] [[FOO1]] : $*Foo1
+// CHECK-NEXT:  // function_ref Foo1.bar.didset
+// CHECK-NEXT:  [[DIDSET:%.*]] = function_ref @$s28lazy_property_with_observers4Foo1V3barSivW : $@convention(method) (Int, @inout Foo1) -> ()
+// CHECK-NEXT:  [[DIDSET_RESULT:%.*]] = apply [[DIDSET]]([[OLDVALUE]], [[BEGIN_ACCESS]]) : $@convention(method) (Int, @inout Foo1) -> ()
+// CHECK-NEXT:  end_access [[BEGIN_ACCESS]] : $*Foo1
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-END: }
