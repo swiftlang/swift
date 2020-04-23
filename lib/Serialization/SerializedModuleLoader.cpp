@@ -1218,6 +1218,10 @@ StringRef SerializedASTFile::getTargetTriple() const {
   return File.getTargetTriple();
 }
 
+ModuleDecl *SerializedASTFile::getUnderlyingModuleIfOverlay() const {
+  return File.getUnderlyingModule();
+}
+
 const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {
   if (auto *UnderlyingModule = File.getUnderlyingModule())
     return UnderlyingModule->findUnderlyingClangModule();

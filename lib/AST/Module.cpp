@@ -1724,6 +1724,14 @@ bool ModuleDecl::walk(ASTWalker &Walker) {
   return false;
 }
 
+ModuleDecl *ModuleDecl::getUnderlyingModuleIfOverlay() const {
+  for (auto *FU : getFiles()) {
+    if (auto *Mod = FU->getUnderlyingModuleIfOverlay())
+      return Mod;
+  }
+  return nullptr;
+}
+
 const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
   for (auto *FU : getFiles()) {
     if (auto *Mod = FU->getUnderlyingClangModule())
@@ -1827,6 +1835,9 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
   SourceLoc unused;
 
   worklist.push_back(this);
+  if (auto *clangModule = getUnderlyingModuleIfOverlay())
+    worklist.push_back(clangModule);
+
   while (!worklist.empty()) {
     ModuleDecl *current = worklist.back();
     worklist.pop_back();
@@ -1846,10 +1857,34 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
           if (seen.insert(overlayMod).second) {
             overlayModules.push_back(overlayMod);
             worklist.push_back(overlayMod);
+            if (auto *clangModule = overlayMod->getUnderlyingModuleIfOverlay())
+              worklist.push_back(clangModule);
           }
         }
       }
     }
+  }
+}
+
+namespace {
+  using CrossImportMap =
+      llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>;
+
+
+  Identifier getBystanderIfDeclaring(ModuleDecl *mod, ModuleDecl *overlay,
+                                     CrossImportMap modCrossImports) {
+    auto ret = std::find_if(modCrossImports.begin(), modCrossImports.end(),
+                            [&](CrossImportMap::iterator::value_type &pair) {
+      for (OverlayFile *file: std::get<1>(pair)) {
+        ArrayRef<Identifier> overlays = file->getOverlayModuleNames(
+            mod, SourceLoc(), std::get<0>(pair));
+        if (std::find(overlays.begin(), overlays.end(),
+                      overlay->getName()) != overlays.end())
+          return true;
+      }
+      return false;
+    });
+    return ret != modCrossImports.end() ? ret->first : Identifier();
   }
 }
 
@@ -1875,25 +1910,19 @@ ModuleDecl::getDeclaringModuleAndBystander() {
     if (!seen.insert(importedModule).second)
       continue;
 
-    using CrossImportMap =
-        llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>;
-    CrossImportMap &crossImports = importedModule->declaredCrossImports;
+    Identifier bystander = getBystanderIfDeclaring(
+        importedModule, overlayModule, importedModule->declaredCrossImports);
+    if (!bystander.empty())
+      return *(declaringModuleAndBystander = {importedModule, bystander});
 
-    // If any of MD's cross imports declare this module as its overlay, report
-    // MD as the underlying module.
-    auto ret = std::find_if(crossImports.begin(), crossImports.end(),
-                            [&](CrossImportMap::iterator::value_type &pair) {
-      for (OverlayFile *file: std::get<1>(pair)) {
-        ArrayRef<Identifier> overlays = file->getOverlayModuleNames(
-            importedModule, SourceLoc(), std::get<0>(pair));
-        if (std::find(overlays.begin(), overlays.end(),
-                      overlayModule->getName()) != overlays.end())
-          return true;
-      }
-      return false;
-    });
-    if (ret != crossImports.end())
-      return *(declaringModuleAndBystander = {importedModule, ret->first});
+    // Also check the imported module's underlying module if it's a traditional
+    // overlay (i.e. not a cross-import overlay).
+    if (auto *clangModule = importedModule->getUnderlyingModuleIfOverlay()) {
+      Identifier bystander = getBystanderIfDeclaring(
+          clangModule, overlayModule, clangModule->declaredCrossImports);
+      if (!bystander.empty())
+        return *(declaringModuleAndBystander = {clangModule, bystander});
+    }
 
     if (!importedModule->hasUnderscoredNaming())
       continue;
@@ -1909,8 +1938,9 @@ ModuleDecl::getDeclaringModuleAndBystander() {
 
 bool ModuleDecl::isCrossImportOverlayOf(ModuleDecl *other) {
   ModuleDecl *current = this;
+  ModuleDecl *otherClang = other->getUnderlyingModuleIfOverlay();
   while ((current = current->getDeclaringModuleAndBystander().first)) {
-    if (current == other)
+    if (current == other || current == otherClang)
       return true;
   }
   return false;
@@ -1925,10 +1955,11 @@ ModuleDecl *ModuleDecl::getDeclaringModuleIfCrossImportOverlay() {
 
 bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
     ModuleDecl *declaring, SmallVectorImpl<Identifier> &bystanderNames) {
+  auto *clangModule = declaring->getUnderlyingModuleIfOverlay();
   auto current = std::make_pair(this, Identifier());
   while ((current = current.first->getDeclaringModuleAndBystander()).first) {
     bystanderNames.push_back(current.second);
-    if (current.first == declaring)
+    if (current.first == declaring || current.first == clangModule)
       return true;
   }
   return false;
