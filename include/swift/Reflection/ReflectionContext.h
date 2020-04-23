@@ -852,7 +852,7 @@ public:
   void dumpConformances() {
     std::string ConformancesName = "__ZL12Conformances";
     auto ConformancesAddr = getReader().getSymbolAddress(ConformancesName);
-    printf("%#llx\n", ConformancesAddr);
+    printf("%#llx\n", ConformancesAddr.getAddressData());
     if (!ConformancesAddr)
       return;
 
@@ -860,12 +860,60 @@ public:
     dumpConformanceTree(Root->getResolvedAddress().getAddressData());
   }
   
+  void iterateModules(Demangle::NodePointer Ptr, std::function<void(llvm::StringRef)> Call) {
+    if (Ptr->getKind() == Node::Kind::Module)
+      Call(Ptr->getText());
+    for (auto Child : *Ptr)
+      iterateModules(Child, Call);
+  }
+  
+  void dumpGenericMetadataCacheEntry(const char *Ptr) {
+    struct GenericMetadataCacheEntry {
+      StoredPointer Left, Right;
+      StoredPointer LockedStorage;
+      uint8_t LockedStorageKind;
+      uint8_t TrackingInfo;
+      uint16_t NumKeyParameters;
+      uint16_t NumWitnessTables;
+      uint32_t Hash;
+      StoredPointer Value;
+    };
+    
+    auto EntryPtr = (const GenericMetadataCacheEntry *)Ptr;
+    printf("  Left: %#llx\n", EntryPtr->Left);
+    printf("  Right: %#llx\n", EntryPtr->Right);
+    printf("  LockedStorage: %#llx\n", EntryPtr->LockedStorage);
+    printf("  LockedStorageKind: %u\n", EntryPtr->LockedStorageKind);
+    printf("  TrackingInfo: %u\n", EntryPtr->TrackingInfo);
+    printf("  NumKeyParameters: %u\n", EntryPtr->NumKeyParameters);
+    printf("  NumWitnessTables: %u\n", EntryPtr->NumWitnessTables);
+    printf("  Hash: %#x\n", EntryPtr->Hash);
+    printf("  Value: %#llx\n", EntryPtr->Value);
+    
+    if (EntryPtr->Value) {
+      if (auto Metadata = readMetadata(EntryPtr->Value)) {
+        if (auto TR = readTypeFromMetadata(Metadata.getAddressData())) {
+          Demangle::Demangler Dem;
+          auto Demangling = TR->getDemangling(Dem);
+          auto Name = nodeToString(Demangling);
+          printf("    Name: %s\n", Name.c_str());
+          
+          printf("    Modules:");
+          iterateModules(Demangling, [](llvm::StringRef Str){
+            printf(" %s", Str.str().c_str());
+          });
+          printf("\n");
+        }
+      }
+    }
+  }
+  
   void dumpMetadataAllocations() {
     std::string AllocationPoolName = "__ZL14AllocationPool";
     auto AllocationPoolAddr = getReader().getSymbolAddress(AllocationPoolName);
-    printf("%#llx\n", AllocationPoolAddr);
+    printf("%#llx\n", AllocationPoolAddr.getAddressData());
     
-    printf("Initial pool: %#llx\n", getReader().getSymbolAddress("__ZL21InitialAllocationPool"));
+    printf("Initial pool: %#llx\n", getReader().getSymbolAddress("__ZL21InitialAllocationPool").getAddressData());
     
     struct PoolRange {
       StoredPointer Begin;
@@ -899,23 +947,29 @@ public:
       
       auto PoolBytes = getReader()
         .readBytes(RemoteAddress(PoolStart), Trailer->PoolSize);
-      auto PoolPtr = (char *)PoolBytes.get();
+      auto PoolPtr = (const char *)PoolBytes.get();
       if (!PoolPtr)
         break;
-      auto AllocationPtr = PoolPtr;
-      while (AllocationPtr - PoolPtr < Trailer->PoolSize) {
-        auto Header = (AllocationHeader *)AllocationPtr;
+      uintptr_t Offset = 0;
+      while (Offset < Trailer->PoolSize) {
+        auto AllocationPtr = PoolPtr + Offset;
+        auto Header = (const AllocationHeader *)AllocationPtr;
         if (Header->Size == 0)
           break;
         auto Allocation = AllocationPtr + sizeof(AllocationHeader);
-        printf("Allocation tag %u size %u offset %#llx\n", Header->Tag, Header->Size, Allocation - PoolPtr);
+        auto RemoteAddr = PoolStart + Offset + sizeof(AllocationHeader);
+        printf("Allocation tag %u size %u offset %#lx, remote address %#llx\n", Header->Tag, Header->Size, Offset, RemoteAddr);
         
         switch (Header->Tag) {
+          case GenericMetadataCacheTag: {
+            dumpGenericMetadataCacheEntry(Allocation);
+            break;
+          }
           default:
             break;
         }
         
-        AllocationPtr = Allocation + Header->Size;
+        Offset += sizeof(AllocationHeader) + Header->Size;
       }
       
       TrailerPtr = Trailer->PrevTrailer;

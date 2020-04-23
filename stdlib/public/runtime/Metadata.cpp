@@ -586,8 +586,8 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   }
 
   auto bytes = (char*) 
-    cache.getAllocator().Allocate(allocationBounds.getTotalSizeInBytes(),
-                                  alignof(void*));
+    cache.getAllocator().withTag(GenericClassMetadataTag)
+      .Allocate(allocationBounds.getTotalSizeInBytes(), alignof(void*));
 
   auto addressPoint = bytes + allocationBounds.getAddressPointInBytes();
   auto metadata = reinterpret_cast<ClassMetadata *>(addressPoint);
@@ -659,7 +659,8 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
 
   size_t totalSize = sizeof(FullMetadata<ValueMetadata>) + extraDataSize;
 
-  auto bytes = (char*) cache.getAllocator().Allocate(totalSize, alignof(void*));
+  auto bytes = (char*) cache.getAllocator().withTag(GenericValueMetadataTag)
+    .Allocate(totalSize, alignof(void*));
 
 #ifndef NDEBUG
   // Fill the metadata record with garbage.
