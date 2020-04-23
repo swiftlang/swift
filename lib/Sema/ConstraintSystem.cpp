@@ -170,12 +170,12 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
       if (!locator || !locator->getPath().empty())
         continue;
 
-      auto anchor = locator->getAnchor();
-      if (!(anchor && anchor.is<const Expr *>()))
+      auto *anchor = getAsExpr(locator->getAnchor());
+      if (!anchor)
         continue;
 
       literalProtocol =
-          TypeChecker::getLiteralProtocol(getASTContext(), castToExpr(anchor));
+          TypeChecker::getLiteralProtocol(getASTContext(), anchor);
       if (literalProtocol)
         break;
     }
@@ -3175,8 +3175,8 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
 
     // If we can't resolve the locator to an anchor expression with no path,
     // we can't diagnose this well.
-    auto anchor = simplifyLocatorToAnchor(overload.locator);
-    if (!(anchor || anchor.is<const Expr *>()))
+    auto *anchor = getAsExpr(simplifyLocatorToAnchor(overload.locator));
+    if (!anchor)
       continue;
 
     auto it = indexMap.find(castToExpr(anchor));
@@ -3521,8 +3521,6 @@ TypedNode constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
 }
 
 Expr *constraints::getArgumentExpr(TypedNode node, unsigned index) {
-  assert(node.is<const Expr *>());
-
   auto *expr = castToExpr(node);
   Expr *argExpr = nullptr;
   if (auto *AE = dyn_cast<ApplyExpr>(expr))

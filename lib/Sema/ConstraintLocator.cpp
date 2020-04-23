@@ -194,7 +194,7 @@ bool ConstraintLocator::isResultOfKeyPathDynamicMemberLookup() const {
 }
 
 bool ConstraintLocator::isKeyPathSubscriptComponent() const {
-  auto *anchor = getAnchor().dyn_cast<const Expr *>();
+  auto *anchor = getAsExpr(getAnchor());
   auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
   if (!KPE)
     return false;
