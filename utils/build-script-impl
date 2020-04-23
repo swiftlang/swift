@@ -243,10 +243,6 @@ KNOWN_SETTINGS=(
     skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
     skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
-
-    # SWIFT_ENABLE_TENSORFLOW
-    enable-tensorflow                             ""                "If true, enable compiling with TensorFlow support"
-    # SWIFT_ENABLE_TENSORFLOW END
 )
 
 components=(
@@ -1700,7 +1696,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
 
                     # SWIFT_ENABLE_TENSORFLOW
-                    -DSWIFT_ENABLE_TENSORFLOW:BOOL=$(true_false "${ENABLE_TENSORFLOW}")
+                    -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
                     # SWIFT_ENABLE_TENSORFLOW END
                     "${swift_cmake_options[@]}"
                 )

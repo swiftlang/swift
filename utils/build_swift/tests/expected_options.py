@@ -234,17 +234,6 @@ EXPECTED_DEFAULTS = {
     'verbose_build': False,
     'watchos': False,
     'watchos_all': False,
-    # SWIFT_ENABLE_TENSORFLOW
-    'enable_tensorflow': False,
-    'enable_tensorflow_gpu': False,
-    'enable_x10': False,
-    'build_tensorflow': False,
-    'tensorflow_host_lib_dir': None,
-    'tensorflow_host_include_dir': None,
-    'tensorflow_target_lib_dir': None,
-    'tensorflow_target_include_dir': None,
-    'host_bazel': None,
-    'tensorflow_bazel_options': [],
 }
 
 
@@ -678,16 +667,4 @@ EXPECTED_OPTIONS = [
     IgnoreOption('--ios-all'),
     IgnoreOption('--tvos-all'),
     IgnoreOption('--watchos-all'),
-
-    # SWIFT_ENABLE_TENSORFLOW
-    EnableOption('--enable-tensorflow'),
-    EnableOption('--enable-tensorflow-gpu'),
-    EnableOption('--enable-x10'),
-    EnableOption('--build-tensorflow'),
-    PathOption('--tensorflow-host-lib-dir'),
-    PathOption('--tensorflow-host-include-dir'),
-    PathOption('--tensorflow-target-lib-dir'),
-    PathOption('--tensorflow-target-include-dir'),
-    PathOption('--host-bazel'),
-    AppendOption('--tensorflow-bazel-options'),
 ]

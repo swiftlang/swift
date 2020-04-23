@@ -173,17 +173,6 @@ def _apply_default_arguments(args):
     if args.test_optimize_none_with_implicit_dynamic:
         args.test = True
 
-    # SWIFT_ENABLE_TENSORFLOW
-    if args.build_tensorflow or args.enable_tensorflow_gpu or \
-       args.tensorflow_host_lib_dir is not None or \
-       args.tensorflow_host_include_dir is not None or \
-       args.tensorflow_target_lib_dir is not None or \
-       args.tensorflow_target_include_dir is not None:
-        args.enable_tensorflow = True
-
-    if not args.enable_tensorflow:
-        args.build_tensorflow = False
-
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
         args.test_linux = False
@@ -391,10 +380,6 @@ def create_argument_parser():
            help='the absolute path to lipo. Default is auto detected.')
     option('--host-libtool', store_path(executable=True),
            help='the absolute path to libtool. Default is auto detected.')
-    # SWIFT_ENABLE_TENSORFLOW
-    option('--host-bazel', store_path(executable=True),
-           help='the absolute path to bazel, used to build TensorFlow. Default '
-                'is auto detected.')
     option('--distcc', toggle_true,
            default=os.environ.get('USE_DISTCC') == '1',
            help='use distcc in pump mode')
@@ -953,10 +938,6 @@ def create_argument_parser():
     option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
            help='skip building Swift Benchmark Suite')
 
-    # SWIFT_ENABLE_TENSORFLOW
-    option('--build-tensorflow', toggle_true,
-           help='build TensorFlow from source')
-
     option('--build-external-benchmarks', toggle_true,
            help='skip building Swift Benchmark Suite')
 
@@ -1098,41 +1079,6 @@ def create_argument_parser():
     option('--skip-test-optimize-for-size', unsupported)
     option('--skip-test-optimize-none-with-implicit-dynamic', unsupported)
     option('--skip-test-optimized', unsupported)
-
-    # -------------------------------------------------------------------------
-    in_group('Build settings specific to TensorFlow support')
-
-    option('--enable-tensorflow', toggle_true,
-           default=False,
-           help='If true, build Swift with TensorFlow support.')
-    option('--enable-tensorflow-gpu', toggle_true,
-           default=False,
-           help='If true, build Swift with TensorFlow GPU support.')
-    option('--enable-x10', toggle_true,
-           default=False,
-           help='If true, build Swift with X10 support.')
-    option('--tensorflow-host-lib-dir', store_path,
-           default=None,
-           help='Path to a directory containing TensorFlow libraries '
-                '(libtensorflow.so). Used for linking swiftc.')
-    option('--tensorflow-host-include-dir', store_path,
-           default=None,
-           help='Path to a directory containing TensorFlow headers. '
-                'Used for linking swiftc.')
-    option('--tensorflow-target-lib-dir', store_path,
-           default=None,
-           help='Path to a directory containing TensorFlow libraries '
-                '(libtensorflow.so). Used for linking Swift programs.')
-    option('--tensorflow-target-include-dir', store_path,
-           default=None,
-           help='Path to a directory containing TensorFlow headers. '
-                'Used for linking Swift programs.')
-    option('--tensorflow-bazel-options', append,
-           type=argparse.ShellSplitType(),
-           default=[],
-           help='Comma separated options passed to Bazel when building '
-                'TensorFlow, e.g. "--copt=-mavx,--copt=-msse4.2". Can be '
-                'called multiple times to add multiple such options.')
 
     # -------------------------------------------------------------------------
     in_group('Build-script-impl arguments (for disambiguation)')
