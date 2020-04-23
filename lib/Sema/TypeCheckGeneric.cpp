@@ -753,7 +753,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
-    LookupConformanceFn conformances,
     GenericRequirementsCheckListener *listener,
     SubstOptions options) {
   bool valid = true;
@@ -766,14 +765,18 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   SmallVector<RequirementSet, 8> pendingReqs;
   pendingReqs.push_back({requirements, {}});
 
-  ASTContext &ctx = dc->getASTContext();
+  auto *module = dc->getParentModule();
+  ASTContext &ctx = module->getASTContext();
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
 
     for (const auto &rawReq : current.Requirements) {
       auto req = rawReq;
       if (current.Parents.empty()) {
-        auto substed = rawReq.subst(substitutions, conformances, options);
+        auto substed = rawReq.subst(
+            substitutions,
+            LookUpConformanceInModule(module),
+            options);
         if (!substed) {
           // Another requirement will fail later; just continue.
           valid = false;

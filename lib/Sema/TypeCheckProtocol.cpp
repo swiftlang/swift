@@ -3956,7 +3956,6 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       { proto->getSelfInterfaceType() },
       proto->getRequirementSignature(),
       QuerySubstitutionMap{substitutions},
-      LookUpConformanceInModule(DC->getParentModule()),
       &listener);
 
   switch (result) {
@@ -4434,8 +4433,7 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
     auto conditionalCheckResult = checkGenericArguments(
         DC, ComplainLoc, noteLoc, T,
         {lookupResult.getRequirement()->getSelfInterfaceType()}, *condReqs,
-        [](SubstitutableType *dependentType) { return Type(dependentType); },
-        LookUpConformanceInModule(M));
+        [](SubstitutableType *dependentType) { return Type(dependentType); });
     switch (conditionalCheckResult) {
     case RequirementCheckResult::Success:
       break;

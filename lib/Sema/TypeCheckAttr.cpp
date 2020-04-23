@@ -2691,11 +2691,10 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
     // Use invalid 'SourceLoc's to suppress diagnostics.
     auto result = TypeChecker::checkGenericArguments(
-          protocol, SourceLoc(), SourceLoc(), typeEraser,
+          dc, SourceLoc(), SourceLoc(), typeEraser,
           genericSignature->getGenericParams(),
           genericSignature->getRequirements(),
-          QuerySubstitutionMap{subMap},
-          LookUpConformanceInModule(dc->getParentModule()));
+          QuerySubstitutionMap{subMap});
 
     if (result != RequirementCheckResult::Success) {
       unviable.push_back(
@@ -4388,8 +4387,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
                    source->getGenericParams(), target->getRequirements(),
                    [](SubstitutableType *dependentType) {
                      return Type(dependentType);
-                   },
-                   lookupConformance) == RequirementCheckResult::Success;
+                   }) == RequirementCheckResult::Success;
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
@@ -4832,8 +4830,6 @@ doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
 
 void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto *transpose = cast<FuncDecl>(D);
-  auto lookupConformance =
-      LookUpConformanceInModule(D->getDeclContext()->getParentModule());
   auto originalName = attr->getOriginalFunctionName();
   auto *transposeInterfaceType =
       transpose->getInterfaceType()->castTo<AnyFunctionType>();
@@ -4928,8 +4924,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
             source->getGenericParams(), target->getRequirements(),
             [](SubstitutableType *dependentType) {
               return Type(dependentType);
-            },
-            lookupConformance) == RequirementCheckResult::Success;
+            }) == RequirementCheckResult::Success;
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {

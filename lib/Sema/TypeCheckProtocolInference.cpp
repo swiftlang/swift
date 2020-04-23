@@ -1097,7 +1097,6 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                        { proto->getSelfInterfaceType() },
                                        sanitizedRequirements,
                                        QuerySubstitutionMap{substitutions},
-                                       LookUpConformanceInModule(dc->getParentModule()),
                                        nullptr, options);
   switch (result) {
   case RequirementCheckResult::Failure:
@@ -1145,7 +1144,6 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
                        ext->getGenericSignature()->getGenericParams(),
                        ext->getGenericSignature()->getRequirements(),
                        QueryTypeSubstitutionMap{subs},
-                       LookUpConformanceInModule(ext->getModuleContext()),
                        nullptr, options)) {
   case RequirementCheckResult::Success:
   case RequirementCheckResult::SubstitutionFailure:

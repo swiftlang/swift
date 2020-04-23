@@ -687,7 +687,6 @@ RequirementCheckResult checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
-    LookupConformanceFn conformances,
     GenericRequirementsCheckListener *listener = nullptr,
     SubstOptions options = None);
 

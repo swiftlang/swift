@@ -674,8 +674,7 @@ static Type checkContextualRequirements(Type type,
         dc, loc, noteLoc, type,
         genericSig->getGenericParams(),
         genericSig->getRequirements(),
-        QueryTypeSubstitutionMap{subMap},
-        LookUpConformanceInModule(dc->getParentModule()));
+        QueryTypeSubstitutionMap{subMap});
 
   switch (result) {
   case RequirementCheckResult::Failure:
@@ -914,8 +913,7 @@ Type TypeChecker::applyUnboundGenericArguments(
       checkGenericArguments(dc, loc, noteLoc, unboundType,
                             genericSig->getGenericParams(),
                             genericSig->getRequirements(),
-                            QueryTypeSubstitutionMap{subs},
-                            LookUpConformanceInModule(module));
+                            QueryTypeSubstitutionMap{subs});
 
     switch (result) {
     case RequirementCheckResult::Failure:
