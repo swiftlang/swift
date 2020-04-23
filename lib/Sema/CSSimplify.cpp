@@ -3577,6 +3577,13 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::KeyPathRoot: {
+    conversionsOrFixes.push_back(AllowKeyPathRootTypeMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+
+    break;
+  }
+
   case ConstraintLocator::FunctionArgument: {
     auto *argLoc = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::SynthesizedArgument(0)));
@@ -7829,8 +7836,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
 
     auto matchRoot = [&](ConstraintKind kind) -> bool {
-      auto rootMatches = matchTypes(rootTy, kpRootTy, kind,
-                                    subflags, locator);
+      auto rootMatches =
+          matchTypes(rootTy, kpRootTy, kind, subflags,
+                     locator.withPathElement(LocatorPathElt::KeyPathRoot()));
       switch (rootMatches) {
       case SolutionKind::Error:
         return false;
@@ -9392,6 +9400,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
+  case FixKind::AllowKeyPathRootTypeMismatch:
   case FixKind::AllowCoercionToForceCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
