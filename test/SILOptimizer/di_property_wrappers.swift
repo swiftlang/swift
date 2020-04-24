@@ -501,6 +501,37 @@ public final class Synchronized<Value> {
   }
 }
 
+struct SR_12341 {
+  @Wrapper var wrapped: Int = 10
+  var str: String
+
+  init() {
+     wrapped = 42
+     str = ""
+     wrapped = 27
+  }
+
+  init(condition: Bool) {
+    wrapped = 42
+    wrapped = 27
+    str = ""
+  }
+}
+
+func testSR_12341() {
+  // CHECK: ## SR_12341
+  print("\n## SR_12341")
+
+  // CHECK-NEXT:   .. init 10
+  // CHECK-NEXT:   .. init 42
+  // CHECK-NEXT:   .. set 27
+  _ = SR_12341()
+
+  // CHECK-NEXT:   .. init 10
+  // CHECK-NEXT:   .. init 42
+  // CHECK-NEXT:   .. init 27
+  _ = SR_12341(condition: true)
+}
 
 testIntStruct()
 testIntClass()
@@ -511,3 +542,4 @@ testOptIntStruct()
 testDefaultNilOptIntStruct()
 testComposed()
 testWrapperInitWithDefaultArg()
+testSR_12341()
