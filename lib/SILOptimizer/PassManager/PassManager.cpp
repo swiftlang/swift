@@ -103,6 +103,11 @@ llvm::cl::list<std::string>
                        llvm::cl::desc("Verify the module/analyses after we run "
                                       "a pass from this list"));
 
+llvm::cl::list<std::string> SILForceVerifyAroundPass(
+    "sil-verify-force-analysis-around-pass",
+    llvm::cl::desc("For the given passes, precompute analyses before the pass "
+                   "and verify analyses after the pass"));
+
 llvm::cl::opt<bool> SILVerifyWithoutInvalidation(
     "sil-verify-without-invalidation", llvm::cl::init(false),
     llvm::cl::desc("Verify after passes even if the pass has not invalidated"));
@@ -110,6 +115,11 @@ llvm::cl::opt<bool> SILVerifyWithoutInvalidation(
 llvm::cl::opt<bool> SILDisableSkippingPasses(
     "sil-disable-skipping-passes", llvm::cl::init(false),
     llvm::cl::desc("Do not skip passes even if nothing was changed"));
+
+llvm::cl::opt<bool> SILForceVerifyAll(
+    "sil-verify-force-analysis", llvm::cl::init(false),
+    llvm::cl::desc("For all passes, precompute analyses before the pass and "
+                   "verify analyses after the pass"));
 
 static llvm::ManagedStatic<std::vector<unsigned>> DebugPassNumbers;
 
@@ -421,7 +431,19 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   Mod->registerDeleteNotificationHandler(SFT);
   if (breakBeforeRunning(F->getName(), SFT))
     LLVM_BUILTIN_DEBUGTRAP;
+  if (SILForceVerifyAll ||
+      SILForceVerifyAroundPass.end() !=
+          std::find_if(SILForceVerifyAroundPass.begin(),
+                       SILForceVerifyAroundPass.end(), MatchFun)) {
+    forcePrecomputeAnalyses(F);
+  }
   SFT->run();
+  if (SILForceVerifyAll ||
+      SILForceVerifyAroundPass.end() !=
+          std::find_if(SILForceVerifyAroundPass.begin(),
+                       SILForceVerifyAroundPass.end(), MatchFun)) {
+    verifyAnalyses(F);
+  }
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->removeDeleteNotificationHandler(SFT);
 
