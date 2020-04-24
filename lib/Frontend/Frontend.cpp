@@ -794,7 +794,40 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
                                         MainBufferID);
   }
 
-  parseAndCheckTypesUpTo(LimitStage);
+  bool hadLoadError = parsePartialModulesAndInputFiles();
+  if (hadLoadError)
+    return;
+
+  assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
+    auto *SF = dyn_cast<SourceFile>(File);
+    if (!SF)
+      return true;
+    return SF->ASTStage >= SourceFile::ImportsResolved;
+  }) && "some files have not yet had their imports resolved");
+  MainModule->setHasResolvedImports();
+
+  forEachFileToTypeCheck([&](SourceFile &SF) {
+    if (LimitStage == SourceFile::ImportsResolved) {
+      bindExtensions(SF);
+      return;
+    }
+
+    performTypeChecking(SF);
+
+    // Parse the SIL decls if needed.
+    // TODO: Requestify SIL parsing.
+    if (TheSILModule) {
+      SILParserState SILContext(TheSILModule.get());
+      parseSourceFileSIL(SF, &SILContext);
+    }
+  });
+
+  // If the limiting AST stage is import resolution, we're done.
+  if (LimitStage <= SourceFile::ImportsResolved) {
+    return;
+  }
+
+  finishTypeChecking();
 }
 
 bool CompilerInstance::loadStdlib() {
@@ -814,46 +847,6 @@ bool CompilerInstance::loadStdlib() {
     return false;
   }
   return true;
-}
-
-void CompilerInstance::parseAndCheckTypesUpTo(
-    SourceFile::ASTStage_t limitStage) {
-  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-check-types");
-
-  bool hadLoadError = parsePartialModulesAndInputFiles();
-  if (hadLoadError)
-    return;
-
-  assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
-    auto *SF = dyn_cast<SourceFile>(File);
-    if (!SF)
-      return true;
-    return SF->ASTStage >= SourceFile::ImportsResolved;
-  }) && "some files have not yet had their imports resolved");
-  MainModule->setHasResolvedImports();
-
-  forEachFileToTypeCheck([&](SourceFile &SF) {
-    if (limitStage == SourceFile::ImportsResolved) {
-      bindExtensions(SF);
-      return;
-    }
-
-    performTypeChecking(SF);
-
-    // Parse the SIL decls if needed.
-    // TODO: Requestify SIL parsing.
-    if (TheSILModule) {
-      SILParserState SILContext(TheSILModule.get());
-      parseSourceFileSIL(SF, &SILContext);
-    }
-  });
-
-  // If the limiting AST stage is import resolution, we're done.
-  if (limitStage <= SourceFile::ImportsResolved) {
-    return;
-  }
-
-  finishTypeChecking();
 }
 
 bool CompilerInstance::parsePartialModulesAndInputFiles() {
