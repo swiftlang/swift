@@ -3795,6 +3795,21 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
         continue;
 
+    // A witness is not viable unless the conditional requirements of its
+    // declaration context are satisfied by those of the conformance context.
+    // FIXME: Handle the case of a candidate in a constrained protocol
+    //  extension.
+    if (candidate.Member->getDeclContext()->getSelfNominalTypeDecl() ==
+        Adoptee->getAnyNominal()) {
+      const auto candidateContextSig =
+          candidate.Member->getDeclContext()->getGenericSignatureOfContext();
+
+      if (candidateContextSig &&
+          !candidateContextSig->requirementsNotSatisfiedBy(
+              DC->getGenericSignatureOfContext()).empty())
+        continue;
+    }
+
     // Check this type against the protocol requirements.
     if (auto checkResult =
             checkTypeWitness(DC, Proto, assocType, candidate.MemberType)) {

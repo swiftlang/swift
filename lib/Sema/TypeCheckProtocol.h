@@ -71,6 +71,7 @@ struct TypeWitnessConflict {
 ///
 /// This class evaluates true if an error occurred.
 class CheckTypeWitnessResult {
+  /// The requirement that the type witness does not satisfy.
   Type Requirement;
 
 public:

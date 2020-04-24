@@ -429,3 +429,42 @@ func sr_10992_foo(_ fn: (SR_10992_S<String>) -> Void) {}
 func sr_10992_bar(_ fn: (SR_10992_P) -> Void) {
   sr_10992_foo(fn) // expected-error {{global function 'sr_10992_foo' requires that 'String' conform to 'SR_10992_P'}}
 }
+
+// SR-12663: A witness is not viable unless the conditional requirements of
+// its declaration context are satisfied by those of the conformance context.
+
+protocol SR_12663_P { associatedtype X }
+// expected-note@-1 3 {{protocol requires nested type 'X'; do you want to add it?}}
+
+struct SR_12663_S1<T> {
+  typealias X = Never
+}
+extension SR_12663_S1: SR_12663_P where T == Void {} // OK
+
+struct SR_12663_S2<T> {}
+extension SR_12663_S2 where T: Equatable {
+  typealias X = Never
+}
+extension SR_12663_S2: SR_12663_P where T == Int {} // OK
+
+struct SR_12663_S3<T> {}
+extension SR_12663_S3 where T == Never {
+  typealias X = Never
+}
+extension SR_12663_S3: SR_12663_P where T == Void {}
+// expected-error@-1 {{type 'SR_12663_S3<T>' does not conform to protocol 'SR_12663_P'}}
+
+struct SR_12663_S4<T>: SR_12663_P {}
+// expected-error@-1 {{type 'SR_12663_S4<T>' does not conform to protocol 'SR_12663_P'}}
+extension SR_12663_S4 where T == Never {
+  typealias X = Never
+}
+
+struct SR_12663_S5<T> {
+  struct Inner where T: Equatable {}
+}
+extension SR_12663_S5.Inner: SR_12663_P where T: Comparable {}
+// expected-error@-1 {{type 'SR_12663_S5<T>.Inner' does not conform to protocol 'SR_12663_P'}}
+extension SR_12663_S5.Inner where T == Int {
+  typealias X = Never
+}
