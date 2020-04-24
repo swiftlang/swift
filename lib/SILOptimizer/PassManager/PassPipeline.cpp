@@ -396,6 +396,15 @@ static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
   P.addPerformanceSILLinker();
 }
 
+
+static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
+  P.startPipeline("PrepareOptimizationPasses");
+
+  P.addForEachLoopUnroll();
+  P.addMandatoryCombine();
+  P.addAccessMarkerElimination();
+}
+
 static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("EarlyModulePasses");
 
@@ -626,23 +635,6 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
-  SILPassPipelinePlan P(Options);
-
-  if (Options.DebugSerialization) {
-    addPerfDebugSerializationPipeline(P);
-    return P;
-  }
-
-  P.startPipeline("SILOpt Prepare Passes");
-  P.addForEachLoopUnroll();
-  P.addMandatoryCombine();
-  P.addAccessMarkerElimination();
-
-  return P;
-}
-
-SILPassPipelinePlan
 SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
 
@@ -650,6 +642,10 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
     addPerfDebugSerializationPipeline(P);
     return P;
   }
+  
+  // Passes which run once before all other optimizations run. Those passes are
+  // _not_ intended to run later again.
+  addPrepareOptimizationsPipeline(P);
 
   // Eliminate immediately dead functions and then clone functions from the
   // stdlib.
