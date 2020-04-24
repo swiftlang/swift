@@ -425,6 +425,10 @@ static bool isInterestingTypealias(Type type) {
 /// Decide whether to show the desugared type or not.  We filter out some
 /// cases to avoid too much noise.
 static bool shouldShowAKA(Type type, StringRef typeName) {
+  // (aka '<<error type>>') does not contribute to a message whatsoever.
+  if (type->is<ErrorType>())
+    return false;
+
   // Canonical types are already desugared.
   if (type->isCanonical())
     return false;

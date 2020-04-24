@@ -469,12 +469,13 @@ GenericSignature TypeChecker::checkGenericSignature(
   // Debugging of the generic signature builder and generic signature
   // generation.
   if (dc->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
+    llvm::errs() << "\n";
     if (auto *VD = dyn_cast_or_null<ValueDecl>(dc->getAsDecl())) {
       VD->dumpRef(llvm::errs());
+      llvm::errs() << "\n";
     } else {
       dc->printContext(llvm::errs());
     }
-    llvm::errs() << "\n";
     llvm::errs() << "Generic signature: ";
     sig->print(llvm::errs());
     llvm::errs() << "\n";
@@ -591,8 +592,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // Debugging of the generic signature builder and generic signature
     // generation.
     if (GC->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
-      PD->printContext(llvm::errs());
       llvm::errs() << "\n";
+      PD->printContext(llvm::errs());
       llvm::errs() << "Generic signature: ";
       sig->print(llvm::errs());
       llvm::errs() << "\n";
