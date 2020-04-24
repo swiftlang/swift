@@ -1696,7 +1696,16 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
 
                     # SWIFT_ENABLE_TENSORFLOW
+                    # CMake options specific to `tensorflow` branch here.
+
+                    # Propagate "SWIFT_ENABLE_TENSORFLOW=TRUE" to CMake.
+                    # This affects lit tests, adding "tensorflow" as an available feature.
                     -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
+
+                    # Always use "@rpath" as the directory of the install_name for standard library dylibs.
+                    # The default value is "/usr/lib/swift", which doesn't work for toolchains that provide
+                    # custom standard library modules or that make changes to libswiftCore.dylib.
+                    -DSWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR:STRING="@rpath"
                     # SWIFT_ENABLE_TENSORFLOW END
                     "${swift_cmake_options[@]}"
                 )
