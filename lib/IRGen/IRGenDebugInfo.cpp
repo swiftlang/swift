@@ -1014,7 +1014,8 @@ private:
       SmallVector<llvm::Metadata *, 16> TemplateParams;
       for (auto Param : BGT->getGenericArgs()) {
         TemplateParams.push_back(DBuilder.createTemplateTypeParameter(
-            TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param))));
+            TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param)),
+            false));
       }
       return DBuilder.getOrCreateArray(TemplateParams);
   }
