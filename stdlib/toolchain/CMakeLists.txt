@@ -56,6 +56,10 @@ else()
   add_compile_definitions(LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
 endif()
 
+# Compatibility libraries build in a special alternate universe that can't
+# directly link to most OS runtime libraries, and have to access the
+# runtime being patched only through public ABI.
+list(APPEND CXX_COMPILE_FLAGS "-DSWIFT_COMPATIBILITY_LIBRARY=1")
 
 add_subdirectory(legacy_layouts)
 add_subdirectory(Compatibility50)
