@@ -4599,9 +4599,13 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
 }
 
 bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
-  // Enums explicitly marked frozen are exhaustive.
-  if (getAttrs().hasAttribute<FrozenAttr>())
+  // Enums explicitly marked frozen are exhaustive. Enums explicitly
+  // marked open are not.
+  if (getAttrs().hasAttribute<FrozenAttr>()) {
     return true;
+  } else if (getAttrs().hasAttribute<OpenAttr>()) {
+    return false;
+  }
 
   // Objective-C enums /not/ marked frozen are /not/ exhaustive.
   // Note: This implicitly holds @objc enums defined in Swift to a higher
@@ -4648,6 +4652,10 @@ bool EnumDecl::isEffectivelyExhaustive(ModuleDecl *M,
   // whether imported or not, to deal with C's loose rules around enums.
   // This covers both frozen and non-frozen @objc enums.
   if (isObjC())
+    return false;
+
+  // Open enums are non-exhaustive.
+  if (getAttrs().hasAttribute<OpenAttr>())
     return false;
 
   // Otherwise, the only non-exhaustive cases are those that don't have a fixed

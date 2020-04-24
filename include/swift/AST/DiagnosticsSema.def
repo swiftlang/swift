@@ -1474,6 +1474,8 @@ ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
+WARNING(enum_open_nonpublic,none,
+        "%0 has no effect on non-public enums", (DeclAttribute))
 
 // Variables (var and let).
 ERROR(getset_init,none,

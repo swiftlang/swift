@@ -1478,6 +1478,7 @@ namespace  {
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
     UNINTERESTING_ATTR(WeakLinked)
     UNINTERESTING_ATTR(Frozen)
+    UNINTERESTING_ATTR(Open)
     UNINTERESTING_ATTR(HasInitialValue)
     UNINTERESTING_ATTR(ImplementationOnly)
     UNINTERESTING_ATTR(Custom)

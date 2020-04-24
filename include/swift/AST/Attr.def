@@ -560,6 +560,10 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   100)
 
+SIMPLE_DECL_ATTR(_open, Open,
+  OnEnum | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToRemove | APIBreakingToAdd,
+  101)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

@@ -822,7 +822,7 @@ namespace {
 
           if (!E->isFormallyExhaustive(DC)) {
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/false));
-          } else if (!E->getAttrs().hasAttribute<FrozenAttr>()) {
+          } else if (!E->getAttrs().hasAttribute<FrozenAttr>() || E->getAttrs().hasAttribute<OpenAttr>()) {
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/true));
           }
 

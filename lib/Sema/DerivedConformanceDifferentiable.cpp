@@ -430,6 +430,11 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   if (nominal->getAttrs().hasAttribute<FrozenAttr>())
     structDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/ true));
 
+  // If nominal type is `@open`, also mark `TangentVector` struct as
+  // `@open`.
+  if (nominal->getAttrs().hasAttribute<OpenAttr>())
+    structDecl->getAttrs().add(new (C) OpenAttr(/*implicit*/ true));
+
   // If nominal type is `@usableFromInline`, also mark `TangentVector` struct as
   // `@usableFromInline`.
   if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>())

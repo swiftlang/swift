@@ -105,6 +105,7 @@ struct MyStruct {}
 // KEYWORD4-NEXT:             Keyword/None:                       frozen[#Enum Attribute#]; name=frozen
 // KEYWORD4-NEXT:             Keyword/None:                       propertyWrapper[#Enum Attribute#]; name=propertyWrapper
 // KEYWORD4-NEXT:             Keyword/None:                       _functionBuilder[#Enum Attribute#]; name=_functionBuilder
+// KEYWORD4-NEXT:             Keyword/None:                       _open[#Enum Attribute#]; name=_open
 // KEYWORD4-NEXT:             End completions
 
 
@@ -248,6 +249,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
+// ON_MEMBER_LAST-DAG: Keyword/None:                       _open[#Declaration Attribute#]; name=_open
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]

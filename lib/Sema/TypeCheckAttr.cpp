@@ -243,6 +243,7 @@ public:
   void visitImplementsAttr(ImplementsAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
+  void visitOpenAttr(OpenAttr *attr);
 
   void visitCustomAttr(CustomAttr *attr);
   void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
@@ -2836,6 +2837,19 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
       !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::frozen_attr_on_internal_type,
                           VD->getFullName(), VD->getFormalAccess());
+  }
+}
+
+void AttributeChecker::visitOpenAttr(OpenAttr *attr) {
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    if (ED->getFormalAccess() < AccessLevel::Public &&
+        !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+      diagnoseAndRemoveAttr(attr, diag::enum_open_nonpublic, attr);
+      return;
+    }
+  } else {
+    attr->setInvalid();
+    return;
   }
 }
 
