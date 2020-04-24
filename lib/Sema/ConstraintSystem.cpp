@@ -2515,7 +2515,7 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      return getDecl()->getFullName();
+      return getDecl()->getName();
 
     case OverloadChoiceKind::KeyPathApplication:
       // TODO: This should probably produce subscript(keyPath:), but we
@@ -2745,7 +2745,7 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
   OS << Decl::getDescriptiveKindName(parent->getDescriptiveKind());
   if (auto *decl = dyn_cast<ValueDecl>(parent)) {
     if (decl->hasName())
-      OS << " '" << decl->getFullName() << "'";
+      OS << " '" << decl->getName() << "'";
   }
 
   return OS.str().str();
@@ -3018,7 +3018,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     if (auto *callExpr = getAsExpr<CallExpr>(commonAnchor))
       commonAnchor = callExpr->getDirectCallee();
     auto &DE = getASTContext().Diags;
-    auto name = decl->getFullName();
+    const auto name = decl->getName();
 
     // Emit an error message for the ambiguity.
     if (aggregatedFixes.size() == 1 &&
@@ -3106,7 +3106,7 @@ static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
     if (!choice.isDecl())
       continue;
 
-    DeclName nextName = choice.getDecl()->getFullName();
+    const DeclName nextName = choice.getDecl()->getName();
     if (!name) {
       name = nextName;
       continue;

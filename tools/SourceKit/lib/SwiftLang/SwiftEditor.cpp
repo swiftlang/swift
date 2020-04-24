@@ -921,7 +921,7 @@ public:
       return true;
 
     if (isa<VarDecl>(D) && D->hasName() &&
-        D->getFullName() == D->getASTContext().Id_self)
+        D->getName() == D->getASTContext().Id_self)
       return true;
 
     // Do not annotate references to unavailable decls.

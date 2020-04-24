@@ -2148,7 +2148,7 @@ void ModuleFile::lookupValue(DeclName name,
           continue;
         }
         auto VD = cast<ValueDecl>(declOrError.get());
-        if (name.isSimpleName() || VD->getFullName().matchesRef(name))
+        if (name.isSimpleName() || VD->getName().matchesRef(name))
           results.push_back(VD);
       }
     }
@@ -2591,7 +2591,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
     } else {
       for (auto item : *iter) {
         auto vd = cast<ValueDecl>(getDecl(item.second));
-        if (!vd->getFullName().matchesRef(name))
+        if (!vd->getName().matchesRef(name))
           continue;
         
         auto dc = vd->getDeclContext();

@@ -478,7 +478,7 @@ void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
 template <typename FnTy>
 void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
-  ++NamesSeen[VD->getFullName()];
+  ++NamesSeen[VD->getName()];
   SmallVector<LookupResultEntry, 8> RelatedDecls;
 
   if (isa<ParamDecl>(VD))
@@ -499,7 +499,7 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
       continue;
 
     if (RelatedVD != VD) {
-      ++NamesSeen[RelatedVD->getFullName()];
+      ++NamesSeen[RelatedVD->getName()];
       RelatedDecls.push_back(result);
     }
   }
@@ -509,7 +509,7 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   for (auto Related : RelatedDecls) {
     ValueDecl *RelatedVD = Related.getValueDecl();
     bool SameBase = Related.getBaseDecl() && Related.getBaseDecl() == OriginalBase;
-    Fn(RelatedVD, SameBase, NamesSeen[RelatedVD->getFullName()] > 1);
+    Fn(RelatedVD, SameBase, NamesSeen[RelatedVD->getName()] > 1);
   }
 }
 
@@ -1052,7 +1052,7 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
                                  NameTranslatingInfo &Info) {
   auto &Ctx = VD->getDeclContext()->getASTContext();
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
-  DeclName OrigName = VD->getFullName();
+  const DeclName OrigName = VD->getName();
   DeclBaseName BaseName = Info.BaseName.empty()
                               ? OrigName.getBaseName()
                               : DeclBaseName(

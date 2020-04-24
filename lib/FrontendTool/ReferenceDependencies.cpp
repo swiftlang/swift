@@ -368,7 +368,7 @@ void ProvidesEmitter::CollectedDeclarations::findNominalsAndOperators(
       continue;
     }
 
-    if (VD->getFullName().isOperator()) {
+    if (VD->getName().isOperator()) {
       memberOperatorDecls.push_back(cast<FuncDecl>(VD));
       continue;
     }

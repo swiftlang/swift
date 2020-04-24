@@ -3266,7 +3266,7 @@ void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
 
 void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
   Printer << "/* placeholder for ";
-  recordDeclLoc(decl, [&]{ Printer << decl->getFullName(); });
+  recordDeclLoc(decl, [&]{ Printer << decl->getName(); });
   unsigned numVTableEntries = decl->getNumberOfVTableEntries();
   if (numVTableEntries > 0)
     Printer << " (vtable entries: " << numVTableEntries << ")";
