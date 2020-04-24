@@ -14,6 +14,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -2011,4 +2012,42 @@ AbstractFunctionDecl *swift::getBaseMethod(AbstractFunctionDecl *FD) {
     FD = FD->getOverriddenDecl();
   }
   return FD;
+}
+
+FullApplySite
+swift::cloneFullApplySiteReplacingCallee(FullApplySite applySite,
+                                         SILValue newCallee,
+                                         SILBuilderContext &builderCtx) {
+  SmallVector<SILValue, 16> arguments;
+  llvm::copy(applySite.getArguments(), std::back_inserter(arguments));
+
+  SILBuilderWithScope builder(applySite.getInstruction(), builderCtx);
+  builder.addOpenedArchetypeOperands(applySite.getInstruction());
+
+  switch (applySite.getKind()) {
+  case FullApplySiteKind::TryApplyInst: {
+    auto *tai = cast<TryApplyInst>(applySite.getInstruction());
+    return builder.createTryApply(tai->getLoc(), newCallee,
+                                  tai->getSubstitutionMap(), arguments,
+                                  tai->getNormalBB(), tai->getErrorBB());
+  }
+  case FullApplySiteKind::ApplyInst: {
+    auto *ai = cast<ApplyInst>(applySite);
+    auto fTy = newCallee->getType().getAs<SILFunctionType>();
+
+    // The optimizer can generate a thin_to_thick_function from a throwing thin
+    // to a non-throwing thick function (in case it can prove that the function
+    // is not throwing).
+    // Therefore we have to check if the new callee (= the argument of the
+    // thin_to_thick_function) is a throwing function and set the not-throwing
+    // flag in this case.
+    return builder.createApply(applySite.getLoc(), newCallee,
+                               applySite.getSubstitutionMap(), arguments,
+                               ai->isNonThrowing() || fTy->hasErrorResult());
+  }
+  case FullApplySiteKind::BeginApplyInst: {
+    llvm_unreachable("begin_apply support not implemented?!");
+  }
+  }
+  llvm_unreachable("Unhandled case?!");
 }
