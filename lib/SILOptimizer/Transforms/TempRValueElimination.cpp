@@ -628,6 +628,16 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     // We pass in SILValue() since we do not have a source address.
     if (!collectLoads(useOper, user, tempObj, SILValue(), loadInsts))
       return {std::next(si->getIterator()), false};
+
+    // Bail if there is any kind of user which is not handled in the code below.
+    switch (user->getKind()) {
+      case SILInstructionKind::CopyAddrInst:
+      case SILInstructionKind::FixLifetimeInst:
+      case SILInstructionKind::MarkDependenceInst:
+        continue;
+      default:
+        return {std::next(si->getIterator()), false};
+    }
   }
 
   // Since store is always a consuming operation, we do not need to worry about
