@@ -137,6 +137,8 @@ public:
   /// specific verification will do so.
   virtual void verify(SILFunction *F) const { verify(); }
 
+  virtual void forcePrecompute(SILFunction *F) {}
+
   /// Perform a potentially more expensive verification of the state of this
   /// analysis.
   ///
@@ -232,6 +234,15 @@ public:
     if (!it.second)
       it.second = newFunctionAnalysis(f);
     return it.second.get();
+  }
+
+  virtual void forcePrecompute(SILFunction *f) override {
+    // Check that the analysis can handle this function.
+    verifyFunction(f);
+
+    auto &it = storage.FindAndConstruct(f);
+    if (!it.second)
+      it.second = newFunctionAnalysis(f);
   }
 
   /// Invalidate all information in this analysis.
