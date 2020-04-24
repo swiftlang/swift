@@ -87,14 +87,14 @@ bool TypeVariableType::Implementation::isClosureType() const {
   if (!(locator && locator->getAnchor()))
     return false;
 
-  return isa<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
+  return isExpr<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
 }
 
 bool TypeVariableType::Implementation::isClosureResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;
 
-  return isa<ClosureExpr>(locator->getAnchor()) &&
+  return isExpr<ClosureExpr>(locator->getAnchor()) &&
          locator->isLastElement<LocatorPathElt::ClosureResult>();
 }
 
@@ -184,18 +184,18 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 
 Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   SmallVector<LocatorPathElt, 4> pathBuffer;
-  Expr *anchor = getLocatorParts(pathBuffer);
+  auto anchor = getLocatorParts(pathBuffer);
   // Locators are not guaranteed to have an anchor
   // if constraint system is used to verify generic
   // requirements.
-  if (!anchor)
+  if (!anchor.is<const Expr *>())
     return nullptr;
 
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
   SourceRange range;
   simplifyLocator(anchor, path, range);
-  return (path.empty() ? anchor : nullptr);
+  return (path.empty() ? getAsExpr(anchor) : nullptr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2671,7 +2671,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         else if (root != archetypeType)
           return Type();
         
-        auto locator = cs.getConstraintLocator(nullptr);
+        auto locator = cs.getConstraintLocator({});
         auto replacement = cs.createTypeVariable(locator,
                                                  TVO_CanBindToNoEscape);
 
@@ -2689,7 +2689,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
 
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
-      auto locator = cs.getConstraintLocator(nullptr);
+      auto locator = cs.getConstraintLocator({});
       auto replacement = cs.createTypeVariable(locator,
                                                TVO_CanBindToNoEscape);
       types[origType] = replacement;
@@ -2711,7 +2711,7 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
     type2 = replaceArchetypesWithTypeVariables(cs, type2);
   }
 
-  cs.addConstraint(kind, type1, type2, cs.getConstraintLocator(nullptr));
+  cs.addConstraint(kind, type1, type2, cs.getConstraintLocator({}));
 
   if (openArchetypes) {
     assert(!unwrappedIUO && "FIXME");

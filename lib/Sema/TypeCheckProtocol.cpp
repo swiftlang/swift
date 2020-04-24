@@ -943,8 +943,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // Open up the witness type.
     witnessType = witness->getInterfaceType();
     // FIXME: witness as a base locator?
-    locator = cs->getConstraintLocator(nullptr);
-    witnessLocator = cs->getConstraintLocator(static_cast<Expr *>(nullptr),
+    locator = cs->getConstraintLocator({});
+    witnessLocator = cs->getConstraintLocator({},
                                               LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
