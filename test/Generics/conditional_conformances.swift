@@ -433,7 +433,7 @@ func sr_10992_bar(_ fn: (SR_10992_P) -> Void) {
 
 // SR-7516
 
-protocol SR_7516_P1 { associatedtype X = Void } // expected-note {{protocol requires nested type 'X'; do you want to add it?}}
+protocol SR_7516_P1 { associatedtype X = Void } // expected-note 4{{protocol requires nested type 'X'; do you want to add it?}}
 protocol SR_7516_P2 { associatedtype X = Bool }
 protocol SR_7516_P3 { associatedtype X = Void }
 protocol SR_7516_P4 { associatedtype X } // expected-note {{protocol requires nested type 'X'; do you want to add it?}}
@@ -514,3 +514,19 @@ extension SR_7516_S5: SR_7516_P1 {
 // DEFAULT_TYPE_WITNESS-NEXT: internal typealias X = Void
 }
 extension SR_7516_S5: SR_7516_P4 where T: Equatable {}
+
+struct SR_7516_S6<T> {}
+extension SR_7516_S6: SR_7516_P2 where T == Void {}
+extension SR_7516_S6: SR_7516_P1 where T == Never { // expected-error {{type 'SR_7516_S6<T>' does not conform to protocol 'SR_7516_P1'}}
+}
+
+struct SR_7516_S7<T> {}
+extension SR_7516_S7: SR_7516_P1 where T == Void {} // expected-error {{type 'SR_7516_S7<T>' does not conform to protocol 'SR_7516_P1'}}
+extension SR_7516_S7: SR_7516_P2 where T == Never {
+  typealias X = Bool
+}
+
+struct SR_7516_S8<T>: SR_7516_P1 {} // expected-error {{type 'SR_7516_S8<T>' does not conform to protocol 'SR_7516_P1'}}
+extension SR_7516_S8: SR_7516_P2 where T == Never {
+  typealias X = Bool
+}

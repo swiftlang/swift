@@ -3795,6 +3795,20 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
         continue;
 
+    // A candidate is nonviable if its context has requirements not
+    // satisfied by those of the confomance context.
+    {
+      const auto candidateCtxSig = candidate.Member->getDeclContext()
+          ->getGenericSignatureOfContext();
+      const auto conformanceCtxSig = DC->getGenericSignatureOfContext();
+
+      if(candidateCtxSig && conformanceCtxSig &&
+         !candidateCtxSig->requirementsNotSatisfiedBy(
+             conformanceCtxSig).empty()) {
+        continue;
+      }
+    }
+
     // Check this type against the protocol requirements.
     if (auto checkResult =
             checkTypeWitness(DC, Proto, assocType, candidate.MemberType)) {
