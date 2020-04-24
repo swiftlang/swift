@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines data structures for capturing module dependencies.
+// This file defines data structures for capturing all of the source files
+// and modules on which a given module depends, forming a graph of all of the
+// modules that need to be present for a given module to be built.
 //
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_AST_MODULE_DEPENDENCIES_H
@@ -36,6 +38,8 @@ enum class ModuleDependenciesKind : int8_t {
 };
 
 /// Base class for the variant storage of ModuleDependencies.
+///
+/// This class is mostly an implementation detail for \c ModuleDependencies.
 class ModuleDependenciesStorageBase {
 public:
   const bool isSwiftModule;
@@ -57,6 +61,8 @@ public:
 };
 
 /// Describes the dependencies of a Swift module.
+///
+/// This class is mostly an implementation detail for \c ModuleDependencies.
 class SwiftModuleDependenciesStorage : public ModuleDependenciesStorageBase {
 public:
   /// The Swift interface file, if it can be used to generate the module file.
@@ -89,6 +95,9 @@ public:
   }
 };
 
+/// Describes the dependencies of a Clang module.
+///
+/// This class is mostly an implementation detail for \c ModuleDependencies.
 class ClangModuleDependenciesStorage : public ModuleDependenciesStorageBase {
 public:
   /// The module map file used to generate the Clang module.
@@ -126,6 +135,10 @@ public:
 };
 
 /// Describes the dependencies of a given module.
+///
+/// The dependencies of a module include all of the source files that go
+/// into that module, as well as any modules that are directly imported
+/// into the module.
 class ModuleDependencies {
 private:
   std::unique_ptr<ModuleDependenciesStorageBase> storage;
