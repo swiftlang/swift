@@ -1605,10 +1605,17 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
         }
       }
     }
-    
+
     // Attach the foreign error convention.
     if (inheritedConvention) {
-      method->setForeignErrorConvention(*inheritedConvention);
+      // Diagnose if this is a method that does not throw
+      // but inherits an ObjC error convention.
+      if (!method->hasThrows())
+        method->diagnose(diag::satisfy_throws_objc,
+                         isa<ConstructorDecl>(method));
+      else
+        method->setForeignErrorConvention(*inheritedConvention);
+
     } else if (method->hasThrows()) {
       assert(errorConvention && "Missing error convention");
       method->setForeignErrorConvention(*errorConvention);
