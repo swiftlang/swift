@@ -178,6 +178,10 @@ extension String {
   /// Creates a string by copying the data from a given
   /// C array of UTF8-encoded bytes.
   public init?(utf8String bytes: UnsafePointer<CChar>) {
+    // This isn't declared to accept nil but in practice it appears some people
+    // manage to pass it nil anyway
+    guard UInt(bitPattern: bytes) != 0 else { return nil }
+    
     if let str = String(validatingUTF8: bytes) {
       self = str
       return

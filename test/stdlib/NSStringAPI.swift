@@ -230,6 +230,12 @@ NSStringAPIs.test("init(utf8String:)") {
   up.deallocate()
 }
 
+NSStringAPIs.test("init(utf8String:) compatibility hack") {
+  let ptr = UnsafePointer<CChar>(bitPattern: 0)
+  expectNil(String(utf8String: ptr))
+}
+
+
 NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
   expectTrue("foo".canBeConverted(to: .ascii))
   expectFalse("あいう".canBeConverted(to: .ascii))
