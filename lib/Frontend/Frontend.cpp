@@ -822,13 +822,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-check-types");
 
   bool hadLoadError = parsePartialModulesAndInputFiles();
-  if (Invocation.isCodeCompletion()) {
-    // When we are doing code completion, make sure to emit at least one
-    // diagnostic, so that ASTContext is marked as erroneous.  In this case
-    // various parts of the compiler (for example, AST verifier) have less
-    // strict assumptions about the AST.
-    Diagnostics.diagnose(SourceLoc(), diag::error_doing_code_completion);
-  }
   if (hadLoadError)
     return;
 
