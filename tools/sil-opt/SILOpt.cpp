@@ -480,7 +480,6 @@ int main(int argc, char **argv) {
   if (OptimizationGroup == OptGroup::Diagnostics) {
     runSILDiagnosticPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Performance) {
-    runSILOptPreparePasses(*CI.getSILModule());
     runSILOptimizationPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Lowering) {
     runSILLoweringPasses(*CI.getSILModule());

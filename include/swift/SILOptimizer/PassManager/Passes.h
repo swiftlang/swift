@@ -33,9 +33,6 @@ namespace swift {
   /// \returns true if the diagnostic passes produced an error
   bool runSILDiagnosticPasses(SILModule &M);
 
-  /// Prepare SIL for the -O pipeline.
-  void runSILOptPreparePasses(SILModule &Module);
-
   /// Run all the SIL performance optimization passes on \p M.
   void runSILOptimizationPasses(SILModule &M);
 
