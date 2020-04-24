@@ -123,10 +123,10 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
 }
 
 ConstraintLocator *
-Solution::getConstraintLocator(const Expr *anchor,
+Solution::getConstraintLocator(TypedNode anchor,
                                ArrayRef<LocatorPathElt> path) const {
   auto &cs = getConstraintSystem();
-  return cs.getConstraintLocator(const_cast<Expr *>(anchor), path);
+  return cs.getConstraintLocator(anchor, path);
 }
 
 ConstraintLocator *
@@ -1204,9 +1204,9 @@ namespace {
       // For properties, build member references.
       if (isa<VarDecl>(member)) {
         if (isUnboundInstanceMember) {
-          assert(memberLocator.getBaseLocator() && 
+          assert(memberLocator.getBaseLocator() &&
                  cs.UnevaluatedRootExprs.count(
-                   memberLocator.getBaseLocator()->getAnchor()) &&
+                     getAsExpr(memberLocator.getBaseLocator()->getAnchor())) &&
                  "Attempt to reference an instance member of a metatype");
           auto baseInstanceTy = cs.getType(base)
               ->getInOutObjectType()->getMetatypeInstanceType();
@@ -1618,7 +1618,7 @@ namespace {
 
         if (selected.choice.getKind() ==
                 OverloadChoiceKind::KeyPathDynamicMemberLookup &&
-            !isa<SubscriptExpr>(locator.getAnchor()))
+            !isExpr<SubscriptExpr>(locator.getAnchor()))
           locatorKind = ConstraintLocator::Member;
 
         newSubscript =
@@ -1744,7 +1744,7 @@ namespace {
         locatorKind = ConstraintLocator::Member;
 
       if (choice.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-        locatorKind = isa<SubscriptExpr>(locator.getAnchor())
+        locatorKind = isExpr<SubscriptExpr>(locator.getAnchor())
                           ? ConstraintLocator::SubscriptMember
                           : ConstraintLocator::Member;
       }
@@ -1898,7 +1898,7 @@ namespace {
                                              SourceLoc dotLoc,
                                              ConstraintLocator *memberLoc) {
       auto &ctx = cs.getASTContext();
-      auto *anchor = memberLoc->getAnchor();
+      auto *anchor = getAsExpr(memberLoc->getAnchor());
 
       SmallVector<KeyPathExpr::Component, 2> components;
 
@@ -7804,13 +7804,13 @@ namespace {
     explicit CompareExprSourceLocs(SourceManager &sourceMgr)
       : sourceMgr(sourceMgr) { }
 
-    bool operator()(Expr *lhs, Expr *rhs) const {
+    bool operator()(TypedNode lhs, TypedNode rhs) const {
       if (static_cast<bool>(lhs) != static_cast<bool>(rhs)) {
         return static_cast<bool>(lhs);
       }
 
-      auto lhsLoc = lhs->getLoc();
-      auto rhsLoc = rhs->getLoc();
+      auto lhsLoc = getLoc(lhs);
+      auto rhsLoc = getLoc(rhs);
       if (lhsLoc.isValid() != rhsLoc.isValid())
         return lhsLoc.isValid();
 
@@ -7824,26 +7824,27 @@ namespace {
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   /// Collect the fixes on a per-expression basis.
-  llvm::SmallDenseMap<Expr *, SmallVector<ConstraintFix *, 4>> fixesPerExpr;
+  llvm::SmallDenseMap<TypedNode, SmallVector<ConstraintFix *, 4>>
+      fixesPerAnchor;
   for (auto *fix : solution.Fixes) {
-    fixesPerExpr[fix->getAnchor()].push_back(fix);
+    fixesPerAnchor[fix->getAnchor()].push_back(fix);
   }
 
   // Collect all of the expressions that have fixes, and sort them by
   // source ordering.
-  SmallVector<Expr *, 4> exprsWithFixes;
-  for (const auto &fix : fixesPerExpr) {
-    exprsWithFixes.push_back(fix.getFirst());
+  SmallVector<TypedNode, 4> orderedAnchors;
+  for (const auto &fix : fixesPerAnchor) {
+    orderedAnchors.push_back(fix.getFirst());
   }
-  std::sort(exprsWithFixes.begin(), exprsWithFixes.end(),
+  std::sort(orderedAnchors.begin(), orderedAnchors.end(),
             CompareExprSourceLocs(Context.SourceMgr));
 
   // Walk over each of the expressions, diagnosing fixes.
   bool diagnosedAnyErrors = false;
 
-  for (auto expr : exprsWithFixes) {
+  for (auto anchor : orderedAnchors) {
     // Coalesce fixes with the same locator to avoid duplicating notes.
-    auto fixes = fixesPerExpr[expr];
+    auto fixes = fixesPerAnchor[anchor];
 
     using ConstraintFixVector = llvm::SmallVector<ConstraintFix *, 4>;
     llvm::SmallMapVector<ConstraintLocator *,

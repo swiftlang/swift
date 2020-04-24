@@ -4489,7 +4489,7 @@ bool swift::areGenericRequirementsSatisfied(
 
   ConstraintSystemOptions Options;
   ConstraintSystem CS(const_cast<DeclContext *>(DC), Options);
-  auto Loc = CS.getConstraintLocator(nullptr);
+  auto Loc = CS.getConstraintLocator({});
 
   // For every requirement, add a constraint.
   for (auto Req : sig->getRequirements()) {
@@ -4550,7 +4550,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(
       ConstraintKind::ValueMember, DeclNameRef(Name), BaseTy,
-      FunctionRefKind::SingleApply, CS.getConstraintLocator(nullptr), false);
+      FunctionRefKind::SingleApply, CS.getConstraintLocator({}), false);
 
   // Keep track of all the unviable members.
   for (auto Can : LookupResult.UnviableCandidates)
@@ -4564,7 +4564,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
     return Result;
 
   // Try to figure out the best overload.
-  ConstraintLocator *Locator = CS.getConstraintLocator(nullptr);
+  ConstraintLocator *Locator = CS.getConstraintLocator({});
   TypeVariableType *TV = CS.createTypeVariable(Locator,
                                                TVO_CanBindToLValue |
                                                TVO_CanBindToNoEscape);

@@ -459,8 +459,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   // of the optional type extracted by force unwrap.
   bool isOptionalObject = false;
   if (auto *locator = typeVar->getImpl().getLocator()) {
-    auto *anchor = locator->getAnchor();
-    isOptionalObject = anchor && isa<ForceValueExpr>(anchor);
+    auto anchor = locator->getAnchor();
+    isOptionalObject = isExpr<ForceValueExpr>(anchor);
   }
 
   // Gather the constraints associated with this type variable.
@@ -1104,7 +1104,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
         if (cs.recordFix(fix))
           return true;
       } else if (srcLocator->getAnchor() &&
-                 isa<ObjectLiteralExpr>(srcLocator->getAnchor())) {
+                 isExpr<ObjectLiteralExpr>(srcLocator->getAnchor())) {
         auto *fix = SpecifyObjectLiteralTypeImport::create(
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))
