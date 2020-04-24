@@ -148,6 +148,8 @@ These forms of mismatching has also been requested from time to time and can hel
 
 We can enable certain forms of "desugaring", such as allowing enum cases to satisfy static requirements:
 
+_Note: This has now been implemented in Swift 5.3. See [SE-0280](https://github.com/apple/swift-evolution/blob/master/proposals/0280-enum-cases-as-protocol-witnesses.md) for more details._
+
 For example:
 
 ```swift
@@ -165,12 +167,6 @@ let e: some E = E.foo
 ```
 
 Enum cases already _behave_ like static properties/functions in the language, both syntactically and semantically, so it's not unreasonable to think of a case as "sugar" for a `static var` or `static func`.
-
-Related bugs:
-- https://bugs.swift.org/browse/SR-3170
-- https://bugs.swift.org/browse/SR-9099
-
-See this proposal for more information: https://github.com/apple/swift-evolution/pull/1119
 
 ### Default arguments
 
