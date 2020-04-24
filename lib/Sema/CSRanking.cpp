@@ -505,7 +505,7 @@ bool CompareDeclSpecializationRequest::evaluate(
   ConstraintSystem cs(dc, ConstraintSystemOptions());
   bool knownNonSubtype = false;
 
-  auto *locator = cs.getConstraintLocator(nullptr);
+  auto *locator = cs.getConstraintLocator({});
   // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
 
@@ -769,8 +769,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   bool isVarAndNotProtocol2 = false;
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
-    if (auto *anchor = locator->getAnchor()) {
-      auto weight = cs.getExprDepth(anchor);
+    if (auto *anchor = locator->getAnchor().dyn_cast<const Expr *>()) {
+      auto weight = cs.getExprDepth(const_cast<Expr *>(anchor));
       if (weight)
         return *weight + 1;
     }
