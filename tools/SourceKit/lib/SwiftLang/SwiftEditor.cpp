@@ -1363,8 +1363,10 @@ public:
     // We only vend the selector name for @IBAction and @IBSegueAction methods.
     if (auto FuncD = dyn_cast_or_null<FuncDecl>(D)) {
       if (FuncD->getAttrs().hasAttribute<IBActionAttr>() ||
-          FuncD->getAttrs().hasAttribute<IBSegueActionAttr>())
-        return FuncD->getObjCSelector().getString(Buf);
+          FuncD->getAttrs().hasAttribute<IBSegueActionAttr>()) {
+        return FuncD->getObjCSelector(DeclName(), /*skipIsObjCResolution*/true)
+          .getString(Buf);
+      }
     }
     return StringRef();
   }
