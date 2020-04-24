@@ -10,9 +10,7 @@ var v = PublicPrivate()
 // Can access all public members and types.
 
 v.PublicMemberVar = 1
-// TODO: Static member variables don't appear to be imported correctly yet. Once
-// they are, verify that PublicStaticMemberVar is accessible.
-// PublicPrivate.PublicStaticMemberVar = 1
+PublicPrivate.PublicStaticMemberVar = 1
 v.publicMemberFunc()
 
 var publicTypedefVar: PublicPrivate.PublicTypedef
@@ -29,8 +27,6 @@ var publicFlagEnumVar: PublicPrivate.PublicFlagEnum
 // Cannot access any private members and types.
 
 v.PrivateMemberVar = 1 // expected-error {{value of type 'PublicPrivate' has no member 'PrivateMemberVar'}}
-// TODO: This gives the expected error, but only because static member variables
-// (private or  public) aren't imported at all. Once that is fixed, remove this
 PublicPrivate.PrivateStaticMemberVar = 1 // expected-error {{'PublicPrivate' has no member 'PrivateStaticMemberVar'}}
 v.privateMemberFunc() // expected-error {{value of type 'PublicPrivate' has no member 'privateMemberFunc'}}
 

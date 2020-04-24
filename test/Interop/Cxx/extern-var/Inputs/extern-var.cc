@@ -1,21 +1,13 @@
 int counter = 12;
 
-int getCounterFromCxx() {
-  return counter;
-}
+int getCounterFromCxx() { return counter; }
 
-void setCounterFromCxx(int c) {
-  counter = c;
-}
+void setCounterFromCxx(int c) { counter = c; }
 
 namespace Namespaced {
-  int counter = 12;
+int counter = 12;
 
-  int getCounterFromCxx() {
-    return counter;
-  }
+int getCounterFromCxx() { return counter; }
 
-  void setCounterFromCxx(int c) {
-    counter = c;
-  }
-}
+void setCounterFromCxx(int c) { counter = c; }
+} // namespace Namespaced

@@ -43,7 +43,10 @@ def rewrite(parent, names, copy_fn, rm_fn):
             else:
                 copy_fn(path, new_path)
 
-        rm_fn(path)
+        if platform.system() == 'Windows':
+            rm_fn(u'\\'.join([u'\\\\?', os.path.normpath(path)]))
+        else:
+            rm_fn(path)
 
 
 for parent, dirs, files in os.walk(root_dir, topdown=False):

@@ -4,8 +4,8 @@ int getCounterFromCxx();
 void setCounterFromCxx(int);
 
 namespace Namespaced {
-  extern int counter;
+extern int counter;
 
-  int getCounterFromCxx();
-  void setCounterFromCxx(int);
-}
+int getCounterFromCxx();
+void setCounterFromCxx(int);
+} // namespace Namespaced

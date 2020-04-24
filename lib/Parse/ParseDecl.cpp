@@ -4588,8 +4588,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
         return whereStatus;
       trailingWhereHadCodeCompletion = true;
     }
-
-    if (whereStatus.isSuccess()) {
+    if (!requirements.empty()) {
       trailingWhereClause = TrailingWhereClause::create(Context, whereLoc,
                                                         requirements);
     }

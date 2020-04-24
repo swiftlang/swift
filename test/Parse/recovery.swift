@@ -436,7 +436,7 @@ struct ErrorTypeInVarDeclFunctionType1 {
 }
 
 struct ErrorTypeInVarDeclArrayType1 {
-  var v1 : Int[+] // expected-error {{unexpected ']' in type; did you mean to write an array type?}}
+  var v1 : Int[+] // expected-error {{array types are now written with the brackets around the element type}}
   // expected-error @-1 {{expected expression after unary operator}}
   // expected-error @-2 {{expected expression}}
   var v2 : Int
@@ -444,11 +444,14 @@ struct ErrorTypeInVarDeclArrayType1 {
 
 struct ErrorTypeInVarDeclArrayType2 {
   var v1 : Int[+ // expected-error {{unary operator cannot be separated from its operand}}
+                 // expected-error@-1 {{expected ']' in array type}}
+                 // expected-note@-2 {{to match this opening '['}}
   var v2 : Int // expected-error {{expected expression}}
 }
 
 struct ErrorTypeInVarDeclArrayType3 {
-  var v1 : Int[
+  var v1 : Int[ // expected-error {{expected ']' in array type}}
+                // expected-note@-1 {{to match this opening '['}}
   ;  // expected-error {{expected expression}}
   var v2 : Int
 }
@@ -480,8 +483,9 @@ struct ErrorTypeInVarDeclDictionaryType {
 
 struct ErrorInFunctionSignatureResultArrayType1 {
   func foo() -> Int[ { // expected-error {{expected '{' in body of function declaration}}
+                       // expected-note@-1 {{to match this opening '['}}
     return [0]
-  }
+  }  // expected-error {{expected ']' in array type}}
   func bar() -> Int] { // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{17-17=[}}
     return [0]
   }
@@ -669,10 +673,8 @@ case let (jeb):
 // rdar://19605164
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {
-func a(s: S[{{g) -> Int {}
-// expected-error@+2 {{expected parameter name followed by ':'}}
-// expected-error@+1 {{expected ',' separator}}
-}}}
+func a(s: S[{{g) -> Int {} // expected-note {{to match this opening '['}}
+}}} // expected-error {{expected ']' in array type}}
 #endif
   
   

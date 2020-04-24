@@ -272,6 +272,10 @@ public:
     return false;
   }
 
+  virtual ModuleDecl *getUnderlyingModuleIfOverlay() const {
+    return nullptr;
+  }
+
   /// Returns the associated clang module if one exists.
   virtual const clang::Module *getUnderlyingClangModule() const {
     return nullptr;

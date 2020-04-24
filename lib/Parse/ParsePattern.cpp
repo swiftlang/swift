@@ -332,7 +332,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
         // If we didn't parse a type, then we already diagnosed that the type
         // was invalid.  Remember that.
-        if (type.isParseError() && !type.hasCodeCompletion())
+        if (type.isNull() && !type.hasCodeCompletion())
           param.isInvalid = true;
       } else if (paramContext != Parser::ParameterContextKind::Closure) {
         diagnose(Tok, diag::expected_parameter_colon);
