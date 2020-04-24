@@ -1,9 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -primary-file %S/Inputs/a.swift -emit-module-path %t/a.swiftmodule
-// SWIFT_ENABLE_TENSORFLOW
-// Use `-enable-experimental-cross-file-derivative-registration` flag. To be removed soon.
-// RUN: %target-swift-frontend -enable-experimental-cross-file-derivative-registration -emit-module -primary-file %S/Inputs/b.swift -emit-module-path %t/b.swiftmodule -I %t
-// SWIFT_ENABLE_TENSORFLOW END
+// RUN: %target-swift-frontend -emit-module -primary-file %S/Inputs/b.swift -emit-module-path %t/b.swiftmodule -I %t
 // "-verify-ignore-unknown" is for "<unknown>:0: note: 'init()' declared here"
 // RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unknown -I %t %s
 

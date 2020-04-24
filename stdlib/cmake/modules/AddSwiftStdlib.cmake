@@ -1733,11 +1733,6 @@ function(add_swift_target_library name)
       endif()
     endif()
 
-    # SWIFT_ENABLE_TENSORFLOW
-    list(APPEND swiftlib_swift_compile_flags_all
-         -Xfrontend -enable-experimental-cross-file-derivative-registration)
-    # SWIFT_ENABLE_TENSORFLOW END
-
     # Collect architecture agnostic SDK linker flags
     set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
     if(${sdk} STREQUAL IOS_SIMULATOR AND ${name} STREQUAL swiftMediaPlayer)
