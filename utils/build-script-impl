@@ -1282,32 +1282,32 @@ function cmake_config_opt() {
 }
 
 function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
-    local clang_dest_dir=$1
+    local clang_dest_dir="$1"
 
     HOST_CXX_DIR=$(dirname "${HOST_CXX}")
     HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
     DEST_LIB_CLANG_DIR="${clang_dest_dir}/lib/clang"
 
-    if [[ -d "${HOST_LIB_CLANG_DIR}" ]] && [[ -d "${DEST_LIB_CLANG_DIR}" ]]; then
-        DEST_CXX_BUILTINS_VERSION=$(ls "${DEST_LIB_CLANG_DIR}" | awk '{print $0}')
-        DEST_BUILTINS_DIR="${clang_dest_dir}/lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
+    [ -d "${HOST_LIB_CLANG_DIR}" -a -d "${DEST_LIB_CLANG_DIR}" ] || return
 
-        if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
-            for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
-                HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
-                echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
+    DEST_CXX_BUILTINS_VERSION=$(ls -1 "${DEST_LIB_CLANG_DIR}")
+    DEST_BUILTINS_DIR="${clang_dest_dir}/lib/clang/${DEST_CXX_BUILTINS_VERSION}/lib/darwin"
 
-                for OS in ios watchos tvos; do
-                    LIB_NAME="libclang_rt.$OS.a"
-                    HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                    if [[ -f "${HOST_LIB_PATH}" ]]; then
-                        call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
-                    elif [[ "${VERBOSE_BUILD}" ]]; then
-                        echo "no file exists at ${HOST_LIB_PATH}"
-                    fi
-                done
+    if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
+        for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
+            HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
+            echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
+
+            for OS in ios watchos tvos; do
+                LIB_NAME="libclang_rt.$OS.a"
+                HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
+                if [[ -f "${HOST_LIB_PATH}" ]]; then
+                    call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
+                elif [[ "${VERBOSE_BUILD}" ]]; then
+                    echo "no file exists at ${HOST_LIB_PATH}"
+                fi
             done
-        fi
+        done
     fi
 }
 
