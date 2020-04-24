@@ -2789,7 +2789,7 @@ for host in "${ALL_HOSTS[@]}"; do
         
         # When we are installing LLVM copy over the compiler-rt
         # builtins for iOS/tvOS/watchOS to ensure that we don't
-        # have compiler crashes when building apps for such platforms.
+        # have linker errors  when building apps for such platforms.
         if [[ "${product}" = "llvm" ]] && [[ ! -z "${LLVM_INSTALL_COMPONENTS}" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
             copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain "${host_install_destdir}${host_install_prefix}"
         fi
