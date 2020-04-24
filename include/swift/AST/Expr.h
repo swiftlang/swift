@@ -3781,12 +3781,7 @@ public:
 
   TypeRepr *getExplicitResultTypeRepr() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultType.getTypeRepr();
-  }
-
-  void setExplicitResultType(SourceLoc arrowLoc, TypeLoc resultType) {
-    ArrowLoc = arrowLoc;
-    ExplicitResultType = resultType;
+    return ExplicitResultType->getTypeRepr();
   }
 
   /// Determine whether the closure has a single expression for its
