@@ -260,8 +260,6 @@ private:
         });
   }
 
-  FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
-
   // Build concrete existential information using findInitExistential.
   Optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfo(Operand &ArgOperand);
