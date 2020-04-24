@@ -402,10 +402,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
-  Opts.EnableRequestBasedIncrementalDependencies =
-      Args.hasFlag(OPT_enable_request_based_incremental_dependencies,
-                   OPT_disable_request_based_incremental_dependencies,
-                   Opts.EnableRequestBasedIncrementalDependencies);
   Opts.EnableASTScopeLookup =
       Args.hasFlag(options::OPT_enable_astscope_lookup,
                    options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
@@ -553,9 +549,22 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
+  std::string TargetArgScratch;
+
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
+
+    // Backward compatibility hack: infer "simulator" environment for x86
+    // iOS/tvOS/watchOS. The driver takes care of this for the frontend
+    // most of the time, but loading of old .swiftinterface files goes
+    // directly to the frontend.
+    if (tripleInfersSimulatorEnvironment(Target)) {
+      // Set the simulator environment.
+      Target.setEnvironment(llvm::Triple::EnvironmentType::Simulator);
+      TargetArgScratch = Target.str();
+      TargetArg = TargetArgScratch;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_target_variant)) {
@@ -760,7 +769,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
-  if (Args.hasArg(OPT_warnings_as_errors))
+  if (Args.hasFlag(options::OPT_warnings_as_errors,
+                   options::OPT_no_warnings_as_errors, false))
     Opts.ExtraArgs.push_back("-Werror");
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
@@ -845,7 +855,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
-  Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
+  Opts.WarningsAsErrors = Args.hasFlag(options::OPT_warnings_as_errors,
+                                       options::OPT_no_warnings_as_errors,
+                                       false);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
   Opts.EnableExperimentalFormatting |=

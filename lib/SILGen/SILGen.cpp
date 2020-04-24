@@ -1781,7 +1781,7 @@ public:
 
     // If the source file contains an artificial main, emit the implicit
     // toplevel code.
-    if (auto mainClass = sf->getMainClass()) {
+    if (auto mainDecl = sf->getMainDecl()) {
       assert(!sgm.M.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)
              && "already emitted toplevel before main class?!");
 
@@ -1798,7 +1798,7 @@ public:
           SGF.F.getConventions().getParameterSILTypes().begin();
       entry->createFunctionArgument(*paramTypeIter);
       entry->createFunctionArgument(*std::next(paramTypeIter));
-      SGF.emitArtificialTopLevel(mainClass);
+      SGF.emitArtificialTopLevel(mainDecl);
     }
   }
 };

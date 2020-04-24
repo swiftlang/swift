@@ -36,6 +36,7 @@ class GenericTypeParamType;
 class InfixOperatorDecl;
 class IterableDeclContext;
 class ModuleDecl;
+struct ImplicitImport;
 class NamedPattern;
 class NominalTypeDecl;
 class OperatorDecl;

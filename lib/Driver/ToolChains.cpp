@@ -216,7 +216,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
-  inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
+  inputArgs.AddAllArgs(arguments, options::OPT_warnings_as_errors,
+                       options::OPT_no_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);

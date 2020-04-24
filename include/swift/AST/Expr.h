@@ -3759,7 +3759,12 @@ public:
     assert(hasExplicitResultType() && "No explicit result type");
     return ExplicitResultType;
   }
-  
+
+  TypeRepr *getExplicitResultTypeRepr() const {
+    assert(hasExplicitResultType() && "No explicit result type");
+    return ExplicitResultType.getTypeRepr();
+  }
+
   void setExplicitResultType(SourceLoc arrowLoc, TypeLoc resultType) {
     ArrowLoc = arrowLoc;
     ExplicitResultType = resultType;

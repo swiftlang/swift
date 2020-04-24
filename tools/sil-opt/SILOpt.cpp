@@ -461,7 +461,7 @@ int main(int argc, char **argv) {
   if (CI.getSILModule())
     CI.getSILModule()->setSerializeSILAction([]{});
 
-  if (RemarksFilename != "") {
+  if (!RemarksFilename.empty()) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
         llvm::remarks::parseFormat(RemarksFormat);
     if (llvm::Error E = formatOrErr.takeError()) {

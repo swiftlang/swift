@@ -284,6 +284,7 @@ public:
 class EnumMetadataLayout : public NominalMetadataLayout {
   /// The offset of the payload size field, if there is one.
   StoredOffset PayloadSizeOffset;
+  StoredOffset TrailingFlagsOffset;
 
   // TODO: presumably it would be useful to store *something* here
   // for resilience.
@@ -301,6 +302,7 @@ public:
   }
 
   Offset getPayloadSizeOffset() const;
+  Offset getTrailingFlagsOffset() const;
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Enum;
@@ -310,6 +312,7 @@ public:
 /// Layout for struct type metadata.
 class StructMetadataLayout : public NominalMetadataLayout {
   llvm::DenseMap<VarDecl*, StoredOffset> FieldOffsets;
+  StoredOffset TrailingFlagsOffset;
 
   /// The start of the field-offset vector.
   StoredOffset FieldOffsetVector;
@@ -338,6 +341,7 @@ public:
   Size getStaticFieldOffset(VarDecl *field) const;
 
   Offset getFieldOffsetVectorOffset() const;
+  Offset getTrailingFlagsOffset() const;
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Struct;

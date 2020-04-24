@@ -32,7 +32,7 @@ class SwiftPM(product.Product):
         script_path = os.path.join(
             self.source_dir, 'Utilities', 'bootstrap')
         toolchain_path = self.install_toolchain_path()
-        swiftc = os.path.join(toolchain_path, "usr", "bin", "swiftc")
+        swiftc = os.path.join(toolchain_path, "bin", "swiftc")
 
         # FIXME: We require llbuild build directory in order to build. Is
         # there a better way to get this?

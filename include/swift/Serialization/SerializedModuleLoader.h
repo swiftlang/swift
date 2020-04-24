@@ -410,11 +410,13 @@ public:
 
   virtual StringRef getModuleDefiningPath() const override;
 
-  ClassDecl *getMainClass() const override;
+  Decl *getMainDecl() const override;
 
   bool hasEntryPoint() const override;
 
   virtual const clang::Module *getUnderlyingClangModule() const override;
+
+  virtual ModuleDecl *getUnderlyingModuleIfOverlay() const override;
 
   virtual bool getAllGenericSignatures(
                    SmallVectorImpl<GenericSignature> &genericSignatures)

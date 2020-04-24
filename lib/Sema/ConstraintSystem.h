@@ -999,7 +999,11 @@ public:
                                       bool lookThroughApply = true) const;
 
   ConstraintLocator *
-  getConstraintLocator(Expr *anchor, ArrayRef<LocatorPathElt> path = {}) const;
+  getConstraintLocator(const Expr *anchor,
+                       ArrayRef<LocatorPathElt> path = {}) const;
+
+  ConstraintLocator *getConstraintLocator(ConstraintLocator *baseLocator,
+                                          ArrayRef<LocatorPathElt> path) const;
 
   void setExprTypes(Expr *expr) const;
 
@@ -1609,8 +1613,6 @@ public:
 
   class SolverScope;
 
-  Constraint *failedConstraint = nullptr;
-
   /// Expressions that are known to be unevaluated.
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
@@ -1619,6 +1621,10 @@ public:
   unsigned CountDisjunctions = 0;
 
 private:
+  /// A constraint that has failed along the current solver path.
+  /// Do not set directly, call \c recordFailedConstraint instead.
+  Constraint *failedConstraint = nullptr;
+
   /// Current phase of the constraint system lifetime.
   ConstraintSystemPhase Phase = ConstraintSystemPhase::ConstraintGeneration;
 
@@ -1928,24 +1934,6 @@ private:
       generatedConstraints.push_back(constraint);
     }
 
-    /// Erase given constraint from the list of generated constraints
-    /// along the current solver path. Note that this operation doesn't
-    /// guarantee any ordering of the after it's application.
-    ///
-    /// \param constraint The constraint to erase.
-    void removeGeneratedConstraint(Constraint *constraint) {
-      for (auto *&generated : generatedConstraints) {
-        // When we find the constraint we're erasing, overwrite its
-        // value with the last element in the generated constraints
-        // vector and then pop that element from the vector.
-        if (generated == constraint) {
-          generated = generatedConstraints.back();
-          generatedConstraints.pop_back();
-          return;
-        }
-      }
-    }
-
     /// Register given scope to be tracked by the current solver state,
     /// this helps to make sure that all of the retired/generated constraints
     /// are dealt with correctly when the life time of the scope ends.
@@ -2112,6 +2100,10 @@ private:
   };
 
 public:
+  /// Retrieve the first constraint that has failed along the solver's path, or
+  /// \c nullptr if no constraint has failed.
+  Constraint *getFailedConstraint() const { return failedConstraint; }
+
   ConstraintSystemPhase getPhase() const { return Phase; }
 
   /// Move constraint system to a new phase of its lifetime.
@@ -2852,8 +2844,8 @@ public:
       break;
 
     case SolutionKind::Error:
-      if (shouldAddNewFailingConstraint()) {
-        addNewFailingConstraint(Constraint::createMemberOrOuterDisjunction(
+      if (shouldRecordFailedConstraint()) {
+        recordFailedConstraint(Constraint::createMemberOrOuterDisjunction(
             *this, ConstraintKind::ValueMember, baseTy, memberTy, name, useDC,
             functionRefKind, outerAlternatives, getConstraintLocator(locator)));
       }
@@ -2883,8 +2875,8 @@ public:
       break;
 
     case SolutionKind::Error:
-      if (shouldAddNewFailingConstraint()) {
-        addNewFailingConstraint(
+      if (shouldRecordFailedConstraint()) {
+        recordFailedConstraint(
           Constraint::createMember(*this, ConstraintKind::UnresolvedValueMember,
                                    baseTy, memberTy, name,
                                    useDC, functionRefKind,
@@ -2941,23 +2933,38 @@ public:
     addUnsolvedConstraint(constraint);
   }
 
-  /// Whether we should add a new constraint to capture a failure.
-  bool shouldAddNewFailingConstraint() const {
-    // Only do this at the top level.
+  /// Whether we should record the failure of a constraint.
+  bool shouldRecordFailedConstraint() const {
+    // If we're debugging, always note a failure so we can print it out.
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver)
+      return true;
+
+    // Otherwise, only record it if we don't already have a failed constraint.
+    // This avoids allocating unnecessary constraints.
     return !failedConstraint;
   }
 
-  /// Add a new constraint that we know fails.
-  void addNewFailingConstraint(Constraint *constraint) {
-    assert(shouldAddNewFailingConstraint());
-    failedConstraint = constraint;
-    failedConstraint->setActive(false);
+  /// Note that a particular constraint has failed, setting \c failedConstraint
+  /// if necessary.
+  void recordFailedConstraint(Constraint *constraint) {
+    assert(!constraint->isActive());
+    if (!failedConstraint)
+      failedConstraint = constraint;
 
-    // Record this as a newly-generated constraint.
-    if (solverState) {
-      solverState->addGeneratedConstraint(constraint);
-      solverState->retireConstraint(constraint);
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState ? solverState->depth * 2 : 0)
+          << "(failed constraint ";
+      constraint->print(log, &getASTContext().SourceMgr);
+      log << ")\n";
     }
+  }
+
+  /// Remove a constraint from the system that has failed, setting
+  /// \c failedConstraint if necessary.
+  void retireFailedConstraint(Constraint *constraint) {
+    retireConstraint(constraint);
+    recordFailedConstraint(constraint);
   }
 
   /// Add a newly-generated constraint that is known not to be solvable
@@ -4211,7 +4218,8 @@ private:
     /// The set of potential bindings.
     SmallVector<PotentialBinding, 4> Bindings;
 
-    /// Whether this type variable is fully bound by one of its constraints.
+    /// Whether these bindings should be delayed until the rest of the
+    /// constraint system is considered "fully bound".
     bool FullyBound = false;
 
     /// Whether the bindings of this type involve other type variables.

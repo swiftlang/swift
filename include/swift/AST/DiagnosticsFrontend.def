@@ -39,6 +39,10 @@ ERROR(error_unsupported_target_arch, none,
 ERROR(error_unsupported_opt_for_target, none,
       "unsupported option '%0' for target '%1'", (StringRef, StringRef))
 
+WARNING(warning_inferred_simulator_target,none,
+      "inferring simulator environment for target '%0'; "
+      "use '-target %1' instead", (StringRef, StringRef))
+
 ERROR(error_argument_not_allowed_with, none,
       "argument '%0' is not allowed with '%1'", (StringRef, StringRef))
 
@@ -138,8 +142,6 @@ ERROR(error_stdlib_module_name,none,
 
 ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
-ERROR(error_underlying_module_not_found,none,
-      "underlying Objective-C module %0 not found", (Identifier))
 
 ERROR(error_unable_to_load_supplementary_output_file_map, none,
       "unable to load supplementary output file map '%0': %1",

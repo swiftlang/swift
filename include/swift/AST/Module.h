@@ -59,6 +59,7 @@ namespace swift {
   class FuncDecl;
   class InfixOperatorDecl;
   class LinkLibrary;
+  struct ImplicitImport;
   class ModuleLoader;
   class NominalTypeDecl;
   class EnumElementDecl;
@@ -158,6 +159,42 @@ enum class ResilienceStrategy : unsigned {
   Resilient
 };
 
+/// The kind of stdlib that should be imported.
+enum class ImplicitStdlibKind {
+  /// No standard library should be implicitly imported.
+  None,
+
+  /// The Builtin module should be implicitly imported.
+  Builtin,
+
+  /// The regular Swift standard library should be implicitly imported.
+  Stdlib
+};
+
+struct ImplicitImportInfo {
+  /// The implicit stdlib to import.
+  ImplicitStdlibKind StdlibKind;
+
+  /// Whether we should attempt to import an underlying Clang half of this
+  /// module.
+  bool ShouldImportUnderlyingModule;
+
+  /// The bridging header path for this module, empty if there is none.
+  StringRef BridgingHeaderPath;
+
+  /// The names of additional modules to be implicitly imported.
+  SmallVector<Identifier, 4> ModuleNames;
+
+  /// An additional list of already-loaded modules which should be implicitly
+  /// imported.
+  SmallVector<std::pair<ModuleDecl *, /*exported*/ bool>, 4>
+      AdditionalModules;
+
+  ImplicitImportInfo()
+      : StdlibKind(ImplicitStdlibKind::None),
+        ShouldImportUnderlyingModule(false) {}
+};
+
 class OverlayFile;
 
 /// The minimum unit of compilation.
@@ -245,6 +282,10 @@ private:
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
 
+  /// A description of what should be implicitly imported by each file of this
+  /// module.
+  const ImplicitImportInfo ImportInfo;
+
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getSourceLookupCache() const;
 
@@ -274,14 +315,28 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  ModuleDecl(Identifier name, ASTContext &ctx);
+  ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
 
 public:
-  static ModuleDecl *create(Identifier name, ASTContext &ctx) {
-    return new (ctx) ModuleDecl(name, ctx);
+  /// Creates a new module with a given \p name.
+  ///
+  /// \param importInfo Information about which modules should be implicitly
+  /// imported by each file of this module.
+  static ModuleDecl *
+  create(Identifier name, ASTContext &ctx,
+         ImplicitImportInfo importInfo = ImplicitImportInfo()) {
+    return new (ctx) ModuleDecl(name, ctx, importInfo);
   }
 
   using Decl::getASTContext;
+
+  /// Retrieves information about which modules are implicitly imported by
+  /// each file of this module.
+  const ImplicitImportInfo &getImplicitImportInfo() const { return ImportInfo; }
+
+  /// Retrieve a list of modules that each file of this module implicitly
+  /// imports.
+  ArrayRef<ImplicitImport> getImplicitImports() const;
 
   ArrayRef<FileUnit *> getFiles() {
     return Files;
@@ -351,12 +406,16 @@ private:
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
 
+  ///  If this is a traditional (non-cross-import) overlay, get its underlying
+  ///  module if one exists.
+  ModuleDecl *getUnderlyingModuleIfOverlay() const;
+
 public:
 
   /// Returns true if this module is an underscored cross import overlay
-  /// declared by \p other, either directly or transitively (via intermediate
-  /// cross-import overlays - for cross-imports involving more than two
-  /// modules).
+  /// declared by \p other or its underlying clang module, either directly or
+  /// transitively (via intermediate cross-import overlays - for cross-imports
+  /// involving more than two modules).
   bool isCrossImportOverlayOf(ModuleDecl *other);
 
   /// If this module is an underscored cross-import overlay, returns the
@@ -365,16 +424,18 @@ public:
   /// cross-imports involving more than two modules).
   ModuleDecl *getDeclaringModuleIfCrossImportOverlay();
 
-  /// If this module is an underscored cross-import overlay of \p declaring
-  /// either directly or transitively, populates \p bystanderNames with the set
-  /// of bystander modules that must be present alongside \p declaring for
-  /// the overlay to be imported and returns true. Returns false otherwise.
+  /// If this module is an underscored cross-import overlay of \p declaring or
+  /// its underlying clang module, either directly or transitively, populates
+  /// \p bystanderNames with the set of bystander modules that must be present
+  /// alongside \p declaring for the overlay to be imported and returns true.
+  /// Returns false otherwise.
   bool getRequiredBystandersIfCrossImportOverlay(
       ModuleDecl *declaring, SmallVectorImpl<Identifier> &bystanderNames);
 
 
   /// Walks and loads the declared, underscored cross-import overlays of this
-  /// module, transitively, to find all overlays this module underlies.
+  /// module and its underlying clang module, transitively, to find all cross
+  /// import overlays this module underlies.
   ///
   /// This is used by tooling to present these overlays as part of this module.
   void findDeclaredCrossImportOverlaysTransitive(

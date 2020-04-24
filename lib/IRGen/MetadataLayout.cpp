@@ -543,6 +543,11 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
       super::noteStartOfGenericRequirements();
     }
 
+    void addTrailingFlags() {
+      Layout.TrailingFlagsOffset = getNextOffset();
+      super::addTrailingFlags();
+    }
+
     void layout() {
       super::layout();
       Layout.TheSize = getMetadataSize();
@@ -556,6 +561,11 @@ Offset
 EnumMetadataLayout::getPayloadSizeOffset() const {
   assert(PayloadSizeOffset.isStatic());
   return Offset(PayloadSizeOffset.getStaticOffset());
+}
+
+Offset EnumMetadataLayout::getTrailingFlagsOffset() const {
+  assert(TrailingFlagsOffset.isStatic());
+  return Offset(TrailingFlagsOffset.getStaticOffset());
 }
 
 /********************************** STRUCTS ***********************************/
@@ -594,6 +604,11 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
       super::noteEndOfFieldOffsets();
     }
 
+    void addTrailingFlags() {
+      Layout.TrailingFlagsOffset = getNextOffset();
+      super::addTrailingFlags();
+    }
+
     void layout() {
       super::layout();
       Layout.TheSize = getMetadataSize();
@@ -620,6 +635,11 @@ StructMetadataLayout::getFieldOffsetVectorOffset() const {
   return Offset(FieldOffsetVector.getStaticOffset());
 }
 
+Offset 
+StructMetadataLayout::getTrailingFlagsOffset() const {
+  assert(TrailingFlagsOffset.isStatic());
+  return Offset(TrailingFlagsOffset.getStaticOffset());
+}
 /****************************** FOREIGN CLASSES *******************************/
 ForeignClassMetadataLayout::ForeignClassMetadataLayout(IRGenModule &IGM,
                                                        ClassDecl *theClass)

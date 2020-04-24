@@ -208,9 +208,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
-  SourceFile *tmpSF =
-      new (*tmpCtx) SourceFile(*tmpM, oldSF->Kind, tmpBufferID,
-                               SourceFile::ImplicitModuleImportKind::None);
+  SourceFile *tmpSF = new (*tmpCtx) SourceFile(*tmpM, oldSF->Kind, tmpBufferID);
   tmpSF->enableInterfaceHash();
   // Ensure all non-function-body tokens are hashed into the interface hash
   tmpCtx->LangOpts.EnableTypeFingerprints = false;
@@ -318,12 +316,11 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
     // Create a new module and a source file using the current AST context.
     auto &Ctx = oldM->getASTContext();
-    auto newM = ModuleDecl::create(oldM->getName(), Ctx);
-    CompilerInstance::ImplicitImports implicitImport(CI);
-    SourceFile *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main,
-                                             newBufferID, implicitImport.kind);
+    auto *newM =
+        ModuleDecl::create(oldM->getName(), Ctx, oldM->getImplicitImportInfo());
+    auto *newSF =
+        new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID);
     newM->addFile(*newSF);
-    CompilerInstance::addAdditionalInitialImportsTo(newSF, implicitImport);
     newSF->enableInterfaceHash();
 
     // Tell the compiler instance we've replaced the code completion file.

@@ -291,5 +291,7 @@ def toolchain_path(install_destdir, install_prefix):
     built_toolchain_path = install_destdir
     if platform.system() == 'Darwin':
         # The prefix is an absolute path, so concatenate without os.path.
-        built_toolchain_path += darwin_toolchain_prefix(install_prefix)
+        built_toolchain_path += darwin_toolchain_prefix(install_prefix) + "/usr"
+    else:
+        built_toolchain_path += install_prefix
     return built_toolchain_path

@@ -337,7 +337,7 @@ ImportDepth::ImportDepth(ASTContext &context,
   // specially by applying import depth 0.
   llvm::StringSet<> auxImports;
   for (StringRef moduleName :
-       invocation.getFrontendOptions().ImplicitImportModuleNames)
+       invocation.getFrontendOptions().getImplicitImportModuleNames())
     auxImports.insert(moduleName);
 
   // Private imports from this module.

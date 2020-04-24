@@ -580,6 +580,9 @@ ERROR(expr_keypath_subscript_index_not_hashable, none,
 ERROR(expr_smart_keypath_application_type_mismatch,none,
       "key path of type %0 cannot be applied to a base of type %1",
       (Type, Type))
+ERROR(expr_keypath_root_type_mismatch, none,
+      "key path with root type %0 cannot be applied to a base of type %1",
+      (Type, Type))
 ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
 WARNING(expr_deprecated_writable_keypath,none,
@@ -2456,6 +2459,9 @@ ERROR(override_throws,none,
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
+ERROR(satisfy_throws_objc,none,
+      "satisfying a throwing @objc %select{method|initializer}0 with "
+      "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
 ERROR(override_optional_mismatch,none,
       "cannot override %0 %select{parameter|index}1 of type %2 with "
@@ -2890,17 +2896,19 @@ ERROR(nscopying_doesnt_conform,none,
       " the NSCopying protocol", ())
 
 // UIApplicationMain/NSApplicationMain attribute
-#define SELECT_APPLICATION_MAIN "select{'UIApplicationMain'|'NSApplicationMain'}"
+#define SELECT_APPLICATION_MAIN "select{'UIApplicationMain'|'NSApplicationMain'|'main'}"
 #define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
+#define SELECT_APPLICATION_TYPE "select{class|class|type}"
+#define SELECT_APPLICATION_TYPES "select{classes|classes|types}"
 
 ERROR(attr_ApplicationMain_not_ApplicationDelegate,none,
       "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
       (unsigned))
 ERROR(attr_generic_ApplicationMain_not_supported,none,
-      "generic %" SELECT_APPLICATION_MAIN "0 classes are not supported",
+      "generic %" SELECT_APPLICATION_MAIN "0 %" SELECT_APPLICATION_TYPES "0 are not supported",
       (unsigned))
 ERROR(attr_ApplicationMain_multiple,none,
-      "%" SELECT_APPLICATION_MAIN "0 attribute can only apply to one class in a module",
+      "%" SELECT_APPLICATION_MAIN "0 attribute can only apply to one %" SELECT_APPLICATION_TYPE "0 in a module",
       (unsigned))
 ERROR(attr_ApplicationMain_with_script,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute cannot be used in a module that contains "
@@ -2909,6 +2917,10 @@ ERROR(attr_ApplicationMain_with_script,none,
 NOTE(attr_ApplicationMain_script_here,none,
      "top-level code defined in this source file",
      ())
+
+ERROR(attr_MainType_without_main,none,
+      "%0 is annotated with @main and must provide a main static function of type () -> Void or () throws -> Void.",
+      (DeclName))
 
 #undef SELECT_APPLICATION_MAIN
 #undef SELECT_APPLICATION_DELEGATE

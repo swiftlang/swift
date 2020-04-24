@@ -46,4 +46,11 @@ EDUCATIONAL_NOTES(property_wrapper_failable_init,
 EDUCATIONAL_NOTES(property_wrapper_type_requirement_not_accessible,
                   "property-wrapper-requirements.md")
 
+EDUCATIONAL_NOTES(missing_append_interpolation,
+                  "string-interpolation-conformance.md")
+EDUCATIONAL_NOTES(append_interpolation_static,
+                  "string-interpolation-conformance.md")
+EDUCATIONAL_NOTES(append_interpolation_void_or_discardable,
+                  "string-interpolation-conformance.md")
+
 #undef EDUCATIONAL_NOTES

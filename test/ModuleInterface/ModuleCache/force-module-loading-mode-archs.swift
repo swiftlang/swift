@@ -10,11 +10,11 @@
 
 // 2. Only interface is present.
 // RUN: %empty-directory(%t/Lib.swiftmodule)
-// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.swiftmodule/%target-cpu.swiftinterface
+// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.swiftmodule/%module-target-triple.swiftinterface
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: env SWIFT_FORCE_MODULE_LOADING=only-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
-// RUN: env SWIFT_FORCE_MODULE_LOADING=only-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s
+// RUN: env SWIFT_FORCE_MODULE_LOADING=only-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH-2 -DARCH=%module-target-triple -DTARGET_CPU=%target-cpu %s
 // (default)
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -I %t %s 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 
@@ -34,7 +34,7 @@
 // RUN: %empty-directory(%t/MCP)
 
 // 4. Both are present.
-// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.swiftmodule/%target-cpu.swiftinterface
+// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.swiftmodule/%module-target-triple.swiftinterface
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: %empty-directory(%t/MCP)
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-SERIALIZED %s
@@ -82,19 +82,19 @@
 
 // 8. Only the interface is present but for the wrong architecture.
 // (Diagnostics for the module only are tested elsewhere.)
-// FIXME: We should improve this to not just say NO-SUCH-MODULE.
 // RUN: rm %t/Lib.swiftmodule/garbage.swiftmodule
-// RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s
-// RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s
+// RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%module-target-triple %s
+// RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%module-target-triple %s
 // RUN: env SWIFT_FORCE_MODULE_LOADING=only-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s
-// RUN: env SWIFT_FORCE_MODULE_LOADING=only-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s
+// RUN: env SWIFT_FORCE_MODULE_LOADING=only-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%module-target-triple %s
 // (default)
-// RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -I %t %s 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s
+// RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -I %t %s 2>&1 | %FileCheck -check-prefix=WRONG-ARCH -DARCH=%module-target-triple %s
 
 import Lib
 // NO-SUCH-MODULE: [[@LINE-1]]:8: error: no such module 'Lib'
 // BAD-MODULE: [[@LINE-2]]:8: error: malformed compiled module: {{.*}}Lib.swiftmodule
 // WRONG-ARCH: [[@LINE-3]]:8: error: could not find module 'Lib' for target '[[ARCH]]'; found: garbage
+// WRONG-ARCH-2: [[@LINE-4]]:8: error: could not find module 'Lib' for target '[[ARCH]]'; found: [[TARGET_CPU]]
 
 struct X {}
 let _: X = Lib.testValue

@@ -33,13 +33,6 @@ public:
   class Impl;
   struct SourceFileSyntaxInfo;
 
-  /// The implicit module import that the SourceFile should get.
-  enum class ImplicitModuleImportKind {
-    None,
-    Builtin,
-    Stdlib
-  };
-
   /// Possible attributes for imports in source files.
   enum class ImportFlags {
     /// The imported module is exposed to anyone who imports the parent module.
@@ -128,8 +121,8 @@ private:
 
   /// This is the list of modules that are imported by this module.
   ///
-  /// This is filled in by the import resolution phase.
-  ArrayRef<ImportedModuleDesc> Imports;
+  /// This is \c None until it is filled in by the import resolution phase.
+  Optional<ArrayRef<ImportedModuleDesc>> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -145,14 +138,14 @@ private:
   TypeRefinementContext *TRC = nullptr;
 
   /// If non-null, used to track name lookups that happen within this file.
-  Optional<ReferencedNameTracker> ReferencedNames;
   Optional<ReferencedNameTracker> RequestReferencedNames;
 
-  /// The class in this file marked \@NS/UIApplicationMain.
-  ClassDecl *MainClass = nullptr;
+  /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
+  /// that calls main on the type marked @main.
+  Decl *MainDecl = nullptr;
 
-  /// The source location of the main class.
-  SourceLoc MainClassDiagLoc;
+  /// The source location of the main type.
+  SourceLoc MainDeclDiagLoc;
 
   /// A hash of all interface-contributing tokens that have been lexed for
   /// this source file so far.
@@ -163,10 +156,6 @@ private:
   ///
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
-
-  /// Does this source file have any implementation-only imports?
-  /// If not, we can fast-path module checks.
-  bool HasImplementationOnlyImports = false;
 
   /// The parsing options for the file.
   ParsingOptions ParsingOpts;
@@ -335,12 +324,17 @@ public:
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
-             bool KeepSyntaxTree = false, ParsingOptions parsingOpts = {});
+             bool KeepParsedTokens = false, bool KeepSyntaxTree = false,
+             ParsingOptions parsingOpts = {});
 
   ~SourceFile();
 
-  void addImports(ArrayRef<ImportedModuleDesc> IM);
+  /// Retrieve an immutable view of the source file's imports.
+  ArrayRef<ImportedModuleDesc> getImports() const { return *Imports; }
+
+  /// Set the imports for this source file. This gets called by import
+  /// resolution.
+  void setImports(ArrayRef<ImportedModuleDesc> imports);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.
@@ -355,9 +349,9 @@ public:
   hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
                              ImportQueryKind kind = TestableAndPrivate) const;
 
-  bool hasImplementationOnlyImports() const {
-    return HasImplementationOnlyImports;
-  }
+  /// Does this source file have any implementation-only imports?
+  /// If not, we can fast-path module checks.
+  bool hasImplementationOnlyImports() const;
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
@@ -394,6 +388,8 @@ public:
     auto &value = std::get<1>(*i);
     overlays.append(value.begin(), value.end());
   }
+
+  SWIFT_DEBUG_DUMPER(dumpSeparatelyImportedOverlays());
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
@@ -458,13 +454,6 @@ public:
 
   virtual bool walk(ASTWalker &walker) override;
 
-  ReferencedNameTracker *getLegacyReferencedNameTracker() {
-    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
-  }
-  const ReferencedNameTracker *getLegacyReferencedNameTracker() const {
-    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
-  }
-
   ReferencedNameTracker *getRequestBasedReferencedNameTracker() {
     return RequestReferencedNames ? RequestReferencedNames.getPointer() : nullptr;
   }
@@ -478,8 +467,7 @@ public:
   /// else reference dependencies will not be registered.
   void createReferencedNameTracker();
 
-  /// Retrieves the name tracker instance corresponding to
-  /// \c EnableRequestBasedIncrementalDependencies
+  /// Retrieves the appropriate referenced name tracker instance.
   ///
   /// If incremental dependencies tracking is not enabled or \c createReferencedNameTracker()
   /// has not been invoked on this source file, the result is \c nullptr.
@@ -553,26 +541,28 @@ public:
     llvm_unreachable("bad SourceFileKind");
   }
 
-  ClassDecl *getMainClass() const override {
-    return MainClass;
+  Decl *getMainDecl() const override { return MainDecl; }
+  SourceLoc getMainDeclDiagLoc() const {
+    assert(hasMainDecl());
+    return MainDeclDiagLoc;
   }
   SourceLoc getMainClassDiagLoc() const {
     assert(hasMainClass());
-    return MainClassDiagLoc;
+    return getMainDeclDiagLoc();
   }
 
   /// Register a "main" class for the module, complaining if there is more than
   /// one.
   ///
   /// Should only be called during type-checking.
-  bool registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc);
+  bool registerMainDecl(Decl *mainDecl, SourceLoc diagLoc);
 
   /// True if this source file has an application entry point.
   ///
   /// This is true if the source file either is in script mode or contains
   /// a designated main class.
   bool hasEntryPoint() const override {
-    return isScriptMode() || hasMainClass();
+    return isScriptMode() || hasMainDecl();
   }
 
   /// Get the root refinement context for the file. The root context may be

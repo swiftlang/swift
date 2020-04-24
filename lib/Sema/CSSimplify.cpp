@@ -3577,6 +3577,13 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::KeyPathRoot: {
+    conversionsOrFixes.push_back(AllowKeyPathRootTypeMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+
+    break;
+  }
+
   case ConstraintLocator::FunctionArgument: {
     auto *argLoc = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::SynthesizedArgument(0)));
@@ -5175,8 +5182,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::SelfObjectOfProtocol: {
     auto conformance = TypeChecker::containsProtocol(
         type, protocol, DC,
-        (ConformanceCheckFlags::InExpression |
-         ConformanceCheckFlags::SkipConditionalRequirements));
+         ConformanceCheckFlags::SkipConditionalRequirements);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -5186,8 +5192,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // Check whether this type conforms to the protocol.
     auto conformance = TypeChecker::conformsToProtocol(
         type, protocol, DC,
-        (ConformanceCheckFlags::InExpression |
-         ConformanceCheckFlags::SkipConditionalRequirements));
+         ConformanceCheckFlags::SkipConditionalRequirements);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -6871,8 +6876,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   assert(proto && "Value witness constraint for a non-requirement");
   auto conformance = TypeChecker::conformsToProtocol(
       baseObjectType, proto, useDC,
-      (ConformanceCheckFlags::InExpression |
-       ConformanceCheckFlags::SkipConditionalRequirements));
+       ConformanceCheckFlags::SkipConditionalRequirements);
   if (!conformance) {
     // The conformance failed, so mark the member type as a "hole". We cannot
     // do anything further here.
@@ -7802,6 +7806,13 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return SolutionKind::Unsolved;
   };
 
+  // When locator points to a KeyPathDynamicMemberLookup, reject the
+  // key path application.
+  auto last = locator.last();
+  if (last && last->isKeyPathDynamicMember()) {
+    return SolutionKind::Error;
+  }
+  
   if (auto clas = keyPathTy->getAs<NominalType>()) {
     if (clas->getDecl() == getASTContext().getAnyKeyPathDecl()) {
       // Read-only keypath, whose projected value is upcast to `Any?`.
@@ -7822,8 +7833,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
 
     auto matchRoot = [&](ConstraintKind kind) -> bool {
-      auto rootMatches = matchTypes(rootTy, kpRootTy, kind,
-                                    subflags, locator);
+      auto rootMatches =
+          matchTypes(rootTy, kpRootTy, kind, subflags,
+                     locator.withPathElement(LocatorPathElt::KeyPathRoot()));
       switch (rootMatches) {
       case SolutionKind::Error:
         return false;
@@ -8042,7 +8054,7 @@ retry_after_fail:
     ASTContext &ctx = getASTContext();
     if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+      log.indent(solverState ? solverState->depth * 2 : 0)
         << "(common result type for $T" << fnTypeVar->getID() << " is "
         << commonResultType.getString()
         << ")\n";
@@ -9184,7 +9196,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   auto &ctx = getASTContext();
   if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
-    log.indent(solverState ? solverState->depth * 2 + 2 : 0)
+    log.indent(solverState ? solverState->depth * 2 : 0)
       << "(attempting fix ";
     fix->print(log);
     log << ")\n";
@@ -9385,6 +9397,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
+  case FixKind::AllowKeyPathRootTypeMismatch:
   case FixKind::AllowCoercionToForceCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
@@ -9632,12 +9645,12 @@ ConstraintSystem::addKeyPathApplicationConstraint(Type keypath,
                                                TMF_GenerateConstraints,
                                                locator)) {
   case SolutionKind::Error:
-    if (shouldAddNewFailingConstraint()) {
+    if (shouldRecordFailedConstraint()) {
       auto c = Constraint::create(*this, ConstraintKind::KeyPathApplication,
                                   keypath, root, value,
                                   getConstraintLocator(locator));
       if (isFavored) c->setFavored();
-      addNewFailingConstraint(c);
+      recordFailedConstraint(c);
     }
     return;
   
@@ -9661,13 +9674,13 @@ ConstraintSystem::addKeyPathConstraint(
                                     TMF_GenerateConstraints,
                                     locator)) {
   case SolutionKind::Error:
-    if (shouldAddNewFailingConstraint()) {
+    if (shouldRecordFailedConstraint()) {
       auto c = Constraint::create(*this, ConstraintKind::KeyPath,
                                   keypath, root, value,
                                   getConstraintLocator(locator),
                                   componentTypeVars);
       if (isFavored) c->setFavored();
-      addNewFailingConstraint(c);
+      recordFailedConstraint(c);
     }
     return;
   
@@ -9724,11 +9737,11 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   switch (addConstraintImpl(kind, first, second, locator, isFavored)) {
   case SolutionKind::Error:
     // Add a failing constraint, if needed.
-    if (shouldAddNewFailingConstraint()) {
+    if (shouldRecordFailedConstraint()) {
       auto c = Constraint::create(*this, kind, first, second,
                                   getConstraintLocator(locator));
       if (isFavored) c->setFavored();
-      addNewFailingConstraint(c);
+      recordFailedConstraint(c);
     }
     return;
 
@@ -9831,11 +9844,11 @@ void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
   switch (simplifyFixConstraint(fix, first, second, kind, subflags, locator)) {
   case SolutionKind::Error:
     // Add a failing constraint, if needed.
-    if (shouldAddNewFailingConstraint()) {
+    if (shouldRecordFailedConstraint()) {
       auto c = Constraint::createFixed(*this, kind, fix, first, second,
                                        getConstraintLocator(locator));
       if (isFavored) c->setFavored();
-      addNewFailingConstraint(c);
+      recordFailedConstraint(c);
     }
     return;
 
@@ -10078,24 +10091,14 @@ void ConstraintSystem::simplifyDisjunctionChoice(Constraint *choice) {
   // Simplify this term in the disjunction.
   switch (simplifyConstraint(*choice)) {
   case ConstraintSystem::SolutionKind::Error:
-    if (!failedConstraint)
-      failedConstraint = choice;
-    if (solverState)
-      solverState->retireConstraint(choice);
+    recordFailedConstraint(choice);
     break;
 
   case ConstraintSystem::SolutionKind::Solved:
-    if (solverState)
-      solverState->retireConstraint(choice);
     break;
 
   case ConstraintSystem::SolutionKind::Unsolved:
-    InactiveConstraints.push_back(choice);
-    CG.addConstraint(choice);
+    addUnsolvedConstraint(choice);
     break;
   }
-
-  // Record this as a generated constraint.
-  if (solverState)
-    solverState->addGeneratedConstraint(choice);
 }

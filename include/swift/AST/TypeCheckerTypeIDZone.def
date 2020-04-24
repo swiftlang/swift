@@ -89,6 +89,8 @@ SWIFT_REQUEST(TypeChecker, HasDynamicMemberLookupAttributeRequest,
               bool(CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDynamicCallableAttributeRequest,
               bool(CanType), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
+              bool(SourceFile *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature (ModuleDecl *, GenericSignatureImpl *,
                                  GenericParamSource,
@@ -128,6 +130,8 @@ SWIFT_REQUEST(TypeChecker, ValidatePrecedenceGroupRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
               std::string(const TypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ModuleImplicitImportsRequest,
+              ArrayRef<ImplicitImport>(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, NamingPatternRequest,
               NamedPattern *(VarDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,

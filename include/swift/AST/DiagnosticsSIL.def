@@ -108,7 +108,7 @@ ERROR(capture_before_declaration_defer,none,
 NOTE(captured_value_declared_here,none,
      "captured value declared here", ())
 
-#define SELECT_ESCAPING_CLOSURE_KIND "escaping %select{local function|closure}0"
+#define SELECT_ESCAPING_CLOSURE_KIND "escaping %select{local function|closure|autoclosure}0"
 
 // Invalid escaping capture diagnostics.
 ERROR(escaping_inout_capture,none,
@@ -132,6 +132,10 @@ ERROR(escaping_noescape_var_capture,none,
       " captures non-escaping value", (unsigned))
 
 NOTE(value_captured_here,none,"captured here", ())
+
+NOTE(copy_inout_captured_by_autoclosure,none, "pass a copy of %0", (Identifier))
+
+NOTE(copy_self_captured_by_autoclosure,none, "pass a copy of 'self'", ())
 
 #undef SELECT_ESCAPING_CLOSURE_KIND
 

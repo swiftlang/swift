@@ -19,18 +19,35 @@ using namespace swift;
 SILRemarkStreamer::SILRemarkStreamer(
     std::unique_ptr<llvm::remarks::RemarkStreamer> &&streamer,
     std::unique_ptr<llvm::raw_fd_ostream> &&stream, const ASTContext &Ctx)
-    : streamerContext(std::make_unique<llvm::LLVMContext>()),
-      remarkStream(std::move(stream)), ctx(Ctx) {
-  streamerContext->setMainRemarkStreamer(std::move(streamer));
-}
+    : owner(Owner::SILModule), streamer(std::move(streamer)), context(nullptr),
+      remarkStream(std::move(stream)), ctx(Ctx) { }
 
 llvm::remarks::RemarkStreamer &SILRemarkStreamer::getLLVMStreamer() {
-  return *streamerContext->getMainRemarkStreamer();
+  switch (owner) {
+  case Owner::SILModule:
+    return *streamer.get();
+  case Owner::LLVM:
+    return *context->getMainRemarkStreamer();
+  }
+  return *streamer.get();
 }
 
 const llvm::remarks::RemarkStreamer &
 SILRemarkStreamer::getLLVMStreamer() const {
-  return *streamerContext->getMainRemarkStreamer();
+  switch (owner) {
+  case Owner::SILModule:
+    return *streamer.get();
+  case Owner::LLVM:
+    return *context->getMainRemarkStreamer();
+  }
+  return *streamer.get();
+}
+
+void SILRemarkStreamer::intoLLVMContext(llvm::LLVMContext &Ctx) & {
+  assert(owner == Owner::SILModule);
+  Ctx.setMainRemarkStreamer(std::move(streamer));
+  context = &Ctx;
+  owner = Owner::LLVM;
 }
 
 std::unique_ptr<SILRemarkStreamer>

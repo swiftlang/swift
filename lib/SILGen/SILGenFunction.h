@@ -607,9 +607,9 @@ public:
   void emitDestroyingDestructor(DestructorDecl *dd);
 
   /// Generates code for an artificial top-level function that starts an
-  /// application based on a main class.
-  void emitArtificialTopLevel(ClassDecl *mainClass);
-  
+  /// application based on a main type and optionally a main type.
+  void emitArtificialTopLevel(Decl *mainDecl);
+
   /// Generates code for a class deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
   void emitDeallocatingDestructor(DestructorDecl *dd);

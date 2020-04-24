@@ -476,17 +476,22 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
                                                      const Symbol &S,
                                                      llvm::json::OStream &OS) {
   DeclarationFragmentPrinter Printer(OS, Key);
-  auto Options = getDeclarationFragmentsPrintOptions();
-  Options.ArgAndParamPrinting =
-    PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
-  Options.VarInitializers = false;
-  Options.PrintDefaultArgumentValue = false;
-  Options.PrintEmptyArgumentNames = false;
-  Options.PrintOverrideKeyword = false;
-  if (S.getSynthesizedBaseType()) {
-    Options.setBaseType(S.getSynthesizedBaseType());
+
+  if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
+    Printer.printAbridgedType(TD);
+  } else {
+    auto Options = getDeclarationFragmentsPrintOptions();
+    Options.ArgAndParamPrinting =
+      PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
+    Options.VarInitializers = false;
+    Options.PrintDefaultArgumentValue = false;
+    Options.PrintEmptyArgumentNames = false;
+    Options.PrintOverrideKeyword = false;
+    if (S.getSynthesizedBaseType()) {
+      Options.setBaseType(S.getSynthesizedBaseType());
+    }
+    S.getSymbolDecl()->print(Printer, Options);
   }
-  S.getSymbolDecl()->print(Printer, Options);
 }
 
 void
@@ -505,6 +510,11 @@ bool SymbolGraph::isImplicitlyPrivate(const ValueDecl *VD) const {
   // Don't record effectively internal declarations if specified
   if (Walker.Options.MinimumAccessLevel > AccessLevel::Internal &&
       VD->hasUnderscoredNaming()) {
+    return true;
+  }
+
+  // Don't include declarations with the @_spi attribute for now.
+  if (VD->getAttrs().getAttribute(DeclAttrKind::DAK_SPIAccessControl)) {
     return true;
   }
 

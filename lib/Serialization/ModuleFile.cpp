@@ -1341,6 +1341,10 @@ static bool areCompatibleArchitectures(const llvm::Triple &moduleTarget,
 
 static bool areCompatibleOSs(const llvm::Triple &moduleTarget,
                              const llvm::Triple &ctxTarget) {
+  if ((!moduleTarget.hasEnvironment() && ctxTarget.isSimulatorEnvironment()) ||
+      (!ctxTarget.hasEnvironment() && moduleTarget.isSimulatorEnvironment()))
+    return false;
+
   if (moduleTarget.getOS() == ctxTarget.getOS())
     return true;
 
@@ -2974,9 +2978,9 @@ bool SerializedASTFile::getAllGenericSignatures(
   return true;
 }
 
-ClassDecl *SerializedASTFile::getMainClass() const {
+Decl *SerializedASTFile::getMainDecl() const {
   assert(hasEntryPoint());
-  return cast_or_null<ClassDecl>(File.getDecl(File.Bits.EntryPointDeclID));
+  return File.getDecl(File.Bits.EntryPointDeclID);
 }
 
 const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {
