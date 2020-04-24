@@ -511,8 +511,8 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/wait.h"
         export *
       }
-    }
 % end
+    }
 % if CMAKE_SDK in ["LINUX", "FREEBSD"]:
     module sysexits {
       header "${GLIBC_INCLUDE_PATH}/sysexits.h"
@@ -534,8 +534,8 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/utime.h"
       export *
     }
-  }
 % end
+  }
 }
 
 % if CMAKE_SDK != "WASI":
