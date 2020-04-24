@@ -189,13 +189,6 @@ def validate_arguments(toolchain, args):
     if args.host_target is None or args.stdlib_deployment_targets is None:
         fatal_error("unknown operating system")
 
-    # SWIFT_ENABLE_TENSORFLOW
-    if args.enable_tensorflow:
-        if toolchain.bazel is None:
-            fatal_error(
-                "can't find bazel, needed to build TensorFlow (please "
-                "install bazel)")
-
     if args.symbols_package:
         if not os.path.isabs(args.symbols_package):
             print(
@@ -237,59 +230,6 @@ def validate_arguments(toolchain, args):
         fatal_error(
             "--legacy-impl is incompatible with building packages needing "
             "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
-
-    # SWIFT_ENABLE_TENSORFLOW
-    if args.enable_tensorflow:
-        tensorflow_libs = ["libtensorflow.so"]
-        tensorflow_dirs = [
-            ("tensorflow_host_lib_dir", True),
-            ("tensorflow_host_include_dir", False),
-            ("tensorflow_target_lib_dir", True),
-            ("tensorflow_target_include_dir", False),
-        ]
-        tensorflow_dirs = [d for d in tensorflow_dirs
-                           if getattr(args, d[0]) is not None]
-        for dirname, is_lib_dir in tensorflow_dirs:
-            tensorflow_dir = getattr(args, dirname)
-            if not os.path.isdir(tensorflow_dir):
-                fatal_error(
-                    "--{} does not exist (was '{}')"
-                    .format(dirname, tensorflow_dir))
-            if is_lib_dir:
-                for lib in tensorflow_libs:
-                    if not os.path.exists(
-                            os.path.join(tensorflow_dir, lib)):
-                        fatal_error(
-                            "--{} does not contain '{}' (was '{}')"
-                            .format(dirname, lib, tensorflow_dir))
-
-        if args.build_tensorflow and \
-            args.tensorflow_host_lib_dir is not None and \
-                args.tensorflow_host_include_dir is not None:
-            fatal_error(
-                "when building with TensorFlow support, cannot specify "
-                " --build-tensorflow (to build TensorFlow from source) at "
-                "the same time as --tensorflow-host-lib-dir and "
-                "--tensorflow-host-include-dir (to use custom TensorFlow "
-                "headers/libraries); please pick one")
-
-    if args.enable_tensorflow_gpu:
-        os.environ['TF_NEED_CUDA'] = '1'
-        if '--config=cuda' not in args.tensorflow_bazel_options:
-            args.tensorflow_bazel_options += ['--config=cuda']
-
-        # Warn if TensorFlow GPU support environmental variable is not
-        # specified.
-        def warn_unspecified_tensorflow_env_var(name):
-            if name not in os.environ:
-                print_note(
-                    "'{}' environment variable was not specified; "
-                    "TensorFlow configure script default will be used"
-                    .format(name))
-        warn_unspecified_tensorflow_env_var('TF_CUDA_VERSION')
-        warn_unspecified_tensorflow_env_var('TF_CUDNN_VERSION')
-        warn_unspecified_tensorflow_env_var('CUDA_TOOLKIT_PATH')
-        warn_unspecified_tensorflow_env_var('CUDNN_INSTALL_PATH')
 
 
 def default_stdlib_deployment_targets(args):
@@ -415,18 +355,6 @@ def apply_default_arguments(toolchain, args):
         args.extra_cmake_options.append(
             '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
                 args.swift_darwin_module_archs))
-
-    # SWIFT_ENABLE_TENSORFLOW
-    if args.enable_tensorflow_gpu:
-        args.enable_tensorflow = True
-
-    if args.enable_tensorflow:
-        if args.tensorflow_host_lib_dir is None and \
-           args.tensorflow_host_include_dir is None:
-            args.build_tensorflow = True
-        elif args.tensorflow_host_lib_dir is not None and \
-                args.tensorflow_host_include_dir is not None:
-            args.build_tensorflow = False
 
 
 # -----------------------------------------------------------------------------
@@ -796,11 +724,6 @@ class BuildScriptInvocation(object):
                     min(args.swift_tools_max_parallel_lto_link_jobs,
                         args.build_jobs)
                 ]
-
-        # SWIFT_ENABLE_TENSORFLOW
-        if args.enable_tensorflow:
-            impl_args += ["--enable-tensorflow"]
-        # SWIFT_ENABLE_TENSORFLOW END
 
         impl_args += args.build_script_impl_args
 
@@ -1264,9 +1187,6 @@ def main_normal():
         toolchain.libtool = args.host_libtool
     if args.cmake is not None:
         toolchain.cmake = args.cmake
-    # SWIFT_ENABLE_TENSORFLOW
-    if args.host_bazel is not None:
-        toolchain.bazel = args.host_bazel
 
     cmake = CMake(args=args, toolchain=toolchain)
     # Check the CMake version is sufficient on Linux and build from source

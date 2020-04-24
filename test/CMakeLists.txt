@@ -157,7 +157,6 @@ normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 # SWIFT_ENABLE_TENSORFLOW
 normalize_boolean_spelling(SWIFT_ENABLE_TENSORFLOW)
-normalize_boolean_spelling(SWIFT_ENABLE_TENSORFLOW_GPU)
 # SWIFT_ENABLE_TENSORFLOW END
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
@@ -342,15 +341,6 @@ _Block_release(void) { }\n")
       if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)
         list(APPEND LIT_ARGS
             "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-      endif()
-
-      if(SWIFT_ENABLE_TENSORFLOW)
-        list(APPEND LIT_ARGS
-            "--param" "swift_tensorflow_path=${SWIFT_TENSORFLOW_TARGET_LIB_DIR}")
-      endif()
-      if(SWIFT_ENABLE_TENSORFLOW_GPU)
-        list(APPEND LIT_ARGS
-            "--param" "swift_tensorflow_gpu")
       endif()
 
       execute_process(COMMAND

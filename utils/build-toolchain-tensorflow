@@ -26,11 +26,12 @@ function usage() {
   echo "-t --test"
   echo "Run tests."
   echo ""
-  if [[ "$(uname -s)" == "Linux" ]] ; then
-      echo "-g --gpu"
-      echo "Enable GPU support."
-      echo ""
-  fi
+  echo "--tensorflow-swift-apis"
+  echo "Build and install the tensorflow-swift-apis library in the toolchain. (Default)."
+  echo ""
+  echo "--no-tensorflow-swift-apis"
+  echo "Do not build and install the tensorflow-swift-apis library in the toolchain."
+  echo ""
   if [[ "$(uname -s)" == "Darwin" ]] ; then
       echo "-p --pkg"
       echo "Build a installer package."
@@ -46,8 +47,7 @@ DRY_RUN=
 BUNDLE_PREFIX=
 INSTALLER_PACKAGE=
 SWIFT_PACKAGE_BASE=
-SWIFT_PACKAGE_GPU=
-SWIFT_PACKAGE_X10=
+SWIFT_PACKAGE_TENSORFLOW_SWIFT_APIS=,tensorflow_swift_apis
 SWIFT_PACKAGE_NOTEST=
 SWIFT_PACKAGE_INSTALLER=
 # SWIFT_ENABLE_TENSORFLOW
@@ -92,20 +92,20 @@ while [ $# -ne 0 ]; do
     fi
   ;;
   -g|--gpu)
-    if [ "$(uname -s)" == "Linux" ]; then
-      SWIFT_PACKAGE_GPU=,gpu
-    else
-      echo "--gpu is not supported on \"$(uname -s)\". See --help"
-      exit 1
-    fi
+    # Warn, for backwards compatibility with existing callers.
+    # TODO: Remove when we have fixed up all callers.
+    echo "Warning: --gpu deprecated."
   ;;
   -x|--x10)
-    if [ "$(uname -s)" == "Linux" ]; then
-      SWIFT_PACKAGE_X10=,x10
-    else
-      echo "--x10 is not supported on \"$(uname -s)\". See --help"
-      exit 1
-    fi
+    # Warn, for backwards compatibility with existing callers.
+    # TODO: Remove when we have fixed up all callers.
+    echo "Warning: --x10 deprecated."
+  ;;
+  --tensorflow-swift-apis)
+    SWIFT_PACKAGE_TENSORFLOW_SWIFT_APIS=,tensorflow_swift_apis
+  ;;
+  --no-tensorflow-swift-apis)
+    SWIFT_PACKAGE_TENSORFLOW_SWIFT_APIS=
   ;;
   *)
     if [ ${FIRST_ARG_PROCESSED} -ne 0 ]; then
@@ -118,7 +118,7 @@ while [ $# -ne 0 ]; do
   shift
 done
 
-SWIFT_PACKAGE="${SWIFT_PACKAGE_BASE}${SWIFT_PACKAGE_GPU}${SWIFT_PACKAGE_X10}${SWIFT_PACKAGE_NOTEST}${SWIFT_PACKAGE_INSTALLER}"
+SWIFT_PACKAGE="${SWIFT_PACKAGE_BASE}${SWIFT_PACKAGE_TENSORFLOW_SWIFT_APIS}${SWIFT_PACKAGE_NOTEST}${SWIFT_PACKAGE_INSTALLER}"
 
 # Get host name.
 HOST=

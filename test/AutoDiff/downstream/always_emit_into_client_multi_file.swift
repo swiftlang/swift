@@ -2,7 +2,7 @@
 // cross_module_derivative_attr_e2e.swift.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-cross-file-derivative-registration -parse-as-library -emit-module -module-name MultiFileModule -emit-module-path %t/MultiFileModule.swiftmodule -emit-library -o %t/%target-library-name(MultiFileModule) %S/Inputs/always_emit_into_client/MultiFileModule/file1.swift %S/Inputs/always_emit_into_client/MultiFileModule/file2.swift
+// RUN: %target-build-swift -parse-as-library -emit-module -module-name MultiFileModule -emit-module-path %t/MultiFileModule.swiftmodule -emit-library -o %t/%target-library-name(MultiFileModule) %S/Inputs/always_emit_into_client/MultiFileModule/file1.swift %S/Inputs/always_emit_into_client/MultiFileModule/file2.swift
 // RUN: not %target-build-swift -I%t -L%t %s -o %t/a.out -lm -lMultiFileModule 2>&1 | %FileCheck %s
 
 import StdlibUnittest

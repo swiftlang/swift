@@ -502,14 +502,6 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 
 // Experimental feature options
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-1097): Remove this flag and always enable cross-file derivative registration.
-def enable_experimental_cross_file_derivative_registration :
-  Flag<["-"], "enable-experimental-cross-file-derivative-registration">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
-  HelpText<"Enable experimental cross-file derivative registration">;
-// SWIFT_ENABLE_TENSORFLOW END
-
 // Note: this flag will be removed when JVP/differential generation in the
 // differentiation transform is robust.
 def enable_experimental_forward_mode_differentiation :
