@@ -191,11 +191,10 @@ namespace {
   };
 
   struct ConformanceCacheKey {
-    /// Either a Metadata* or a NominalTypeDescriptor*.
-    const void *Type;
+    const Metadata *Type;
     const ProtocolDescriptor *Proto;
 
-    ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto)
+    ConformanceCacheKey(const Metadata *type, const ProtocolDescriptor *proto)
         : Type(type), Proto(proto) {
       assert(type);
     }
@@ -203,7 +202,7 @@ namespace {
 
   struct ConformanceCacheEntry {
   private:
-    const void *Type; 
+    const Metadata *Type; 
     const ProtocolDescriptor *Proto;
     std::atomic<const ProtocolConformanceDescriptor *> Description;
     std::atomic<size_t> FailureGeneration;
@@ -267,7 +266,7 @@ struct ConformanceState {
     initializeProtocolConformanceLookup();
   }
 
-  void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
+  void cacheSuccess(const Metadata *type, const ProtocolDescriptor *proto,
                     const ProtocolConformanceDescriptor *description) {
     auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
                                     description, 0);
@@ -278,7 +277,7 @@ struct ConformanceState {
     }
   }
 
-  void cacheFailure(const void *type, const ProtocolDescriptor *proto,
+  void cacheFailure(const Metadata *type, const ProtocolDescriptor *proto,
                     size_t failureGeneration) {
     auto result =
       Cache.getOrInsert(ConformanceCacheKey(type, proto),
@@ -291,7 +290,7 @@ struct ConformanceState {
     }
   }
 
-  ConformanceCacheEntry *findCached(const void *type,
+  ConformanceCacheEntry *findCached(const Metadata *type,
                                     const ProtocolDescriptor *proto) {
     return Cache.find(ConformanceCacheKey(type, proto));
   }
@@ -386,15 +385,6 @@ struct ConformanceCacheResult {
   }
 };
 
-/// Retrieve the type key from the given metadata, to be used when looking
-/// into the conformance cache.
-static const void *getConformanceCacheTypeKey(const Metadata *type) {
-  if (auto description = type->getTypeContextDescriptor())
-    return description;
-
-  return type;
-}
-
 /// Search for a conformance descriptor in the ConformanceCache.
 static
 ConformanceCacheResult
@@ -440,22 +430,6 @@ recur:
 
       // Negative cache entry is out-of-date.
       // Continue searching for a better result.
-    }
-  }
-
-  {
-    // For generic and resilient types, nondependent conformances
-    // are keyed by the nominal type descriptor rather than the
-    // metadata, so try that.
-    auto typeKey = getConformanceCacheTypeKey(type);
-
-    // Hash and lookup the type-protocol pair in the cache.
-    if (auto *Value = C.findCached(typeKey, protocol)) {
-      if (Value->isSuccessful())
-        return ConformanceCacheResult::cachedSuccess(Value->getDescription());
-
-      // We don't try to cache negative responses for generic
-      // patterns.
     }
   }
 
