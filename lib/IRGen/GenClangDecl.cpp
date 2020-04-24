@@ -37,6 +37,10 @@ public:
 } // end anonymous namespace
 
 void IRGenModule::emitClangDecl(const clang::Decl *decl) {
+  // Ignore this decl if we've seen it before.
+  if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
+    return;
+
   auto valueDecl = dyn_cast<clang::ValueDecl>(decl);
   if (!valueDecl || valueDecl->isExternallyVisible()) {
     ClangCodeGen->HandleTopLevelDecl(
@@ -44,8 +48,6 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     return;
   }
 
-  if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
-    return;
   SmallVector<const clang::Decl *, 8> stack;
   stack.push_back(decl);
 
