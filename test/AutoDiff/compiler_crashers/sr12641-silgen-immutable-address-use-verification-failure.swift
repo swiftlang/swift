@@ -1,6 +1,9 @@
 // RUN: not --crash %target-swift-frontend -emit-sil -verify %s
 // REQUIRES: asserts
 
+// This crash does not occur on the tensorflow branch.
+// UNSUPPORTED: tensorflow
+
 // SR-12641: SILGen verification error regarding `ImmutableAddressUseVerifier` and AutoDiff-generated code.
 
 import _Differentiation
