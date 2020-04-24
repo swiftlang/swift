@@ -2645,10 +2645,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
                                       ConstraintLocator *locator) {
   auto &DE = cs.getASTContext().Diags;
   auto *anchor = locator->getAnchor();
-
-  auto *applyExpr = dyn_cast_or_null<ApplyExpr>(cs.getParentExpr(anchor));
-  if (!applyExpr)
-    return;
+  auto *applyExpr = cast<ApplyExpr>(cs.getParentExpr(anchor));
 
   auto isNameOfStandardComparisonOperator = [](Identifier opName) -> bool {
     return opName.is("==") || opName.is("!=") || opName.is("===") ||
@@ -3032,9 +3029,23 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       DE.diagnose(commonAnchor->getLoc(), diag::no_candidates_match_result_type,
                   baseName.userFacingName(), getContextualType(anchor));
     } else if (name.isOperator()) {
-      diagnoseOperatorAmbiguity(*this, name.getBaseIdentifier(), solutions,
-                                commonCalleeLocator);
-      return true;
+      auto *anchor = commonCalleeLocator->getAnchor();
+
+      // If operator is "applied" e.g. `1 + 2` there are tailored
+      // diagnostics in case of ambiguity, but if it's referenced
+      // e.g. `arr.sort(by: <)` it's better to produce generic error
+      // and a note per candidate.
+      if (auto *parentExpr = getParentExpr(anchor)) {
+        if (isa<ApplyExpr>(parentExpr)) {
+          diagnoseOperatorAmbiguity(*this, name.getBaseIdentifier(), solutions,
+                                    commonCalleeLocator);
+          return true;
+        }
+      }
+
+      DE.diagnose(anchor->getLoc(), diag::no_overloads_match_exactly_in_call,
+                  /*isApplication=*/false, decl->getDescriptiveKind(),
+                  name.isSpecial(), name.getBaseName());
     } else {
       bool isApplication =
           llvm::any_of(ArgumentInfos, [&](const auto &argInfo) {
