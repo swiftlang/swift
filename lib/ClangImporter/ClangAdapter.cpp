@@ -81,7 +81,7 @@ const clang::Decl *
 importer::getFirstNonLocalDecl(const clang::Decl *D) {
   D = D->getCanonicalDecl();
   auto iter = llvm::find_if(D->redecls(), [](const clang::Decl *next) -> bool {
-    return !next->isLexicallyWithinFunctionOrMethod();
+    return !next->isInLocalScope();
   });
   if (iter == D->redecls_end())
     return nullptr;
