@@ -218,9 +218,9 @@ The standard library cannot import the Darwin module (much less an ICU module), 
 
 ### Internal structures
 
-#### `_FixedArray`
+#### `_FixedArray16`
 
-The standard library has internal array of fixed size 16. This provides fast random access into contiguous (usually stack-allocated) memory. See [FixedArray.swift](https://github.com/apple/swift/blob/master/stdlib/public/core/FixedArray.swift) for implementation.
+The standard library has an internal array type of fixed size 16. This provides fast random access into contiguous (usually stack-allocated) memory. See [FixedArray.swift](https://github.com/apple/swift/blob/master/stdlib/public/core/FixedArray.swift) for implementation.
 
 #### Thread Local Storage
 
