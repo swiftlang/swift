@@ -1448,6 +1448,7 @@ namespace  {
     UNINTERESTING_ATTR(Specialize)
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
+    UNINTERESTING_ATTR(MainType)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)

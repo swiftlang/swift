@@ -3954,10 +3954,6 @@ namespace {
     }
 
     Decl *VisitVarDecl(const clang::VarDecl *decl) {
-      // FIXME: Swift does not have static variables in structs/classes yet.
-      if (decl->getDeclContext()->isRecord())
-        return nullptr;
-
       // Variables are imported as... variables.
       Optional<ImportedName> correctSwiftName;
       auto importedName = importFullName(decl, correctSwiftName);

@@ -49,14 +49,10 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
   // names checked in "#if arch(...)". Fall back to that name in the one case
   // where it's different from what Swift 4.2 supported:
   // - 32-bit ARM platforms (formerly "arm")
-  // - arm64e (formerly shared with "arm64")
   // We should be able to drop this once there's an Xcode that supports the
   // new names.
-  if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
+  if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm) {
     body("arm");
-  else if (Ctx.LangOpts.Target.getSubArch() ==
-           llvm::Triple::SubArchType::AArch64SubArch_E) {
-    body("arm64");
   }
 }
 
@@ -409,8 +405,12 @@ bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
       return false;
     StringRef filePath = directoryIterator->path();
     StringRef extension = llvm::sys::path::extension(filePath);
-    if (file_types::lookupTypeForExtension(extension) ==
-          file_types::TY_SwiftModuleFile) {
+    auto fileType = file_types::lookupTypeForExtension(extension);
+    // We also check for interfaces here, because the SerializedModuleLoader
+    // is invoked after the ModuleInterfaceLoader; if the ModuleInterfaceLoader
+    // handled interfaces separately, we could get duplicate diagnostics.
+    if (fileType == file_types::TY_SwiftModuleFile
+        || fileType == file_types::TY_SwiftModuleInterfaceFile) {
       if (!foundArchs.empty())
         foundArchs += ", ";
       foundArchs += llvm::sys::path::stem(filePath).str();
@@ -418,7 +418,7 @@ bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
   }
 
   if (foundArchs.empty()) {
-    // Maybe this swiftmodule directory only contains swiftinterfaces, or
+    // It is strange that there were no swiftmodules or swiftinterfaces here;
     // maybe something else is going on. Regardless, we shouldn't emit a
     // possibly incorrect diagnostic.
     return false;

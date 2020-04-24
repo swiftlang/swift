@@ -551,8 +551,7 @@ namespace {
       if (otherArgTy && otherArgTy->getAnyNominal()) {
         if (otherArgTy->isEqual(paramTy) &&
             TypeChecker::conformsToProtocol(
-                otherArgTy, literalProto, CS.DC,
-                ConformanceCheckFlags::InExpression)) {
+                otherArgTy, literalProto, CS.DC, None)) {
           return true;
         }
       } else if (Type defaultType =
@@ -4550,8 +4549,8 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(
-    ConstraintKind::ValueMember, DeclNameRef(Name), BaseTy,
-    FunctionRefKind::SingleApply, nullptr, false);
+      ConstraintKind::ValueMember, DeclNameRef(Name), BaseTy,
+      FunctionRefKind::SingleApply, CS.getConstraintLocator(nullptr), false);
 
   // Keep track of all the unviable members.
   for (auto Can : LookupResult.UnviableCandidates)

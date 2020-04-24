@@ -23,26 +23,25 @@ ExternVarTestSuite.test("write-from-cxx") {
   expectEqual(84, getCounterFromCxx())
 }
 
-//FIXME mangle non-top-level var names to prevent name collisions
-// ExternVarTestSuite.test("namespaced-write-from-swift") {
-//   Namespaced.counter = 42
-//   expectEqual(42, Namespaced.counter)
-//   expectEqual(42, amespaced.getCounterFromCxx())
-// }
+ExternVarTestSuite.test("namespaced-write-from-swift") {
+  Namespaced.counter = 42
+  expectEqual(42, Namespaced.counter)
+  expectEqual(42, Namespaced.getCounterFromCxx())
+}
 
-//FIXME mangle non-top-level var names to prevent name collisions
-// ExternVarTestSuite.test("namespaced-write-from-cxx") {
-//   Namespaced.setCounterFromCxx(84)
-//   expectEqual(84, Namespaced.counter)
-//   expectEqual(84, Namespaced.getCounterFromCxx())
-// }
+ExternVarTestSuite.test("namespaced-write-from-cxx") {
+  Namespaced.setCounterFromCxx(84)
+  expectEqual(84, Namespaced.counter)
+  expectEqual(84, Namespaced.getCounterFromCxx())
+}
 
-//FIXME mangle non-top-level var names to prevent name collisions
-// ExternVarTestSuite.test("no-collisions") {
-//   counter = 12
-//   Namespaced.counter = 42
-//   expectEqual(12, counter)
-//   expectEqual(42, Namespaced.counter)
-// }
+// Check that variables with identical names in different namespaces don't
+// collide in any intermediate representation of the compiler.
+ExternVarTestSuite.test("no-collisions") {
+  counter = 12
+  Namespaced.counter = 42
+  expectEqual(12, counter)
+  expectEqual(42, Namespaced.counter)
+}
 
 runAllTests()

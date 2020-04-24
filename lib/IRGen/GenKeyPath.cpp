@@ -1044,6 +1044,11 @@ emitKeyPathComponent(IRGenModule &IGM,
         // native class resilience. We never directly access ObjC-imported
         // ivars so we can disregard ObjC ivar resilience for this computation
         // and start counting at the Swift native root.
+        if (loweredClassTy.getASTType()->hasTypeParameter())
+          loweredClassTy = SILType::getPrimitiveObjectType(
+              GenericEnvironment::mapTypeIntoContext(
+                  genericEnv, loweredClassTy.getASTType())
+                  ->getCanonicalType());
         switch (getClassFieldAccess(IGM, loweredClassTy, property)) {
         case FieldAccess::ConstantDirect:
         case FieldAccess::ConstantIndirect:

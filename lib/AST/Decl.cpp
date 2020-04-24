@@ -1972,30 +1972,53 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
   return false;
 }
 
-static bool isDirectToStorageAccess(const AccessorDecl *accessor,
+static bool isDirectToStorageAccess(const DeclContext *UseDC,
                                     const VarDecl *var, bool isAccessOnSelf) {
-  // All accesses have ordinary semantics except those to variables
-  // with storage from within their own accessors.
-  if (accessor->getStorage() != var)
-    return false;
-
   if (!var->hasStorage())
     return false;
 
-  // In Swift 5 and later, the access must also be a member access on 'self'.
-  if (!isAccessOnSelf &&
-      var->getDeclContext()->isTypeContext() &&
-      var->getASTContext().isSwiftVersionAtLeast(5))
+  auto *AFD = dyn_cast<AbstractFunctionDecl>(UseDC);
+  if (AFD == nullptr)
     return false;
 
-  // As a special case, 'read' and 'modify' coroutines with forced static
-  // dispatch must use ordinary semantics, so that the 'modify' coroutine for a
-  // 'dynamic' property uses Objective-C message sends and not direct access to
-  // storage.
-  if (accessor->hasForcedStaticDispatch())
+  // The property reference is for immediate class, not a derived class.
+  if (AFD->getParent()->getSelfNominalTypeDecl() !=
+      var->getDeclContext()->getSelfNominalTypeDecl())
     return false;
 
-  return true;
+  // If the storage is resilient, we cannot access it directly at all.
+  if (var->isResilient(UseDC->getParentModule(),
+                       UseDC->getResilienceExpansion()))
+    return false;
+
+  if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD)) {
+    // The access must also be a member access on 'self' in all language modes.
+    if (!isAccessOnSelf)
+      return false;
+
+    return true;
+  } else if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+    // The accessor must be for the variable itself.
+    if (accessor->getStorage() != var)
+      return false;
+
+    // In Swift 5 and later, the access must also be a member access on 'self'.
+    if (!isAccessOnSelf &&
+        var->getDeclContext()->isTypeContext() &&
+        var->getASTContext().isSwiftVersionAtLeast(5))
+      return false;
+
+    // As a special case, 'read' and 'modify' coroutines with forced static
+    // dispatch must use ordinary semantics, so that the 'modify' coroutine for a
+    // 'dynamic' property uses Objective-C message sends and not direct access to
+    // storage.
+    if (accessor->hasForcedStaticDispatch())
+      return false;
+
+    return true;
+  }
+
+  return false;
 }
 
 /// Determines the access semantics to use in a DeclRefExpr or
@@ -2003,14 +2026,9 @@ static bool isDirectToStorageAccess(const AccessorDecl *accessor,
 AccessSemantics
 ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
                                          bool isAccessOnSelf) const {
-  // The condition most likely to fast-path us is not being in an accessor,
-  // so we check that first.
-  if (auto *accessor = dyn_cast<AccessorDecl>(UseDC)) {
-    if (auto *var = dyn_cast<VarDecl>(this)) {
-      if (isDirectToStorageAccess(accessor, var, isAccessOnSelf))
-        return AccessSemantics::DirectToStorage;
-    }
-  }
+  if (auto *var = dyn_cast<VarDecl>(this))
+    if (isDirectToStorageAccess(UseDC, var, isAccessOnSelf))
+      return AccessSemantics::DirectToStorage;
 
   // Otherwise, it's a semantically normal access.  The client should be
   // able to figure out the most efficient way to do this access.
@@ -4437,12 +4455,14 @@ StringRef ClassDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
-ArtificialMainKind ClassDecl::getArtificialMainKind() const {
+ArtificialMainKind Decl::getArtificialMainKind() const {
   if (getAttrs().hasAttribute<UIApplicationMainAttr>())
     return ArtificialMainKind::UIApplicationMain;
   if (getAttrs().hasAttribute<NSApplicationMainAttr>())
     return ArtificialMainKind::NSApplicationMain;
-  llvm_unreachable("class has no @ApplicationMain attr?!");
+  if (isa<FuncDecl>(this))
+    return ArtificialMainKind::TypeMain;
+  llvm_unreachable("type has no @Main attr?!");
 }
 
 static bool isOverridingDecl(const ValueDecl *Derived,
@@ -7325,6 +7345,12 @@ SelfAccessKind FuncDecl::getSelfAccessKind() const {
 bool FuncDecl::isCallAsFunctionMethod() const {
   return getBaseIdentifier() == getASTContext().Id_callAsFunction &&
          isInstanceMember();
+}
+
+bool FuncDecl::isMainTypeMainMethod() const {
+  return (getBaseIdentifier() == getASTContext().Id_main) &&
+         !isInstanceMember() && getResultInterfaceType()->isVoid() &&
+         getParameters()->size() == 0;
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,

@@ -592,18 +592,22 @@ bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
 }
 
 SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
-                                                 GenericSignature otherSig) {
+                                            GenericSignature otherSig) const {
   SmallVector<Requirement, 4> result;
 
-  // If the signatures are the same, all requirements are satisfied.
+  // If the signatures match by pointer, all requirements are satisfied.
   if (otherSig.getPointer() == this) return result;
 
   // If there is no other signature, no requirements are satisfied.
   if (!otherSig){
-    result.insert(result.end(),
-                  getRequirements().begin(), getRequirements().end());
+    const auto reqs = getRequirements();
+    result.append(reqs.begin(), reqs.end());
     return result;
   }
+
+  // If the canonical signatures are equal, all requirements are satisfied.
+  if (getCanonicalSignature() == otherSig->getCanonicalSignature())
+    return result;
 
   // Find the requirements that aren't satisfied.
   for (const auto &req : getRequirements()) {

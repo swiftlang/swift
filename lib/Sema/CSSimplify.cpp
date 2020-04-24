@@ -3577,6 +3577,13 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::KeyPathRoot: {
+    conversionsOrFixes.push_back(AllowKeyPathRootTypeMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+
+    break;
+  }
+
   case ConstraintLocator::FunctionArgument: {
     auto *argLoc = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::SynthesizedArgument(0)));
@@ -5175,8 +5182,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::SelfObjectOfProtocol: {
     auto conformance = TypeChecker::containsProtocol(
         type, protocol, DC,
-        (ConformanceCheckFlags::InExpression |
-         ConformanceCheckFlags::SkipConditionalRequirements));
+         ConformanceCheckFlags::SkipConditionalRequirements);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -5186,8 +5192,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // Check whether this type conforms to the protocol.
     auto conformance = TypeChecker::conformsToProtocol(
         type, protocol, DC,
-        (ConformanceCheckFlags::InExpression |
-         ConformanceCheckFlags::SkipConditionalRequirements));
+         ConformanceCheckFlags::SkipConditionalRequirements);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -6871,8 +6876,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   assert(proto && "Value witness constraint for a non-requirement");
   auto conformance = TypeChecker::conformsToProtocol(
       baseObjectType, proto, useDC,
-      (ConformanceCheckFlags::InExpression |
-       ConformanceCheckFlags::SkipConditionalRequirements));
+       ConformanceCheckFlags::SkipConditionalRequirements);
   if (!conformance) {
     // The conformance failed, so mark the member type as a "hole". We cannot
     // do anything further here.
@@ -7829,8 +7833,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
 
     auto matchRoot = [&](ConstraintKind kind) -> bool {
-      auto rootMatches = matchTypes(rootTy, kpRootTy, kind,
-                                    subflags, locator);
+      auto rootMatches =
+          matchTypes(rootTy, kpRootTy, kind, subflags,
+                     locator.withPathElement(LocatorPathElt::KeyPathRoot()));
       switch (rootMatches) {
       case SolutionKind::Error:
         return false;
@@ -9392,6 +9397,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
+  case FixKind::AllowKeyPathRootTypeMismatch:
   case FixKind::AllowCoercionToForceCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }

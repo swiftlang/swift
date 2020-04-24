@@ -1146,7 +1146,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
                        ext->getGenericSignature()->getRequirements(),
                        QueryTypeSubstitutionMap{subs},
                        LookUpConformanceInModule(ext->getModuleContext()),
-                       ConformanceCheckFlags::InExpression,
+                       None,
                        nullptr, options)) {
   case RequirementCheckResult::Success:
   case RequirementCheckResult::SubstitutionFailure:

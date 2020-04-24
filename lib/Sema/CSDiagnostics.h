@@ -2022,6 +2022,24 @@ public:
 
   bool diagnoseAsError() override;
 };
+
+/// Diagnose a key path root type that cannot be applied to an instance
+/// base that has another type.
+///
+/// \code
+/// func f(_ bar: Bar , keyPath: KeyPath<Foo, Int> ) {
+///   bar[keyPath: keyPath]
+/// }
+/// \endcode
+class KeyPathRootTypeMismatchFailure final : public ContextualFailure {
+public:
+  KeyPathRootTypeMismatchFailure(const Solution &solution, Type lhs, Type rhs,
+                                 ConstraintLocator *locator)
+      : ContextualFailure(solution, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

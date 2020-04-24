@@ -2472,8 +2472,7 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
           Ctx.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
     auto conformance = TypeChecker::conformsToProtocol(
-        errorCodeType, errorCodeProtocol, getDC(),
-        ConformanceCheckFlags::InExpression);
+        errorCodeType, errorCodeProtocol, getDC(), None);
     if (conformance) {
       Type errorType =
           conformance
@@ -2805,7 +2804,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   SmallVector<std::string, 8> missingProtoTypeStrings;
   for (auto protocol : layout.getProtocols()) {
     if (!TypeChecker::conformsToProtocol(fromType, protocol->getDecl(), getDC(),
-                                         ConformanceCheckFlags::InExpression)) {
+                                         None)) {
       missingProtoTypeStrings.push_back(protocol->getString());
     }
   }
@@ -6222,5 +6221,17 @@ bool MissingQuialifierInMemberRefFailure::diagnoseAsError() {
 bool CoercionAsForceCastFailure::diagnoseAsError() {
   emitDiagnostic(diag::coercion_may_fail_warning, getFromType(), getToType())
       .highlight(getSourceRange());
+  return true;
+}
+
+bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
+  auto locator = getLocator();
+  assert(locator->isKeyPathRoot() && "Expected a key path root");
+  
+  auto baseType = getFromType();
+  auto rootType = getToType();
+
+  emitDiagnostic(diag::expr_keypath_root_type_mismatch,
+                 rootType, baseType);
   return true;
 }
