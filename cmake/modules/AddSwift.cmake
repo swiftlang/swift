@@ -481,28 +481,17 @@ function(add_swift_host_library name)
     message(FATAL_ERROR "Either SHARED or STATIC must be specified")
   endif()
 
-  # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
-  set(embed_bitcode_arg)
-  if(SWIFT_EMBED_BITCODE_SECTION)
-    if(SWIFT_HOST_VARIANT_SDK MATCHES "(I|TV|WATCH)OS")
-      list(APPEND ASHL_C_COMPILE_FLAGS "-fembed-bitcode")
-      set(embed_bitcode_arg EMBED_BITCODE)
-    endif()
-  endif()
-
   if(XCODE)
-    string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
-    list(GET split_path -1 dir)
+    get_filename_component(dir ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
+
     file(GLOB_RECURSE ASHL_HEADERS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def
       ${CMAKE_CURRENT_SOURCE_DIR}/*.def)
-
     file(GLOB_RECURSE ASHL_TDS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
 
-    set_source_files_properties(${ASHL_HEADERS} ${ASHL_TDS}
-      PROPERTIES
+    set_source_files_properties(${ASHL_HEADERS} ${ASHL_TDS} PROPERTIES
       HEADER_FILE_ONLY true)
     source_group("TableGen descriptions" FILES ${ASHL_TDS})
 
@@ -515,109 +504,94 @@ function(add_swift_host_library name)
     set(libkind STATIC)
   endif()
 
-  add_library("${target}" ${libkind} ${ASHL_SOURCES})
-  _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
-  add_dependencies(${target} ${LLVM_COMMON_DEPENDS})
-
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
-    swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH} SWIFTLIB_INCLUDE)
-    target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
-    set_target_properties(${target}
-                          PROPERTIES
-                            CXX_STANDARD 14)
-  endif()
-
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
-    set_property(TARGET "${target}" PROPERTY NO_SONAME ON)
-  endif()
-
-  llvm_update_compile_flags(${target})
-
-  set_output_directory(${target}
+  add_library(${name} ${libkind} ${ASHL_SOURCES})
+  add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
+  llvm_update_compile_flags(${name})
+  swift_common_llvm_config(${name} ${ASHL_LLVM_LINK_COMPONENTS})
+  set_output_directory(${name}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-    set_target_properties("${target}"
+    set_target_properties(${name}
       PROPERTIES
       INSTALL_NAME_DIR "@rpath")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
-    set_target_properties("${target}"
+    set_target_properties(${name}
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL CYGWIN)
-    set_target_properties("${target}"
+    set_target_properties(${name}
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
-    set_target_properties("${target}"
+    set_target_properties(${name}
       PROPERTIES
       INSTALL_RPATH "$ORIGIN")
   endif()
 
-  set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
-  set_target_properties("${target}" PROPERTIES FOLDER "Swift libraries")
+  set_target_properties(${name} PROPERTIES
+    BUILD_WITH_INSTALL_RPATH YES
+    FOLDER "Swift libraries")
 
-  # Call llvm_config() only for libraries that are part of the compiler.
-  swift_common_llvm_config("${target}" ${ASHL_LLVM_LINK_COMPONENTS})
-
-  target_compile_options(${target} PRIVATE
-    ${ASHL_C_COMPILE_FLAGS})
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
-    if(libkind STREQUAL SHARED)
-      target_compile_definitions(${target} PRIVATE
-        _WINDLL)
-    endif()
-  endif()
-
-  _add_host_variant_c_compile_flags(${target})
-  _add_host_variant_link_flags(${target})
+  _add_host_variant_c_compile_flags(${name})
+  _add_host_variant_link_flags(${name})
+  _set_target_prefix_and_suffix(${name} "${libkind}" "${SWIFT_HOST_VARIANT_SDK}")
 
   # Set compilation and link flags.
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
     swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH}
       ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
-    target_include_directories(${target} SYSTEM PRIVATE
+    target_include_directories(${name} SYSTEM PRIVATE
       ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
+
+    if(libkind STREQUAL SHARED)
+      target_compile_definitions(${name} PRIVATE
+        _WINDLL)
+    endif()
 
     if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
       swift_windows_get_sdk_vfs_overlay(ASHL_VFS_OVERLAY)
-      target_compile_options(${target} PRIVATE
+      target_compile_options(${name} PRIVATE
         "SHELL:-Xclang -ivfsoverlay -Xclang ${ASHL_VFS_OVERLAY}")
 
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl` does so.
-      target_compile_options(${target} PRIVATE
+      target_compile_options(${name} PRIVATE
         "SHELL:-Xclang --dependent-lib=oldnames"
         # TODO(compnerd) handle /MT, /MTd
         "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
     endif()
+
+    set_target_properties(${name} PROPERTIES
+      CXX_STANDARD 14
+      NO_SONAME YES)
   endif()
 
   if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-    target_link_options(${target} PRIVATE
-      "LINKER:-compatibility_version,1")
-    if(SWIFT_COMPILER_VERSION)
-      target_link_options(${target} PRIVATE
-        "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
-    endif()
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION)
-      if(${SWIFT_HOST_VARIANT_SDK} MATCHES "(I|TV|WATCH)OS")
-        target_link_options(${target} PRIVATE
-          "LINKER:-bitcode_bundle"
-          "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
+      target_compile_options(${name} PRIVATE
+        -fembed-bitcode)
+      target_link_options(${name} PRIVATE
+        "LINKER:-bitcode_bundle"
+        "LINKER:-lto_library,${LLVM_LIBRARY_DIR}/libLTO.dylib")
 
-        # Please note that using a generator expression to fit
-        # this in a single target_link_options does not work
-        # (at least in CMake 3.15 and 3.16),
-        # since that seems not to allow the LINKER: prefix to be
-        # evaluated (i.e. it will be added as-is to the linker parameters)
-        if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
-          target_link_options(${target} PRIVATE
-            "LINKER:-bitcode_hide_symbols")
-        endif()
+      # Please note that using a generator expression to fit this in a single
+      # target_link_options does not work (at least in CMake 3.15 and 3.16),
+      # since that seems not to allow the LINKER: prefix to be evaluated (i.e.
+      # it will be added as-is to the linker parameters)
+      if(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
+        target_link_options(${name} PRIVATE
+          "LINKER:-bitcode_hide_symbols")
       endif()
+    endif()
+
+    target_link_options(${name} PRIVATE
+      "LINKER:-compatibility_version,1")
+    if(SWIFT_COMPILER_VERSION)
+      target_link_options(${name} PRIVATE
+        "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
     endif()
   endif()
 
