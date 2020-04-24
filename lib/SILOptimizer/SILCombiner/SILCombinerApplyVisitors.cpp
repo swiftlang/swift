@@ -1209,35 +1209,6 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
   return true;
 }
 
-// Return a new apply with the specified callee. This creates a new apply rather
-// than simply rewriting the callee operand because the apply's SubstCalleeType,
-// derived from the callee and substitution list, may change.
-FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
-                                              SILValue callee) {
-  SmallVector<SILValue, 4> arguments;
-  for (SILValue arg : apply.getArguments())
-    arguments.push_back(arg);
-
-  Builder.addOpenedArchetypeOperands(apply.getInstruction());
-  if (auto *TAI = dyn_cast<TryApplyInst>(apply)) {
-    return Builder.createTryApply(TAI->getLoc(), callee,
-                                  TAI->getSubstitutionMap(), arguments,
-                                  TAI->getNormalBB(), TAI->getErrorBB());
-  } else {
-    auto *AI = cast<ApplyInst>(apply);
-    auto fTy = callee->getType().getAs<SILFunctionType>();
-    // The optimizer can generate a thin_to_thick_function from a throwing thin
-    // to a non-throwing thick function (in case it can prove that the function
-    // is not throwing).
-    // Therefore we have to check if the new callee (= the argument of the
-    // thin_to_thick_function) is a throwing function and set the not-throwing
-    // flag in this case.
-    return Builder.createApply(apply.getLoc(), callee,
-                               apply.getSubstitutionMap(), arguments,
-                               AI->isNonThrowing() || fTy->hasErrorResult());
-  }
-}
-
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (AI->getFunction()->hasOwnership())
     return nullptr;
@@ -1289,7 +1260,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     // function when rewriting the callsite. This should be ok because the
     // ABI normally expects a guaranteed callee.
     if (!AI->getOrigCalleeType()->isCalleeConsumed())
-      return rewriteApplyCallee(AI, TTTFI->getOperand()).getInstruction();
+      return cloneFullApplySiteReplacingCallee(AI, TTTFI->getOperand(),
+                                               Builder.getBuilderContext())
+          .getInstruction();
   }
 
   // (apply (witness_method)) -> propagate information about
@@ -1424,7 +1397,9 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
     // function when rewriting the callsite. This should be ok because the
     // ABI normally expects a guaranteed callee.
     if (!AI->getOrigCalleeType()->isCalleeConsumed())
-      return rewriteApplyCallee(AI, TTTFI->getOperand()).getInstruction();
+      return cloneFullApplySiteReplacingCallee(AI, TTTFI->getOperand(),
+                                               Builder.getBuilderContext())
+          .getInstruction();
   }
 
   // (apply (witness_method)) -> propagate information about
