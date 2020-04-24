@@ -59,6 +59,10 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
 } // end anonymous namespace
 
 void IRGenModule::emitClangDecl(const clang::Decl *decl) {
+  // Ignore this decl if we've seen it before.
+  if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
+    return;
+
   // Fast path for the case where `decl` doesn't contain executable code, so it
   // can't reference any other declarations that we would need to emit.
   if (getDeclWithExecutableCode(const_cast<clang::Decl *>(decl)) == nullptr) {
@@ -67,8 +71,6 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     return;
   }
 
-  if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
-    return;
   SmallVector<const clang::Decl *, 8> stack;
   stack.push_back(decl);
 
