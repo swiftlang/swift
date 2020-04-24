@@ -99,7 +99,7 @@ extension _AbstractStringStorage {
       return _nativeIsEqual(
         _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
     default:
-          // We're allowed to crash, but for compatibility reasons NSCFString allows
+      // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
       if !_isNSString(other) {
         return 0
@@ -129,7 +129,7 @@ extension _AbstractStringStorage {
       immediately, so when we run out of fast options to try, do the same.
       We can likely be more clever here if need be
       */
-      return _cocoaStringCompare(self, other) == 0 ? 1 : 0
+      return _cocoaStringEqual(self, other) ? 1 : 0
     }
   }
 }

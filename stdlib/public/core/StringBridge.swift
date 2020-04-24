@@ -18,6 +18,24 @@ internal typealias _CocoaString = AnyObject
 
 #if _runtime(_ObjC)
 
+private var taggedConstantNSStringISAPointer: UInt64 = 0
+
+// We can't send ObjC messages to these, so we have to handle them specially
+// in each place we would normally call a _StringSelectorHolder method
+@inline(__always)
+private func asFormerlyTaggedConstantString(_ str: _CocoaString)
+  -> UnsafePointer<_swift_shims_builtin_CFString>? {
+  #if arch(arm64)
+  let isaPtr = unsafeBitCast(str,
+                             to: UnsafePointer<_swift_shims_builtin_CFString>)
+  if isaPtr.pointee ==
+      taggedConstantNSStringISAPointer._unsafelyUnwrappedUnchecked {
+    return isaPtr
+  }
+  #endif
+  return nil
+}
+
 // Swift's String bridges NSString via this protocol and these
 // variables, allowing the core stdlib to remain decoupled from
 // Foundation.
@@ -89,6 +107,7 @@ private func _copyNSString(_ str: _StringSelectorHolder) -> _CocoaString {
 internal func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString
 ) -> _CocoaString {
+  if asFormerlyTaggedConstantString(source) != nil { return source }
   return _copyNSString(_objc(source))
 }
 
@@ -102,7 +121,7 @@ private func _NSStringLen(_ str: _StringSelectorHolder) -> Int {
 internal func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
 ) -> Int {
-  if let len = getConstantTaggedCocoaContents(source)?.utf16Length {
+  if let len = asFormerlyTaggedConstantString(source)?.utf16Length {
     return len
   }
   return _NSStringLen(_objc(source))
@@ -110,7 +129,7 @@ internal func _stdlib_binary_CFStringGetLength(
 
 @_effects(readonly)
 internal func _isNSString(_ str:AnyObject) -> Bool {
-  if getConstantTaggedCocoaContents(str) != nil {
+  if asFormerlyTaggedConstantString(str) != nil {
     return true
   }
   return _swift_stdlib_isNSString(str) != 0
@@ -126,6 +145,9 @@ private func _NSStringCharactersPtr(_ str: _StringSelectorHolder) -> UnsafeMutab
 internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
+  if asFormerlyTaggedConstantString(source) != nil {
+    return nil /* always ASCII */
+  }
   return _NSStringCharactersPtr(_objc(source))
 }
 
@@ -149,6 +171,19 @@ internal func _cocoaStringCopyCharacters(
   range: Range<Int>,
   into destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) {
+  if let str = asFormerlyTaggedConstantString(source) {
+    let buf = UnsafeBufferPointer<UInt8>(
+          start: str.asciiContentsPointer,
+          len: str.utf16Length
+    )
+    for i in range {
+      // always ascii
+      destination.pointee = UTF16.CodeUnit(buf[i])
+      destination += 1
+    }
+    return
+  }
+  
   _NSStringGetCharacters(from: _objc(source), range: range, into: destination)
 }
 
@@ -163,6 +198,15 @@ private func _NSStringGetCharacter(
 internal func _cocoaStringSubscript(
   _ target: _CocoaString, _ position: Int
 ) -> UTF16.CodeUnit {
+  if let str = asFormerlyTaggedConstantString(source) {
+    let buf = UnsafeBufferPointer<UInt8>(
+          start: str.asciiContentsPointer,
+          len: str.utf16Length
+    )
+    // always ascii
+    return UTF16.CodeUnit(buf[position])
+  }
+
   return _NSStringGetCharacter(_objc(target), position)
 }
 
@@ -195,6 +239,23 @@ internal func _cocoaStringCopyUTF8(
   _ target: _CocoaString,
   into bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
+  if let str = asFormerlyTaggedConstantString(source) {
+    let buf = UnsafeBufferPointer<UInt8>(
+          start: str.asciiContentsPointer,
+          len: str.utf16Length
+    )
+    var ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
+    var numWritten = 0
+    
+    for char in buf {
+      guard numWritten < bufPtr.count else { return nil }
+      // always ascii
+      ptr.initialize(to: char)
+      destination += 1
+      numWritten += 1
+    }
+    return numWritten
+  }
   return _NSStringCopyUTF8(_objc(target), into: bufPtr)
 }
 
@@ -226,6 +287,10 @@ internal func _cocoaStringUTF8Count(
   range: Range<Int>
 ) -> Int? {
   if range.isEmpty { return 0 }
+  if let len = asFormerlyTaggedConstantString(target)?.utf16Length {
+    if range.lowerBound < 0 || range.upperBound > len { return nil }
+    return range.upperBound
+  }
   return _NSStringUTF8Count(_objc(target), range: range)
 }
 
@@ -239,10 +304,35 @@ private func _NSStringCompare(
 }
 
 @_effects(readonly)
-internal func _cocoaStringCompare(
+internal func _cocoaStringEqual(
   _ string: _CocoaString, _ other: _CocoaString
-) -> Int {
-  return _NSStringCompare(_objc(string), other)
+) -> Bool {
+//  if let taggedConstantString = asFormerlyTaggedConstantString(string) {
+//    if let taggedConstantOther = asFormerlyTaggedConstantString(other) {
+//      if taggedConstantString.utf16Length != taggedConstantOther.utf16Length {
+//        return false
+//      }
+//      if taggedConstantOther.asciiContentsPointer ==
+//          taggedConstantString.asciiContentsPointer {
+//        return true
+//      }
+//      // both ASCII, can just memcmp contents
+//      return memcmp(
+//        taggedConstantOther.asciiContentsPointer,
+//        taggedConstantString.asciiContentsPointer,
+//        taggedConstantString.utf16Length
+//      ) == 0
+//    } else {
+//      // can msgSend to them, not tagged constant
+//      return _NSStringCompare(_objc(other), string) == 0
+//    }
+//  }
+  precondition(asFormerlyTaggedConstantString(string) == nil,
+   "Cannot call _cocoaGetCStringTrampoline with a tagged constant NSString"
+  )
+
+  // can msgSend to us, not tagged constant
+  return _NSStringCompare(_objc(string), other) == 0
 }
 
 @_effects(readonly)
@@ -276,6 +366,9 @@ internal func _cocoaGetCStringTrampoline(
   _ maxLength: Int,
   _ encoding: UInt
 ) -> Int8 {
+  precondition(asFormerlyTaggedConstantString(string) == nil,
+   "Cannot call _cocoaGetCStringTrampoline with a tagged constant NSString"
+  )
   return Int8(_swift_stdlib_NSStringGetCStringTrampoline(
     string, buffer, maxLength, encoding))
 }
@@ -299,24 +392,13 @@ internal enum _KnownCocoaString {
 #if !(arch(i386) || arch(arm) || arch(wasm32))
   case tagged
 #endif
-#if arch(arm64)
-  case constantTagged
-#endif
 
   @inline(__always)
   init(_ str: _CocoaString) {
 
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(str) {
-#if arch(arm64)
-      if let _ = getConstantTaggedCocoaContents(str) {
-        self = .constantTagged
-      } else {
-        self = .tagged
-      }
-#else
       self = .tagged
-#endif
       return
     }
 #endif
@@ -362,7 +444,7 @@ private func _withCocoaASCIIPointer<R>(
 ) -> R? {
   #if !(arch(i386) || arch(arm))
   if _isObjCTaggedPointer(str) {
-    if let ptr = getConstantTaggedCocoaContents(str)?.asciiContentsPointer {
+    if let ptr = asFormerlyTaggedConstantString(str)?.asciiContentsPointer {
       return work(ptr)
     }
     if requireStableAddress {
@@ -434,7 +516,8 @@ private func formConstantTaggedCocoaString(
   let constantPtr:UnsafeRawPointer = Builtin.reinterpretCast(untaggedCocoa)
 
   // Check if what we're pointing to is actually a valid tagged constant
-  guard _swift_stdlib_dyld_is_objc_constant_string(constantPtr) == 1 else {
+  guard asFormerlyTaggedConstantString(untaggedCocoa) != nil &&
+        _swift_stdlib_dyld_is_objc_constant_string(constantPtr) == 1 else {
     return nil
   }
 
@@ -445,10 +528,8 @@ private func formConstantTaggedCocoaString(
 }
 
 @inline(__always)
-private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
-    (utf16Length: Int,
-     asciiContentsPointer: UnsafePointer<UInt8>,
-     untaggedCocoa: _CocoaString)? {
+private func untagConstantTaggedCocoaString(_ cocoaString: _CocoaString) ->
+    _CocoaString? {
 #if !arch(arm64)
   return nil
 #else
@@ -458,8 +539,6 @@ private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
   }
 
   let taggedValue = unsafeBitCast(cocoaString, to: UInt.self)
-  
-
 
   guard taggedValue & constantTagMask == expectedConstantTagValue else {
     return nil
@@ -482,11 +561,7 @@ private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
   let isASCII = ivarPointer.pointee.flags & isUTF16Mask == 0
   precondition(isASCII) // we don't currently support non-ASCII here
   let contentsPtr = ivarPointer.pointee.str
-  return (
-    utf16Length: Int(length),
-    asciiContentsPointer: contentsPtr,
-    untaggedCocoa: Builtin.reinterpretCast(ivarPointer)
-  )
+  return Builtin.reinterpretCast(ivarPointer)
 #endif
 }
 
@@ -502,17 +577,21 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
       cocoaString, to: __SharedStringStorage.self).asString._guts
 #if !(arch(i386) || arch(arm))
   case .tagged:
-    return _StringGuts(_SmallString(taggedCocoa: cocoaString))
 #if arch(arm64)
-  case .constantTagged:
-    let taggedContents = getConstantTaggedCocoaContents(cocoaString)!
-    return _StringGuts(
-      cocoa: taggedContents.untaggedCocoa,
-      providesFastUTF8: false, //TODO: if contentsPtr is UTF8 compatible, use it
-      isASCII: true,
-      length: taggedContents.utf16Length
-    )
+    if let taggedContents = untagConstantTaggedCocoaString(cocoaString) {
+      let isaPtr = unsafeBitCast(taggedContents.untaggedCocoa,
+        to: UnsafePointer<_swift_shims_builtin_CFString>
+      )
+      taggedConstantNSStringISAPointer = isaPtr.pointee
+      return _StringGuts(
+        cocoa: taggedContents.untaggedCocoa,
+        providesFastUTF8: false,
+        isASCII: true,
+        length: taggedContents.utf16Length
+      )
+    }
 #endif
+    return _StringGuts(_SmallString(taggedCocoa: cocoaString))
 #endif
   case .cocoa:
     // "Copy" it into a value to be sure nobody will modify behind
