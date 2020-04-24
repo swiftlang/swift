@@ -856,6 +856,14 @@ extension _StringObject {
     return Builtin.reinterpretCast(largeAddressBits)
 #endif
   }
+
+  @_alwaysEmitIntoClient
+  @inlinable
+  @inline(__always)
+  internal var owner: AnyObject? {
+    guard self.isMortal else { return nil }
+    return Builtin.reinterpretCast(largeAddressBits)
+  }
 }
 
 // Aggregate queries / abstractions
