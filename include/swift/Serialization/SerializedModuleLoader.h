@@ -416,6 +416,8 @@ public:
 
   virtual const clang::Module *getUnderlyingClangModule() const override;
 
+  virtual ModuleDecl *getUnderlyingModuleIfOverlay() const override;
+
   virtual bool getAllGenericSignatures(
                    SmallVectorImpl<GenericSignature> &genericSignatures)
                 override;

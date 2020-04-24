@@ -466,10 +466,11 @@ function(_compile_swift_files
     list(APPEND swift_flags "-parse-as-library")
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
+    set(module_triple ${SWIFT_SDK_${SWIFTFILE_SDK}_ARCH_${SWIFTFILE_ARCHITECTURE}_MODULE})
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
        SWIFTFILE_SDK STREQUAL "MACCATALYST")
       set(specific_module_dir "${module_base}.swiftmodule")
-      set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
+      set(module_base "${module_base}.swiftmodule/${module_triple}")
     else()
       set(specific_module_dir)
     endif()
@@ -532,11 +533,19 @@ function(_compile_swift_files
 
       set(maccatalyst_specific_module_dir
           "${maccatalyst_module_dir}/${SWIFTFILE_MODULE_NAME}.swiftmodule")
-      set(maccatalyst_module_base "${maccatalyst_specific_module_dir}/${SWIFTFILE_ARCHITECTURE}")
+      set(maccatalyst_module_triple ${SWIFT_SDK_MACCATALYST_ARCH_${SWIFTFILE_ARCHITECTURE}_MODULE})
+      set(maccatalyst_module_base "${maccatalyst_specific_module_dir}/${maccatalyst_module_triple}")
       set(maccatalyst_module_file "${maccatalyst_module_base}.swiftmodule")
       set(maccatalyst_module_doc_file "${maccatalyst_module_base}.swiftdoc")
 
       set(maccatalyst_module_outputs "${maccatalyst_module_file}" "${maccatalyst_module_doc_file}")
+
+      if(SWIFT_ENABLE_MODULE_INTERFACES)
+        set(maccatalyst_interface_file "${maccatalyst_module_base}.swiftinterface")
+        list(APPEND maccatalyst_module_outputs "${maccatalyst_interface_file}")
+      else()
+        set(maccatalyst_interface_file)
+      endif()
 
       swift_install_in_component(DIRECTORY ${maccatalyst_specific_module_dir}
                                  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${maccatalyst_library_subdir}"
@@ -613,6 +622,12 @@ function(_compile_swift_files
     list(APPEND maccatalyst_swift_flags
       "-I" "${SWIFTLIB_DIR}/${maccatalyst_library_subdir}")
     set(maccatalyst_swift_module_flags ${swift_module_flags})
+    list(FIND maccatalyst_swift_module_flags "${interface_file}" interface_file_index)
+    if(NOT interface_file_index EQUAL -1)
+      list(INSERT maccatalyst_swift_module_flags ${interface_file_index} "${maccatalyst_interface_file}")
+      math(EXPR old_interface_file_index "${interface_file_index} + 1")
+      list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
+    endif()
   elseif(maccatalyst_build_flavor STREQUAL "ios-like")
     compute_library_subdir(maccatalyst_library_subdir
       "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
