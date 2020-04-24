@@ -191,17 +191,13 @@ module SwiftGlibc [system] {
     }
 % end
 
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU"]:
     module ftw {
       header "${GLIBC_INCLUDE_PATH}/ftw.h"
       export *
     }
     module glob {
       header "${GLIBC_INCLUDE_PATH}/glob.h"
-      export *
-    }
-    module iconv {
-      header "${GLIBC_INCLUDE_PATH}/iconv.h"
       export *
     }
     module langinfo {
@@ -216,16 +212,8 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/netdb.h"
       export *
     }
-    module ifaddrs {
-      header "${GLIBC_INCLUDE_PATH}/ifaddrs.h"
-      export *
-    }
     module search {
       header "${GLIBC_INCLUDE_PATH}/search.h"
-      export *
-    }
-    module spawn {
-      header "${GLIBC_INCLUDE_PATH}/spawn.h"
       export *
     }
     module syslog {
@@ -234,6 +222,21 @@ module SwiftGlibc [system] {
     }
     module tar {
       header "${GLIBC_INCLUDE_PATH}/tar.h"
+      export *
+    }
+% end
+
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+    module iconv {
+      header "${GLIBC_INCLUDE_PATH}/iconv.h"
+      export *
+    }
+    module ifaddrs {
+      header "${GLIBC_INCLUDE_PATH}/ifaddrs.h"
+      export *
+    }
+    module spawn {
+      header "${GLIBC_INCLUDE_PATH}/spawn.h"
       export *
     }
     module utmpx {
@@ -247,47 +250,16 @@ module SwiftGlibc [system] {
 % end
 
 % if CMAKE_SDK == "HAIKU":
-    module ftw {
-      header "${GLIBC_INCLUDE_PATH}/ftw.h"
-      export *
-    }
-    module glob {
-      header "${GLIBC_INCLUDE_PATH}/glob.h"
-      export *
-    }
     module iconv {
       header "${GLIBC_INCLUDE_PATH}/../iconv.h"
-      export *
-    }
-    module langinfo {
-      header "${GLIBC_INCLUDE_PATH}/langinfo.h"
-      export *
-    }
-    module monetary {
-      header "${GLIBC_INCLUDE_PATH}/monetary.h"
-      export *
-    }
-    module netdb {
-      header "${GLIBC_INCLUDE_PATH}/netdb.h"
       export *
     }
     module ifaddrs {
       header "${GLIBC_INCLUDE_PATH}/../bsd/ifaddrs.h"
       export *
     }
-    module search {
-      header "${GLIBC_INCLUDE_PATH}/search.h"
-      export *
-    }
-    module syslog {
-      header "${GLIBC_INCLUDE_PATH}/syslog.h"
-      export *
-    }
-    module tar {
-      header "${GLIBC_INCLUDE_PATH}/tar.h"
-      export *
-    }
 % end
+
     module arpa {
       module inet {
         header "${GLIBC_INCLUDE_PATH}/arpa/inet.h"
