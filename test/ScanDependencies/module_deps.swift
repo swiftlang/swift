@@ -123,8 +123,8 @@ import E
 
 // Check make-style dependencies
 // CHECK-MAKE-DEPS: module_deps.swift
-// CHECK-MAKE-DEPS-SAME: Swift.swiftmodule
 // CHECK-MAKE-DEPS-SAME: A.swiftinterface
+// CHECK-MAKE-DEPS-SAME: Swift.swiftmodule
 // CHECK-MAKE-DEPS-SAME: B.h
 // CHECK-MAKE-DEPS-SAME: F.h
 // CHECK-MAKE-DEPS-SAME: Bridging.h
