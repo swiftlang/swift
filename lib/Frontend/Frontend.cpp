@@ -846,18 +846,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
       SILParserState SILContext(TheSILModule.get());
       parseSourceFileSIL(SF, &SILContext);
     }
-
-    auto &opts = Invocation.getFrontendOptions();
-    if (!Context->hadError() && opts.DebuggerTestingTransform)
-      performDebuggerTestingTransform(SF);
-
-    if (!Context->hadError() && opts.PCMacro)
-      performPCMacro(SF);
-
-    // Playground transform knows to look out for PCMacro's changes and not
-    // to playground log them.
-    if (!Context->hadError() && opts.PlaygroundTransform)
-      performPlaygroundTransform(SF, opts.PlaygroundHighPerformance);
   });
 
   // If the limiting AST stage is import resolution, we're done.
