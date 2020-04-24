@@ -2282,7 +2282,7 @@ Expr *Parser::parseExprIdentifier() {
       }
     } else {
       for (auto activeVar : DisabledVars) {
-        if (activeVar->getFullName() == name.getFullName()) {
+        if (activeVar->getName() == name.getFullName()) {
           diagnose(loc.getBaseNameLoc(), DisabledVarReason);
           return new (Context) ErrorExpr(loc.getSourceRange());
         }

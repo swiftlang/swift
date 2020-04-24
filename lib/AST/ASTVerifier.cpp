@@ -2814,8 +2814,8 @@ public:
 
       // All of the parameter names should match.
       if (!isa<DestructorDecl>(AFD)) { // Destructor has no non-self params.
-        auto paramNames = AFD->getFullName().getArgumentNames();
-        bool checkParamNames = (bool)AFD->getFullName();
+        auto paramNames = AFD->getName().getArgumentNames();
+        bool checkParamNames = (bool)AFD->getName();
         auto *firstParams = AFD->getParameters();
 
         if (checkParamNames &&

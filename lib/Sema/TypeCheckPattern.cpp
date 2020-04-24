@@ -909,7 +909,7 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
 
   if (addDeclNote)
     DE.diagnose(enumCase->getStartLoc(), diag::decl_declared_here,
-                enumCase->getFullName());
+                enumCase->getName());
 }
 
 /// Perform top-down type coercion on the given pattern.

@@ -4920,7 +4920,8 @@ public:
     auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
     if (!nominal) {
       XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
-      DeclName fullName = cast<ValueDecl>(nominalOrError.get())->getFullName();
+      const DeclName fullName =
+          cast<ValueDecl>(nominalOrError.get())->getName();
       tinyTrace.addValue(fullName.getBaseIdentifier());
       return llvm::make_error<XRefError>("declaration is not a nominal type",
                                          tinyTrace, fullName);

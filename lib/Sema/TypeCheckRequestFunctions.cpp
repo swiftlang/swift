@@ -213,7 +213,7 @@ Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
     if (!paramFnType) {
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::function_builder_parameter_not_of_function_type,
-                         nominal->getFullName());
+                         nominal->getName());
       mutableAttr->setInvalid();
       return Type();
     }
@@ -222,7 +222,7 @@ Type FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
     if (param->isAutoClosure()) {
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::function_builder_parameter_autoclosure,
-                         nominal->getFullName());
+                         nominal->getName());
       mutableAttr->setInvalid();
       return Type();
     }

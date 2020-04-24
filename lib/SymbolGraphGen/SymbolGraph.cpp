@@ -99,11 +99,11 @@ SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
     return false;
   };
 
-  if (FoundRequirementMemberNamed(VD->getFullName(), Proto)) {
+  if (FoundRequirementMemberNamed(VD->getName(), Proto)) {
     return true;
   }
   for (auto *Inherited : Proto->getInheritedProtocols()) {
-    if (FoundRequirementMemberNamed(VD->getFullName(), Inherited)) {
+    if (FoundRequirementMemberNamed(VD->getName(), Inherited)) {
       return true;
     }
   }
@@ -315,7 +315,7 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
   auto HandleProtocol = [=](const ProtocolDecl *P) {
     for (const auto *Member : P->getMembers()) {
       if (const auto *MemberVD = dyn_cast<ValueDecl>(Member)) {
-        if (MemberVD->getFullName().compare(VD->getFullName()) == 0) {
+        if (MemberVD->getName().compare(VD->getName()) == 0) {
           recordEdge(Symbol(this, VD, nullptr),
                      Symbol(this, MemberVD, nullptr),
                      RelationshipKind::DefaultImplementationOf());

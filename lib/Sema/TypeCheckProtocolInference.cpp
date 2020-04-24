@@ -1678,7 +1678,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
         diags.diagnose(failedDefaultedAssocType,
                        diag::default_associated_type_req_fail,
                        failedDefaultedWitness,
-                       failedDefaultedAssocType->getFullName(),
+                       failedDefaultedAssocType->getName(),
                        proto->getDeclaredType(),
                        failedDefaultedResult.getRequirement(),
                        failedDefaultedResult.isConformanceRequirement());
@@ -1714,7 +1714,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
         auto proto = conformance->getProtocol();
         auto &diags = proto->getASTContext().Diags;
         diags.diagnose(assocType, diag::bad_associated_type_deduction,
-                       assocType->getFullName(), proto->getFullName());
+                       assocType->getName(), proto->getName());
         for (const auto &failed : failedSet) {
           if (failed.Result.isError())
             continue;
@@ -1769,17 +1769,17 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
         auto &diags = conformance->getDeclContext()->getASTContext().Diags;
         diags.diagnose(typeWitnessConflict->AssocType,
                        diag::ambiguous_associated_type_deduction,
-                       typeWitnessConflict->AssocType->getFullName(),
+                       typeWitnessConflict->AssocType->getName(),
                        typeWitnessConflict->FirstType,
                        typeWitnessConflict->SecondType);
 
         diags.diagnose(typeWitnessConflict->FirstWitness,
                        diag::associated_type_deduction_witness,
-                       typeWitnessConflict->FirstRequirement->getFullName(),
+                       typeWitnessConflict->FirstRequirement->getName(),
                        typeWitnessConflict->FirstType);
         diags.diagnose(typeWitnessConflict->SecondWitness,
                        diag::associated_type_deduction_witness,
-                       typeWitnessConflict->SecondRequirement->getFullName(),
+                       typeWitnessConflict->SecondRequirement->getName(),
                        typeWitnessConflict->SecondType);
       });
 
@@ -1832,7 +1832,7 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
         NormalProtocolConformance *conformance) {
         auto &diags = assocType->getASTContext().Diags;
         diags.diagnose(assocType, diag::ambiguous_associated_type_deduction,
-                       assocType->getFullName(), firstType, secondType);
+                       assocType->getName(), firstType, secondType);
 
         auto diagnoseWitness = [&](std::pair<ValueDecl *, ValueDecl *> match,
                                    Type type){
@@ -1840,7 +1840,7 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
           if (match.first && match.second) {
             diags.diagnose(match.second,
                            diag::associated_type_deduction_witness,
-                           match.first->getFullName(), type);
+                           match.first->getName(), type);
 
             return;
           }

@@ -816,7 +816,7 @@ namespace {
                     Space::forType(TTy->getUnderlyingType(), Identifier()));
               }
             }
-            return Space::forConstructor(tp, eed->getFullName(),
+            return Space::forConstructor(tp, eed->getName(),
                                          constElemSpaces);
           });
 

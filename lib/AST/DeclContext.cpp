@@ -581,7 +581,7 @@ void AccessScope::dump() const {
     if (auto *ext = dyn_cast<ExtensionDecl>(decl))
       llvm::errs() << ext->getExtendedNominal()->getName();
     else if (auto *named = dyn_cast<ValueDecl>(decl))
-      llvm::errs() << named->getFullName();
+      llvm::errs() << named->getName();
     else
       llvm::errs() << (const void *)decl;
 
@@ -680,7 +680,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     break;
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    OS << " name=" << AFD->getFullName();
+    OS << " name=" << AFD->getName();
     if (AFD->hasInterfaceType())
       OS << " : " << AFD->getInterfaceType();
     else
