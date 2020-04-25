@@ -4,4 +4,4 @@
 // UNSUPPORTED: OS=maccatalyst
 
 import DummyFramework
-// CHECK: could not find module 'DummyFramework' for target 'arm64e-apple-ios'; found: arm64-apple-ios, arm64
+// CHECK: no such module 'DummyFramework'
