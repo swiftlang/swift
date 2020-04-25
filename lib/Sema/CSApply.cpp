@@ -90,8 +90,7 @@ Solution::computeSubstitutions(GenericSignature sig,
 
     // FIXME: Retrieve the conformance from the solution itself.
     return TypeChecker::conformsToProtocol(replacement, protoType,
-                                           getConstraintSystem().DC,
-                                           None);
+                                           getConstraintSystem().DC);
   };
 
   return SubstitutionMap::get(sig,
@@ -414,7 +413,7 @@ namespace {
 
       return SubstitutionMap::get(sig,
                                   QueryTypeSubstitutionMap{subs},
-                                  TypeChecker::LookUpConformance(cs.DC));
+                                  LookUpConformanceInModule(cs.DC->getParentModule()));
     }
 
   public:
@@ -447,7 +446,7 @@ namespace {
           // the protocol requirement with Self == the concrete type, and SILGen
           // (or later) can devirtualize as appropriate.
           auto conformance =
-            TypeChecker::conformsToProtocol(baseTy, proto, cs.DC, None);
+            TypeChecker::conformsToProtocol(baseTy, proto, cs.DC);
           if (conformance.isConcrete()) {
             if (auto witness = conformance.getConcrete()->getWitnessDecl(decl)) {
               bool isMemberOperator = witness->getDeclContext()->isTypeContext();
@@ -2082,8 +2081,7 @@ namespace {
       auto bridgedToObjectiveCConformance
         = TypeChecker::conformsToProtocol(valueType,
                                           bridgedProto,
-                                          cs.DC,
-                                          None);
+                                          cs.DC);
 
       FuncDecl *fn = nullptr;
 
@@ -2343,7 +2341,7 @@ namespace {
       ProtocolDecl *protocol = TypeChecker::getProtocol(
           ctx, expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
-      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC, None)) {
+      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC)) {
         // If the type does not conform to ExpressibleByStringLiteral, it should
         // be ExpressibleByExtendedGraphemeClusterLiteral.
         protocol = TypeChecker::getProtocol(
@@ -2352,7 +2350,7 @@ namespace {
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
-      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC, None)) {
+      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC)) {
         // ... or it should be ExpressibleByUnicodeScalarLiteral.
         protocol = TypeChecker::getProtocol(
             cs.getASTContext(), expr->getLoc(),
@@ -2467,7 +2465,7 @@ namespace {
         assert(proto && "Missing string interpolation protocol?");
 
         auto conformance =
-          TypeChecker::conformsToProtocol(type, proto, cs.DC, None);
+          TypeChecker::conformsToProtocol(type, proto, cs.DC);
         assert(conformance && "string interpolation type conforms to protocol");
 
         DeclName constrName(ctx, DeclBaseName::createConstructor(), argLabels);
@@ -2573,7 +2571,7 @@ namespace {
       auto proto = TypeChecker::getLiteralProtocol(cs.getASTContext(), expr);
       assert(proto && "Missing object literal protocol?");
       auto conformance =
-        TypeChecker::conformsToProtocol(conformingType, proto, cs.DC, None);
+        TypeChecker::conformsToProtocol(conformingType, proto, cs.DC);
       assert(conformance && "object literal type conforms to protocol");
 
       auto constrName = TypeChecker::getObjectLiteralConstructorName(ctx, expr);
@@ -3278,7 +3276,7 @@ namespace {
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
       auto conformance =
-        TypeChecker::conformsToProtocol(arrayTy, arrayProto, cs.DC, None);
+        TypeChecker::conformsToProtocol(arrayTy, arrayProto, cs.DC);
       assert(conformance && "Type does not conform to protocol?");
 
       DeclName name(ctx, DeclBaseName::createConstructor(),
@@ -3322,8 +3320,7 @@ namespace {
           KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
       auto conformance =
-        TypeChecker::conformsToProtocol(dictionaryTy, dictionaryProto, cs.DC,
-                                        None);
+        TypeChecker::conformsToProtocol(dictionaryTy, dictionaryProto, cs.DC);
       if (conformance.isInvalid())
         return nullptr;
 
@@ -4062,7 +4059,7 @@ namespace {
           // Special handle for literals conditional checked cast when they can
           // be statically coerced to the cast type.
           if (protocol && TypeChecker::conformsToProtocol(
-                              toType, protocol, cs.DC, None)) {
+                              toType, protocol, cs.DC)) {
             ctx.Diags
                 .diagnose(expr->getLoc(),
                           diag::literal_conditional_downcast_to_coercion,
@@ -4939,7 +4936,7 @@ namespace {
         // verified by the solver, we just need to get it again
         // with all of the generic parameters resolved.
         auto hashableConformance =
-          TypeChecker::conformsToProtocol(indexType, hashable, cs.DC, None);
+          TypeChecker::conformsToProtocol(indexType, hashable, cs.DC);
         assert(hashableConformance);
 
         conformances.push_back(hashableConformance);
@@ -5263,7 +5260,7 @@ collectExistentialConformances(Type fromType, Type toType,
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : layout.getProtocols()) {
     conformances.push_back(TypeChecker::containsProtocol(
-        fromType, proto->getDecl(), DC, None));
+        fromType, proto->getDecl(), DC));
   }
 
   return toType->getASTContext().AllocateCopy(conformances);
@@ -6430,7 +6427,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
       auto conformance =
         TypeChecker::conformsToProtocol(
-                        cs.getType(expr), hashable, cs.DC, None);
+                        cs.getType(expr), hashable, cs.DC);
       assert(conformance && "must conform to Hashable");
 
       return cs.cacheType(
@@ -6965,7 +6962,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   // initialize via the builtin protocol.
   if (builtinProtocol) {
     auto builtinConformance = TypeChecker::conformsToProtocol(
-        type, builtinProtocol, cs.DC, None);
+        type, builtinProtocol, cs.DC);
     if (builtinConformance) {
       // Find the witness that we'll use to initialize the type via a builtin
       // literal.
@@ -6997,7 +6994,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
   // This literal type must conform to the (non-builtin) protocol.
   assert(protocol && "requirements should have stopped recursion");
-  auto conformance = TypeChecker::conformsToProtocol(type, protocol, cs.DC, None);
+  auto conformance = TypeChecker::conformsToProtocol(type, protocol, cs.DC);
   assert(conformance && "must conform to literal protocol");
 
   // Dig out the literal type and perform a builtin literal conversion to it.
@@ -7134,7 +7131,7 @@ ExprRewriter::buildDynamicCallable(ApplyExpr *apply, SelectedOverload selected,
     auto dictLitProto =
         ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     auto conformance =
-        TypeChecker::conformsToProtocol(argumentType, dictLitProto, cs.DC, None);
+        TypeChecker::conformsToProtocol(argumentType, dictLitProto, cs.DC);
     auto keyType = conformance.getTypeWitnessByName(argumentType, ctx.Id_Key);
     auto valueType =
         conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
@@ -8406,7 +8403,7 @@ ProtocolConformanceRef Solution::resolveConformance(
     // itself rather than another conforms-to-protocol check.
     Type substConformingType = simplifyType(conformingType);
     return TypeChecker::conformsToProtocol(
-        substConformingType, proto, constraintSystem->DC, None);
+        substConformingType, proto, constraintSystem->DC);
   }
 
   return ProtocolConformanceRef::forInvalid();

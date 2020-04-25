@@ -2451,7 +2451,7 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
           Ctx.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
     auto conformance = TypeChecker::conformsToProtocol(
-        errorCodeType, errorCodeProtocol, getDC(), None);
+        errorCodeType, errorCodeProtocol, getDC());
     if (conformance) {
       Type errorType =
           conformance
@@ -2781,8 +2781,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   // Let's build a list of protocols that the context does not conform to.
   SmallVector<std::string, 8> missingProtoTypeStrings;
   for (auto protocol : layout.getProtocols()) {
-    if (!TypeChecker::conformsToProtocol(fromType, protocol->getDecl(), getDC(),
-                                         None)) {
+    if (!TypeChecker::conformsToProtocol(fromType, protocol->getDecl(), getDC())) {
       missingProtoTypeStrings.push_back(protocol->getString());
     }
   }

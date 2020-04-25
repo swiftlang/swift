@@ -406,7 +406,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
                                                  KnownProtocolKind::Equatable);
   assert(equatableProto);
   assert(
-      TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl, None));
+      TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl));
   (void)equatableProto;
   (void)rawType;
 
@@ -465,7 +465,7 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
   if (!equatableProto)
     return false;
 
-  if (TypeChecker::conformsToProtocol(rawType, equatableProto, DC, None)
+  if (TypeChecker::conformsToProtocol(rawType, equatableProto, DC)
           .isInvalid())
     return false;
 

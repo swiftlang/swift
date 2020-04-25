@@ -355,11 +355,9 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
   
   // Make sure this type conforms to OptionSet
   auto *optionSetProto = VD->getASTContext().getProtocol(KnownProtocolKind::OptionSet);
-  bool conformsToOptionSet = (bool)TypeChecker::containsProtocol(
+  bool conformsToOptionSet = (bool)TypeChecker::conformsToProtocol(
                                                   DC->getSelfTypeInContext(),
-                                                  optionSetProto,
-                                                  DC,
-                                                  /*Flags*/None);
+                                                  optionSetProto, DC);
   
   if (!conformsToOptionSet)
     return;
@@ -919,7 +917,7 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
 #define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
   if (auto proto = TypeChecker::getProtocol(                                   \
           type->getASTContext(), SourceLoc(), KnownProtocolKind::Kind)) {      \
-    if (TypeChecker::conformsToProtocol(type, proto, dc, None))                \
+    if (TypeChecker::conformsToProtocol(type, proto, dc))                      \
       return std::string(String);                                              \
   }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
@@ -1040,8 +1038,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
     auto ref = TypeChecker::conformsToProtocol(
-        superclassType, decodableProto, superclassDecl,
-        ConformanceCheckOptions(), SourceLoc());
+        superclassType, decodableProto, superclassDecl);
     if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
@@ -1070,8 +1067,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
       auto ref = TypeChecker::conformsToProtocol(
-          superclassType, encodableProto, superclassDecl,
-          ConformanceCheckOptions(), SourceLoc());
+          superclassType, encodableProto, superclassDecl);
       if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).

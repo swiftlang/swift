@@ -188,9 +188,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    auto conformance = TypeChecker::conformsToProtocol(
-        nominal->getDeclaredInterfaceType(), proto, nominal,
-        ConformanceCheckFlags::SkipConditionalRequirements);
+    auto conformance = nominal->getParentModule()->lookupConformance(
+        nominal->getDeclaredInterfaceType(), proto);
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
@@ -599,7 +598,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, Enu
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
       if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                          protocol, DC, None)
+                                          protocol, DC)
               .isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }

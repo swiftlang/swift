@@ -766,9 +766,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
 
         do {
           // If the type conforms to this protocol, we're covered.
-          if (TypeChecker::conformsToProtocol(
-                  testType, protocol, DC,
-                   ConformanceCheckFlags::SkipConditionalRequirements)) {
+          if (DC->getParentModule()->lookupConformance(testType, protocol)) {
             coveredLiteralProtocols.insert(protocol);
             break;
           }

@@ -949,17 +949,17 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
 
       SWIFT_DEFER { recursionCheck.erase(assocType); };
 
+      auto *module = dc->getParentModule();
+
       // Try to substitute into the base type.
-      Type result = depMemTy->substBaseType(dc->getParentModule(), baseTy);
+      Type result = depMemTy->substBaseType(module, baseTy);
       if (!result->hasError())
         return result;
 
       // If that failed, check whether it's because of the conformance we're
       // evaluating.
       auto localConformance
-        = TypeChecker::conformsToProtocol(
-                          baseTy, assocType->getProtocol(), dc,
-                          ConformanceCheckFlags::SkipConditionalRequirements);
+        = module->lookupConformance(baseTy, assocType->getProtocol());
       if (localConformance.isInvalid() || localConformance.isAbstract() ||
           (localConformance.getConcrete()->getRootConformance() !=
            conformance)) {
@@ -1097,8 +1097,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                        { proto->getSelfInterfaceType() },
                                        sanitizedRequirements,
                                        QuerySubstitutionMap{substitutions},
-                                       TypeChecker::LookUpConformance(dc),
-                                       None, nullptr, options);
+                                       nullptr, options);
   switch (result) {
   case RequirementCheckResult::Failure:
     ++NumSolutionStatesFailedCheck;
@@ -1145,8 +1144,6 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
                        ext->getGenericSignature()->getGenericParams(),
                        ext->getGenericSignature()->getRequirements(),
                        QueryTypeSubstitutionMap{subs},
-                       LookUpConformanceInModule(ext->getModuleContext()),
-                       None,
                        nullptr, options)) {
   case RequirementCheckResult::Success:
   case RequirementCheckResult::SubstitutionFailure:
