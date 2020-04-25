@@ -165,6 +165,7 @@ public:
 
       return MemBehavior::MayWrite;
     }
+    llvm_unreachable("invalid access kind");
   }
 
   MemBehavior visitEndAccessInst(EndAccessInst *endAccess) {
