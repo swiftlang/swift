@@ -60,6 +60,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintUserInaccessibleAttrs = false;
   Opts.SkipPrivateStdlibDecls = true;
   Opts.SkipUnderscoredStdlibProtocols = true;
+  Opts.PrintGenericRequirements = false;
 
   Opts.ExclusiveAttrList.clear();
 
@@ -68,6 +69,18 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
 #include "swift/AST/Attr.def"
 
   return Opts;
+}
+
+PrintOptions
+SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
+  auto Options = getDeclarationFragmentsPrintOptions();
+  Options.ArgAndParamPrinting =
+    PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
+  Options.VarInitializers = false;
+  Options.PrintDefaultArgumentValue = false;
+  Options.PrintEmptyArgumentNames = false;
+  Options.PrintOverrideKeyword = false;
+  return Options;
 }
 
 bool
@@ -503,6 +516,24 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key,
 }
 
 void
+SymbolGraph::serializeNavigatorDeclarationFragments(StringRef Key,
+                                                    const Symbol &S,
+                                                    llvm::json::OStream &OS) {
+  DeclarationFragmentPrinter Printer(OS, Key);
+
+  if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
+    Printer.printTypeRef(TD->getInterfaceType(), TD, TD->getName(),
+                         PrintNameContext::Normal);
+    return;
+  }
+  auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
+  if (S.getSynthesizedBaseType()) {
+    Options.setBaseType(S.getSynthesizedBaseType());
+  }
+  S.getSymbolDecl()->print(Printer, Options);
+}
+
+void
 SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
                                                      const Symbol &S,
                                                      llvm::json::OStream &OS) {
@@ -511,13 +542,7 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
   if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
     Printer.printAbridgedType(TD);
   } else {
-    auto Options = getDeclarationFragmentsPrintOptions();
-    Options.ArgAndParamPrinting =
-      PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
-    Options.VarInitializers = false;
-    Options.PrintDefaultArgumentValue = false;
-    Options.PrintEmptyArgumentNames = false;
-    Options.PrintOverrideKeyword = false;
+    auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
     if (S.getSynthesizedBaseType()) {
       Options.setBaseType(S.getSynthesizedBaseType());
     }

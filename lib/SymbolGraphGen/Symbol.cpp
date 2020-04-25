@@ -126,7 +126,7 @@ void Symbol::serializeNames(llvm::json::OStream &OS) const {
     getPathComponents(PathComponents);
     
     OS.attribute("title", PathComponents.back());
-    // "navigator": null
+    Graph->serializeNavigatorDeclarationFragments("navigator", *this, OS);
     Graph->serializeSubheadingDeclarationFragments("subHeading", *this, OS);
     // "prose": null
   });
