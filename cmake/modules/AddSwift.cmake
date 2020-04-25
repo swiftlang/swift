@@ -77,19 +77,8 @@ function(is_darwin_based_sdk sdk_name out_var)
 endfunction()
 
 # Usage:
-# _add_host_variant_c_compile_link_flags(
-#   RESULT_VAR_NAME result_var_name
-# )
-function(_add_host_variant_c_compile_link_flags)
-  set(oneValueArgs RESULT_VAR_NAME)
-  cmake_parse_arguments(CFLAGS
-    ""
-    "${oneValueArgs}"
-    ""
-    ${ARGN})
-
-  set(result ${${CFLAGS_RESULT_VAR_NAME}})
-
+# _add_host_variant_c_compile_link_flags(name)
+function(_add_host_variant_c_compile_link_flags name)
   is_darwin_based_sdk("${SWIFT_HOST_VARIANT_SDK}" IS_DARWIN)
   if(IS_DARWIN)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
@@ -100,15 +89,15 @@ function(_add_host_variant_c_compile_link_flags)
     get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-    list(APPEND result "-target" "${target}")
+    target_compile_options(${name} PRIVATE -target;${target})
   endif()
 
   set(_sysroot
     "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
   if(IS_DARWIN)
-    list(APPEND result "-isysroot" "${_sysroot}")
+    target_compile_options(${name} PRIVATE -isysroot;${_sysroot})
   elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
-    list(APPEND result "--sysroot=${_sysroot}")
+    target_compile_options(${name} PRIVATE --sysroot=${_sysroot})
   endif()
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
@@ -116,7 +105,7 @@ function(_add_host_variant_c_compile_link_flags)
     # enabled, then fallback to the linker included in the android NDK.
     if(NOT SWIFT_ENABLE_LLD_LINKER)
       swift_android_tools_path(${SWIFT_HOST_VARIANT_ARCH} tools_path)
-      list(APPEND result "-B" "${tools_path}")
+      target_compile_options(${name} PRIVATE -B${tools_path})
     endif()
   endif()
 
@@ -124,25 +113,21 @@ function(_add_host_variant_c_compile_link_flags)
     # We collate -F with the framework path to avoid unwanted deduplication
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
-    list(APPEND result
-      "-arch" "${SWIFT_HOST_VARIANT_ARCH}"
+    target_compile_options(${name} PRIVATE
+      -arch ${SWIFT_HOST_VARIANT_ARCH}
       "-F${SWIFT_SDK_${SWIFT_HOST_VARIANT_ARCH}_PATH}/../../../Developer/Library/Frameworks"
       "-m${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
   endif()
 
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
   if (_lto_flag_out)
-    list(APPEND result "${_lto_flag_out}")
+    target_compile_options(${name} PRIVATE ${_lto_flag_out})
   endif()
-
-  set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
 
 function(_add_host_variant_c_compile_flags target)
-  _add_host_variant_c_compile_link_flags(RESULT_VAR_NAME result)
-  target_compile_options(${target} PRIVATE
-    ${result})
+  _add_host_variant_c_compile_link_flags(${target})
 
   is_build_type_optimized("${CMAKE_BUILD_TYPE}" optimized)
   if(optimized)
@@ -305,9 +290,7 @@ function(_add_host_variant_c_compile_flags target)
 endfunction()
 
 function(_add_host_variant_link_flags target)
-  _add_host_variant_c_compile_link_flags(RESULT_VAR_NAME result)
-  target_link_options(${target} PRIVATE
-    ${result})
+  _add_host_variant_c_compile_link_flags(${target})
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL LINUX)
     target_link_libraries(${target} PRIVATE
