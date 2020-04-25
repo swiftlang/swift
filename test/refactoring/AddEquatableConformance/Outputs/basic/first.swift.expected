@@ -5,6 +5,7 @@ class TestAddEquatable: Equatable {
 
     static func == (lhs: TestAddEquatable, rhs: TestAddEquatable) -> Bool {
         return lhs.property == rhs.property &&
+               lhs.prop == rhs.prop &&
                lhs.pr == rhs.pr
     }
 }
@@ -14,6 +15,10 @@ extension TestAddEquatable {
         return true
     }
 }
+
+extension TestAddEquatable {
+}
+
 
 
 

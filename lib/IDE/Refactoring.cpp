@@ -3214,15 +3214,11 @@ class AddEquatableContext {
       return false;
     }
     auto Req = dyn_cast<FuncDecl>(Reqs[0]);
-    auto Params = Req->getParameters();
-    if (!Req || Params->size() != 2) {
-      return false;
-    }
-    return true;
+    return Req && Req->getParameters()->size() == 2;
   }
 
   bool isPropertiesListValid() {
-    return !getPublicProperties().empty();
+    return !getUserAccessibleProperties().empty();
   }
 
   void printFunctionBody(ASTPrinter &Printer, StringRef ExtraIndent,
@@ -3230,7 +3226,7 @@ class AddEquatableContext {
 
   std::vector<ValueDecl *> getProtocolRequirements();
 
-  std::vector<VarDecl *> getPublicProperties();
+  std::vector<VarDecl *> getUserAccessibleProperties();
 
 public:
 
@@ -3252,11 +3248,13 @@ public:
 
   static AddEquatableContext getDeclarationContextFromInfo(ResolvedCursorInfo Info);
 
-  std::string getDeclForProtocol();
+  std::string getInsertionTextForProtocol();
 
-  std::string getDeclForFunction(SourceManager &SM);
+  std::string getInsertionTextForFunction(SourceManager &SM);
 
   bool isValid() {
+    // FIXME: Allow to generate explicit == method for declarations which already have
+    // compiler-generated == method
     return StartLoc.isValid() && ProtInsertStartLoc.isValid() &&
     !conformsToEquatableProtocol() && isPropertiesListValid() &&
     isRequirementValid();
@@ -3289,7 +3287,7 @@ getInsertStartLoc() {
 }
 
 std::string AddEquatableContext::
-getDeclForProtocol() {
+getInsertionTextForProtocol() {
   StringRef ProtocolName = getProtocolName(KnownProtocolKind::Equatable);
   std::string Buffer;
   llvm::raw_string_ostream OS(Buffer);
@@ -3302,7 +3300,7 @@ getDeclForProtocol() {
 }
 
 std::string AddEquatableContext::
-getDeclForFunction(SourceManager &SM) {
+getInsertionTextForFunction(SourceManager &SM) {
   auto Reqs = getProtocolRequirements();
   auto Req = dyn_cast<FuncDecl>(Reqs[0]);
   auto Params = Req->getParameters();
@@ -3337,10 +3335,10 @@ getDeclForFunction(SourceManager &SM) {
 }
 
 std::vector<VarDecl *> AddEquatableContext::
-getPublicProperties() {
+getUserAccessibleProperties() {
   std::vector<VarDecl *> PublicProperties;
   for (VarDecl *Decl : StoredProperties) {
-    if (!Decl->hasPrivateAccessor()) {
+    if (Decl->Decl::isUserAccessible()) {
       PublicProperties.push_back(Decl);
     }
   }
@@ -3386,7 +3384,7 @@ printFunctionBody(ASTPrinter &Printer, StringRef ExtraIndent, ParameterList *Par
   StringRef Point = ".";
   StringRef Join = " == ";
   StringRef And = " &&";
-  auto Props = getPublicProperties();
+  auto Props = getUserAccessibleProperties();
   auto FParam = Params->get(0)->getName();
   auto SParam = Params->get(1)->getName();
   auto Prop = Props[0]->getName();
@@ -3412,9 +3410,9 @@ bool RefactoringActionAddEquatableConformance::
 performChange() {
   auto Context = AddEquatableContext::getDeclarationContextFromInfo(CursorInfo);
   EditConsumer.insertAfter(SM, Context.getStartLocForProtocolDecl(),
-                           Context.getDeclForProtocol());
+                           Context.getInsertionTextForProtocol());
   EditConsumer.insertAfter(SM, Context.getInsertStartLoc(),
-                           Context.getDeclForFunction(SM));
+                           Context.getInsertionTextForFunction(SM));
   return false;
 }
 

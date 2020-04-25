@@ -302,6 +302,43 @@ class TestAddEquatable {
     let pr = "test3"
 }
 
+struct TestAddEquatableStruct {
+    var property = "test"
+    private var prop = "test2"
+    let pr = "test3"
+}
+
+enum AddEquatableEnum {
+    case first
+    case second
+}
+
+class TestAddEquatableConforming: Equatable {
+    var property = "test"
+
+    public static func ==(lhs: TestAddEquatableConforming,
+                          rhs: TestAddEquatableConforming) -> Bool {
+        return lhs.property == rhs.property
+    }
+}
+
+struct TestAddEquatableStructConforming: Equatable {
+    var property = "test"
+}
+
+extension TestAddEquatable {
+    func test() -> Bool {
+        return false
+    }
+}
+
+extension TestAddEquatableStructConforming: Equatable {
+    public static func ==(lhs: TestAddEquatableConforming,
+                          rhs: TestAddEquatableConforming) -> Bool {
+        return lhs.property == rhs.property
+    }
+}
+
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -404,6 +441,12 @@ class TestAddEquatable {
 // RUN: %refactor -source-filename %s -pos=292:3 -end-pos=296:4 | %FileCheck %s -check-prefix=CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY
 
 // RUN: %refactor -source-filename %s -pos=299:16 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE
+// RUN: %refactor -source-filename %s -pos=305:12 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE
+// RUN: %refactor -source-filename %s -pos=311:9 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED
+// RUN: %refactor -source-filename %s -pos=316:11 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED
+// RUN: %refactor -source-filename %s -pos=325:12 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED
+// RUN: %refactor -source-filename %s -pos=329:15 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE
+// RUN: %refactor -source-filename %s -pos=335:15 | %FileCheck %s -check-prefix=CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED
 
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
@@ -463,3 +506,7 @@ class TestAddEquatable {
 // CHECK-IS-NOT-CONVERT-TO-COMPUTED-PROPERTY: Action ends
 
 // CHECK-ADD-EQUATABLE-CONFORMANCE: Add Equatable Conformance
+
+// CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED: Action begins
+// CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED-NOT: Add Equatable Conformance
+// CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED: Action ends
