@@ -22,6 +22,7 @@
 
 #include "swift/FrontendTool/FrontendTool.h"
 #include "ImportedModules.h"
+#include "ScanDependencies.h"
 #include "ReferenceDependencies.h"
 #include "TBD.h"
 
@@ -1250,8 +1251,10 @@ static bool performCompile(CompilerInstance &Instance,
     // Disable delayed parsing of type and function bodies when we've been
     // asked to dump the resulting AST.
     bool CanDelayBodies = Action != FrontendOptions::ActionType::DumpParse;
-    Instance.performParseOnly(/*EvaluateConditionals*/
-                    Action == FrontendOptions::ActionType::EmitImportedModules,
+    bool EvaluateConditionals =
+        Action == FrontendOptions::ActionType::EmitImportedModules
+        || Action == FrontendOptions::ActionType::ScanDependencies;
+    Instance.performParseOnly(EvaluateConditionals,
                               CanDelayBodies);
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
@@ -1263,10 +1266,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::Parse)
     return Context.hadError();
 
+  if (Action == FrontendOptions::ActionType::ScanDependencies) {
+    scanDependencies(Instance);
+  }
+
   (void)emitMakeDependenciesIfNeeded(Context.Diags,
                                      Instance.getDependencyTracker(), opts);
 
-  if (Action == FrontendOptions::ActionType::ResolveImports)
+  if (Action == FrontendOptions::ActionType::ResolveImports ||
+      Action == FrontendOptions::ActionType::ScanDependencies)
     return Context.hadError();
 
   if (observer)

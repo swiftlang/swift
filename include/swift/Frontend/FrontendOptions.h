@@ -132,6 +132,8 @@ public:
 
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
+
+    ScanDependencies,   ///< Scan dependencies of Swift source files
   };
 
   /// Indicates the action the user requested that the frontend perform.

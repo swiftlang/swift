@@ -1031,6 +1031,10 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
 
+def scan_dependencies : Flag<["-"], "scan-dependencies">,
+  HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
 def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
   Flags<[FrontendOption]>,
   HelpText<"Enable ASTScope-based unqualified name lookup">;
