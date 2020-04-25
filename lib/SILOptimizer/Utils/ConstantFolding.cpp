@@ -1008,6 +1008,7 @@ IEEESemantics getFPSemantics(BuiltinFloatType *fpType) {
   case BuiltinFloatType::PPC128:
     llvm_unreachable("ppc128 is not supported");
   }
+  llvm_unreachable("invalid floating point kind");
 }
 
 /// This function, given the exponent and significand of a binary fraction

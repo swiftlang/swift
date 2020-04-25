@@ -1470,6 +1470,7 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
     case FrontendOptions::TBDValidationMode::All:
       return true;
     }
+    llvm_unreachable("invalid mode");
   }();
 
   TBDGenOptions Opts = Invocation.getTBDGenOptions();

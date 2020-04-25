@@ -65,6 +65,7 @@ public:
     case NormalDifferentiableFunctionTypeComponent::VJP:
       return "vjp";
     }
+    llvm_unreachable("invalid component type");
   }
 
   SILType getType(IRGenModule &IGM, SILType t) const {
@@ -209,6 +210,7 @@ public:
     case LinearDifferentiableFunctionTypeComponent::Transpose:
       return "transpose";
     }
+    llvm_unreachable("invalid component type");
   }
 
   SILType getType(IRGenModule &IGM, SILType t) const {
@@ -223,6 +225,7 @@ public:
           LookUpConformanceInModule(IGM.getSwiftModule()));
       return SILType::getPrimitiveObjectType(transposeTy);
     }
+    llvm_unreachable("invalid component type");
   }
 };
 
@@ -321,6 +324,7 @@ public:
           LookUpConformanceInModule(IGM.getSwiftModule()));
       return SILType::getPrimitiveObjectType(transposeTy);
     }
+    llvm_unreachable("invalid component type");
   }
 
   StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
