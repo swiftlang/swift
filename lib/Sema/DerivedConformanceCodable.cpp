@@ -88,7 +88,7 @@ static CodableConformanceType typeConformsToCodable(DeclContext *context,
                                  false, proto);
   }
 
-  auto conf = TypeChecker::conformsToProtocol(target, proto, context, None);
+  auto conf = TypeChecker::conformsToProtocol(target, proto, context);
   return conf.isInvalid() ? DoesNotConform : Conforms;
 }
 
@@ -264,7 +264,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   if (!TypeChecker::conformsToProtocol(codingKeysType, codingKeyProto,
-                                       derived.getConformanceContext(), None)) {
+                                       derived.getConformanceContext())) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -847,10 +847,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
             });
         auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
         bool conformsToEncodable =
-            TypeChecker::conformsToProtocol(
-                targetDecl->getDeclaredInterfaceType(), encodableProto,
-                conformanceDC,
-                ConformanceCheckFlags::SkipConditionalRequirements) != nullptr;
+            conformanceDC->getParentModule()->lookupConformance(
+                targetDecl->getDeclaredInterfaceType(), encodableProto) != nullptr;
 
         // Strategy to use for CodingKeys enum diagnostic part - this is to
         // make the behaviour more explicit:
@@ -1091,8 +1089,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (TypeChecker::conformsToProtocol(superType, proto, superclassDecl,
-                                          None)) {
+      if (TypeChecker::conformsToProtocol(superType, proto, superclassDecl)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getName();
       } else {

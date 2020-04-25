@@ -1130,10 +1130,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       return false;
 
     auto targetType = target->getDeclaredInterfaceType();
-    auto ref = TypeChecker::conformsToProtocol(
-        targetType, protocol, target,
-        ConformanceCheckFlags::SkipConditionalRequirements);
-
+    auto ref = target->getParentModule()->lookupConformance(
+        targetType, protocol);
     if (ref.isInvalid()) {
       return false;
     }
