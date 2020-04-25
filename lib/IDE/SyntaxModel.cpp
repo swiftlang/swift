@@ -547,22 +547,24 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     return {false, E};
 
   auto addCallArgExpr = [&](Expr *Elem, TupleExpr *ParentTupleExpr) {
-    if (isCurrentCallArgExpr(ParentTupleExpr)) {
-      CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
-      SyntaxStructureNode SN;
-      SN.Kind = SyntaxStructureKind::Argument;
-      SN.NameRange = NR;
-      SN.BodyRange = charSourceRangeFromSourceRange(SM, Elem->getSourceRange());
-      if (NR.isValid()) {
-        SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
-                                                            Elem->getEndLoc()));
-        passTokenNodesUntil(NR.getStart(), ExcludeNodeAtLocation);
-      }
-      else
-        SN.Range = SN.BodyRange;
+    if (isa<DefaultArgumentExpr>(Elem) ||
+        !isCurrentCallArgExpr(ParentTupleExpr))
+      return;
 
-      pushStructureNode(SN, Elem);
+    CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::Argument;
+    SN.NameRange = NR;
+    SN.BodyRange = charSourceRangeFromSourceRange(SM, Elem->getSourceRange());
+    if (NR.isValid()) {
+      SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
+                                                          Elem->getEndLoc()));
+      passTokenNodesUntil(NR.getStart(), ExcludeNodeAtLocation);
     }
+    else
+      SN.Range = SN.BodyRange;
+
+    pushStructureNode(SN, Elem);
   };
 
   if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
