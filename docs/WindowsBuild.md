@@ -15,6 +15,21 @@ The following must take place in the **developer command prompt** (provided by V
 
 The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.
 
+### Python
+
+In the Visual Studio installation program, under *Individual Components*
+
+1. Install *Python 2*, either the 32-bit version (C:\Python27\\) or the 64-bit version (C:\Python27amd64\\)
+2. Install *Python 3 64 bits (3.7.x)*
+
+If you are building a debug version of Swift, you should also install the Python debug binaries.
+
+1. In the Windows settings, go to *Add and Remove Programs*
+2. Select the *Python 3.7.x (64-bit)* entry
+3. Click *Modify*, then *Yes*, then *Modify* again and then *Next*
+4. Select *Download debug binaries (requires VS 2015 or later)*
+5. Click *Install*
+
 ## Clone the repositories
 
 1. Clone `apple/llvm-project` into a directory for the toolchain
