@@ -374,6 +374,7 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     return diagnose(loc, diag::autodiff_when_differentiating_function_call);
   }
   }
+  llvm_unreachable("invalid invoker");
 }
 
 } // end namespace autodiff

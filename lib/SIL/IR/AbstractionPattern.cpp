@@ -927,6 +927,7 @@ const {
       
     return AbstractionPattern(getGenericSignature(), memberTy);
   }
+  llvm_unreachable("invalid abstraction pattern kind");
 }
 
 AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(

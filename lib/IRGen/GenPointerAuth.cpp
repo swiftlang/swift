@@ -584,6 +584,7 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
       llvm_unreachable("not type discriminated");
     }
     }
+    llvm_unreachable("invalid representation");
   };
 
   auto getCoroutineYieldTypesDiscriminator = [&](CanSILFunctionType fnType) {

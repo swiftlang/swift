@@ -1027,6 +1027,7 @@ static SILValue createValueFromAddr(SILValue addr, SILBuilder *builder,
     // Just return anything not null for the dry-run.
     return elems[0];
   }
+  llvm_unreachable("invalid kind");
 }
 
 /// Simplify the following two frontend patterns:
