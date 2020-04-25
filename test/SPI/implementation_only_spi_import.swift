@@ -18,6 +18,6 @@ foo() // OK
 #elseif LIB_C
 
 import B
-foo() // expected-error{{use of unresolved identifier}}
+foo() // expected-error{{cannot find 'foo' in scope}}
 
 #endif

@@ -40,6 +40,6 @@ funcFromModuleA()
 // is stdout and stderr, mixed together).
 //
 // CHECK-DAG: "<result from ModuleA><result from ModuleB>"
-// CHECK-DAG: error: use of unresolved identifier 'funcFromModuleA'
+// CHECK-DAG: error: cannot find 'funcFromModuleA' in scope
 // CHECK-DAG: "<result from ModuleA>"
 

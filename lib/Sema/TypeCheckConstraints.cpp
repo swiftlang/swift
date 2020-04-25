@@ -392,7 +392,7 @@ static bool diagnoseRangeOperatorMisspell(DiagnosticEngine &Diags,
 
   if (!corrected.empty()) {
     Diags
-        .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+        .diagnose(UDRE->getLoc(), diag::cannot_find_in_scope_corrected,
                   UDRE->getName(), true, corrected)
         .highlight(UDRE->getSourceRange())
         .fixItReplace(UDRE->getSourceRange(), corrected);
@@ -416,7 +416,7 @@ static bool diagnoseIncDecOperator(DiagnosticEngine &Diags,
 
   if (!corrected.empty()) {
     Diags
-        .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+        .diagnose(UDRE->getLoc(), diag::cannot_find_in_scope_corrected,
                   UDRE->getName(), true, corrected)
         .highlight(UDRE->getSourceRange());
 
@@ -537,7 +537,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
     auto emitBasicError = [&] {
       Context.Diags
-          .diagnose(Loc, diag::use_unresolved_identifier, Name,
+          .diagnose(Loc, diag::cannot_find_in_scope, Name,
                     Name.isOperator())
           .highlight(UDRE->getSourceRange());
     };
@@ -561,7 +561,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
       if (auto typo = corrections.claimUniqueCorrection()) {
         auto diag = Context.Diags.diagnose(
-            Loc, diag::use_unresolved_identifier_corrected, Name,
+            Loc, diag::cannot_find_in_scope_corrected, Name,
             Name.isOperator(), typo->CorrectedName.getBaseIdentifier().str());
         diag.highlight(UDRE->getSourceRange());
         typo->addFixits(diag);

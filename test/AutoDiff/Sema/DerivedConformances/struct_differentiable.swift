@@ -308,7 +308,7 @@ where T: Differentiable {}
 
 // TF-265: Test invalid initializer (that uses a non-existent type).
 struct InvalidInitializer: Differentiable {
-  init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {}  // expected-error {{use of undeclared type 'NonExistentType'}}
+  init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {}  // expected-error {{cannot find type 'NonExistentType' in scope}}
 }
 
 // Test memberwise initializer synthesis.

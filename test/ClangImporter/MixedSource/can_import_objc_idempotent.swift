@@ -18,21 +18,21 @@
 // current module.  Only an 'import Foo' statement should do this.
 
 #if canImport(AppKit)
-  class AppKitView : NSView {} // expected-error {{use of undeclared type 'NSView'}}
+  class AppKitView : NSView {} // expected-error {{cannot find type 'NSView' in scope}}
 #endif
 
 #if canImport(UIKit)
-  class UIKitView : UIView {} // expected-error {{use of undeclared type 'UIView'}}
+  class UIKitView : UIView {} // expected-error {{cannot find type 'UIView' in scope}}
 #endif
 
 #if canImport(CoreGraphics)
   let square = CGRect(x: 100, y: 100, width: 100, height: 100)
-  // expected-error@-1 {{use of unresolved identifier 'CGRect'}}
+  // expected-error@-1 {{cannot find 'CGRect' in scope}}
 
   let (r, s) = square.divided(atDistance: 50, from: .minXEdge)
 #endif
 
 #if canImport(MixedWithHeader)
-let object = NSObject() // expected-error {{use of unresolved identifier 'NSObject'}}
-let someAPI = Derived() // expected-error {{use of unresolved identifier 'Derived'}}
+let object = NSObject() // expected-error {{cannot find 'NSObject' in scope}}
+let someAPI = Derived() // expected-error {{cannot find 'Derived' in scope}}
 #endif

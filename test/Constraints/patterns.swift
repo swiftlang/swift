@@ -21,7 +21,7 @@ default:
 }
 
 switch (1, 2) {
-case (var a, a): // expected-error {{use of unresolved identifier 'a'}}
+case (var a, a): // expected-error {{cannot find 'a' in scope}}
   ()
 }
 
@@ -260,7 +260,7 @@ if case .foo = sr2057 { } // Ok
 // Invalid 'is' pattern
 class SomeClass {}
 if case let doesNotExist as SomeClass:AlsoDoesNotExist {}
-// expected-error@-1 {{use of undeclared type 'AlsoDoesNotExist'}}
+// expected-error@-1 {{cannot find type 'AlsoDoesNotExist' in scope}}
 // expected-error@-2 {{variable binding in a condition requires an initializer}}
 
 // `.foo` and `.bar(...)` pattern syntax should also be able to match
