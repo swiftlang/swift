@@ -1457,6 +1457,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
+  printRequirements &= Options.PrintGenericRequirements;
   bool printInherited = (flags & PrintInherited);
   bool swapSelfAndDependentMemberType =
     (flags & SwapSelfAndDependentMemberType);

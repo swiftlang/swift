@@ -75,8 +75,14 @@ struct SymbolGraph {
   /// Get the base print options for declaration fragments.
   PrintOptions getDeclarationFragmentsPrintOptions() const;
 
+
+  /// Returns `true` if `VD` is the best known candidate for an
+  /// overload set in `Owner`.
   bool synthesizedMemberIsBestCandidate(const ValueDecl *VD,
                                         const NominalTypeDecl *Owner) const;
+
+  /// Get the print options for subHeading declaration fragments.
+  PrintOptions getSubHeadingDeclarationFragmentsPrintOptions() const;
 
   // MARK: - Symbols (Nodes)
 
@@ -186,13 +192,20 @@ struct SymbolGraph {
   serializeDeclarationFragments(StringRef Key, const Symbol &S,
                                 llvm::json::OStream &OS);
 
-  /// Get the overall declaration fragments for a `ValueDecl` when it is viewed
+  /// Get the declaration fragments for a symbol when viewed in a navigator
+  /// where there is limited horizontal space.
+  void
+  serializeNavigatorDeclarationFragments(StringRef Key,
+                                         const Symbol &S,
+                                         llvm::json::OStream &OS);
+
+  /// Get the declaration fragments for a symbol when it is viewed
   /// as a subheading and/or part of a larger group of symbol listings.
   void
   serializeSubheadingDeclarationFragments(StringRef Key, const Symbol &S,
                                           llvm::json::OStream &OS);
 
-  /// Get the overall declaration for a type declaration.
+  /// Get the overall declaration for a symbol.
   void
   serializeDeclarationFragments(StringRef Key, Type T,
                                 llvm::json::OStream &OS);
