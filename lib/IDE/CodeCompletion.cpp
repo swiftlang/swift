@@ -3531,7 +3531,8 @@ public:
       if (Type Unwrapped = ExprType->getOptionalObjectType()) {
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
                                  IncludeInstanceMembers,
-                                 /*includeDerivedRequirements*/false);
+                                 /*includeDerivedRequirements*/false,
+                                 /*includeProtocolExtensionMembers*/true);
         return true;
       }
       assert(IsUnwrappedOptional && "IUOs should be optional if not bound/forced");
@@ -3552,7 +3553,8 @@ public:
         if (!tryTupleExprCompletions(Unwrapped)) {
           lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
                                    IncludeInstanceMembers,
-                                   /*includeDerivedRequirements*/false);
+                                   /*includeDerivedRequirements*/false,
+                                   /*includeProtocolExtensionMembers*/true);
         }
       }
       return true;
@@ -3623,7 +3625,8 @@ public:
 
     lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
                              IncludeInstanceMembers,
-                             /*includeDerivedRequirements*/false);
+                             /*includeDerivedRequirements*/false,
+                             /*includeProtocolExtensionMembers*/true);
   }
 
   void collectOperators(SmallVectorImpl<OperatorDecl *> &results) {
@@ -4099,7 +4102,8 @@ public:
     llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
     lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
                              /*includeInstanceMembers=*/false,
-                             /*includeDerivedRequirements*/false);
+                             /*includeDerivedRequirements*/false,
+                             /*includeProtocolExtensionMembers*/true);
   }
 
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
@@ -4161,7 +4165,8 @@ public:
     lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType),
                              CurrDeclContext,
                              IncludeInstanceMembers,
-                             /*includeDerivedRequirements*/false);
+                             /*includeDerivedRequirements*/false,
+                             /*includeProtocolExtensionMembers*/false);
     if (BaseType->isAnyExistentialType()) {
       addKeyword("Protocol", MetatypeType::get(BaseType));
       addKeyword("Type", ExistentialMetatypeType::get(BaseType));
@@ -4195,7 +4200,8 @@ public:
     NeedLeadingDot = false;
     lookupVisibleMemberDecls(*this, MetatypeType::get(selfTy),
                              CurrDeclContext, IncludeInstanceMembers,
-                             /*includeDerivedRequirements*/false);
+                             /*includeDerivedRequirements*/false,
+                             /*includeProtocolExtensionMembers*/true);
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
@@ -4864,7 +4870,8 @@ public:
       Type Meta = MetatypeType::get(CurrTy);
       lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
                                /*includeInstanceMembers=*/true,
-                               /*includeDerivedRequirements*/true);
+                               /*includeDerivedRequirements*/true,
+                               /*includeProtocolExtensionMembers*/false);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);
     }
