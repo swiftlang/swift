@@ -716,7 +716,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
   ///             byteCount: count * MemoryLayout<Int8>.stride,
   ///             alignment: MemoryLayout<Int8>.alignment)
-  ///     let int8Pointer = myBytes.initializeMemory(
+  ///     let int8Pointer = bytesPointer.initializeMemory(
   ///             as: Int8.self, repeating: 0, count: count)
   ///
   ///     // After using 'int8Pointer':
