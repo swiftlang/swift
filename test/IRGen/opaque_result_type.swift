@@ -2,9 +2,6 @@
 // RUN: %{python} %utils/chex.py < %s > %t/opaque_result_type.swift
 // RUN: %target-swift-frontend -enable-implicit-dynamic -disable-availability-checking -emit-ir %t/opaque_result_type.swift | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NODEBUG %t/opaque_result_type.swift
 
-// FIXME: Disabled because compilation is crashing in arm64e
-// REQUIRES: rdar60734429
-
 public protocol O {
   func bar()
 }
