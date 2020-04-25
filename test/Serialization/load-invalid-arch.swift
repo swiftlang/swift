@@ -24,7 +24,7 @@
 // CHECK-ALL: error: no such module 'new_module'
 // CHECK-ALL-NEXT: import new_module
 // CHECK-ALL-NEXT: 		^
-// CHECK-ALL: error: use of unresolved identifier 'new_module'
+// CHECK-ALL: error: cannot find 'new_module' in scope
 // CHECK-ALL-NEXT: new_module.foo()
 // CHECK-ALL-NEXT: ^~~~~~~~~~
 // CHECK-ALL-NOT: error:

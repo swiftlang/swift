@@ -675,8 +675,8 @@ func testBridgeFunctionPointerTypedefs(fptrTypedef: FPTypedef) {
 }
 
 func testNonTrivialStructs() {
-  _ = NonTrivialToCopy() // expected-error {{use of unresolved identifier 'NonTrivialToCopy'}}
-  _ = NonTrivialToCopyWrapper() // expected-error {{use of unresolved identifier 'NonTrivialToCopyWrapper'}}
+  _ = NonTrivialToCopy() // expected-error {{cannot find 'NonTrivialToCopy' in scope}}
+  _ = NonTrivialToCopyWrapper() // expected-error {{cannot find 'NonTrivialToCopyWrapper' in scope}}
   _ = TrivialToCopy() // okay
 }
 

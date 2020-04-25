@@ -442,13 +442,13 @@ class r22344208 {
   }
 }
 
-var f = { (s: Undeclared) -> Int in 0 } // expected-error {{use of undeclared type 'Undeclared'}}
+var f = { (s: Undeclared) -> Int in 0 } // expected-error {{cannot find type 'Undeclared' in scope}}
 
 // <rdar://problem/21375863> Swift compiler crashes when using closure, declared to return illegal type.
 func r21375863() {
   var width = 0
   var height = 0
-  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{use of undeclared type 'asdf'}}
+  var bufs: [[UInt8]] = (0..<4).map { _ -> [asdf] in  // expected-error {{cannot find type 'asdf' in scope}}
     [UInt8](repeating: 0, count: width*height)
   }
 }

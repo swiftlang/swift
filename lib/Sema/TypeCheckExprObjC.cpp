@@ -263,7 +263,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         diags.diagnose(componentNameLoc, diag::could_not_find_type_member,
                        currentType, componentName);
       else
-        diags.diagnose(componentNameLoc, diag::use_unresolved_identifier,
+        diags.diagnose(componentNameLoc, diag::cannot_find_in_scope,
                        componentName, false);
 
       // Note all the correction candidates.

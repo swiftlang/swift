@@ -63,7 +63,7 @@ var evenOrOdd : (Int) -> String = {$0 % 2 == 0 ? "even" : "odd"}
 
 // <rdar://problem/15367882>
 func foo() {
-  not_declared({ $0 + 1 }) // expected-error{{use of unresolved identifier 'not_declared'}}
+  not_declared({ $0 + 1 }) // expected-error{{cannot find 'not_declared' in scope}}
 }
 
 // <rdar://problem/15536725>
@@ -588,7 +588,7 @@ extension A_SR_5030 {
 }
 
 // rdar://problem/33296619
-let u = rdar33296619().element //expected-error {{use of unresolved identifier 'rdar33296619'}}
+let u = rdar33296619().element //expected-error {{cannot find 'rdar33296619' in scope}}
 
 [1].forEach { _ in
   _ = "\(u)"
@@ -614,7 +614,7 @@ _ = "".withCString { UnsafeMutableRawPointer(mutating: $0) }
 
 // rdar://problem/34077439 - Crash when pre-checking bails out and
 // leaves us with unfolded SequenceExprs inside closure body.
-_ = { (offset) -> T in // expected-error {{use of undeclared type 'T'}}
+_ = { (offset) -> T in // expected-error {{cannot find type 'T' in scope}}
   return offset ? 0 : 0
 }
 

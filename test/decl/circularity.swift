@@ -81,7 +81,7 @@ open class G1<A> {
 
 class C3: G1<A>, P {
     // expected-error@-1 {{type 'C3' does not conform to protocol 'P'}}
-    // expected-error@-2 {{use of undeclared type 'A'}}
+    // expected-error@-2 {{cannot find type 'A' in scope}}
     override func run(a: A) {}
     // expected-error@-1 {{method does not override any method from its superclass}}
 }

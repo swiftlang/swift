@@ -11,7 +11,7 @@ var y : y_ty = 4
 typealias y_ty = (Int)
 
 // Verify that never-defined types are caught.
-var z : z_ty = 42  // expected-error {{use of undeclared type 'z_ty'}}
+var z : z_ty = 42  // expected-error {{cannot find type 'z_ty' in scope}}
 
 // Make sure we type-check all declarations before any initializers
 var a : Int = b

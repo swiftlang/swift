@@ -16,7 +16,7 @@
 //
 // RUN: %target-swift-frontend -typecheck -verify -I %t -module-cache-path %t/modulecache %s
 
-unresolved // expected-error {{use of unresolved identifier 'unresolved'}}
+unresolved // expected-error {{cannot find 'unresolved' in scope}}
 
 import SomeModule
 

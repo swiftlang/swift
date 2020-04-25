@@ -94,9 +94,9 @@ public func testTopLevel() {
   _ = __PrivS1()
 
 #if !IRGEN
-  let _ = PrivFooSub() // expected-error {{use of unresolved identifier}}
-  privTest() // expected-error {{use of unresolved identifier}}
-  PrivS1() // expected-error {{use of unresolved identifier}}
+  let _ = PrivFooSub() // expected-error {{cannot find 'PrivFooSub' in scope}}
+  privTest() // expected-error {{cannot find 'privTest' in scope}}
+  PrivS1() // expected-error {{cannot find 'PrivS1' in scope}}
 #endif
 }
 
