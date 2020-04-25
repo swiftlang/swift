@@ -75,6 +75,9 @@ struct SymbolGraph {
   /// Get the base print options for declaration fragments.
   PrintOptions getDeclarationFragmentsPrintOptions() const;
 
+  bool synthesizedMemberIsBestCandidate(const ValueDecl *VD,
+                                        const NominalTypeDecl *Owner) const;
+
   // MARK: - Symbols (Nodes)
 
   /**
@@ -197,7 +200,11 @@ struct SymbolGraph {
   /// Returns `true` if the declaration has a name that makes it
   /// implicitly internal/private, such as underscore prefixes,
   /// and checking every named parent context as well.
-  bool isImplicitlyPrivate(const ValueDecl *VD) const;
+  ///
+  /// \param IgnoreContext If `true`, don't consider
+  /// the context of the symbol to determine whether it is implicitly private.
+  bool isImplicitlyPrivate(const ValueDecl *VD,
+                           bool IgnoreContext = false) const;
 
   /// Returns `true` if the declaration should be included as a node
   /// in the graph.
