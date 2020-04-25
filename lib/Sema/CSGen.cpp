@@ -2741,16 +2741,19 @@ namespace {
       auto *locator = CS.getConstraintLocator(closure);
       auto closureType = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
 
-      // Collect any references to closure parameters whose types involve type
-      // variables from the closure, because there will be a dependency on
-      // those type variables once we have generated constraints for the
-      // closure body.
-      struct CollectParameterRefs : public ASTWalker {
+      // Collect any variable references whose types involve type variables,
+      // because there will be a dependency on those type variables once we have
+      // generated constraints for the closure body. This includes references
+      // to other closure params such as in `{ x in { x }}` where the inner
+      // closure is dependent on the outer closure's param type, as well as
+      // cases like `for i in x where bar({ i })` where there's a dependency on
+      // the type variable for the pattern `i`.
+      struct CollectVarRefs : public ASTWalker {
         ConstraintSystem &cs;
-        llvm::SmallVector<TypeVariableType *, 4> paramRefs;
+        llvm::SmallVector<TypeVariableType *, 4> varRefs;
         bool hasErrorExprs = false;
 
-        CollectParameterRefs(ConstraintSystem &cs) : cs(cs) { }
+        CollectVarRefs(ConstraintSystem &cs) : cs(cs) { }
 
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           // If there are any error expressions in this closure
@@ -2760,21 +2763,21 @@ namespace {
             return {false, nullptr};
           }
 
-          // Retrieve type variables from references to parameter declarations.
+          // Retrieve type variables from references to var decls.
           if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
-            if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
-              if (Type paramType = cs.getTypeIfAvailable(paramDecl)) {
-                paramType->getTypeVariables(paramRefs);
+            if (auto *varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
+              if (auto varType = cs.getTypeIfAvailable(varDecl)) {
+                varType->getTypeVariables(varRefs);
               }
             }
           }
 
           return { true, expr };
         }
-      } collectParameterRefs(CS);
-      closure->walk(collectParameterRefs);
+      } collectVarRefs(CS);
+      closure->walk(collectVarRefs);
 
-      if (collectParameterRefs.hasErrorExprs)
+      if (collectVarRefs.hasErrorExprs)
         return Type();
 
       auto inferredType = inferClosureType(closure);
@@ -2784,7 +2787,7 @@ namespace {
       CS.addUnsolvedConstraint(
           Constraint::create(CS, ConstraintKind::DefaultClosureType,
                              closureType, inferredType, locator,
-                             collectParameterRefs.paramRefs));
+                             collectVarRefs.varRefs));
 
       CS.setClosureType(closure, inferredType);
       return closureType;
