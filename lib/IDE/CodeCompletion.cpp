@@ -1872,6 +1872,10 @@ public:
         expectedTypeContext.possibleTypes.push_back(T);
   }
 
+  void setIdealExpectedType(Type Ty) {
+    expectedTypeContext.idealType = Ty;
+  }
+
   CodeCompletionContext::TypeContextKind typeContextKind() const {
     if (expectedTypeContext.empty()) {
       return CodeCompletionContext::TypeContextKind::None;
@@ -2011,12 +2015,6 @@ public:
     if (ForcedSemanticContext)
       return *ForcedSemanticContext;
 
-    if (IsUnresolvedMember) {
-      if (isa<EnumElementDecl>(D)) {
-        return SemanticContextKind::ExpressionSpecific;
-      }
-    }
-
     switch (Reason) {
     case DeclVisibilityKind::LocalVariable:
     case DeclVisibilityKind::FunctionParameter:
@@ -2078,6 +2076,23 @@ public:
       llvm_unreachable("should not see this kind");
     }
     llvm_unreachable("unhandled kind");
+  }
+
+  bool isUnresolvedMemberIdealType(Type Ty) {
+    assert(Ty);
+    if (!IsUnresolvedMember)
+      return false;
+    Type idealTy = expectedTypeContext.idealType;
+    if (!idealTy)
+      return false;
+    /// Consider optional object type is the ideal.
+    /// For exmaple:
+    ///   enum MyEnum { case foo, bar }
+    ///   func foo(_: MyEnum?)
+    ///   fooo(.<HERE>)
+    /// Prefer '.foo' and '.bar' over '.some' and '.none'.
+    idealTy = idealTy->lookThroughAllOptionalTypes();
+    return idealTy->isEqual(Ty);
   }
 
   void addValueBaseName(CodeCompletionResultBuilder &Builder,
@@ -2406,6 +2421,9 @@ public:
                                                       DynamicOrOptional);
     else
       addTypeAnnotation(Builder, VarType);
+
+    if (isUnresolvedMemberIdealType(VarType))
+      Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
   }
 
   static bool hasInterestingDefaultValues(const AbstractFunctionDecl *func) {
@@ -2862,6 +2880,9 @@ public:
         }
       }
       Builder.addTypeAnnotation(TypeStr);
+
+      if (isUnresolvedMemberIdealType(ResultType))
+        Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
     };
 
     if (!AFT || IsImplicitlyCurriedInstanceMethod) {
@@ -3148,6 +3169,9 @@ public:
     }
 
     addTypeAnnotation(Builder, EnumType);
+
+    if (isUnresolvedMemberIdealType(EnumType))
+      Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation = Type(),
@@ -4117,7 +4141,7 @@ public:
         auto &SM = CurrDeclContext->getASTContext().SourceMgr;
         if (DotLoc.isValid())
           bytesToErase = SM.getByteDistance(DotLoc, SM.getCodeCompletionLoc());
-        addKeyword("nil", T, SemanticContextKind::ExpressionSpecific,
+        addKeyword("nil", T, SemanticContextKind::None,
                    CodeCompletionKeywordKind::kw_nil, bytesToErase);
       }
       getUnresolvedMemberCompletions(T);
@@ -5755,6 +5779,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
     Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
                             ContextInfo.isSingleExpressionBody());
+    Lookup.setIdealExpectedType(CodeCompleteTokenExpr->getType());
     Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
     DoPostfixExprBeginning();
     break;
@@ -5810,6 +5835,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
     Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
                             ContextInfo.isSingleExpressionBody());
+    Lookup.setIdealExpectedType(CodeCompleteTokenExpr->getType());
     Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
     break;
   }

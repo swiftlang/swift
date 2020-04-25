@@ -40,6 +40,9 @@ struct ExpectedTypeContext {
   /// Possible types of the code completion expression.
   llvm::SmallVector<Type, 4> possibleTypes;
 
+  /// Pre typechecked type of the expression at the completion position.
+  Type idealType;
+
   /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
   /// `foo({ here })`.
   ///
@@ -134,6 +137,10 @@ public:
   void setNotRecommended(CodeCompletionResult::NotRecommendedReason Reason) {
     IsNotRecommended = true;
     NotRecReason = Reason;
+  }
+
+  void setSemanticContext(SemanticContextKind Kind) {
+    SemanticContext = Kind;
   }
 
   void
