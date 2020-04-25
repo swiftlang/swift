@@ -1,0 +1,24 @@
+module A {
+  header "A.h"
+  export *
+}
+
+module B {
+  header "B.h"
+  export *
+}
+
+module C {
+  header "C.h"
+  export *
+}
+
+module D {
+  header "D.h"
+  export *
+}
+
+module F {
+  header "F.h"
+  export *
+}

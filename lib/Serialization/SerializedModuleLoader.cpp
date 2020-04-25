@@ -14,6 +14,7 @@
 #include "ModuleFile.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
@@ -344,6 +345,46 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
 
   *ModuleBuffer = std::move(ModuleOrErr.get());
   return std::error_code();
+}
+
+llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
+    Twine modulePath) {
+  // Open the module file
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  auto moduleBuf = fs.getBufferForFile(modulePath);
+  if (!moduleBuf)
+    return moduleBuf.getError();
+
+  // Load the module file without validation.
+  std::unique_ptr<ModuleFile> loadedModuleFile;
+  bool isFramework = false;
+  serialization::ValidationInfo loadInfo =
+      ModuleFile::load(modulePath.str(),
+                       std::move(moduleBuf.get()),
+                       nullptr,
+                       nullptr,
+                       isFramework, loadedModuleFile,
+                       nullptr);
+
+  // Map the set of dependencies over to the "module dependencies".
+  auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str());
+  llvm::StringSet<> addedModuleNames;
+  for (const auto &dependency : loadedModuleFile->getDependencies()) {
+    // FIXME: Record header dependency?
+    if (dependency.isHeader())
+      continue;
+
+    // Find the top-level module name.
+    auto modulePathStr = dependency.getPrettyPrintedPath();
+    StringRef moduleName = modulePathStr;
+    auto dotPos = moduleName.find('.');
+    if (dotPos != std::string::npos)
+      moduleName = moduleName.slice(0, dotPos);
+
+    dependencies.addModuleDependency(moduleName, addedModuleNames);
+  }
+
+  return std::move(dependencies);
 }
 
 std::error_code SerializedModuleLoader::findModuleFilesInDirectory(

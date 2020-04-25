@@ -135,6 +135,9 @@ protected:
     return false;
   }
 
+  /// Scan the given serialized module file to determine dependencies.
+  llvm::ErrorOr<ModuleDependencies> scanModuleFile(Twine modulePath);
+
 public:
   virtual ~SerializedModuleLoaderBase();
   SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;
@@ -189,6 +192,9 @@ public:
       llvm::SetVector<AutoDiffConfig> &results) override;
 
   virtual void verifyAllModules() override;
+
+  virtual Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache) override;
 };
 
 /// Imports serialized Swift modules into an ASTContext.
