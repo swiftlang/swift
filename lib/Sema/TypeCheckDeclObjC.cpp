@@ -99,13 +99,13 @@ static void describeObjCReason(const ValueDecl *VD, ObjCReason Reason) {
 
     auto overridden = VD->getOverriddenDecl();
     overridden->diagnose(diag::objc_overriding_objc_decl,
-                         kind, VD->getOverriddenDecl()->getFullName());
+                         kind, VD->getOverriddenDecl()->getName());
   } else if (Reason == ObjCReason::WitnessToObjC) {
     auto requirement = Reason.getObjCRequirement();
     requirement->diagnose(diag::objc_witness_objc_requirement,
-                VD->getDescriptiveKind(), requirement->getFullName(),
+                VD->getDescriptiveKind(), requirement->getName(),
                 cast<ProtocolDecl>(requirement->getDeclContext())
-                  ->getFullName());
+                  ->getName());
   }
 }
 
@@ -1358,7 +1358,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
       if (storageObjCAttr && storageObjCAttr->isSwift3Inferred() &&
           shouldDiagnoseObjCReason(*isObjC, ctx)) {
         storage->diagnose(diag::accessor_swift3_objc_inference,
-                 storage->getDescriptiveKind(), storage->getFullName(),
+                 storage->getDescriptiveKind(), storage->getName(),
                  isa<SubscriptDecl>(storage), accessor->isSetter())
           .fixItInsert(storage->getAttributeInsertionLoc(/*forModifier=*/false),
                        "@objc ");
@@ -1504,15 +1504,15 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
     // note the ambiguity.
     if (*requirementObjCName != *req->getObjCRuntimeName()) {
       decl->diagnose(diag::objc_ambiguous_inference,
-                     decl->getDescriptiveKind(), decl->getFullName(),
+                     decl->getDescriptiveKind(), decl->getName(),
                      *requirementObjCName, *req->getObjCRuntimeName());
 
       // Note the candidates and what Objective-C names they provide.
       auto diagnoseCandidate = [&](ValueDecl *req) {
         auto proto = cast<ProtocolDecl>(req->getDeclContext());
         auto diag = decl->diagnose(diag::objc_ambiguous_inference_candidate,
-                                   req->getFullName(),
-                                   proto->getFullName(),
+                                   req->getName(),
+                                   proto->getName(),
                                    *req->getObjCRuntimeName());
         fixDeclarationObjCName(diag, decl,
                                decl->getObjCRuntimeName(/*skipIsObjC=*/true),
@@ -1591,12 +1591,12 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
           if (declProvidingInheritedConvention
               && inheritedConvention != reqErrorConvention) {
             method->diagnose(diag::objc_ambiguous_error_convention,
-                             method->getFullName());
+                             method->getName());
             declProvidingInheritedConvention->diagnose(
                              diag::objc_ambiguous_error_convention_candidate,
-                             declProvidingInheritedConvention->getFullName());
+                             declProvidingInheritedConvention->getName());
             reqMethod->diagnose(diag::objc_ambiguous_error_convention_candidate,
-                                reqMethod->getFullName());
+                                reqMethod->getName());
             break;
           }
 
@@ -1736,10 +1736,10 @@ void swift::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
 std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *member) {
   if (isa<ConstructorDecl>(member))
-    return { 0 + member->isImplicit(), member->getFullName() };
+    return { 0 + member->isImplicit(), member->getName() };
 
   if (isa<DestructorDecl>(member))
-    return { 2 + member->isImplicit(), member->getFullName() };
+    return { 2 + member->isImplicit(), member->getName() };
 
   if (auto accessor = dyn_cast<AccessorDecl>(member)) {
     switch (accessor->getAccessorKind()) {
@@ -1751,13 +1751,13 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 
     case AccessorKind::Get:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
-        return { 5, var->getFullName() };
+        return { 5, var->getName() };
 
       return { 6, Identifier() };
 
     case AccessorKind::Set:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
-        return { 7, var->getFullName() };
+        return { 7, var->getName() };
       return { 8, Identifier() };
     }
 
@@ -1766,13 +1766,13 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 
   // Normal method.
   auto func = cast<FuncDecl>(member);
-  return { 4, func->getFullName() };
+  return { 4, func->getName() };
 }
 
 bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
                                DeclName targetName) {
   if (decl->isImplicit()) return false;
-  if (decl->getFullName() == targetName) return false;
+  if (decl->getName() == targetName) return false;
 
   // Handle properties directly.
   if (auto var = dyn_cast<VarDecl>(decl)) {
@@ -1786,7 +1786,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
   auto func = dyn_cast<AbstractFunctionDecl>(decl);
   if (!func) return true;
 
-  auto name = func->getFullName();
+  const auto name = func->getName();
 
   // Fix the name of the function itself.
   if (name.getBaseName() != targetName.getBaseName()) {
@@ -1948,7 +1948,7 @@ namespace {
       // The declarations are in different source files (or unknown source
       // files) of the same module. Order based on name.
       // FIXME: This isn't a total ordering.
-      return lhs->getFullName() < rhs->getFullName();
+      return lhs->getName() < rhs->getName();
     }
   };
 } // end anonymous namespace
@@ -2270,7 +2270,7 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
     auto reqDiagInfo = getObjCMethodDiagInfo(unsatisfied.second);
     auto conflictDiagInfo = getObjCMethodDiagInfo(conflicts[0]);
     auto protocolName
-      = cast<ProtocolDecl>(req->getDeclContext())->getFullName();
+      = cast<ProtocolDecl>(req->getDeclContext())->getName();
     Ctx.Diags.diagnose(conflicts[0],
                        diag::objc_optional_requirement_conflict,
                        conflictDiagInfo.first,
@@ -2281,7 +2281,7 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                        protocolName);
 
     // Fix the name of the witness, if we can.
-    if (req->getFullName() != conflicts[0]->getFullName() &&
+    if (req->getName() != conflicts[0]->getName() &&
         req->getKind() == conflicts[0]->getKind() &&
         isa<AccessorDecl>(req) == isa<AccessorDecl>(conflicts[0])) {
       // They're of the same kind: fix the name.
@@ -2298,10 +2298,10 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
 
       auto diag = Ctx.Diags.diagnose(conflicts[0],
                                      diag::objc_optional_requirement_swift_rename,
-                                     kind, req->getFullName());
+                                     kind, req->getName());
 
       // Fix the Swift name.
-      fixDeclarationName(diag, conflicts[0], req->getFullName());
+      fixDeclarationName(diag, conflicts[0], req->getName());
 
       // Fix the '@objc' attribute, if needed.
       if (!conflicts[0]->canInferObjCFromRequirement(req))
@@ -2324,7 +2324,7 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
     Ctx.Diags.diagnose(getDeclContextLoc(unsatisfied.first),
                        diag::protocol_conformance_here,
                        true,
-                       classDecl->getFullName(),
+                       classDecl->getName(),
                       protocolName);
     Ctx.Diags.diagnose(req, diag::kind_declname_declared_here,
                        DescriptiveDeclKind::Requirement, reqDiagInfo.second);

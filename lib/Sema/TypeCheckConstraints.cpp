@@ -87,14 +87,14 @@ bool TypeVariableType::Implementation::isClosureType() const {
   if (!(locator && locator->getAnchor()))
     return false;
 
-  return isa<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
+  return isExpr<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
 }
 
 bool TypeVariableType::Implementation::isClosureResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;
 
-  return isa<ClosureExpr>(locator->getAnchor()) &&
+  return isExpr<ClosureExpr>(locator->getAnchor()) &&
          locator->isLastElement<LocatorPathElt::ClosureResult>();
 }
 
@@ -184,18 +184,18 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 
 Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   SmallVector<LocatorPathElt, 4> pathBuffer;
-  Expr *anchor = getLocatorParts(pathBuffer);
+  auto anchor = getLocatorParts(pathBuffer);
   // Locators are not guaranteed to have an anchor
   // if constraint system is used to verify generic
   // requirements.
-  if (!anchor)
+  if (!anchor.is<const Expr *>())
     return nullptr;
 
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
   SourceRange range;
   simplifyLocator(anchor, path, range);
-  return (path.empty() ? anchor : nullptr);
+  return (path.empty() ? getAsExpr(anchor) : nullptr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -501,7 +501,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       // module we could offer a fix-it.
       for (auto lookupResult : inaccessibleResults) {
         auto *VD = lookupResult.getValueDecl();
-        VD->diagnose(diag::decl_declared_here, VD->getFullName());
+        VD->diagnose(diag::decl_declared_here, VD->getName());
       }
 
       // Don't try to recover here; we'll get more access-related diagnostics
@@ -618,7 +618,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       if (Lookup.outerResults().empty()) {
         Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
         Context.Diags.diagnose(innerDecl, diag::decl_declared_here,
-                               localDeclAfterUse->getFullName());
+                               localDeclAfterUse->getName());
         Expr *error = new (Context) ErrorExpr(UDRE->getSourceRange());
         return error;
       }
@@ -750,7 +750,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   Context.Diags.diagnose(Loc, diag::ambiguous_decl_ref, Name);
   for (auto Result : Lookup) {
     auto *Decl = Result.getValueDecl();
-    Context.Diags.diagnose(Decl, diag::decl_declared_here, Decl->getFullName());
+    Context.Diags.diagnose(Decl, diag::decl_declared_here, Decl->getName());
   }
   return new (Context) ErrorExpr(UDRE->getSourceRange());
 }
@@ -773,7 +773,7 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
     if (nestedArg->isSuperExpr())
       return ctorContext->getImplicitSelfDecl();
     if (auto declRef = dyn_cast<DeclRefExpr>(nestedArg))
-      if (declRef->getDecl()->getFullName() == DC->getASTContext().Id_self)
+      if (declRef->getDecl()->getName() == DC->getASTContext().Id_self)
         return ctorContext->getImplicitSelfDecl();
   }
   return nullptr;
@@ -2671,7 +2671,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         else if (root != archetypeType)
           return Type();
         
-        auto locator = cs.getConstraintLocator(nullptr);
+        auto locator = cs.getConstraintLocator({});
         auto replacement = cs.createTypeVariable(locator,
                                                  TVO_CanBindToNoEscape);
 
@@ -2689,7 +2689,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
 
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
-      auto locator = cs.getConstraintLocator(nullptr);
+      auto locator = cs.getConstraintLocator({});
       auto replacement = cs.createTypeVariable(locator,
                                                TVO_CanBindToNoEscape);
       types[origType] = replacement;
@@ -2711,7 +2711,7 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
     type2 = replaceArchetypesWithTypeVariables(cs, type2);
   }
 
-  cs.addConstraint(kind, type1, type2, cs.getConstraintLocator(nullptr));
+  cs.addConstraint(kind, type1, type2, cs.getConstraintLocator({}));
 
   if (openArchetypes) {
     assert(!unwrappedIUO && "FIXME");

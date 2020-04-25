@@ -1663,7 +1663,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
                                 HiddenImportKind::SPI;
       auto diag = D->diagnose(diag::decl_from_hidden_module,
                               offendingType->getDescriptiveKind(),
-                              offendingType->getFullName(),
+                              offendingType->getName(),
                               static_cast<unsigned>(reason), M->getName(),
                               static_cast<unsigned>(importKind));
       highlightOffendingType(diag, complainRepr);
@@ -1673,7 +1673,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       ModuleDecl *M = offendingConformance->getDeclContext()->getParentModule();
       D->diagnose(diag::conformance_from_implementation_only_module,
                   offendingConformance->getType(),
-                  offendingConformance->getProtocol()->getFullName(),
+                  offendingConformance->getProtocol()->getName(),
                   static_cast<unsigned>(reason), M->getName());
     }
 

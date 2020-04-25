@@ -123,10 +123,10 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
 }
 
 ConstraintLocator *
-Solution::getConstraintLocator(const Expr *anchor,
+Solution::getConstraintLocator(TypedNode anchor,
                                ArrayRef<LocatorPathElt> path) const {
   auto &cs = getConstraintSystem();
-  return cs.getConstraintLocator(const_cast<Expr *>(anchor), path);
+  return cs.getConstraintLocator(anchor, path);
 }
 
 ConstraintLocator *
@@ -1169,7 +1169,7 @@ namespace {
                   Swift3ObjCInferenceWarnings::Minimal) {
             context.Diags.diagnose(
                 memberLoc, diag::expr_dynamic_lookup_swift3_objc_inference,
-                member->getDescriptiveKind(), member->getFullName(),
+                member->getDescriptiveKind(), member->getName(),
                 member->getDeclContext()->getSelfNominalTypeDecl()->getName());
             context.Diags
                 .diagnose(member, diag::make_decl_objc,
@@ -1204,9 +1204,9 @@ namespace {
       // For properties, build member references.
       if (isa<VarDecl>(member)) {
         if (isUnboundInstanceMember) {
-          assert(memberLocator.getBaseLocator() && 
+          assert(memberLocator.getBaseLocator() &&
                  cs.UnevaluatedRootExprs.count(
-                   memberLocator.getBaseLocator()->getAnchor()) &&
+                     getAsExpr(memberLocator.getBaseLocator()->getAnchor())) &&
                  "Attempt to reference an instance member of a metatype");
           auto baseInstanceTy = cs.getType(base)
               ->getInOutObjectType()->getMetatypeInstanceType();
@@ -1618,7 +1618,7 @@ namespace {
 
         if (selected.choice.getKind() ==
                 OverloadChoiceKind::KeyPathDynamicMemberLookup &&
-            !isa<SubscriptExpr>(locator.getAnchor()))
+            !isExpr<SubscriptExpr>(locator.getAnchor()))
           locatorKind = ConstraintLocator::Member;
 
         newSubscript =
@@ -1744,7 +1744,7 @@ namespace {
         locatorKind = ConstraintLocator::Member;
 
       if (choice.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-        locatorKind = isa<SubscriptExpr>(locator.getAnchor())
+        locatorKind = isExpr<SubscriptExpr>(locator.getAnchor())
                           ? ConstraintLocator::SubscriptMember
                           : ConstraintLocator::Member;
       }
@@ -1898,7 +1898,7 @@ namespace {
                                              SourceLoc dotLoc,
                                              ConstraintLocator *memberLoc) {
       auto &ctx = cs.getASTContext();
-      auto *anchor = memberLoc->getAnchor();
+      auto *anchor = getAsExpr(memberLoc->getAnchor());
 
       SmallVector<KeyPathExpr::Component, 2> components;
 
@@ -2894,7 +2894,7 @@ namespace {
         bool diagnoseBadInitRef = true;
         auto arg = base->getSemanticsProvidingExpr();
         if (auto dre = dyn_cast<DeclRefExpr>(arg)) {
-          if (dre->getDecl()->getFullName() == cs.getASTContext().Id_self) {
+          if (dre->getDecl()->getName() == cs.getASTContext().Id_self) {
             // We have a reference to 'self'.
             diagnoseBadInitRef = false;
             // Make sure the reference to 'self' occurs within an initializer.
@@ -3473,7 +3473,7 @@ namespace {
             // initializer failable.
             de.diagnose(otherCtorRef->getLoc(),
                         diag::delegate_chain_nonoptional_to_optional,
-                        isChaining, ctor->getFullName());
+                        isChaining, ctor->getName());
             de.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
                 .fixItInsertAfter(expr->getEndLoc(), "!");
             de.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
@@ -4381,9 +4381,9 @@ namespace {
         if (!func->getDeclContext()->isTypeContext()) {
           de.diagnose(E->getLoc(), diag::expr_selector_not_method,
                       func->getDeclContext()->isModuleScopeContext(),
-                      func->getFullName())
+                      func->getName())
               .highlight(subExpr->getSourceRange());
-          de.diagnose(func, diag::decl_declared_here, func->getFullName());
+          de.diagnose(func, diag::decl_declared_here, func->getName());
           return E;
         }
 
@@ -4399,7 +4399,7 @@ namespace {
           de.diagnose(E->getModifierLoc(),
                       diag::expr_selector_expected_property,
                       E->getSelectorKind() == ObjCSelectorExpr::Setter,
-                      foundDecl->getDescriptiveKind(), foundDecl->getFullName())
+                      foundDecl->getDescriptiveKind(), foundDecl->getName())
               .fixItRemoveChars(E->getModifierLoc(),
                                 E->getSubExpr()->getStartLoc());
 
@@ -4416,9 +4416,9 @@ namespace {
         // If this isn't a property on a type, complain.
         if (!var->getDeclContext()->isTypeContext()) {
           de.diagnose(E->getLoc(), diag::expr_selector_not_property,
-                      isa<ParamDecl>(var), var->getFullName())
+                      isa<ParamDecl>(var), var->getName())
               .highlight(subExpr->getSourceRange());
-          de.diagnose(var, diag::decl_declared_here, var->getFullName());
+          de.diagnose(var, diag::decl_declared_here, var->getName());
           return E;
         }
 
@@ -4429,7 +4429,7 @@ namespace {
             var->isSetterAccessibleFrom(cs.DC);
           auto primaryDiag =
               de.diagnose(E->getLoc(), diag::expr_selector_expected_method,
-                          isSettable, var->getFullName());
+                          isSettable, var->getName());
           primaryDiag.highlight(subExpr->getSourceRange());
 
           // The point at which we will insert the modifier.
@@ -4443,10 +4443,10 @@ namespace {
 
             // Add notes for the getter and setter, respectively.
             de.diagnose(modifierLoc, diag::expr_selector_add_modifier, false,
-                        var->getFullName())
+                        var->getName())
                 .fixItInsert(modifierLoc, "getter: ");
             de.diagnose(modifierLoc, diag::expr_selector_add_modifier, true,
-                        var->getFullName())
+                        var->getName())
                 .fixItInsert(modifierLoc, "setter: ");
 
             // Bail out now. We don't know what the user wanted, so
@@ -4469,8 +4469,8 @@ namespace {
           // Make sure we actually have a setter.
           if (!var->isSettable(cs.DC)) {
             de.diagnose(E->getLoc(), diag::expr_selector_property_not_settable,
-                        var->getDescriptiveKind(), var->getFullName());
-            de.diagnose(var, diag::decl_declared_here, var->getFullName());
+                        var->getDescriptiveKind(), var->getName());
+            de.diagnose(var, diag::decl_declared_here, var->getName());
             return E;
           }
 
@@ -4478,8 +4478,8 @@ namespace {
           if (!var->isSetterAccessibleFrom(cs.DC)) {
             de.diagnose(E->getLoc(),
                         diag::expr_selector_property_setter_inaccessible,
-                        var->getDescriptiveKind(), var->getFullName());
-            de.diagnose(var, diag::decl_declared_here, var->getFullName());
+                        var->getDescriptiveKind(), var->getName());
+            de.diagnose(var, diag::decl_declared_here, var->getName());
             return E;
           }
 
@@ -4491,7 +4491,7 @@ namespace {
         de.diagnose(E->getLoc(), diag::expr_selector_no_declaration)
             .highlight(subExpr->getSourceRange());
         de.diagnose(foundDecl, diag::decl_declared_here,
-                    foundDecl->getFullName());
+                    foundDecl->getName());
         return E;
       }
       assert(method && "Didn't find a method?");
@@ -4505,12 +4505,12 @@ namespace {
         // problems.
         if (auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext())) {
           de.diagnose(E->getLoc(), diag::expr_selector_cannot_be_used,
-                      foundDecl->getBaseName(), protocolDecl->getFullName());
+                      foundDecl->getBaseName(), protocolDecl->getName());
           return E;
         }
 
         de.diagnose(E->getLoc(), diag::expr_selector_not_objc,
-                    foundDecl->getDescriptiveKind(), foundDecl->getFullName())
+                    foundDecl->getDescriptiveKind(), foundDecl->getName())
             .highlight(subExpr->getSourceRange());
         de.diagnose(foundDecl, diag::make_decl_objc,
                     foundDecl->getDescriptiveKind())
@@ -4523,7 +4523,7 @@ namespace {
             cs.getASTContext().LangOpts.WarnSwift3ObjCInference ==
                 Swift3ObjCInferenceWarnings::Minimal) {
           de.diagnose(E->getLoc(), diag::expr_selector_swift3_objc_inference,
-                      foundDecl->getDescriptiveKind(), foundDecl->getFullName(),
+                      foundDecl->getDescriptiveKind(), foundDecl->getName(),
                       foundDecl->getDeclContext()
                           ->getSelfNominalTypeDecl()
                           ->getName())
@@ -5759,9 +5759,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       // We already had a ParenExpr, so replace it's sub-expression.
       argParen->setSubExpr(newArgs[0]);
     } else {
+      bool isImplicit = arg->isImplicit();
       arg = new (ctx)
           ParenExpr(lParenLoc, newArgs[0], rParenLoc, hasTrailingClosure);
-      arg->setImplicit();
+      arg->setImplicit(isImplicit);
     }
   } else {
     assert(isa<TupleType>(paramType.getPointer()));
@@ -5776,7 +5777,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       // Build a new TupleExpr, re-using source location information.
       arg = TupleExpr::create(ctx, lParenLoc, newArgs, newLabels, newLabelLocs,
                               rParenLoc, hasTrailingClosure,
-                              /*implicit=*/true);
+                              /*implicit=*/arg->isImplicit());
     }
   }
 
@@ -7804,13 +7805,13 @@ namespace {
     explicit CompareExprSourceLocs(SourceManager &sourceMgr)
       : sourceMgr(sourceMgr) { }
 
-    bool operator()(Expr *lhs, Expr *rhs) const {
+    bool operator()(TypedNode lhs, TypedNode rhs) const {
       if (static_cast<bool>(lhs) != static_cast<bool>(rhs)) {
         return static_cast<bool>(lhs);
       }
 
-      auto lhsLoc = lhs->getLoc();
-      auto rhsLoc = rhs->getLoc();
+      auto lhsLoc = getLoc(lhs);
+      auto rhsLoc = getLoc(rhs);
       if (lhsLoc.isValid() != rhsLoc.isValid())
         return lhsLoc.isValid();
 
@@ -7824,26 +7825,27 @@ namespace {
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   /// Collect the fixes on a per-expression basis.
-  llvm::SmallDenseMap<Expr *, SmallVector<ConstraintFix *, 4>> fixesPerExpr;
+  llvm::SmallDenseMap<TypedNode, SmallVector<ConstraintFix *, 4>>
+      fixesPerAnchor;
   for (auto *fix : solution.Fixes) {
-    fixesPerExpr[fix->getAnchor()].push_back(fix);
+    fixesPerAnchor[fix->getAnchor()].push_back(fix);
   }
 
   // Collect all of the expressions that have fixes, and sort them by
   // source ordering.
-  SmallVector<Expr *, 4> exprsWithFixes;
-  for (const auto &fix : fixesPerExpr) {
-    exprsWithFixes.push_back(fix.getFirst());
+  SmallVector<TypedNode, 4> orderedAnchors;
+  for (const auto &fix : fixesPerAnchor) {
+    orderedAnchors.push_back(fix.getFirst());
   }
-  std::sort(exprsWithFixes.begin(), exprsWithFixes.end(),
+  std::sort(orderedAnchors.begin(), orderedAnchors.end(),
             CompareExprSourceLocs(Context.SourceMgr));
 
   // Walk over each of the expressions, diagnosing fixes.
   bool diagnosedAnyErrors = false;
 
-  for (auto expr : exprsWithFixes) {
+  for (auto anchor : orderedAnchors) {
     // Coalesce fixes with the same locator to avoid duplicating notes.
-    auto fixes = fixesPerExpr[expr];
+    auto fixes = fixesPerAnchor[anchor];
 
     using ConstraintFixVector = llvm::SmallVector<ConstraintFix *, 4>;
     llvm::SmallMapVector<ConstraintLocator *,

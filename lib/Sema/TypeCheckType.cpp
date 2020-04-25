@@ -1000,7 +1000,8 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
           ? diag::unsupported_recursion_in_associated_type_reference
           : diag::broken_associated_type_witness;
 
-  ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl), typeDecl->getFullName(), parentTy);
+  ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl),
+                     typeDecl->getName(), parentTy);
 }
 
 /// Returns a valid type or ErrorType in case of an error.
@@ -1217,7 +1218,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     if (!memberLookup.empty()) {
       auto member = memberLookup[0].getValueDecl();
       diags.diagnose(comp->getNameLoc(), diag::invalid_member_reference,
-                     member->getDescriptiveKind(), member->getFullName(),
+                     member->getDescriptiveKind(), member->getName(),
                      parentType)
           .highlight(parentRange);
     } else {
@@ -1228,7 +1229,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       // expected name lookup to find a module when there's a conflicting type.
       if (auto typeDecl = parentType->getNominalOrBoundGenericNominal()) {
         ctx.Diags.diagnose(typeDecl, diag::decl_declared_here,
-                           typeDecl->getFullName());
+                           typeDecl->getName());
       }
     }
   }

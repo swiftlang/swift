@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCException.m -c -o %t/ObjCException.o
-// RUN: %target-build-swift -import-objc-header %S/Inputs/ObjCException.h -Xlinker %t/ObjCException.o %s -o %t/a.out
+// RUN: %target-build-swift -Xllvm -sil-verify-force-analysis=true -import-objc-header %S/Inputs/ObjCException.h -Xlinker %t/ObjCException.o %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 

@@ -104,7 +104,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
       downgradeToWarning = DowngradeToWarning::Yes;
   }
 
-  auto diagName = D->getFullName();
+  auto diagName = D->getName();
   bool isAccessor = false;
 
   // Swift 4.2 did not check accessor accessiblity.
@@ -116,7 +116,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
     // For accessors, diagnose with the name of the storage instead of the
     // implicit '_'.
-    diagName = accessor->getStorage()->getFullName();
+    diagName = accessor->getStorage()->getName();
   }
 
   // Swift 5.0 did not check the underlying types of local typealiases.
@@ -161,7 +161,7 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
   // TODO: different diagnostics
   ASTContext &ctx = definingModule->getASTContext();
   ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module,
-                     D->getDescriptiveKind(), D->getFullName(),
+                     D->getDescriptiveKind(), D->getName(),
                      static_cast<unsigned>(fragileKind.kind),
                      definingModule->getName(),
                      static_cast<unsigned>(!isImplementationOnly));
@@ -191,7 +191,7 @@ diagnoseGenericArgumentsExportability(SourceLoc loc,
     ASTContext &ctx = M->getASTContext();
     ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
                        rootConf->getType(),
-                       rootConf->getProtocol()->getFullName(), 0, M->getName());
+                       rootConf->getProtocol()->getName(), 0, M->getName());
     hadAnyIssues = true;
   }
   return hadAnyIssues;

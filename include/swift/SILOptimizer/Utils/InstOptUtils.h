@@ -578,6 +578,15 @@ bool tryOptimizeApplyOfPartialApply(
     PartialApplyInst *pai, SILBuilderContext &builderCtxt,
     InstModCallbacks callbacks = InstModCallbacks());
 
+/// Clone this full apply site, replacing the callee with \p newCallee while
+/// doing so.
+///
+/// The current full apply site is used as an insertion point, so the caller
+/// must clean up this full apply site.
+FullApplySite cloneFullApplySiteReplacingCallee(FullApplySite applySite,
+                                                SILValue newCallee,
+                                                SILBuilderContext &builderCtx);
+
 } // end namespace swift
 
 #endif

@@ -1528,6 +1528,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       break;
 
+    case options::OPT_scan_dependencies:
+      OI.CompilerOutputType = file_types::TY_JSONDependencies;
+      // We want the imported modules from the module as a whole, not individual
+      // files, so let's do it in one invocation rather than having to collate
+      // later.
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      break;
+
     case options::OPT_index_file:
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       OI.CompilerOutputType = file_types::TY_IndexData;
@@ -1980,6 +1988,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_PrivateSwiftModuleInterfaceFile:
       case file_types::TY_SwiftCrossImportDir:
       case file_types::TY_SwiftOverlayFile:
+      case file_types::TY_JSONDependencies:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,

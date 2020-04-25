@@ -1457,6 +1457,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
+  printRequirements &= Options.PrintGenericRequirements;
   bool printInherited = (flags & PrintInherited);
   bool swapSelfAndDependentMemberType =
     (flags & SwapSelfAndDependentMemberType);
@@ -3265,7 +3266,7 @@ void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
 
 void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
   Printer << "/* placeholder for ";
-  recordDeclLoc(decl, [&]{ Printer << decl->getFullName(); });
+  recordDeclLoc(decl, [&]{ Printer << decl->getName(); });
   unsigned numVTableEntries = decl->getNumberOfVTableEntries();
   if (numVTableEntries > 0)
     Printer << " (vtable entries: " << numVTableEntries << ")";

@@ -687,11 +687,10 @@ std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
 /// execute much faster.
-static bool shouldImplicityImportSwiftOnoneSupportModule(
-    const CompilerInvocation &Invocation) {
-  if (Invocation.getImplicitStdlibKind() != ImplicitStdlibKind::Stdlib)
+bool CompilerInvocation::shouldImportSwiftONoneSupport() const {
+  if (getImplicitStdlibKind() != ImplicitStdlibKind::Stdlib)
     return false;
-  if (Invocation.getSILOptions().shouldOptimize())
+  if (getSILOptions().shouldOptimize())
     return false;
 
   // If we are not executing an action that has a dependency on
@@ -706,7 +705,7 @@ static bool shouldImplicityImportSwiftOnoneSupportModule(
   //
   // This optimization is disabled by -track-system-dependencies to preserve
   // the explicit dependency.
-  const auto &options = Invocation.getFrontendOptions();
+  const auto &options = getFrontendOptions();
   return options.TrackSystemDeps
       || FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
 }
@@ -720,7 +719,7 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   for (auto &moduleStr : frontendOpts.getImplicitImportModuleNames())
     imports.ModuleNames.push_back(Context->getIdentifier(moduleStr));
 
-  if (shouldImplicityImportSwiftOnoneSupportModule(Invocation))
+  if (Invocation.shouldImportSwiftONoneSupport())
     imports.ModuleNames.push_back(Context->getIdentifier(SWIFT_ONONE_SUPPORT));
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
@@ -822,13 +821,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-check-types");
 
   bool hadLoadError = parsePartialModulesAndInputFiles();
-  if (Invocation.isCodeCompletion()) {
-    // When we are doing code completion, make sure to emit at least one
-    // diagnostic, so that ASTContext is marked as erroneous.  In this case
-    // various parts of the compiler (for example, AST verifier) have less
-    // strict assumptions about the AST.
-    Diagnostics.diagnose(SourceLoc(), diag::error_doing_code_completion);
-  }
   if (hadLoadError)
     return;
 
@@ -1062,8 +1054,6 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
     runSILPassesForOnone(*SM);
     return;
   }
-  runSILOptPreparePasses(*SM);
-
   StringRef CustomPipelinePath =
   Invocation.getSILOptions().ExternalPassPipelineFilename;
   if (!CustomPipelinePath.empty()) {

@@ -437,7 +437,7 @@ private:
       auto *VD = dyn_cast<ValueDecl>(D);
       if (!VD || excludeIfPrivate(VD))
         continue;
-      if (VD->getFullName().isOperator())
+      if (VD->getName().isOperator())
         memberOperatorDecls.push_back(cast<FuncDecl>(D));
       else if (const auto *const NTD = dyn_cast<NominalTypeDecl>(D))
         findNominalsAndOperatorsIn(NTD);

@@ -619,9 +619,9 @@ namespace {
     }
 
     void printDeclName(const ValueDecl *D) {
-      if (D->getFullName()) {
+      if (D->getName()) {
         PrintWithColorRAII(OS, IdentifierColor)
-          << '\"' << D->getFullName() << '\"';
+          << '\"' << D->getName() << '\"';
       } else {
         PrintWithColorRAII(OS, IdentifierColor)
           << "'anonname=" << (const void*)D << '\'';
@@ -1105,7 +1105,7 @@ namespace {
     void visitAccessorDecl(AccessorDecl *AD) {
       printCommonFD(AD, "accessor_decl");
       OS << " " << getAccessorKindString(AD->getAccessorKind());
-      OS << "_for=" << AD->getStorage()->getFullName();
+      OS << "_for=" << AD->getStorage()->getName();
       printAbstractFunctionDecl(AD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -1268,7 +1268,7 @@ namespace {
     void visitMissingMemberDecl(MissingMemberDecl *MMD) {
       printCommon(MMD, "missing_member_decl ");
       PrintWithColorRAII(OS, IdentifierColor)
-          << '\"' << MMD->getFullName() << '\"';
+          << '\"' << MMD->getName() << '\"';
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
   };
@@ -1367,15 +1367,15 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::AbstractFunctionDecl:
-    printName(os, cast<AbstractFunctionDecl>(dc)->getFullName());
+    printName(os, cast<AbstractFunctionDecl>(dc)->getName());
     break;
 
   case DeclContextKind::SubscriptDecl:
-    printName(os, cast<SubscriptDecl>(dc)->getFullName());
+    printName(os, cast<SubscriptDecl>(dc)->getName());
     break;
 
   case DeclContextKind::EnumElementDecl:
-    printName(os, cast<EnumElementDecl>(dc)->getFullName());
+    printName(os, cast<EnumElementDecl>(dc)->getName());
     break;
   }
 }
@@ -1393,7 +1393,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
   os << ".";
 
   // Print name.
-  getFullName().printPretty(os);
+  getName().printPretty(os);
 
   // Print location.
   auto &srcMgr = getASTContext().SourceMgr;
@@ -3171,7 +3171,7 @@ static void dumpProtocolConformanceRec(
         out << '\n';
         out.indent(indent + 2);
         PrintWithColorRAII(out, ParenthesisColor) << '(';
-        out << "value req=" << req->getFullName() << " witness=";
+        out << "value req=" << req->getName() << " witness=";
         if (!witness) {
           out << "(none)";
         } else if (witness.getDecl() == req) {
