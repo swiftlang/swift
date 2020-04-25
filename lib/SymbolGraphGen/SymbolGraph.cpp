@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/DeclObjC.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -218,6 +219,28 @@ void SymbolGraph::recordSuperclassSynthesizedMemberRelationships(Symbol S) {
   }
 }
 
+bool SymbolGraph::synthesizedMemberIsBestCandidate(const ValueDecl *VD,
+    const NominalTypeDecl *Owner) const {
+  const auto *FD = dyn_cast<FuncDecl>(VD);
+  if (!FD) {
+    return true;
+  }
+  auto *DC = const_cast<DeclContext*>(Owner->getDeclContext());
+
+  ResolvedMemberResult Result =
+    resolveValueMember(*DC, Owner->getSelfTypeInContext(),
+                       FD->getEffectiveFullName());
+
+  const auto ViableCandidates =
+    Result.getMemberDecls(InterestedMemberKind::All);
+
+  if (ViableCandidates.size() < 2) {
+    return true;
+  }
+
+  return !(Result.hasBestOverload() && Result.getBestOverload() != VD);
+}
+
 void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
   if (!Walker.Options.EmitSynthesizedMembers) {
     return;
@@ -264,14 +287,22 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
             continue;
           }
 
+          const auto StdlibModule = OwningNominal->getASTContext()
+              .getStdlibModule(/*loadIfAbsent=*/true);
+
           // There can be synthesized members on effectively private protocols
           // or things that conform to them. We don't want to include those.
-          if (SynthMember->hasUnderscoredNaming()) {
+          if (isImplicitlyPrivate(SynthMember,
+              /*IgnoreContext =*/
+              SynthMember->getModuleContext() == StdlibModule)) {
             continue;
           }
 
-          auto ExtendedSG =
-              Walker.getModuleSymbolGraph(OwningNominal->getModuleContext());
+          if (!synthesizedMemberIsBestCandidate(SynthMember, OwningNominal)) {
+            continue;
+          }
+
+          auto ExtendedSG = Walker.getModuleSymbolGraph(OwningNominal);
 
           Symbol Source(this, SynthMember, OwningNominal);
           Symbol Target(this, OwningNominal, nullptr);
@@ -501,7 +532,8 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
   T->print(Printer, getDeclarationFragmentsPrintOptions());
 }
 
-bool SymbolGraph::isImplicitlyPrivate(const ValueDecl *VD) const {
+bool SymbolGraph::isImplicitlyPrivate(const ValueDecl *VD,
+                                      bool IgnoreContext) const {
   // Don't record unconditionally private declarations
   if (VD->isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic=*/false)) {
     return true;
@@ -550,15 +582,19 @@ bool SymbolGraph::isImplicitlyPrivate(const ValueDecl *VD) const {
     return true;
   }
 
+  if (IgnoreContext) {
+    return false;
+  }
+
   // Check up the parent chain. Anything inside a privately named
   // thing is also private. We could be looking at the `B` of `_A.B`.
   if (const auto *DC = VD->getDeclContext()) {
     if (const auto *Parent = DC->getAsDecl()) {
       if (const auto *ParentVD = dyn_cast<ValueDecl>(Parent)) {
-        return isImplicitlyPrivate(ParentVD);
+        return isImplicitlyPrivate(ParentVD, IgnoreContext);
       } else if (const auto *Extension = dyn_cast<ExtensionDecl>(Parent)) {
         if (const auto *Nominal = Extension->getExtendedNominal()) {
-          return isImplicitlyPrivate(Nominal);
+          return isImplicitlyPrivate(Nominal, IgnoreContext);
         }
       }
     }
