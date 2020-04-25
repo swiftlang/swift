@@ -97,8 +97,8 @@ func testImplicitMember() -> MyStruct {
 }
 // EXPR_IMPLICITMEMBER: Begin completions, 3 items
 // EXPR_IMPLICITMEMBER-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: <name>init</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); name=init(x: Int)
-// EXPR_IMPLICITMEMBER-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: <name>instance</name>; name=instance
-// EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); name=create(x: Int)
+// EXPR_IMPLICITMEMBER-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: <name>instance</name>; name=instance
+// EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); name=create(x: Int)
 // EXPR_IMPLICITMEMBER: End completions
 
 func testArgument() -> MyStruct {
