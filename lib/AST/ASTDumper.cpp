@@ -2695,7 +2695,7 @@ public:
       }
     }
     OS << '\n';
-    auto *TyR = E->getTypeLoc().getTypeRepr();
+    auto *TyR = E->getPlaceholderTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR)
       printRec(TyR);

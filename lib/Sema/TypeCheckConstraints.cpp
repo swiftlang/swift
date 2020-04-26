@@ -1096,16 +1096,6 @@ namespace {
         return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
       }
 
-      if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
-        if (!PlaceholderE->getTypeLoc().isNull()) {
-          if (!TypeChecker::validateType(
-                  getASTContext(), PlaceholderE->getTypeLoc(),
-                  TypeResolution::forContextual(DC), None))
-            expr->setType(PlaceholderE->getTypeLoc().getType());
-        }
-        return finish(true, expr);
-      }
-
       // Let's try to figure out if `InOutExpr` is out of place early
       // otherwise there is a risk of producing solutions which can't
       // be later applied to AST and would result in the crash in some
