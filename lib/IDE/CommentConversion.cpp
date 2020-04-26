@@ -247,7 +247,7 @@ struct CommentToXMLConverter {
 
   void printTagFields(ArrayRef<StringRef> Tags) {
     OS << "<Tags>";
-    for (const auto Tag : Tags) {
+    for (const auto &Tag : Tags) {
       if (Tag.empty()) {
         continue;
       }
@@ -821,7 +821,7 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
     Converter.visit(N);
   }
 
-  for (const auto PF : DC->getParamFields()) {
+  for (const auto &PF : DC->getParamFields()) {
     Converter.visit(PF);
   }
 
