@@ -90,8 +90,7 @@ Solution::computeSubstitutions(GenericSignature sig,
 
     // FIXME: Retrieve the conformance from the solution itself.
     return TypeChecker::conformsToProtocol(replacement, protoType,
-                                           getConstraintSystem().DC,
-                                           None);
+                                           getConstraintSystem().DC);
   };
 
   return SubstitutionMap::get(sig,
@@ -414,7 +413,7 @@ namespace {
 
       return SubstitutionMap::get(sig,
                                   QueryTypeSubstitutionMap{subs},
-                                  TypeChecker::LookUpConformance(cs.DC));
+                                  LookUpConformanceInModule(cs.DC->getParentModule()));
     }
 
   public:
@@ -447,7 +446,7 @@ namespace {
           // the protocol requirement with Self == the concrete type, and SILGen
           // (or later) can devirtualize as appropriate.
           auto conformance =
-            TypeChecker::conformsToProtocol(baseTy, proto, cs.DC, None);
+            TypeChecker::conformsToProtocol(baseTy, proto, cs.DC);
           if (conformance.isConcrete()) {
             if (auto witness = conformance.getConcrete()->getWitnessDecl(decl)) {
               bool isMemberOperator = witness->getDeclContext()->isTypeContext();
@@ -1169,7 +1168,7 @@ namespace {
                   Swift3ObjCInferenceWarnings::Minimal) {
             context.Diags.diagnose(
                 memberLoc, diag::expr_dynamic_lookup_swift3_objc_inference,
-                member->getDescriptiveKind(), member->getFullName(),
+                member->getDescriptiveKind(), member->getName(),
                 member->getDeclContext()->getSelfNominalTypeDecl()->getName());
             context.Diags
                 .diagnose(member, diag::make_decl_objc,
@@ -2082,8 +2081,7 @@ namespace {
       auto bridgedToObjectiveCConformance
         = TypeChecker::conformsToProtocol(valueType,
                                           bridgedProto,
-                                          cs.DC,
-                                          None);
+                                          cs.DC);
 
       FuncDecl *fn = nullptr;
 
@@ -2343,7 +2341,7 @@ namespace {
       ProtocolDecl *protocol = TypeChecker::getProtocol(
           ctx, expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
-      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC, None)) {
+      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC)) {
         // If the type does not conform to ExpressibleByStringLiteral, it should
         // be ExpressibleByExtendedGraphemeClusterLiteral.
         protocol = TypeChecker::getProtocol(
@@ -2352,7 +2350,7 @@ namespace {
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
-      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC, None)) {
+      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC)) {
         // ... or it should be ExpressibleByUnicodeScalarLiteral.
         protocol = TypeChecker::getProtocol(
             cs.getASTContext(), expr->getLoc(),
@@ -2467,7 +2465,7 @@ namespace {
         assert(proto && "Missing string interpolation protocol?");
 
         auto conformance =
-          TypeChecker::conformsToProtocol(type, proto, cs.DC, None);
+          TypeChecker::conformsToProtocol(type, proto, cs.DC);
         assert(conformance && "string interpolation type conforms to protocol");
 
         DeclName constrName(ctx, DeclBaseName::createConstructor(), argLabels);
@@ -2573,7 +2571,7 @@ namespace {
       auto proto = TypeChecker::getLiteralProtocol(cs.getASTContext(), expr);
       assert(proto && "Missing object literal protocol?");
       auto conformance =
-        TypeChecker::conformsToProtocol(conformingType, proto, cs.DC, None);
+        TypeChecker::conformsToProtocol(conformingType, proto, cs.DC);
       assert(conformance && "object literal type conforms to protocol");
 
       auto constrName = TypeChecker::getObjectLiteralConstructorName(ctx, expr);
@@ -2894,7 +2892,7 @@ namespace {
         bool diagnoseBadInitRef = true;
         auto arg = base->getSemanticsProvidingExpr();
         if (auto dre = dyn_cast<DeclRefExpr>(arg)) {
-          if (dre->getDecl()->getFullName() == cs.getASTContext().Id_self) {
+          if (dre->getDecl()->getName() == cs.getASTContext().Id_self) {
             // We have a reference to 'self'.
             diagnoseBadInitRef = false;
             // Make sure the reference to 'self' occurs within an initializer.
@@ -3278,7 +3276,7 @@ namespace {
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
       auto conformance =
-        TypeChecker::conformsToProtocol(arrayTy, arrayProto, cs.DC, None);
+        TypeChecker::conformsToProtocol(arrayTy, arrayProto, cs.DC);
       assert(conformance && "Type does not conform to protocol?");
 
       DeclName name(ctx, DeclBaseName::createConstructor(),
@@ -3322,8 +3320,7 @@ namespace {
           KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
       auto conformance =
-        TypeChecker::conformsToProtocol(dictionaryTy, dictionaryProto, cs.DC,
-                                        None);
+        TypeChecker::conformsToProtocol(dictionaryTy, dictionaryProto, cs.DC);
       if (conformance.isInvalid())
         return nullptr;
 
@@ -3473,7 +3470,7 @@ namespace {
             // initializer failable.
             de.diagnose(otherCtorRef->getLoc(),
                         diag::delegate_chain_nonoptional_to_optional,
-                        isChaining, ctor->getFullName());
+                        isChaining, ctor->getName());
             de.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
                 .fixItInsertAfter(expr->getEndLoc(), "!");
             de.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
@@ -4062,7 +4059,7 @@ namespace {
           // Special handle for literals conditional checked cast when they can
           // be statically coerced to the cast type.
           if (protocol && TypeChecker::conformsToProtocol(
-                              toType, protocol, cs.DC, None)) {
+                              toType, protocol, cs.DC)) {
             ctx.Diags
                 .diagnose(expr->getLoc(),
                           diag::literal_conditional_downcast_to_coercion,
@@ -4381,9 +4378,9 @@ namespace {
         if (!func->getDeclContext()->isTypeContext()) {
           de.diagnose(E->getLoc(), diag::expr_selector_not_method,
                       func->getDeclContext()->isModuleScopeContext(),
-                      func->getFullName())
+                      func->getName())
               .highlight(subExpr->getSourceRange());
-          de.diagnose(func, diag::decl_declared_here, func->getFullName());
+          de.diagnose(func, diag::decl_declared_here, func->getName());
           return E;
         }
 
@@ -4399,7 +4396,7 @@ namespace {
           de.diagnose(E->getModifierLoc(),
                       diag::expr_selector_expected_property,
                       E->getSelectorKind() == ObjCSelectorExpr::Setter,
-                      foundDecl->getDescriptiveKind(), foundDecl->getFullName())
+                      foundDecl->getDescriptiveKind(), foundDecl->getName())
               .fixItRemoveChars(E->getModifierLoc(),
                                 E->getSubExpr()->getStartLoc());
 
@@ -4416,9 +4413,9 @@ namespace {
         // If this isn't a property on a type, complain.
         if (!var->getDeclContext()->isTypeContext()) {
           de.diagnose(E->getLoc(), diag::expr_selector_not_property,
-                      isa<ParamDecl>(var), var->getFullName())
+                      isa<ParamDecl>(var), var->getName())
               .highlight(subExpr->getSourceRange());
-          de.diagnose(var, diag::decl_declared_here, var->getFullName());
+          de.diagnose(var, diag::decl_declared_here, var->getName());
           return E;
         }
 
@@ -4429,7 +4426,7 @@ namespace {
             var->isSetterAccessibleFrom(cs.DC);
           auto primaryDiag =
               de.diagnose(E->getLoc(), diag::expr_selector_expected_method,
-                          isSettable, var->getFullName());
+                          isSettable, var->getName());
           primaryDiag.highlight(subExpr->getSourceRange());
 
           // The point at which we will insert the modifier.
@@ -4443,10 +4440,10 @@ namespace {
 
             // Add notes for the getter and setter, respectively.
             de.diagnose(modifierLoc, diag::expr_selector_add_modifier, false,
-                        var->getFullName())
+                        var->getName())
                 .fixItInsert(modifierLoc, "getter: ");
             de.diagnose(modifierLoc, diag::expr_selector_add_modifier, true,
-                        var->getFullName())
+                        var->getName())
                 .fixItInsert(modifierLoc, "setter: ");
 
             // Bail out now. We don't know what the user wanted, so
@@ -4469,8 +4466,8 @@ namespace {
           // Make sure we actually have a setter.
           if (!var->isSettable(cs.DC)) {
             de.diagnose(E->getLoc(), diag::expr_selector_property_not_settable,
-                        var->getDescriptiveKind(), var->getFullName());
-            de.diagnose(var, diag::decl_declared_here, var->getFullName());
+                        var->getDescriptiveKind(), var->getName());
+            de.diagnose(var, diag::decl_declared_here, var->getName());
             return E;
           }
 
@@ -4478,8 +4475,8 @@ namespace {
           if (!var->isSetterAccessibleFrom(cs.DC)) {
             de.diagnose(E->getLoc(),
                         diag::expr_selector_property_setter_inaccessible,
-                        var->getDescriptiveKind(), var->getFullName());
-            de.diagnose(var, diag::decl_declared_here, var->getFullName());
+                        var->getDescriptiveKind(), var->getName());
+            de.diagnose(var, diag::decl_declared_here, var->getName());
             return E;
           }
 
@@ -4491,7 +4488,7 @@ namespace {
         de.diagnose(E->getLoc(), diag::expr_selector_no_declaration)
             .highlight(subExpr->getSourceRange());
         de.diagnose(foundDecl, diag::decl_declared_here,
-                    foundDecl->getFullName());
+                    foundDecl->getName());
         return E;
       }
       assert(method && "Didn't find a method?");
@@ -4505,12 +4502,12 @@ namespace {
         // problems.
         if (auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext())) {
           de.diagnose(E->getLoc(), diag::expr_selector_cannot_be_used,
-                      foundDecl->getBaseName(), protocolDecl->getFullName());
+                      foundDecl->getBaseName(), protocolDecl->getName());
           return E;
         }
 
         de.diagnose(E->getLoc(), diag::expr_selector_not_objc,
-                    foundDecl->getDescriptiveKind(), foundDecl->getFullName())
+                    foundDecl->getDescriptiveKind(), foundDecl->getName())
             .highlight(subExpr->getSourceRange());
         de.diagnose(foundDecl, diag::make_decl_objc,
                     foundDecl->getDescriptiveKind())
@@ -4523,7 +4520,7 @@ namespace {
             cs.getASTContext().LangOpts.WarnSwift3ObjCInference ==
                 Swift3ObjCInferenceWarnings::Minimal) {
           de.diagnose(E->getLoc(), diag::expr_selector_swift3_objc_inference,
-                      foundDecl->getDescriptiveKind(), foundDecl->getFullName(),
+                      foundDecl->getDescriptiveKind(), foundDecl->getName(),
                       foundDecl->getDeclContext()
                           ->getSelfNominalTypeDecl()
                           ->getName())
@@ -4939,7 +4936,7 @@ namespace {
         // verified by the solver, we just need to get it again
         // with all of the generic parameters resolved.
         auto hashableConformance =
-          TypeChecker::conformsToProtocol(indexType, hashable, cs.DC, None);
+          TypeChecker::conformsToProtocol(indexType, hashable, cs.DC);
         assert(hashableConformance);
 
         conformances.push_back(hashableConformance);
@@ -5263,7 +5260,7 @@ collectExistentialConformances(Type fromType, Type toType,
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : layout.getProtocols()) {
     conformances.push_back(TypeChecker::containsProtocol(
-        fromType, proto->getDecl(), DC, None));
+        fromType, proto->getDecl(), DC));
   }
 
   return toType->getASTContext().AllocateCopy(conformances);
@@ -5759,9 +5756,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       // We already had a ParenExpr, so replace it's sub-expression.
       argParen->setSubExpr(newArgs[0]);
     } else {
+      bool isImplicit = arg->isImplicit();
       arg = new (ctx)
           ParenExpr(lParenLoc, newArgs[0], rParenLoc, hasTrailingClosure);
-      arg->setImplicit();
+      arg->setImplicit(isImplicit);
     }
   } else {
     assert(isa<TupleType>(paramType.getPointer()));
@@ -5776,7 +5774,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       // Build a new TupleExpr, re-using source location information.
       arg = TupleExpr::create(ctx, lParenLoc, newArgs, newLabels, newLabelLocs,
                               rParenLoc, hasTrailingClosure,
-                              /*implicit=*/true);
+                              /*implicit=*/arg->isImplicit());
     }
   }
 
@@ -6429,7 +6427,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
       auto conformance =
         TypeChecker::conformsToProtocol(
-                        cs.getType(expr), hashable, cs.DC, None);
+                        cs.getType(expr), hashable, cs.DC);
       assert(conformance && "must conform to Hashable");
 
       return cs.cacheType(
@@ -6964,7 +6962,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   // initialize via the builtin protocol.
   if (builtinProtocol) {
     auto builtinConformance = TypeChecker::conformsToProtocol(
-        type, builtinProtocol, cs.DC, None);
+        type, builtinProtocol, cs.DC);
     if (builtinConformance) {
       // Find the witness that we'll use to initialize the type via a builtin
       // literal.
@@ -6996,7 +6994,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
   // This literal type must conform to the (non-builtin) protocol.
   assert(protocol && "requirements should have stopped recursion");
-  auto conformance = TypeChecker::conformsToProtocol(type, protocol, cs.DC, None);
+  auto conformance = TypeChecker::conformsToProtocol(type, protocol, cs.DC);
   assert(conformance && "must conform to literal protocol");
 
   // Dig out the literal type and perform a builtin literal conversion to it.
@@ -7133,7 +7131,7 @@ ExprRewriter::buildDynamicCallable(ApplyExpr *apply, SelectedOverload selected,
     auto dictLitProto =
         ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     auto conformance =
-        TypeChecker::conformsToProtocol(argumentType, dictLitProto, cs.DC, None);
+        TypeChecker::conformsToProtocol(argumentType, dictLitProto, cs.DC);
     auto keyType = conformance.getTypeWitnessByName(argumentType, ctx.Id_Key);
     auto valueType =
         conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
@@ -8405,7 +8403,7 @@ ProtocolConformanceRef Solution::resolveConformance(
     // itself rather than another conforms-to-protocol check.
     Type substConformingType = simplifyType(conformingType);
     return TypeChecker::conformsToProtocol(
-        substConformingType, proto, constraintSystem->DC, None);
+        substConformingType, proto, constraintSystem->DC);
   }
 
   return ProtocolConformanceRef::forInvalid();

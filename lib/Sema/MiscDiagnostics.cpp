@@ -378,16 +378,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       // NSObject.addObserver(_:forKeyPath:options:context:)
       if (uncurryLevel == 1 && argIndex == 3) {
-        return decl->getFullName().isCompoundName("addObserver",
-                                                  { "", "forKeyPath",
-                                                    "options", "context" });
+        return decl->getName().isCompoundName("addObserver",
+                                              { "", "forKeyPath",
+                                                "options", "context" });
       }
 
       // NSObject.removeObserver(_:forKeyPath:context:)
       if (uncurryLevel == 1 && argIndex == 2) {
-        return decl->getFullName().isCompoundName("removeObserver",
-                                                  { "", "forKeyPath",
-                                                    "context" });
+        return decl->getName().isCompoundName("removeObserver",
+                                              { "", "forKeyPath", "context" });
       }
 
       return false;
@@ -466,7 +465,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       // Point to callee parameter
       Ctx.Diags.diagnose(calleeParam, diag::decl_declared_here,
-                         calleeParam->getFullName());
+                         calleeParam->getName());
     }
 
     Optional<MagicIdentifierLiteralExpr::Kind>
@@ -600,8 +599,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                          VD->getBaseIdentifier(),
                          VD->getDescriptiveKind(),
                          declParent->getDescriptiveKind(),
-                         declParent->getFullName());
-      Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD->getFullName());
+                         declParent->getName());
+      Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD->getName());
 
       if (VD->getDeclContext()->isTypeContext()) {
         Ctx.Diags.diagnose(DRE->getLoc(), diag::fix_unqualified_access_member)
@@ -1984,7 +1983,7 @@ static void diagnoseUnownedImmediateDeallocationImpl(ASTContext &ctx,
   ctx.Diags.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
     .highlight(diagRange);
 
-  ctx.Diags.diagnose(varDecl, diag::decl_declared_here, varDecl->getFullName());
+  ctx.Diags.diagnose(varDecl, diag::decl_declared_here, varDecl->getName());
 }
 
 void swift::diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
@@ -3375,7 +3374,7 @@ class ObjCSelectorWalker : public ASTWalker {
     // Determine the name we would search for. If there are no
     // argument names, our lookup will be based solely on the base
     // name.
-    DeclName lookupName = method->getFullName();
+    DeclName lookupName = method->getName();
     if (lookupName.getArgumentNames().empty())
       lookupName = lookupName.getBaseName();
 
@@ -3460,7 +3459,7 @@ public:
       if (!ctorContextType || !ctorContextType->isEqual(SelectorTy))
         return { true, expr };
 
-      auto argNames = ctor->getFullName().getArgumentNames();
+      auto argNames = ctor->getName().getArgumentNames();
       if (argNames.size() != 1) return { true, expr };
 
       // Is this the init(stringLiteral:) initializer or init(_:) initializer?
@@ -3623,14 +3622,14 @@ public:
           switch (bestAccessor->getAccessorKind()) {
           case AccessorKind::Get:
             out << "getter: ";
-            name = bestAccessor->getStorage()->getFullName();
+            name = bestAccessor->getStorage()->getName();
             break;
 
           case AccessorKind::Set:
           case AccessorKind::WillSet:
           case AccessorKind::DidSet:
             out << "setter: ";
-            name = bestAccessor->getStorage()->getFullName();
+            name = bestAccessor->getStorage()->getName();
             break;
 
           case AccessorKind::Address:
@@ -3640,7 +3639,7 @@ public:
             llvm_unreachable("cannot be @objc");
           }
         } else {
-          name = bestMethod->getFullName();
+          name = bestMethod->getName();
         }
 
         auto typeName = nominal->getName().str();
@@ -3960,7 +3959,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
                               : diag::iuo_to_any_coercion_note;
 
           Ctx.Diags.diagnose(decl->getLoc(), noteDiag,
-                             decl->getDescriptiveKind(), decl->getFullName());
+                             decl->getDescriptiveKind(), decl->getName());
         }
       } else {
         Ctx.Diags.diagnose(subExpr->getStartLoc(),
@@ -4223,7 +4222,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
               !storage->isSetterAccessibleFrom(DC)) {
             Ctx.Diags.diagnose(keyPathExpr->getLoc(),
                                swift::diag::expr_deprecated_writable_keypath,
-                               storage->getFullName());
+                               storage->getName());
           }
         }
       }
@@ -4270,8 +4269,8 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
         return;
       if (fn->getModuleContext()->getName() != C.Id_Foundation)
         return;
-      if (!fn->getFullName().isCompoundName("observe",
-                                            {"", "options", "changeHandler"}))
+      if (!fn->getName().isCompoundName("observe",
+                                        {"", "options", "changeHandler"}))
         return;
       auto args = cast<TupleExpr>(expr->getArg());
       auto firstArg = dyn_cast<KeyPathExpr>(args->getElement(0));
@@ -4291,7 +4290,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       C.Diags
           .diagnose(expr->getLoc(),
                     diag::observe_keypath_property_not_objc_dynamic,
-                    property->getFullName(), fn->getFullName())
+                    property->getName(), fn->getName())
           .highlight(lastComponent.getLoc());
     }
 
@@ -4545,7 +4544,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
-  DeclName name = afd->getFullName();
+  const DeclName name = afd->getName();
   if (!name)
     return None;
 

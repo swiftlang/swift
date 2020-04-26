@@ -197,7 +197,7 @@ private:
 
     // Create "$Varname".
     llvm::SmallString<256> DstNameBuf;
-    DeclName DstDN = DstDecl->getFullName();
+    const DeclName DstDN = DstDecl->getName();
     StringRef DstName = Ctx.AllocateCopy(DstDN.getString(DstNameBuf));
     assert(!DstName.empty() && "Varname must be non-empty");
     Expr *Varname = new (Ctx) StringLiteralExpr(DstName, SourceRange());

@@ -259,6 +259,7 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver) {
   case swift::PlatformKind::macCatalystApplicationExtension:
     return LinkerPlatformId::macCatalyst;
   }
+  llvm_unreachable("invalid platform kind");
 }
 
 static StringRef

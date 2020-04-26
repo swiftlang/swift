@@ -427,7 +427,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::ValueWitness: {
     auto requirement = getRequirement();
     auto selfNominal = requirement->getDeclContext()->getSelfNominalTypeDecl();
-    Out << "[." << selfNominal->getName() << "::" << requirement->getFullName()
+    Out << "[." << selfNominal->getName() << "::" << requirement->getName()
         << ": witness] == ";
     break;
   }

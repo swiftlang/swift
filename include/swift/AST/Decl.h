@@ -2503,8 +2503,7 @@ public:
   bool isOperator() const { return Name.isOperator(); }
 
   /// Retrieve the full name of the declaration.
-  /// TODO: Rename to getName?
-  DeclName getFullName() const { return Name; }
+  DeclName getName() const { return Name; }
   void setName(DeclName name) { Name = name; }
 
   /// Retrieve the base name of the declaration, ignoring any argument
@@ -2518,7 +2517,7 @@ public:
   /// Generates a DeclNameRef referring to this declaration with as much
   /// specificity as possible.
   DeclNameRef createNameRef() const {
-    return DeclNameRef(getFullName());
+    return DeclNameRef(Name);
   }
 
   /// Retrieve the name to use for this declaration when interoperating
@@ -2847,7 +2846,6 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -4973,7 +4971,6 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -5948,7 +5945,7 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    assert(!getName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -6649,7 +6646,7 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    assert(!getName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -7402,7 +7399,7 @@ public:
     return new (ctx) MissingMemberDecl(DC, name, numVTableEntries, hasStorage);
   }
 
-  DeclName getFullName() const {
+  DeclName getName() const {
     return Name;
   }
 

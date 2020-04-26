@@ -458,10 +458,11 @@ getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
   return None;
 }
 
-static void
-getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                             ASTContext &ctx,
-                             const ClangImporterOptions &importerOpts) {
+void
+importer::getNormalInvocationArguments(
+    std::vector<std::string> &invocationArgStrs,
+    ASTContext &ctx,
+    const ClangImporterOptions &importerOpts) {
   const auto &LangOpts = ctx.LangOpts;
   const llvm::Triple &triple = LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
@@ -709,10 +710,11 @@ getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
   });
 }
 
-static void
-addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                             ASTContext &ctx,
-                             const ClangImporterOptions &importerOpts) {
+void
+importer::addCommonInvocationArguments(
+    std::vector<std::string> &invocationArgStrs,
+    ASTContext &ctx,
+    const ClangImporterOptions &importerOpts) {
   using ImporterImpl = ClangImporter::Implementation;
   const llvm::Triple &triple = ctx.LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
@@ -3006,7 +3008,7 @@ ClangModuleUnit::lookupNestedType(Identifier name,
       if (importedContext != baseType)
         return true;
 
-      assert(decl->getFullName().matchesRef(name) &&
+      assert(decl->getName() == name &&
              "importFullName behaved differently from importDecl");
       results.push_back(decl);
       anyMatching = true;
@@ -3661,7 +3663,7 @@ void ClangImporter::Implementation::lookupValue(
 
     // If the name matched, report this result.
     bool anyMatching = false;
-    if (decl->getFullName().matchesRef(name) &&
+    if (decl->getName().matchesRef(name) &&
         decl->getDeclContext()->isModuleScopeContext()) {
       consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
       anyMatching = true;
@@ -3670,7 +3672,7 @@ void ClangImporter::Implementation::lookupValue(
     // If there is an alternate declaration and the name matches,
     // report this result.
     for (auto alternate : getAlternateDecls(decl)) {
-      if (alternate->getFullName().matchesRef(name) &&
+      if (alternate->getName().matchesRef(name) &&
           alternate->getDeclContext()->isModuleScopeContext()) {
         consumer.foundDecl(alternate, DeclVisibilityKind::VisibleAtTopLevel);
         anyMatching = true;
@@ -3705,7 +3707,7 @@ void ClangImporter::Implementation::lookupValue(
                                                      nameVersion));
           if (!alternateNamedDecl || alternateNamedDecl == decl)
             return;
-          assert(alternateNamedDecl->getFullName().matchesRef(name) &&
+          assert(alternateNamedDecl->getName().matchesRef(name) &&
                  "importFullName behaved differently from importDecl");
           if (alternateNamedDecl->getDeclContext()->isModuleScopeContext()) {
             consumer.foundDecl(alternateNamedDecl,
@@ -3751,7 +3753,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
       // If the name we found matches, report the declaration.
       // FIXME: If we didn't need to check alternate decls here, we could avoid
       // importing the member at all by checking importedName ahead of time.
-      if (decl->getFullName().matchesRef(name)) {
+      if (decl->getName().matchesRef(name)) {
         consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup,
                            DynamicLookupInfo::AnyObject);
       }
@@ -3759,7 +3761,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
       // Check for an alternate declaration; if its name matches,
       // report it.
       for (auto alternate : getAlternateDecls(decl)) {
-        if (alternate->getFullName().matchesRef(name)) {
+        if (alternate->getName().matchesRef(name)) {
           consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
                              DynamicLookupInfo::AnyObject);
         }

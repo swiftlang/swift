@@ -35,6 +35,7 @@ SourceLoc DifferentiationInvoker::getLocation() const {
         ->getLocation()
         .getSourceLoc();
   }
+  llvm_unreachable("invalid differentation invoker kind");
 }
 
 void DifferentiationInvoker::print(llvm::raw_ostream &os) const {

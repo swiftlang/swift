@@ -875,14 +875,14 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     // Key path referring to the property being accessed.
     Expr *propertyKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
     propertyKeyPath = UnresolvedDotExpr::createImplicit(ctx, propertyKeyPath,
-        enclosingSelfAccess->accessedProperty->getFullName());
+        enclosingSelfAccess->accessedProperty->getName());
     propertyKeyPath = new (ctx) KeyPathExpr(
         SourceLoc(), nullptr, propertyKeyPath, /*hasLeadingDot=*/true);
 
     // Key path referring to the backing storage property.
     Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
     storageKeyPath = UnresolvedDotExpr::createImplicit(ctx, storageKeyPath,
-                                                       storage->getFullName());
+                                                       storage->getName());
     storageKeyPath = new (ctx) KeyPathExpr(SourceLoc(), nullptr, storageKeyPath,
                                            /*hasLeadingDot=*/true);
     Expr *args[3] = {selfDRE, propertyKeyPath, storageKeyPath};
@@ -890,7 +890,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
     lookupExpr = SubscriptExpr::create(
         ctx, wrapperMetatype, SourceLoc(), args,
-        subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
+        subscriptDecl->getName().getArgumentNames(), { }, SourceLoc(),
         nullptr, subscriptDecl, /*Implicit=*/true);
 
     // FIXME: Since we're not resolving overloads or anything, we should be
@@ -956,7 +956,7 @@ static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc, None))
+    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc))
       return result;
   }
 
@@ -1002,7 +1002,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   FuncDecl *copyMethod = nullptr;
   for (auto member : conformance.getRequirement()->getMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
-      if (func->getFullName() == copyWithZoneName) {
+      if (func->getName() == copyWithZoneName) {
         copyMethod = func;
         break;
       }
@@ -2615,7 +2615,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
       var->setInvalid();
       if (auto nominalWrapper = wrapperType->getAnyNominal()) {
         nominalWrapper->diagnose(diag::property_wrapper_declared_here,
-                                 nominalWrapper->getFullName());
+                                 nominalWrapper->getName());
       }
       return PropertyWrapperBackingPropertyInfo();
     }

@@ -1095,7 +1095,7 @@ static Type getContextFreeInterfaceType(ValueDecl *VD) {
 ArrayRef<ValueDecl *>
 ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
   // Skip decls that don't have valid names.
-  if (!VD->getFullName())
+  if (!VD->getName())
     return ArrayRef<ValueDecl*>();
 
   // Check if VD is from a protocol extension.
@@ -1107,7 +1107,7 @@ ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
   // the same name with VD.
   ResolvedMemberResult LookupResult =
   resolveValueMember(*P->getInnermostDeclContext(),
-                     P->getDeclaredInterfaceType(), VD->getFullName());
+                     P->getDeclaredInterfaceType(), VD->getName());
 
   auto VDType = getContextFreeInterfaceType(VD);
   for (auto Mem : LookupResult.getMemberDecls(InterestedMemberKind::All)) {

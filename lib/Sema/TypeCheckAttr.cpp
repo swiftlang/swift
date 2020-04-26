@@ -481,7 +481,7 @@ void AttributeChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
   if (!FD->getAttrs().hasAttribute<ObjCAttr>() ||
       !FD->getAttrs().getAttribute<ObjCAttr>()->hasName()) {
     auto newSwiftBaseName = replacingPrefix(FD->getBaseIdentifier());
-    auto argumentNames = FD->getFullName().getArgumentNames();
+    auto argumentNames = FD->getName().getArgumentNames();
     DeclName newSwiftName(Ctx, newSwiftBaseName, argumentNames);
 
     auto diag = diagnose(FD, diag::fixit_rename_in_swift, newSwiftName);
@@ -1120,8 +1120,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   if (!hasKeywordArguments) {
     auto arrayLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    return (bool)TypeChecker::conformsToProtocol(argType, arrayLitProto, DC,
-                                                 ConformanceCheckOptions());
+    return (bool)TypeChecker::conformsToProtocol(argType, arrayLitProto, DC);
   }
   // If keyword arguments, check that argument type conforms to
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
@@ -1130,13 +1129,11 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
     ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
     ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC,
-                                                  ConformanceCheckOptions());
+  auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC);
   if (dictConf.isInvalid())
     return false;
   auto keyType = dictConf.getTypeWitnessByName(argType, ctx.Id_Key);
-  return (bool)TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
-                                               ConformanceCheckOptions());
+  return (bool)TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC);
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -1229,8 +1226,7 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
     ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
 
   // If this is `subscript(dynamicMember: String*)`
-  return (bool)TypeChecker::conformsToProtocol(paramType, stringLitProto, DC,
-                                               ConformanceCheckOptions());
+  return (bool)TypeChecker::conformsToProtocol(paramType, stringLitProto, DC);
 }
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
@@ -1671,7 +1667,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   if (!ApplicationDelegateProto ||
       !TypeChecker::conformsToProtocol(CD->getDeclaredType(),
-                                       ApplicationDelegateProto, CD, None)) {
+                                       ApplicationDelegateProto, CD)) {
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_not_ApplicationDelegate,
              applicationMainKind);
@@ -2026,7 +2022,7 @@ static void checkSpecializeAttrRequirements(
       if (gpDecl) {
         ctx.Diags.diagnose(attr->getLocation(),
                            diag::specialize_attr_missing_constraint,
-                           gpDecl->getFullName());
+                           gpDecl->getName());
       }
     }
   }
@@ -2070,8 +2066,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   if (!genericSig) {
     // Only generic functions are permitted to have trailing where clauses.
     diagnose(attr->getLocation(),
-             diag::specialize_attr_nongeneric_trailing_where,
-             FD->getFullName())
+             diag::specialize_attr_nongeneric_trailing_where, FD->getName())
         .highlight(trailingWhereClause->getSourceRange());
     return;
   }
@@ -2199,7 +2194,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   if (VD->getFormalAccess() < AccessLevel::Public &&
       !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
-                          VD->getFullName(), VD->getFormalAccess());
+                          VD->getName(), VD->getFormalAccess());
   }
 }
 
@@ -2217,8 +2212,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   if (VD->getFormalAccess() != AccessLevel::Internal) {
     diagnoseAndRemoveAttr(attr,
                           diag::usable_from_inline_attr_with_explicit_access,
-                          VD->getFullName(),
-                          VD->getFormalAccess());
+                          VD->getName(), VD->getFormalAccess());
     return;
   }
 
@@ -2405,7 +2399,7 @@ static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
     for (auto result : results) {
       Diags.diagnose(result,
                      diag::dynamic_replacement_accessor_ambiguous_candidate,
-                     result->getModuleContext()->getFullName());
+                     result->getModuleContext()->getName());
     }
     attr->setInvalid();
     return nullptr;
@@ -2417,7 +2411,7 @@ static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
   if (!origStorage->isDynamic()) {
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_not_dynamic,
-                   origStorage->getFullName());
+                   origStorage->getName());
     attr->setInvalid();
     return nullptr;
   }
@@ -2434,7 +2428,7 @@ static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_not_explicit,
                    (unsigned)origAccessor->getAccessorKind(),
-                   origStorage->getFullName());
+                   origStorage->getName());
     attr->setInvalid();
     return nullptr;
   }
@@ -2470,7 +2464,7 @@ findReplacedFunction(DeclNameRef replacedFunctionName,
         if (Diags) {
           Diags->diagnose(attr->getLocation(),
                           diag::dynamic_replacement_function_not_dynamic,
-                          result->getFullName());
+                          result->getName());
           attr->setInvalid();
         }
         return nullptr;
@@ -2495,7 +2489,7 @@ findReplacedFunction(DeclNameRef replacedFunctionName,
     for (auto *result : results) {
       Diags->diagnose(SourceLoc(),
                       diag::dynamic_replacement_found_function_of_type,
-                      result->getFullName(),
+                      result->getName(),
                       result->getInterfaceType()->getCanonicalType());
     }
   }
@@ -2557,13 +2551,13 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   if (original->isObjC() && !replacement->isObjC()) {
     diagnose(attr->getLocation(),
              diag::dynamic_replacement_replacement_not_objc_dynamic,
-             replacement->getFullName());
+             replacement->getName());
     attr->setInvalid();
   }
   if (!original->isObjC() && replacement->isObjC()) {
     diagnose(attr->getLocation(),
              diag::dynamic_replacement_replaced_not_objc_dynamic,
-             original->getFullName());
+             original->getName());
     attr->setInvalid();
   }
 
@@ -2637,7 +2631,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   }
 
   // The type eraser must conform to the annotated protocol
-  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc, None)) {
+  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc)) {
     diags.diagnose(attr->getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
@@ -2692,16 +2686,14 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
           return getSubstitution(type);
         },
-        TypeChecker::LookUpConformance(dc));
+        LookUpConformanceInModule(dc->getParentModule()));
 
     // Use invalid 'SourceLoc's to suppress diagnostics.
     auto result = TypeChecker::checkGenericArguments(
-          protocol, SourceLoc(), SourceLoc(), typeEraser,
+          dc, SourceLoc(), SourceLoc(), typeEraser,
           genericSignature->getGenericParams(),
           genericSignature->getRequirements(),
-          QuerySubstitutionMap{subMap},
-          TypeChecker::LookUpConformance(dc),
-          None);
+          QuerySubstitutionMap{subMap});
 
     if (result != RequirementCheckResult::Success) {
       unviable.push_back(
@@ -2809,7 +2801,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     if (!NTD->lookupConformance(DC->getParentModule(), PD, conformances)) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_not_conformed_to,
-               NTD->getFullName(), PD->getFullName())
+               NTD->getName(), PD->getName())
         .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
     }
 
@@ -2838,7 +2830,7 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (VD->getFormalAccess() < AccessLevel::Public &&
       !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::frozen_attr_on_internal_type,
-                          VD->getFullName(), VD->getFormalAccess());
+                          VD->getName(), VD->getFormalAccess());
   }
 }
 
@@ -2872,7 +2864,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
       diagnose(attr->getLocation(),
                diag::property_wrapper_attribute_not_on_property,
-               nominal->getFullName());
+               nominal->getName());
       attr->setInvalid();
       return;
     }
@@ -2910,7 +2902,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       if (shouldDiagnose()) {
         diagnose(attr->getLocation(),
                  diag::function_builder_attribute_on_storage_without_getter,
-                 nominal->getFullName(),
+                 nominal->getName(),
                  isa<SubscriptDecl>(storage) ? 0
                    : storage->getDeclContext()->isTypeContext() ? 1
                    : cast<VarDecl>(storage)->isLet() ? 2 : 3);
@@ -2920,7 +2912,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     } else {
       diagnose(attr->getLocation(),
                diag::function_builder_attribute_not_allowed_here,
-               nominal->getFullName());
+               nominal->getName());
       attr->setInvalid();
       return;
     }
@@ -2949,8 +2941,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   }
 
   diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
-           nominal->getDescriptiveKind(), nominal->getFullName());
-  nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
+           nominal->getDescriptiveKind(), nominal->getName());
+  nominal->diagnose(diag::decl_declared_here, nominal->getName());
   attr->setInvalid();
 }
 
@@ -3360,7 +3352,7 @@ static ProtocolConformanceRef getDifferentiableConformance(Type type,
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
   auto conf =
-      TypeChecker::conformsToProtocol(type, differentiableProto, DC, None);
+      TypeChecker::conformsToProtocol(type, differentiableProto, DC);
   if (!conf)
     return ProtocolConformanceRef();
   // Try to get the `TangentVector` type witness, in case the conformance has
@@ -3459,7 +3451,7 @@ static IndexSubset *computeDifferentiabilityParameters(
     if (!isInstanceMethod) {
       diags
           .diagnose(attrLoc, diag::diff_function_no_parameters,
-                    function->getFullName())
+                    function->getName())
           .highlight(function->getSignatureSourceRange());
       return nullptr;
     }
@@ -3474,7 +3466,7 @@ static IndexSubset *computeDifferentiabilityParameters(
       if (!conformsToDifferentiable(selfType, function)) {
         diags
             .diagnose(attrLoc, diag::diff_function_no_parameters,
-                      function->getFullName())
+                      function->getName())
             .highlight(function->getSignatureSourceRange());
         return nullptr;
       }
@@ -4016,7 +4008,7 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
           .diagnose(
               attr->getLocation(),
               diag::differentiable_attr_where_clause_for_nongeneric_original,
-              original->getFullName())
+              original->getName())
           .highlight(whereClause->getSourceRange());
       attr->setInvalid();
       return true;
@@ -4236,7 +4228,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
   if (originalResults.empty()) {
     diags
         .diagnose(attr->getLocation(), diag::autodiff_attr_original_void_result,
-                  original->getFullName())
+                  original->getName())
         .highlight(original->getSourceRange());
     attr->setInvalid();
     return nullptr;
@@ -4386,21 +4378,8 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
         // requirements are not satisfied.
         if (!source)
           return false;
-        // Check if target's requirements are satisfied by source.
-        // Cancel diagnostics using `DiagnosticTransaction`.
-        // Diagnostics should not be emitted because this function is used to
-        // check candidates; if no candidates match, a separate diagnostic will
-        // be produced.
-        DiagnosticTransaction transaction(Ctx.Diags);
-        SWIFT_DEFER { transaction.abort(); };
-        return TypeChecker::checkGenericArguments(
-                   derivative, originalName.Loc.getBaseNameLoc(),
-                   originalName.Loc.getBaseNameLoc(), Type(),
-                   source->getGenericParams(), target->getRequirements(),
-                   [](SubstitutableType *dependentType) {
-                     return Type(dependentType);
-                   },
-                   lookupConformance, None) == RequirementCheckResult::Success;
+
+        return target->requirementsNotSatisfiedBy(source).empty();
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
@@ -4485,7 +4464,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
                      diag::derivative_attr_original_stored_property_unsupported,
                      originalName.Name);
       diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here,
-                     asd->getFullName());
+                     asd->getName());
       return true;
     }
   }
@@ -4516,7 +4495,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
         diags.diagnose(
             attr->getLocation(),
             diag::derivative_attr_class_member_dynamic_self_result_unsupported,
-            DeclNameRef(originalAFD->getFullName()));
+            DeclNameRef(originalAFD->getName()));
         return true;
       }
     }
@@ -4559,7 +4538,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   if (originalResults.empty()) {
     diags
         .diagnose(attr->getLocation(), diag::autodiff_attr_original_void_result,
-                  derivative->getFullName())
+                  derivative->getName())
         .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
     attr->setInvalid();
     return true;
@@ -4613,7 +4592,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     // Emit differential/pullback type mismatch error on attribute.
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_result_func_type_mismatch,
-                   funcResultElt.getName(), originalAFD->getFullName());
+                   funcResultElt.getName(), originalAFD->getName());
     // Emit note with expected differential/pullback type on actual type
     // location.
     auto *tupleReturnTypeRepr =
@@ -4628,7 +4607,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     if (originalAFD->getLoc().isValid())
       diags.diagnose(originalAFD->getLoc(),
                      diag::derivative_attr_result_func_original_note,
-                     originalAFD->getFullName());
+                     originalAFD->getName());
     return true;
   }
 
@@ -4639,7 +4618,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   if (derivativeAttrs.size() > 1) {
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_original_already_has_derivative,
-                   originalAFD->getFullName());
+                   originalAFD->getName());
     for (auto *duplicateAttr : derivativeAttrs) {
       if (duplicateAttr == attr)
         continue;
@@ -4843,8 +4822,6 @@ doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
 
 void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto *transpose = cast<FuncDecl>(D);
-  auto lookupConformance =
-      LookUpConformanceInModule(D->getDeclContext()->getParentModule());
   auto originalName = attr->getOriginalFunctionName();
   auto *transposeInterfaceType =
       transpose->getInterfaceType()->castTo<AnyFunctionType>();
@@ -4929,21 +4906,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
         // requirements are not satisfied.
         if (!source)
           return false;
-        // Check if target's requirements are satisfied by source.
-        // Cancel diagnostics using `DiagnosticTransaction`.
-        // Diagnostics should not be emitted because this function is used to
-        // check candidates; if no candidates match, a separate diagnostic will
-        // be produced.
-        DiagnosticTransaction transaction(Ctx.Diags);
-        SWIFT_DEFER { transaction.abort(); };
-        return TypeChecker::checkGenericArguments(
-            transpose, originalName.Loc.getBaseNameLoc(),
-            originalName.Loc.getBaseNameLoc(), Type(),
-            source->getGenericParams(), target->getRequirements(),
-            [](SubstitutableType *dependentType) {
-              return Type(dependentType);
-            },
-            lookupConformance, None) == RequirementCheckResult::Success;
+
+        return target->requirementsNotSatisfiedBy(source).empty();
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {

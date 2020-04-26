@@ -167,10 +167,10 @@ namespace {
   };
 
   static DeclName getDescriptiveName(AbstractFunctionDecl *AFD) {
-    DeclName name = AFD->getFullName();
+    DeclName name = AFD->getName();
     if (!name) {
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        name = accessor->getStorage()->getFullName();
+        name = accessor->getStorage()->getName();
       }
     }
     return name;
@@ -495,7 +495,7 @@ public:
                                        diag::return_non_failable_init)
           .highlight(E->getSourceRange());
         getASTContext().Diags.diagnose(ctor->getLoc(), diag::make_init_failable,
-                    ctor->getFullName())
+                    ctor->getName())
           .fixItInsertAfter(ctor->getLoc(), "?");
         RS->setResult(nullptr);
         return RS;
@@ -1533,10 +1533,10 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       }
 
       auto diagID = diag::expression_unused_result_call;
-      if (callee->getFullName().isOperator())
+      if (callee->getName().isOperator())
         diagID = diag::expression_unused_result_operator;
       
-      DE.diagnose(fn->getLoc(), diagID, callee->getFullName())
+      DE.diagnose(fn->getLoc(), diagID, callee->getName())
         .highlight(SR1).highlight(SR2);
     } else
       DE.diagnose(fn->getLoc(), diag::expression_unused_result_unknown,

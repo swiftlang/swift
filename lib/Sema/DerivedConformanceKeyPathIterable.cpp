@@ -106,8 +106,8 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
 
     auto *dotExpr = new (C)
         UnresolvedDotExpr(nominalTypeExpr, SourceLoc(),
-                          DeclNameRef(member->getFullName()),
-                          DeclNameLoc(), /*Implicit*/ true);
+                          DeclNameRef(member->getName()), DeclNameLoc(),
+                          /*Implicit*/ true);
     Expr *keyPathExpr =
         new (C) KeyPathExpr(SourceLoc(), dotExpr, nullptr, /*Implicit*/ true);
     // NOTE(TF-575): Adding an explicit coercion expression to

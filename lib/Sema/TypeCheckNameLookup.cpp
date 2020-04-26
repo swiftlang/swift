@@ -152,9 +152,8 @@ namespace {
 
       // Dig out the protocol conformance.
       auto *foundProto = cast<ProtocolDecl>(foundDC);
-      auto conformance = TypeChecker::conformsToProtocol(conformingType,
-                                                         foundProto, DC,
-                                                         ConformanceCheckFlags::SkipConditionalRequirements);
+      auto conformance = DC->getParentModule()->lookupConformance(
+          conformingType, foundProto);
       if (conformance.isInvalid()) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
@@ -481,8 +480,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
-      auto conformance = conformsToProtocol(type, protocol, dc,
-                                            ConformanceCheckFlags::SkipConditionalRequirements);
+      auto conformance = dc->getParentModule()->lookupConformance(type, protocol);
       if (!conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
@@ -596,7 +594,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     if (!isPlausibleTypo(refKind, corrections.WrittenName, decl))
       return;
 
-    auto candidateName = decl->getFullName();
+    const auto candidateName = decl->getName();
 
     // Don't waste time computing edit distances that are more than
     // the worst in our collection.
@@ -695,7 +693,7 @@ void TypoCorrectionResults::noteAllCandidates() const {
     // diagnostic.
     if (!ClaimedCorrection) {
       SyntacticTypoCorrection correction(WrittenName, Loc,
-                                         candidate->getFullName());
+                                         candidate->getName());
       correction.addFixits(diagnostic);
     }
   }

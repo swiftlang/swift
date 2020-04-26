@@ -83,8 +83,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
 
   // Filter out benign diagnostics for editing.
-  if (Info.ID == diag::lex_editor_placeholder.ID ||
-      Info.ID == diag::error_doing_code_completion.ID)
+  if (Info.ID == diag::lex_editor_placeholder.ID)
     return;
 
   bool IsNote = (Info.Kind == DiagnosticKind::Note);
@@ -921,7 +920,7 @@ public:
       return true;
 
     if (isa<VarDecl>(D) && D->hasName() &&
-        D->getFullName() == D->getASTContext().Id_self)
+        D->getName() == D->getASTContext().Id_self)
       return true;
 
     // Do not annotate references to unavailable decls.

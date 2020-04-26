@@ -754,7 +754,7 @@ void TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
     const UnavailabilityReason &Reason) {
-  diagnosePotentialUnavailability(D, D->getFullName(), ReferenceRange,
+  diagnosePotentialUnavailability(D, D->getName(), ReferenceRange,
                                   ReferenceDC, Reason);
 }
 
@@ -1425,7 +1425,7 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   assert(Accessor->isGetterOrSetter());
 
   const AbstractStorageDecl *ASD = Accessor->getStorage();
-  DeclName Name = ASD->getFullName();
+  DeclName Name = ASD->getName();
 
   auto &diag = ForInout ? diag::availability_inout_accessor_only_version_newer
                         : diag::availability_accessor_only_version_newer;
@@ -1942,12 +1942,12 @@ getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
   static const unsigned NOT_ACCESSOR_INDEX = 2;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-    DeclName Name = accessor->getStorage()->getFullName();
+    DeclName Name = accessor->getStorage()->getName();
     assert(accessor->isGetterOrSetter());
     return {static_cast<unsigned>(accessor->getAccessorKind()), Name};
   }
 
-  return {NOT_ACCESSOR_INDEX, D->getFullName()};
+  return {NOT_ACCESSOR_INDEX, D->getName()};
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
@@ -2078,7 +2078,7 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
     }
 
     DeclName newName = parsedName.formDeclName(ctx);
-    size_t numArgs = override->getFullName().getArgumentNames().size();
+    size_t numArgs = override->getName().getArgumentNames().size();
     if (!newName || newName.getArgumentNames().size() != numArgs)
       return;
 
@@ -2666,8 +2666,8 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
     Context.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
   if (!integerType || !floatingType) return false;
 
-  return TypeChecker::conformsToProtocol(ty, integerType, DC, None) ||
-         TypeChecker::conformsToProtocol(ty, floatingType, DC, None);
+  return TypeChecker::conformsToProtocol(ty, integerType, DC) ||
+         TypeChecker::conformsToProtocol(ty, floatingType, DC);
 }
 
 

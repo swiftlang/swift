@@ -99,7 +99,7 @@ bool DerivedConformance::canDeriveElementaryFunctions(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, mathProto, DC, None);
+    return (bool)TypeChecker::conformsToProtocol(varType, mathProto, DC);
   });
 }
 

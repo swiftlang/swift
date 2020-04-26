@@ -40,7 +40,7 @@ static Type getVectorProtocolVectorSpaceScalarAssocType(
   if (varDecl->getInterfaceType()->hasError())
     return nullptr;
   auto varType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
-  auto conf = TypeChecker::conformsToProtocol(varType, vectorProto, DC, None);
+  auto conf = TypeChecker::conformsToProtocol(varType, vectorProto, DC);
   if (!conf)
     return nullptr;
   return conf.getTypeWitnessByName(varType, C.Id_VectorSpaceScalar);

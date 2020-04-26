@@ -355,11 +355,9 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
   
   // Make sure this type conforms to OptionSet
   auto *optionSetProto = VD->getASTContext().getProtocol(KnownProtocolKind::OptionSet);
-  bool conformsToOptionSet = (bool)TypeChecker::containsProtocol(
+  bool conformsToOptionSet = (bool)TypeChecker::conformsToProtocol(
                                                   DC->getSelfTypeInContext(),
-                                                  optionSetProto,
-                                                  DC,
-                                                  /*Flags*/None);
+                                                  optionSetProto, DC);
   
   if (!conformsToOptionSet)
     return;
@@ -558,8 +556,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     const auto *currentOverride = current->getOverriddenDecl();
     const auto *otherOverride = other->getOverriddenDecl();
     if (currentOverride && currentOverride == otherOverride) {
-      current->diagnose(diag::multiple_override, current->getFullName());
-      other->diagnose(diag::multiple_override_prev, other->getFullName());
+      current->diagnose(diag::multiple_override, current->getName());
+      other->diagnose(diag::multiple_override_prev, other->getName());
       current->setInvalid();
       break;
     }
@@ -686,8 +684,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
       // would be in Swift 5 mode, emit a warning instead of an error.
       if (wouldBeSwift5Redeclaration) {
         current->diagnose(diag::invalid_redecl_swift5_warning,
-                          current->getFullName());
-        other->diagnose(diag::invalid_redecl_prev, other->getFullName());
+                          current->getName());
+        other->diagnose(diag::invalid_redecl_prev, other->getName());
       } else {
         const auto *otherInit = dyn_cast<ConstructorDecl>(other);
         // Provide a better description for implicit initializers.
@@ -698,13 +696,13 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           // productive diagnostic.
           if (!other->getOverriddenDecl())
             current->diagnose(diag::invalid_redecl_init,
-                              current->getFullName(),
+                              current->getName(),
                               otherInit->isMemberwiseInitializer());
         } else if (!current->isImplicit() && !other->isImplicit()) {
           ctx.Diags.diagnoseWithNotes(
             current->diagnose(diag::invalid_redecl,
-                              current->getFullName()), [&]() {
-            other->diagnose(diag::invalid_redecl_prev, other->getFullName());
+                              current->getName()), [&]() {
+            other->diagnose(diag::invalid_redecl_prev, other->getName());
           });
         }
         current->setInvalid();
@@ -919,7 +917,7 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
 #define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
   if (auto proto = TypeChecker::getProtocol(                                   \
           type->getASTContext(), SourceLoc(), KnownProtocolKind::Kind)) {      \
-    if (TypeChecker::conformsToProtocol(type, proto, dc, None))                \
+    if (TypeChecker::conformsToProtocol(type, proto, dc))                      \
       return std::string(String);                                              \
   }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
@@ -1040,8 +1038,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
     auto ref = TypeChecker::conformsToProtocol(
-        superclassType, decodableProto, superclassDecl,
-        ConformanceCheckOptions(), SourceLoc());
+        superclassType, decodableProto, superclassDecl);
     if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
@@ -1070,8 +1067,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
       auto ref = TypeChecker::conformsToProtocol(
-          superclassType, encodableProto, superclassDecl,
-          ConformanceCheckOptions(), SourceLoc());
+          superclassType, encodableProto, superclassDecl);
       if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
@@ -1260,13 +1256,13 @@ public:
       // expressions to mean something builtin to the language.  We *do* allow
       // these if they are escaped with backticks though.
       if (VD->getDeclContext()->isTypeContext() &&
-          (VD->getFullName().isSimpleName(Context.Id_Type) ||
-           VD->getFullName().isSimpleName(Context.Id_Protocol)) &&
+          (VD->getName().isSimpleName(Context.Id_Type) ||
+           VD->getName().isSimpleName(Context.Id_Protocol)) &&
           VD->getNameLoc().isValid() &&
           Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
         auto &DE = getASTContext().Diags;
         DE.diagnose(VD->getNameLoc(), diag::reserved_member_name,
-                    VD->getFullName(), VD->getBaseIdentifier().str());
+                    VD->getName(), VD->getBaseIdentifier().str());
         DE.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");
@@ -1687,7 +1683,7 @@ public:
     auto *DC = NTD->getDeclContext();
     auto kind = DC->getFragileFunctionKind();
     if (kind.kind != FragileFunctionKind::None) {
-      NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getFullName(),
+      NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getName(),
                     static_cast<unsigned>(kind.kind));
     }
 
@@ -1716,7 +1712,7 @@ public:
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
           NTD->diagnose(diag::unsupported_type_nested_in_generic_function,
-                        NTD->getName(), AFD->getFullName());
+                        NTD->getName(), AFD->getName());
         } else {
           NTD->diagnose(diag::unsupported_type_nested_in_generic_closure,
                         NTD->getName());
@@ -2224,7 +2220,7 @@ public:
         // We did not find 'Self'. Complain.
         FD->diagnose(diag::operator_in_unrelated_type,
                      FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
-                     FD->getFullName());
+                     FD->getName());
       }
     }
 
@@ -2357,7 +2353,7 @@ public:
     if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
       if (!ED->getGenericParams() && !ED->isInvalid()) {
         ED->diagnose(diag::extension_nongeneric_trailing_where,
-                     nominal->getFullName())
+                     nominal->getName())
           .highlight(trailingWhereClause->getSourceRange());
       }
     }
@@ -2463,10 +2459,10 @@ public:
       if (CD->isFailable() &&
           CD->getOverriddenDecl() &&
           !CD->getOverriddenDecl()->isFailable()) {
-        CD->diagnose(diag::failable_initializer_override, CD->getFullName());
+        CD->diagnose(diag::failable_initializer_override, CD->getName());
         auto *OD = CD->getOverriddenDecl();
         OD->diagnose(diag::nonfailable_initializer_override_here,
-                     OD->getFullName());
+                     OD->getName());
       }
     }
 
@@ -2503,7 +2499,7 @@ public:
         }
         if (CD->getFormalAccess() < requiredAccess) {
           auto diag = CD->diagnose(diag::required_initializer_not_accessible,
-                                   nominal->getFullName());
+                                   nominal->getName());
           fixItAccess(diag, CD, requiredAccess);
         }
       }

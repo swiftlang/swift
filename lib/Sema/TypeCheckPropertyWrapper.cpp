@@ -79,7 +79,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
                       nominal->getDeclaredType(), name);
     for (auto var : vars) {
       var->diagnose(diag::kind_declname_declared_here,
-                    var->getDescriptiveKind(), var->getFullName());
+                    var->getDescriptiveKind(), var->getName());
     }
     return nullptr;
   }
@@ -89,7 +89,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   if (isDeclNotAsAccessibleAsParent(var, nominal)) {
     var->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                   var->getFormalAccess(), var->getDescriptiveKind(),
-                  var->getFullName(), nominal->getDeclaredType(),
+                  var->getName(), nominal->getDeclaredType(),
                   nominal->getFormalAccess());
     return nullptr;
   }
@@ -208,21 +208,21 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
       switch (reason) {
       case NonViableReason::Failable:
         init->diagnose(diag::property_wrapper_failable_init,
-                       init->getFullName());
+                       init->getName());
         break;
 
       case NonViableReason::Inaccessible:
         init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                        init->getFormalAccess(), init->getDescriptiveKind(),
-                       init->getFullName(), nominal->getDeclaredType(),
+                       init->getName(), nominal->getDeclaredType(),
                        nominal->getFormalAccess());
         break;
 
       case NonViableReason::ParameterTypeMismatch:
         init->diagnose(diag::property_wrapper_wrong_initial_value_init,
-                       init->getFullName(), paramType,
+                       init->getName(), paramType,
                        valueVar->getValueInterfaceType());
-        valueVar->diagnose(diag::decl_declared_here, valueVar->getFullName());
+        valueVar->diagnose(diag::decl_declared_here, valueVar->getName());
         break;
       }
     }
@@ -272,7 +272,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
     for (auto subscript : subscripts) {
       subscript->diagnose(diag::kind_declname_declared_here,
                           subscript->getDescriptiveKind(),
-                          subscript->getFullName());
+                          subscript->getName());
     }
     return nullptr;
 
@@ -284,7 +284,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
     subscript->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                         subscript->getFormalAccess(),
                         subscript->getDescriptiveKind(),
-                        subscript->getFullName(), nominal->getDeclaredType(),
+                        subscript->getName(), nominal->getDeclaredType(),
                         nominal->getFormalAccess());
     return nullptr;
   }
@@ -482,7 +482,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
         whichKind = 2 + static_cast<unsigned>(attr->get());
       }
       var->diagnose(diag::property_with_wrapper_conflict_attribute,
-                    var->getFullName(), whichKind);
+                    var->getName(), whichKind);
       continue;
     }
 
@@ -499,7 +499,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       else
         whichKind = 2;
       var->diagnose(diag::property_with_wrapper_in_bad_context,
-                    var->getFullName(), whichKind)
+                    var->getName(), whichKind)
         .highlight(attr->getRange());
 
       continue;
@@ -509,7 +509,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
     if (isa<ClassDecl>(dc)) {
       if (var->getAttrs().hasAttribute<OverrideAttr>()) {
         var->diagnose(diag::property_with_wrapper_overrides,
-                      var->getFullName())
+                      var->getName())
           .highlight(attr->getRange());
         continue;
       }
@@ -637,7 +637,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     var->setInvalid();
     if (auto nominalWrapper = rawType->getAnyNominal()) {
       nominalWrapper->diagnose(diag::property_wrapper_declared_here,
-                               nominalWrapper->getFullName());
+                               nominalWrapper->getName());
     }
     return Type();
   }

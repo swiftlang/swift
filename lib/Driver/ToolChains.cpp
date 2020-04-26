@@ -567,6 +567,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-module";
   case file_types::TY_ImportedModules:
     return "-emit-imported-modules";
+  case file_types::TY_JSONDependencies:
+    return "-scan-dependencies";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -833,6 +835,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_PCH:
     case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
+    case file_types::TY_JSONDependencies:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:

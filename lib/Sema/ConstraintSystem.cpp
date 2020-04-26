@@ -2518,7 +2518,7 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      return getDecl()->getFullName();
+      return getDecl()->getName();
 
     case OverloadChoiceKind::KeyPathApplication:
       // TODO: This should probably produce subscript(keyPath:), but we
@@ -2659,10 +2659,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
                                       ConstraintLocator *locator) {
   auto &DE = cs.getASTContext().Diags;
   auto *anchor = castToExpr(locator->getAnchor());
-
-  auto *applyExpr = dyn_cast_or_null<ApplyExpr>(cs.getParentExpr(anchor));
-  if (!applyExpr)
-    return;
+  auto *applyExpr = cast<ApplyExpr>(cs.getParentExpr(anchor));
 
   auto isNameOfStandardComparisonOperator = [](Identifier opName) -> bool {
     return opName.is("==") || opName.is("!=") || opName.is("===") ||
@@ -2763,7 +2760,7 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
   OS << Decl::getDescriptiveKindName(parent->getDescriptiveKind());
   if (auto *decl = dyn_cast<ValueDecl>(parent)) {
     if (decl->hasName())
-      OS << " '" << decl->getFullName() << "'";
+      OS << " '" << decl->getName() << "'";
   }
 
   return OS.str().str();
@@ -3036,7 +3033,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     if (auto *callExpr = getAsExpr<CallExpr>(commonAnchor))
       commonAnchor = callExpr->getDirectCallee();
     auto &DE = getASTContext().Diags;
-    auto name = decl->getFullName();
+    const auto name = decl->getName();
 
     // Emit an error message for the ambiguity.
     if (aggregatedFixes.size() == 1 &&
@@ -3046,9 +3043,23 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       DE.diagnose(getLoc(commonAnchor), diag::no_candidates_match_result_type,
                   baseName.userFacingName(), getContextualType(anchor));
     } else if (name.isOperator()) {
-      diagnoseOperatorAmbiguity(*this, name.getBaseIdentifier(), solutions,
-                                commonCalleeLocator);
-      return true;
+      auto *anchor = castToExpr(commonCalleeLocator->getAnchor());
+
+      // If operator is "applied" e.g. `1 + 2` there are tailored
+      // diagnostics in case of ambiguity, but if it's referenced
+      // e.g. `arr.sort(by: <)` it's better to produce generic error
+      // and a note per candidate.
+      if (auto *parentExpr = getParentExpr(anchor)) {
+        if (isa<ApplyExpr>(parentExpr)) {
+          diagnoseOperatorAmbiguity(*this, name.getBaseIdentifier(), solutions,
+                                    commonCalleeLocator);
+          return true;
+        }
+      }
+
+      DE.diagnose(anchor->getLoc(), diag::no_overloads_match_exactly_in_call,
+                  /*isApplication=*/false, decl->getDescriptiveKind(),
+                  name.isSpecial(), name.getBaseName());
     } else {
       bool isApplication =
           llvm::any_of(ArgumentInfos, [&](const auto &argInfo) {
@@ -3124,7 +3135,7 @@ static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
     if (!choice.isDecl())
       continue;
 
-    DeclName nextName = choice.getDecl()->getFullName();
+    const DeclName nextName = choice.getDecl()->getName();
     if (!name) {
       name = nextName;
       continue;
@@ -3602,7 +3613,7 @@ bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                                           KnownProtocolKind protocol) {
   if (auto *proto =
           TypeChecker::getProtocol(cs.getASTContext(), SourceLoc(), protocol))
-    return (bool)TypeChecker::conformsToProtocol(type, proto, cs.DC, None);
+    return (bool)TypeChecker::conformsToProtocol(type, proto, cs.DC);
   return false;
 }
 
@@ -3616,7 +3627,7 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   if (!rawReprType)
     return Type();
 
-  auto conformance = TypeChecker::conformsToProtocol(type, rawReprType, DC, None);
+  auto conformance = TypeChecker::conformsToProtocol(type, rawReprType, DC);
   if (conformance.isInvalid())
     return Type();
 

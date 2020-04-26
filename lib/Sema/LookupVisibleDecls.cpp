@@ -463,7 +463,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           };
           DeclVisibilityKind ReasonForThisDecl = ReasonForThisProtocol;
           if (const auto Witness = NormalConformance->getWitness(VD)) {
-            if (Witness.getDecl()->getFullName() == VD->getFullName()) {
+            if (Witness.getDecl()->getName() == VD->getName()) {
               if (LS.isIncludingDerivedRequirements() &&
                   Reason == DeclVisibilityKind::MemberOfCurrentNominal &&
                   isDerivedRequirement(Witness.getDecl())) {

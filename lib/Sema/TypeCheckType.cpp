@@ -674,9 +674,7 @@ static Type checkContextualRequirements(Type type,
         dc, loc, noteLoc, type,
         genericSig->getGenericParams(),
         genericSig->getRequirements(),
-        QueryTypeSubstitutionMap{subMap},
-        TypeChecker::LookUpConformance(dc),
-        None);
+        QueryTypeSubstitutionMap{subMap});
 
   switch (result) {
   case RequirementCheckResult::Failure:
@@ -907,14 +905,15 @@ Type TypeChecker::applyUnboundGenericArguments(
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   auto dc = resolution.getDeclContext();
+  auto *module = dc->getParentModule();
+
   if (!skipRequirementsCheck &&
       resolution.getStage() > TypeResolutionStage::Structural) {
     auto result =
       checkGenericArguments(dc, loc, noteLoc, unboundType,
                             genericSig->getGenericParams(),
                             genericSig->getRequirements(),
-                            QueryTypeSubstitutionMap{subs},
-                            LookUpConformance(dc), None);
+                            QueryTypeSubstitutionMap{subs});
 
     switch (result) {
     case RequirementCheckResult::Failure:
@@ -934,7 +933,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformance(dc));
+                                LookUpConformanceInModule(module));
 
   // Form a sugared typealias reference.
   Type parentType = unboundType->getParent();
@@ -942,7 +941,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto genericSig = typealias->getGenericSignature();
     auto subMap = SubstitutionMap::get(genericSig,
                                        QueryTypeSubstitutionMap{subs},
-                                       LookUpConformance(dc));
+                                       LookUpConformanceInModule(module));
     resultType = TypeAliasType::get(typealias, parentType,
                                     subMap, resultType);
   }
@@ -982,9 +981,8 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
   if (protocol) {
-    auto conformanceRef = TypeChecker::conformsToProtocol(
-        parentTy, protocol, dc,
-         ConformanceCheckFlags::SkipConditionalRequirements);
+    auto conformanceRef = dc->getParentModule()->lookupConformance(
+        parentTy, protocol);
     if (conformanceRef.isConcrete())
       conformance = conformanceRef.getConcrete();
   }
@@ -1000,7 +998,8 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
           ? diag::unsupported_recursion_in_associated_type_reference
           : diag::broken_associated_type_witness;
 
-  ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl), typeDecl->getFullName(), parentTy);
+  ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl),
+                     typeDecl->getName(), parentTy);
 }
 
 /// Returns a valid type or ErrorType in case of an error.
@@ -1217,7 +1216,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     if (!memberLookup.empty()) {
       auto member = memberLookup[0].getValueDecl();
       diags.diagnose(comp->getNameLoc(), diag::invalid_member_reference,
-                     member->getDescriptiveKind(), member->getFullName(),
+                     member->getDescriptiveKind(), member->getName(),
                      parentType)
           .highlight(parentRange);
     } else {
@@ -1228,7 +1227,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       // expected name lookup to find a module when there's a conflicting type.
       if (auto typeDecl = parentType->getNominalOrBoundGenericNominal()) {
         ctx.Diags.diagnose(typeDecl, diag::decl_declared_here,
-                           typeDecl->getFullName());
+                           typeDecl->getName());
       }
     }
   }
@@ -2858,7 +2857,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     subMap = SubstitutionMap::get(
       genericSig,
       QueryTypeSubstitutionMap{genericArgMap},
-      TypeChecker::LookUpConformance(DC));
+      LookUpConformanceInModule(DC->getParentModule()));
   }
   
   auto layout = SILLayout::get(Context, genericSig, fields);
@@ -2949,7 +2948,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       subsMap.insert({params[i], resolved->getCanonicalType()});
     }
     return SubstitutionMap::get(sig, QueryTypeSubstitutionMap{subsMap},
-                                TypeChecker::LookUpConformance(DC))
+                                LookUpConformanceInModule(DC->getParentModule()))
       .getCanonical();
   };
 
@@ -3054,7 +3053,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
 
     witnessMethodConformance = TypeChecker::conformsToProtocol(
-        selfType, protocolType->getDecl(), DC, ConformanceCheckOptions());
+        selfType, protocolType->getDecl(), DC);
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }

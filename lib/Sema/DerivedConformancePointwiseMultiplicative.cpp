@@ -50,7 +50,7 @@ DerivedConformance::canDerivePointwiseMultiplicative(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, proto, DC, None);
+    return (bool)TypeChecker::conformsToProtocol(varType, proto, DC);
   });
 }
 

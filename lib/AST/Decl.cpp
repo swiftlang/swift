@@ -2810,7 +2810,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
 OverloadSignature ValueDecl::getOverloadSignature() const {
   OverloadSignature signature;
 
-  signature.Name = getFullName();
+  signature.Name = getName();
   signature.InProtocolExtension
     = static_cast<bool>(getDeclContext()->getExtendedProtocolDecl());
   signature.IsInstanceMember = isInstanceMember();
@@ -6701,8 +6701,8 @@ SourceRange SubscriptDecl::getSignatureSourceRange() const {
 }
 
 DeclName AbstractFunctionDecl::getEffectiveFullName() const {
-  if (getFullName())
-    return getFullName();
+  if (getName())
+    return getName();
 
   if (auto accessor = dyn_cast<AccessorDecl>(this)) {
     auto &ctx = getASTContext();
@@ -6715,7 +6715,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Get:
     case AccessorKind::Read:
     case AccessorKind::Modify:
-      return subscript ? subscript->getFullName()
+      return subscript ? subscript->getName()
                        : DeclName(ctx, storage->getBaseName(),
                                   ArrayRef<Identifier>());
 
@@ -6727,8 +6727,8 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
       argNames.push_back(Identifier());
       // The subscript index parameters.
       if (subscript) {
-        argNames.append(subscript->getFullName().getArgumentNames().begin(),
-                        subscript->getFullName().getArgumentNames().end());
+        argNames.append(subscript->getName().getArgumentNames().begin(),
+                        subscript->getName().getArgumentNames().end());
       }
       return DeclName(ctx, storage->getBaseName(), argNames);
     }
@@ -6888,7 +6888,7 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
     llvm_unreachable("Unknown subclass of AbstractFunctionDecl");
   }
 
-  auto argNames = getFullName().getArgumentNames();
+  auto argNames = getName().getArgumentNames();
 
   // Use the preferred name if specified
   if (preferredName) {
@@ -7044,7 +7044,7 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 #ifndef NDEBUG
-  auto Name = getFullName();
+  const auto Name = getName();
   if (!isa<DestructorDecl>(this))
     assert((!Name || !Name.isSimpleName()) && "Must have a compound name");
   assert(!Name || (Name.getArgumentNames().size() == BodyParams->size()));
@@ -7430,8 +7430,8 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
 
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   // The initializer must have a single, non-empty argument name.
-  if (getFullName().getArgumentNames().size() != 1 ||
-      getFullName().getArgumentNames()[0].empty())
+  if (getName().getArgumentNames().size() != 1 ||
+      getName().getArgumentNames()[0].empty())
     return false;
 
   auto *params = getParameters();
@@ -7993,7 +7993,7 @@ struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
       return;
     const Decl *D = static_cast<const Decl *>(Entity);
     if (auto const *VD = dyn_cast<const ValueDecl>(D)) {
-      VD->getFullName().print(OS, false);
+      VD->getName().print(OS, false);
     } else {
       OS << "<"
          << Decl::getDescriptiveKindName(D->getDescriptiveKind())

@@ -15,11 +15,26 @@ The following must take place in the **developer command prompt** (provided by V
 
 The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019) helps in finding the component name given its ID for Visual Studio 2019.
 
+### Python
+
+In the Visual Studio installation program, under *Individual Components*
+
+1. Install *Python 2*, either the 32-bit version (C:\Python27\\) or the 64-bit version (C:\Python27amd64\\)
+2. Install *Python 3 64 bits (3.7.x)*
+
+If you are building a debug version of Swift, you should also install the Python debug binaries.
+
+1. In the Windows settings, go to *Add and Remove Programs*
+2. Select the *Python 3.7.x (64-bit)* entry
+3. Click *Modify*, then *Yes*, then *Modify* again and then *Next*
+4. Select *Download debug binaries (requires VS 2015 or later)*
+5. Click *Install*
+
 ## Clone the repositories
 
 1. Clone `apple/llvm-project` into a directory for the toolchain
 2. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-llbuild`, `apple/swift-package-manager` into the toolchain directory
-3. Clone `compnerd/windows-swift` as a peer of the toolchain directory
+3. Clone `compnerd/swift-build` as a peer of the toolchain directory
 
 - Currently, other repositories in the Swift project have not been tested and may not be supported.
 
@@ -40,12 +55,12 @@ git clone https://github.com/apple/swift-corelibs-xctest toolchain/swift-corelib
 git clone https://github.com/apple/swift-llbuild toolchain/llbuild
 git clone https://github.com/apple/swift-tools-support-core toolchain/swift-tools-support-core
 git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager toolchain/swiftpm
-git clone https://github.com/compnerd/windows-swift windows-swift
+git clone https://github.com/compnerd/swift-build swift-build
 ```
 
 ## Acquire ICU, SQLite3, curl, libxml2 and zlib
 
-Go to [compnerd's windows-swift azure page](https://dev.azure.com/compnerd/swift-build/_build) and open [Pipelines](https://dev.azure.com/compnerd/swift-build/_build) where you'll see bots (hopefully green) for:
+Go to [compnerd's swift-build azure page](https://dev.azure.com/compnerd/swift-build/_build) and open [Pipelines](https://dev.azure.com/compnerd/swift-build/_build) where you'll see bots (hopefully green) for:
 
 - [ICU](https://dev.azure.com/compnerd/swift-build/_build?definitionId=9)
 - [SQLite](https://dev.azure.com/compnerd/swift-build/_build?definitionId=12&_a=summary)
@@ -93,8 +108,8 @@ Warning: Creating the above links usually requires administrator privileges. The
 ```cmd
 md "S:\b\toolchain"
 cmake -B "S:\b\toolchain" -G Ninja -S S:\toolchain\llvm ^
-  -C S:\windows-swift\cmake\caches\Windows-x86_64.cmake ^
-  -C S:\windows-swift\cmake\caches\org.compnerd.dt.cmake ^
+  -C S:\swift-build\cmake\caches\windows-x86_64.cmake ^
+  -C S:\swift-build\cmake\caches\org.compnerd.dt.cmake ^
   -DLLVM_ENABLE_ASSERTIONS=YES ^
   -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;cmark;swift;lldb;lld" ^
   -DLLVM_EXTERNAL_PROJECTS="cmark;swift" ^

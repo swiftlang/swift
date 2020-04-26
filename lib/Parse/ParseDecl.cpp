@@ -4337,6 +4337,21 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
     return makeParserError();
   }
 
+  // If there is expected tokens after the code completion token, just eat the
+  // code completion token. We don't need code completion here.
+  // E.g.:
+  //   'func' <completion> ('('|'<')
+  //   'typealias' <completion> ('='|'<')
+  // If there's no expected token after the completion, override completion may
+  // kicks in. So leave the token here.
+  // E.g.
+  //   'func' <completion>
+  //   'init' <completion>
+  if (P.Tok.is(tok::code_complete) && canRecover(P.peekToken())) {
+    P.consumeToken(tok::code_complete);
+    return makeParserCodeCompletionStatus();
+  }
+
   P.diagnose(P.Tok, diag::expected_identifier_in_decl, DeclKindName);
   return makeParserError();
 }
@@ -4888,7 +4903,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
       [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
   if (Status.isError()) {
     TmpCtxt->setTransparent();
-    return nullptr;
+    return Status;
   }
     
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
@@ -5004,8 +5019,8 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
       *this, Id, IdLoc, "associatedtype",
       [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
   if (Status.isError())
-    return nullptr;
-  
+    return Status;
+
   DebuggerContextChange DCC(*this, Id, DeclKind::AssociatedType);
   
   // Reject generic parameters with a specific error.
@@ -6244,7 +6259,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                  startsWithLess(next);
         });
     if (NameStatus.isError())
-      return nullptr;
+      return NameStatus;
   }
 
   DebuggerContextChange DCC(*this, SimpleName, DeclKind::Func);
@@ -6517,7 +6532,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
         return next.isAny(tok::colon, tok::l_brace) || startsWithLess(next);
       });
   if (Status.isError())
-    return nullptr;
+    return Status;
 
   DebuggerContextChange DCC(*this, EnumName, DeclKind::Enum);
   
@@ -6799,7 +6814,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
         return next.isAny(tok::colon, tok::l_brace) || startsWithLess(next);
       });
   if (Status.isError())
-    return nullptr;
+    return Status;
 
   DebuggerContextChange DCC (*this, StructName, DeclKind::Struct);
   
@@ -6892,7 +6907,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
         return next.isAny(tok::colon, tok::l_brace) || startsWithLess(next);
       });
   if (Status.isError())
-    return nullptr;
+    return Status;
 
   DebuggerContextChange DCC (*this, ClassName, DeclKind::Class);
   
@@ -7012,7 +7027,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       *this, ProtocolName, NameLoc, "protocol",
       [&](const Token &next) { return next.isAny(tok::colon, tok::l_brace); });
   if (Status.isError())
-    return nullptr;
+    return Status;
 
   // Protocols don't support generic parameters, but people often want them and
   // we want to have good error recovery if they try them out.  Parse them and

@@ -3403,8 +3403,8 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[FuncLayout::Code];
     SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
     nameComponentsAndDependencies.push_back(
-        S.addDeclBaseNameRef(fn->getFullName().getBaseName()));
-    for (auto argName : fn->getFullName().getArgumentNames())
+        S.addDeclBaseNameRef(fn->getBaseName()));
+    for (auto argName : fn->getName().getArgumentNames())
       nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
@@ -3431,8 +3431,8 @@ public:
                            S.addDeclRef(fn->getOperatorDecl()),
                            S.addDeclRef(fn->getOverriddenDecl()),
                            overriddenDeclAffectsABI(fn->getOverriddenDecl()),
-                           fn->getFullName().getArgumentNames().size() +
-                             fn->getFullName().isCompoundName(),
+                           fn->getName().getArgumentNames().size() +
+                             fn->getName().isCompoundName(),
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
@@ -3539,7 +3539,7 @@ public:
     SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
     auto baseName = S.addDeclBaseNameRef(elem->getBaseName());
     nameComponentsAndDependencies.push_back(baseName);
-    for (auto argName : elem->getFullName().getArgumentNames())
+    for (auto argName : elem->getName().getArgumentNames())
       nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
 
     Type ty = elem->getInterfaceType();
@@ -3569,7 +3569,7 @@ public:
                                   isRawValueImplicit,
                                   isNegative,
                                   S.addUniquedStringRef(RawValueText),
-                                  elem->getFullName().getArgumentNames().size()+1,
+                                  elem->getName().getArgumentNames().size()+1,
                                   nameComponentsAndDependencies);
     if (auto *PL = elem->getParameterList())
       writeParameterList(PL);
@@ -3584,7 +3584,7 @@ public:
     Accessors accessors = getAccessors(subscript);
 
     SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
-    for (auto argName : subscript->getFullName().getArgumentNames())
+    for (auto argName : subscript->getName().getArgumentNames())
       nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
 
     for (auto accessor : accessors.Decls)
@@ -3625,8 +3625,7 @@ public:
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
                                 rawStaticSpelling,
-                                subscript->
-                                  getFullName().getArgumentNames().size(),
+                                subscript->getName().getArgumentNames().size(),
                                 S.addDeclRef(subscript->getOpaqueResultTypeDecl()),
                                 numVTableEntries,
                                 nameComponentsAndDependencies);
@@ -3642,7 +3641,7 @@ public:
     auto contextID = S.addDeclContextRef(ctor->getDeclContext());
 
     SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
-    for (auto argName : ctor->getFullName().getArgumentNames())
+    for (auto argName : ctor->getName().getArgumentNames())
       nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
 
     Type ty = ctor->getInterfaceType();
@@ -3673,7 +3672,7 @@ public:
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
                                   firstTimeRequired,
-                                  ctor->getFullName().getArgumentNames().size(),
+                                  ctor->getName().getArgumentNames().size(),
                                   nameComponentsAndDependencies);
 
     writeGenericParams(ctor->getGenericParams());

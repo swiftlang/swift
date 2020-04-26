@@ -885,7 +885,7 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
   if (!D->hasName())
     return true;
 
-  OS << D->getFullName();
+  OS << D->getName();
   return false;
 }
 
