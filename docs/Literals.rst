@@ -36,13 +36,30 @@ The ExpressibleByStringLiteral Protocol
 Here is the ExpressibleByStringLiteral protocol as defined in the standard
 library's CompilerProtocols.swift::
 
-  // NOTE: the compiler has builtin knowledge of this protocol
-  // Conforming types can be initialized with arbitrary string literals.
+  /// A type that can be initialized with a string literal.
+  ///
+  /// The `String` and `StaticString` types conform to the
+  /// `ExpressibleByStringLiteral` protocol. You can initialize a variable or
+  /// constant of either of these types using a string literal of any length.
+  ///
+  ///     let picnicGuest = "Deserving porcupine"
+  ///
+  /// Conforming to ExpressibleByStringLiteral
+  /// ========================================
+  ///
+  /// To add `ExpressibleByStringLiteral` conformance to your custom type,
+  /// implement the required initializer.
   public protocol ExpressibleByStringLiteral
     : ExpressibleByExtendedGraphemeClusterLiteral {
 
-    typealias StringLiteralType : _ExpressibleByBuiltinStringLiteral
-    // Create an instance initialized to `value`.
+    /// A type that represents a string literal.
+    ///
+    /// Valid types for `StringLiteralType` are `String` and `StaticString`.
+    associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
+
+    /// Creates an instance initialized to the given string value.
+    ///
+    /// - Parameter value: The value of the new instance.
     init(stringLiteral value: StringLiteralType)
   }
 
