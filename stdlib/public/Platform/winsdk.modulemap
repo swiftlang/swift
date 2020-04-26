@@ -216,5 +216,13 @@ module WinSDK [system] {
 
     link "AdvAPI32.Lib"
   }
+
+  module WinRPC {
+    header "../shared/rpc.h"
+    header "../shared/rpcndr.h"
+    export *
+
+    link "RpcRT4.Lib"
+  }
 }
 
