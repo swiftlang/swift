@@ -365,7 +365,7 @@ extension String.UnicodeScalarIndex {
   /// in the string.
   ///
   ///     let cafe = "Café 🍵"
-  ///     let i = cafe.unicodeScalars.firstIndex(of: "🍵")
+  ///     let i = cafe.unicodeScalars.firstIndex(of: "🍵")!
   ///     let j = i.samePosition(in: cafe)!
   ///     print(cafe[j...])
   ///     // Prints "🍵"
