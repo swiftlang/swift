@@ -712,7 +712,7 @@ public:
         }
       }
     }
-    for (const auto dcAndScope : bogusDCs) {
+    for (const auto &dcAndScope : bogusDCs) {
       llvm::errs() << "ASTScope tree confabulated: " << dcAndScope.getFirst()
                    << ":\n";
       dcAndScope.getFirst()->printContext(llvm::errs());

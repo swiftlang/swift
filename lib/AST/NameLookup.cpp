@@ -2160,7 +2160,7 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   SmallPtrSet<const ProtocolDecl *, 2> known;
   known.insert(PD);
   bool anyObject = false;
-  for (const auto found : getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
+  for (const auto &found : getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
     if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
       if (known.insert(proto).second)
         result.push_back(proto);
