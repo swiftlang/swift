@@ -2422,7 +2422,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
                                VarDecl *&capturedSelfDecl,
                                ParameterList *&params, SourceLoc &throwsLoc,
                                SourceLoc &arrowLoc,
-                               TypeRepr *&explicitResultType, SourceLoc &inLoc){
+                               TypeExpr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
   bracketRange = SourceRange();
   capturedSelfDecl = nullptr;
@@ -2686,12 +2686,14 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       arrowLoc = consumeToken();
 
       // Parse the type.
-      explicitResultType =
+      auto *explicitResultTypeRepr =
           parseType(diag::expected_closure_result_type).getPtrOrNull();
-      if (!explicitResultType) {
+      if (!explicitResultTypeRepr) {
         // If we couldn't parse the result type, clear out the arrow location.
         arrowLoc = SourceLoc();
         invalid = true;
+      } else {
+        explicitResultType = new (Context) TypeExpr(explicitResultTypeRepr);
       }
     }
   }
@@ -2791,7 +2793,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   ParameterList *params = nullptr;
   SourceLoc throwsLoc;
   SourceLoc arrowLoc;
-  TypeRepr *explicitResultType;
+  TypeExpr *explicitResultType;
   SourceLoc inLoc;
   parseClosureSignatureIfPresent(bracketRange, captureList,
                                  capturedSelfDecl, params, throwsLoc,

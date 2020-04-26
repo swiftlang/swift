@@ -1320,15 +1320,6 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
     hadParameterError |= param->isInvalid();
   }
 
-  // Validate the result type, if present.
-  if (closure->hasExplicitResultType() &&
-      TypeChecker::validateType(getASTContext(),
-                                closure->getExplicitResultTypeLoc(),
-                                TypeResolution::forContextual(closure),
-                                TypeResolverContext::InExpression)) {
-    return false;
-  }
-
   if (hadParameterError)
     return false;
 

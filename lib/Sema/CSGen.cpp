@@ -2177,14 +2177,25 @@ namespace {
       // parameter or return type is omitted, a fresh type variable is used to
       // stand in for that parameter or return type, allowing it to be inferred
       // from context.
-      Type resultTy;
-      if (closure->hasExplicitResultType() &&
-          closure->getExplicitResultTypeLoc().getType()) {
-        resultTy = closure->getExplicitResultTypeLoc().getType();
-      } else {
-        auto *resultLoc =
-            CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+      auto getExplicitResultType = [&]() -> Type {
+        if (!closure->hasExplicitResultType()) {
+          return Type();
+        }
 
+        auto *resultExpr = closure->getExplicitResultTypeExpr();
+        if (auto declaredTy = resultExpr->getInstanceType()) {
+          return declaredTy;
+        }
+
+        return resolveTypeReferenceInExpression(closure->getExplicitResultTypeRepr());
+      };
+
+      Type resultTy;
+      auto *resultLoc =
+            CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+      if (auto explicityTy = getExplicitResultType()) {
+        resultTy = explicityTy;
+      } else {
         auto getContextualResultType = [&]() -> Type {
           if (auto contextualType = CS.getContextualType(closure)) {
             if (auto fnType = contextualType->getAs<FunctionType>())
@@ -2205,6 +2216,11 @@ namespace {
               resultLoc,
               closure->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
         }
+      }
+
+      if (closure->hasExplicitResultType()) {
+        CS.setType(closure->getExplicitResultTypeExpr(),
+                   MetatypeType::get(resultTy));
       }
 
       return FunctionType::get(closureParams, resultTy, extInfo);

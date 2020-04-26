@@ -663,7 +663,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     if (Closure->hasExplicitResultType())
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
-                          Closure->getExplicitResultTypeLoc().getSourceRange());
+                          Closure->getExplicitResultTypeExpr()->getSourceRange());
 
     pushStructureNode(SN, Closure);
 

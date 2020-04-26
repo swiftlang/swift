@@ -3706,7 +3706,7 @@ class ClosureExpr : public AbstractClosureExpr {
   SourceLoc InLoc;
 
   /// The explicitly-specified result type.
-  TypeLoc ExplicitResultType;
+  TypeExpr *ExplicitResultType;
 
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
@@ -3714,7 +3714,7 @@ class ClosureExpr : public AbstractClosureExpr {
 public:
   ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
-              SourceLoc inLoc, TypeLoc explicitResultType,
+              SourceLoc inLoc, TypeExpr *explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
@@ -3774,9 +3774,15 @@ public:
   }
 
   /// Retrieve the explicit result type location information.
-  TypeLoc &getExplicitResultTypeLoc() {
+  TypeExpr *getExplicitResultTypeExpr() const {
     assert(hasExplicitResultType() && "No explicit result type");
     return ExplicitResultType;
+  }
+
+  void setExplicitResultTypeExpr(TypeExpr *NewResultType) {
+    assert(hasExplicitResultType() && "No explicit result type");
+    ExplicitResultType = NewResultType;
+    assert(hasExplicitResultType() && "No explicit result type");
   }
 
   TypeRepr *getExplicitResultTypeRepr() const {

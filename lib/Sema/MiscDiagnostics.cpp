@@ -537,6 +537,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             isa<SubscriptExpr>(ParentExpr)) {
           return;
         }
+
+        if (auto *CE = dyn_cast<ClosureExpr>(ParentExpr)) {
+          if (CE->hasExplicitResultType() &&
+              CE->getExplicitResultTypeExpr() == E) {
+            return;
+          }
+        }
       }
 
       // Is this a protocol metatype?
