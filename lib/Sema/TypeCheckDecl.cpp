@@ -813,13 +813,34 @@ DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
     return defaultType;
   }
 
-  TypeRepr *defaultDefinition = assocType->getDefaultDefinitionTypeRepr();
-  if (defaultDefinition) {
-    auto resolution = TypeResolution::forInterface(assocType->getDeclContext());
-    return resolution.resolveType(defaultDefinition, None);
+  const auto typeRepr = assocType->getDefaultDefinitionTypeRepr();
+  if (typeRepr == nullptr)
+    return Type();
+
+  const auto proto = assocType->getProtocol();
+  const auto resolvedTy = TypeResolution::forInterface(proto)
+      .resolveType(typeRepr, None);
+
+  if (resolvedTy->hasError())
+    return resolvedTy;
+
+  // If the default type is not a valid type witness for a conformance
+  // to the enclosing protocol, diagnose that now.
+  if (const auto subject = assocType
+          ->requirementNotSatisfiedByTypeWitness(resolvedTy, proto, proto)) {
+    const auto &ctx = assocType->getASTContext();
+    ctx.Diags.diagnose(typeRepr->getStartLoc(),
+                       diag::default_associated_type_req_fail,
+                       resolvedTy,
+                       assocType->getFullName(),
+                       subject,
+                       subject->isExistentialType())
+        .highlight(typeRepr->getSourceRange());
+
+    return ErrorType::get(ctx);
   }
 
-  return Type();
+  return resolvedTy;
 }
 
 bool

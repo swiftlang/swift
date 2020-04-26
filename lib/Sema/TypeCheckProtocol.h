@@ -90,14 +90,6 @@ public:
   explicit operator bool() const { return !Requirement.isNull(); }
 };
 
-/// Check whether the given type witness can be used for the given
-/// associated type.
-///
-/// \returns an empty result on success, or a description of the error.
-CheckTypeWitnessResult checkTypeWitness(DeclContext *dc, ProtocolDecl *proto,
-                                        AssociatedTypeDecl *assocType,
-                                        Type type);
-
 /// The set of associated types that have been inferred by matching
 /// the given value witness to its corresponding requirement.
 struct InferredAssociatedTypesByWitness {

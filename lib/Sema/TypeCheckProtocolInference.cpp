@@ -375,10 +375,12 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       if (!canInferFromOtherAssociatedType) {
         // Check that the type witness meets the
         // requirements on the associated type.
-        if (auto failed =
-                checkTypeWitness(dc, proto, result.first, result.second)) {
+        if (auto failed = result.first
+                ->requirementNotSatisfiedByTypeWitness(result.second, proto,
+                                                       dc)) {
           witnessResult.NonViable.push_back(
-                          std::make_tuple(result.first,result.second,failed));
+              std::make_tuple(result.first, result.second,
+                              CheckTypeWitnessResult(failed)));
           LLVM_DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
           REJECT;
         }
@@ -857,12 +859,13 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
   if (defaultType->hasError())
     return Type();
 
-  if (auto failed = checkTypeWitness(dc, proto, assocType, defaultType)) {
+  if (auto failed = assocType
+          ->requirementNotSatisfiedByTypeWitness(defaultType, proto, dc)) {
     // Record the failure, if we haven't seen one already.
-    if (!failedDefaultedAssocType && !failed.isError()) {
+    if (!failedDefaultedAssocType && !failed->is<ErrorType>()) {
       failedDefaultedAssocType = defaultedAssocType;
       failedDefaultedWitness = defaultType;
-      failedDefaultedResult = failed;
+      failedDefaultedResult = CheckTypeWitnessResult(failed);
     }
 
     return Type();
@@ -889,7 +892,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
     return Type();
 
   // Make sure that the derived type is sane.
-  if (checkTypeWitness(dc, proto, assocType, derivedType)) {
+  if (assocType->requirementNotSatisfiedByTypeWitness(derivedType, proto, dc)) {
     /// FIXME: Diagnose based on this.
     failedDerivedAssocType = assocType;
     failedDerivedWitness = derivedType;
@@ -1676,7 +1679,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
         auto proto = conformance->getProtocol();
         auto &diags = proto->getASTContext().Diags;
         diags.diagnose(failedDefaultedAssocType,
-                       diag::default_associated_type_req_fail,
+                       diag::default_associated_type_req_fail_note,
                        failedDefaultedWitness,
                        failedDefaultedAssocType->getFullName(),
                        proto->getDeclaredType(),

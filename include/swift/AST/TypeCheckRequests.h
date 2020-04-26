@@ -2401,6 +2401,26 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Returns the subject of a requirement that is not satisfied by the given
+/// type witness.
+class RequirementNotSatisfiedByTypeWitness
+    : public SimpleRequest<RequirementNotSatisfiedByTypeWitness,
+                           Type(AssociatedTypeDecl *, CanType,
+                                const ProtocolDecl *,
+                                DeclContext *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Type evaluate(Evaluator &evaluator, AssociatedTypeDecl *ATD,
+                CanType Witness,
+                const ProtocolDecl *Proto,
+                DeclContext *DC) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

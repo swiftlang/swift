@@ -3993,6 +3993,15 @@ Type AssociatedTypeDecl::getDefaultDefinitionType() const {
            Type());
 }
 
+Type AssociatedTypeDecl::requirementNotSatisfiedByTypeWitness(Type Ty,
+                                                              ProtocolDecl *PD,
+                                                              DeclContext *DC) const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    RequirementNotSatisfiedByTypeWitness{const_cast<AssociatedTypeDecl *>(this),
+                                         Ty->getCanonicalType(), PD, DC},
+    Type());
+}
+
 SourceRange AssociatedTypeDecl::getSourceRange() const {
   SourceLoc endLoc;
   if (auto TWC = getTrailingWhereClause()) {

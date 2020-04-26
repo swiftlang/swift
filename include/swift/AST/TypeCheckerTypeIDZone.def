@@ -29,6 +29,10 @@ SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CallerSideDefaultArgExprRequest,
               Expr *(DefaultArgumentExpr *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, RequirementNotSatisfiedByTypeWitness,
+              Type(AssociatedTypeDecl *, CanType, const ProtocolDecl *,
+                   DeclContext *),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
               evaluator::SideEffect(ValueDecl *),
               Uncached, NoLocationInfo)

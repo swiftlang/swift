@@ -3684,20 +3684,21 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 
 # pragma mark Type witness resolution
 
-CheckTypeWitnessResult swift::checkTypeWitness(DeclContext *dc,
-                                               ProtocolDecl *proto,
-                                               AssociatedTypeDecl *assocType,
-                                               Type type) {
-  auto genericSig = proto->getGenericSignature();
-  auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
-                                         assocType);
+Type RequirementNotSatisfiedByTypeWitness::evaluate(Evaluator &evaluator,
+                                                    AssociatedTypeDecl *ATD,
+                                                    CanType Witness,
+                                                    const ProtocolDecl *Proto,
+                                                    DeclContext *DC) const {
+  assert(Witness && "Checking a null witness type");
+  if (Witness->hasError())
+    return ErrorType::get(ATD->getASTContext());
 
-  if (type->hasError())
-    return ErrorType::get(proto->getASTContext());
+  Type contextType = Witness->hasTypeParameter()
+      ? DC->mapTypeIntoContext(Witness)
+      : Witness;
 
-  Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
-                                              : type;
-
+  auto genericSig = Proto->getGenericSignature();
+  auto *depTy = DependentMemberType::get(Proto->getSelfInterfaceType(), ATD);
   // FIXME: This is incorrect; depTy is written in terms of the protocol's
   // associated types, and we need to substitute in known type witnesses.
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
@@ -3708,10 +3709,10 @@ CheckTypeWitnessResult swift::checkTypeWitness(DeclContext *dc,
   // Check protocol conformances.
   for (auto reqProto : genericSig->getConformsTo(depTy)) {
     if (TypeChecker::conformsToProtocol(
-            contextType, reqProto, dc,
+            contextType, reqProto, DC,
             ConformanceCheckFlags::SkipConditionalRequirements)
             .isInvalid())
-      return CheckTypeWitnessResult(reqProto->getDeclaredType());
+      return reqProto->getDeclaredType();
 
     // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
     // build unless we fail here while inferring an associated type
@@ -3719,22 +3720,22 @@ CheckTypeWitnessResult swift::checkTypeWitness(DeclContext *dc,
     if (contextType->isSpecialized()) {
       auto *decl = contextType->getAnyNominal();
       auto subMap = contextType->getContextSubstitutionMap(
-          dc->getParentModule(),
+          DC->getParentModule(),
           decl,
           decl->getGenericEnvironmentOfContext());
       for (auto replacement : subMap.getReplacementTypes()) {
         if (replacement->hasError())
-          return CheckTypeWitnessResult(reqProto->getDeclaredType());
+          return reqProto->getDeclaredType();
       }
     }
   }
 
   if (genericSig->requiresClass(depTy) &&
       !contextType->satisfiesClassConstraint())
-    return CheckTypeWitnessResult(proto->getASTContext().getAnyObjectType());
+    return ATD->getASTContext().getAnyObjectType();
 
   // Success!
-  return CheckTypeWitnessResult();
+  return Type();
 }
 
 ResolveWitnessResult
@@ -3796,9 +3797,9 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
         continue;
 
     // Check this type against the protocol requirements.
-    if (auto checkResult =
-            checkTypeWitness(DC, Proto, assocType, candidate.MemberType)) {
-      nonViable.push_back({candidate.Member, checkResult});
+    if (const auto req = assocType->requirementNotSatisfiedByTypeWitness(
+            candidate.MemberType, Proto, DC)) {
+      nonViable.push_back({candidate.Member, CheckTypeWitnessResult(req)});
     } else {
       viable.push_back(candidate);
     }

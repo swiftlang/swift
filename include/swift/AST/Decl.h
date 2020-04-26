@@ -3244,6 +3244,15 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
+  /// Check the given type witness against the requirements of \c this
+  /// associated type relative to the requirement signature of the given
+  /// protocol. If a requirement fails, returns its subject.
+  ///
+  /// \param DC The context in which to check conformances.
+  Type requirementNotSatisfiedByTypeWitness(Type Ty,
+                                            ProtocolDecl *PD,
+                                            DeclContext *DC) const;
+
   /// Retrieve the associated type "anchor", which is the associated type
   /// declaration that will be used to describe this associated type in the
   /// ABI.

@@ -2020,9 +2020,13 @@ NOTE(ambiguous_witnesses_wrong_name,none,
      "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
 NOTE(no_witnesses_type,none,
      "protocol requires nested type %0; do you want to add it?", (Identifier))
-NOTE(default_associated_type_req_fail,none,
-     "default type %0 for associated type %1 (from protocol %2) "
-     "does not %select{inherit from|conform to}4 %3",
+ERROR(default_associated_type_req_fail,none,
+      "default type %0 for associated type %1 is required to "
+      "%select{inherit from|conform to}3 %2",
+      (Type, DeclName, Type, bool))
+NOTE(default_associated_type_req_fail_note,none,
+     "default type %0 for associated type %1 (from protocol %2) does not"
+     "%select{inherit from|conform to}4 %3",
      (Type, DeclName, Type, Type, bool))
 ERROR(associated_type_access,none,
       "associated type in "
