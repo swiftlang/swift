@@ -5547,7 +5547,7 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 }
 
 bool UnnecessaryCoercionFailure::diagnoseAsError() {
-  auto expr = cast<CoerceExpr>(getAnchor());
+  auto expr = getAsExpr<CoerceExpr>(getAnchor());
   auto sourceRange =
       SourceRange(expr->getLoc(), expr->getCastTypeLoc().getSourceRange().End);
   auto castType = expr->getCastTypeLoc().getType();
@@ -5558,15 +5558,14 @@ bool UnnecessaryCoercionFailure::diagnoseAsError() {
     auto toTypeAlias = cast<TypeAliasType>(getToType().getPointer());
     // If the typealias are different, we need a warning mentioning both types.
     if (fromTypeAlias->getDecl() != toTypeAlias->getDecl()) {
-      emitDiagnostic(expr->getLoc(),
-                     diag::unnecessary_same_typealias_type_coercion,
+      emitDiagnostic(diag::unnecessary_same_typealias_type_coercion,
                      getFromType(), castType)
           .fixItRemove(sourceRange);
       return true;
     }
   }
   
-  emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
+  emitDiagnostic(diag::unnecessary_same_type_coercion,
                  castType)
       .fixItRemove(sourceRange);
   return true;

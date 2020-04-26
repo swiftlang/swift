@@ -1155,7 +1155,7 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
   if (!isExplicitCoercion)
     return false;
 
-  auto expr = cast<CoerceExpr>(locator.getAnchor());
+  auto expr = getAsExpr<CoerceExpr>(locator.getAnchor());
   
   // Check to ensure the from and to types are equal the cast type.
   // This is required to handle cases where the conversion is done
