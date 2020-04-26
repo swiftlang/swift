@@ -8107,6 +8107,7 @@ public:
     case AutoDiffDerivativeFunctionKind::VJP:
       return getVJPFunction();
     }
+    llvm_unreachable("invalid derivative kind");
   }
 };
 

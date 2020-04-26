@@ -5179,8 +5179,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   switch (kind) {
   case ConstraintKind::SelfObjectOfProtocol: {
     auto conformance = TypeChecker::containsProtocol(
-        type, protocol, DC,
-         ConformanceCheckFlags::SkipConditionalRequirements);
+        type, protocol, DC, /*skipConditionalRequirements=*/true);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -5188,9 +5187,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo: {
     // Check whether this type conforms to the protocol.
-    auto conformance = TypeChecker::conformsToProtocol(
-        type, protocol, DC,
-         ConformanceCheckFlags::SkipConditionalRequirements);
+    auto conformance = DC->getParentModule()->lookupConformance(
+        type, protocol);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -6869,9 +6867,8 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   // conformance already?
   auto proto = requirement->getDeclContext()->getSelfProtocolDecl();
   assert(proto && "Value witness constraint for a non-requirement");
-  auto conformance = TypeChecker::conformsToProtocol(
-      baseObjectType, proto, useDC,
-       ConformanceCheckFlags::SkipConditionalRequirements);
+  auto conformance = useDC->getParentModule()->lookupConformance(
+      baseObjectType, proto);
   if (!conformance) {
     // The conformance failed, so mark the member type as a "hole". We cannot
     // do anything further here.

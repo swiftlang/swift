@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -753,14 +754,9 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
-    LookupConformanceFn conformances,
-    ConformanceCheckOptions conformanceOptions,
     GenericRequirementsCheckListener *listener,
     SubstOptions options) {
   bool valid = true;
-
-  // We handle any conditional requirements ourselves.
-  conformanceOptions |= ConformanceCheckFlags::SkipConditionalRequirements;
 
   struct RequirementSet {
     ArrayRef<Requirement> Requirements;
@@ -770,14 +766,18 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   SmallVector<RequirementSet, 8> pendingReqs;
   pendingReqs.push_back({requirements, {}});
 
-  ASTContext &ctx = dc->getASTContext();
+  auto *module = dc->getParentModule();
+  ASTContext &ctx = module->getASTContext();
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
 
     for (const auto &rawReq : current.Requirements) {
       auto req = rawReq;
       if (current.Parents.empty()) {
-        auto substed = rawReq.subst(substitutions, conformances, options);
+        auto substed = rawReq.subst(
+            substitutions,
+            LookUpConformanceInModule(module),
+            options);
         if (!substed) {
           // Another requirement will fail later; just continue.
           valid = false;
@@ -819,14 +819,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       case RequirementKind::Conformance: {
         // Protocol conformance requirements.
         auto proto = secondType->castTo<ProtocolType>();
-        // FIXME: This should track whether this should result in a private
-        // or non-private dependency.
-        // FIXME: Do we really need "used" at this point?
-        // FIXME: Poor location information. How much better can we do here?
-        // FIXME: This call should support listener to be able to properly
-        //        diagnose problems with conformances.
-        auto conformance = conformsToProtocol(firstType, proto->getDecl(), dc,
-                                              conformanceOptions, loc);
+        auto conformance = module->lookupConformance(firstType, proto->getDecl());
 
         if (conformance) {
           // Report the conformance.
@@ -844,7 +837,9 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
           continue;
         }
 
-        // A failure at the top level is diagnosed elsewhere.
+        if (loc.isValid())
+          diagnoseConformanceFailure(firstType, proto->getDecl(), module, loc);
+
         if (current.Parents.empty())
           return RequirementCheckResult::Failure;
 

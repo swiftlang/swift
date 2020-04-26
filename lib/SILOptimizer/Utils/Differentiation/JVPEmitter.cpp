@@ -221,6 +221,7 @@ SILValue JVPEmitter::materializeTangentDirect(AdjointValue val,
   case AdjointValueKind::Concrete:
     return val.getConcreteValue();
   }
+  llvm_unreachable("invalid value kind");
 }
 
 SILValue JVPEmitter::materializeTangent(AdjointValue val, SILLocation loc) {

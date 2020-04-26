@@ -959,8 +959,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   // primitive literal protocols.
   auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
     ProtocolDecl *proto = ED->getASTContext().getProtocol(protoKind);
-    return TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext(),
-                                           None);
+    return TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext());
   };
 
   static auto otherLiteralProtocolKinds = {
@@ -2434,10 +2433,8 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   TypeChecker::addImplicitConstructors(CD);
 
   auto forceConformance = [&](ProtocolDecl *protocol) {
-    auto ref = TypeChecker::conformsToProtocol(
-        CD->getDeclaredInterfaceType(), protocol, CD,
-        ConformanceCheckFlags::SkipConditionalRequirements, SourceLoc());
-
+    auto ref = CD->getParentModule()->lookupConformance(
+        CD->getDeclaredInterfaceType(), protocol);
     if (ref.isInvalid()) {
       return;
     }
