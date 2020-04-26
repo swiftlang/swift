@@ -3386,7 +3386,7 @@ public:
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
-    private llvm::TrailingObjects<UnresolvedSpecializeExpr, TypeLoc> {
+    private llvm::TrailingObjects<UnresolvedSpecializeExpr, TypeRepr *> {
   friend TrailingObjects;
 
   Expr *SubExpr;
@@ -3395,31 +3395,27 @@ class UnresolvedSpecializeExpr final : public Expr,
 
   UnresolvedSpecializeExpr(Expr *SubExpr,
                            SourceLoc LAngleLoc,
-                           ArrayRef<TypeLoc> UnresolvedParams,
+                           ArrayRef<TypeRepr *> UnresolvedParams,
                            SourceLoc RAngleLoc)
     : Expr(ExprKind::UnresolvedSpecialize, /*Implicit=*/false),
       SubExpr(SubExpr), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
     Bits.UnresolvedSpecializeExpr.NumUnresolvedParams = UnresolvedParams.size();
     std::uninitialized_copy(UnresolvedParams.begin(), UnresolvedParams.end(),
-                            getTrailingObjects<TypeLoc>());
+                            getTrailingObjects<TypeRepr *>());
   }
 
 public:
   static UnresolvedSpecializeExpr *
   create(ASTContext &ctx, Expr *SubExpr, SourceLoc LAngleLoc,
-         ArrayRef<TypeLoc> UnresolvedParams, SourceLoc RAngleLoc);
+         ArrayRef<TypeRepr *> UnresolvedParams, SourceLoc RAngleLoc);
   
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
   
   /// Retrieve the list of type parameters. These parameters have not yet
   /// been bound to archetypes of the entity to be specialized.
-  ArrayRef<TypeLoc> getUnresolvedParams() const {
-    return {getTrailingObjects<TypeLoc>(),
-            Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
-  }
-  MutableArrayRef<TypeLoc> getUnresolvedParams() {
-    return {getTrailingObjects<TypeLoc>(),
+  ArrayRef<TypeRepr *> getUnresolvedParams() const {
+    return {getTrailingObjects<TypeRepr *>(),
             Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
   }
   

@@ -1427,19 +1427,14 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
 
 TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
     UnresolvedSpecializeExpr *us) {
-  SmallVector<TypeRepr *, 4> genericArgs;
-  for (auto &type : us->getUnresolvedParams()) {
-    genericArgs.push_back(type.getTypeRepr());
-  }
-
-  auto angleRange = SourceRange(us->getLAngleLoc(), us->getRAngleLoc());
-
   // If this is a reference type a specialized type, form a TypeExpr.
-
   // The base should be a TypeExpr that we already resolved.
   if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
     if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
-      return TypeExpr::createForSpecializedDecl(ITR, genericArgs, angleRange,
+      return TypeExpr::createForSpecializedDecl(ITR,
+                                                us->getUnresolvedParams(),
+                                                SourceRange(us->getLAngleLoc(),
+                                                            us->getRAngleLoc()),
                                                 getASTContext());
     }
   }

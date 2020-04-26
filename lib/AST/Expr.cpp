@@ -1191,9 +1191,9 @@ ErasureExpr *ErasureExpr::create(ASTContext &ctx, Expr *subExpr, Type type,
 
 UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              Expr *SubExpr, SourceLoc LAngleLoc,
-                                             ArrayRef<TypeLoc> UnresolvedParams,
+                                             ArrayRef<TypeRepr *> UnresolvedParams,
                                              SourceLoc RAngleLoc) {
-  auto size = totalSizeToAlloc<TypeLoc>(UnresolvedParams.size());
+  auto size = totalSizeToAlloc<TypeRepr *>(UnresolvedParams.size());
   auto mem = ctx.Allocate(size, alignof(UnresolvedSpecializeExpr));
   return ::new(mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
                                              UnresolvedParams, RAngleLoc);

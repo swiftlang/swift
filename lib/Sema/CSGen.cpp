@@ -1691,8 +1691,7 @@ namespace {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
           ArrayRef<Type> typeVars = bgt->getGenericArgs();
-          MutableArrayRef<TypeLoc> specializations =
-              expr->getUnresolvedParams();
+          auto specializations = expr->getUnresolvedParams();
 
           // If we have too many generic arguments, complain.
           if (specializations.size() > typeVars.size()) {
@@ -1715,14 +1714,15 @@ namespace {
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             TypeResolutionOptions options(TypeResolverContext::InExpression);
             options |= TypeResolutionFlags::AllowUnboundGenerics;
+            auto tyLoc = TypeLoc{specializations[i]};
             if (TypeChecker::validateType(CS.getASTContext(),
-                                specializations[i],
+                                tyLoc,
                                 TypeResolution::forContextual(CS.DC),
                                 options))
               return Type();
 
             CS.addConstraint(ConstraintKind::Bind,
-                             typeVars[i], specializations[i].getType(),
+                             typeVars[i], tyLoc.getType(),
                              locator);
           }
           
