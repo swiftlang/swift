@@ -1426,8 +1426,12 @@ void SourceFile::dump(llvm::raw_ostream &OS) const {
 }
 
 void Pattern::dump() const {
-  PrintPattern(llvm::errs()).visit(const_cast<Pattern*>(this));
-  llvm::errs() << '\n';
+  dump(llvm::errs());
+}
+
+void Pattern::dump(raw_ostream &OS, unsigned Indent) const {
+  PrintPattern(OS, Indent).visit(const_cast<Pattern*>(this));
+  OS << '\n';
 }
 
 //===----------------------------------------------------------------------===//
