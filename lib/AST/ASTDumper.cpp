@@ -3330,6 +3330,13 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
 
   dumpProtocolConformanceRefRec(*this, out, indent, visited);
 }
+
+void ProtocolConformanceRef::print(llvm::raw_ostream &out) const {
+  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  dumpProtocolConformanceRefRec(*this, out, 0, visited);
+
+}
+
 void ProtocolConformance::dump() const {
   auto &out = llvm::errs();
   dump(out);
