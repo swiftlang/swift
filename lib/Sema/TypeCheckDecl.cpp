@@ -488,7 +488,7 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
 
   // Look through all of the inherited nominals for a superclass or a
   // class-bound protocol.
-  for (const auto found : allInheritedNominals) {
+  for (const auto &found : allInheritedNominals) {
     // Superclass bound.
     if (isa<ClassDecl>(found.Item))
       return true;
