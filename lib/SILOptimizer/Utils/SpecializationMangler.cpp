@@ -255,15 +255,25 @@ void
 FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) {
   ArgOpBuffer << 'c';
 
-  // Add in the partial applies function name if we can find one. Assert
-  // otherwise. The reason why this is ok to do is currently we only perform
-  // closure specialization if we know the function_ref in question. When this
-  // restriction is removed, the assert here will fire.
-  if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Inst)) {
-    auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
-    appendIdentifier(FRI->getInitiallyReferencedFunction()->getName());
+  assert(isa<ConvertFunctionInst>(Inst) || isa<ThinToThickFunctionInst>(Inst) ||
+         isa<PartialApplyInst>(Inst) || isa<ConvertEscapeToNoEscapeInst>(Inst));
+
+  SILValue callee = cast<SingleValueInstruction>(Inst);
+  while (isa<ConvertFunctionInst>(callee) ||
+         isa<ConvertEscapeToNoEscapeInst>(Inst) ||
+         isa<ThinToThickFunctionInst>(callee)) {
+    callee = callee.getDefiningInstruction()->getOperand(0);
+  }
+
+  if (!isa<PartialApplyInst>(callee)) {
+    assert(isa<FunctionRefInst>(callee) &&
+           "Instruction pointing to unkown source.");
+    appendIdentifier(cast<FunctionRefInst>(callee)
+                         ->getInitiallyReferencedFunction()
+                         ->getName());
     return;
   }
+
   auto *PAI = cast<PartialApplyInst>(Inst);
   auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
   appendIdentifier(FRI->getInitiallyReferencedFunction()->getName());

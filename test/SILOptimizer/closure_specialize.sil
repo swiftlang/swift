@@ -828,3 +828,79 @@ bb0(%0 : $Int):
   %empty = tuple ()
   return %empty : $()
 }
+
+public struct IntError : Error {
+  init()
+}
+
+public struct MyModel {
+  init()
+}
+
+public struct MyLoader {
+  public typealias Model = MyModel
+  public func load(completionHandler: (Result<MyModel, IntError>) -> ())
+  init()
+}
+
+// CHECK-LABEL: class_level_generic_test
+// CHECK: [[SELF:%[0-9]+]] = alloc_stack
+// CHECK: function_ref specialized class_level_generic_test_closure_2
+// CHECK: [[FN:%[0-9]+]] = function_ref @$s34class_level_generic_test_closure_20a1_b1_c1_d1_E2_1Tf1cn_n : $@convention(thin) (@in_guaranteed MyLoader) -> ()
+// CHECK: [[NEW_PA:%[0-9]+]] = partial_apply [callee_guaranteed] [[FN]]([[SELF]]) : $@convention(thin) (@in_guaranteed MyLoader) -> ()
+// CHECK: apply [[NEW_PA]]() : $@callee_guaranteed () -> ()
+// CHECK-LABEL: end sil function 'class_level_generic_test'
+sil @class_level_generic_test : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $MyLoader ()
+  %5 = alloc_stack $MyLoader
+  store %0 to %5 : $*MyLoader
+  %7 = function_ref @class_level_generic_test_closure_2 : $@convention(thin) (@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Result<τ_0_0, IntError>) -> () for <MyModel>, @in_guaranteed MyLoader) -> ()
+  %8 = partial_apply [callee_guaranteed] %7(%5) : $@convention(thin) (@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Result<τ_0_0, IntError>) -> () for <MyModel>, @in_guaranteed MyLoader) -> ()
+  %9 = convert_function %8 : $@callee_guaranteed (@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Result<τ_0_0, IntError>) -> () for <MyModel>) -> () to $@callee_guaranteed @substituted <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Result<τ_0_0, IntError>) -> () for <τ_0_0>) -> () for <MyModel>
+  dealloc_stack %5 : $*MyLoader
+  %16 = function_ref @class_level_generic_test_closure_1 : $@convention(thin) @noescape (@in_guaranteed Result<MyModel, IntError>) -> ()
+  %17 = thin_to_thick_function %16 : $@convention(thin) @noescape (@in_guaranteed Result<MyModel, IntError>) -> () to $@noescape @callee_guaranteed (@in_guaranteed Result<MyModel, IntError>) -> ()
+  %18 = convert_function %17 : $@noescape @callee_guaranteed (@in_guaranteed Result<MyModel, IntError>) -> () to $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Result<τ_0_0, IntError>) -> () for <MyModel>
+  %19 = apply %9(%18) : $@callee_guaranteed @substituted <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Result<τ_0_0, IntError>) -> () for <τ_0_0>) -> () for <MyModel>
+  %22 = tuple ()
+  return %22 : $()
+}
+
+sil shared [transparent] [thunk] @class_level_generic_test_closure_1 : $@convention(thin) @noescape (@in_guaranteed Result<MyModel, IntError>) -> () {
+bb0(%0 : $*Result<MyModel, IntError>):
+  %41 = tuple ()
+  return %41 : $()
+}
+
+sil shared [transparent] [thunk] @class_level_generic_test_closure_2 : $@convention(thin) (@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Result<τ_0_0, IntError>) -> () for <MyModel>, @in_guaranteed MyLoader) -> () {
+bb0(%0 : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Result<τ_0_0, IntError>) -> () for <MyModel>, %1 : $*MyLoader):
+  %3 = struct $MyModel ()
+  %4 = enum $Result<MyModel, IntError>, #Result.success!enumelt, %3 : $MyModel
+  %5 = alloc_stack $Result<MyModel, IntError>
+  store %4 to %5 : $*Result<MyModel, IntError>
+  %7 = apply %0(%5) : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed Result<τ_0_0, IntError>) -> () for <MyModel>
+  dealloc_stack %5 : $*Result<MyModel, IntError>
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil @test_mutliple_converts : $@convention(thin) (Int) -> ()
+// CHECK-NOT: apply
+// CHECK: [[FN:%[0-9]+]] = function_ref @$s7specgen13take_closure2yyySi_SitcF26$s7specgen6calleeyySi_SitFTf1c_n
+// CHECK: apply [[FN]]() : $@convention(thin) () -> ()
+// CHECK-NOT: apply
+// CHECK-LABEL: end sil function 'test_mutliple_converts'
+sil @test_mutliple_converts : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  // function_ref specgen.(caller (Swift.Int) -> ()).(closure #1)
+  %3 = function_ref @$s7specgen6calleeyySi_SitF : $@convention(thin) (Int, Int) -> ()
+  %cnvt1 = convert_function %3 :$@convention(thin) (Int, Int) -> () to $@noescape @convention(thin) (Int, Int) -> ()
+  %cnvt2 = convert_function %cnvt1 :$@noescape @convention(thin) (Int, Int) -> () to $@convention(thin) (Int, Int) -> ()
+  %5 = thin_to_thick_function %cnvt2 : $@convention(thin) (Int, Int) -> () to $@callee_owned (Int, Int) -> ()
+  
+  %6 = function_ref @$s7specgen13take_closure2yyySi_SitcF : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}

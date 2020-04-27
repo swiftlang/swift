@@ -99,7 +99,8 @@ llvm::cl::opt<bool> EliminateDeadClosures(
 //===----------------------------------------------------------------------===//
 
 static bool isSupportedClosureKind(const SILInstruction *I) {
-  return isa<ThinToThickFunctionInst>(I) || isa<PartialApplyInst>(I);
+  return isa<ThinToThickFunctionInst>(I) || isa<ConvertFunctionInst>(I) ||
+         isa<ConvertEscapeToNoEscapeInst>(I) || isa<PartialApplyInst>(I);
 }
 
 //===----------------------------------------------------------------------===//
@@ -183,19 +184,20 @@ public:
   CallSiteDescriptor(CallSiteDescriptor&&) =default;
   CallSiteDescriptor &operator=(CallSiteDescriptor &&) =default;
 
-  SILFunction *getApplyCallee() const {
-    return cast<FunctionRefInst>(AI.getCallee())
-        ->getInitiallyReferencedFunction();
-  }
+  SILFunction *getApplyCallee() const { return AI.getCalleeFunction(); }
 
   SILFunction *getClosureCallee() const {
-    if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure()))
-      return cast<FunctionRefInst>(PAI->getCallee())
-          ->getInitiallyReferencedFunction();
+    SILValue closure = getClosure();
+    while (isa<ConvertFunctionInst>(closure) ||
+           isa<ConvertEscapeToNoEscapeInst>(closure) ||
+           isa<ThinToThickFunctionInst>(closure)) {
+      closure = closure.getDefiningInstruction()->getOperand(0);
+    }
 
-    auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
-    return cast<FunctionRefInst>(TTTFI->getCallee())
-        ->getInitiallyReferencedFunction();
+    if (auto partialApply = dyn_cast<PartialApplyInst>(closure))
+      closure = partialApply->getCallee();
+
+    return cast<FunctionRefInst>(closure)->getInitiallyReferencedFunction();
   }
 
   bool closureHasRefSemanticContext() const {
@@ -332,7 +334,28 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   FullApplySite AI = CSDesc.getApplyInst();
   SingleValueInstruction *Closure = CSDesc.getClosure();
   SILBuilderWithScope Builder(Closure);
-  FunctionRefInst *FRI = Builder.createFunctionRef(AI.getLoc(), NewF);
+  SingleValueInstruction *FRI = nullptr;
+
+  // If we're rewriting a closure where the origin is a partial apply, create a
+  // second partial apply with the new function_ref and set that as the origin
+  // of the new closure apply. Kepp the old partial apply because it may still
+  // have other references.
+  if (auto partialApply = dyn_cast<PartialApplyInst>(AI.getCalleeOrigin())) {
+    assert(isa<FunctionRefInst>(partialApply->getCallee()));
+    Builder.setInsertionPoint(partialApply);
+    FRI = Builder.createFunctionRef(partialApply->getLoc(), NewF);
+    // These args don't actually change at all.
+    SmallVector<SILValue, 8> newArgs;
+    for (unsigned i = 0; i < partialApply->getNumArguments(); ++i)
+      newArgs.push_back(partialApply->getArgument(i));
+    auto newPartialApply = Builder.createPartialApply(
+        partialApply->getLoc(), FRI, partialApply->getSubstitutionMap(),
+        newArgs, partialApply->getFunctionType()->getCalleeConvention());
+    FRI = newPartialApply;
+    Builder.setInsertionPoint(Closure);
+  } else {
+    FRI = Builder.createFunctionRef(AI.getLoc(), NewF);
+  }
 
   // Create the args for the new apply by removing the closure argument...
   llvm::SmallVector<SILValue, 8> NewArgs;
@@ -547,10 +570,15 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
 
     // Ok, it is a closure we support, set Callee.
     Callee = PAI->getCallee();
-
   } else {
-    // Otherwise closure must be a thin_to_thick_function.
-    Callee = cast<ThinToThickFunctionInst>(Closure)->getCallee();
+    // Must be a convert function or thin to thick.
+    Callee = cast<SingleValueInstruction>(Closure)->getOperand(0);
+  }
+
+  while (isa<ConvertFunctionInst>(Callee) ||
+         isa<ConvertEscapeToNoEscapeInst>(Callee) ||
+         isa<ThinToThickFunctionInst>(Callee)) {
+    Callee = Callee.getDefiningInstruction()->getOperand(0);
   }
 
   // Make sure that it is a simple partial apply (i.e. its callee is a
@@ -1081,6 +1109,8 @@ bool SILClosureSpecializerTransform::gatherCallSites(
   // For each basic block BB in Caller...
   for (auto &BB : *Caller) {
 
+    SmallPtrSet<Operand *, 8> visitedUsers;
+
     // For each instruction II in BB...
     for (auto &II : BB) {
       // If II is not a closure that we support specializing, skip it...
@@ -1112,6 +1142,8 @@ bool SILClosureSpecializerTransform::gatherCallSites(
       // Uses may grow in this loop.
       for (size_t UseIndex = 0; UseIndex < Uses.size(); ++UseIndex) {
         auto *Use = Uses[UseIndex];
+        if (!visitedUsers.insert(Use).second)
+          continue;
         UsePoints.push_back(Use->getUser());
 
         // Recurse through conversions.
@@ -1183,7 +1215,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
 
         // If AI does not have a function_ref definition as its callee, we can
         // not do anything here... so continue...
-        SILFunction *ApplyCallee = AI.getReferencedFunctionOrNull();
+        SILFunction *ApplyCallee = AI.getCalleeFunction();
         if (!ApplyCallee || ApplyCallee->isExternalDeclaration())
           continue;
 
