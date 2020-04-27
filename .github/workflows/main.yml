@@ -19,6 +19,7 @@ jobs:
       - name: Free disk space
         run: |
           df -h
+          sudo apt-get purge libgcc-9-dev gcc-9 libstdc++-9-dev
           sudo swapoff -a
           sudo rm -f /swapfile
           sudo apt clean
