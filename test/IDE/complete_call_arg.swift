@@ -593,8 +593,8 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // SUBSCRIPT_1_DOT: Begin completions
 // SUBSCRIPT_1_DOT-NOT: i1
 // SUBSCRIPT_1_DOT-NOT: s1
-// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              max[#Int#]; name=max
-// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              min[#Int#]; name=min
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific:              max[#Int#]; name=max
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific:              min[#Int#]; name=min
 
   let _ = obj[42, #^SUBSCRIPT_2^#
 // SUBSCRIPT_2: Begin completions, 1 items

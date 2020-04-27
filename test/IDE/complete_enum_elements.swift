@@ -91,7 +91,7 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_TYPE_CONTEXT: Begin completions
 // FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Foo2[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: .alias1[#FooEnum#]; name=alias1
+// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: .alias1[#FooEnum#]; name=alias1
 // FOO_ENUM_TYPE_CONTEXT: End completions
 
 // FOO_ENUM_NO_DOT: Begin completions
@@ -130,7 +130,7 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT_ELEMENTS: Begin completions, 3 items
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: Foo2[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: alias1[#FooEnum#]; name=alias1
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: alias1[#FooEnum#]; name=alias1
 // FOO_ENUM_DOT_ELEMENTS-NEXT: End completions
 
 enum BarEnum {
@@ -154,18 +154,18 @@ enum BarEnum {
 }
 
 // BAR_ENUM_TYPE_CONTEXT: Begin completions
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar1[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar2()[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar3({#Int#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar4({#a: Int#}, {#b: Float#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar5({#a: Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar6({#a: Int#}, {#b: (Float)#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar7({#a: Int#}, {#(b: Float, c: Double)#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar8({#a: Int#}, {#b: (c: Float, d: Double)#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar9({#Int#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar10({#Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar11({#Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Bar12({#Int#}, {#(Float, Double)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar1[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar2()[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar3({#Int#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar4({#a: Int#}, {#b: Float#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar5({#a: Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar6({#a: Int#}, {#b: (Float)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar7({#a: Int#}, {#(b: Float, c: Double)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar8({#a: Int#}, {#b: (c: Float, d: Double)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar9({#Int#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar10({#Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar11({#Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: .Bar12({#Int#}, {#(Float, Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_TYPE_CONTEXT: End completions
 
 // BAR_ENUM_NO_DOT: Begin completions
@@ -220,8 +220,8 @@ enum BazEnum<T> {
 }
 
 // BAZ_ENUM_TYPE_CONTEXT: Begin completions
-// BAZ_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific: .Baz1[#BazEnum<Int>#]{{; name=.+$}}
-// BAZ_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific: .Baz2({#Int#})[#BazEnum<Int>#]{{; name=.+$}}
+// BAZ_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal: .Baz1[#BazEnum<Int>#]{{; name=.+$}}
+// BAZ_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal: .Baz2({#Int#})[#BazEnum<Int>#]{{; name=.+$}}
 // BAZ_ENUM_TYPE_CONTEXT: End completions
 
 // BAZ_INT_ENUM_NO_DOT: Begin completions, 8 items
