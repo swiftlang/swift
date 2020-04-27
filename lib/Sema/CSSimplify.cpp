@@ -4557,7 +4557,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (kind >= ConstraintKind::Subtype) {
     // Bottom-to-anything conversion.
     if (type1->isBottom()) {
-      conversionsOrFixes.push_back(ConversionRestrictionKind::FromUninhabited);
+      conversionsOrFixes.push_back(ConversionRestrictionKind::BottomToAnything);
     }
 
     // Subclass-to-superclass conversion.
@@ -9139,7 +9139,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       bridgedObjCClass->getDeclaredInterfaceType(),
                       ConstraintKind::Subtype, subflags, locator);
   }
-  case ConversionRestrictionKind::FromUninhabited:
+  case ConversionRestrictionKind::BottomToAnything:
     // Nothing more to solve.
     addContextualScore();
     increaseScore(SK_BottomToAnything);

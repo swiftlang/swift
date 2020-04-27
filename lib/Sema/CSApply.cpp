@@ -6550,8 +6550,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return cs.cacheType(new (ctx)
                               ForeignObjectConversionExpr(result, toType));
     }
-    case ConversionRestrictionKind::FromUninhabited: {
-      return cs.cacheType(new (ctx) FromUninhabitedExpr(expr, toType));
+    case ConversionRestrictionKind::BottomToAnything: {
+      return cs.cacheType(new (ctx) BottomToAnythingExpr(expr, toType));
     }
     }
   }

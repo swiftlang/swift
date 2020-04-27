@@ -3364,13 +3364,13 @@ public:
   }
 };
 
-class FromUninhabitedExpr : public ImplicitConversionExpr {
+class BottomToAnythingExpr : public ImplicitConversionExpr {
 public:
-  FromUninhabitedExpr(Expr *subExpr, Type type)
-      : ImplicitConversionExpr(ExprKind::FromUninhabited, subExpr, type) {}
+  BottomToAnythingExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::BottomToAnything, subExpr, type) {}
 
-   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::FromUninhabited;
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::BottomToAnything;
   }
 };
 

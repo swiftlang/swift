@@ -58,7 +58,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       break;
 
     case SK_BottomToAnything:
-      log << "";
+      log << "never to anything conversion";
       break;
 
     case SK_ForceUnchecked:

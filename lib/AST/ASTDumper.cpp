@@ -2276,8 +2276,8 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitFromUninhabitedExpr(FromUninhabitedExpr *E) {
-    printCommon(E, "from_uninhabited") << '\n';
+  void visitBottomToAnythingExpr(BottomToAnythingExpr *E) {
+    printCommon(E, "bottom_to_anything_expr") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
