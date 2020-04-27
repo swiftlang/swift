@@ -26,7 +26,7 @@
 using namespace swift;
 using namespace constraints;
 
-void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, TypedNode anchor,
+void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, ASTNode anchor,
                                 ArrayRef<PathElement> path) {
   id.AddPointer(anchor.getOpaqueValue());
   id.AddInteger(path.size());
@@ -247,6 +247,10 @@ bool ConstraintLocator::isForOptionalTry() const {
   return directlyAt<OptionalTryExpr>();
 }
 
+template <typename E> bool ConstraintLocator::directlyAt() const {
+  return isExpr<E>(getAnchor()) && getPath().empty();
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?
@@ -270,7 +274,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
   
   out << "locator@" << (void*) this << " [";
 
-  if (auto *expr = anchor.dyn_cast<const Expr *>()) {
+  if (auto *expr = anchor.dyn_cast<Expr *>()) {
     out << Expr::getKindName(expr->getKind());
     if (sm) {
       out << '@';
