@@ -2414,7 +2414,7 @@ static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
     return llvm::sys::path::stem(BaseInput);
   
   if (isa<StaticLinkJobAction>(JA)) {
-    Buffer = "lib";
+    Buffer = Triple.isOSWindows() ? "" : "lib";
     Buffer.append(BaseName);
     Buffer.append(Triple.isOSWindows() ? ".lib" : ".a");
     return Buffer.str();

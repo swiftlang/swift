@@ -42,7 +42,7 @@
 // INFERRED_NAME_DARWIN:  -o libARCHIVER.a
 // INFERRED_NAME_LINUX:   libARCHIVER.a
 // INFERRED_NAME_WINDOWS: -lib
-// INFERRED_NAME_WINDOWS: libARCHIVER.lib
+// INFERRED_NAME_WINDOWS: ARCHIVER.lib
 
 // RUN: not %swiftc_driver -driver-print-jobs -module-name ARCHIVER  %s -emit-executable -static 2>&1 | %FileCheck -check-prefix ERROR %s
 
