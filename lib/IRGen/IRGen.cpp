@@ -101,6 +101,12 @@ static cl::opt<bool> AlignModuleToPageSize(
     "align-module-to-page-size", cl::Hidden,
     cl::desc("Align the text section of all LLVM modules to the page size"));
 
+// This option is for performance benchmarking. It ensures we consistently
+// access data at the same alignment even in the face of ASLR.
+static cl::opt<int> ForcedAlignmentForGlobals(
+    "force-align-globals-to", cl::Hidden, cl::init(0),
+    cl::desc("Align all globals to the specified number of bytes"));
+
 namespace {
 // We need this to access IRGenOptions from extension functions
 class PassManagerBuilderWrapper : public PassManagerBuilder {
@@ -325,6 +331,15 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
       if (!I->isDeclaration()) {
         I->setAlignment(llvm::MaybeAlign(pageSize));
         break;
+      }
+    }
+  }
+
+  if (ForcedAlignmentForGlobals) {
+    // For performance benchmarking, align all globals to 32 bytes.
+    for (auto &G : Module->getGlobalList()) {
+      if (!G.isDeclaration()) {
+        G.setAlignment(llvm::MaybeAlign(ForcedAlignmentForGlobals));
       }
     }
   }
