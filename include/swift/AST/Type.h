@@ -148,6 +148,9 @@ enum class SubstFlags {
   DesugarMemberTypes = 0x02,
   /// Substitute types involving opaque type archetypes.
   SubstituteOpaqueArchetypes = 0x04,
+  /// Force substitution of opened archetypes. Normally -- without these flag --
+  /// opened archetype conformances are not substituted.
+  ForceSubstituteOpenedExistentials = 0x08,
 };
 
 /// Options for performing substitutions into a type.
