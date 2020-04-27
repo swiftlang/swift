@@ -82,6 +82,11 @@ func overloaded(_ x: Never) {}
 func overloaded(_ x: Int) {}
 overloaded(fatalError())
 
+// To maintain source compatibility, this shouldn't be ambiguous.
+func overloaded2(_ x: Never?) {}
+func overloaded2(_ x: Int) {}
+overloaded2(fatalError())
+
 func ambiguousOverload(_ x: Int) {} // expected-note {{found this candidate}}
 func ambiguousOverload(_ x: String) {} // expected-note {{found this candidate}}
 ambiguousOverload(fatalError()) // expected-error {{ambiguous use of 'ambiguousOverload'}}

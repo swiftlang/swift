@@ -661,6 +661,8 @@ enum ScoreKind {
   SK_Unavailable,
   /// A use of a disfavored overload.
   SK_DisfavoredOverload,
+  /// A conversion from Never to any type.
+  SK_BottomToAnything,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.

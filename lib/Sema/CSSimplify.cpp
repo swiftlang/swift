@@ -9142,6 +9142,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::FromUninhabited:
     // Nothing more to solve.
     addContextualScore();
+    increaseScore(SK_BottomToAnything);
     return SolutionKind::Solved;
   }
   

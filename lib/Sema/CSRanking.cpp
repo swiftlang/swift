@@ -57,6 +57,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       log << "disfavored overload";
       break;
 
+    case SK_BottomToAnything:
+      log << "";
+      break;
+
     case SK_ForceUnchecked:
       log << "force of an implicitly unwrapped optional";
       break;
