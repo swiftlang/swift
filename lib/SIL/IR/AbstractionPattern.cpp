@@ -378,7 +378,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::Discard:
     llvm_unreachable("operation not needed on discarded abstractions yet");
   case Kind::Type:
-    if (isTypeParameter())
+    if (isTypeParameterOrOpaqueArchetype())
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               getCanTupleElementType(getType(), index));
