@@ -9143,6 +9143,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // Nothing more to solve.
     addContextualScore();
     increaseScore(SK_BottomToAnything);
+    if (worseThanBestSolution()) {
+      return SolutionKind::Error;
+    }
     return SolutionKind::Solved;
   }
   
