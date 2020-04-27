@@ -1,41 +1,3 @@
-
-function(add_sourcekit_symbol_exports target_name export_file)
-  # Makefile.rules contains special cases for different platforms.
-  # We restrict ourselves to Darwin for the time being.
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    add_custom_command(OUTPUT symbol.exports
-      COMMAND sed -e "s/^/_/" < ${export_file} > symbol.exports
-      DEPENDS ${export_file}
-      VERBATIM
-      COMMENT "Creating export file for ${target_name}")
-    add_custom_target(${target_name}_exports DEPENDS symbol.exports)
-    set_property(DIRECTORY APPEND
-      PROPERTY ADDITIONAL_MAKE_CLEAN_FILES symbol.exports)
-    set_target_properties(${target_name}_exports PROPERTIES
-      FOLDER "SourceKit libraries")
-
-    get_property(srcs TARGET ${target_name} PROPERTY SOURCES)
-    foreach(src ${srcs})
-      get_filename_component(extension ${src} EXT)
-      if(extension STREQUAL ".cpp")
-        set(first_source_file ${src})
-        break()
-      endif()
-    endforeach()
-
-    # Force re-linking when the exports file changes. Actually, it
-    # forces recompilation of the source file. The LINK_DEPENDS target
-    # property only works for makefile-based generators.
-    set_property(SOURCE ${first_source_file} APPEND PROPERTY
-      OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/symbol.exports)
-
-    set_property(TARGET ${target_name} APPEND_STRING PROPERTY
-                 LINK_FLAGS " -Wl,-exported_symbols_list,${CMAKE_CURRENT_BINARY_DIR}/symbol.exports")
-
-    add_dependencies(${target_name} ${target_name}_exports)
-  endif()
-endfunction()
-
 # Add default compiler and linker flags to 'target'.
 #
 # FIXME: this is a HACK.  All SourceKit CMake code using this function should be
@@ -155,7 +117,7 @@ macro(add_sourcekit_library name)
   swift_common_llvm_config(${name} ${SOURCEKITLIB_LLVM_LINK_COMPONENTS})
 
   if(SOURCEKITLIB_SHARED AND EXPORTED_SYMBOL_FILE)
-    add_sourcekit_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
+    add_llvm_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
   endif()
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
@@ -302,7 +264,7 @@ macro(add_sourcekit_framework name)
   swift_common_llvm_config(${name} ${SOURCEKITFW_LLVM_LINK_COMPONENTS})
 
   if (EXPORTED_SYMBOL_FILE)
-    add_sourcekit_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
+    add_llvm_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
   endif()
 
   if(SOURCEKITFW_MODULEMAP)
