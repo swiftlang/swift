@@ -1317,7 +1317,7 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   TypeDecl *currentDecl = nullptr;
   DeclContext *currentDC = nullptr;
   bool isAmbiguous = false;
-  for (const auto entry : globals) {
+  for (const auto &entry : globals) {
     auto *foundDC = entry.getDeclContext();
     auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
 

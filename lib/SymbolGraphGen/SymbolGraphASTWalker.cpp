@@ -136,7 +136,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
         }
       };
 
-      for (const auto InheritedLoc : Extension->getInherited()) {
+      for (const auto &InheritedLoc : Extension->getInherited()) {
         auto InheritedTy = InheritedLoc.getType();
         if (!InheritedTy) {
           continue;
@@ -146,7 +146,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
       while (!UnexpandedCompositions.empty()) {
         const auto *Comp = UnexpandedCompositions.pop_back_val();
-        for (const auto Member : Comp->getMembers()) {
+        for (const auto &Member : Comp->getMembers()) {
           HandleProtocolOrComposition(Member);
         }
       }
