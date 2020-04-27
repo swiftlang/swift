@@ -805,10 +805,10 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
     ++paramArgIter;
   }
   ApplySite newAS;
-  bool changed;
-  std::tie(newAS, changed) = replaceApplySite(
+  bool neededCFGChange;
+  std::tie(newAS, neededCFGChange) = replaceApplySite(
       builder, loc, applySite, fri, subs, newArgs, substConv, newArgBorrows);
-  changedCFG |= changed;
+  changedCFG |= neededCFGChange;
   FullApplySite newAI = FullApplySite::isa(newAS.getInstruction());
   assert(newAI);
 
@@ -1036,11 +1036,11 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
   auto *fri = applyBuilder.createFunctionRefFor(loc, f);
 
   ApplySite newApplySite;
-  bool changed = false;
-  std::tie(newApplySite, changed) =
+  bool neededCFGChange = false;
+  std::tie(newApplySite, neededCFGChange) =
       replaceApplySite(applyBuilder, loc, applySite, fri, subMap, arguments,
                        substConv, borrowedArgs);
-  changedCFG |= changed;
+  changedCFG |= neededCFGChange;
 
   if (ore)
     ore->emit([&]() {

@@ -930,11 +930,11 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     for (unsigned i = 0, e = srcTupleTy->getNumElements(); i < e; i++) {
       SILValue element = builder->createTupleExtract(loc, value, i);
       // Cast the value if necessary.
-      bool changed;
-      std::tie(element, changed) = castValueToABICompatibleType(
+      bool neededCFGChange;
+      std::tie(element, neededCFGChange) = castValueToABICompatibleType(
           builder, loc, element, srcTy.getTupleElementType(i),
           destTy.getTupleElementType(i));
-      changedCFG |= changed;
+      changedCFG |= neededCFGChange;
       expectedTuple.push_back(element);
     }
 
