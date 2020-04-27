@@ -1861,7 +1861,7 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
     if (tuple->hasEllipsis())
       return false;
 
-    for (const auto elt : tuple->getElements()) {
+    for (const auto &elt : tuple->getElements()) {
       if (!isDefaultInitializable(elt.Type, ctx))
         return false;
     }

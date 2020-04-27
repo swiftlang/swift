@@ -490,13 +490,13 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     }
 
     OS.attributeArray("symbols", [&](){
-      for (const auto S: Nodes) {
+      for (const auto &S: Nodes) {
         S.serialize(OS);
       }
     });
 
     OS.attributeArray("relationships", [&](){
-      for (const auto Relationship : Edges) {
+      for (const auto &Relationship : Edges) {
         Relationship.serialize(OS);
       }
     });
