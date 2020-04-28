@@ -116,7 +116,7 @@ static void writeQuotedEscaped(llvm::raw_ostream &os,
 
 void OutputFileMap::write(llvm::raw_ostream &os,
                           ArrayRef<StringRef> inputs) const {
-  for (const auto input : inputs) {
+  for (const auto &input : inputs) {
     writeQuotedEscaped(os, input);
     os << ":";
 
