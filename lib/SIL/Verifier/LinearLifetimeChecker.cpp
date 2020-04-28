@@ -44,9 +44,15 @@ struct State {
   /// parent block of the value.
   Optional<SILValue> value;
 
-  /// The block where the live range begins. If the field value is not None,
-  /// then this is value->getParentBlock();
-  SILBasicBlock *beginBlock;
+  /// The insertion point where the live range begins. If the field value is not
+  /// None, then:
+  //
+  // 1. If this value is defined by an instruction, it will be
+  //    value->getDefiningInstruction().
+  //
+  // 2. If this is an argument, this is the first instruction in the argument's
+  //    defining block.
+  SILInstruction *beginInst;
 
   /// The result error object that use to signal either that no errors were
   /// found or if errors are found the specific type of error that was found.
@@ -84,8 +90,8 @@ struct State {
         LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
         Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
-      : value(value), beginBlock(value->getParentBlock()), error(errorBehavior),
-        visitedBlocks(visitedBlocks),
+      : value(value), beginInst(value->getDefiningInsertionPoint()),
+        error(errorBehavior), visitedBlocks(visitedBlocks),
         leakingBlockCallback(leakingBlockCallback),
         consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
 
@@ -94,10 +100,12 @@ struct State {
         LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
         Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
-      : value(), beginBlock(beginBlock), error(errorBehavior),
+      : value(), beginInst(&*beginBlock->begin()), error(errorBehavior),
         visitedBlocks(visitedBlocks),
         leakingBlockCallback(leakingBlockCallback),
         consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
+
+  SILBasicBlock *getBeginBlock() const { return beginInst->getParent(); }
 
   void initializeAllNonConsumingUses(ArrayRef<Operand *> nonConsumingUsers);
   void initializeAllConsumingUses(
@@ -159,6 +167,30 @@ void State::initializeAllNonConsumingUses(
     ArrayRef<Operand *> nonConsumingUsers) {
   for (Operand *use : nonConsumingUsers) {
     auto *userBlock = use->getUser()->getParent();
+
+    // First check if this non consuming user is in our definition block. If so,
+    // validate that it is strictly after our defining instruction. If so, just
+    // emit an error now and exit.
+    if (userBlock == getBeginBlock()) {
+      if (std::find_if(beginInst->getIterator(), userBlock->end(),
+                       [&use](const SILInstruction &inst) -> bool {
+                         return use->getUser() == &inst;
+                       }) == userBlock->end()) {
+        error.handleUseAfterFree([&] {
+          llvm::errs() << "Function: '"
+                       << getBeginBlock()->getParent()->getName() << "'\n"
+                       << "Found use before def?!\n"
+                       << "Value: ";
+          if (auto v = value) {
+            llvm::errs() << *v;
+          } else {
+            llvm::errs() << "N/A. \n";
+          }
+        });
+        return;
+      }
+    }
+
     // First try to associate User with User->getParent().
     auto result =
         blocksWithNonConsumingUses.insert(std::make_pair(userBlock, use));
@@ -213,7 +245,7 @@ void State::initializeAllConsumingUses(
     // If this user is in the same block as the value, do not visit
     // predecessors. We must be extra tolerant here since we allow for
     // unreachable code.
-    if (userBlock == beginBlock)
+    if (userBlock == getBeginBlock())
       continue;
 
     // Then for each predecessor of this block...
@@ -233,7 +265,8 @@ void State::initializeConsumingUse(Operand *consumingUse,
     return;
 
   error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
+    llvm::errs() << "Function: '" << getBeginBlock()->getParent()->getName()
+                 << "'\n"
                  << "Found over consume?!\n";
     if (auto v = value) {
       llvm::errs() << "Value: " << *v;
@@ -266,7 +299,7 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
                      return nonConsumingUse->getUser() == &i;
                    }) != userBlock->end()) {
     error.handleUseAfterFree([&] {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+      llvm::errs() << "Function: '" << getBeginBlock()->getParent()->getName()
                    << "'\n"
                    << "Found use after free?!\n"
                    << "Value: ";
@@ -304,7 +337,8 @@ void State::checkPredsForDoubleConsume(Operand *consumingUse,
   }
 
   error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
+    llvm::errs() << "Function: '" << getBeginBlock()->getParent()->getName()
+                 << "'\n"
                  << "Found over consume?!\n"
                  << "Value: ";
     if (auto v = value) {
@@ -335,7 +369,8 @@ void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
   }
 
   error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
+    llvm::errs() << "Function: '" << getBeginBlock()->getParent()->getName()
+                 << "'\n"
                  << "Found over consume?!\n"
                  << "Value: ";
     if (auto v = value) {
@@ -402,7 +437,7 @@ void State::performDataflow(DeadEndBlocks &deBlocks) {
     // further to do since we do not want to visit the predecessors of our
     // dominating block. On the other hand, we do want to add its successors to
     // the successorBlocksThatMustBeVisited set.
-    if (block == beginBlock)
+    if (block == getBeginBlock())
       continue;
 
     // Then for each predecessor of this block:
@@ -438,7 +473,7 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
 
     // If we are supposed to error on leaks, do so now.
     error.handleLeak([&] {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+      llvm::errs() << "Function: '" << getBeginBlock()->getParent()->getName()
                    << "'\n"
                    << "Error! Found a leak due to a consuming post-dominance "
                       "failure!\n";
@@ -472,7 +507,7 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
     }
 
     error.handleUseAfterFree([&] {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+      llvm::errs() << "Function: '" << getBeginBlock()->getParent()->getName()
                    << "'\n"
                    << "Found use after free due to unvisited non lifetime "
                       "ending uses?!\n"

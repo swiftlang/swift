@@ -316,6 +316,18 @@ public:
   }
   SILInstruction *getDefiningInstruction();
 
+  /// Return the SIL instruction that can be used to describe the first time
+  /// this value is available.
+  ///
+  /// For instruction results, this returns getDefiningInstruction(). For
+  /// arguments, this returns SILBasicBlock::begin() for the argument's parent
+  /// block. Returns nullptr for SILUndef.
+  const SILInstruction *getDefiningInsertionPoint() const {
+    return const_cast<ValueBase *>(this)->getDefiningInsertionPoint();
+  }
+
+  SILInstruction *getDefiningInsertionPoint();
+
   struct DefiningInstructionResult {
     SILInstruction *Instruction;
     size_t ResultIndex;
