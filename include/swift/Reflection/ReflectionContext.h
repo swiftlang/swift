@@ -867,10 +867,30 @@ public:
   
   llvm::Optional<std::string>
   iterateMetadataAllocations(std::function<void (MetadataAllocation)> Call) {
-    std::string AllocationPoolName = "__ZL14AllocationPool";
-    auto AllocationPoolAddr = getReader().getSymbolAddress(AllocationPoolName);
+    std::string IterationEnabledName =
+      "__swift_debug_metadataAllocationIterationEnabled";
+    std::string AllocationPoolPointerName =
+      "__swift_debug_allocationPoolPointer";
+
+    auto IterationEnabledAddr =
+      getReader().getSymbolAddress(IterationEnabledName);
+    if (!IterationEnabledAddr)
+      return "unable to look up debug variable " + IterationEnabledName;
+    char IterationEnabled;
+    if (!getReader().readInteger(IterationEnabledAddr, &IterationEnabled))
+      return "failed to read value of " + IterationEnabledName;
+    if (!IterationEnabled)
+      return std::string("remote process does not have metadata allocation "
+                         "iteration enabled");
+
+    auto AllocationPoolAddrAddr =
+      getReader().getSymbolAddress(AllocationPoolPointerName);
+    if (!AllocationPoolAddrAddr)
+      return "unable to look up debug variable " + AllocationPoolPointerName;
+    auto AllocationPoolAddr =
+      getReader().readPointer(AllocationPoolAddrAddr, sizeof(StoredPointer));
     if (!AllocationPoolAddr)
-      return "unable to look up allocation pool symbol " + AllocationPoolName;
+      return "failed to read value of " + AllocationPoolPointerName;
     
     struct PoolRange {
       StoredPointer Begin;
@@ -886,7 +906,7 @@ public:
     };
 
     auto PoolBytes = getReader()
-      .readBytes(RemoteAddress(AllocationPoolAddr), sizeof(PoolRange));
+      .readBytes(AllocationPoolAddr->getResolvedAddress(), sizeof(PoolRange));
     auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
     if (!Pool)
       return std::string("failure reading allocation pool contents");

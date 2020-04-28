@@ -5484,18 +5484,31 @@ static std::atomic<PoolRange>
 AllocationPool{PoolRange{InitialAllocationPool.Pool,
                          sizeof(InitialAllocationPool.Pool)}};
 
+bool swift::_swift_debug_metadataAllocationIterationEnabled = false;
+const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
+
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
-  if (Tag == 0) abort();
+  assert(Tag != 0);
   assert(alignment <= alignof(void*));
   assert(size % alignof(void*) == 0);
+
+  static OnceToken_t getenvToken;
+  SWIFT_ONCE_F(getenvToken, [](void *) {
+    const char *value =
+      getenv("SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION");
+    if (value && (value[0] == '1' || value[0] == 'y' || value[0] == 'Y'))
+      _swift_debug_metadataAllocationIterationEnabled = true;
+  }, nullptr);
 
   // If the size is larger than the maximum, just use malloc.
   if (size > PoolRange::MaxPoolAllocationSize)
     return malloc(size);
 
   // Allocate out of the pool.
+  auto sizeWithHeader = size;
+  if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled))
+    sizeWithHeader += sizeof(AllocationHeader);
   PoolRange curState = AllocationPool.load(std::memory_order_relaxed);
-  auto sizeWithHeader = size + sizeof(AllocationHeader);
   while (true) {
     char *allocation;
     PoolRange newState;
@@ -5508,18 +5521,21 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       newState = PoolRange{curState.Begin + sizeWithHeader,
                            curState.Remaining - sizeWithHeader};
     } else {
-      auto poolSize = PoolRange::PageSize - sizeof(PoolTrailer);
+      auto poolSize = PoolRange::PageSize;
+      if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled))
+        poolSize -= sizeof(PoolTrailer);
       allocatedNewPage = true;
       allocation = new char[PoolRange::PageSize];
 
-      char *prevTrailer = curState.Begin + curState.Remaining;
-      PoolTrailer *newTrailer = (PoolTrailer *)(allocation + poolSize);
-      newTrailer->PrevTrailer = prevTrailer;
-      newTrailer->PoolSize = poolSize;
-
+      if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
+        PoolTrailer *newTrailer = (PoolTrailer *)(allocation + poolSize);
+        char *prevTrailer = curState.Begin + curState.Remaining;
+        newTrailer->PrevTrailer = prevTrailer;
+        newTrailer->PoolSize = poolSize;
+      }
       newState = PoolRange{allocation + sizeWithHeader,
                            poolSize - sizeWithHeader};
-      __asan_poison_memory_region(allocation, PoolRange::PageSize);
+      __asan_poison_memory_region(allocation, newState.Remaining);
     }
 
     // Swap in the new state.
@@ -5531,11 +5547,15 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       __msan_allocated_memory(allocation, sizeWithHeader);
       __asan_unpoison_memory_region(allocation, sizeWithHeader);
       
-      AllocationHeader *header = (AllocationHeader *)allocation;
-      header->Size = size;
-      header->Tag = Tag;
+      if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
+        AllocationHeader *header = (AllocationHeader *)allocation;
+        header->Size = size;
+        header->Tag = Tag;
       
-      return allocation + sizeof(AllocationHeader);
+        return allocation + sizeof(AllocationHeader);
+      } else {
+        return allocation;
+      }
     }
 
     // If it failed, go back to a neutral state and try again.

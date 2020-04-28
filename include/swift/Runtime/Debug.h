@@ -231,6 +231,11 @@ bool _swift_reportFatalErrorsToDebugger;
 SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_shouldReportFatalErrorsToDebugger();
 
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_debug_metadataAllocationIterationEnabled;
+
+SWIFT_RUNTIME_STDLIB_SPI
+const void * const _swift_debug_allocationPoolPointer;
 
 SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 inline static int swift_asprintf(char **strp, const char *fmt, ...) {
