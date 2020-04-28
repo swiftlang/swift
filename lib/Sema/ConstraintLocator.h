@@ -381,7 +381,11 @@ public:
   bool isForOptionalTry() const;
 
   /// Determine whether this locator points directly to a given expression.
-  template <typename E> bool directlyAt() const;
+  template <typename E> bool directlyAt() const {
+    if (auto *expr = getAnchor().dyn_cast<Expr *>())
+      return isa<E>(expr) && getPath().empty();
+    return false;
+  }
 
   /// Attempts to cast the first path element of the locator to a specific
   /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or

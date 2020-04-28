@@ -247,10 +247,6 @@ bool ConstraintLocator::isForOptionalTry() const {
   return directlyAt<OptionalTryExpr>();
 }
 
-template <typename E> bool ConstraintLocator::directlyAt() const {
-  return isExpr<E>(getAnchor()) && getPath().empty();
-}
-
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?
