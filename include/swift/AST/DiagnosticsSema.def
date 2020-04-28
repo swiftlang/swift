@@ -795,19 +795,19 @@ ERROR(unspaced_unary_operator,none,
       "unary operators must not be juxtaposed; parenthesize inner expression",
       ())
 
-ERROR(use_unresolved_identifier,none,
-      "use of unresolved %select{identifier|operator}1 %0", (DeclNameRef, bool))
-ERROR(use_unresolved_identifier_corrected,none,
-      "use of unresolved %select{identifier|operator}1 %0; did you mean '%2'?",
+ERROR(cannot_find_in_scope,none,
+      "cannot %select{find|find operator}1 %0 in scope", (DeclNameRef, bool))
+ERROR(cannot_find_in_scope_corrected,none,
+      "cannot %select{find|find operator}1 %0 in scope; did you mean '%2'?",
       (DeclNameRef, bool, StringRef))
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
       (bool, StringRef, StringRef))
-ERROR(use_undeclared_type,none,
-      "use of undeclared type %0", (DeclNameRef))
-ERROR(use_undeclared_type_did_you_mean,none,
-      "use of undeclared type %0; did you mean to use '%1'?", (DeclNameRef, StringRef))
+ERROR(cannot_find_type_in_scope,none,
+      "cannot find type %0 in scope", (DeclNameRef))
+ERROR(cannot_find_type_in_scope_did_you_mean,none,
+      "cannot find type %0 in scope; did you mean to use '%1'?", (DeclNameRef, StringRef))
 NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
 NOTE(note_remapped_type,none,
@@ -3669,9 +3669,9 @@ ERROR(continue_not_in_this_stmt,none,
       "'continue' cannot be used with %0 statements", (StringRef))
 
 ERROR(unresolved_label,none,
-      "use of unresolved label %0", (Identifier))
+      "cannot find label %0 in scope", (Identifier))
 ERROR(unresolved_label_corrected,none,
-      "use of unresolved label %0; did you mean %1?",
+      "cannot find label %0 in scope; did you mean %1?",
       (Identifier, Identifier))
 
 ERROR(foreach_sequence_does_not_conform_to_expected_protocol,none,

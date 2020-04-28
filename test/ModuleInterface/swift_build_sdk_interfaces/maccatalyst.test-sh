@@ -1,4 +1,4 @@
-RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/iosmac-sdk/MacOSX.sdk/ -Fsystem-iosmac SECRET_SEARCH_PATH -v -n -o %t/output > %t.txt
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/maccatalyst-sdk/MacOSX.sdk/ -Fsystem-iosmac SECRET_SEARCH_PATH -v -n -o %t/output > %t.txt
 RUN: %FileCheck %s < %t.txt
 RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
 

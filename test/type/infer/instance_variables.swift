@@ -13,6 +13,6 @@ func testX(_ x: inout X) {
 }
 
 struct Broken {
-  var b = True // expected-error{{use of unresolved identifier 'True'}} 
+  var b = True // expected-error{{cannot find 'True' in scope}} 
 }
 

@@ -22,7 +22,7 @@ import SpriteKit.Nonexistent_Submodule
 // CHECK-ERROR: error: no such module
 
 SKScene()
-// CHECK-ERROR: error: use of unresolved identifier 'SKScene'
+// CHECK-ERROR: error: cannot find 'SKScene' in scope
 
 // Use another inline function that references other inline functions.
 MKMapRectIsNull(x)

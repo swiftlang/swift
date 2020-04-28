@@ -252,7 +252,7 @@ _ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Class' re
 
 // Type variables not getting erased with nested closures
 struct Toe {
-  let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
+  let toenail: Nail // expected-error {{cannot find type 'Nail' in scope}}
 
   func clip() {
     // TODO(diagnostics): Solver should stop once it has detected that `toenail` doesn't exist and report that.

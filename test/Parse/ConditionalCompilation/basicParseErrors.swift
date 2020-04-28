@@ -105,7 +105,7 @@ fn_j() // OK
 // expected-error @-1 {{invalid conditional compilation expression}}
 undefinedFunc() // ignored.
 #else
-undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 #endif
 
 #if false
@@ -113,7 +113,7 @@ undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'
 // expected-error @-1 {{invalid conditional compilation expression}}
 undefinedFunc() // ignored.
 #else
-undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 #endif
 
 /// Invalid platform condition arguments don't invalidate the whole condition.
@@ -138,7 +138,7 @@ fn_k()
 // expected-note@-6 {{did you mean 'i386'?}} {{26-29=i386}}
 func undefinedFunc() // ignored.
 #endif
-undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 
 #if os(simulator) // expected-warning {{unknown operating system for build configuration 'os'}} expected-note {{did you mean 'targetEnvironment'}} {{5-7=targetEnvironment}}
 #endif

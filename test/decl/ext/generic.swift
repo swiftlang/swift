@@ -174,8 +174,8 @@ extension S5 : P4 {}
 // rdar://problem/21607421
 public typealias Array2 = Array
 extension Array2 where QQQ : VVV {}
-// expected-error@-1 {{use of undeclared type 'QQQ'}}
-// expected-error@-2 {{use of undeclared type 'VVV'}}
+// expected-error@-1 {{cannot find type 'QQQ' in scope}}
+// expected-error@-2 {{cannot find type 'VVV' in scope}}
 
 // https://bugs.swift.org/browse/SR-9009
 func foo() {

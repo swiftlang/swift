@@ -82,17 +82,17 @@ struct X2d {
 // Invalid declarations
 // FIXME: Suppress the diagnostic for the call below, because the invalid
 // declaration would have matched.
-func f3(_ x: Intthingy) -> Int { } // expected-error{{use of undeclared type 'Intthingy'}}
+func f3(_ x: Intthingy) -> Int { } // expected-error{{cannot find type 'Intthingy' in scope}}
 
 func f3(_ x: Float) -> Float { }
 f3(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
 
-func f4(_ i: Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
-func f4(_ j: Wibble) { } // expected-error{{use of undeclared type 'Wibble'}}
+func f4(_ i: Wonka) { } // expected-error{{cannot find type 'Wonka' in scope}}
+func f4(_ j: Wibble) { } // expected-error{{cannot find type 'Wibble' in scope}}
 f4(5)
 
 func f1() {
-  var c : Class // expected-error{{use of undeclared type 'Class'}}
+  var c : Class // expected-error{{cannot find type 'Class' in scope}}
   markUsed(c.x) // make sure error does not cascade here
 }
 
