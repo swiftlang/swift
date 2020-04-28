@@ -61,10 +61,13 @@ private:
   /// This option is only for override completion lookup.
   unsigned IncludeDerivedRequirements : 1;
 
+  /// Should protocol extension members be included?
+  unsigned IncludeProtocolExtensionMembers : 1;
+
   LookupState()
       : IsQualified(0), IsOnMetatype(0), IsOnSuperclass(0),
         InheritsSuperclassInitializers(0), IncludeInstanceMembers(0),
-        IncludeDerivedRequirements(0) {}
+        IncludeDerivedRequirements(0), IncludeProtocolExtensionMembers(0) {}
 
 public:
   LookupState(const LookupState &) = default;
@@ -90,6 +93,9 @@ public:
   bool isIncludingInstanceMembers() const { return IncludeInstanceMembers; }
   bool isIncludingDerivedRequirements() const {
     return IncludeDerivedRequirements;
+  }
+  bool isIncludingProtocolExtensionMembers() const {
+    return IncludeProtocolExtensionMembers;
   }
 
   LookupState withOnMetatype() const {
@@ -125,6 +131,12 @@ public:
   LookupState withIncludedDerivedRequirements() const {
     auto Result = *this;
     Result.IncludeDerivedRequirements = 1;
+    return Result;
+  }
+
+  LookupState withIncludeProtocolExtensionMembers() const {
+    auto Result = *this;
+    Result.IncludeProtocolExtensionMembers = 1;
     return Result;
   }
 };
@@ -463,13 +475,20 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           };
           DeclVisibilityKind ReasonForThisDecl = ReasonForThisProtocol;
           if (const auto Witness = NormalConformance->getWitness(VD)) {
-            if (Witness.getDecl()->getName() == VD->getName()) {
+            auto *WD = Witness.getDecl();
+            if (WD->getName() == VD->getName()) {
               if (LS.isIncludingDerivedRequirements() &&
                   Reason == DeclVisibilityKind::MemberOfCurrentNominal &&
-                  isDerivedRequirement(Witness.getDecl())) {
+                  isDerivedRequirement(WD)) {
                 ReasonForThisDecl =
                     DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal;
+              } else if (!LS.isIncludingProtocolExtensionMembers() &&
+                         WD->getDeclContext()->getExtendedProtocolDecl()) {
+                // Don't skip this requiement.
+                // Witnesses in protocol extensions aren't reported.
               } else {
+                // lookupVisibleMemberDecls() generally prefers witness members
+                // over requirements.
                 continue;
               }
             }
@@ -481,11 +500,13 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     }
 
     // Add members from any extensions.
-    SmallVector<ValueDecl *, 2> FoundDecls;
-    doGlobalExtensionLookup(BaseTy, Proto->getDeclaredType(), FoundDecls,
-                            FromContext, LS, ReasonForThisProtocol);
-    for (auto *VD : FoundDecls)
-      Consumer.foundDecl(VD, ReasonForThisProtocol);
+    if (LS.isIncludingProtocolExtensionMembers()) {
+      SmallVector<ValueDecl *, 2> FoundDecls;
+      doGlobalExtensionLookup(BaseTy, Proto->getDeclaredType(), FoundDecls,
+                              FromContext, LS, ReasonForThisProtocol);
+      for (auto *VD : FoundDecls)
+        Consumer.foundDecl(VD, ReasonForThisProtocol);
+    }
   }
 }
 
@@ -581,6 +602,9 @@ static void lookupVisibleMemberDeclsImpl(
     }
     if (LS.isIncludingDerivedRequirements()) {
       subLS = subLS.withIncludedDerivedRequirements();
+    }
+    if (LS.isIncludingProtocolExtensionMembers()) {
+      subLS = subLS.withIncludeProtocolExtensionMembers();
     }
 
     // Just perform normal dot lookup on the type see if we find extensions or
@@ -1117,6 +1141,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     auto LS = LookupState::makeUnqualified();
+    LS = LS.withIncludeProtocolExtensionMembers();
 
     // Skip initializer contexts, we will not find any declarations there.
     if (isa<Initializer>(DC)) {
@@ -1314,6 +1339,7 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                      const DeclContext *CurrDC,
                                      bool includeInstanceMembers,
                                      bool includeDerivedRequirements,
+                                     bool includeProtocolExtensionMembers,
                                      GenericSignatureBuilder *GSB) {
   assert(CurrDC);
   LookupState ls = LookupState::makeQualified();
@@ -1322,6 +1348,9 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
   }
   if (includeDerivedRequirements) {
     ls = ls.withIncludedDerivedRequirements();
+  }
+  if (includeProtocolExtensionMembers) {
+    ls = ls.withIncludeProtocolExtensionMembers();
   }
 
   ::lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC, ls,

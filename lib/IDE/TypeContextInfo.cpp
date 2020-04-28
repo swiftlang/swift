@@ -168,7 +168,8 @@ void ContextInfoCallbacks::getImplicitMembers(
 
   lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
                            /*includeInstanceMembers=*/false,
-                           /*includeDerivedRequirements*/false);
+                           /*includeDerivedRequirements*/false,
+                           /*includeProtocolExtensionMembers*/true);
 }
 
 void PrintingTypeContextInfoConsumer::handleResults(
