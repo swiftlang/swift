@@ -35,7 +35,7 @@
 namespace swift {
 
 class Expr;
-struct TypeLoc;
+class TypeLoc;
 class VarDecl;
 class Pattern;
 class SourceManager;

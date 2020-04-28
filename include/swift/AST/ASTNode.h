@@ -30,7 +30,7 @@ namespace swift {
   class Stmt;
   class Decl;
   class Pattern;
-  struct TypeLoc;
+  class TypeLoc;
   class DeclContext;
   class SourceLoc;
   class SourceRange;

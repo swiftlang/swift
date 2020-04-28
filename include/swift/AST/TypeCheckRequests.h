@@ -48,7 +48,7 @@ class RequirementRepr;
 class SpecializeAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
-struct TypeLoc;
+class TypeLoc;
 class Witness;
 struct TypeWitnessAndDecl;
 class ValueDecl;
