@@ -1699,39 +1699,6 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
   }
 }
 
-void swift::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
-  auto &Ctx = SF.getASTContext();
-
-  bool ImportsFoundationModule = false;
-
-  if (Ctx.LangOpts.EnableObjCInterop) {
-    if (!Ctx.LangOpts.EnableObjCAttrRequiresFoundation)
-      return;
-    if (SF.Kind == SourceFileKind::SIL)
-      return;
-  }
-
-  for (auto import : namelookup::getAllImports(&SF)) {
-    if (import.second->getName() == Ctx.Id_Foundation) {
-      ImportsFoundationModule = true;
-      break;
-    }
-  }
-
-  if (ImportsFoundationModule)
-    return;
-
-  for (auto Attr : SF.AttrsRequiringFoundation) {
-    if (!Ctx.LangOpts.EnableObjCInterop)
-      Ctx.Diags.diagnose(Attr->getLocation(), diag::objc_interop_disabled)
-        .fixItRemove(Attr->getRangeWithAt());
-    Ctx.Diags.diagnose(Attr->getLocation(),
-                       diag::attr_used_without_required_module,
-                       Attr, Ctx.Id_Foundation)
-      .highlight(Attr->getRangeWithAt());
-  }
-}
-
 /// Compute the information used to describe an Objective-C redeclaration.
 std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *member) {
