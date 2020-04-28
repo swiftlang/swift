@@ -794,6 +794,8 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
 
   // Make sure that if we have a bridged value release that it is on the bridged
   // value.
+  if (Enum->getParent() != AI->getParent())
+    return BridgedArgument();
   auto *BridgedValueRelease = dyn_cast_or_null<ReleaseValueInst>(
       findReleaseOf(BridgedValue, std::next(SILBasicBlock::iterator(Enum)),
                     SILBasicBlock::iterator(AI)));
