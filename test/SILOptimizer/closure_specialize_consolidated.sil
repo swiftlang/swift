@@ -208,7 +208,9 @@ bb0(%0 : $Int32, %1 : $*Int32):
 }
 
 // CHECK-LABEL: sil @address_caller_trivial
-// CHECK-NOT: partial_apply
+// CHECK: [[PA:%.*]] = partial_apply
+// CHECK-NEXT: [[CV:%.*]] convert_escape_to_noescape [[PA]]
+// CHECK-NOT: [[CV]]
 // CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (Int32, @inout_aliasable Int32) -> ()
 // CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
@@ -246,7 +248,9 @@ bb0(%0 : $*Int32):
 }
 
 // CHECK-LABEL: sil @address_caller_trivial_mutating
-// CHECK-NOT: partial_apply
+// CHECK: [[PA:%.*]] = partial_apply
+// CHECK-NEXT: [[CV:%.*]] convert_escape_to_noescape [[PA]]
+// CHECK-NOT: [[CV]]
 // CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable Int32) -> ()
 // CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
@@ -323,8 +327,9 @@ bb0(%0 : $*Q, %1 : $@noescape @callee_owned (@in Q) -> @out Q):
 // supported address type arguments, i.e. @inout or @inout_aliasable.
 //
 // CHECK-LABEL: sil @address_caller_out_result : $@convention(thin) (@in Q, @in Q) -> @out Q
-// CHECK-NOT: partial_apply
-// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_user_out_result{{.*}} : $@convention(thin) (@inout_aliasable Q, @inout_aliasable Q) -> @out Q
+// CHECK: [[PA:%.*]] = partial_apply
+// CHECK-NEXT: [[CV:%.*]] convert_escape_to_noescape [[PA]]
+// CHECK-NOT: [[CV]]// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_user_out_result{{.*}} : $@convention(thin) (@inout_aliasable Q, @inout_aliasable Q) -> @out Q
 // CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
 // CHECK: return
@@ -342,11 +347,13 @@ bb0(%0 : $*Q, %1 : $*Q, %2 : $*Q):
 }
 
 // CHECK-LABEL: sil @address_caller_existential
-// CHECK-NOT: partial_apply
+// CHECK: [[PA:%.*]] = partial_apply
+// CHECK-NEXT: [[CV:%.*]] convert_escape_to_noescape [[PA]]
+// CHECK-NOT: [[CV]]
 // CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable P) -> ()
+// CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK:  [[SPECIALIZED_FN2:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable P) -> ()
 // CHECK: apply [[SPECIALIZED_FN2]]{{.*}}
-// CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
 // CHECK: return
 sil @address_caller_existential : $@convention(thin) (@in P, @in P, Int32) -> @out P {
@@ -414,8 +421,10 @@ bb0(%0 : $*S, %1 : $S):
 }
 
 // CHECK-LABEL: sil @address_caller_struct
-// CHECK-NOT: partial_apply
-// CHECK: [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable S, @owned S) -> () 
+// CHECK: [[PA:%.*]] = partial_apply
+// CHECK-NEXT: [[CV:%.*]] convert_escape_to_noescape [[PA]]
+// CHECK-NOT: [[CV]]
+// CHECK: [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable S, @owned S) -> ()
 // CHECK: apply [[SPECIALIZED_FN1]]
 // CHECK: [[SPECIALIZED_FN2:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable S, @owned S) -> () 
 // CHECK: apply [[SPECIALIZED_FN2]]
@@ -453,11 +462,13 @@ bb0(%0 : $*C, %1 : $C):
 }
 
 // CHECK-LABEL: sil @address_caller_class1
-// CHECK-NOT: partial_apply
+// CHECK: [[PA:%.*]] = partial_apply
+// CHECK-NEXT: [[CV:%.*]] convert_escape_to_noescape [[PA]]
+// CHECK-NOT: [[CV]]
 // CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable C, @owned C) -> ()
+// CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK:  [[SPECIALIZED_FN2:%.*]] = function_ref @{{.*}}address_closure_noescape_user{{.*}} : $@convention(thin) (@inout_aliasable C, @owned C) -> ()
 // CHECK: apply [[SPECIALIZED_FN2]]{{.*}}
-// CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
 // CHECK: return
 sil @address_caller_class1 : $@convention(thin) (@guaranteed C, @guaranteed C) -> @owned C {
@@ -571,34 +582,28 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
 // CHECK: retain_value [[ARG0]] : $Builtin.NativeObject
 // CHECK-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
 // CHECK-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
-// CHECK: [[SPECFUN0:%.*]] = function_ref @$s23guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
-// CHECK: retain_value [[ARG0]] : $Builtin.NativeObject
-// CHECK-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
-// CHECK-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
+// CHECK: [[DEAD_CLOSURE_1:%.*]] = partial_apply [[OLD_CLOSURE_CALLEE1]]
+// CHECK-NEXT: [[DEAD_CLOSURE_2:%.*]] = thin_to_thick_function [[OLD_CLOSURE_CALLEE2]]
+// CHECK-NEXT: retain_value [[DEAD_CLOSURE_1]]
 // CHECK: [[SPECFUN1:%.*]] = function_ref @$s18owned_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
 // CHECK: retain_value [[ARG0]] : $Builtin.NativeObject
 // CHECK-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
 // CHECK-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
-// CHECK: [[DEAD_CLOSURE_1:%.*]] = partial_apply [[OLD_CLOSURE_CALLEE1]]
-// CHECK: [[SPECFUN2:%.*]] = function_ref @$s23guaranteed_apply_callee014small_closure_C0Tf1cnnnn_n 
+// CHECK: apply [[SPECFUN1]](
+// CHECK: release_value [[DEAD_CLOSURE_1]]
 // CHECK: [[SPECFUN3:%.*]] = function_ref @$s18owned_apply_callee014small_closure_C0Tf1cnnnn_n
-// CHECK: [[DEAD_CLOSURE_2:%.*]] = thin_to_thick_function [[OLD_CLOSURE_CALLEE2]]
-// CHECK: retain_value [[DEAD_CLOSURE_1]]
-// CHECK-NOT: retain_value [[DEAD_CLOSURE_2]]
+// CHECK: apply [[SPECFUN3]](
+// CHECK: [[SPECFUN0:%.*]] = function_ref @$s23guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
+// CHECK: retain_value [[ARG0]] : $Builtin.NativeObject
+// CHECK-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
+// CHECK-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
+// CHECK: apply [[SPECFUN0]](
+// CHECK: [[SPECFUN2:%.*]] = function_ref @$s23guaranteed_apply_callee014small_closure_C0Tf1cnnnn_n
 // CHECK-NOT: apply [[DEAD_CLOSURE_1]]
 // CHECK-NOT: apply [[DEAD_CLOSURE_2]]
-// CHECK: apply [[SPECFUN1]](
-// CHECK-NEXT: release_value [[DEAD_CLOSURE_1]]
-// CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
-// CHECK: apply [[SPECFUN3]](
 // CHECK-NOT: release_value [[DEAD_CLOSURE_1]]
-// CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
-// CHECK: apply [[SPECFUN0]](
-// CHECK-NOT: release_value [[DEAD_CLOSURE_1]]
-// CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
 // CHECK: apply [[SPECFUN2]](
 // CHECK-NEXT: release_value [[DEAD_CLOSURE_1]]
-// CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
 
 // REMOVECLOSURES-LABEL: sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> () {
 // REMOVECLOSURES: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $Error):
@@ -607,26 +612,26 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
 // REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
-// REMOVECLOSURES: [[SPECFUN0:%.*]] = function_ref @$s23guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
-// REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
-// REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
-// REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
 // REMOVECLOSURES: [[SPECFUN1:%.*]] = function_ref @$s18owned_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
 // REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
-// REMOVECLOSURES-NOT: partial_apply [[OLD_CLOSURE_CALLEE1]]
-// REMOVECLOSURES: [[SPECFUN4:%.*]] = function_ref @$s29guaranteed_apply_callee_throw014small_closure_C0Tf1cnnnnn_n
-// REMOVECLOSURES: [[SPECFUN2:%.*]] = function_ref @$s23guaranteed_apply_callee014small_closure_C0Tf1cnnnn_n
+// REMOVECLOSURES-NEXT: apply [[SPECFUN1]](
 // REMOVECLOSURES: [[SPECFUN3:%.*]] = function_ref @$s18owned_apply_callee014small_closure_C0Tf1cnnnn_n
-// REMOVECLOSURES-NOT: thin_to_thick_function [[OLD_CLOSURE_CALLEE2]]
-// REMOVECLOSURES: apply [[SPECFUN1]](
 // REMOVECLOSURES-NEXT: apply [[SPECFUN3]](
+// REMOVECLOSURES: [[SPECFUN0:%.*]] = function_ref @$s23guaranteed_apply_callee014large_closure_C0BoBi32_BoBoTf1cnnnn_n
+// REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: apply [[SPECFUN0]](
+// REMOVECLOSURES-NOT: partial_apply [[OLD_CLOSURE_CALLEE1]]
+// REMOVECLOSURES: [[SPECFUN2:%.*]] = function_ref @$s23guaranteed_apply_callee014small_closure_C0Tf1cnnnn_n
 // REMOVECLOSURES-NEXT: apply [[SPECFUN2]](
+// REMOVECLOSURES-NOT: thin_to_thick_function [[OLD_CLOSURE_CALLEE2]]
 // REMOVECLOSURES-NEXT: strong_release [[ARG0]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: strong_release [[ARG2]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: strong_release [[ARG3]] : $Builtin.NativeObject
+// REMOVECLOSURES: [[SPECFUN4:%.*]] = function_ref @$s29guaranteed_apply_callee_throw014small_closure_C0Tf1cnnnnn_n
 // REMOVECLOSURES-NEXT: try_apply [[SPECFUN4]](
 sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject, %11: $Error):
