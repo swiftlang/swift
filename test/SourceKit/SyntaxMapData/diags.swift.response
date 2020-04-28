@@ -20,7 +20,7 @@
     key.column: 8,
     key.filepath: parse_error.swift,
     key.severity: source.diagnostic.severity.error,
-    key.description: "use of undeclared type 'Undeclared'",
+    key.description: "cannot find type 'Undeclared' in scope",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.ranges: [
       {
@@ -51,7 +51,7 @@
     key.column: 8,
     key.filepath: parse_error.swift,
     key.severity: source.diagnostic.severity.error,
-    key.description: "use of undeclared type 'Undeclared'",
+    key.description: "cannot find type 'Undeclared' in scope",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.ranges: [
       {

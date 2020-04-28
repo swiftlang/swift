@@ -7,7 +7,7 @@ struct OuterGeneric<D> {
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
     associatedtype Rooster
     func flip(_ r: Rooster)
-    func flop(_ t: D) // expected-error{{use of undeclared type 'D'}}
+    func flop(_ t: D) // expected-error{{cannot find type 'D' in scope}}
   }
 }
 
@@ -15,7 +15,7 @@ class OuterGenericClass<T> {
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
     associatedtype Rooster
     func flip(_ r: Rooster)
-    func flop(_ t: T) // expected-error{{use of undeclared type 'T'}}
+    func flop(_ t: T) // expected-error{{cannot find type 'T' in scope}}
   }
 }
 
@@ -24,7 +24,7 @@ protocol OuterProtocol {
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
     associatedtype Rooster
     func flip(_ r: Rooster)
-    func flop(_ h: Hen) // expected-error{{use of undeclared type 'Hen'}}
+    func flop(_ h: Hen) // expected-error{{cannot find type 'Hen' in scope}}
   }
 }
 
@@ -39,11 +39,11 @@ protocol Racoon {
   associatedtype Stripes
   class Claw<T> { // expected-error{{type 'Claw' cannot be nested in protocol 'Racoon'}}
     func mangle(_ s: Stripes) {}
-    // expected-error@-1 {{use of undeclared type 'Stripes'}}
+    // expected-error@-1 {{cannot find type 'Stripes' in scope}}
   }
   struct Fang<T> { // expected-error{{type 'Fang' cannot be nested in protocol 'Racoon'}}
     func gnaw(_ s: Stripes) {}
-    // expected-error@-1 {{use of undeclared type 'Stripes'}}
+    // expected-error@-1 {{cannot find type 'Stripes' in scope}}
   }
   enum Fur { // expected-error{{type 'Fur' cannot be nested in protocol 'Racoon'}}
     case Stripes

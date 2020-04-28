@@ -3665,7 +3665,7 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
 
   // Otherwise, emit the appropriate diagnostic and return nullptr.
   if (results.empty()) {
-    ctx.Diags.diagnose(funcNameLoc, diag::use_unresolved_identifier, funcName,
+    ctx.Diags.diagnose(funcNameLoc, diag::cannot_find_in_scope, funcName,
                        funcName.isOperator());
     return nullptr;
   }

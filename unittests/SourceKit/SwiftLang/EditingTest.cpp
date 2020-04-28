@@ -277,7 +277,7 @@ void EditTest::doubleOpenWithDelay(std::chrono::microseconds delay,
   }
 
   ASSERT_EQ(1u, Consumer.Diags.size());
-  EXPECT_STREQ("use of unresolved identifier 'unknown_name'", Consumer.Diags[0].Description.c_str());
+  EXPECT_STREQ("cannot find 'unknown_name' in scope", Consumer.Diags[0].Description.c_str());
 
   close(DocName);
 }

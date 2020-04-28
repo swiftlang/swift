@@ -1,25 +1,25 @@
 // RUN: %target-typecheck-verify-swift
 
-extension extension_for_invalid_type_1 { // expected-error {{use of undeclared type 'extension_for_invalid_type_1'}}
+extension extension_for_invalid_type_1 { // expected-error {{cannot find type 'extension_for_invalid_type_1' in scope}}
   func f() { }
 }
-extension extension_for_invalid_type_2 { // expected-error {{use of undeclared type 'extension_for_invalid_type_2'}}
+extension extension_for_invalid_type_2 { // expected-error {{cannot find type 'extension_for_invalid_type_2' in scope}}
   static func f() { }
 }
-extension extension_for_invalid_type_3 { // expected-error {{use of undeclared type 'extension_for_invalid_type_3'}}
+extension extension_for_invalid_type_3 { // expected-error {{cannot find type 'extension_for_invalid_type_3' in scope}}
   init() {}
 }
-extension extension_for_invalid_type_4 { // expected-error {{use of undeclared type 'extension_for_invalid_type_4'}}
+extension extension_for_invalid_type_4 { // expected-error {{cannot find type 'extension_for_invalid_type_4' in scope}}
   deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
-extension extension_for_invalid_type_5 { // expected-error {{use of undeclared type 'extension_for_invalid_type_5'}}
+extension extension_for_invalid_type_5 { // expected-error {{cannot find type 'extension_for_invalid_type_5' in scope}}
   typealias X = Int
 }
 
 //===--- Test that we only allow extensions at file scope.
 struct Foo { }
 
-extension NestingTest1 { // expected-error {{use of undeclared type 'NestingTest1'}}
+extension NestingTest1 { // expected-error {{cannot find type 'NestingTest1' in scope}}
   extension Foo {} // expected-error {{declaration is only valid at file scope}}
 }
 struct NestingTest2 {
