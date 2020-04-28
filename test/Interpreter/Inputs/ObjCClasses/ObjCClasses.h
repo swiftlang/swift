@@ -8,6 +8,7 @@ NS_ASSUME_NONNULL_BEGIN
 /* This class has instance variables which are not apparent in the
    interface.  Subclasses will need to be slid by the ObjC runtime. */
 @interface HasHiddenIvars : NSObject
+- (instancetype)init;
 @property NSInteger x;
 @property NSInteger y;
 @property NSInteger z;
