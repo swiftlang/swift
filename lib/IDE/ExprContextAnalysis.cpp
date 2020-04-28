@@ -375,8 +375,8 @@ static void collectPossibleCalleesByQualifiedLookup(
   // Re-typecheck TypeExpr so it's typechecked without the arguments which may
   // affects the inference of the generic arguments.
   if (TypeExpr *tyExpr = dyn_cast<TypeExpr>(baseExpr)) {
-    tyExpr->setType(nullptr);
-    tyExpr->getTypeLoc().setType(nullptr);
+    if (!tyExpr->isImplicit())
+      tyExpr->setType(nullptr);
   }
 
   auto baseTyOpt = getTypeOfCompletionContextExpr(

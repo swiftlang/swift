@@ -130,6 +130,12 @@ void Expr::setType(Type T) {
   Ty = T;
 }
 
+void Expr::setImplicit(bool Implicit) {
+  assert(!isa<TypeExpr>(this) || getType() &&
+         "Cannot make a TypeExpr implicit without a contextual type.");
+  Bits.Expr.Implicit = Implicit;
+}
+
 template <class T> static SourceRange getSourceRangeImpl(const T *E) {
   static_assert(isOverriddenFromExpr(&T::getSourceRange) ||
                 (isOverriddenFromExpr(&T::getStartLoc) &&
@@ -935,8 +941,9 @@ static void
 computeSingleArgumentType(ASTContext &ctx, Expr *arg, bool implicit,
                           llvm::function_ref<Type(const Expr *)> getType) {
   // Propagate 'implicit' to the argument.
-  if (implicit)
+  if (implicit) {
     arg->setImplicit(true);
+  }
 
   // Handle parenthesized expressions.
   if (auto paren = dyn_cast<ParenExpr>(arg)) {
@@ -1919,44 +1926,48 @@ Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
 
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)
 
-TypeExpr::TypeExpr(TypeLoc TyLoc)
-  : Expr(ExprKind::Type, /*implicit*/false), Info(TyLoc) {
-  Type Ty = TyLoc.getType();
-  if (Ty && Ty->hasCanonicalTypeComputed())
-    setType(MetatypeType::get(Ty, Ty->getASTContext()));
-}
+TypeExpr::TypeExpr(TypeRepr *Repr)
+  : Expr(ExprKind::Type, /*implicit*/false), Repr(Repr) {}
 
-TypeExpr::TypeExpr(Type Ty)
-  : Expr(ExprKind::Type, /*implicit*/true), Info(TypeLoc::withoutLoc(Ty)) {
-  if (Ty->hasCanonicalTypeComputed())
-    setType(MetatypeType::get(Ty, Ty->getASTContext()));
+TypeExpr *TypeExpr::createImplicit(Type Ty, ASTContext &C) {
+  assert(Ty);
+  auto *result = new (C) TypeExpr(nullptr);
+  result->setType(MetatypeType::get(Ty, Ty->getASTContext()));
+  result->setImplicit();
+  return result;
 }
 
 // The type of a TypeExpr is always a metatype type.  Return the instance
 // type or null if not set yet.
-Type TypeExpr::getInstanceType(
-    llvm::function_ref<bool(const Expr *)> hasType,
-    llvm::function_ref<Type(const Expr *)> getType) const {
-  if (!hasType(this))
+Type TypeExpr::getInstanceType() const {
+  auto ty = getType();
+  if (!ty)
     return Type();
 
-  if (auto metaType = getType(this)->getAs<MetatypeType>())
+  if (auto metaType = ty->getAs<MetatypeType>())
     return metaType->getInstanceType();
 
-  return ErrorType::get(getType(this)->getASTContext());
+  return ErrorType::get(ty->getASTContext());
 }
 
-
 TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
-                                  DeclContext *DC,
-                                  bool isImplicit) {
+                                  DeclContext *DC) {
   ASTContext &C = Decl->getASTContext();
-  assert(Loc.isValid() || isImplicit);
+  assert(Loc.isValid());
   auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
   Repr->setValue(Decl, DC);
-  auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
-  if (isImplicit)
-    result->setImplicit();
+  return new (C) TypeExpr(Repr);
+}
+
+TypeExpr *TypeExpr::createImplicitForDecl(DeclNameLoc Loc, TypeDecl *Decl,
+                                          DeclContext *DC, Type ty) {
+  ASTContext &C = Decl->getASTContext();
+  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
+  Repr->setValue(Decl, DC);
+  auto result = new (C) TypeExpr(Repr);
+  assert(ty && !ty->hasTypeParameter());
+  result->setType(ty);
+  result->setImplicit();
   return result;
 }
 
@@ -1984,7 +1995,7 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
   Components.push_back(NewComp);
 
   auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
-  return new (C) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  return new (C) TypeExpr(NewTypeRepr);
 }
 
 TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
@@ -2005,7 +2016,7 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
   Components.push_back(NewComp);
 
   auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
-  return new (C) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  return new (C) TypeExpr(NewTypeRepr);
 }
 
 TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
@@ -2054,7 +2065,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
     components.push_back(genericComp);
 
     auto *genericRepr = IdentTypeRepr::create(C, components);
-    return new (C) TypeExpr(TypeLoc(genericRepr, Type()));
+    return new (C) TypeExpr(genericRepr);
   }
 
   return nullptr;
@@ -2065,12 +2076,18 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
 // processing bugs.  If you have an implicit location, use createImplicit.
 TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
   // FIXME: This is horrible.
+  assert(Ty);
   if (Loc.isInvalid()) return createImplicit(Ty, C);
   auto *Repr = new (C) FixedTypeRepr(Ty, Loc);
-  auto *Res = new (C) TypeExpr(TypeLoc(Repr, Ty));
-  Res->setImplicit();
+  auto *Res = new (C) TypeExpr(Repr);
   Res->setType(MetatypeType::get(Ty, C));
+  Res->setImplicit();
   return Res;
+}
+
+SourceRange TypeExpr::getSourceRange() const {
+  if (!getTypeRepr()) return SourceRange();
+  return getTypeRepr()->getSourceRange();
 }
 
 bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
