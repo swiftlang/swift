@@ -3212,6 +3212,9 @@ bool MissingMemberFailure::diagnoseAsError() {
 
   if (diagnoseForDynamicCallable())
     return true;
+  
+  if (diagnoseInLiteralCollectionContext())
+    return true;
 
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
@@ -3396,6 +3399,37 @@ bool MissingMemberFailure::diagnoseForDynamicCallable() const {
     return true;
   }
 
+  return false;
+}
+
+bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
+  auto &cs = getConstraintSystem();
+  auto *expr = castToExpr(getAnchor());
+  auto *parentExpr = cs.getParentExpr(expr);
+  auto &solution = getSolution();
+
+  if (!(parentExpr && isa<UnresolvedMemberExpr>(expr)))
+    return false;
+
+  auto parentType = getType(parentExpr);
+
+  if (!cs.isCollectionType(parentType) && !parentType->is<TupleType>())
+    return false;
+
+  if (isa<TupleExpr>(parentExpr)) {
+    parentExpr = cs.getParentExpr(parentExpr);
+    if (!parentExpr)
+      return false;
+  }
+
+  if (auto *defaultableVar =
+          cs.getType(parentExpr)->getAs<TypeVariableType>()) {
+    if (solution.DefaultedConstraints.count(
+            defaultableVar->getImpl().getLocator()) != 0) {
+      emitDiagnostic(diag::unresolved_member_no_inference, getName());
+      return true;
+    }
+  }
   return false;
 }
 
