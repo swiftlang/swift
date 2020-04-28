@@ -165,7 +165,8 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 
   lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
                            /*includeInstanceMembers=*/false,
-                           /*includeDerivedRequirements*/false);
+                           /*includeDerivedRequirements*/false,
+                           /*includeProtocolExtensionMembers*/true);
 }
 
 } // anonymous namespace.

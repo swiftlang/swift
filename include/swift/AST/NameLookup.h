@@ -473,6 +473,7 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC,
                               bool includeInstanceMembers,
                               bool includeDerivedRequirements,
+                              bool includeProtocolExtensionMembers,
                               GenericSignatureBuilder *GSB = nullptr);
 
 namespace namelookup {
