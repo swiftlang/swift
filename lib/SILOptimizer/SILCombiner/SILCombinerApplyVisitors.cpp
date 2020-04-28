@@ -859,7 +859,8 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
             return CEI.lookupExistentialConformance(proto);
           }
           return ProtocolConformanceRef(proto);
-        });
+        },
+        SubstFlags::ForceSubstituteOpenedExistentials);
   }
 
   // We need to make sure that we can a) update Apply to use the new args and b)
