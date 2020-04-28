@@ -49,7 +49,7 @@ func testGlobal() {
 // GLOBAL_EXPR-DAG: Keyword[#function]/None:            <name>#function</name>; name=#function
 // GLOBAL_EXPR-DAG: Decl[Module]/None:                  <name>Swift</name>; name=Swift
 // GLOBAL_EXPR-DAG: Decl[Struct]/OtherModule[Swift]:    <name>Int</name>; name=Int
-// GLOBAL_EXPR-DAG: Decl[FreeFunction]/OtherModule[Swift]: <name>print</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>items</callarg.param>: <callarg.type>Any</callarg.type>...</callarg>, <callarg><callarg.label>to</callarg.label> <callarg.param>output</callarg.param>: &amp;<callarg.type><typeid.sys>TextOutputStream</typeid.sys></callarg.type></callarg>); name=print(items: Any..., to: &TextOutputStream)
+// GLOBAL_EXPR-DAG: Decl[FreeFunction]/OtherModule[Swift]: <name>print</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>items</callarg.param>: <callarg.type><keyword>Any</keyword></callarg.type>...</callarg>, <callarg><callarg.label>to</callarg.label> <callarg.param>output</callarg.param>: &amp;<callarg.type><typeid.sys>TextOutputStream</typeid.sys></callarg.type></callarg>); name=print(items: Any..., to: &TextOutputStream)
 // GLOBAL_EXPR: End completions
 
 
