@@ -664,3 +664,7 @@ func test_34770265(_ dict: [Int: Int]) {
   dict.rdar_34770265_val()
   // expected-error@-1 {{referencing instance method 'rdar_34770265_val()' on 'Dictionary' requires the types 'Int' and 'String' be equivalent}}
 }
+
+// SR-12672
+_ = [.e] // expected-error {{reference to member 'e' cannot be resolved without a contextual type}}
+let _ : [Any] = [.e] // expected-error {{type 'Any' has no member 'e'}}

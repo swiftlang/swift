@@ -3412,7 +3412,8 @@ bool MissingMemberFailure::diagnoseForDefaultAnyArrayLiteral() const {
   if (contextualType)
     return false;
   
-  if (isa<UnresolvedMemberExpr>(expr) && isa<ArrayExpr>(parentExpr)) {
+  if (isa<UnresolvedMemberExpr>(expr) &&
+      parentExpr && isa<ArrayExpr>(parentExpr)) {
     if (auto *metatype = baseType->getAs<MetatypeType>()) {
       baseType = metatype->getInstanceType();
     }
