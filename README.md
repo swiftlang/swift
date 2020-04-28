@@ -188,6 +188,43 @@ cloning over SSH may provide a better experience (which requires
     ./swift/utils/update-checkout --clone-with-ssh --scheme tensorflow
     cd swift
 
+### Building Swift
+
+The `build-script` is a high-level build automation script that supports basic
+options such as building a Swift-compatible LLDB, building the Swift Package
+Manager, building for various platforms, running tests after builds, and more.
+
+There are two primary build systems to use: Xcode and Ninja. The Xcode build
+system allows you to work in Xcode, but Ninja is a bit faster and supports
+more environments.
+
+First, make sure that you're in the swift directory:
+
+    cd swift
+
+To build using Ninja, run:
+
+    swift/utils/build-script --release-debuginfo
+
+When developing Swift, it helps to build what you're working on in a debug
+configuration while building the rest of the project with optimizations. Below
+are some examples of using debug variants:
+
+    swift/utils/build-script --release-debuginfo --debug-swift # Swift frontend built in debug
+    swift/utils/build-script --release-debuginfo --debug-swift-stdlib # Standard library built in debug
+    swift/utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
+
+Limiting the amount of debug code in the compiler has a very large impact on
+Swift compile times, and in turn the test execution time. If you want to build
+the entire project in debug, you can run:
+
+    swift/utils/build-script  --debug
+
+For documentation of all available arguments, as well as additional usage
+information, see the inline help:
+
+    utils/build-script -h
+
 ### Build systems
 
 #### Xcode
@@ -241,11 +278,11 @@ common debug flow would involve:
 Another option is to change the scheme to "Wait for executable to be launched",
 then run the build product in Terminal.
 
-### Swift Toolchains
+### Swift For TensorFlow Toolchains
 
 #### Building
 
-Swift toolchains are created using the script
+Swift for TensorFlow toolchains are created using the script
 [build-toolchain-tensorflow](https://github.com/apple/swift/blob/tensorflow/utils/build-toolchain-tensorflow).
 This script is used by swift.org's CI to produce snapshots and can allow for one to
 locally reproduce such builds for development or distribution purposes. A typical 
