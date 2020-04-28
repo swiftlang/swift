@@ -818,12 +818,20 @@ public:
 
   llvm::Optional<std::string> iterateConformances(
     std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
-    std::string ConformancesName = "__ZL12Conformances";
-    auto ConformancesAddr = getReader().getSymbolAddress(ConformancesName);
-    if (!ConformancesAddr)
-      return "unable to look up conformances cache symbol " + ConformancesName;
+    std::string ConformancesPointerName =
+      "__swift_debug_protocolConformanceStatePointer";
+    auto ConformancesAddrAddr =
+      getReader().getSymbolAddress(ConformancesPointerName);
+    if (!ConformancesAddrAddr)
+      return "unable to look up debug variable " + ConformancesPointerName;
 
-    auto Root = getReader().readPointer(ConformancesAddr, sizeof(StoredPointer));
+    auto ConformancesAddr =
+      getReader().readPointer(ConformancesAddrAddr, sizeof(StoredPointer));
+    if (!ConformancesAddr)
+      return "unable to read value of " + ConformancesPointerName;
+
+    auto Root = getReader().readPointer(ConformancesAddr->getResolvedAddress(),
+                                        sizeof(StoredPointer));
     iterateConformanceTree(Root->getResolvedAddress().getAddressData(), Call);
     return llvm::None;
   }

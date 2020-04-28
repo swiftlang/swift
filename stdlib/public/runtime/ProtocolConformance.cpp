@@ -315,6 +315,9 @@ void ConformanceState::verify() const {
 
 static Lazy<ConformanceState> Conformances;
 
+const void * const swift::_swift_debug_protocolConformanceStatePointer =
+  &Conformances;
+
 static void
 _registerProtocolConformances(ConformanceState &C,
                               const ProtocolConformanceRecord *begin,
