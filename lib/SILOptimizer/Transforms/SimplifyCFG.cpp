@@ -2418,9 +2418,9 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     for (unsigned i = 0; i < numArgs; ++i) {
       auto Arg = TAI->getArgument(i);
       // Cast argument if required.
-      Arg = castValueToABICompatibleType(&Builder, TAI->getLoc(), Arg,
-                                         origConv.getSILArgumentType(i),
-                                         targetConv.getSILArgumentType(i));
+      std::tie(Arg, std::ignore) = castValueToABICompatibleType(
+          &Builder, TAI->getLoc(), Arg, origConv.getSILArgumentType(i),
+          targetConv.getSILArgumentType(i));
       Args.push_back(Arg);
     }
 
@@ -2435,8 +2435,9 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto Loc = TAI->getLoc();
     auto *NormalBB = TAI->getNormalBB();
 
-    auto CastedResult = castValueToABICompatibleType(&Builder, Loc, NewAI,
-                                                     ResultTy, OrigResultTy);
+    SILValue CastedResult;
+    std::tie(CastedResult, std::ignore) = castValueToABICompatibleType(
+        &Builder, Loc, NewAI, ResultTy, OrigResultTy);
 
     Builder.createBranch(Loc, NormalBB, { CastedResult });
     TAI->eraseFromParent();

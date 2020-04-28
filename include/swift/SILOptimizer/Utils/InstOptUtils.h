@@ -233,9 +233,9 @@ FullApplySite findApplyFromDevirtualizedResult(SILValue value);
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
 /// - both types are tuple-types and some of the elements need to be casted.
-SILValue castValueToABICompatibleType(SILBuilder *builder, SILLocation Loc,
-                                      SILValue value, SILType srcTy,
-                                      SILType destTy);
+std::pair<SILValue, bool /* changedCFG */>
+castValueToABICompatibleType(SILBuilder *builder, SILLocation Loc,
+                             SILValue value, SILType srcTy, SILType destTy);
 /// Peek through trivial Enum initialization, typically for pointless
 /// Optionals.
 ///
