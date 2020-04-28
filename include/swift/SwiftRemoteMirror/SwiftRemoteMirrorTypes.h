@@ -141,6 +141,20 @@ typedef struct swift_childinfo {
   swift_typeref_t TR;
 } swift_childinfo_t;
 
+enum swift_metadata_allocation_tag {
+  SWIFT_GENERIC_METADATA_CACHE_ALLOCATION = 14,
+};
+
+// Tags other than those defined in swift_metadata_allocation_tag will be used
+// and must be treated as unknown.
+typedef int swift_metadata_allocation_tag_t;
+
+typedef struct swift_metadata_allocation {
+  swift_metadata_allocation_tag_t Tag;
+  swift_reflection_ptr_t Ptr;
+  unsigned Size;
+} swift_metadata_allocation_t;
+
 /// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
 typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
