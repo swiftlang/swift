@@ -24,6 +24,7 @@
 #include "llvm/Object/COFF.h"
 
 #include "swift/ABI/Enum.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -815,16 +816,16 @@ public:
     iterateConformanceTree(NodeData->Right, Call);
   }
 
-  bool iterateConformances(
+  llvm::Optional<std::string> iterateConformances(
     std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     std::string ConformancesName = "__ZL12Conformances";
     auto ConformancesAddr = getReader().getSymbolAddress(ConformancesName);
     if (!ConformancesAddr)
-      return false;
+      return "unable to look up conformances cache symbol " + ConformancesName;
 
     auto Root = getReader().readPointer(ConformancesAddr, sizeof(StoredPointer));
     iterateConformanceTree(Root->getResolvedAddress().getAddressData(), Call);
-    return true;
+    return llvm::None;
   }
   
   void iterateModules(Demangle::NodePointer Ptr, std::function<void(llvm::StringRef)> Call) {
@@ -864,11 +865,12 @@ public:
     return 0;
   }
   
-  bool iterateMetadataAllocations(std::function<void (MetadataAllocation)> Call) {
+  llvm::Optional<std::string>
+  iterateMetadataAllocations(std::function<void (MetadataAllocation)> Call) {
     std::string AllocationPoolName = "__ZL14AllocationPool";
     auto AllocationPoolAddr = getReader().getSymbolAddress(AllocationPoolName);
     if (!AllocationPoolAddr)
-      return false;
+      return "unable to look up allocation pool symbol " + AllocationPoolName;
     
     struct PoolRange {
       StoredPointer Begin;
@@ -887,7 +889,7 @@ public:
       .readBytes(RemoteAddress(AllocationPoolAddr), sizeof(PoolRange));
     auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
     if (!Pool)
-      return false;
+      return std::string("failure reading allocation pool contents");
 
     auto TrailerPtr = Pool->Begin + Pool->Remaining;
     while (TrailerPtr) {
@@ -921,7 +923,7 @@ public:
       
       TrailerPtr = Trailer->PrevTrailer;
     }
-    return true;
+    return llvm::None;
   }
 
 private:

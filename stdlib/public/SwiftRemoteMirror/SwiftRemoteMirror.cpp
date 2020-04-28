@@ -40,6 +40,7 @@ struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;
   std::vector<std::function<void()>> freeFuncs;
   std::vector<std::tuple<swift_addr_t, swift_addr_t>> dataSegments;
+  std::string lastError;
   
   SwiftReflectionContext(MemoryReaderImpl impl) {
     auto Reader = std::make_shared<CMemoryReader>(impl);
@@ -422,6 +423,15 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   };
 }
 
+static const char *convertError(SwiftReflectionContextRef ContextRef,
+                                llvm::Optional<std::string> Error) {
+  if (Error) {
+    ContextRef->lastError = *Error;
+    return ContextRef->lastError.c_str();
+  }
+  return nullptr;
+}
+
 swift_typeinfo_t
 swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
@@ -585,31 +595,33 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
   return Demangled.size();
 }
 
-int swift_reflection_iterateConformanceCache(
+const char *swift_reflection_iterateConformanceCache(
   SwiftReflectionContextRef ContextRef,
   void (*Call)(swift_reflection_ptr_t Type,
                swift_reflection_ptr_t Proto,
                void *ContextPtr),
   void *ContextPtr) {
   auto Context = ContextRef->nativeContext;
-  return Context->iterateConformances([&](auto Type, auto Proto) {
+  auto Error = Context->iterateConformances([&](auto Type, auto Proto) {
     Call(Type, Proto, ContextPtr);
   });
+  return convertError(ContextRef, Error);
 }
 
-int swift_reflection_iterateMetadataAllocations(
+const char *swift_reflection_iterateMetadataAllocations(
   SwiftReflectionContextRef ContextRef,
   void (*Call)(swift_metadata_allocation_t Allocation,
                void *ContextPtr),
   void *ContextPtr) {
   auto Context = ContextRef->nativeContext;
-  return Context->iterateMetadataAllocations([&](auto Allocation) {
+  auto Error = Context->iterateMetadataAllocations([&](auto Allocation) {
     swift_metadata_allocation CAllocation;
     CAllocation.Tag = Allocation.Tag;
     CAllocation.Ptr = Allocation.Ptr;
     CAllocation.Size = Allocation.Size;
     Call(CAllocation, ContextPtr);
   });
+  return convertError(ContextRef, Error);
 }
 
 SWIFT_REMOTE_MIRROR_LINKAGE
