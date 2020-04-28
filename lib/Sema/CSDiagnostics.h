@@ -1060,9 +1060,9 @@ private:
   /// defines only `dynamicallyCall(withArguments:)` variant.
   bool diagnoseForDynamicCallable() const;
   
-  /// Tailored diagnostics for array literal with unresolved member expression
-  /// that defaults the element to element type. e.g. _ = [.e]
-  bool diagnoseForDefaultAnyArrayLiteral() const;
+  /// Tailored diagnostics for collection literal with unresolved member expression
+  /// that defaults the element type. e.g. _ = [.e]
+  bool diagnoseInLiteralCollectionContext() const;
 
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,

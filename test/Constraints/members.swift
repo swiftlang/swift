@@ -668,3 +668,8 @@ func test_34770265(_ dict: [Int: Int]) {
 // SR-12672
 _ = [.e] // expected-error {{reference to member 'e' cannot be resolved without a contextual type}}
 let _ : [Any] = [.e] // expected-error {{type 'Any' has no member 'e'}}
+_ = [1 :.e] // expected-error {{reference to member 'e' cannot be resolved without a contextual type}}
+_ = [.e: 1] // expected-error {{reference to member 'e' cannot be resolved without a contextual type}}
+let _ : [Int: Any] = [1 : .e] // expected-error {{type 'Any' has no member 'e'}}
+let _ : (Int, Any) = (1, .e) // expected-error {{type 'Any' has no member 'e'}}
+_ = (1, .e) // expected-error {{cannot infer contextual base in reference to member 'e'}}

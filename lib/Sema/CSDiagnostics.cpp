@@ -3213,7 +3213,7 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (diagnoseForDynamicCallable())
     return true;
   
-  if (diagnoseForDefaultAnyArrayLiteral())
+  if (diagnoseInLiteralCollectionContext())
     return true;
 
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
@@ -3402,23 +3402,30 @@ bool MissingMemberFailure::diagnoseForDynamicCallable() const {
   return false;
 }
 
-bool MissingMemberFailure::diagnoseForDefaultAnyArrayLiteral() const {
+bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
   auto &cs = getConstraintSystem();
-  auto *expr = getAsExpr(getAnchor());
+  auto *expr = castToExpr(getAnchor());
   auto *parentExpr = cs.getParentExpr(expr);
-  auto contextualType = getContextualType(parentExpr);
-  auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
+  auto &solution = getSolution();
 
-  if (contextualType)
+  if (!(parentExpr && isa<UnresolvedMemberExpr>(expr)))
     return false;
-  
-  if (isa<UnresolvedMemberExpr>(expr) &&
-      parentExpr && isa<ArrayExpr>(parentExpr)) {
-    if (auto *metatype = baseType->getAs<MetatypeType>()) {
-      baseType = metatype->getInstanceType();
-    }
-    
-    if (baseType->isAny()) {
+
+  auto parentType = getType(parentExpr);
+
+  if (!cs.isCollectionType(parentType) && !parentType->is<TupleType>())
+    return false;
+
+  if (isa<TupleExpr>(parentExpr)) {
+    parentExpr = cs.getParentExpr(parentExpr);
+    if (!parentExpr)
+      return false;
+  }
+
+  if (auto *defaultableVar =
+          cs.getType(parentExpr)->getAs<TypeVariableType>()) {
+    if (solution.DefaultedConstraints.count(
+            defaultableVar->getImpl().getLocator()) != 0) {
       emitDiagnostic(diag::unresolved_member_no_inference, getName());
       return true;
     }
