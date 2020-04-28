@@ -211,13 +211,6 @@ WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",
     ())
 
-// SWIFT_ENABLE_TENSORFLOW
-ERROR(error_tensorflow_toolchain_repl_not_supported, none,
-      "The Swift for TensorFlow toolchain does not support the Swift REPL. Colab "
-      "(https://github.com/tensorflow/swift/blob/master/Usage.md#colaboratory) and Swift-Jupyter "
-      "(https://github.com/google/swift-jupyter) are supported alternatives.",
-      ())
-
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
