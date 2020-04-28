@@ -159,6 +159,11 @@ char *
 swift_reflection_copyDemangledNameForTypeRef(
   SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef);
 
+SWIFT_REMOTE_MIRROR_LINKAGE
+char *
+swift_reflection_copyDemangledNameForProtocolDescriptor(
+  SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t Proto);
+
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.
 SWIFT_REMOTE_MIRROR_LINKAGE
@@ -284,10 +289,24 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
                                  char *OutDemangledName, size_t MaxLength);
 
 SWIFT_REMOTE_MIRROR_LINKAGE
-void swift_reflection_dumpConformanceCache(SwiftReflectionContextRef ContextRef);
+int swift_reflection_iterateConformanceCache(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_reflection_ptr_t Type,
+               swift_reflection_ptr_t Proto,
+               void *ContextPtr),
+  void *ContextPtr);
 
 SWIFT_REMOTE_MIRROR_LINKAGE
-void swift_reflection_dumpMetadataAllocations(SwiftReflectionContextRef ContextRef);
+int swift_reflection_iterateMetadataAllocations(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_metadata_allocation_t Allocation,
+               void *ContextPtr),
+  void *ContextPtr);
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
+  SwiftReflectionContextRef ContextRef,
+  swift_metadata_allocation_t Allocation);
 
 #ifdef __cplusplus
 } // extern "C"

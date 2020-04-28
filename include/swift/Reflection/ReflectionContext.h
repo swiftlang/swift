@@ -802,42 +802,29 @@ public:
     }
   }
 
-  void dumpConformanceNode(const struct ConformanceNode *Node) {
-    Demangle::Demangler Dem;
-
-    std::string TypeName = "<unknown>";
-    if (auto TR = readTypeFromMetadata(Node->Type)) {
-      auto Demangling = TR->getDemangling(Dem);
-      TypeName = nodeToString(Demangling);
-    }
-
-    auto ProtocolDemangled = readDemanglingForContextDescriptor(Node->Proto, Dem);
-    auto ProtocolName = nodeToString(ProtocolDemangled);
-    
-    printf("Conformance: %s: %s\n", TypeName.c_str(), ProtocolName.c_str());
-  }
-  
-  void dumpConformanceTree(StoredPointer NodePtr) {
+  void iterateConformanceTree(StoredPointer NodePtr,
+    std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     if (!NodePtr)
       return;
     auto NodeBytes = getReader().readBytes(RemoteAddress(NodePtr), sizeof(Node));
     auto NodeData = reinterpret_cast<const ConformanceNode *>(NodeBytes.get());
     if (!NodeData)
       return;
-    dumpConformanceNode(NodeData);
-    dumpConformanceTree(NodeData->Left);
-    dumpConformanceTree(NodeData->Right);
+    Call(NodeData->Type, NodeData->Proto);
+    iterateConformanceTree(NodeData->Left, Call);
+    iterateConformanceTree(NodeData->Right, Call);
   }
 
-  void dumpConformances() {
+  bool iterateConformances(
+    std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     std::string ConformancesName = "__ZL12Conformances";
     auto ConformancesAddr = getReader().getSymbolAddress(ConformancesName);
-    printf("%#llx\n", ConformancesAddr.getAddressData());
     if (!ConformancesAddr)
-      return;
+      return false;
 
     auto Root = getReader().readPointer(ConformancesAddr, sizeof(StoredPointer));
-    dumpConformanceTree(Root->getResolvedAddress().getAddressData());
+    iterateConformanceTree(Root->getResolvedAddress().getAddressData(), Call);
+    return true;
   }
   
   void iterateModules(Demangle::NodePointer Ptr, std::function<void(llvm::StringRef)> Call) {
@@ -847,53 +834,41 @@ public:
       iterateModules(Child, Call);
   }
   
-  void dumpGenericMetadataCacheEntry(const char *Ptr) {
-    struct GenericMetadataCacheEntry {
-      StoredPointer Left, Right;
-      StoredPointer LockedStorage;
-      uint8_t LockedStorageKind;
-      uint8_t TrackingInfo;
-      uint16_t NumKeyParameters;
-      uint16_t NumWitnessTables;
-      uint32_t Hash;
-      StoredPointer Value;
-    };
-    
-    auto EntryPtr = (const GenericMetadataCacheEntry *)Ptr;
-    printf("  Left: %#llx\n", EntryPtr->Left);
-    printf("  Right: %#llx\n", EntryPtr->Right);
-    printf("  LockedStorage: %#llx\n", EntryPtr->LockedStorage);
-    printf("  LockedStorageKind: %u\n", EntryPtr->LockedStorageKind);
-    printf("  TrackingInfo: %u\n", EntryPtr->TrackingInfo);
-    printf("  NumKeyParameters: %u\n", EntryPtr->NumKeyParameters);
-    printf("  NumWitnessTables: %u\n", EntryPtr->NumWitnessTables);
-    printf("  Hash: %#x\n", EntryPtr->Hash);
-    printf("  Value: %#llx\n", EntryPtr->Value);
-    
-    if (EntryPtr->Value) {
-      if (auto Metadata = readMetadata(EntryPtr->Value)) {
-        if (auto TR = readTypeFromMetadata(Metadata.getAddressData())) {
-          Demangle::Demangler Dem;
-          auto Demangling = TR->getDemangling(Dem);
-          auto Name = nodeToString(Demangling);
-          printf("    Name: %s\n", Name.c_str());
-          
-          printf("    Modules:");
-          iterateModules(Demangling, [](llvm::StringRef Str){
-            printf(" %s", Str.str().c_str());
-          });
-          printf("\n");
-        }
-      }
+  struct MetadataAllocation {
+    uint16_t Tag;
+    StoredPointer Ptr;
+    unsigned Size;
+  };
+
+  StoredPointer allocationMetadataPointer(MetadataAllocation Allocation) {
+    if (Allocation.Tag == GenericMetadataCacheTag) {
+        struct GenericMetadataCacheEntry {
+          StoredPointer Left, Right;
+          StoredPointer LockedStorage;
+          uint8_t LockedStorageKind;
+          uint8_t TrackingInfo;
+          uint16_t NumKeyParameters;
+          uint16_t NumWitnessTables;
+          uint32_t Hash;
+          StoredPointer Value;
+        };
+        auto AllocationBytes =
+          getReader().readBytes(RemoteAddress(Allocation.Ptr),
+                                              Allocation.Size);
+        auto Entry = reinterpret_cast<const GenericMetadataCacheEntry *>(
+          AllocationBytes.get());
+        if (!Entry)
+          return 0;
+        return Entry->Value;
     }
+    return 0;
   }
   
-  void dumpMetadataAllocations() {
+  bool iterateMetadataAllocations(std::function<void (MetadataAllocation)> Call) {
     std::string AllocationPoolName = "__ZL14AllocationPool";
     auto AllocationPoolAddr = getReader().getSymbolAddress(AllocationPoolName);
-    printf("%#llx\n", AllocationPoolAddr.getAddressData());
-    
-    printf("Initial pool: %#llx\n", getReader().getSymbolAddress("__ZL21InitialAllocationPool").getAddressData());
+    if (!AllocationPoolAddr)
+      return false;
     
     struct PoolRange {
       StoredPointer Begin;
@@ -912,8 +887,8 @@ public:
       .readBytes(RemoteAddress(AllocationPoolAddr), sizeof(PoolRange));
     auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
     if (!Pool)
-      return;
-    
+      return false;
+
     auto TrailerPtr = Pool->Begin + Pool->Remaining;
     while (TrailerPtr) {
       auto TrailerBytes = getReader()
@@ -922,38 +897,31 @@ public:
       if (!Trailer)
         break;
       auto PoolStart = TrailerPtr - Trailer->PoolSize;
-      printf("Found pool at %#llx, allocation size is %llu\n",
-              PoolStart, Trailer->PoolSize + sizeof(PoolTrailer));
-      
       auto PoolBytes = getReader()
         .readBytes(RemoteAddress(PoolStart), Trailer->PoolSize);
       auto PoolPtr = (const char *)PoolBytes.get();
       if (!PoolPtr)
         break;
+
       uintptr_t Offset = 0;
       while (Offset < Trailer->PoolSize) {
         auto AllocationPtr = PoolPtr + Offset;
         auto Header = (const AllocationHeader *)AllocationPtr;
         if (Header->Size == 0)
           break;
-        auto Allocation = AllocationPtr + sizeof(AllocationHeader);
         auto RemoteAddr = PoolStart + Offset + sizeof(AllocationHeader);
-        printf("Allocation tag %u size %u offset %#lx, remote address %#llx\n", Header->Tag, Header->Size, Offset, RemoteAddr);
-        
-        switch (Header->Tag) {
-          case GenericMetadataCacheTag: {
-            dumpGenericMetadataCacheEntry(Allocation);
-            break;
-          }
-          default:
-            break;
-        }
+        MetadataAllocation Allocation;
+        Allocation.Tag = Header->Tag;
+        Allocation.Ptr = RemoteAddr;
+        Allocation.Size = Header->Size;
+        Call(Allocation);
         
         Offset += sizeof(AllocationHeader) + Header->Size;
       }
       
       TrailerPtr = Trailer->PrevTrailer;
     }
+    return true;
   }
 
 private:

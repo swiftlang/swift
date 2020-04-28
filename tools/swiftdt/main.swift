@@ -43,18 +43,62 @@ let commands = [
   Command(
     name: "dump-conformance-cache",
     help: "Print the contents of the target's protocol conformance cache.",
-    call: swift_reflection_dumpConformanceCache),
+    call: dumpConformanceCache),
   Command(
     name: "dump-metadata-allocations",
     help: "Print the target's metadata allocations.",
-    call: swift_reflection_dumpMetadataAllocations),
+    call: dumpMetadataAllocations),
   Command(
     name: "help",
     help: "Print this help.",
     call: printUsage),
 ]
 
-func printUsage(args: inout ArraySlice<String>) -> Void {
+func dumpConformanceCache(context: SwiftReflectionContextRef) {
+  let success = context.iterateConformanceCache(call: { type, proto in
+    let typeName = context.name(metadata: type) ?? "<unknown>"
+    let protoName = context.name(proto: proto) ?? "<unknown>"
+    print("Conformance: \(typeName): \(protoName)")
+  })
+  if !success {
+    print("Error!")
+  }
+}
+
+func dumpMetadataAllocations(context: SwiftReflectionContextRef) {
+  var allocations: [swift_metadata_allocation_t] = []
+  var metadatas: [swift_reflection_ptr_t] = []
+  let success = context.iterateMetadataAllocations(call: { allocation in
+    allocations.append(allocation)
+    print("Metadata allocation at: \(hex: allocation.Ptr) " + 
+          "size: \(allocation.Size) tag: \(allocation.Tag)")
+    let ptr = context.metadataPointer(allocation: allocation)
+    if ptr != 0 {
+      metadatas.append(ptr)
+    }
+  })
+  if !success {
+    print("Error!")
+    return
+  }
+
+  allocations.sort(by: { $0.Ptr < $1.Ptr })
+  for metadata in metadatas {
+    let name = context.name(metadata: metadata) ?? "<unknown>"
+    print("Metadata \(hex: metadata)")
+    print("    Name: \(name)")
+
+    if let allocation = allocations.last(where: { metadata >= $0.Ptr }) {
+      let offset = metadata - allocation.Ptr
+      print("    In allocation \(hex: allocation.Ptr) " +
+            "size \(allocation.Size) at offset \(offset)")
+    } else {
+      print("    Not in any known metadata allocation. How strange.")
+    }
+  }
+}
+
+func printUsage(args: inout ArraySlice<String>) {
   print("Usage: \(executableName) <command>", to: &Std.err)
   print("", to: &Std.err)
   print("Available commands:", to: &Std.err)

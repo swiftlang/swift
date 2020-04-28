@@ -280,6 +280,18 @@ swift_reflection_copyDemangledNameForTypeRef(
   return strdup(Name.c_str());
 }
 
+SWIFT_REMOTE_MIRROR_LINKAGE
+char *
+swift_reflection_copyDemangledNameForProtocolDescriptor(
+  SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t Proto) {
+  auto Context = ContextRef->nativeContext;
+
+  Demangle::Demangler Dem;
+  auto Demangling = Context->readDemanglingForContextDescriptor(Proto, Dem);
+  auto Name = nodeToString(Demangling);
+  return strdup(Name.c_str());
+}
+
 swift_typeref_t
 swift_reflection_genericArgumentOfTypeRef(swift_typeref_t OpaqueTypeRef,
                                           unsigned Index) {
@@ -573,12 +585,41 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
   return Demangled.size();
 }
 
-void swift_reflection_dumpConformanceCache(SwiftReflectionContextRef ContextRef) {
+int swift_reflection_iterateConformanceCache(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_reflection_ptr_t Type,
+               swift_reflection_ptr_t Proto,
+               void *ContextPtr),
+  void *ContextPtr) {
   auto Context = ContextRef->nativeContext;
-  Context->dumpConformances();
+  return Context->iterateConformances([&](auto Type, auto Proto) {
+    Call(Type, Proto, ContextPtr);
+  });
 }
 
-void swift_reflection_dumpMetadataAllocations(SwiftReflectionContextRef ContextRef) {
+int swift_reflection_iterateMetadataAllocations(
+  SwiftReflectionContextRef ContextRef,
+  void (*Call)(swift_metadata_allocation_t Allocation,
+               void *ContextPtr),
+  void *ContextPtr) {
   auto Context = ContextRef->nativeContext;
-  Context->dumpMetadataAllocations();
+  return Context->iterateMetadataAllocations([&](auto Allocation) {
+    swift_metadata_allocation CAllocation;
+    CAllocation.Tag = Allocation.Tag;
+    CAllocation.Ptr = Allocation.Ptr;
+    CAllocation.Size = Allocation.Size;
+    Call(CAllocation, ContextPtr);
+  });
+}
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
+  SwiftReflectionContextRef ContextRef,
+  swift_metadata_allocation_t Allocation) {
+  auto Context = ContextRef->nativeContext;
+  NativeReflectionContext::MetadataAllocation NativeAllocation;
+  NativeAllocation.Tag = Allocation.Tag;
+  NativeAllocation.Ptr = Allocation.Ptr;
+  NativeAllocation.Size = Allocation.Size;
+  return Context->allocationMetadataPointer(NativeAllocation);
 }
