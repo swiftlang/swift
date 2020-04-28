@@ -2224,7 +2224,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     inFixedBuffer = true;
     storageType = getFixedBufferTy();
     fixedSize = Size(DataLayout.getTypeAllocSize(storageType));
-    fixedAlignment = Alignment(DataLayout.getABITypeAlignment(storageType));
+    fixedAlignment = getFixedBufferAlignment(*this);
   }
 
   // Check whether we've created the global variable already.
