@@ -33,7 +33,6 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
