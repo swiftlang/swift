@@ -2302,15 +2302,6 @@ void Driver::buildJobs(ArrayRef<const Action *> TopLevelActions,
     }
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  for (const Action *A : TopLevelActions) {
-    if (A->getKind() == Action::Kind::REPLJob) {
-      Diags.diagnose(SourceLoc(),
-                     diag::error_tensorflow_toolchain_repl_not_supported);
-      return;
-    }
-  }
-
   for (const Action *A : TopLevelActions) {
     if (auto *JA = dyn_cast<JobAction>(A)) {
       (void)buildJobsForAction(C, JA, OFM, workingDirectory, /*TopLevel=*/true,
