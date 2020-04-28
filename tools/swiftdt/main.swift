@@ -22,7 +22,7 @@ guard let executableName = argv.popFirst() else {
 struct Command {
   var name: String
   var help: String
-  var call: (inout ArraySlice<String>) -> Void
+  var call: (inout ArraySlice<String>) throws -> Void
   
   init(name: String, help: String,
        call: @escaping (inout ArraySlice<String>) -> Void) {
@@ -32,10 +32,10 @@ struct Command {
   }
   
   init(name: String, help: String,
-       call: @escaping (SwiftReflectionContextRef) -> Void) {
+       call: @escaping (SwiftReflectionContextRef) throws -> Void) {
     self.name = name
     self.help = help
-    self.call = { withReflectionContext(args: &$0, call: call) }
+    self.call = { try withReflectionContext(args: &$0, call: call) }
   }
 }
 
@@ -54,21 +54,18 @@ let commands = [
     call: printUsage),
 ]
 
-func dumpConformanceCache(context: SwiftReflectionContextRef) {
-  let success = context.iterateConformanceCache(call: { type, proto in
+func dumpConformanceCache(context: SwiftReflectionContextRef) throws {
+  try context.iterateConformanceCache(call: { type, proto in
     let typeName = context.name(metadata: type) ?? "<unknown>"
     let protoName = context.name(proto: proto) ?? "<unknown>"
     print("Conformance: \(typeName): \(protoName)")
   })
-  if !success {
-    print("Error!")
-  }
 }
 
-func dumpMetadataAllocations(context: SwiftReflectionContextRef) {
+func dumpMetadataAllocations(context: SwiftReflectionContextRef) throws {
   var allocations: [swift_metadata_allocation_t] = []
   var metadatas: [swift_reflection_ptr_t] = []
-  let success = context.iterateMetadataAllocations(call: { allocation in
+  try context.iterateMetadataAllocations(call: { allocation in
     allocations.append(allocation)
     print("Metadata allocation at: \(hex: allocation.Ptr) " + 
           "size: \(allocation.Size) tag: \(allocation.Tag)")
@@ -77,10 +74,6 @@ func dumpMetadataAllocations(context: SwiftReflectionContextRef) {
       metadatas.append(ptr)
     }
   })
-  if !success {
-    print("Error!")
-    return
-  }
 
   allocations.sort(by: { $0.Ptr < $1.Ptr })
   for metadata in metadatas {
@@ -138,18 +131,28 @@ func makeReflectionContext(args: inout ArraySlice<String>)
   return (inspector, reflectionContext)
 }
 
-func withReflectionContext(args: inout ArraySlice<String>,
-                           call: (SwiftReflectionContextRef) -> Void) {
+func withReflectionContext(
+  args: inout ArraySlice<String>,
+  call: (SwiftReflectionContextRef) throws -> Void) throws {
   let (inspector, context) = makeReflectionContext(args: &args)
-  call(context)
-  swift_reflection_destroyReflectionContext(context)
-  inspector.destroyContext()
+  defer {
+    swift_reflection_destroyReflectionContext(context)
+    inspector.destroyContext()
+  }
+  try call(context)
 }
 
 let commandName = argv.popFirst()
 for command in commands {
   if command.name == commandName {
-    command.call(&argv)
+    do {
+      try command.call(&argv)
+    } catch let error as SwiftReflectionContextRef.Error {
+      print("Error: \(error.description)", to: &Std.err)
+      exit(1)
+    } catch {
+      print("Unknown error: \(error)")
+    }
     exit(0)
   }
 }

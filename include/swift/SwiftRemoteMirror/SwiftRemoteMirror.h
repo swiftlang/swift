@@ -289,7 +289,7 @@ size_t swift_reflection_demangle(const char *MangledName, size_t Length,
                                  char *OutDemangledName, size_t MaxLength);
 
 SWIFT_REMOTE_MIRROR_LINKAGE
-int swift_reflection_iterateConformanceCache(
+const char *swift_reflection_iterateConformanceCache(
   SwiftReflectionContextRef ContextRef,
   void (*Call)(swift_reflection_ptr_t Type,
                swift_reflection_ptr_t Proto,
@@ -297,7 +297,7 @@ int swift_reflection_iterateConformanceCache(
   void *ContextPtr);
 
 SWIFT_REMOTE_MIRROR_LINKAGE
-int swift_reflection_iterateMetadataAllocations(
+const char *swift_reflection_iterateMetadataAllocations(
   SwiftReflectionContextRef ContextRef,
   void (*Call)(swift_metadata_allocation_t Allocation,
                void *ContextPtr),
