@@ -273,6 +273,13 @@ namespace {
           // context.
           if (superclassType.hasArchetype())
             Options |= ClassMetadataFlags::ClassHasGenericLayout;
+
+          // Since we're not going to visit the superclass, make sure that we still
+          // set ClassHasObjCAncestry correctly.
+          if (superclassType.getASTType()->getReferenceCounting()
+                == ReferenceCounting::ObjC) {
+            Options |= ClassMetadataFlags::ClassHasObjCAncestry;
+          }
         } else {
           // Otherwise, we are allowed to have total knowledge of the superclass
           // fields, so walk them to compute the layout.
