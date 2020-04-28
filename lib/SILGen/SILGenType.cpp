@@ -567,7 +567,7 @@ public:
     auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
     auto witnessSerialized = Serialized;
     if (witnessSerialized &&
-        fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
+        fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef)) {
       witnessLinkage = SILLinkage::Public;
       witnessSerialized = IsNotSerialized;
     } else {
