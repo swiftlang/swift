@@ -3212,6 +3212,9 @@ bool MissingMemberFailure::diagnoseAsError() {
 
   if (diagnoseForDynamicCallable())
     return true;
+  
+  if (diagnoseForDefaultAnyArrayLiteral())
+    return true;
 
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
@@ -3396,6 +3399,29 @@ bool MissingMemberFailure::diagnoseForDynamicCallable() const {
     return true;
   }
 
+  return false;
+}
+
+bool MissingMemberFailure::diagnoseForDefaultAnyArrayLiteral() const {
+  auto &cs = getConstraintSystem();
+  auto *expr = getAsExpr(getAnchor());
+  auto *parentExpr = cs.getParentExpr(expr);
+  auto contextualType = getContextualType(parentExpr);
+  auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
+
+  if (contextualType)
+    return false;
+  
+  if (isa<UnresolvedMemberExpr>(expr) && isa<ArrayExpr>(parentExpr)) {
+    if (auto *metatype = baseType->getAs<MetatypeType>()) {
+      baseType = metatype->getInstanceType();
+    }
+    
+    if (baseType->isAny()) {
+      emitDiagnostic(diag::unresolved_member_no_inference, getName());
+      return true;
+    }
+  }
   return false;
 }
 
