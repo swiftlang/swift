@@ -857,7 +857,7 @@ public:
     removeShadowedDecls(Decls, DC);
 
     size_t index = 0;
-    for (const auto DeclAndReason : Results) {
+    for (const auto &DeclAndReason : Results) {
       if (index >= Decls.size())
         break;
       if (DeclAndReason.D != Decls[index])

@@ -539,7 +539,7 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
 template <NodeKind kind, typename ContentsT>
 void FrontendSourceFileDepGraphFactory::addAllDefinedDeclsOfAGivenType(
     std::vector<ContentsT> &contentsVec) {
-  for (const auto declOrPair : contentsVec) {
+  for (const auto &declOrPair : contentsVec) {
     Optional<std::string> fp = getFingerprintIfAny(declOrPair);
     addADefinedDecl(
         DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
