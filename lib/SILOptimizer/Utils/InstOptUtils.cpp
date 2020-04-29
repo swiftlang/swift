@@ -805,14 +805,7 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
 /// - both types are tuple-types and some of the elements need to be casted.
-///
-/// If CheckOnly flag is set, then this function only checks if the
-/// required casting is possible. If it is not possible, then None
-/// is returned.
-///
-/// If CheckOnly is not set, then a casting code is generated and the final
-/// casted value is returned.
-///
+/// Return the cast value and true if a CFG modification was required
 /// NOTE: We intentionally combine the checking of the cast's handling
 /// possibility and the transformation performing the cast in the same function,
 /// to avoid any divergence between the check and the implementation in the
@@ -820,27 +813,28 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 ///
 /// NOTE: The implementation of this function is very closely related to the
 /// rules checked by SILVerifier::requireABICompatibleFunctionTypes.
-SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
-                                             SILLocation loc, SILValue value,
-                                             SILType srcTy, SILType destTy) {
+std::pair<SILValue, bool /* changedCFG */>
+swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
+                                    SILValue value, SILType srcTy,
+                                    SILType destTy) {
 
   // No cast is required if types are the same.
   if (srcTy == destTy)
-    return value;
+    return {value, false};
 
   if (srcTy.isAddress() && destTy.isAddress()) {
     // Cast between two addresses and that's it.
-    return builder->createUncheckedAddrCast(loc, value, destTy);
+    return {builder->createUncheckedAddrCast(loc, value, destTy), false};
   }
 
   // If both types are classes and dest is the superclass of src,
   // simply perform an upcast.
   if (destTy.isExactSuperclassOf(srcTy)) {
-    return builder->createUpcast(loc, value, destTy);
+    return {builder->createUpcast(loc, value, destTy), false};
   }
 
   if (srcTy.isHeapObjectReferenceType() && destTy.isHeapObjectReferenceType()) {
-    return builder->createUncheckedRefCast(loc, value, destTy);
+    return {builder->createUncheckedRefCast(loc, value, destTy), false};
   }
 
   if (auto mt1 = srcTy.getAs<AnyMetatypeType>()) {
@@ -850,11 +844,11 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
         // A is a superclass of builder, then it can be done by means
         // of a simple upcast.
         if (mt2.getInstanceType()->isExactSuperclassOf(mt1.getInstanceType())) {
-          return builder->createUpcast(loc, value, destTy);
+          return {builder->createUpcast(loc, value, destTy), false};
         }
 
         // Cast between two metatypes and that's it.
-        return builder->createUncheckedBitCast(loc, value, destTy);
+        return {builder->createUncheckedBitCast(loc, value, destTy), false};
       }
     }
   }
@@ -869,7 +863,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
     // simply perform an upcast.
     if (optionalDestTy.isExactSuperclassOf(optionalSrcTy)) {
       // Insert upcast.
-      return builder->createUpcast(loc, value, destTy);
+      return {builder->createUpcast(loc, value, destTy), false};
     }
 
     // Unwrap the original optional value.
@@ -891,7 +885,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
     SILValue unwrappedValue =
         builder->createUncheckedEnumData(loc, value, someDecl);
     // Cast the unwrapped value.
-    auto castedUnwrappedValue = castValueToABICompatibleType(
+    SILValue castedUnwrappedValue;
+    std::tie(castedUnwrappedValue, std::ignore) = castValueToABICompatibleType(
         builder, loc, unwrappedValue, optionalSrcTy, optionalDestTy);
     // Wrap into optional.
     auto castedValue =
@@ -904,7 +899,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
     builder->createBranch(loc, contBB, {castedValue});
     builder->setInsertionPoint(contBB->begin());
 
-    return contBB->getArgument(0);
+    return {contBB->getArgument(0), true};
   }
 
   // Src is not optional, but dest is optional.
@@ -926,16 +921,19 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
   // Extract elements, cast each of them, create a new tuple.
   if (auto srcTupleTy = srcTy.getAs<TupleType>()) {
     SmallVector<SILValue, 8> expectedTuple;
+    bool changedCFG = false;
     for (unsigned i = 0, e = srcTupleTy->getNumElements(); i < e; i++) {
       SILValue element = builder->createTupleExtract(loc, value, i);
       // Cast the value if necessary.
-      element = castValueToABICompatibleType(builder, loc, element,
-                                             srcTy.getTupleElementType(i),
-                                             destTy.getTupleElementType(i));
+      bool neededCFGChange;
+      std::tie(element, neededCFGChange) = castValueToABICompatibleType(
+          builder, loc, element, srcTy.getTupleElementType(i),
+          destTy.getTupleElementType(i));
+      changedCFG |= neededCFGChange;
       expectedTuple.push_back(element);
     }
 
-    return builder->createTuple(loc, destTy, expectedTuple);
+    return {builder->createTuple(loc, destTy, expectedTuple), changedCFG};
   }
 
   // Function types are interchangeable if they're also ABI-compatible.
@@ -949,8 +947,9 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
                        "not ABI "
                        "compatible");
       // Insert convert_function.
-      return builder->createConvertFunction(loc, value, destTy,
-                                            /*WithoutActuallyEscaping=*/false);
+      return {builder->createConvertFunction(loc, value, destTy,
+                                             /*WithoutActuallyEscaping=*/false),
+              false};
     }
   }
 
