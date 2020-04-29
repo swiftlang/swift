@@ -12,7 +12,7 @@
 
 import Dispatch
 import Foundation
-import _SwiftNetworkOverlayShims
+@_implementationOnly import _SwiftNetworkOverlayShims
 
 /// An NWConnection is an object that represents a bi-directional data pipe between
 /// a local endpoint and a remote endpoint.
