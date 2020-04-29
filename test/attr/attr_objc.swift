@@ -1653,9 +1653,9 @@ protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
 
 class C {
   // Don't crash.
-  @objc func foo(x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
-  @IBAction func myAction(sender: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
-  @IBSegueAction func myAction(coder: Undeclared, sender: Undeclared) -> Undeclared {fatalError()} // expected-error {{use of undeclared type 'Undeclared'}} expected-error {{use of undeclared type 'Undeclared'}} expected-error {{use of undeclared type 'Undeclared'}}
+  @objc func foo(x: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
+  @IBAction func myAction(sender: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
+  @IBSegueAction func myAction(coder: Undeclared, sender: Undeclared) -> Undeclared {fatalError()} // expected-error {{cannot find type 'Undeclared' in scope}} expected-error {{cannot find type 'Undeclared' in scope}} expected-error {{cannot find type 'Undeclared' in scope}}
 }
 
 //===---

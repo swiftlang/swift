@@ -59,11 +59,11 @@ import func     not_existent_module_c.foo // expected-error{{no such module 'not
 //===--- Inheritance list in structs.
 //===---
 
-struct StructWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+struct StructWithInheritance1 : FooNonExistentProtocol {} // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}}
 // NO-TYPEREPR: {{^}}struct StructWithInheritance1 : <<error type>> {{{$}}
 // TYPEREPR: {{^}}struct StructWithInheritance1 : FooNonExistentProtocol {{{$}}
 
-struct StructWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
+struct StructWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}} expected-error {{cannot find type 'BarNonExistentProtocol' in scope}}
 // NO-TYPEREPR: {{^}}struct StructWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYPEREPR: {{^}}struct StructWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 
@@ -71,15 +71,15 @@ struct StructWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {
 //===--- Inheritance list in classes.
 //===---
 
-class ClassWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+class ClassWithInheritance1 : FooNonExistentProtocol {} // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}}
 // NO-TYREPR: {{^}}class ClassWithInheritance1 : <<error type>> {{{$}}
 // TYREPR: {{^}}class ClassWithInheritance1 : FooNonExistentProtocol {{{$}}
 
-class ClassWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
+class ClassWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}} expected-error {{cannot find type 'BarNonExistentProtocol' in scope}}
 // NO-TYREPR: {{^}}class ClassWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}class ClassWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 
-class ClassWithInheritance3 : FooClass, FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+class ClassWithInheritance3 : FooClass, FooNonExistentProtocol {} // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}}
 // NO-TYREPR: {{^}}class ClassWithInheritance3 : FooClass, <<error type>> {{{$}}
 // TYREPR: {{^}}class ClassWithInheritance3 : FooClass, FooNonExistentProtocol {{{$}}
 
@@ -101,7 +101,7 @@ class ClassWithInheritance8 : FooClass, BarClass, FooProtocol, BarProtocol {} //
 // NO-TYREPR: {{^}}class ClassWithInheritance8 : FooClass, <<error type>>, FooProtocol, BarProtocol {{{$}}
 // TYREPR: {{^}}class ClassWithInheritance8 : FooClass, BarClass, FooProtocol, BarProtocol {{{$}}
 
-class ClassWithInheritance9 : FooClass, BarClass, FooProtocol, BarProtocol, FooNonExistentProtocol {} // expected-error {{multiple inheritance from classes 'FooClass' and 'BarClass'}} expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+class ClassWithInheritance9 : FooClass, BarClass, FooProtocol, BarProtocol, FooNonExistentProtocol {} // expected-error {{multiple inheritance from classes 'FooClass' and 'BarClass'}} expected-error {{cannot find type 'FooNonExistentProtocol' in scope}}
 // NO-TYREPR: {{^}}class ClassWithInheritance9 : FooClass, <<error type>>, FooProtocol, BarProtocol, <<error type>> {{{$}}
 // TYREPR: {{^}}class ClassWithInheritance9 : FooClass, BarClass, FooProtocol, BarProtocol, FooNonExistentProtocol {{{$}}
 
@@ -109,11 +109,11 @@ class ClassWithInheritance9 : FooClass, BarClass, FooProtocol, BarProtocol, FooN
 //===--- Inheritance list in enums.
 //===---
 
-enum EnumWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{raw type}} expected-error {{an enum with no cases}}
+enum EnumWithInheritance1 : FooNonExistentProtocol {} // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}} expected-error {{raw type}} expected-error {{an enum with no cases}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance1 : <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance1 : FooNonExistentProtocol {{{$}}
 
-enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}} expected-error {{raw type}} expected-error {{an enum with no cases}}
+enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}} expected-error {{cannot find type 'BarNonExistentProtocol' in scope}} expected-error {{raw type}} expected-error {{an enum with no cases}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 
@@ -139,11 +139,11 @@ enum EnumWithInheritance5 : FooClass, BarClass { case X } // expected-error {{ra
 //===--- Inheritance list in protocols.
 //===---
 
-protocol ProtocolWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+protocol ProtocolWithInheritance1 : FooNonExistentProtocol {} // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}}
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance1 : <<error type>> {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance1 : FooNonExistentProtocol {{{$}}
 
-protocol ProtocolWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
+protocol ProtocolWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}} expected-error {{cannot find type 'BarNonExistentProtocol' in scope}}
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 
@@ -165,7 +165,7 @@ protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error{{mul
 
 // Normal typealiases.
 
-typealias Typealias1 = FooNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+typealias Typealias1 = FooNonExistentProtocol // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}}
 // NO-TYREPR: {{^}}typealias Typealias1 = <<error type>>{{$}}
 // TYREPR: {{^}}typealias Typealias1 = FooNonExistentProtocol{{$}}
 
@@ -183,11 +183,11 @@ protocol AssociatedType1 {
   associatedtype AssociatedTypeDecl2 : BazProtocol = FooClass
 // CHECK: {{^}}  associatedtype AssociatedTypeDecl2 : BazProtocol = FooClass{{$}}
 
-  associatedtype AssociatedTypeDecl3 : FooNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+  associatedtype AssociatedTypeDecl3 : FooNonExistentProtocol // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}}
 // NO-TYREPR: {{^}}  associatedtype AssociatedTypeDecl3 : <<error type>>{{$}}
 // TYREPR: {{^}}  associatedtype AssociatedTypeDecl3 : FooNonExistentProtocol{{$}}
 
-  associatedtype AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
+  associatedtype AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol // expected-error {{cannot find type 'FooNonExistentProtocol' in scope}} expected-error {{cannot find type 'BarNonExistentProtocol' in scope}}
 // NO-TYREPR: {{^}}  associatedtype AssociatedTypeDecl4 : <<error type>>, <<error type>>{{$}}
 // TYREPR: {{^}}  associatedtype AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol{{$}}
 

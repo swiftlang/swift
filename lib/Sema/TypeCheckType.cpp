@@ -1141,7 +1141,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     auto I = Remapped.find(TypeName);
     if (I != Remapped.end()) {
       auto RemappedTy = I->second->getString();
-      diags.diagnose(L, diag::use_undeclared_type_did_you_mean,
+      diags.diagnose(L, diag::cannot_find_type_in_scope_did_you_mean,
                      comp->getNameRef(), RemappedTy)
         .highlight(R)
         .fixItReplace(R, RemappedTy);
@@ -1158,7 +1158,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       return I->second;
     }
 
-    diags.diagnose(L, diag::use_undeclared_type,
+    diags.diagnose(L, diag::cannot_find_type_in_scope,
                 comp->getNameRef())
       .highlight(R);
 
@@ -1654,7 +1654,7 @@ Type TypeChecker::resolveIdentifierType(
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
       diags.diagnose(Components.back()->getNameLoc(),
-                     diag::use_undeclared_type, DeclNameRef(moduleName));
+                     diag::cannot_find_type_in_scope, DeclNameRef(moduleName));
       diags.diagnose(Components.back()->getNameLoc(),
                      diag::note_module_as_type, moduleName);
     }

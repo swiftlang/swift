@@ -149,7 +149,7 @@ rdar19137463(1)
 struct Brunch<U : Fooable> where U.Foo == X {}
 
 struct BadFooable : Fooable { // expected-error{{type 'BadFooable' does not conform to protocol 'Fooable'}}
-  typealias Foo = DoesNotExist // expected-error{{use of undeclared type 'DoesNotExist'}}
+  typealias Foo = DoesNotExist // expected-error{{cannot find type 'DoesNotExist' in scope}}
   var foo: Foo { while true {} }
 }
 
