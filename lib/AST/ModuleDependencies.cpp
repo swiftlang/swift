@@ -39,7 +39,7 @@ ModuleDependencies::getAsClangModule() const {
 void ModuleDependencies::addModuleDependency(
     StringRef module, llvm::StringSet<> &alreadyAddedModules) {
   if (alreadyAddedModules.insert(module).second)
-    storage->moduleDependencies.push_back(module);
+    storage->moduleDependencies.push_back(module.str());
 }
 
 void ModuleDependencies::addModuleDependencies(
@@ -69,7 +69,7 @@ void ModuleDependencies::addModuleDependencies(
   }
 
   // Otherwise, record the source file.
-  swiftStorage->sourceFiles.push_back(fileName);
+  swiftStorage->sourceFiles.push_back(fileName.str());
 }
 
 Optional<std::string> ModuleDependencies::getBridgingHeader() const {
@@ -80,13 +80,13 @@ Optional<std::string> ModuleDependencies::getBridgingHeader() const {
 void ModuleDependencies::addBridgingHeader(StringRef bridgingHeader) {
   auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
   assert(!swiftStorage->bridgingHeaderFile);
-  swiftStorage->bridgingHeaderFile = bridgingHeader;
+  swiftStorage->bridgingHeaderFile = bridgingHeader.str();
 }
 
 /// Add source files that the bridging header depends on.
 void ModuleDependencies::addBridgingSourceFile(StringRef bridgingSourceFile) {
   auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
-  swiftStorage->bridgingSourceFiles.push_back(bridgingSourceFile);
+  swiftStorage->bridgingSourceFiles.push_back(bridgingSourceFile.str());
 }
 
 /// Add (Clang) module on which the bridging header depends.
@@ -94,7 +94,7 @@ void ModuleDependencies::addBridgingModuleDependency(
     StringRef module, llvm::StringSet<> &alreadyAddedModules) {
   auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
   if (alreadyAddedModules.insert(module).second)
-    swiftStorage->bridgingModuleDependencies.push_back(module);
+    swiftStorage->bridgingModuleDependencies.push_back(module.str());
 }
 
 llvm::StringMap<ModuleDependencies> &
@@ -158,7 +158,7 @@ void ModuleDependenciesCache::recordDependencies(
   assert(map.count(moduleName) == 0 && "Already added to map");
   map.insert({moduleName, std::move(dependencies)});
 
-  AllModules.push_back({moduleName, kind});
+  AllModules.push_back({moduleName.str(), kind});
 }
 
 void ModuleDependenciesCache::updateDependencies(
