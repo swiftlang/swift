@@ -3,6 +3,10 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_objc_class.swiftmodule -module-name=resilient_objc_class %S/../Inputs/resilient_objc_class.swift -I %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -enable-library-evolution -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
+//   This is XFAILed on these targets because they're 32-bit but support tagged pointers.
+//   The test is cloned as class_resilience_objc_armv7k.swift for them.
+// XFAIL: CPU=armv7k
+// XFAIL: CPU=arm64_32
 // REQUIRES: objc_interop
 
 import Foundation
