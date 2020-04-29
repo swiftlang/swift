@@ -211,7 +211,7 @@ Type swift::ide::getReturnTypeFromContext(const DeclContext *DC) {
       return ACE->getResultType();
     if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
       if (CE->hasExplicitResultType()) {
-        if (auto ty = CE->getExplicitResultTypeExpr()->getInstanceType()) {
+        if (auto ty = CE->getExplicitResultType()) {
           return ty;
         }
 

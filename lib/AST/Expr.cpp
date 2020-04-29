@@ -1861,6 +1861,11 @@ bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
   return false;
 }
 
+void ClosureExpr::setExplicitResultType(Type ty) {
+  assert(ty && !ty->hasTypeVariable());
+  ExplicitResultType->setType(MetatypeType::get(ty));
+}
+
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 
 void AutoClosureExpr::setBody(Expr *E) {

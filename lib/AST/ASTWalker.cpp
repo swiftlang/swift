@@ -811,9 +811,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     visit(expr->getParameters());
 
     if (expr->hasExplicitResultType()) {
-      Expr *result = doIt(expr->getExplicitResultTypeExpr());
-      if (!result) return nullptr;
-      expr->setExplicitResultTypeExpr(cast<TypeExpr>(result));
+      if (doIt(expr->getExplicitResultTypeRepr()))
+        return nullptr;
     }
 
     // Handle single-expression closures.

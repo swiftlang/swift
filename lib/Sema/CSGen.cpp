@@ -2182,8 +2182,7 @@ namespace {
           return Type();
         }
 
-        auto *resultExpr = closure->getExplicitResultTypeExpr();
-        if (auto declaredTy = resultExpr->getInstanceType()) {
+        if (auto declaredTy = closure->getExplicitResultType()) {
           return declaredTy;
         }
 
@@ -2216,11 +2215,6 @@ namespace {
               resultLoc,
               closure->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
         }
-      }
-
-      if (closure->hasExplicitResultType()) {
-        CS.setType(closure->getExplicitResultTypeExpr(),
-                   MetatypeType::get(resultTy));
       }
 
       return FunctionType::get(closureParams, resultTy, extInfo);

@@ -3769,17 +3769,11 @@ public:
     return ThrowsLoc;
   }
 
-  /// Retrieve the explicit result type location information.
-  TypeExpr *getExplicitResultTypeExpr() const {
+  Type getExplicitResultType() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultType;
+    return ExplicitResultType->getInstanceType();
   }
-
-  void setExplicitResultTypeExpr(TypeExpr *NewResultType) {
-    assert(hasExplicitResultType() && "No explicit result type");
-    ExplicitResultType = NewResultType;
-    assert(hasExplicitResultType() && "No explicit result type");
-  }
+  void setExplicitResultType(Type ty);
 
   TypeRepr *getExplicitResultTypeRepr() const {
     assert(hasExplicitResultType() && "No explicit result type");
