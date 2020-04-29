@@ -123,7 +123,7 @@ extension String {
   ///                                      repairingInvalidCodeUnits: true)
   ///         print(s)
   ///     }
-  ///     // Prints "Optional("Café")"
+  ///     // Prints "Optional((result: "Caf�", repairsMade: true))"
   ///
   /// - Parameters:
   ///   - cString: A pointer to a null-terminated code sequence encoded in
