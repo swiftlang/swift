@@ -2603,6 +2603,11 @@ static ConstraintFix *fixPropertyWrapperFailure(
     ConstraintSystem &cs, Type baseTy, ConstraintLocator *locator,
     llvm::function_ref<bool(SelectedOverload, VarDecl *, Type)> attemptFix,
     Optional<Type> toType = None) {
+  // Don't attempt this fix if this is a key path dynamic member
+  // lookup which produced no results. Unwrapping or wrapping
+  // the base type is not going to produce desired results.
+  if (locator->isForKeyPathDynamicMemberLookup())
+    return nullptr;
 
   Expr *baseExpr = nullptr;
   if (auto *anchor = locator->getAnchor()) {
