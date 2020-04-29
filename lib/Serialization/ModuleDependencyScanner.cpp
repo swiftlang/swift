@@ -116,7 +116,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   // Walk the source file to find the import declarations.
   llvm::StringSet<> alreadyAddedModules;
   auto dependencies = ModuleDependencies::forSwiftInterface(
-      modulePath.str(), moduleInterfacePath.str());
+      modulePath.str().str(), moduleInterfacePath.str());
 
   // FIXME: Suppressing diagnostics here is incorrect, and is currently
   // used to paper over the fact that we should be creating a fresh
