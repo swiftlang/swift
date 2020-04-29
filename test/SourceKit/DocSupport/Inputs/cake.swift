@@ -119,3 +119,5 @@ public protocol P {
 public extension P {
     func bar() where Self: Equatable {}
 }
+
+public func shouldPrintAnyAsKeyword(x: Any) {}

@@ -520,19 +520,21 @@ bool SwiftASTManager::initCompilerInvocation(
   ImporterOpts.DetailedPreprocessingRecord = true;
 
   assert(!Invocation.getModuleName().empty());
-  Invocation.getLangOptions().AttachCommentsToDecls = true;
-  Invocation.getLangOptions().DiagnosticsEditorMode = true;
-  Invocation.getLangOptions().CollectParsedToken = true;
-  auto &FrontendOpts = Invocation.getFrontendOptions();
-  if (FrontendOpts.PlaygroundTransform) {
+
+  auto &LangOpts = Invocation.getLangOptions();
+  LangOpts.AttachCommentsToDecls = true;
+  LangOpts.DiagnosticsEditorMode = true;
+  LangOpts.CollectParsedToken = true;
+  if (LangOpts.PlaygroundTransform) {
     // The playground instrumenter changes the AST in ways that disrupt the
     // SourceKit functionality. Since we don't need the instrumenter, and all we
     // actually need is the playground semantics visible to the user, like
     // silencing the "expression resolves to an unused l-value" error, disable it.
-    FrontendOpts.PlaygroundTransform = false;
+    LangOpts.PlaygroundTransform = false;
   }
 
   // Disable the index-store functionality for the sourcekitd requests.
+  auto &FrontendOpts = Invocation.getFrontendOptions();
   FrontendOpts.IndexStorePath.clear();
   ImporterOpts.IndexStorePath.clear();
 

@@ -52,8 +52,6 @@
 // RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_10 < %t.members10.txt
 // RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members10.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURNS_DROPFIRST_SEQUENCE | %FileCheck %s -check-prefix=RETURNS_DROPFIRST_SEQUENCE
-
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_1 | %FileCheck %s -check-prefix=POSTFIX_RVALUE_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_2 | %FileCheck %s -check-prefix=POSTFIX_LVALUE_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_OPTIONAL_1 | %FileCheck %s -check-prefix=POSTFIX_OPTIONAL
@@ -217,12 +215,6 @@ func testArchetypeReplacement6() {
 
 // PRIVATE_NOMINAL_MEMBERS_10: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_10-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#(t): P1 & P2#})[#Void#]{{; name=.+}}
-
-// rdar://problem/22334700
-struct Test1000 : Sequence {
-  func #^RETURNS_DROPFIRST_SEQUENCE^#
-}
-// RETURNS_DROPFIRST_SEQUENCE: Decl[InstanceMethod]/Super: dropFirst(_ k: Int = 1) -> DropFirstSequence<Test1000>
 
 func testPostfixOperator1(_ x: Int) {
   x#^POSTFIX_INT_1^#

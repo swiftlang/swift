@@ -1,10 +1,10 @@
 // RUN: %target-typecheck-verify-swift
 
-protocol he where A : B { // expected-error {{use of undeclared type 'A'}}
-  // expected-error@-1 {{use of undeclared type 'B'}}
+protocol he where A : B { // expected-error {{cannot find type 'A' in scope}}
+  // expected-error@-1 {{cannot find type 'B' in scope}}
 
-  associatedtype vav where A : B // expected-error{{use of undeclared type 'A'}}
-  // expected-error@-1 {{use of undeclared type 'B'}}
+  associatedtype vav where A : B // expected-error{{cannot find type 'A' in scope}}
+  // expected-error@-1 {{cannot find type 'B' in scope}}
 }
 
 
@@ -89,11 +89,11 @@ class OuterGeneric<T> {
 // Crash with missing types in requirements.
 protocol P1 {
   associatedtype A where A == ThisTypeDoesNotExist
-  // expected-error@-1{{use of undeclared type 'ThisTypeDoesNotExist'}}
+  // expected-error@-1{{cannot find type 'ThisTypeDoesNotExist' in scope}}
   associatedtype B where ThisTypeDoesNotExist == B
-  // expected-error@-1{{use of undeclared type 'ThisTypeDoesNotExist'}}
+  // expected-error@-1{{cannot find type 'ThisTypeDoesNotExist' in scope}}
   associatedtype C where ThisTypeDoesNotExist == ThisTypeDoesNotExist
-  // expected-error@-1 2{{use of undeclared type 'ThisTypeDoesNotExist'}}
+  // expected-error@-1 2{{cannot find type 'ThisTypeDoesNotExist' in scope}}
 }
 
 // Diagnostic referred to the wrong type - <rdar://problem/33604221>

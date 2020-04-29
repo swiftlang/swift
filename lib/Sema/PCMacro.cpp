@@ -575,7 +575,7 @@ public:
         Context, BeforeLoggerRef, ArgsWithSourceRange, ArgLabels);
     Added<ApplyExpr *> AddedBeforeLogger(BeforeLoggerCall);
     if (!doTypeCheck(Context, TypeCheckDC, AddedBeforeLogger)) {
-      // typically due to 'use of unresolved identifier '__builtin_pc_before''
+      // typically due to 'cannot find '__builtin_pc_before' in scope'
       return E; // return E, it will be used in recovering from TC failure
     }
 
@@ -587,7 +587,7 @@ public:
         Context, AfterLoggerRef, ArgsWithSourceRange, ArgLabels);
     Added<ApplyExpr *> AddedAfterLogger(AfterLoggerCall);
     if (!doTypeCheck(Context, TypeCheckDC, AddedAfterLogger)) {
-      // typically due to 'use of unresolved identifier '__builtin_pc_after''
+      // typically due to 'cannot find '__builtin_pc_after' in scope'
       return E; // return E, it will be used in recovering from TC failure
     }
 

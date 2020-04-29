@@ -134,6 +134,8 @@ public:
   void dump(llvm::raw_ostream &out, unsigned indent = 0,
             bool details = true) const;
 
+  void print(llvm::raw_ostream &out) const;
+
   bool operator==(ProtocolConformanceRef other) const {
     return Union == other.Union;
   }

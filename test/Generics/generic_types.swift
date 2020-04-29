@@ -243,4 +243,4 @@ struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 // expected-error@-2 {{'A' is not a member type of 'T'}}
 
 enum X7<T> where X7.X : G { case X } // expected-error{{enum case 'X' is not a member type of 'X7<T>'}}
-// expected-error@-1{{use of undeclared type 'G'}}
+// expected-error@-1{{cannot find type 'G' in scope}}

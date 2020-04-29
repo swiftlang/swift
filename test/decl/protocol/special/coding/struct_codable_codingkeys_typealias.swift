@@ -30,7 +30,7 @@ let _ = SimpleStruct.CodingKeys.self // expected-error {{'CodingKeys' is inacces
 // nominal type should produce errors.
 struct StructWithUndeclaredCodingKeys : Codable { // expected-error {{type 'StructWithUndeclaredCodingKeys' does not conform to protocol 'Decodable'}}
   // expected-error@-1 {{type 'StructWithUndeclaredCodingKeys' does not conform to protocol 'Encodable'}}
-  private typealias CodingKeys = NonExistentType // expected-error {{use of undeclared type 'NonExistentType'}}
+  private typealias CodingKeys = NonExistentType // expected-error {{cannot find type 'NonExistentType' in scope}}
   // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey}}
   // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey}}
 }
