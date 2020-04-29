@@ -32,6 +32,7 @@
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Lex/Preprocessor.h"
@@ -1556,8 +1557,8 @@ bool ClangImporter::Implementation::shouldAllowNSUIntegerAsInt(
 ImportedType ClangImporter::Implementation::importPropertyType(
     const clang::ObjCPropertyDecl *decl, bool isFromSystemModule) {
   const auto assignOrUnsafeUnretained =
-      clang::ObjCPropertyDecl::OBJC_PR_assign |
-      clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained;
+      clang::ObjCPropertyAttribute::kind_assign |
+      clang::ObjCPropertyAttribute::kind_unsafe_unretained;
 
   ImportTypeKind importKind;
   // HACK: Certain decls are always imported using bridged types,

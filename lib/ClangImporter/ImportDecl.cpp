@@ -47,6 +47,7 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclObjCCommon.h"
 #include "clang/Basic/CharInfo.h"
 #include "swift/Basic/Statistic.h"
 #include "clang/Basic/TargetInfo.h"
@@ -2085,7 +2086,7 @@ classImplementsProtocol(const clang::ObjCInterfaceDecl *constInterface,
 
 static void
 applyPropertyOwnership(VarDecl *prop,
-                       clang::ObjCPropertyDecl::PropertyAttributeKind attrs) {
+                       clang::ObjCPropertyAttribute::Kind attrs) {
   Type ty = prop->getInterfaceType();
   if (auto innerTy = ty->getOptionalObjectType())
     ty = innerTy;
@@ -2093,19 +2094,19 @@ applyPropertyOwnership(VarDecl *prop,
     return;
 
   ASTContext &ctx = prop->getASTContext();
-  if (attrs & clang::ObjCPropertyDecl::OBJC_PR_copy) {
+  if (attrs & clang::ObjCPropertyAttribute::kind_copy) {
     prop->getAttrs().add(new (ctx) NSCopyingAttr(false));
     return;
   }
-  if (attrs & clang::ObjCPropertyDecl::OBJC_PR_weak) {
+  if (attrs & clang::ObjCPropertyAttribute::kind_weak) {
     prop->getAttrs().add(new (ctx)
                              ReferenceOwnershipAttr(ReferenceOwnership::Weak));
     prop->setInterfaceType(WeakStorageType::get(
         prop->getInterfaceType(), ctx));
     return;
   }
-  if ((attrs & clang::ObjCPropertyDecl::OBJC_PR_assign) ||
-      (attrs & clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained)) {
+  if ((attrs & clang::ObjCPropertyAttribute::kind_assign) ||
+      (attrs & clang::ObjCPropertyAttribute::kind_unsafe_unretained)) {
     prop->getAttrs().add(
         new (ctx) ReferenceOwnershipAttr(ReferenceOwnership::Unmanaged));
     prop->setInterfaceType(UnmanagedStorageType::get(
