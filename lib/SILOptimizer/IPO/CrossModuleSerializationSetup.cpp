@@ -129,7 +129,8 @@ static void makeDeclUsableFromInline(ValueDecl *decl, SILModule &M) {
   if (decl->getEffectiveAccess() >= AccessLevel::Public)
     return;
 
-  if (!decl->isUsableFromInline()) {
+  if (decl->getFormalAccess() < AccessLevel::Public &&
+      !decl->isUsableFromInline()) {
     // Mark the nominal type as "usableFromInline".
     // TODO: find a way to do this without modifying the AST. The AST should be
     // immutable at this point.
@@ -244,15 +245,15 @@ prepareInstructionForSerialization(SILInstruction *inst) {
 void CrossModuleSerializationSetup::handleReferencedFunction(SILFunction *func) {
   if (!func->isDefinition() || func->isAvailableExternally())
     return;
+  if (func->isSerialized() == IsSerialized)
+    return;
+
   if (func->getLinkage() == SILLinkage::Shared) {
     assert(func->isThunk() != IsNotThunk &&
       "only thunks are accepted to have shared linkage");
     assert(canSerialize(func, /*lookIntoThunks*/ false) &&
       "we should already have checked that the thunk is serializable");
     
-    if (func->isSerialized() == IsSerialized)
-      return;
-
     // We cannot make shared functions "usableFromInline", i.e. make them Public
     // because this could result in duplicate-symbol errors. Instead we make
     // them "@alwaysEmitIntoClient"
