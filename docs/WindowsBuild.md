@@ -33,6 +33,10 @@ If you are building a debug version of Swift, you should also install the Python
 4. Select *Download debug binaries (requires VS 2015 or later)*
 5. Click *Install*
 
+## Enable Developer Mode
+
+From the settings application, go to `Update & Security`.  In the `For developers` tab, select `Developer Mode` for `Use Developer Features`.  This is required to enable the creation of symbolic links.
+
 ## Clone the repositories
 
 1. Clone `apple/llvm-project` into a directory for the toolchain
@@ -113,6 +117,7 @@ md "S:\b\toolchain"
 cmake -B "S:\b\toolchain" ^
   -C S:\swift-build\cmake\caches\windows-x86_64.cmake ^
   -C S:\swift-build\cmake\caches\org.compnerd.dt.cmake ^
+  -D CMAKE_BUILD_TYPE=Release ^
   -D LLVM_ENABLE_ASSERTIONS=YES ^
   -D LLVM_ENABLE_PROJECTS="clang;clang-tools-extra;cmark;swift;lldb;lld" ^
   -D LLVM_EXTERNAL_PROJECTS="cmark;swift" ^
