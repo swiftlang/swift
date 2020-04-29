@@ -18,6 +18,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
@@ -28,6 +30,7 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "clang/AST/ASTContext.h"
 
 using namespace swift;
 using namespace ide;
@@ -162,10 +165,77 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
   return newDC;
 }
 
+/// Check if any dependent files are modified since \p timestamp.
+bool areAnyDependentFilesInvalidated(CompilerInstance &CI,
+                                     llvm::vfs::FileSystem &FS,
+                                     StringRef currentFileName,
+                                     llvm::sys::TimePoint<> timestamp) {
+
+  auto isInvalidated = [&](StringRef filePath) -> bool {
+    auto stat = FS.status(filePath);
+    if (!stat)
+      // Missing.
+      return true;
+
+    auto lastModTime = stat->getLastModificationTime();
+    if (lastModTime > timestamp)
+      // Modified.
+      return true;
+
+    // If the last modification time is zero, this file is probably from a
+    // virtual file system. We need to check the content.
+    if (lastModTime == llvm::sys::TimePoint<>()) {
+      if (&CI.getFileSystem() == &FS)
+        return false;
+
+      auto oldContent = CI.getFileSystem().getBufferForFile(filePath);
+      auto newContent = FS.getBufferForFile(filePath);
+      if (!oldContent || !newContent)
+        // (unreachable?)
+        return true;
+
+      if (oldContent.get()->getBuffer() != newContent.get()->getBuffer())
+        // Different content.
+        return true;
+    }
+
+    return false;
+  };
+
+  // Check files in the current module.
+  for (FileUnit *file : CI.getMainModule()->getFiles()) {
+    StringRef filename;
+    if (auto SF = dyn_cast<SourceFile>(file))
+      filename = SF->getFilename();
+    else if (auto LF = dyn_cast<LoadedFile>(file))
+      filename = LF->getFilename();
+    else
+      continue;
+
+    // Ignore the current file and synthesized files.
+    if (filename.empty() || filename.front() == '<' ||
+        filename.equals(currentFileName))
+      continue;
+
+    if (isInvalidated(filename))
+      return true;
+  }
+
+  // Check other non-system depenencies (e.g. modules, headers).
+  for (auto &dep : CI.getDependencyTracker()->getDependencies()) {
+    if (isInvalidated(dep))
+      return true;
+  }
+
+  // All loaded module files are not modified since the timestamp.
+  return false;
+}
+
 } // namespace
 
 bool CompletionInstance::performCachedOperationIfPossible(
     const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
@@ -187,9 +257,16 @@ bool CompletionInstance::performCachedOperationIfPossible(
   auto &oldInfo = oldState->getCodeCompletionDelayedDeclState();
 
   auto &SM = CI.getSourceMgr();
-  if (SM.getIdentifierForBuffer(SM.getCodeCompletionBufferID()) !=
-      completionBuffer->getBufferIdentifier())
+  auto bufferName = completionBuffer->getBufferIdentifier();
+  if (SM.getIdentifierForBuffer(SM.getCodeCompletionBufferID()) != bufferName)
     return false;
+
+  if (shouldCheckDependencies()) {
+    if (areAnyDependentFilesInvalidated(CI, *FileSystem, bufferName,
+                                        DependencyCheckedTimestamp))
+      return false;
+    DependencyCheckedTimestamp = std::chrono::system_clock::now();
+  }
 
   // Parse the new buffer into temporary SourceFile.
   SourceManager tmpSM;
@@ -265,8 +342,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
         completionBuffer->getBuffer().slice(startOffset, endOffset);
     auto newOffset = Offset - startOffset;
 
-    newBufferID = SM.addMemBufferCopy(sourceText,
-                                      completionBuffer->getBufferIdentifier());
+    newBufferID = SM.addMemBufferCopy(sourceText, bufferName);
     SM.openVirtualFile(SM.getLocForBufferStart(newBufferID),
                        tmpSM.getDisplayNameForLoc(startLoc),
                        tmpSM.getLineAndColumn(startLoc).first - 1);
@@ -312,8 +388,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
       endOffset = tmpSM.getLocOffsetInBuffer(endLoc, tmpBufferID);
       sourceText = sourceText.slice(0, endOffset);
     }
-    newBufferID = SM.addMemBufferCopy(sourceText,
-                                      completionBuffer->getBufferIdentifier());
+    newBufferID = SM.addMemBufferCopy(sourceText, bufferName);
     SM.setCodeCompletionPoint(newBufferID, Offset);
 
     // Create a new module and a source file using the current AST context.
@@ -372,7 +447,15 @@ bool CompletionInstance::performNewOperation(
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
   llvm::PrettyStackTraceString trace("While performing new completion");
 
+  auto isCachedCompletionRequested = ArgsHash.hasValue();
+
   auto TheInstance = std::make_unique<CompilerInstance>();
+
+  // Track dependencies in fast-completion mode to invalidate the compiler
+  // instance if any dependent files are modified.
+  if (isCachedCompletionRequested)
+    TheInstance->createDependencyTracker(false);
+
   {
     auto &CI = *TheInstance;
     if (DiagC)
@@ -410,13 +493,32 @@ bool CompletionInstance::performNewOperation(
     Callback(CI, /*reusingASTContext=*/false);
   }
 
-  if (ArgsHash.hasValue()) {
-    CachedCI = std::move(TheInstance);
-    CachedArgHash = *ArgsHash;
-    CachedReuseCount = 0;
-  }
+  // Cache the compiler instance if fast completion is enabled.
+  if (isCachedCompletionRequested)
+    cacheCompilerInstance(std::move(TheInstance), *ArgsHash);
 
   return true;
+}
+
+void CompletionInstance::cacheCompilerInstance(
+    std::unique_ptr<CompilerInstance> CI, llvm::hash_code ArgsHash) {
+  CachedCI = std::move(CI);
+  CachedArgHash = ArgsHash;
+  auto now = std::chrono::system_clock::now();
+  DependencyCheckedTimestamp = now;
+  CachedReuseCount = 0;
+}
+
+bool CompletionInstance::shouldCheckDependencies() const {
+  assert(CachedCI);
+  using namespace std::chrono;
+  auto now = system_clock::now();
+  return DependencyCheckedTimestamp + seconds(DependencyCheckIntervalSecond) < now;
+}
+
+void CompletionInstance::setDependencyCheckIntervalSecond(unsigned Value) {
+  std::lock_guard<std::mutex> lock(mtx);
+  DependencyCheckIntervalSecond = Value;
 }
 
 bool swift::ide::CompletionInstance::performOperation(
@@ -454,8 +556,9 @@ bool swift::ide::CompletionInstance::performOperation(
     // the cached completion instance.
     std::lock_guard<std::mutex> lock(mtx);
 
-    if (performCachedOperationIfPossible(Invocation, ArgsHash, completionBuffer,
-                                         Offset, DiagC, Callback))
+    if (performCachedOperationIfPossible(Invocation, ArgsHash, FileSystem,
+                                         completionBuffer, Offset, DiagC,
+                                         Callback))
       return true;
 
     if (performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,

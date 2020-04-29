@@ -438,9 +438,21 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     if (!Req.getInt64(KeyOptimizeForIDE, EditorMode, true)) {
       OptimizeForIDE = EditorMode;
     }
+    Optional<unsigned> CompletionCheckDependencyInterval;
+    int64_t IntervalValue = 0;
+    if (!Req.getInt64(KeyCompletionCheckDependencyInterval,
+                      IntervalValue, /*isOptional=*/true))
+      CompletionCheckDependencyInterval = IntervalValue;
 
-    GlobalConfig::Settings UpdatedConfig = Config->update(OptimizeForIDE);
+    GlobalConfig::Settings UpdatedConfig = Config->update(
+        OptimizeForIDE, CompletionCheckDependencyInterval);
+
+    getGlobalContext().getSwiftLangSupport().globalConfigurationUpdated(Config);
+
     dict.set(KeyOptimizeForIDE, UpdatedConfig.OptimizeForIDE);
+    dict.set(KeyCompletionCheckDependencyInterval,
+             UpdatedConfig.CompletionCheckDependencyInterval);
+
     return Rec(RB.createResponse());
   }
   if (ReqUID == RequestProtocolVersion) {

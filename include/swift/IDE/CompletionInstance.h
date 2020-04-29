@@ -18,6 +18,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -38,12 +39,19 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 /// Manages \c CompilerInstance for completion like operations.
 class CompletionInstance {
   unsigned MaxASTReuseCount = 100;
+  unsigned DependencyCheckIntervalSecond = 5;
 
   std::mutex mtx;
 
   std::unique_ptr<CompilerInstance> CachedCI;
   llvm::hash_code CachedArgHash;
+  llvm::sys::TimePoint<> DependencyCheckedTimestamp;
   unsigned CachedReuseCount = 0;
+
+  void cacheCompilerInstance(std::unique_ptr<CompilerInstance> CI,
+                             llvm::hash_code ArgsHash);
+
+  bool shouldCheckDependencies() const;
 
   /// Calls \p Callback with cached \c CompilerInstance if it's usable for the
   /// specified completion request.
@@ -52,6 +60,7 @@ class CompletionInstance {
   /// in function bodies, or the interface hash of the file has changed.
   bool performCachedOperationIfPossible(
       const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
       llvm::function_ref<void(CompilerInstance &, bool)> Callback);
@@ -69,6 +78,8 @@ class CompletionInstance {
       llvm::function_ref<void(CompilerInstance &, bool)> Callback);
 
 public:
+  void setDependencyCheckIntervalSecond(unsigned Value);
+
   /// Calls \p Callback with a \c CompilerInstance which is prepared for the
   /// second pass. \p Callback is resposible to perform the second pass on it.
   /// The \c CompilerInstance may be reused from the previous completions,
