@@ -27,6 +27,46 @@ CHANGELOG
 Swift 5.3
 ----------
 
+* [SR-11700][]:
+
+  Exclusivity violations within code that computes the `default`
+  argument during Dictionary access are now diagnosed.
+
+  ```swift
+  struct Container {
+     static let defaultKey = 0
+
+     var dictionary = [defaultKey:0]
+
+     mutating func incrementValue(at key: Int) {
+       dictionary[key, default: dictionary[Container.defaultKey]!] += 1
+     }
+  }
+  // error: overlapping accesses to 'self.dictionary', but modification requires exclusive access; consider copying to a local variable
+  //     dictionary[key, default: dictionary[Container.defaultKey]!] += 1
+  //     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // note: conflicting access is here
+  //     dictionary[key, default: dictionary[Container.defaultKey]!] += 1
+  //                              ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+  ```
+
+  The exclusivity violation can be avoided by precomputing the `default`
+  argument using a local variable.
+
+  ```swift
+  struct Container {
+    static let defaultKey = 0
+
+    var dictionary = [defaultKey:0]
+
+    mutating func incrementValue(at key: Int) {
+      let defaultValue = dictionary[Container.defaultKey]!
+      dictionary[key, default: defaultValue] += 1
+    }
+  }
+  // No error.
+  ```
+
 * [SE-0268][]:
   
   A `didSet` observer which does not refer to the `oldValue` in its body or does not explicitly request it by placing it in the parameter list (i.e. `didSet(oldValue)`) will no longer trigger a call to the property getter to fetch the `oldValue`.
