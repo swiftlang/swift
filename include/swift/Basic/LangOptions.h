@@ -331,10 +331,6 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
-    /// Emit the newer, finer-grained swiftdeps file. Eventually will support
-    /// faster rebuilds.
-    bool EnableFineGrainedDependencies = true;
-
     /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
     /// the interface hash, hash them into per-iterable-decl-context
     /// fingerprints. Fine-grained dependency types won't dirty every provides

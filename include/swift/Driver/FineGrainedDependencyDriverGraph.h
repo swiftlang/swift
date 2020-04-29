@@ -17,7 +17,6 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "swift/Driver/Job.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -38,6 +37,9 @@
 // driver.
 
 namespace swift {
+
+class UnifiedStatsReporter;
+
 namespace fine_grained_dependencies {
 
 //==============================================================================
