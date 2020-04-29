@@ -544,12 +544,32 @@ namespace {
 
     explicit PrintDecl(raw_ostream &os, unsigned indent = 0)
       : OS(os), Indent(indent) { }
-    
+
+  private:
     void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
     void printRec(Expr *E) { E->dump(OS, Indent+2); }
     void printRec(Stmt *S, const ASTContext &Ctx) { S->dump(OS, &Ctx, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
     void printRec(TypeRepr *T);
+
+    void printWhereRequirements(
+        PointerUnion<const AssociatedTypeDecl *, const GenericContext *> Owner)
+        const {
+      const auto printWhere = [&](const TrailingWhereClause *Where) {
+        if (Where) {
+          OS << " where requirements: ";
+          Where->print(OS, /*printWhereKeyword*/ false);
+        }
+      };
+
+      if (const auto GC = Owner.dyn_cast<const GenericContext *>()) {
+        if (!GC->isGeneric() || isa<ProtocolDecl>(GC))
+          printWhere(GC->getTrailingWhereClause());
+      } else {
+        const auto ATD = Owner.get<const AssociatedTypeDecl *>();
+        printWhere(ATD->getTrailingWhereClause());
+      }
+    }
 
     // Print a field with a value.
     template<typename T>
@@ -588,6 +608,7 @@ namespace {
                  [&] { OS << ", "; });
     }
 
+  public:
     void visitImportDecl(ImportDecl *ID) {
       printCommon(ID, "import_decl");
 
@@ -610,12 +631,7 @@ namespace {
       printCommon(ED, "extension_decl", ExtensionColor);
       OS << ' ';
       ED->getExtendedType().print(OS);
-      printInherited(ED->getInherited());
-      for (Decl *Member : ED->getMembers()) {
-        OS << '\n';
-        printRec(Member);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(ED);
     }
 
     void printDeclName(const ValueDecl *D) {
@@ -637,6 +653,7 @@ namespace {
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
+      printWhereRequirements(TAD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -680,10 +697,7 @@ namespace {
         OS << " default=";
         defaultDef.print(OS);
       }
-      if (auto whereClause = decl->getTrailingWhereClause()) {
-        OS << " where requirements: ";
-        whereClause->print(OS, /*printWhereKeyword*/false);
-      }
+      printWhereRequirements(decl);
       if (decl->overriddenDeclsComputed()) {
         OS << " overridden=";
         interleave(decl->getOverriddenDecls(),
@@ -708,19 +722,7 @@ namespace {
       } else {
         OS << "<null>";
       }
-      printInherited(PD->getInherited());
-      if (auto whereClause = PD->getTrailingWhereClause()) {
-        OS << " where requirements: ";
-        interleave(whereClause->getRequirements(),
-                   [&](const RequirementRepr &req) { req.print(OS); },
-                   [&] { OS << ", "; });
-      }
-
-      for (auto VD : PD->getMembers()) {
-        OS << '\n';
-        printRec(VD);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(PD);
     }
 
     void printCommon(ValueDecl *VD, const char *Name,
@@ -794,6 +796,28 @@ namespace {
         else
           OS << " non-resilient";
       }
+    }
+
+    void printCommonPost(const IterableDeclContext *IDC) {
+      switch (IDC->getIterableContextKind()) {
+      case IterableDeclContextKind::NominalTypeDecl: {
+        const auto NTD = cast<NominalTypeDecl>(IDC);
+        printInherited(NTD->getInherited());
+        printWhereRequirements(NTD);
+        break;
+      }
+      case IterableDeclContextKind::ExtensionDecl:
+        const auto ED = cast<ExtensionDecl>(IDC);
+        printInherited(ED->getInherited());
+        printWhereRequirements(ED);
+        break;
+      }
+
+      for (Decl *D : IDC->getMembers()) {
+        OS << '\n';
+        printRec(D);
+      }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitSourceFile(const SourceFile &SF) {
@@ -870,12 +894,7 @@ namespace {
 
     void visitEnumDecl(EnumDecl *ED) {
       printCommon(ED, "enum_decl");
-      printInherited(ED->getInherited());
-      for (Decl *D : ED->getMembers()) {
-        OS << '\n';
-        printRec(D);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(ED);
     }
 
     void visitEnumElementDecl(EnumElementDecl *EED) {
@@ -885,24 +904,14 @@ namespace {
 
     void visitStructDecl(StructDecl *SD) {
       printCommon(SD, "struct_decl");
-      printInherited(SD->getInherited());
-      for (Decl *D : SD->getMembers()) {
-        OS << '\n';
-        printRec(D);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(SD);
     }
 
     void visitClassDecl(ClassDecl *CD) {
       printCommon(CD, "class_decl");
       if (CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
         OS << " @_staticInitializeObjCMetadata";
-      printInherited(CD->getInherited());
-      for (Decl *D : CD->getMembers()) {
-        OS << '\n';
-        printRec(D);
-      }
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      printCommonPost(CD);
     }
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
