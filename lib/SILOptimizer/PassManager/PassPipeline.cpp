@@ -293,7 +293,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
+
   addSimplifyCFGSILCombinePasses(P);
+
+  P.addArrayElementPropagation();
 
   // Perform a round of loop/array optimization in the mid-level pipeline after
   // potentially inlining semantic calls, e.g. Array append. The high level
