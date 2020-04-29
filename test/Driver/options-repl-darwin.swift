@@ -1,3 +1,6 @@
+// SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
+// UNSUPPORTED: tensorflow
+
 // REQUIRES: OS=macosx
 
 // Test LLDB detection, first in a clean environment, then in one that looks
