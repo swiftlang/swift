@@ -12,7 +12,7 @@
 
 @_exported
 import ObjectiveC
-import _SwiftObjectiveCOverlayShims
+@_implementationOnly import _SwiftObjectiveCOverlayShims
 
 //===----------------------------------------------------------------------===//
 // Objective-C Primitive Types
