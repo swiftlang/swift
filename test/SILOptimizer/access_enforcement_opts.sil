@@ -1737,3 +1737,136 @@ bb0(%0 : ${ var Int64 }):
   end_access %access : $*Int64
   return %val : $Int64
 }
+
+// CHECK-LABEL: sil @promote_local_class_to_static
+// CHECK: begin_access [modify] [static] [no_nested_conflict]
+// CHECK: begin_access [read] [static] [no_nested_conflict]
+// CHECK-LABEL: end sil function 'promote_local_class_to_static'
+sil @promote_local_class_to_static : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %4 = alloc_ref [stack] $RefElemClass
+  
+  %8 = ref_element_addr %4 : $RefElemClass, #RefElemClass.y
+  %9 = begin_access [modify] [dynamic] [no_nested_conflict] %8 : $*Int32
+  store %1 to %9 : $*Int32
+  end_access %9 : $*Int32
+  
+  %17 = begin_access [read] [dynamic] [no_nested_conflict] %8 : $*Int32
+  %18 = struct_element_addr %17 : $*Int32, #Int32._value
+  %19 = load %18 : $*Builtin.Int32
+  end_access %17 : $*Int32
+
+  set_deallocating %4 : $RefElemClass
+  dealloc_ref %4 : $RefElemClass
+  dealloc_ref [stack] %4 : $RefElemClass
+  
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+class Class1 {
+  @_hasStorage @_hasInitialValue var x: Int32 { get set }
+  deinit
+  init()
+}
+
+struct Struct1 {
+  @_hasStorage @_hasInitialValue var c: Class1 { get set }
+  init(c: Class1 = Class1())
+  init()
+}
+
+class Class2 {
+  @_hasStorage @_hasInitialValue var s: Struct1 { get set }
+  deinit
+  init()
+}
+
+// CHECK-LABEL: sil @promote_local_class_in_struct_in_class_to_static
+// CHECK: begin_access [modify] [static] [no_nested_conflict]
+// CHECK: begin_access [read] [static] [no_nested_conflict]
+// CHECK-LABEL: end sil function 'promote_local_class_in_struct_in_class_to_static'
+sil @promote_local_class_in_struct_in_class_to_static : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %4 = alloc_ref [stack] $Class2
+  
+  %5 = ref_element_addr %4 : $Class2, #Class2.s
+  %6 = struct_element_addr %5 : $*Struct1, #Struct1.c
+  %7 = load %6 : $*Class1
+  %8 = ref_element_addr %7 : $Class1, #Class1.x
+  %9 = begin_access [modify] [dynamic] [no_nested_conflict] %8 : $*Int32
+  store %1 to %9 : $*Int32
+  end_access %9 : $*Int32
+  
+  %17 = begin_access [read] [dynamic] [no_nested_conflict] %8 : $*Int32
+  %18 = struct_element_addr %17 : $*Int32, #Int32._value
+  %19 = load %18 : $*Builtin.Int32
+  end_access %17 : $*Int32
+
+  set_deallocating %4 : $Class2
+  dealloc_ref %4 : $Class2
+  dealloc_ref [stack] %4 : $Class2
+  
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @promote_local_class_in_struct_to_static
+// CHECK: begin_access [modify] [static] [no_nested_conflict]
+// CHECK: begin_access [read] [static] [no_nested_conflict]
+// CHECK-LABEL: end sil function 'promote_local_class_in_struct_to_static'
+sil @promote_local_class_in_struct_to_static : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %4 = alloc_stack $Struct1
+  
+  %6 = struct_element_addr %4 : $*Struct1, #Struct1.c
+  %7 = load %6 : $*Class1
+  %8 = ref_element_addr %7 : $Class1, #Class1.x
+  %9 = begin_access [modify] [dynamic] [no_nested_conflict] %8 : $*Int32
+  store %1 to %9 : $*Int32
+  end_access %9 : $*Int32
+  
+  %17 = begin_access [read] [dynamic] [no_nested_conflict] %8 : $*Int32
+  %18 = struct_element_addr %17 : $*Int32, #Int32._value
+  %19 = load %18 : $*Builtin.Int32
+  end_access %17 : $*Int32
+
+  dealloc_stack %4 : $*Struct1
+  
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @promote_local_class_in_tuple_to_static
+// CHECK: begin_access [modify] [static] [no_nested_conflict]
+// CHECK: begin_access [read] [static] [no_nested_conflict]
+// CHECK-LABEL: end sil function 'promote_local_class_in_tuple_to_static'
+sil @promote_local_class_in_tuple_to_static : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %4 = alloc_stack $(Class1, Int)
+  
+  %6 = tuple_element_addr %4 : $*(Class1, Int), 0
+  %7 = load %6 : $*Class1
+  %8 = ref_element_addr %7 : $Class1, #Class1.x
+  %9 = begin_access [modify] [dynamic] [no_nested_conflict] %8 : $*Int32
+  store %1 to %9 : $*Int32
+  end_access %9 : $*Int32
+  
+  %17 = begin_access [read] [dynamic] [no_nested_conflict] %8 : $*Int32
+  %18 = struct_element_addr %17 : $*Int32, #Int32._value
+  %19 = load %18 : $*Builtin.Int32
+  end_access %17 : $*Int32
+
+  dealloc_stack %4 : $*(Class1, Int)
+  
+  %9999 = tuple ()
+  return %9999 : $()
+}

@@ -582,9 +582,7 @@ public:
   // Visitors for specific identified access kinds. These default to calling out
   // to visitIdentified.
 
-  Result visitClassAccess(RefElementAddrInst *field) {
-    return asImpl().visitBase(field, AccessedStorage::Class);
-  }
+  Result visitClassAccess(RefElementAddrInst *field);
   Result visitArgumentAccess(SILFunctionArgument *arg) {
     return asImpl().visitBase(arg, AccessedStorage::Argument);
   }

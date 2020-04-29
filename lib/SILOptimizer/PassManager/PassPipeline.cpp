@@ -588,6 +588,10 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
 static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
 
+  P.addAccessEnforcementOpts();
+  P.addAccessEnforcementWMO();
+  P.addAccessMarkerElimination();
+
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addReleaseDevirtualizer();
 

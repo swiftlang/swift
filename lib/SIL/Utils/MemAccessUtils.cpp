@@ -100,7 +100,6 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     value = base;
     break;
   case Stack:
-    assert(isa<AllocStackInst>(base));
     value = base;
     break;
   case Nested:
@@ -771,4 +770,23 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::ValueMetatypeInst:
     return;
   }
+}
+
+template <typename Impl, typename Result>
+Result swift::AccessUseDefChainVisitor<Impl, Result>::visitClassAccess(
+    RefElementAddrInst *field) {
+  auto operand = field->getOperand();
+  while (isa<StructElementAddrInst>(operand) ||
+         isa<RefElementAddrInst>(operand) ||
+         isa<TupleElementAddrInst>(operand) || isa<LoadInst>(operand))
+    operand = operand.getDefiningInstruction()->getOperand(0);
+
+  if (isa<AllocStackInst>(operand))
+    return asImpl().visitBase(field, AccessedStorage::Stack);
+  if (auto allocRef = dyn_cast<AllocRefInst>(operand)) {
+    if (allocRef->isAllocatingStack())
+      return asImpl().visitBase(field, AccessedStorage::Stack);
+  }
+
+  return asImpl().visitBase(field, AccessedStorage::Class);
 }
