@@ -1076,6 +1076,10 @@ private:
   /// overload to be present, but a class marked as `@dynamicCallable`
   /// defines only `dynamicallyCall(withArguments:)` variant.
   bool diagnoseForDynamicCallable() const;
+  
+  /// Tailored diagnostics for collection literal with unresolved member expression
+  /// that defaults the element type. e.g. _ = [.e]
+  bool diagnoseInLiteralCollectionContext() const;
 
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
