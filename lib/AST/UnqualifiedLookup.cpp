@@ -1222,7 +1222,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
-    if (!value->getFullName().matchesRef(factory.Name.getFullName()))
+    if (!value->getName().matchesRef(factory.Name.getFullName()))
       continue;
 
     // In order to preserve the behavior of the existing context-based lookup,

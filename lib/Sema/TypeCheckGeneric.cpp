@@ -264,7 +264,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
 
       ctx.Diags.diagnose(decl,
                          diag::requirement_restricts_self,
-                         decl->getDescriptiveKind(), decl->getFullName(),
+                         decl->getDescriptiveKind(), decl->getName(),
                          req.getFirstType().getString(),
                          static_cast<unsigned>(req.getKind()),
                          req.getSecondType().getString());

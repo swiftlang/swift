@@ -426,7 +426,7 @@ static bool collectPossibleCalleesForApply(
   } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
       collectPossibleCalleesByQualifiedLookup(
-          DC, DSCE->getArg(), DeclNameRef(DRE->getDecl()->getFullName()),
+          DC, DSCE->getArg(), DeclNameRef(DRE->getDecl()->getName()),
           candidates);
     }
   } else if (auto CRCE = dyn_cast<ConstructorRefCallExpr>(fnExpr)) {

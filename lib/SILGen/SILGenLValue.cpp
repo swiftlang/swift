@@ -1043,7 +1043,7 @@ static bool isReadNoneFunction(const Expr *e) {
   // we can "safely" assume it is readnone (btw, yes this is totally gross).
   // This is better to be attribute driven, a la rdar://15587352.
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
-    DeclName name = dre->getDecl()->getFullName();
+    const DeclName name = dre->getDecl()->getName();
     return (name.getArgumentNames().size() == 1 &&
             name.getBaseName() == DeclBaseName::createConstructor() &&
             !name.getArgumentNames()[0].empty() &&
@@ -2433,7 +2433,7 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
     // this handles the case in initializers where there is actually a stack
     // allocation for it as well.
     if (isa<ParamDecl>(dre->getDecl()) &&
-        dre->getDecl()->getFullName() == SGF.getASTContext().Id_self &&
+        dre->getDecl()->getName() == SGF.getASTContext().Id_self &&
         dre->getDecl()->isImplicit()) {
       ctx = SGFContext::AllowGuaranteedPlusZero;
       if (SGF.SelfInitDelegationState != SILGenFunction::NormalSelf) {

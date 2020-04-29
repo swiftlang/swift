@@ -559,7 +559,7 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
       if (VD->getBaseName().empty())
         continue;
 
-      for (auto *Default: PD->lookupDirect(VD->getFullName())) {
+      for (auto *Default: PD->lookupDirect(VD->getName())) {
         if (Default->getDeclContext()->getExtendedProtocolDecl() == PD) {
           DefaultMap.insert({Default, VD});
         }

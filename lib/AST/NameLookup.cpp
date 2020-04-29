@@ -182,7 +182,7 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
       // C.init overrides B.init overrides A.init, but only C.init and
       // A.init are in the chain. Make sure we still remove A.init from the
       // set in this case.
-      if (decl->getFullName().getBaseName() == DeclBaseName::createConstructor()) {
+      if (decl->getBaseName() == DeclBaseName::createConstructor()) {
         /// FIXME: Avoid the possibility of an infinite loop by fixing the root
         ///        cause instead (incomplete circularity detection).
         assert(decl != overrides && "Circular class inheritance?");
@@ -444,7 +444,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
           if (owningStruct1 == owningStruct2 &&
               owningStruct1->getName().is("Data") &&
               isa<FuncDecl>(firstDecl) && isa<FuncDecl>(secondDecl) &&
-              firstDecl->getFullName() == secondDecl->getFullName() &&
+              firstDecl->getName() == secondDecl->getName() &&
               firstDecl->getBaseName().userFacingName() == "withUnsafeBytes") {
             // If the second module is the Foundation module and the first
             // is the NIOFoundationCompat module, the second is shadowed by the
@@ -602,7 +602,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
   bool anyCollisions = false;
   for (auto decl : decls) {
     // Record this declaration based on its full name.
-    auto &knownDecls = collidingDeclGroups[decl->getFullName()];
+    auto &knownDecls = collidingDeclGroups[decl->getName()];
     if (!knownDecls.empty())
       anyCollisions = true;
 
@@ -616,7 +616,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
   // Walk through the declarations again, marking any declarations that shadow.
   llvm::SmallPtrSet<ValueDecl *, 4> shadowed;
   for (auto decl : decls) {
-    auto known = collidingDeclGroups.find(decl->getFullName());
+    auto known = collidingDeclGroups.find(decl->getName());
     if (known == collidingDeclGroups.end()) {
       // We already handled this group.
       continue;
@@ -1029,7 +1029,7 @@ void MemberLookupTable::addMember(Decl *member) {
 
   // Add this declaration to the lookup set under its compound name and simple
   // name.
-  vd->getFullName().addToLookupTable(Lookup, vd);
+  vd->getName().addToLookupTable(Lookup, vd);
 
   // And if given a synonym, under that name too.
   if (A)
@@ -1227,7 +1227,7 @@ maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
     // Filter-out any decl that doesn't have the name we're looking for
     // (asserting as a consistency-check that such entries all have
     // @_implements attrs for the name!)
-    if (V->getFullName().matchesRef(name)) {
+    if (V->getName().matchesRef(name)) {
       result.push_back(V);
     } else {
       auto A = V->getAttrs().getAttribute<ImplementsAttr>();
@@ -2343,7 +2343,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                            moduleName.str().str() + ".");
             ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
                                assocType->getDescriptiveKind(),
-                               assocType->getFullName());
+                               assocType->getName());
 
             ComponentIdentTypeRepr *components[2] = {
               new (ctx) SimpleIdentTypeRepr(identTypeRepr->getNameLoc(),

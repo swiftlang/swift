@@ -143,7 +143,7 @@ class swift::SourceLookupCache {
   public:
     void add(ValueDecl *VD) {
       if (!VD->hasName()) return;
-      VD->getFullName().addToLookupTable(Members, VD);
+      VD->getName().addToLookupTable(Members, VD);
     }
 
     void clear() {
@@ -389,7 +389,7 @@ void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
     for (ValueDecl *vd : tlv.second) {
       // Declarations are added under their full and simple names.  Skip the
       // entry for the simple name so that we report each declaration once.
-      if (tlv.first.isSimpleName() && !vd->getFullName().isSimpleName())
+      if (tlv.first.isSimpleName() && !vd->getName().isSimpleName())
         continue;
       Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
     }
@@ -2784,7 +2784,7 @@ void SynthesizedFileUnit::lookupValue(
     DeclName name, NLKind lookupKind,
     SmallVectorImpl<ValueDecl *> &result) const {
   for (auto *decl : TopLevelDecls) {
-    if (decl->getFullName().matchesRef(name))
+    if (decl->getName().matchesRef(name))
       result.push_back(decl);
   }
 }

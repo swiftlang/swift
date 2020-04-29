@@ -123,7 +123,7 @@ class BuilderClosureVisitor
 
         // Function must have the right argument labels, if provided.
         if (!argLabels.empty()) {
-          auto funcLabels = func->getFullName().getArgumentNames();
+          auto funcLabels = func->getName().getArgumentNames();
           if (argLabels.size() > funcLabels.size() ||
               funcLabels.slice(0, argLabels.size()) != argLabels)
             continue;

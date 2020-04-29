@@ -927,7 +927,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 
       auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
       auto *varExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
-                                                        varDecl->getFullName());
+                                                        varDecl->getName());
       auto *assignExpr = new (C) AssignExpr(varExpr, SourceLoc(), tryExpr,
                                             /*Implicit=*/true);
       statements.push_back(assignExpr);
@@ -1094,7 +1094,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
       if (TypeChecker::conformsToProtocol(superType, proto, superclassDecl,
                                           None)) {
         // super.init(from:) must be accessible.
-        memberName = cast<ConstructorDecl>(requirement)->getFullName();
+        memberName = cast<ConstructorDecl>(requirement)->getName();
       } else {
         // super.init() must be accessible.
         // Passing an empty params array constructs a compound name with no
@@ -1111,7 +1111,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
       if (result.empty()) {
         // No super initializer for us to call.
         superclassDecl->diagnose(diag::decodable_no_super_init_here,
-                                 requirement->getFullName(), memberName);
+                                 requirement->getName(), memberName);
         return false;
       } else if (result.size() > 1) {
         // There are multiple results for this lookup. We'll end up producing a
@@ -1125,20 +1125,20 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
         if (!initializer->isDesignatedInit()) {
           // We must call a superclass's designated initializer.
           initializer->diagnose(diag::decodable_super_init_not_designated_here,
-                                requirement->getFullName(), memberName);
+                                requirement->getName(), memberName);
           return false;
         } else if (!initializer->isAccessibleFrom(conformanceDC)) {
           // Cannot call an inaccessible method.
           auto accessScope = initializer->getFormalAccessScope(conformanceDC);
           initializer->diagnose(diag::decodable_inaccessible_super_init_here,
-                                requirement->getFullName(), memberName,
+                                requirement->getName(), memberName,
                                 accessScope.accessLevelForDiagnostics());
           return false;
         } else if (initializer->isFailable()) {
           // We can't call super.init() if it's failable, since init(from:)
           // isn't failable.
           initializer->diagnose(diag::decodable_super_init_is_failable_here,
-                                requirement->getFullName(), memberName);
+                                requirement->getName(), memberName);
           return false;
         }
       }
@@ -1196,7 +1196,7 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   ConformanceDecl->diagnose(diag::type_does_not_conform,
                             Nominal->getDeclaredType(), getProtocolType());
   requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Func,
-                        requirement->getFullName(), getProtocolType(),
+                        requirement->getName(), getProtocolType(),
                         /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.
@@ -1232,7 +1232,7 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   ConformanceDecl->diagnose(diag::type_does_not_conform,
                             Nominal->getDeclaredType(), getProtocolType());
   requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Constructor,
-                        requirement->getFullName(), getProtocolType(),
+                        requirement->getName(), getProtocolType(),
                         /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.

@@ -445,7 +445,7 @@ Symbol::getPathComponents(SmallVectorImpl<SmallString<32>> &Components) const {
     // Collect the spellings of the fully qualified identifier components.
     while (Decl && !isa<ModuleDecl>(Decl)) {
       SmallString<32> Scratch;
-      Decl->getFullName().getString(Scratch);
+      Decl->getName().getString(Scratch);
       DeclComponents.push_back(Scratch);
       if (const auto *DC = Decl->getDeclContext()) {
         if (const auto *Nominal = DC->getSelfNominalTypeDecl()) {
@@ -464,7 +464,7 @@ Symbol::getPathComponents(SmallVectorImpl<SmallString<32>> &Components) const {
     // existing on another type, such as a default implementation of
     // a protocol. Build a path as if it were defined in the base type.
     SmallString<32> LastPathComponent;
-    VD->getFullName().getString(LastPathComponent);
+    VD->getName().getString(LastPathComponent);
     Components.push_back(LastPathComponent);
     collectPathComponents(BaseTypeDecl, Components);
   } else {

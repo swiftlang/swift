@@ -419,7 +419,7 @@ public:
     // to avoid circular validation.
     if (isTypeLookup && !isa<TypeDecl>(VD))
       return;
-    if (VD->getFullName().matchesRef(name.getFullName()))
+    if (VD->getName().matchesRef(name.getFullName()))
       results.push_back(LookupResultEntry(VD));
   }
 };
