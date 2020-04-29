@@ -1,3 +1,7 @@
+module StaticVar {
+  header "static-var.h"
+}
+
 module StaticLocalVar {
   header "static-local-var.h"
 }
