@@ -9,3 +9,7 @@ module StaticMemberVar {
 module InlineStaticMemberVar {
   header "inline-static-member-var.h"
 }
+
+module StaticMemberFunc {
+  header "static-member-func.h"
+}
