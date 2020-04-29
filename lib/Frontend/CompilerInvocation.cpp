@@ -451,7 +451,19 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
+
+  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
+
   Opts.Playground |= Args.hasArg(OPT_playground);
+  Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
+  if (Args.hasArg(OPT_disable_playground_transform))
+    Opts.PlaygroundTransform = false;
+  Opts.PlaygroundHighPerformance |=
+      Args.hasArg(OPT_playground_high_performance);
+
+  // This can be enabled independently of the playground transform.
+  Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
+
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);

@@ -671,7 +671,6 @@ private:
   ImplicitImportInfo getImplicitImportInfo() const;
 
   void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
-  void parseAndCheckTypesUpTo(SourceFile::ASTStage_t LimitStage);
 
   /// Return true if had load error
   bool parsePartialModulesAndInputFiles();

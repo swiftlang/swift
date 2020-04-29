@@ -103,13 +103,6 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
-  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
-
-  computePlaygroundOptions();
-
-  // This can be enabled independently of the playground transform.
-  Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
-
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
   Opts.IgnoreSwiftSourceInfo |= Args.hasArg(OPT_ignore_module_source_info);
@@ -259,15 +252,6 @@ void ArgsToFrontendOptionsConverter::computeTBDOptions() {
                      A->getOption().getPrefixedName(), value);
     }
   }
-}
-
-void ArgsToFrontendOptionsConverter::computePlaygroundOptions() {
-  using namespace options;
-  Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
-  if (Args.hasArg(OPT_disable_playground_transform))
-    Opts.PlaygroundTransform = false;
-  Opts.PlaygroundHighPerformance |=
-      Args.hasArg(OPT_playground_high_performance);
 }
 
 void ArgsToFrontendOptionsConverter::computeHelpOptions() {
