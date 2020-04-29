@@ -226,7 +226,7 @@ private:
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
         ClosureExpr(SourceRange(), nullptr, Params, SourceLoc(), SourceLoc(),
-                    SourceLoc(), TypeLoc(), DF.getNextDiscriminator(),
+                    SourceLoc(), nullptr, DF.getNextDiscriminator(),
                     getCurrentDeclContext());
     Closure->setImplicit(true);
 

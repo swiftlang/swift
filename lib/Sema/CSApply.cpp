@@ -7696,6 +7696,10 @@ namespace {
         auto *params = closure->getParameters();
         TypeChecker::coerceParameterListToType(params, closure, fnType);
 
+        if (closure->hasExplicitResultType()) {
+          closure->setExplicitResultType(fnType->getResult());
+        }
+
         if (auto transform =
                        Rewriter.getAppliedBuilderTransform(closure)) {
           // Apply the function builder to the closure. We want to be in the

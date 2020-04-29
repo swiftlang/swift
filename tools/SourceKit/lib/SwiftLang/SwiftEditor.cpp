@@ -1562,7 +1562,7 @@ private:
     PlaceholderFinder Finder(E->getStartLoc(), Found);
     E->walk(Finder);
     if (Found) {
-      if (auto TR = Found->getTypeLoc().getTypeRepr()) {
+      if (auto TR = Found->getPlaceholderTypeRepr()) {
         TR->walk(ClosureWalker);
         return ClosureWalker.FoundFunctionTypeRepr;
       }

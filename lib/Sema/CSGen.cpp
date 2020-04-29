@@ -1691,8 +1691,7 @@ namespace {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
           ArrayRef<Type> typeVars = bgt->getGenericArgs();
-          MutableArrayRef<TypeLoc> specializations =
-              expr->getUnresolvedParams();
+          auto specializations = expr->getUnresolvedParams();
 
           // If we have too many generic arguments, complain.
           if (specializations.size() > typeVars.size()) {
@@ -1715,14 +1714,15 @@ namespace {
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             TypeResolutionOptions options(TypeResolverContext::InExpression);
             options |= TypeResolutionFlags::AllowUnboundGenerics;
+            auto tyLoc = TypeLoc{specializations[i]};
             if (TypeChecker::validateType(CS.getASTContext(),
-                                specializations[i],
+                                tyLoc,
                                 TypeResolution::forContextual(CS.DC),
                                 options))
               return Type();
 
             CS.addConstraint(ConstraintKind::Bind,
-                             typeVars[i], specializations[i].getType(),
+                             typeVars[i], tyLoc.getType(),
                              locator);
           }
           
@@ -2177,14 +2177,24 @@ namespace {
       // parameter or return type is omitted, a fresh type variable is used to
       // stand in for that parameter or return type, allowing it to be inferred
       // from context.
-      Type resultTy;
-      if (closure->hasExplicitResultType() &&
-          closure->getExplicitResultTypeLoc().getType()) {
-        resultTy = closure->getExplicitResultTypeLoc().getType();
-      } else {
-        auto *resultLoc =
-            CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+      auto getExplicitResultType = [&]() -> Type {
+        if (!closure->hasExplicitResultType()) {
+          return Type();
+        }
 
+        if (auto declaredTy = closure->getExplicitResultType()) {
+          return declaredTy;
+        }
+
+        return resolveTypeReferenceInExpression(closure->getExplicitResultTypeRepr());
+      };
+
+      Type resultTy;
+      auto *resultLoc =
+            CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+      if (auto explicityTy = getExplicitResultType()) {
+        resultTy = explicityTy;
+      } else {
         auto getContextualResultType = [&]() -> Type {
           if (auto contextualType = CS.getContextualType(closure)) {
             if (auto fnType = contextualType->getAs<FunctionType>())
@@ -3285,33 +3295,34 @@ namespace {
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-      if (E->getTypeLoc().isNull()) {
-        auto locator = CS.getConstraintLocator(E);
-
-        // A placeholder may have any type, but default to Void type if
-        // otherwise unconstrained.
-        auto &placeholderTy
-          = editorPlaceholderVariables[currentEditorPlaceholderVariable];
-        if (!placeholderTy) {
-          placeholderTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
-
-          CS.addConstraint(ConstraintKind::Defaultable,
-                           placeholderTy,
-                           TupleType::getEmpty(CS.getASTContext()),
-                           locator);
-        }
-
-        // Move to the next placeholder variable.
-        currentEditorPlaceholderVariable
-          = (currentEditorPlaceholderVariable + 1) %
-              numEditorPlaceholderVariables;
-
-        return placeholderTy;
+      if (auto *placeholderRepr = E->getPlaceholderTypeRepr()) {
+        // Just resolve the referenced type.
+        // FIXME: The type reference needs to be opened into context.
+        return resolveTypeReferenceInExpression(placeholderRepr);
       }
 
-      // NOTE: The type loc may be there but have failed to validate, in which
-      // case we return the null type.
-      return E->getType();
+      auto locator = CS.getConstraintLocator(E);
+
+      // A placeholder may have any type, but default to Void type if
+      // otherwise unconstrained.
+      auto &placeholderTy
+        = editorPlaceholderVariables[currentEditorPlaceholderVariable];
+      if (!placeholderTy) {
+        placeholderTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+
+        CS.addConstraint(ConstraintKind::Defaultable,
+                         placeholderTy,
+                         TupleType::getEmpty(CS.getASTContext()),
+                         locator);
+      }
+
+      // Move to the next placeholder variable.
+      // FIXME: Cycling type variables like this is unsound.
+      currentEditorPlaceholderVariable
+        = (currentEditorPlaceholderVariable + 1) %
+            numEditorPlaceholderVariables;
+
+      return placeholderTy;
     }
 
     Type visitObjCSelectorExpr(ObjCSelectorExpr *E) {

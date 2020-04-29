@@ -257,7 +257,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
 
   ClosureExpr *CE =
       new (Context) ClosureExpr(SourceRange(), nullptr, params, SourceLoc(),
-                                SourceLoc(), SourceLoc(), TypeLoc(),
+                                SourceLoc(), SourceLoc(), nullptr,
                                 discriminator, newTopLevel);
 
   SmallVector<AnyFunctionType::Param, 1> args;

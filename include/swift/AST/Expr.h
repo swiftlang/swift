@@ -3386,7 +3386,7 @@ public:
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
-    private llvm::TrailingObjects<UnresolvedSpecializeExpr, TypeLoc> {
+    private llvm::TrailingObjects<UnresolvedSpecializeExpr, TypeRepr *> {
   friend TrailingObjects;
 
   Expr *SubExpr;
@@ -3395,31 +3395,27 @@ class UnresolvedSpecializeExpr final : public Expr,
 
   UnresolvedSpecializeExpr(Expr *SubExpr,
                            SourceLoc LAngleLoc,
-                           ArrayRef<TypeLoc> UnresolvedParams,
+                           ArrayRef<TypeRepr *> UnresolvedParams,
                            SourceLoc RAngleLoc)
     : Expr(ExprKind::UnresolvedSpecialize, /*Implicit=*/false),
       SubExpr(SubExpr), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
     Bits.UnresolvedSpecializeExpr.NumUnresolvedParams = UnresolvedParams.size();
     std::uninitialized_copy(UnresolvedParams.begin(), UnresolvedParams.end(),
-                            getTrailingObjects<TypeLoc>());
+                            getTrailingObjects<TypeRepr *>());
   }
 
 public:
   static UnresolvedSpecializeExpr *
   create(ASTContext &ctx, Expr *SubExpr, SourceLoc LAngleLoc,
-         ArrayRef<TypeLoc> UnresolvedParams, SourceLoc RAngleLoc);
+         ArrayRef<TypeRepr *> UnresolvedParams, SourceLoc RAngleLoc);
   
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
   
   /// Retrieve the list of type parameters. These parameters have not yet
   /// been bound to archetypes of the entity to be specialized.
-  ArrayRef<TypeLoc> getUnresolvedParams() const {
-    return {getTrailingObjects<TypeLoc>(),
-            Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
-  }
-  MutableArrayRef<TypeLoc> getUnresolvedParams() {
-    return {getTrailingObjects<TypeLoc>(),
+  ArrayRef<TypeRepr *> getUnresolvedParams() const {
+    return {getTrailingObjects<TypeRepr *>(),
             Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
   }
   
@@ -3706,7 +3702,7 @@ class ClosureExpr : public AbstractClosureExpr {
   SourceLoc InLoc;
 
   /// The explicitly-specified result type.
-  TypeLoc ExplicitResultType;
+  TypeExpr *ExplicitResultType;
 
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
@@ -3714,7 +3710,7 @@ class ClosureExpr : public AbstractClosureExpr {
 public:
   ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
-              SourceLoc inLoc, TypeLoc explicitResultType,
+              SourceLoc inLoc, TypeExpr *explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
@@ -3773,20 +3769,15 @@ public:
     return ThrowsLoc;
   }
 
-  /// Retrieve the explicit result type location information.
-  TypeLoc &getExplicitResultTypeLoc() {
+  Type getExplicitResultType() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultType;
+    return ExplicitResultType->getInstanceType();
   }
+  void setExplicitResultType(Type ty);
 
   TypeRepr *getExplicitResultTypeRepr() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultType.getTypeRepr();
-  }
-
-  void setExplicitResultType(SourceLoc arrowLoc, TypeLoc resultType) {
-    ArrowLoc = arrowLoc;
-    ExplicitResultType = resultType;
+    return ExplicitResultType->getTypeRepr();
   }
 
   /// Determine whether the closure has a single expression for its
@@ -4939,25 +4930,20 @@ public:
 class EditorPlaceholderExpr : public Expr {
   Identifier Placeholder;
   SourceLoc Loc;
-  TypeLoc PlaceholderTy;
+  TypeRepr *PlaceholderTy;
   TypeRepr *ExpansionTyR;
   Expr *SemanticExpr;
 
 public:
   EditorPlaceholderExpr(Identifier Placeholder, SourceLoc Loc,
-                        TypeLoc PlaceholderTy,
-                        TypeRepr *ExpansionTyR)
-    : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
-      Placeholder(Placeholder), Loc(Loc),
-      PlaceholderTy(PlaceholderTy),
-      ExpansionTyR(ExpansionTyR),
-      SemanticExpr(nullptr) {
-  }
+                        TypeRepr *PlaceholderTy, TypeRepr *ExpansionTyR)
+      : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
+        Placeholder(Placeholder), Loc(Loc), PlaceholderTy(PlaceholderTy),
+        ExpansionTyR(ExpansionTyR), SemanticExpr(nullptr) {}
 
   Identifier getPlaceholder() const { return Placeholder; }
   SourceRange getSourceRange() const { return Loc; }
-  TypeLoc &getTypeLoc() { return PlaceholderTy; }
-  TypeLoc getTypeLoc() const { return PlaceholderTy; }
+  TypeRepr *getPlaceholderTypeRepr() const { return PlaceholderTy; }
   SourceLoc getTrailingAngleBracketLoc() const {
     return Loc.getAdvancedLoc(Placeholder.getLength() - 1);
   }

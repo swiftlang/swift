@@ -1551,7 +1551,7 @@ public:
           ParameterList *&params,
           SourceLoc &throwsLoc,
           SourceLoc &arrowLoc,
-          TypeRepr *&explicitResultType,
+          TypeExpr *&explicitResultType,
           SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
