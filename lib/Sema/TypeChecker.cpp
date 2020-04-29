@@ -401,7 +401,6 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
-  diagnoseAttrsRequiringFoundation(SF);
   diagnoseObjCMethodConflicts(SF);
   diagnoseObjCUnsatisfiedOptReqConflicts(SF);
   diagnoseUnintendedObjCMethodOverrides(SF);

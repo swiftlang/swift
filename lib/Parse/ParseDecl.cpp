@@ -3935,15 +3935,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
     DeclResult.setHasCodeCompletion();
   }
 
-  if (auto SF = CurDeclContext->getParentSourceFile()) {
-    if (!getScopeInfo().isInactiveConfigBlock()) {
-      for (auto Attr : Attributes) {
-        if (isa<ObjCAttr>(Attr))
-          SF->AttrsRequiringFoundation.insert(Attr);
-      }
-    }
-  }
-
   if (DeclResult.isNonNull()) {
     Decl *D = DeclResult.get();
     if (!declWasHandledAlready(D))
