@@ -2895,7 +2895,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
   // If the nominal type is a property wrapper type, we can be delegating
   // through a property.
-  if (nominal->getPropertyWrapperTypeInfo()) {
+  if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
     // property wrappers can only be applied to variables
     if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
       diagnose(attr->getLocation(),
