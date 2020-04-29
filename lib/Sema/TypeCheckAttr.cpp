@@ -23,6 +23,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -882,6 +883,41 @@ static bool checkObjCDeclContext(Decl *D) {
   return false;
 }
 
+static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
+  auto *SF = decl->getDeclContext()->getParentSourceFile();
+  assert(SF);
+
+  // We only care about explicitly written @objc attributes.
+  if (attr->isImplicit())
+    return;
+
+  auto &ctx = SF->getASTContext();
+  if (ctx.LangOpts.EnableObjCInterop) {
+    // Don't diagnose in a SIL file.
+    if (SF->Kind == SourceFileKind::SIL)
+      return;
+
+    // Don't diagnose for -disable-objc-attr-requires-foundation-module.
+    if (!ctx.LangOpts.EnableObjCAttrRequiresFoundation)
+      return;
+  }
+
+  // If we have the Foundation module, @objc is okay.
+  auto *foundation = ctx.getLoadedModule(ctx.Id_Foundation);
+  if (foundation && ctx.getImportCache().isImportedBy(foundation, SF))
+    return;
+
+  if (!ctx.LangOpts.EnableObjCInterop) {
+    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
+      .fixItRemove(attr->getRangeWithAt());
+  }
+
+  ctx.Diags.diagnose(attr->getLocation(),
+                     diag::attr_used_without_required_module, attr,
+                     ctx.Id_Foundation)
+    .highlight(attr->getRangeWithAt());
+}
+
 void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
   // Only certain decls can be ObjC.
   Optional<Diag<>> error;
@@ -988,6 +1024,9 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     // Enum elements require names.
     diagnoseAndRemoveAttr(attr, diag::objc_enum_case_req_name);
   }
+
+  // Diagnose an @objc attribute used without importing Foundation.
+  diagnoseObjCAttrWithoutFoundation(attr, D);
 }
 
 void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {

@@ -1078,7 +1078,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
       removeEquivalenceClassFromTree(FE);
     
     auto *CI = dyn_cast<CallInst>(I);
-    if (!CI || CI->getCalledValue() != Old) {
+    if (!CI || CI->getCalledOperand() != Old) {
       AllReplaced = false;
       continue;
     }

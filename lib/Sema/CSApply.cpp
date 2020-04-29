@@ -1030,6 +1030,18 @@ namespace {
       // Build a member reference.
       auto memberRef = resolveConcreteDeclRef(member, memberLocator);
 
+      // If we're referring to a member type, it's just a type
+      // reference.
+      if (auto *TD = dyn_cast<TypeDecl>(member)) {
+        Type refType = simplifyType(openedType);
+        auto ref = TypeExpr::createForDecl(memberLoc, TD, cs.DC);
+        cs.setType(ref, refType);
+        auto *result = new (context) DotSyntaxBaseIgnoredExpr(
+            base, dotLoc, ref, refType);
+        cs.setType(result, refType);
+        return result;
+      }
+
       // If we're referring to the member of a module, it's just a simple
       // reference.
       if (baseTy->is<ModuleType>()) {
@@ -1041,18 +1053,6 @@ namespace {
         auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, cs.getType(ref)));
         return forceUnwrapIfExpected(DSBI, choice, memberLocator);
-      }
-
-      // If we're referring to a member type, it's just a type
-      // reference.
-      if (auto *TD = dyn_cast<TypeDecl>(member)) {
-        Type refType = simplifyType(openedType);
-        auto ref = TypeExpr::createForDecl(memberLoc, TD, cs.DC);
-        cs.setType(ref, refType);
-        auto *result = new (context) DotSyntaxBaseIgnoredExpr(
-            base, dotLoc, ref, refType);
-        cs.setType(result, refType);
-        return result;
       }
 
       bool isUnboundInstanceMember =
