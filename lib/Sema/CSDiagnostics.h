@@ -20,6 +20,7 @@
 #include "ConstraintSystem.h"
 #include "OverloadChoice.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
@@ -45,7 +46,7 @@ public:
   FailureDiagnostic(const Solution &solution, ConstraintLocator *locator)
       : S(solution), Locator(locator) {}
 
-  FailureDiagnostic(const Solution &solution, TypedNode anchor)
+  FailureDiagnostic(const Solution &solution, ASTNode anchor)
       : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
 
   virtual ~FailureDiagnostic();
@@ -77,13 +78,13 @@ public:
   /// e.g. ambiguity error.
   virtual bool diagnoseAsNote();
 
-  TypedNode getRawAnchor() const { return Locator->getAnchor(); }
+  ASTNode getRawAnchor() const { return Locator->getAnchor(); }
 
-  virtual TypedNode getAnchor() const;
+  virtual ASTNode getAnchor() const;
 
   ConstraintLocator *getLocator() const { return Locator; }
 
-  Type getType(TypedNode node, bool wantRValue = true) const;
+  Type getType(ASTNode node, bool wantRValue = true) const;
 
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
@@ -117,17 +118,17 @@ protected:
     return S.getConstraintSystem();
   }
 
-  Type getContextualType(TypedNode anchor) const {
+  Type getContextualType(ASTNode anchor) const {
     auto &cs = getConstraintSystem();
     return cs.getContextualType(anchor);
   }
 
-  TypeLoc getContextualTypeLoc(TypedNode anchor) const {
+  TypeLoc getContextualTypeLoc(ASTNode anchor) const {
     auto &cs = getConstraintSystem();
     return cs.getContextualTypeLoc(anchor);
   }
 
-  ContextualTypePurpose getContextualTypePurpose(TypedNode anchor) const {
+  ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
     auto &cs = getConstraintSystem();
     return cs.getContextualTypePurpose(anchor);
   }
@@ -157,17 +158,17 @@ protected:
   }
 
   ConstraintLocator *
-  getConstraintLocator(TypedNode anchor,
+  getConstraintLocator(ASTNode anchor,
                        ConstraintLocator::PathElement element) const {
-    return S.getConstraintLocator(anchor.get<const Expr *>(), {element});
+    return S.getConstraintLocator(anchor, {element});
   }
 
   /// Retrive the constraint locator for the given anchor and
   /// path, uniqued and automatically calculate the summary flags
   ConstraintLocator *getConstraintLocator(
-      TypedNode anchor,
+      ASTNode anchor,
       ArrayRef<ConstraintLocator::PathElement> path = {}) const {
-    return S.getConstraintLocator(anchor.get<const Expr *>(), path);
+    return S.getConstraintLocator(anchor, path);
   }
 
   ConstraintLocator *
@@ -247,7 +248,7 @@ public:
     assert(getGenericContext() &&
            "Affected decl not within a generic context?");
 
-    if (auto *parentExpr = findParentExpr(getRawAnchor().get<const Expr *>()))
+    if (auto *parentExpr = findParentExpr(getRawAnchor().get<Expr *>()))
       Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
@@ -490,8 +491,7 @@ class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {
   ArrayRef<OverloadChoice> Choices;
 
 public:
-  TrailingClosureAmbiguityFailure(ArrayRef<Solution> solutions,
-                                  TypedNode anchor,
+  TrailingClosureAmbiguityFailure(ArrayRef<Solution> solutions, ASTNode anchor,
                                   ArrayRef<OverloadChoice> choices)
       : FailureDiagnostic(solutions.front(), anchor), Choices(choices) {}
 
@@ -504,16 +504,16 @@ public:
 /// trying to assign something to immutable value, or trying
 /// to access mutating member on immutable base.
 class AssignmentFailure final : public FailureDiagnostic {
-  const Expr *DestExpr;
+  Expr *DestExpr;
   SourceLoc Loc;
   Diag<StringRef> DeclDiagnostic;
   Diag<Type> TypeDiagnostic;
 
 public:
-  AssignmentFailure(const Expr *destExpr, const Solution &solution,
+  AssignmentFailure(Expr *destExpr, const Solution &solution,
                     SourceLoc diagnosticLoc);
 
-  AssignmentFailure(const Expr *destExpr, const Solution &solution,
+  AssignmentFailure(Expr *destExpr, const Solution &solution,
                     SourceLoc diagnosticLoc, Diag<StringRef> declDiag,
                     Diag<Type> typeDiag)
       : FailureDiagnostic(solution, destExpr), DestExpr(destExpr),
@@ -789,7 +789,7 @@ public:
                                    Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
 
-  TypedNode getAnchor() const override;
+  ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 
@@ -950,7 +950,7 @@ public:
   MissingCallFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
-  TypedNode getAnchor() const override;
+  ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 };
@@ -1149,7 +1149,7 @@ protected:
   const ConstructorDecl *Init;
   SourceRange BaseRange;
 
-  TypedNode getAnchor() const override { return getRawAnchor(); }
+  ASTNode getAnchor() const override { return getRawAnchor(); }
 
   InvalidInitRefFailure(const Solution &solution, Type baseTy,
                         const ConstructorDecl *init, SourceRange baseRange,
@@ -1243,7 +1243,7 @@ public:
     assert(!SynthesizedArgs.empty() && "No missing arguments?!");
   }
 
-  TypedNode getAnchor() const override;
+  ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 
@@ -1268,8 +1268,7 @@ private:
   /// Gather information associated with expression that represents
   /// a call - function, arguments, # of arguments and whether it has
   /// a trailing closure.
-  std::tuple<Expr *, Expr *, unsigned, bool>
-  getCallInfo(TypedNode anchor) const;
+  std::tuple<Expr *, Expr *, unsigned, bool> getCallInfo(ASTNode anchor) const;
 
   /// Transform given argument into format suitable for a fix-it
   /// text e.g. `[<label>:]? <#<type#>`
@@ -1636,7 +1635,7 @@ protected:
 /// _ = S()
 /// ```
 class MissingGenericArgumentsFailure final : public FailureDiagnostic {
-  using Anchor = llvm::PointerUnion<TypeRepr *, const Expr *>;
+  using Anchor = llvm::PointerUnion<TypeRepr *, Expr *>;
 
   SmallVector<GenericTypeParamType *, 4> Parameters;
 
@@ -1872,7 +1871,7 @@ public:
                                Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {}
 
-  TypedNode getAnchor() const override;
+  ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
 };

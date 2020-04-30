@@ -18,6 +18,7 @@
 #define SWIFT_SEMA_CSFIX_H
 
 #include "ConstraintLocator.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
@@ -313,7 +314,7 @@ public:
   /// Retrieve anchor expression associated with this fix.
   /// NOTE: such anchor comes directly from locator without
   /// any simplication attempts.
-  TypedNode getAnchor() const;
+  ASTNode getAnchor() const;
   ConstraintLocator *getLocator() const { return Locator; }
 
 protected:

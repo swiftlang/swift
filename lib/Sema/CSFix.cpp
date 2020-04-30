@@ -34,7 +34,7 @@ using namespace constraints;
 
 ConstraintFix::~ConstraintFix() {}
 
-TypedNode ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
+ASTNode ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
 
 void ConstraintFix::print(llvm::raw_ostream &Out) const {
   Out << "[fix: ";
