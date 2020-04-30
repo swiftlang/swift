@@ -113,6 +113,9 @@ struct HasInitWithDefaultArgs {
 HasInitWithDefaultArgs(z: 45)
 HasInitWithDefaultArgs(y: 45, z: 89)
 
+func `hasBackticks`(`x`: Int) {}
+`hasBackticks`(`x`:2)
+
 // RUN: %sourcekitd-test -req=cursor -pos=3:1 -end-pos=5:13 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK1
 
 // CHECK1: ACTIONS BEGIN
@@ -150,6 +153,13 @@ HasInitWithDefaultArgs(y: 45, z: 89)
 // RUN: %sourcekitd-test -req=cursor -pos=114:24  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=114:31  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=114:31  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+
+// RUN: %sourcekitd-test -req=cursor -pos=116:6  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=116:7  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:1  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:2  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:16  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:17  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 
 // RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
 // RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
