@@ -1453,8 +1453,7 @@ namespace {
       TypeResolutionOptions options(TypeResolverContext::InExpression);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       bool hadError = TypeChecker::validateType(
-          CS.getASTContext(), loc,
-          TypeResolution::forContextual(CS.DC, options));
+          loc, TypeResolution::forContextual(CS.DC, options));
       return hadError ? Type() : loc.getType();
     }
 
@@ -1716,8 +1715,7 @@ namespace {
             options |= TypeResolutionFlags::AllowUnboundGenerics;
             auto tyLoc = TypeLoc{specializations[i]};
             if (TypeChecker::validateType(
-                    CS.getASTContext(), tyLoc,
-                    TypeResolution::forContextual(CS.DC, options)))
+                    tyLoc, TypeResolution::forContextual(CS.DC, options)))
               return Type();
 
             CS.addConstraint(ConstraintKind::Bind,
@@ -2660,7 +2658,7 @@ namespace {
           pattern = pattern->getSemanticsProvidingPattern();
           while (auto isp = dyn_cast<IsPattern>(pattern)) {
             if (TypeChecker::validateType(
-                    CS.getASTContext(), isp->getCastTypeLoc(),
+                    isp->getCastTypeLoc(),
                     TypeResolution::forContextual(
                         CS.DC, TypeResolverContext::InExpression))) {
               return false;
@@ -2986,7 +2984,7 @@ namespace {
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       if (TypeChecker::validateType(
-              CS.getASTContext(), expr->getCastTypeLoc(),
+              expr->getCastTypeLoc(),
               TypeResolution::forContextual(CS.DC, options)))
         return nullptr;
 
@@ -3015,7 +3013,7 @@ namespace {
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       if (TypeChecker::validateType(
-              CS.getASTContext(), expr->getCastTypeLoc(),
+              expr->getCastTypeLoc(),
               TypeResolution::forContextual(CS.DC, options)))
         return nullptr;
 
@@ -3042,7 +3040,6 @@ namespace {
     }
 
     Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
-      auto &ctx = CS.getASTContext();
       auto fromExpr = expr->getSubExpr();
       if (!fromExpr) // Either wasn't constructed correctly or wasn't folded.
         return nullptr;
@@ -3051,7 +3048,7 @@ namespace {
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       if (TypeChecker::validateType(
-              ctx, expr->getCastTypeLoc(),
+              expr->getCastTypeLoc(),
               TypeResolution::forContextual(CS.DC, options)))
         return nullptr;
 
@@ -3081,7 +3078,7 @@ namespace {
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       if (TypeChecker::validateType(
-              ctx, expr->getCastTypeLoc(),
+              expr->getCastTypeLoc(),
               TypeResolution::forContextual(CS.DC, options)))
         return nullptr;
 

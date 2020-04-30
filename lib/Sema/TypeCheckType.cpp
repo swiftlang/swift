@@ -1740,13 +1740,12 @@ static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
   return !isValid;
 }
 
-bool TypeChecker::validateType(ASTContext &Context, TypeLoc &Loc,
-                               TypeResolution resolution) {
+bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution) {
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
     return Loc.isError();
 
-  if (auto *Stats = Context.Stats)
+  if (auto *Stats = resolution.getASTContext().Stats)
     Stats->getFrontendCounters().NumTypesValidated++;
 
   Type type = resolution.resolveType(Loc.getTypeRepr());
@@ -3866,7 +3865,7 @@ Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
 
   ASTContext &ctx = dc->getASTContext();
   auto resolution = TypeResolution::forContextual(dc, options);
-  if (TypeChecker::validateType(ctx, attr->getTypeLoc(), resolution))
+  if (TypeChecker::validateType(attr->getTypeLoc(), resolution))
     return Type();
 
   // We always require the type to resolve to a nominal type.

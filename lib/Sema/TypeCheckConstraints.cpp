@@ -1918,7 +1918,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
     typeLoc = TypeLoc(typeExpr->getTypeRepr(), Type());
     bool hadError = TypeChecker::validateType(
-        getASTContext(), typeLoc, TypeResolution::forContextual(DC, options));
+        typeLoc, TypeResolution::forContextual(DC, options));
 
     if (hadError)
       return nullptr;

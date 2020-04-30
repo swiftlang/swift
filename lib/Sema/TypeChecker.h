@@ -379,7 +379,7 @@ Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 /// \param resolution The type resolution being performed.
 ///
 /// \returns true if type validation failed, or false otherwise.
-bool validateType(ASTContext &Ctx, TypeLoc &Loc, TypeResolution resolution);
+bool validateType(TypeLoc &Loc, TypeResolution resolution);
 
 /// Check for unsupported protocol types in the given declaration.
 void checkUnsupportedProtocolType(Decl *decl);

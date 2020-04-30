@@ -135,8 +135,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   // Pass along the error type if resolving the repr failed.
   auto resolution = TypeResolution::forInterface(
       dc, dc->getGenericSignatureOfContext(), options);
-  bool validationError
-    = TypeChecker::validateType(ctx, constraintTypeLoc, resolution);
+  bool validationError =
+      TypeChecker::validateType(constraintTypeLoc, resolution);
   auto constraintType = constraintTypeLoc.getType();
   if (validationError)
     return nullptr;

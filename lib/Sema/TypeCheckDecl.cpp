@@ -1435,8 +1435,8 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (TypeChecker::validateType(
-          Ctx, typeLoc, TypeResolution::forInterface(DC, options)))
+  if (TypeChecker::validateType(typeLoc,
+                                TypeResolution::forInterface(DC, options)))
     return nullptr;
 
   return typeLoc.getType()->getAnyNominal();
@@ -1770,8 +1770,7 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
 
   auto underlyingLoc = TypeLoc(typeAlias->getUnderlyingTypeRepr());
   if (TypeChecker::validateType(
-          typeAlias->getASTContext(), underlyingLoc,
-          TypeResolution::forInterface(typeAlias, options))) {
+          underlyingLoc, TypeResolution::forInterface(typeAlias, options))) {
     typeAlias->setInvalid();
     return ErrorType::get(typeAlias->getASTContext());
   }
@@ -2124,7 +2123,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   auto &ctx = dc->getASTContext();
   auto resolution = TypeResolution::forInterface(dc, options);
-  if (TypeChecker::validateType(ctx, TL, resolution)) {
+  if (TypeChecker::validateType(TL, resolution)) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }
