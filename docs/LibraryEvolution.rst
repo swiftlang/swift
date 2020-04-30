@@ -577,7 +577,7 @@ There are very few safe changes to make to protocols and their members:
   themselves).
 - The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
   be added to or removed from a function requirement.
-- A new `associatedtype` requirement may be added (with the appropriate
+- A new ``associatedtype`` requirement may be added (with the appropriate
   availability), as long as it has a default implementation.
 - A new non-type requirement may be added (with the appropriate availability),
   as long as it has an unconstrained default implementation. If the requirement
