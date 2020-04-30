@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/MemAlloc.h"
 
 // ADT uses report_bad_alloc_error to report an error when it can't allocate
 // elements for a data structure. The swift runtime uses ADT without linking
@@ -87,6 +88,32 @@ __attribute__((__weak__, __visibility__("hidden")))
 #endif
 void SmallVectorBase<uint64_t>::grow_pod(void *FirstEl, size_t MinCapacity,
                                          size_t TSize);
+
+// The same for allocate_buffer and deallocate_buffer, which are used by
+// DenseMap and unique_function. This is a hack. This implementation is copied
+// from llvm/lib/Support/MemAlloc.cpp and has to stay in sync with it.
+LLVM_ATTRIBUTE_RETURNS_NONNULL LLVM_ATTRIBUTE_RETURNS_NOALIAS void *
+llvm::allocate_buffer(size_t Size, size_t Alignment) {
+  return ::operator new(Size
+#ifdef __cpp_aligned_new
+                        ,
+                        std::align_val_t(Alignment)
+#endif
+  );
+}
+
+void llvm::deallocate_buffer(void *Ptr, size_t Size, size_t Alignment) {
+  ::operator delete(Ptr
+#ifdef __cpp_sized_deallocation
+                    ,
+                    Size
+#endif
+#ifdef __cpp_aligned_new
+                    ,
+                    std::align_val_t(Alignment)
+#endif
+  );
+}
 
 } // end namespace llvm
 #endif // defined(swiftCore_EXPORTS)
