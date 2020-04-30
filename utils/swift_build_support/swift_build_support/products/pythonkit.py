@@ -48,9 +48,12 @@ class PythonKit(product.Product):
             pass
 
         # SWIFT_ENABLE_TENSORFLOW
+        # NOTE(TF-1252): macOS deployment target must be below 10.13 to avoid
+        # libswiftCore.dylib dynamic linker issues on 10.14+ while `tensorflow`
+        # branch contains changes to libswiftCore.dylib.
         target = ''
         if host_target.startswith('macosx'):
-            target = '-DCMAKE_Swift_COMPILER_TARGET=x86_64-apple-macosx10.13'
+            target = '-DCMAKE_Swift_COMPILER_TARGET=x86_64-apple-macosx10.10'
         # SWIFT_ENABLE_TENSORFLOW END
 
         with shell.pushd(self.build_dir):
