@@ -188,7 +188,7 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   // Locators are not guaranteed to have an anchor
   // if constraint system is used to verify generic
   // requirements.
-  if (!anchor.is<const Expr *>())
+  if (!anchor.is<Expr *>())
     return nullptr;
 
   ArrayRef<LocatorPathElt> path = pathBuffer;
@@ -3021,18 +3021,17 @@ void ConstraintSystem::dump(Expr *E) const {
 }
 
 void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
-  auto getTypeOfExpr = [&](const Expr *E) -> Type {
+  auto getTypeOfExpr = [&](Expr *E) -> Type {
     if (hasType(E))
       return getType(E);
     return Type();
   };
-  auto getTypeOfTypeLoc = [&](const TypeLoc &TL) -> Type {
+  auto getTypeOfTypeLoc = [&](TypeLoc &TL) -> Type {
     if (hasType(TL))
       return getType(TL);
     return Type();
   };
-  auto getTypeOfKeyPathComponent =
-      [&](const KeyPathExpr *KP, unsigned I) -> Type {
+  auto getTypeOfKeyPathComponent = [&](KeyPathExpr *KP, unsigned I) -> Type {
     if (hasType(KP, I))
       return getType(KP, I);
     return Type();

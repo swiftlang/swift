@@ -364,13 +364,13 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
-    TypedNode anchor, ArrayRef<ConstraintLocator::PathElement> path) {
+    ASTNode anchor, ArrayRef<ConstraintLocator::PathElement> path) {
   auto summaryFlags = ConstraintLocator::getSummaryFlagsForPath(path);
   return getConstraintLocator(anchor, path, summaryFlags);
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
-    TypedNode anchor, ArrayRef<ConstraintLocator::PathElement> path,
+    ASTNode anchor, ArrayRef<ConstraintLocator::PathElement> path,
     unsigned summaryFlags) {
   assert(summaryFlags == ConstraintLocator::getSummaryFlagsForPath(path));
 
@@ -423,7 +423,7 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 
 ConstraintLocator *ConstraintSystem::getCalleeLocator(
     ConstraintLocator *locator, bool lookThroughApply,
-    llvm::function_ref<Type(const Expr *)> getType,
+    llvm::function_ref<Type(Expr *)> getType,
     llvm::function_ref<Type(Type)> simplifyType,
     llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
         getOverloadFor) {
@@ -3320,7 +3320,7 @@ constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
   return cs.getConstraintLocator(anchor, path);
 }
 
-void constraints::simplifyLocator(TypedNode &anchor,
+void constraints::simplifyLocator(ASTNode &anchor,
                                   ArrayRef<LocatorPathElt> &path,
                                   SourceRange &range) {
   range = SourceRange();
@@ -3532,7 +3532,7 @@ void constraints::simplifyLocator(TypedNode &anchor,
   }
 }
 
-TypedNode constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
+ASTNode constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
   if (!locator)
     return nullptr;
 
@@ -3549,7 +3549,7 @@ TypedNode constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
   return path.empty() ? anchor : nullptr;
 }
 
-Expr *constraints::getArgumentExpr(TypedNode node, unsigned index) {
+Expr *constraints::getArgumentExpr(ASTNode node, unsigned index) {
   auto *expr = castToExpr(node);
   Expr *argExpr = nullptr;
   if (auto *AE = dyn_cast<ApplyExpr>(expr))
@@ -4478,26 +4478,20 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
   ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
 }
 
-SourceLoc constraints::getLoc(TypedNode anchor) {
-  if (auto *E = anchor.dyn_cast<const Expr *>()) {
+SourceLoc constraints::getLoc(ASTNode anchor) {
+  if (auto *E = anchor.dyn_cast<Expr *>()) {
     return E->getLoc();
-  } else if (auto *T = anchor.dyn_cast<const TypeLoc *>()) {
+  } else if (auto *T = anchor.dyn_cast<TypeLoc *>()) {
     return T->getLoc();
-  } else if (auto *V = anchor.dyn_cast<const VarDecl *>()) {
-    return V->getNameLoc();
+  } else if (auto *V = anchor.dyn_cast<Decl *>()) {
+    if (auto VD = dyn_cast<VarDecl>(V))
+      return VD->getNameLoc();
+    return anchor.getStartLoc();
   } else {
-    return anchor.get<const Pattern *>()->getLoc();
+    return anchor.get<Pattern *>()->getLoc();
   }
 }
 
-SourceRange constraints::getSourceRange(TypedNode anchor) {
-  if (auto *E = anchor.dyn_cast<const Expr *>()) {
-    return E->getSourceRange();
-  } else if (auto *T = anchor.dyn_cast<const TypeLoc *>()) {
-    return T->getSourceRange();
-  } else if (auto *V = anchor.dyn_cast<const VarDecl *>()) {
-    return V->getSourceRange();
-  } else {
-    return anchor.get<const Pattern *>()->getSourceRange();
-  }
+SourceRange constraints::getSourceRange(ASTNode anchor) {
+  return anchor.getSourceRange();
 }

@@ -67,7 +67,7 @@ namespace swift {
   class Token;
   class TopLevelContext;
   class TypeCheckerOptions;
-  struct TypeLoc;
+  class TypeLoc;
   class UnifiedStatsReporter;
 
   namespace Lowering {

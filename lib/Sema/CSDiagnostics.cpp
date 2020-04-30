@@ -51,7 +51,7 @@ bool FailureDiagnostic::diagnoseAsNote() {
   return false;
 }
 
-TypedNode FailureDiagnostic::getAnchor() const {
+ASTNode FailureDiagnostic::getAnchor() const {
   auto &cs = getConstraintSystem();
 
   auto *locator = getLocator();
@@ -72,7 +72,7 @@ TypedNode FailureDiagnostic::getAnchor() const {
   return anchor;
 }
 
-Type FailureDiagnostic::getType(TypedNode node, bool wantRValue) const {
+Type FailureDiagnostic::getType(ASTNode node, bool wantRValue) const {
   return resolveType(S.getType(node), /*reconstituteSugar=*/false, wantRValue);
 }
 
@@ -413,7 +413,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
       llvm::SmallPtrSet<Expr *, 4> anchors;
       for (const auto *fix : cs.getFixes()) {
         if (auto anchor = fix->getAnchor()) {
-          if (anchor.is<const Expr *>())
+          if (anchor.is<Expr *>())
             anchors.insert(getAsExpr(anchor));
         }
       }
@@ -862,7 +862,7 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
   return true;
 }
 
-TypedNode MissingForcedDowncastFailure::getAnchor() const {
+ASTNode MissingForcedDowncastFailure::getAnchor() const {
   auto anchor = FailureDiagnostic::getAnchor();
   if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
     return assignExpr->getSrc();
@@ -893,7 +893,7 @@ bool MissingAddressOfFailure::diagnoseAsError() {
   return true;
 }
 
-TypedNode MissingExplicitConversionFailure::getAnchor() const {
+ASTNode MissingExplicitConversionFailure::getAnchor() const {
   auto anchor = FailureDiagnostic::getAnchor();
 
   if (auto *assign = getAsExpr<AssignExpr>(anchor))
@@ -1453,8 +1453,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
   return true;
 }
 
-AssignmentFailure::AssignmentFailure(const Expr *destExpr,
-                                     const Solution &solution,
+AssignmentFailure::AssignmentFailure(Expr *destExpr, const Solution &solution,
                                      SourceLoc diagnosticLoc)
     : FailureDiagnostic(solution, destExpr), DestExpr(destExpr),
       Loc(diagnosticLoc),
@@ -3013,7 +3012,7 @@ bool NonOptionalUnwrapFailure::diagnoseAsError() {
   return true;
 }
 
-TypedNode MissingCallFailure::getAnchor() const {
+ASTNode MissingCallFailure::getAnchor() const {
   auto anchor = FailureDiagnostic::getAnchor();
 
   if (auto *FVE = getAsExpr<ForceValueExpr>(anchor))
@@ -3470,7 +3469,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
   auto anchor = getAnchor();
 
-  if (!anchor.is<const Expr *>())
+  if (!anchor.is<Expr *>())
     return false;
 
   Expr *expr = findParentExpr(castToExpr(anchor));
@@ -3745,7 +3744,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Fall back to a fix-it with a full type qualifier
-    const Expr *baseExpr = nullptr;
+    Expr *baseExpr = nullptr;
     if (const auto *SE = getAsExpr<SubscriptExpr>(getRawAnchor()))
       baseExpr = SE->getBase();
     else if (const auto UDE = getAsExpr<UnresolvedDotExpr>(getRawAnchor()))
@@ -3823,7 +3822,7 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
   return true;
 }
 
-TypedNode MissingArgumentsFailure::getAnchor() const {
+ASTNode MissingArgumentsFailure::getAnchor() const {
   auto anchor = FailureDiagnostic::getAnchor();
 
   if (auto *captureList = getAsExpr<CaptureListExpr>(anchor))
@@ -4302,7 +4301,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
 }
 
 std::tuple<Expr *, Expr *, unsigned, bool>
-MissingArgumentsFailure::getCallInfo(TypedNode anchor) const {
+MissingArgumentsFailure::getCallInfo(ASTNode anchor) const {
   if (auto *call = getAsExpr<CallExpr>(anchor)) {
     return std::make_tuple(call->getFn(), call->getArg(),
                            call->getNumArguments(), call->hasTrailingClosure());
@@ -5058,8 +5057,8 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
     Anchor anchor, GenericTypeParamType *GP) const {
   auto &cs = getConstraintSystem();
 
-  auto loc = anchor.is<const Expr *>() ? anchor.get<const Expr *>()->getLoc()
-                                       : anchor.get<TypeRepr *>()->getLoc();
+  auto loc = anchor.is<Expr *>() ? anchor.get<Expr *>()->getLoc()
+                                 : anchor.get<TypeRepr *>()->getLoc();
 
   auto *locator = getLocator();
   // Type variables associated with missing generic parameters are
@@ -5113,7 +5112,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     return;
 
   auto *GTD = dyn_cast<GenericTypeDecl>(paramDC);
-  if (!GTD || anchor.is<const Expr *>())
+  if (!GTD || anchor.is<Expr *>())
     return;
 
   auto getParamDecl =
