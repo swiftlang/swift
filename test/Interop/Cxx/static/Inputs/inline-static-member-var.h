@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_CXX_STATIC_INPUTS_INLINE_STATIC_MEMBER_VAR_H
+#define TEST_INTEROP_CXX_STATIC_INPUTS_INLINE_STATIC_MEMBER_VAR_H
+
 inline static int init() { return 42; }
 
 class WithInlineStaticMember {
@@ -10,3 +13,5 @@ class WithInlineStaticMember {
     static int *getStaticMemberAddress();
     static void setStaticMemberFromCxx(int);
 };
+
+#endif
