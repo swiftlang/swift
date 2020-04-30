@@ -12,7 +12,7 @@
 
 import Darwin
 import Security
-import _SwiftNetworkOverlayShims
+@_implementationOnly import _SwiftNetworkOverlayShims
 
 /// NWError is a type to deliver error codes relevant to NWConnection and NWListener objects.
 /// Generic connectivity errors will be delivered in the posix domain, resolution errors will
