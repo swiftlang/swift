@@ -5,9 +5,7 @@ add_swift_unittest(SwiftDriverTests
   UnitTestSourceFileDepGraphFactory.cpp
 )
 
-target_link_libraries(SwiftDriverTests
-   PRIVATE
-   swiftDriver
-   swiftClangImporter
+target_link_libraries(SwiftDriverTests PRIVATE
    swiftAST
-)
+   swiftClangImporter
+   swiftDriver)
