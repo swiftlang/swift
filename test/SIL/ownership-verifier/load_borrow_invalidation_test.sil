@@ -272,3 +272,106 @@ bb0(%0 : $Builtin.RawPointer):
   %9999 = tuple()
   return %9999 : $()
 }
+
+////////////////////////
+// Address Cast Tests //
+////////////////////////
+
+sil [ossa] @unconditional_checked_cast_addr_test : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  unconditional_checked_cast_addr Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @conditional_addr_cast_always_take : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  checked_cast_addr_br take_always Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @conditional_addr_cast_take_on_success : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  checked_cast_addr_br take_on_success Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject, bb1, bb2
+
+bb1:
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @conditional_addr_cast_copyonsuccess_1 : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  checked_cast_addr_br copy_on_success Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject, bb1, bb2
+
+bb1:
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  destroy_addr %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @conditional_addr_cast_copyonsuccess_2 : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %0a = load_borrow %0 : $*Builtin.NativeObject
+
+  %stack0 = alloc_stack $Builtin.NativeObject
+  checked_cast_addr_br copy_on_success Builtin.NativeObject in %0 : $*Builtin.NativeObject to Builtin.NativeObject in %stack0 : $*Builtin.NativeObject, bb1, bb2
+
+bb1:
+  destroy_addr %stack0 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %stack0 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+  destroy_addr %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

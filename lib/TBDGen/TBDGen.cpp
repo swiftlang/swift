@@ -474,10 +474,10 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
         rootConformance);
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
-      auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
+      auto witnessRef = SILDeclRef(witnessDecl);
       if (conformanceIsFixed &&
           (isa<SelfProtocolConformance>(rootConformance) ||
-           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage))) {
+           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef))) {
         Mangle::ASTMangler Mangler;
         addSymbol(
             Mangler.mangleWitnessThunk(rootConformance, requirementDecl));

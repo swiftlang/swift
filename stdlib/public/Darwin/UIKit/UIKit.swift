@@ -14,7 +14,7 @@ import Foundation
 @_exported import UIKit
 
 #if os(iOS) || os(tvOS)
-import _SwiftUIKitOverlayShims
+@_implementationOnly import _SwiftUIKitOverlayShims
 #endif
 
 //===----------------------------------------------------------------------===//

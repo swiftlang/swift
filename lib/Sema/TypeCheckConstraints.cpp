@@ -188,7 +188,7 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   // Locators are not guaranteed to have an anchor
   // if constraint system is used to verify generic
   // requirements.
-  if (!anchor.is<const Expr *>())
+  if (!anchor.is<Expr *>())
     return nullptr;
 
   ArrayRef<LocatorPathElt> path = pathBuffer;
@@ -1096,16 +1096,6 @@ namespace {
         return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
       }
 
-      if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
-        if (!PlaceholderE->getTypeLoc().isNull()) {
-          if (!TypeChecker::validateType(
-                  getASTContext(), PlaceholderE->getTypeLoc(),
-                  TypeResolution::forContextual(DC), None))
-            expr->setType(PlaceholderE->getTypeLoc().getType());
-        }
-        return finish(true, expr);
-      }
-
       // Let's try to figure out if `InOutExpr` is out of place early
       // otherwise there is a risk of producing solutions which can't
       // be later applied to AST and would result in the crash in some
@@ -1320,15 +1310,6 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
     hadParameterError |= param->isInvalid();
   }
 
-  // Validate the result type, if present.
-  if (closure->hasExplicitResultType() &&
-      TypeChecker::validateType(getASTContext(),
-                                closure->getExplicitResultTypeLoc(),
-                                TypeResolution::forContextual(closure),
-                                TypeResolverContext::InExpression)) {
-    return false;
-  }
-
   if (hadParameterError)
     return false;
 
@@ -1436,19 +1417,14 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
 
 TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
     UnresolvedSpecializeExpr *us) {
-  SmallVector<TypeRepr *, 4> genericArgs;
-  for (auto &type : us->getUnresolvedParams()) {
-    genericArgs.push_back(type.getTypeRepr());
-  }
-
-  auto angleRange = SourceRange(us->getLAngleLoc(), us->getRAngleLoc());
-
   // If this is a reference type a specialized type, form a TypeExpr.
-
   // The base should be a TypeExpr that we already resolved.
   if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
     if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
-      return TypeExpr::createForSpecializedDecl(ITR, genericArgs, angleRange,
+      return TypeExpr::createForSpecializedDecl(ITR,
+                                                us->getUnresolvedParams(),
+                                                SourceRange(us->getLAngleLoc(),
+                                                            us->getRAngleLoc()),
                                                 getASTContext());
     }
   }
@@ -3045,18 +3021,17 @@ void ConstraintSystem::dump(Expr *E) const {
 }
 
 void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
-  auto getTypeOfExpr = [&](const Expr *E) -> Type {
+  auto getTypeOfExpr = [&](Expr *E) -> Type {
     if (hasType(E))
       return getType(E);
     return Type();
   };
-  auto getTypeOfTypeLoc = [&](const TypeLoc &TL) -> Type {
+  auto getTypeOfTypeLoc = [&](TypeLoc &TL) -> Type {
     if (hasType(TL))
       return getType(TL);
     return Type();
   };
-  auto getTypeOfKeyPathComponent =
-      [&](const KeyPathExpr *KP, unsigned I) -> Type {
+  auto getTypeOfKeyPathComponent = [&](KeyPathExpr *KP, unsigned I) -> Type {
     if (hasType(KP, I))
       return getType(KP, I);
     return Type();

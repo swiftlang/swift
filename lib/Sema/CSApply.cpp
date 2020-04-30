@@ -114,7 +114,7 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
   auto &cs = getConstraintSystem();
   return cs.getCalleeLocator(
       locator, lookThroughApply,
-      [&](const Expr *expr) -> Type { return getType(expr); },
+      [&](Expr *expr) -> Type { return getType(expr); },
       [&](Type type) -> Type { return simplifyType(type)->getRValueType(); },
       [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
         return getOverloadChoiceIfAvailable(locator);
@@ -122,7 +122,7 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
 }
 
 ConstraintLocator *
-Solution::getConstraintLocator(TypedNode anchor,
+Solution::getConstraintLocator(ASTNode anchor,
                                ArrayRef<LocatorPathElt> path) const {
   auto &cs = getConstraintSystem();
   return cs.getConstraintLocator(anchor, path);
@@ -153,10 +153,10 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
 /// This extends functionality of `Expr::isTypeReference` with
 /// support for `UnresolvedDotExpr` and `UnresolvedMemberExpr`.
 /// This method could be used on not yet fully type-checked AST.
-bool ConstraintSystem::isTypeReference(const Expr *E) {
+bool ConstraintSystem::isTypeReference(Expr *E) {
   return E->isTypeReference(
-      [&](const Expr *E) -> Type { return simplifyType(getType(E)); },
-      [&](const Expr *E) -> Decl * {
+      [&](Expr *E) -> Type { return simplifyType(getType(E)); },
+      [&](Expr *E) -> Decl * {
         if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
           return findResolvedMemberRef(
               getConstraintLocator(UDE, ConstraintLocator::Member));
@@ -175,13 +175,13 @@ bool ConstraintSystem::isTypeReference(const Expr *E) {
       });
 }
 
-bool ConstraintSystem::isStaticallyDerivedMetatype(const Expr *E) {
+bool ConstraintSystem::isStaticallyDerivedMetatype(Expr *E) {
   return E->isStaticallyDerivedMetatype(
-      [&](const Expr *E) -> Type { return simplifyType(getType(E)); },
-      [&](const Expr *E) -> bool { return isTypeReference(E); });
+      [&](Expr *E) -> Type { return simplifyType(getType(E)); },
+      [&](Expr *E) -> bool { return isTypeReference(E); });
 }
 
-Type ConstraintSystem::getInstanceType(const TypeExpr *E) {
+Type ConstraintSystem::getInstanceType(TypeExpr *E) {
   if (!hasType(E))
     return Type();
 
@@ -192,7 +192,7 @@ Type ConstraintSystem::getInstanceType(const TypeExpr *E) {
 }
 
 Type ConstraintSystem::getResultType(const AbstractClosureExpr *E) {
-  return E->getResultType([&](const Expr *E) -> Type { return getType(E); });
+  return E->getResultType([&](Expr *E) -> Type { return getType(E); });
 }
 
 static bool buildObjCKeyPathString(KeyPathExpr *E,
@@ -882,9 +882,9 @@ namespace {
       // the base is implicit or not. This helps maintain some invariants around
       // source ranges.
       if (selfParamRef->isImplicit()) {
-          selfCall =
-            CallExpr::createImplicit(context, ref, selfOpenedRef, { },
-                                     [&](const Expr *E) { return cs.getType(E); });
+        selfCall =
+            CallExpr::createImplicit(context, ref, selfOpenedRef, {},
+                                     [&](Expr *E) { return cs.getType(E); });
         selfCall->setType(refTy->getResult());
         cs.cacheType(selfCall);
 
@@ -1030,6 +1030,18 @@ namespace {
       // Build a member reference.
       auto memberRef = resolveConcreteDeclRef(member, memberLocator);
 
+      // If we're referring to a member type, it's just a type
+      // reference.
+      if (auto *TD = dyn_cast<TypeDecl>(member)) {
+        Type refType = simplifyType(openedType);
+        auto ref = TypeExpr::createForDecl(memberLoc, TD, cs.DC);
+        cs.setType(ref, refType);
+        auto *result = new (context) DotSyntaxBaseIgnoredExpr(
+            base, dotLoc, ref, refType);
+        cs.setType(result, refType);
+        return result;
+      }
+
       // If we're referring to the member of a module, it's just a simple
       // reference.
       if (baseTy->is<ModuleType>()) {
@@ -1041,18 +1053,6 @@ namespace {
         auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, cs.getType(ref)));
         return forceUnwrapIfExpected(DSBI, choice, memberLocator);
-      }
-
-      // If we're referring to a member type, it's just a type
-      // reference.
-      if (auto *TD = dyn_cast<TypeDecl>(member)) {
-        Type refType = simplifyType(openedType);
-        auto ref = TypeExpr::createForDecl(memberLoc, TD, cs.DC);
-        cs.setType(ref, refType);
-        auto *result = new (context) DotSyntaxBaseIgnoredExpr(
-            base, dotLoc, ref, refType);
-        cs.setType(result, refType);
-        return result;
       }
 
       bool isUnboundInstanceMember =
@@ -1778,9 +1778,7 @@ namespace {
       if (!index)
         return nullptr;
 
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
+      auto getType = [&](Expr *E) -> Type { return cs.getType(E); };
 
       // Handle dynamic lookup.
       if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
@@ -1968,7 +1966,7 @@ namespace {
           anchor = SubscriptExpr::create(
               ctx, dotExpr, origComponent.getIndexExpr(), ConcreteDeclRef(),
               /*implicit=*/true, AccessSemantics::Ordinary,
-              [&](const Expr *expr) { return simplifyType(cs.getType(expr)); });
+              [&](Expr *expr) { return simplifyType(cs.getType(expr)); });
         } else {
           return nullptr;
         }
@@ -2742,9 +2740,7 @@ namespace {
       if (!result)
         return nullptr;
 
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
+      auto getType = [&](Expr *E) -> Type { return cs.getType(E); };
 
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
@@ -3242,7 +3238,7 @@ namespace {
       // solver was allowed to return free or unresolved types, which can
       // happen while running diagnostics on one of the expressions.
       if (!overload) {
-        const auto *base = expr->getBase();
+        auto *base = expr->getBase();
         auto &de = cs.getASTContext().Diags;
         auto baseType = cs.getType(base);
 
@@ -7237,9 +7233,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
             OpaqueValueExpr(apply->getFn()->getSourceRange(), Type());
         cs.setType(escapable, escapableParams[0].getOldType());
 
-        auto getType = [&](const Expr *E) -> Type {
-          return cs.getType(E);
-        };
+        auto getType = [&](Expr *E) -> Type { return cs.getType(E); };
 
         auto callSubExpr = CallExpr::createImplicit(ctx, body,
                                                     {escapable}, {}, getType);
@@ -7294,10 +7288,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto opaqueValue =
             new (ctx) OpaqueValueExpr(apply->getSourceRange(), openedTy);
         cs.setType(opaqueValue, openedTy);
-        
-        auto getType = [&](const Expr *E) -> Type {
-          return cs.getType(E);
-        };
+
+        auto getType = [&](Expr *E) -> Type { return cs.getType(E); };
 
         auto callSubExpr = CallExpr::createImplicit(ctx, body, {opaqueValue}, {}, getType);
         cs.cacheSubExprTypes(callSubExpr);
@@ -7696,6 +7688,10 @@ namespace {
         auto *params = closure->getParameters();
         TypeChecker::coerceParameterListToType(params, closure, fnType);
 
+        if (closure->hasExplicitResultType()) {
+          closure->setExplicitResultType(fnType->getResult());
+        }
+
         if (auto transform =
                        Rewriter.getAppliedBuilderTransform(closure)) {
           // Apply the function builder to the closure. We want to be in the
@@ -7805,7 +7801,7 @@ namespace {
     explicit CompareExprSourceLocs(SourceManager &sourceMgr)
       : sourceMgr(sourceMgr) { }
 
-    bool operator()(TypedNode lhs, TypedNode rhs) const {
+    bool operator()(ASTNode lhs, ASTNode rhs) const {
       if (static_cast<bool>(lhs) != static_cast<bool>(rhs)) {
         return static_cast<bool>(lhs);
       }
@@ -7825,15 +7821,14 @@ namespace {
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   /// Collect the fixes on a per-expression basis.
-  llvm::SmallDenseMap<TypedNode, SmallVector<ConstraintFix *, 4>>
-      fixesPerAnchor;
+  llvm::SmallDenseMap<ASTNode, SmallVector<ConstraintFix *, 4>> fixesPerAnchor;
   for (auto *fix : solution.Fixes) {
     fixesPerAnchor[fix->getAnchor()].push_back(fix);
   }
 
   // Collect all of the expressions that have fixes, and sort them by
   // source ordering.
-  SmallVector<TypedNode, 4> orderedAnchors;
+  SmallVector<ASTNode, 4> orderedAnchors;
   for (const auto &fix : fixesPerAnchor) {
     orderedAnchors.push_back(fix.getFirst());
   }
@@ -8412,7 +8407,7 @@ ProtocolConformanceRef Solution::resolveConformance(
   return ProtocolConformanceRef::forInvalid();
 }
 
-Type Solution::getType(TypedNode node) const {
+Type Solution::getType(ASTNode node) const {
   auto result = nodeTypes.find(node);
   if (result != nodeTypes.end())
     return result->second;

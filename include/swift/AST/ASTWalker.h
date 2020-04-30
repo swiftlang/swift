@@ -25,7 +25,7 @@ class ModuleDecl;
 class Stmt;
 class Pattern;
 class TypeRepr;
-struct TypeLoc;
+class TypeLoc;
 class ParameterList;
 enum class AccessKind: unsigned char;
 

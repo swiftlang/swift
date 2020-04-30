@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import SafariServices // Clang module
-import _SwiftSafariServicesOverlayShims
+@_implementationOnly import _SwiftSafariServicesOverlayShims
 
 #if os(macOS)
 

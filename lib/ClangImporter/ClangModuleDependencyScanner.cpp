@@ -134,7 +134,7 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
       commandLineArgs.begin(), commandLineArgs.end(),
       "<swift-imported-modules>");
   assert(sourceFilePos != commandLineArgs.end());
-  *sourceFilePos = sourceFileName;
+  *sourceFilePos = sourceFileName.str();
 
   // HACK! Drop the -fmodule-format= argument and the one that
   // precedes it.
@@ -202,7 +202,7 @@ static void recordModuleDependencies(
     // File dependencies for this module.
     std::vector<std::string> fileDeps;
     for (const auto &fileDep : clangModuleDep.FileDeps) {
-      fileDeps.push_back(fileDep.getKey());
+      fileDeps.push_back(fileDep.getKey().str());
     }
 
     // Module-level dependencies.
@@ -334,7 +334,7 @@ bool ClangImporter::addBridgingHeaderDependencies(
 
   // Update the cache with the new information for the module.
   cache.updateDependencies(
-     {moduleName, ModuleDependenciesKind::Swift},
+     {moduleName.str(), ModuleDependenciesKind::Swift},
      std::move(targetModule));
 
   return false;

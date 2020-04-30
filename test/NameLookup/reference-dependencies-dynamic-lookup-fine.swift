@@ -4,10 +4,10 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-fine-grained-dependencies -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t.swiftdeps
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t.swiftdeps
 
 // Check that the output is deterministic.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-fine-grained-dependencies -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
 // RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t.swiftdeps >%t-processed.swiftdeps
 // RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t-2.swiftdeps >%t-2-processed.swiftdeps
 // RUN: diff %t-processed.swiftdeps %t-2-processed.swiftdeps
