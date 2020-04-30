@@ -146,6 +146,14 @@ sudo apt-get install    \
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
 
+In addition, you'll need to set up Git Large File Storage for your user account:
+
+```
+curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+sudo apt-get install git-lfs
+git lfs install
+```
+
 Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md).
 
 ### Getting Sources for Swift and Related Projects
