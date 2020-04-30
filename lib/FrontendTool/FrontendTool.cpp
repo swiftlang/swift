@@ -23,7 +23,6 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "ImportedModules.h"
 #include "ScanDependencies.h"
-#include "ReferenceDependencies.h"
 #include "TBD.h"
 
 #include "swift/Subsystems.h"
@@ -137,6 +136,17 @@ swift::frontend::utils::escapeForMake(StringRef raw,
   buffer.push_back('\0');
 
   return buffer.data();
+}
+
+static std::vector<std::string>
+reversePathSortedFilenames(const ArrayRef<std::string> elts) {
+  std::vector<std::string> tmp(elts.begin(), elts.end());
+  std::sort(tmp.begin(), tmp.end(), [](const std::string &a,
+                                       const std::string &b) -> bool {
+              return std::lexicographical_compare(a.rbegin(), a.rend(),
+                                                  b.rbegin(), b.rend());
+            });
+  return tmp;
 }
 
 /// Emits a Make-style dependencies file.
@@ -942,17 +952,11 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
       auto LangOpts = Invocation.getLangOptions();
-      if (LangOpts.EnableFineGrainedDependencies) {
-        (void)fine_grained_dependencies::emitReferenceDependencies(
-            Instance.getASTContext().Diags, SF,
-            *Instance.getDependencyTracker(),
-            referenceDependenciesFilePath,
-            LangOpts.EmitFineGrainedDependencySourcefileDotFiles);
-      } else {
-        (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
-                                        *Instance.getDependencyTracker(),
-                                        referenceDependenciesFilePath);
-      }
+      (void)fine_grained_dependencies::emitReferenceDependencies(
+          Instance.getASTContext().Diags, SF,
+          *Instance.getDependencyTracker(),
+          referenceDependenciesFilePath,
+          LangOpts.EmitFineGrainedDependencySourcefileDotFiles);
     }
   }
 }

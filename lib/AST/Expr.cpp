@@ -1190,9 +1190,9 @@ ErasureExpr *ErasureExpr::create(ASTContext &ctx, Expr *subExpr, Type type,
 
 UnresolvedSpecializeExpr *UnresolvedSpecializeExpr::create(ASTContext &ctx,
                                              Expr *SubExpr, SourceLoc LAngleLoc,
-                                             ArrayRef<TypeLoc> UnresolvedParams,
+                                             ArrayRef<TypeRepr *> UnresolvedParams,
                                              SourceLoc RAngleLoc) {
-  auto size = totalSizeToAlloc<TypeLoc>(UnresolvedParams.size());
+  auto size = totalSizeToAlloc<TypeRepr *>(UnresolvedParams.size());
   auto mem = ctx.Allocate(size, alignof(UnresolvedSpecializeExpr));
   return ::new(mem) UnresolvedSpecializeExpr(SubExpr, LAngleLoc,
                                              UnresolvedParams, RAngleLoc);
@@ -1858,6 +1858,11 @@ bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
   if (auto *VD = getCapturedSelfDecl())
     return VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>();
   return false;
+}
+
+void ClosureExpr::setExplicitResultType(Type ty) {
+  assert(ty && !ty->hasTypeVariable());
+  ExplicitResultType->setType(MetatypeType::get(ty));
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)

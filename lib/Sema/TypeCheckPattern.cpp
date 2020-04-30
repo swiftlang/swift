@@ -211,13 +211,11 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     assert(!components.empty() && "no components before generic args?!");
     
     // Track the AST location of the generic arguments.
-    SmallVector<TypeRepr*, 4> argTypeReprs;
-    for (auto &arg : use->getUnresolvedParams())
-      argTypeReprs.push_back(arg.getTypeRepr());
     auto origComponent = components.back();
     components.back() =
       GenericIdentTypeRepr::create(C, origComponent->getNameLoc(),
-                                   origComponent->getNameRef(), argTypeReprs,
+                                   origComponent->getNameRef(),
+                                   use->getUnresolvedParams(),
                                    SourceRange(use->getLAngleLoc(),
                                                use->getRAngleLoc()));
 
