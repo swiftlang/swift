@@ -49,11 +49,11 @@ InheritedTypeRequest::evaluate(
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
-    resolution = TypeResolution::forStructural(dc);
+    resolution = TypeResolution::forStructural(dc, options);
     break;
 
   case TypeResolutionStage::Interface:
-    resolution = TypeResolution::forInterface(dc);
+    resolution = TypeResolution::forInterface(dc, options);
     break;
 
   case TypeResolutionStage::Contextual: {
@@ -72,7 +72,7 @@ InheritedTypeRequest::evaluate(
 
   Type inheritedType;
   if (typeLoc.getTypeRepr())
-    inheritedType = resolution->resolveType(typeLoc.getTypeRepr(), options);
+    inheritedType = resolution->resolveType(typeLoc.getTypeRepr());
   else
     inheritedType = typeLoc.getType();
 

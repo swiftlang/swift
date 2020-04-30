@@ -538,11 +538,11 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
-  auto resolution = TypeResolution::forContextual(DC, GenericEnv);
+  auto resolution = TypeResolution::forContextual(DC, GenericEnv, options);
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  return TypeChecker::validateType(Ctx, T, resolution, options);
+  return TypeChecker::validateType(Ctx, T, resolution);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.

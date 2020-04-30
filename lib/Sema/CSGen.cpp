@@ -1453,8 +1453,8 @@ namespace {
       TypeResolutionOptions options(TypeResolverContext::InExpression);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       bool hadError = TypeChecker::validateType(
-          CS.getASTContext(), loc, TypeResolution::forContextual(CS.DC),
-          options);
+          CS.getASTContext(), loc,
+          TypeResolution::forContextual(CS.DC, options));
       return hadError ? Type() : loc.getType();
     }
 
@@ -1715,10 +1715,9 @@ namespace {
             TypeResolutionOptions options(TypeResolverContext::InExpression);
             options |= TypeResolutionFlags::AllowUnboundGenerics;
             auto tyLoc = TypeLoc{specializations[i]};
-            if (TypeChecker::validateType(CS.getASTContext(),
-                                tyLoc,
-                                TypeResolution::forContextual(CS.DC),
-                                options))
+            if (TypeChecker::validateType(
+                    CS.getASTContext(), tyLoc,
+                    TypeResolution::forContextual(CS.DC, options)))
               return Type();
 
             CS.addConstraint(ConstraintKind::Bind,
@@ -2660,10 +2659,10 @@ namespace {
           // of is-patterns applied to an irrefutable pattern.
           pattern = pattern->getSemanticsProvidingPattern();
           while (auto isp = dyn_cast<IsPattern>(pattern)) {
-            if (TypeChecker::validateType(CS.getASTContext(),
-                                          isp->getCastTypeLoc(),
-                                          TypeResolution::forContextual(CS.DC),
-                                          TypeResolverContext::InExpression)) {
+            if (TypeChecker::validateType(
+                    CS.getASTContext(), isp->getCastTypeLoc(),
+                    TypeResolution::forContextual(
+                        CS.DC, TypeResolverContext::InExpression))) {
               return false;
             }
 
@@ -2986,10 +2985,9 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (TypeChecker::validateType(CS.getASTContext(),
-                                    expr->getCastTypeLoc(),
-                                    TypeResolution::forContextual(CS.DC),
-                                    options))
+      if (TypeChecker::validateType(
+              CS.getASTContext(), expr->getCastTypeLoc(),
+              TypeResolution::forContextual(CS.DC, options)))
         return nullptr;
 
       // Open the type we're casting to.
@@ -3016,10 +3014,9 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (TypeChecker::validateType(CS.getASTContext(),
-                                    expr->getCastTypeLoc(),
-                                    TypeResolution::forContextual(CS.DC),
-                                    options))
+      if (TypeChecker::validateType(
+              CS.getASTContext(), expr->getCastTypeLoc(),
+              TypeResolution::forContextual(CS.DC, options)))
         return nullptr;
 
       // Open the type we're casting to.
@@ -3053,10 +3050,9 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (TypeChecker::validateType(ctx,
-                                    expr->getCastTypeLoc(),
-                                    TypeResolution::forContextual(CS.DC),
-                                    options))
+      if (TypeChecker::validateType(
+              ctx, expr->getCastTypeLoc(),
+              TypeResolution::forContextual(CS.DC, options)))
         return nullptr;
 
       // Open the type we're casting to.
@@ -3084,10 +3080,9 @@ namespace {
       auto &ctx = CS.getASTContext();
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (TypeChecker::validateType(ctx,
-                                    expr->getCastTypeLoc(),
-                                    TypeResolution::forContextual(CS.DC),
-                                    options))
+      if (TypeChecker::validateType(
+              ctx, expr->getCastTypeLoc(),
+              TypeResolution::forContextual(CS.DC, options)))
         return nullptr;
 
       // Open up the type we're checking.
