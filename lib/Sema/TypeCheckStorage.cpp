@@ -1764,9 +1764,16 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
 
   bool isModify = accessor->getAccessorKind() == AccessorKind::Modify;
 
+  // Special-case for a modify coroutine of a simple stored property with
+  // observers. We can yield a borrowed copy of the underlying storage
+  // in this case. However, if the accessor was synthesized on-demand,
+  // we do the more general thing, because on-demand accessors might be
+  // serialized, which prevents them from being able to directly reference
+  // didSet/willSet accessors, which are private.
   if (isModify &&
       (storageReadWriteImpl == ReadWriteImplKind::StoredWithSimpleDidSet ||
-       storageReadWriteImpl == ReadWriteImplKind::InheritedWithSimpleDidSet)) {
+       storageReadWriteImpl == ReadWriteImplKind::InheritedWithSimpleDidSet) &&
+      !accessor->hasForcedStaticDispatch()) {
     return synthesizeModifyCoroutineBodyWithSimpleDidSet(accessor, ctx);
   }
 
