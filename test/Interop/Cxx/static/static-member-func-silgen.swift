@@ -11,6 +11,7 @@ func callStaticMemberFunc() -> CInt {
 // CHECK: [[VALUE:%.*]] = apply [[FUNC]]() : $@convention(c) () -> Int32
 // CHECK: return [[VALUE]] : $Int32
 
+// CHECK: // clang name: WithStaticMemberFunc::staticMemberFunc
 // CHECK: sil [clang WithStaticMemberFunc.staticMemberFunc] @{{_ZN20WithStaticMemberFunc16staticMemberFuncEv|\?staticMemberFunc@WithStaticMemberFunc@@SAHXZ}} : $@convention(c) () -> Int32
 
 func callStaticMemberFuncAddr() -> CInt {
@@ -21,4 +22,5 @@ func callStaticMemberFuncAddr() -> CInt {
 // CHECK: [[FUNC:%.*]] = function_ref @{{_ZN20WithStaticMemberFunc26getStaticMemberFuncAddressEv|\?getStaticMemberFuncAddress@WithStaticMemberFunc@@SAP6AHXZXZ}} : $@convention(c) () -> Optional<@convention(c) () -> Int32>
 // CHECK: [[VALUE:%.*]] = apply [[FUNC]]() : $@convention(c) () -> Optional<@convention(c) () -> Int32>
 
+// CHECK: // clang name: WithStaticMemberFunc::getStaticMemberFuncAddress
 // CHECK: sil [clang WithStaticMemberFunc.getStaticMemberFuncAddress] @{{_ZN20WithStaticMemberFunc26getStaticMemberFuncAddressEv|\?getStaticMemberFuncAddress@WithStaticMemberFunc@@SAP6AHXZXZ}} : $@convention(c) () -> Optional<@convention(c) () -> Int32>
