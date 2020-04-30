@@ -144,13 +144,13 @@ protocol P3 {
 
 // Test for not crashing on recursive aliases
 protocol Circular {
-  typealias Y = Self.Y // expected-error {{type alias 'Y' references itself}}
+  typealias Y = Self.Y // expected-error {{type alias 'Y' references itself}} expected-note {{while resolving type 'Self.Y'}}
 
-  typealias Y2 = Y2 // expected-error {{type alias 'Y2' references itself}}
+  typealias Y2 = Y2 // expected-error {{type alias 'Y2' references itself}} expected-note {{while resolving type 'Y2'}}
 
-  typealias Y3 = Y4 // expected-error {{type alias 'Y3' references itself}}
+  typealias Y3 = Y4 // expected-error {{type alias 'Y3' references itself}} expected-note {{while resolving type 'Y4'}}
 
-  typealias Y4 = Y3 // expected-note {{through reference here}}
+  typealias Y4 = Y3 // expected-note {{through reference here}} expected-note {{while resolving type 'Y3'}}
 }
 
 // Qualified and unqualified references to protocol typealiases from concrete type

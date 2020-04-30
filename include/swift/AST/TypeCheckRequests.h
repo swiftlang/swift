@@ -50,6 +50,7 @@ class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
 class Witness;
+class TypeResolution;
 struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
@@ -2405,6 +2406,28 @@ public:
   // Cached.
   bool isCached() const { return true; }
 };
+
+class ResolveTypeRequest
+    : public SimpleRequest<ResolveTypeRequest,
+                           Type(TypeResolution *, TypeRepr *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+public:
+  // Cycle handling.
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, TypeResolution *resolution,
+                TypeRepr *repr) const;
+};
+
+void simple_display(llvm::raw_ostream &out, const TypeResolution *resolution);
+SourceLoc extractNearestSourceLoc(const TypeRepr *repr);
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
