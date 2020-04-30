@@ -1492,7 +1492,7 @@ static Expr *maybeWrapInOutExpr(Expr *expr, ASTContext &ctx) {
 /// setter which calls them.
 static std::pair<BraceStmt *, bool>
 synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
-                             ASTContext &Ctx) {
+                             ASTContext &Ctx, bool isLazy = false) {
   auto VD = cast<VarDecl>(Set->getStorage());
 
   SourceLoc Loc = VD->getLoc();
@@ -1559,10 +1559,9 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     // parameter or it's provided explicitly in the parameter list.
     if (!didSet->isSimpleDidSet()) {
       Expr *OldValueExpr =
-          buildStorageReference(Set, VD, target,
+          buildStorageReference(Set, VD, isLazy ? TargetImpl::Ordinary : target,
                                 /*isUsedForGetAccess=*/true,
-                                /*isUsedForSetAccess=*/true,
-                                Ctx);
+                                /*isUsedForSetAccess=*/true, Ctx);
 
       // Error recovery.
       if (OldValueExpr == nullptr) {
@@ -1590,8 +1589,9 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(), true);
   ValueDRE->setType(ValueDecl->getType());
-  createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, target,
-                                            SetterBody, Ctx);
+  createPropertyStoreOrCallSuperclassSetter(
+      Set, ValueDRE, isLazy ? VD->getLazyStorageProperty() : VD, target,
+      SetterBody, Ctx);
 
   if (auto didSet = VD->getParsedAccessor(AccessorKind::DidSet))
     callObserver(didSet, OldValue);
@@ -1619,6 +1619,10 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
       // Lazy property setters write to the underlying storage.
+      if (var->hasObservers()) {
+        return synthesizeObservedSetterBody(setter, TargetImpl::Storage, ctx,
+                                            /*isLazy=*/true);
+      }
       auto *storage = var->getLazyStorageProperty();
       return synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Storage,
                                                     storage, ctx);
@@ -2791,11 +2795,10 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   }
 
   // Lazy properties must be written as stored properties in the source.
-  if (!info.isSimpleStored()) {
-    diagnoseAndRemoveAttr(var, attr,
-                          info.hasStorage()
-                          ? diag::lazy_not_observable
-                          : diag::lazy_not_on_computed);
+  if (info.getReadImpl() != ReadImplKind::Stored &&
+      (info.getWriteImpl() != WriteImplKind::Stored &&
+       info.getWriteImpl() != WriteImplKind::StoredWithObservers)) {
+    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_computed);
     invalid = true;
   }
 
