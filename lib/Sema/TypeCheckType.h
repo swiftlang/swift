@@ -230,6 +230,15 @@ public:
     return !static_cast<bool>(unsigned(set) & ~unsigned(flags));
   }
 
+  friend bool operator==(TypeResolutionOptions lhs, TypeResolutionOptions rhs) {
+    return lhs.base == rhs.base && lhs.context == rhs.context &&
+           lhs.flags == rhs.flags;
+  }
+
+  friend bool operator!=(TypeResolutionOptions lhs, TypeResolutionOptions rhs) {
+    return !(lhs == rhs);
+  }
+
   /// Produce type resolution options with additional flags.
   friend TypeResolutionOptions operator|(TypeResolutionOptions lhs,
                                          TypeResolutionFlags rhs) {
@@ -276,6 +285,7 @@ public:
 class TypeResolution {
   DeclContext *dc;
   TypeResolutionStage stage;
+  TypeResolutionOptions options;
 
   union {
     /// The generic environment used to map to archetypes.
@@ -292,8 +302,9 @@ class TypeResolution {
     } complete;
   };
 
-  TypeResolution(DeclContext *dc, TypeResolutionStage stage)
-    : dc(dc), stage(stage) { }
+  TypeResolution(DeclContext *dc, TypeResolutionStage stage,
+                 TypeResolutionOptions options)
+      : dc(dc), stage(stage), options(options) {}
 
   GenericSignatureBuilder *getGenericSignatureBuilder() const;
 
@@ -301,28 +312,37 @@ public:
   /// Form a type resolution for the structure of a type, which does not
   /// attempt to resolve member types of type parameters to a particular
   /// associated type.
-  static TypeResolution forStructural(DeclContext *dc);
-
-  /// Form a type resolution for an interface type, which is a complete
-  /// description of the type using generic parameters.
-  static TypeResolution forInterface(DeclContext *dc);
+  static TypeResolution forStructural(DeclContext *dc,
+                                      TypeResolutionOptions opts);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution forInterface(DeclContext *dc,
-                                     GenericSignature genericSig);
+                                     TypeResolutionOptions opts);
+
+  /// Form a type resolution for an interface type, which is a complete
+  /// description of the type using generic parameters.
+  static TypeResolution forInterface(DeclContext *dc,
+                                     GenericSignature genericSig,
+                                     TypeResolutionOptions opts);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given declaration
   /// context.
-  static TypeResolution forContextual(DeclContext *dc);
+  static TypeResolution forContextual(DeclContext *dc,
+                                      TypeResolutionOptions opts);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given generic
   /// environment.
   static TypeResolution forContextual(DeclContext *dc,
-                                      GenericEnvironment *genericEnv);
+                                      GenericEnvironment *genericEnv,
+                                      TypeResolutionOptions opts);
 
+public:
+  TypeResolution withOptions(TypeResolutionOptions opts) const;
+
+public:
   /// Retrieve the ASTContext in which this resolution occurs.
   ASTContext &getASTContext() const;
 
@@ -332,6 +352,8 @@ public:
 
   /// Retrieve the type resolution stage.
   TypeResolutionStage getStage() const { return stage; }
+
+  TypeResolutionOptions getOptions() const { return options; }
 
   /// Retrieves the generic signature for the context, or NULL if there is
   /// no generic signature to resolve types.
@@ -344,10 +366,8 @@ public:
   ///
   /// \param TyR The type representation to check.
   ///
-  /// \param options Options that alter type resolution.
-  ///
   /// \returns a well-formed type or an ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR, TypeResolutionOptions options);
+  Type resolveType(TypeRepr *TyR);
 
   /// Whether this type resolution uses archetypes (vs. generic parameters).
   bool usesArchetypes() const;

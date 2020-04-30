@@ -2622,8 +2622,8 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    auto resolution = TypeResolution::forContextual(PD);
-    return resolution.resolveType(typeEraserRepr, /*options=*/None);
+    auto resolution = TypeResolution::forContextual(PD, None);
+    return resolution.resolveType(typeEraserRepr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -2809,8 +2809,8 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-    auto resolution = TypeResolution::forContextual(DC);
-    T = resolution.resolveType(ProtoTypeLoc.getTypeRepr(), options);
+    auto resolution = TypeResolution::forContextual(DC, options);
+    T = resolution.resolveType(ProtoTypeLoc.getTypeRepr());
     ProtoTypeLoc.setType(T);
   }
 
@@ -4469,12 +4469,13 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
         return derivative->getParent() == func->getParent();
       };
 
-  auto resolution = TypeResolution::forContextual(derivative->getDeclContext());
   Type baseType;
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
     TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowModule;
-    baseType = resolution.resolveType(baseTypeRepr, options);
+    auto resolution =
+        TypeResolution::forContextual(derivative->getDeclContext(), options);
+    baseType = resolution.resolveType(baseTypeRepr);
   }
   if (baseType && baseType->hasError())
     return true;
@@ -4982,10 +4983,11 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
       [&](AbstractFunctionDecl *decl) { return true; };
 
-  auto resolution = TypeResolution::forContextual(transpose->getDeclContext());
+  auto resolution =
+      TypeResolution::forContextual(transpose->getDeclContext(), None);
   Type baseType;
   if (attr->getBaseTypeRepr())
-    baseType = resolution.resolveType(attr->getBaseTypeRepr(), None);
+    baseType = resolution.resolveType(attr->getBaseTypeRepr());
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
                                : defaultUnqualifiedLookupOptions) |
