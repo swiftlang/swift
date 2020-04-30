@@ -121,9 +121,10 @@ public:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &e) const;
-  void writeDependencySink(Evaluator &eval,
-                           ReferencedNameTracker &tracker, Type t) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &e) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
+                           Type t) const;
 };
 
 /// Request the raw type of the given enum.
@@ -890,7 +891,8 @@ public:
 
 public:
   // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 /// Request to obtain a list of stored properties in a nominal type.
@@ -2030,7 +2032,8 @@ public:
 
 public:
   // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 /// Computes whether the specified type or a super-class/super-protocol has the
@@ -2271,8 +2274,9 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &eval) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceLookupResult r) const;
 };
 
@@ -2298,8 +2302,9 @@ public:
   void cacheResult(evaluator::SideEffect) const;
 
 public:
-  evaluator::DependencySource readDependencySource(Evaluator &eval) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            evaluator::SideEffect) const;
 };
 

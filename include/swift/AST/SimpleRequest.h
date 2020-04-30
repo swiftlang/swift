@@ -232,7 +232,8 @@ SourceLoc extractNearestSourceLoc(const std::tuple<First, Rest...> &value) {
 /// and specify \c RequestFlags::DependencySource in addition to one of
 /// the 3 caching kinds defined above.
 /// \code
-///   evaluator::DependencySource readDependencySource(Evaluator &) const;
+///   evaluator::DependencySource
+///   readDependencySource(const evaluator::DependencyCollector &) const;
 /// \endcode
 ///
 /// Requests that define dependency sinks should instead override
@@ -241,8 +242,7 @@ SourceLoc extractNearestSourceLoc(const std::tuple<First, Rest...> &value) {
 /// \c RequestFlags::DependencySource should be specified along with
 /// one of the 3 caching kinds defined above.
 /// \code
-///   void writeDependencySink(Evaluator &,
-///                            ReferencedNameTracker &, Output) const;
+///   void writeDependencySink(evaluator::DependencyCollector &, Output) const;
 /// \endcode
 template<typename Derived, typename Signature, RequestFlags Caching>
 class SimpleRequest;
