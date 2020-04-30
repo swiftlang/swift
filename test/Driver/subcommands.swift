@@ -1,3 +1,6 @@
+// SWIFT_ENABLE_TENSORFLOW: REPL is disabled in tensorflow branch.
+// UNSUPPORTED: tensorflow
+
 // REQUIRES: shell
 // Check that 'swift' and 'swift repl' invoke the REPL.
 
