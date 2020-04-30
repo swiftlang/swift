@@ -14,10 +14,11 @@
 #define SWIFT_SIL_LINEARLIFETIMECHECKER_PRIVATE_H
 
 #include "swift/SIL/LinearLifetimeChecker.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 
-struct LinearLifetimeChecker::ErrorBehaviorKind {
+struct LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::ErrorBehaviorKind {
   enum inner_t {
     Invalid = 0,
     ReturnFalse = 1,
@@ -53,14 +54,15 @@ struct LinearLifetimeChecker::ErrorBehaviorKind {
   }
 };
 
-class LinearLifetimeChecker::Error {
-  ErrorBehaviorKind errorBehavior;
+class LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::Error {
+  friend class ErrorBuilder;
+
   bool foundUseAfterFree = false;
   bool foundLeak = false;
   bool foundOverConsume = false;
 
 public:
-  Error(ErrorBehaviorKind errorBehavior) : errorBehavior(errorBehavior) {}
+  Error() {}
 
   bool getFoundError() const {
     return foundUseAfterFree || foundLeak || foundOverConsume;
@@ -71,41 +73,89 @@ public:
   bool getFoundUseAfterFree() const { return foundUseAfterFree; }
 
   bool getFoundOverConsume() const { return foundOverConsume; }
+};
 
-  void handleLeak(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundLeak = true;
+class LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::ErrorBuilder {
+  StringRef functionName;
+  ErrorBehaviorKind behavior;
+  Optional<Error> error;
 
-    if (errorBehavior.shouldPrintMessage())
+  // NOTE: This is only here so that we can emit a unique id for all errors to
+  // ease working with FileCheck.
+  static unsigned errorMessageCount;
+
+public:
+  ErrorBuilder(const SILFunction &fn,
+               LinearLifetimeChecker::ErrorBehaviorKind behavior)
+      : functionName(fn.getName()), behavior(behavior), error(Error()) {}
+
+  ErrorBuilder(const SILFunction &fn,
+               LinearLifetimeChecker::ErrorBehaviorKind::inner_t behavior)
+      : functionName(fn.getName()), behavior(behavior), error(Error()) {}
+
+  Error getFinalError() && {
+    auto result = *error;
+    error = None;
+    return result;
+  }
+
+  bool handleLeak(llvm::function_ref<void()> &&messagePrinterFunc) {
+    error->foundLeak = true;
+
+    if (behavior.shouldPrintMessage()) {
+      llvm::errs() << "Error#: " << errorMessageCount
+                   << ". Begin Error in Function: '" << functionName << "'\n";
       messagePrinterFunc();
+      llvm::errs() << "Error#: " << errorMessageCount
+                   << ". End Error in Function: '" << functionName << "'\n";
+      ++errorMessageCount;
+    }
 
-    if (errorBehavior.shouldReturnFalseOnLeak())
-      return;
+    if (behavior.shouldReturnFalseOnLeak()) {
+      return false;
+    }
 
     // We already printed out our error if we needed to, so don't pass it along.
-    handleError([]() {});
+    return handleError([]() {}, true);
   }
 
-  void handleOverConsume(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundOverConsume = true;
-    handleError(std::move(messagePrinterFunc));
+  bool handleOverConsume(llvm::function_ref<void()> &&messagePrinterFunc) {
+    error->foundOverConsume = true;
+    return handleError(std::move(messagePrinterFunc));
   }
 
-  void handleUseAfterFree(llvm::function_ref<void()> &&messagePrinterFunc) {
-    foundUseAfterFree = true;
-    handleError(std::move(messagePrinterFunc));
+  bool handleUseAfterFree(llvm::function_ref<void()> &&messagePrinterFunc) {
+    error->foundUseAfterFree = true;
+    return handleError(std::move(messagePrinterFunc));
+  }
+
+  bool
+  handleMalformedSIL(llvm::function_ref<void()> &&messagePrinterFunc) const {
+    return handleError(std::move(messagePrinterFunc));
   }
 
 private:
-  void handleError(llvm::function_ref<void()> &&messagePrinterFunc) {
-    if (errorBehavior.shouldPrintMessage())
+  bool handleError(llvm::function_ref<void()> &&messagePrinterFunc,
+                   bool quiet = false) const {
+    if (behavior.shouldPrintMessage()) {
+      if (!quiet) {
+        llvm::errs() << "Error#: " << errorMessageCount
+                     << ". Begin Error in Function: '" << functionName << "'\n";
+      }
       messagePrinterFunc();
-
-    if (errorBehavior.shouldReturnFalse()) {
-      return;
+      if (!quiet) {
+        llvm::errs() << "Error#: " << errorMessageCount
+                     << ". End Error in Function: '" << functionName << "'\n";
+        ++errorMessageCount;
+      }
     }
 
-    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
-    llvm_unreachable("triggering standard assertion failure routine");
+    if (behavior.shouldReturnFalse()) {
+      return false;
+    }
+
+    llvm::errs() << "Found ownership error?!\n";
+    llvm::report_fatal_error("triggering standard assertion failure routine");
   }
 };
 

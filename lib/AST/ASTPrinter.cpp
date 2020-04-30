@@ -4365,7 +4365,7 @@ public:
       if (T->hasExplicitAnyObject())
         Printer << "AnyObject";
       else
-        Printer << "Any";
+        Printer.printKeyword("Any", Options);
     } else {
       interleave(T->getMembers(), [&](Type Ty) { visit(Ty); },
                  [&] { Printer << " & "; });

@@ -264,6 +264,12 @@ constructValuesForKey(SILValue initialValue,
       continue;
     }
 
+    // unconditional_checked_cast_addr does a take on its input memory.
+    if (isa<UnconditionalCheckedCastAddrInst>(user)) {
+      wellBehavedWriteAccumulator.push_back(op);
+      continue;
+    }
+
     if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
       if (ccabi->getConsumptionKind() != CastConsumptionKind::CopyOnSuccess) {
         wellBehavedWriteAccumulator.push_back(op);

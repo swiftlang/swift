@@ -406,6 +406,27 @@ PropertyWrapperTypeInfoRequest::evaluate(
     }
   }
 
+  auto diagnoseInvalidDynamicSelf = [&]() -> bool {
+    bool invalidDynamicSelf = false;
+    if (result.projectedValueVar &&
+        result.projectedValueVar->getValueInterfaceType()->is<DynamicSelfType>()) {
+      result.projectedValueVar->diagnose(
+          diag::property_wrapper_dynamic_self_type, /*projectedValue=*/true);
+      invalidDynamicSelf = true;
+    }
+
+    if (result.valueVar->getValueInterfaceType()->is<DynamicSelfType>()) {
+      result.valueVar->diagnose(
+          diag::property_wrapper_dynamic_self_type, /*projectedValue=*/false);
+      invalidDynamicSelf = true;
+    }
+
+    return invalidDynamicSelf;
+  };
+
+  if (diagnoseInvalidDynamicSelf())
+    return PropertyWrapperTypeInfo();
+
   return result;
 }
 

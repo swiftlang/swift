@@ -420,21 +420,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
 
-  Opts.EnableFineGrainedDependencies =
-      Args.hasFlag(options::OPT_enable_fine_grained_dependencies,
-                   options::OPT_disable_fine_grained_dependencies,
-                   Opts.EnableFineGrainedDependencies);
   Opts.EnableTypeFingerprints =
       Args.hasFlag(options::OPT_enable_type_fingerprints,
                    options::OPT_disable_type_fingerprints,
                    LangOptions().EnableTypeFingerprints);
-
-  if (!Opts.EnableFineGrainedDependencies && Opts.EnableTypeFingerprints) {
-    Diags.diagnose(
-        SourceLoc(),
-        diag::warning_type_fingerprints_require_fine_grained_dependencies);
-    Opts.EnableTypeFingerprints = false;
-  }
 
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
@@ -451,7 +440,19 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
+
+  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
+
   Opts.Playground |= Args.hasArg(OPT_playground);
+  Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
+  if (Args.hasArg(OPT_disable_playground_transform))
+    Opts.PlaygroundTransform = false;
+  Opts.PlaygroundHighPerformance |=
+      Args.hasArg(OPT_playground_high_performance);
+
+  // This can be enabled independently of the playground transform.
+  Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
+
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);

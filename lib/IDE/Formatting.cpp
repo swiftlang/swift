@@ -2295,9 +2295,8 @@ private:
 
       SourceLoc ContextLoc = getContextLocForArgs(SM, USE);
       ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
-      for (auto &Arg: USE->getUnresolvedParams()) {
-        if (auto *T = Arg.getTypeRepr())
-          Aligner.updateAlignment(T->getSourceRange(), T);
+      for (auto *T : USE->getUnresolvedParams()) {
+        Aligner.updateAlignment(T->getSourceRange(), T);
       }
       return Aligner.getContextAndSetAlignment(CtxOverride);
     }

@@ -572,6 +572,12 @@ struct ImmutableAddressUseVerifier {
         if (isConsumingOrMutatingYieldUse(use))
           return true;
         break;
+      case SILInstructionKind::BeginAccessInst:
+        if (cast<BeginAccessInst>(inst)->getAccessKind() != SILAccessKind::Read)
+          return true;
+        break;
+      case SILInstructionKind::EndAccessInst:
+        break;
       case SILInstructionKind::CopyAddrInst:
         if (isConsumingOrMutatingCopyAddrUse(use))
           return true;
@@ -692,6 +698,8 @@ public:
     }
     llvm::dbgs() << "In function:\n";
     F.print(llvm::dbgs());
+    llvm::dbgs() << "In module:\n";
+    F.getModule().print(llvm::dbgs());
 
     // We abort by default because we want to always crash in
     // the debugger.

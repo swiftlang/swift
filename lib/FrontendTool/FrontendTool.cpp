@@ -23,7 +23,6 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "ImportedModules.h"
 #include "ScanDependencies.h"
-#include "ReferenceDependencies.h"
 #include "TBD.h"
 
 #include "swift/Subsystems.h"
@@ -137,6 +136,17 @@ swift::frontend::utils::escapeForMake(StringRef raw,
   buffer.push_back('\0');
 
   return buffer.data();
+}
+
+static std::vector<std::string>
+reversePathSortedFilenames(const ArrayRef<std::string> elts) {
+  std::vector<std::string> tmp(elts.begin(), elts.end());
+  std::sort(tmp.begin(), tmp.end(), [](const std::string &a,
+                                       const std::string &b) -> bool {
+              return std::lexicographical_compare(a.rbegin(), a.rend(),
+                                                  b.rbegin(), b.rend());
+            });
+  return tmp;
 }
 
 /// Emits a Make-style dependencies file.
@@ -643,8 +653,7 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
-/// \return true on error.
-static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
+static void emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
                                   const CompilerInvocation &Invocation,
                                   const CompilerInstance &Instance);
 
@@ -942,17 +951,11 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
       auto LangOpts = Invocation.getLangOptions();
-      if (LangOpts.EnableFineGrainedDependencies) {
-        (void)fine_grained_dependencies::emitReferenceDependencies(
-            Instance.getASTContext().Diags, SF,
-            *Instance.getDependencyTracker(),
-            referenceDependenciesFilePath,
-            LangOpts.EmitFineGrainedDependencySourcefileDotFiles);
-      } else {
-        (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
-                                        *Instance.getDependencyTracker(),
-                                        referenceDependenciesFilePath);
-      }
+      (void)fine_grained_dependencies::emitReferenceDependencies(
+          Instance.getASTContext().Diags, SF,
+          *Instance.getDependencyTracker(),
+          referenceDependenciesFilePath,
+          LangOpts.EmitFineGrainedDependencySourcefileDotFiles);
     }
   }
 }
@@ -1140,15 +1143,14 @@ static bool performCompileStepsPostSema(const CompilerInvocation &Invocation,
 }
 
 /// Emits index data for all primary inputs, or the main module.
-static bool
+static void
 emitIndexData(const CompilerInvocation &Invocation, const CompilerInstance &Instance) {
-  bool hadEmitIndexDataError = false;
   if (Instance.getPrimarySourceFiles().empty())
-    return emitIndexDataIfNeeded(nullptr, Invocation, Instance);
-  for (SourceFile *SF : Instance.getPrimarySourceFiles())
-    hadEmitIndexDataError = emitIndexDataIfNeeded(SF, Invocation, Instance) ||
-                            hadEmitIndexDataError;
-  return hadEmitIndexDataError;
+    emitIndexDataIfNeeded(nullptr, Invocation, Instance);
+  else {
+    for (SourceFile *SF : Instance.getPrimarySourceFiles())
+      emitIndexDataIfNeeded(SF, Invocation, Instance);
+  }
 }
 
 /// Emits all "one-per-module" supplementary outputs that don't depend on
@@ -1313,19 +1315,16 @@ static bool performCompile(CompilerInstance &Instance,
   emitSwiftRangesForAllPrimaryInputsIfNeeded(Invocation, Instance);
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
-  if (Context.hadError()) {
-    //  Emit the index store data even if there were compiler errors.
-    (void)emitIndexData(Invocation, Instance);
+  emitIndexData(Invocation, Instance);
+
+  if (Context.hadError())
     return true;
-  }
 
   (void)emitLoadedModuleTraceForAllPrimariesIfNeeded(
       Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    if (emitIndexData(Invocation, Instance))
-      return true;
     // FIXME: Whole-module outputs with a non-whole-module -typecheck ought to
     // be disallowed, but the driver implements -index-file mode by generating a
     // regular whole-module frontend command line and modifying it to index just
@@ -1637,17 +1636,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Context, MSF);
 
-  {
-    if (PSPs.haveModuleOrModuleDocOutputPaths()) {
-      if (Action == FrontendOptions::ActionType::MergeModules ||
-          Action == FrontendOptions::ActionType::EmitModuleOnly) {
-        // What if MSF is a module?
-        // emitIndexDataIfNeeded already handles that case;
-        // it'll index everything.
-        return emitIndexDataIfNeeded(MSF.dyn_cast<SourceFile *>(), Invocation,
-                                     Instance) ||
-               Context.hadError();
-      }
+  if (PSPs.haveModuleOrModuleDocOutputPaths()) {
+    if (Action == FrontendOptions::ActionType::MergeModules ||
+        Action == FrontendOptions::ActionType::EmitModuleOnly) {
+      return Context.hadError();
     }
   }
 
@@ -1699,11 +1691,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       IRGenOpts, std::move(SM), PSPs, OutputFilename, MSF, HashGlobal,
       ParallelOutputFilenames, LinkerDirectives);
 
-  // Walk the AST for indexing after IR generation. Walking it before seems
-  // to cause miscompilation issues.
-  if (emitIndexDataIfNeeded(MSF.dyn_cast<SourceFile *>(), Invocation, Instance))
-    return true;
-
   // Just because we had an AST error it doesn't mean we can't performLLVM.
   bool HadError = Instance.getASTContext().hadError();
 
@@ -1722,13 +1709,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
          HadError;
 }
 
-static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
+static void emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
                                   const CompilerInvocation &Invocation,
                                   const CompilerInstance &Instance) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
   if (opts.IndexStorePath.empty())
-    return false;
+    return;
 
   // FIXME: provide index unit token(s) explicitly and only use output file
   // paths as a fallback.
@@ -1749,29 +1736,23 @@ static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
     const PrimarySpecificPaths &PSPs =
         opts.InputsAndOutputs.getPrimarySpecificPathsForPrimary(
             PrimarySourceFile->getFilename());
-    if (index::indexAndRecord(PrimarySourceFile, PSPs.OutputFilename,
-                              opts.IndexStorePath, opts.IndexSystemModules,
-                              opts.IndexIgnoreStdlib, isDebugCompilation,
-                              Invocation.getTargetTriple(),
-                              *Instance.getDependencyTracker())) {
-      return true;
-    }
+    (void) index::indexAndRecord(PrimarySourceFile, PSPs.OutputFilename,
+                                 opts.IndexStorePath, opts.IndexSystemModules,
+                                 opts.IndexIgnoreStdlib, isDebugCompilation,
+                                 Invocation.getTargetTriple(),
+                                 *Instance.getDependencyTracker());
   } else {
     std::string moduleToken =
         Invocation.getModuleOutputPathForAtMostOnePrimary();
     if (moduleToken.empty())
       moduleToken = opts.InputsAndOutputs.getSingleOutputFilename();
 
-    if (index::indexAndRecord(Instance.getMainModule(), opts.InputsAndOutputs.copyOutputFilenames(),
-                              moduleToken, opts.IndexStorePath,
-                              opts.IndexSystemModules, opts.IndexIgnoreStdlib,
-                              isDebugCompilation, Invocation.getTargetTriple(),
-                              *Instance.getDependencyTracker())) {
-      return true;
-    }
+    (void) index::indexAndRecord(Instance.getMainModule(), opts.InputsAndOutputs.copyOutputFilenames(),
+                                 moduleToken, opts.IndexStorePath,
+                                 opts.IndexSystemModules, opts.IndexIgnoreStdlib,
+                                 isDebugCompilation, Invocation.getTargetTriple(),
+                                 *Instance.getDependencyTracker());
   }
-
-  return false;
 }
 
 /// Returns true if an error occurred.

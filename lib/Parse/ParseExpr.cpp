@@ -395,7 +395,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       ParserResult<TypeRepr> ty = parseType();
       if (ty.isNonNull())
         return makeParserResult(
-            new (Context) TypeExpr(TypeLoc(ty.get(), Type())));
+            new (Context) TypeExpr(ty.get()));
       checkForInputIncomplete();
       return nullptr;
     }
@@ -1161,13 +1161,10 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         if (argStat.isError())
           diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
 
-        SmallVector<TypeLoc, 8> locArgs;
-        for (auto ty : args)
-          locArgs.push_back(ty);
         SyntaxContext->createNodeInPlace(SyntaxKind::SpecializeExpr);
         Result = makeParserResult(
             Result, UnresolvedSpecializeExpr::create(
-                        Context, Result.get(), LAngleLoc, locArgs, RAngleLoc));
+                        Context, Result.get(), LAngleLoc, args, RAngleLoc));
       }
 
       continue;
@@ -1534,7 +1531,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::kw_Any: { // Any
     ExprContext.setCreateSyntax(SyntaxKind::TypeExpr);
     auto TyR = parseAnyType();
-    return makeParserResult(new (Context) TypeExpr(TypeLoc(TyR.get())));
+    return makeParserResult(new (Context) TypeExpr(TyR.get()));
   }
 
   case tok::dollarident: // $1
@@ -2306,16 +2303,13 @@ Expr *Parser::parseExprIdentifier() {
     // global or local declarations here.
     assert(!TD->getDeclContext()->isTypeContext() ||
            isa<GenericTypeParamDecl>(TD));
-    E = TypeExpr::createForDecl(loc, TD, /*DC*/nullptr, /*implicit*/false);
+    E = TypeExpr::createForDecl(loc, TD, /*DC*/ nullptr);
   } else {
     E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
   }
   
   if (hasGenericArgumentList) {
-    SmallVector<TypeLoc, 8> locArgs;
-    for (auto ty : args)
-      locArgs.push_back(ty);
-    E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, locArgs,
+    E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, args,
                                          RAngleLoc);
   }
   return E;
@@ -2326,14 +2320,14 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
   assert(PlaceholderTok.is(tok::identifier));
   assert(PlaceholderId.isEditorPlaceholder());
 
-  auto parseTypeForPlaceholder = [&](TypeLoc &TyLoc, TypeRepr *&ExpansionTyR) {
+  auto parseTypeForPlaceholder = [&]() -> std::pair<TypeRepr *, TypeRepr *> {
     Optional<EditorPlaceholderData> DataOpt =
       swift::parseEditorPlaceholder(PlaceholderTok.getText());
     if (!DataOpt)
-      return;
+      return {nullptr, nullptr};
     StringRef TypeStr = DataOpt->Type;
     if (TypeStr.empty())
-      return;
+      return {nullptr, nullptr};
 
     // Ensure that we restore the parser state at exit.
     ParserPositionRAII PPR(*this);
@@ -2363,21 +2357,21 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
       return parseType().getPtrOrNull();
     };
 
-    TypeRepr *TyR = parseTypeString(TypeStr);
-    TyLoc = TyR;
+    TypeRepr *PlaceholderTyR = parseTypeString(TypeStr);
+    TypeRepr *ExpansionTyR = nullptr;
     if (DataOpt->TypeForExpansion == TypeStr) {
-      ExpansionTyR = TyR;
+      ExpansionTyR = PlaceholderTyR;
     } else {
       ExpansionTyR = parseTypeString(DataOpt->TypeForExpansion);
     }
+    return {PlaceholderTyR, ExpansionTyR};
   };
 
-  TypeLoc TyLoc;
+  TypeRepr *PlaceholderTyR = nullptr;
   TypeRepr *ExpansionTyR = nullptr;
-  parseTypeForPlaceholder(TyLoc, ExpansionTyR);
-  return new (Context) EditorPlaceholderExpr(PlaceholderId,
-                                             PlaceholderTok.getLoc(),
-                                             TyLoc, ExpansionTyR);
+  std::tie(PlaceholderTyR, ExpansionTyR) = parseTypeForPlaceholder();
+  return new (Context) EditorPlaceholderExpr(
+      PlaceholderId, PlaceholderTok.getLoc(), PlaceholderTyR, ExpansionTyR);
 }
 
 // Extract names of the tuple elements and preserve the structure
@@ -2422,7 +2416,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
                                VarDecl *&capturedSelfDecl,
                                ParameterList *&params, SourceLoc &throwsLoc,
                                SourceLoc &arrowLoc,
-                               TypeRepr *&explicitResultType, SourceLoc &inLoc){
+                               TypeExpr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
   bracketRange = SourceRange();
   capturedSelfDecl = nullptr;
@@ -2686,12 +2680,14 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       arrowLoc = consumeToken();
 
       // Parse the type.
-      explicitResultType =
+      auto *explicitResultTypeRepr =
           parseType(diag::expected_closure_result_type).getPtrOrNull();
-      if (!explicitResultType) {
+      if (!explicitResultTypeRepr) {
         // If we couldn't parse the result type, clear out the arrow location.
         arrowLoc = SourceLoc();
         invalid = true;
+      } else {
+        explicitResultType = new (Context) TypeExpr(explicitResultTypeRepr);
       }
     }
   }
@@ -2791,7 +2787,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   ParameterList *params = nullptr;
   SourceLoc throwsLoc;
   SourceLoc arrowLoc;
-  TypeRepr *explicitResultType;
+  TypeExpr *explicitResultType;
   SourceLoc inLoc;
   parseClosureSignatureIfPresent(bracketRange, captureList,
                                  capturedSelfDecl, params, throwsLoc,

@@ -3183,13 +3183,8 @@ void ClangModuleUnit::lookupObjCMethods(
       (void)owner.importDecl(objcMethod->findPropertyDecl(true),
                              owner.CurrentVersion);
 
-    // Import it.
-    // FIXME: Retrying a failed import works around recursion bugs in the Clang
-    // importer.
     auto imported =
         owner.importDecl(objcMethod, owner.CurrentVersion);
-    if (!imported)
-      imported = owner.importDecl(objcMethod, owner.CurrentVersion);
     if (!imported) continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(imported))

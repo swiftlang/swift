@@ -46,7 +46,7 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
                                         llvm::StringSet<> &knownModules) {
   if (!knownModules.insert(moduleName).second)
     return;
-  allModules.push_back(moduleName);
+  allModules.push_back(moduleName.str());
 
   auto dependencies = cache.findDependencies(
       moduleName, ModuleDependenciesKind::Clang);
@@ -352,7 +352,7 @@ bool swift::scanDependencies(CompilerInstance &instance) {
 
   // Compute the dependencies of the main module.
   auto mainDependencies =
-      ModuleDependencies::forSwiftModule(mainModulePath.str());
+      ModuleDependencies::forSwiftModule(mainModulePath.str().str());
   {
     llvm::StringSet<> alreadyAddedModules;
     for (auto fileUnit : mainModule->getFiles()) {
@@ -410,7 +410,7 @@ bool swift::scanDependencies(CompilerInstance &instance) {
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
                   std::set<ModuleDependencyID>> allModules;
   
-  allModules.insert({mainModuleName, mainDependencies.getKind()});
+  allModules.insert({mainModuleName.str(), mainDependencies.getKind()});
 
   // Create the module dependency cache.
   ModuleDependenciesCache cache;

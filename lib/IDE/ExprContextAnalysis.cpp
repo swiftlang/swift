@@ -29,6 +29,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Subsystems.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 
@@ -209,10 +210,23 @@ Type swift::ide::getReturnTypeFromContext(const DeclContext *DC) {
     if (ACE->getType() && !ACE->getType()->hasError())
       return ACE->getResultType();
     if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
-      if (CE->hasExplicitResultType())
-        return const_cast<ClosureExpr *>(CE)
-            ->getExplicitResultTypeLoc()
-            .getType();
+      if (CE->hasExplicitResultType()) {
+        if (auto ty = CE->getExplicitResultType()) {
+          return ty;
+        }
+
+        auto typeLoc = TypeLoc{CE->getExplicitResultTypeRepr()};
+        if (swift::performTypeLocChecking(DC->getASTContext(),
+                                          typeLoc,
+                                          /*isSILMode*/ false,
+                                          /*isSILType*/ false,
+                                          DC->getGenericEnvironmentOfContext(),
+                                          const_cast<DeclContext *>(DC),
+                                          /*diagnostics*/ false)) {
+          return Type();
+        }
+        return typeLoc.getType();
+      }
     }
   }
   return Type();
@@ -375,8 +389,8 @@ static void collectPossibleCalleesByQualifiedLookup(
   // Re-typecheck TypeExpr so it's typechecked without the arguments which may
   // affects the inference of the generic arguments.
   if (TypeExpr *tyExpr = dyn_cast<TypeExpr>(baseExpr)) {
-    tyExpr->setType(nullptr);
-    tyExpr->getTypeLoc().setType(nullptr);
+    if (!tyExpr->isImplicit())
+      tyExpr->setType(nullptr);
   }
 
   auto baseTyOpt = getTypeOfCompletionContextExpr(

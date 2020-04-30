@@ -74,4 +74,4 @@ import struct DeclaringLibrary.DeclaringLibraryTy
 import DeclaringLibrary
 #endif
 
-func fn(_: OverlayLibraryTy) {} // expected-error {{use of undeclared type 'OverlayLibraryTy'}}
+func fn(_: OverlayLibraryTy) {} // expected-error {{cannot find type 'OverlayLibraryTy' in scope}}

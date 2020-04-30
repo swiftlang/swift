@@ -1461,20 +1461,19 @@ namespace {
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      auto &typeLoc = E->getTypeLoc();
-      if (typeLoc.wasValidated()) {
-        type = typeLoc.getType();
-      } else if (typeLoc.hasLocation()) {
-        type = resolveTypeReferenceInExpression(typeLoc);
-      } else if (E->isImplicit() && CS.hasType(&typeLoc)) {
-        type = CS.getType(typeLoc);
+      if (E->isImplicit()) {
+        type = CS.getInstanceType(CS.cacheType(E));
+        assert(type && "Implicit type expr must have type set!");
+      } else {
+        auto *repr = E->getTypeRepr();
+        assert(repr && "Explicit node has no type repr!");
+        type = resolveTypeReferenceInExpression(repr);
       }
 
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
       type = CS.openUnboundGenericType(type, locator);
-      CS.setType(E->getTypeLoc(), type);
       return MetatypeType::get(type);
     }
 
@@ -1692,8 +1691,7 @@ namespace {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
           ArrayRef<Type> typeVars = bgt->getGenericArgs();
-          MutableArrayRef<TypeLoc> specializations =
-              expr->getUnresolvedParams();
+          auto specializations = expr->getUnresolvedParams();
 
           // If we have too many generic arguments, complain.
           if (specializations.size() > typeVars.size()) {
@@ -1716,14 +1714,15 @@ namespace {
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             TypeResolutionOptions options(TypeResolverContext::InExpression);
             options |= TypeResolutionFlags::AllowUnboundGenerics;
+            auto tyLoc = TypeLoc{specializations[i]};
             if (TypeChecker::validateType(CS.getASTContext(),
-                                specializations[i],
+                                tyLoc,
                                 TypeResolution::forContextual(CS.DC),
                                 options))
               return Type();
 
             CS.addConstraint(ConstraintKind::Bind,
-                             typeVars[i], specializations[i].getType(),
+                             typeVars[i], tyLoc.getType(),
                              locator);
           }
           
@@ -2178,14 +2177,24 @@ namespace {
       // parameter or return type is omitted, a fresh type variable is used to
       // stand in for that parameter or return type, allowing it to be inferred
       // from context.
-      Type resultTy;
-      if (closure->hasExplicitResultType() &&
-          closure->getExplicitResultTypeLoc().getType()) {
-        resultTy = closure->getExplicitResultTypeLoc().getType();
-      } else {
-        auto *resultLoc =
-            CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+      auto getExplicitResultType = [&]() -> Type {
+        if (!closure->hasExplicitResultType()) {
+          return Type();
+        }
 
+        if (auto declaredTy = closure->getExplicitResultType()) {
+          return declaredTy;
+        }
+
+        return resolveTypeReferenceInExpression(closure->getExplicitResultTypeRepr());
+      };
+
+      Type resultTy;
+      auto *resultLoc =
+            CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+      if (auto explicityTy = getExplicitResultType()) {
+        resultTy = explicityTy;
+      } else {
         auto getContextualResultType = [&]() -> Type {
           if (auto contextualType = CS.getContextualType(closure)) {
             if (auto fnType = contextualType->getAs<FunctionType>())
@@ -3286,33 +3295,34 @@ namespace {
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-      if (E->getTypeLoc().isNull()) {
-        auto locator = CS.getConstraintLocator(E);
-
-        // A placeholder may have any type, but default to Void type if
-        // otherwise unconstrained.
-        auto &placeholderTy
-          = editorPlaceholderVariables[currentEditorPlaceholderVariable];
-        if (!placeholderTy) {
-          placeholderTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
-
-          CS.addConstraint(ConstraintKind::Defaultable,
-                           placeholderTy,
-                           TupleType::getEmpty(CS.getASTContext()),
-                           locator);
-        }
-
-        // Move to the next placeholder variable.
-        currentEditorPlaceholderVariable
-          = (currentEditorPlaceholderVariable + 1) %
-              numEditorPlaceholderVariables;
-
-        return placeholderTy;
+      if (auto *placeholderRepr = E->getPlaceholderTypeRepr()) {
+        // Just resolve the referenced type.
+        // FIXME: The type reference needs to be opened into context.
+        return resolveTypeReferenceInExpression(placeholderRepr);
       }
 
-      // NOTE: The type loc may be there but have failed to validate, in which
-      // case we return the null type.
-      return E->getType();
+      auto locator = CS.getConstraintLocator(E);
+
+      // A placeholder may have any type, but default to Void type if
+      // otherwise unconstrained.
+      auto &placeholderTy
+        = editorPlaceholderVariables[currentEditorPlaceholderVariable];
+      if (!placeholderTy) {
+        placeholderTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+
+        CS.addConstraint(ConstraintKind::Defaultable,
+                         placeholderTy,
+                         TupleType::getEmpty(CS.getASTContext()),
+                         locator);
+      }
+
+      // Move to the next placeholder variable.
+      // FIXME: Cycling type variables like this is unsound.
+      currentEditorPlaceholderVariable
+        = (currentEditorPlaceholderVariable + 1) %
+            numEditorPlaceholderVariables;
+
+      return placeholderTy;
     }
 
     Type visitObjCSelectorExpr(ObjCSelectorExpr *E) {
@@ -4025,11 +4035,11 @@ namespace {
             // result of the join.
             auto joinMetaTy =
                 CG.resultOfTypeOperation(typeOperation, apply->getArg());
-            auto joinTy = joinMetaTy->castTo<MetatypeType>()->getInstanceType();
+            auto joinTy = joinMetaTy->castTo<MetatypeType>();
 
-            auto *TE = TypeExpr::createImplicit(joinTy, CS.getASTContext());
+            auto *TE = TypeExpr::createImplicit(joinTy->getInstanceType(),
+                                                CS.getASTContext());
             CS.cacheType(TE);
-            CS.setType(TE->getTypeLoc(), joinTy);
 
             auto *DSE = new (CS.getASTContext())
                 DotSelfExpr(TE, SourceLoc(), SourceLoc(), CS.getType(TE));

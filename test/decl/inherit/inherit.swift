@@ -57,9 +57,9 @@ class GenericBase<T> {}
 class GenericSub<T> : GenericBase<T> {} // okay
 
 class InheritGenericParam<T> : T {} // expected-error {{inheritance from non-protocol, non-class type 'T'}}
-class InheritBody : T { // expected-error {{use of undeclared type 'T'}}
+class InheritBody : T { // expected-error {{cannot find type 'T' in scope}}
   typealias T = A
 }
-class InheritBodyBad : fn { // expected-error {{use of undeclared type 'fn'}}
+class InheritBodyBad : fn { // expected-error {{cannot find type 'fn' in scope}}
   func fn() {}
 }

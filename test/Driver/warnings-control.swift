@@ -18,7 +18,7 @@ func bar() {
 	foo()
 // To help anchor the checks, have an error. Put it inside a later function, to help make sure it comes after
 	xyz
-// DEFAULT: error: use of unresolved identifier 'xyz'
-// WERR:    error: use of unresolved identifier 'xyz'
-// NOWARN:  error: use of unresolved identifier 'xyz'
+// DEFAULT: error: cannot find 'xyz' in scope
+// WERR:    error: cannot find 'xyz' in scope
+// NOWARN:  error: cannot find 'xyz' in scope
 }

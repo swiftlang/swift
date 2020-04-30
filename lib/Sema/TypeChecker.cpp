@@ -382,6 +382,18 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     performWholeModuleTypeChecking(*SF);
   }
 
+  // Perform various AST transforms we've been asked to perform.
+  if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)
+    performDebuggerTestingTransform(*SF);
+
+  if (!Ctx.hadError() && Ctx.LangOpts.PCMacro)
+    performPCMacro(*SF);
+
+  // Playground transform knows to look out for PCMacro's changes and not
+  // to playground log them.
+  if (!Ctx.hadError() && Ctx.LangOpts.PlaygroundTransform)
+    performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundHighPerformance);
+
   return std::make_tuple<>();
 }
 
@@ -389,7 +401,6 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
-  diagnoseAttrsRequiringFoundation(SF);
   diagnoseObjCMethodConflicts(SF);
   diagnoseObjCUnsatisfiedOptReqConflicts(SF);
   diagnoseUnintendedObjCMethodOverrides(SF);

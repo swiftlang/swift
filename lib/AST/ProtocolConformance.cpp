@@ -122,7 +122,8 @@ ProtocolConformanceRef::subst(Type origType,
 
   // Opened existentials trivially conform and do not need to go through
   // substitution map lookup.
-  if (substType->isOpenedExistential())
+  if (substType->isOpenedExistential() &&
+      !options.contains(SubstFlags::ForceSubstituteOpenedExistentials))
     return *this;
 
   auto *proto = getRequirement();

@@ -256,12 +256,6 @@ public:
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
 
-  /// A set of special declaration attributes which require the
-  /// Foundation module to be imported to work. If the foundation
-  /// module is still not imported by the time type checking is
-  /// complete, we diagnose.
-  llvm::SetVector<const DeclAttribute *> AttrsRequiringFoundation;
-
   /// A set of synthesized declarations that need to be type checked.
   llvm::SmallVector<Decl *, 8> SynthesizedDecls;
 

@@ -1,6 +1,5 @@
 set(swiftDriver_sources
   Action.cpp
-  CoarseGrainedDependencyGraph.cpp
   Compilation.cpp
   DarwinToolChains.cpp
   SourceComparator.cpp

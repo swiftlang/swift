@@ -1615,7 +1615,7 @@ llvm::CallInst *CallEmission::emitCallSite() {
 
     // Insert a call to @llvm.coro.prepare.retcon, then bitcast to the right
     // function type.
-    auto origCallee = call->getCalledValue();
+    auto origCallee = call->getCalledOperand();
     llvm::Value *opaqueCallee = origCallee;
     opaqueCallee =
       IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);

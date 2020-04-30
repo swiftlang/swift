@@ -64,8 +64,8 @@ import E
 // CHECK-LABEL: "modulePath": "C.pcm",
 
 // CHECK: "sourceFiles": [
-// CHECK-NEXT: module.modulemap
-// CHECK-NEXT: C.h
+// CHECK-DAG: module.modulemap
+// CHECK-DAG: C.h
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
@@ -109,8 +109,8 @@ import E
 // CHECK-LABEL: "modulePath": "B.pcm"
 
 // CHECK-NEXT: sourceFiles
-// CHECK-NEXT: B.h
-// CHECK-NEXT: module.modulemap
+// CHECK-DAG: module.modulemap
+// CHECK-DAG: B.h
 
 // CHECK: directDependencies
 // CHECK-NEXT: {

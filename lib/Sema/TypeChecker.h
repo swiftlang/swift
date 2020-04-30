@@ -1411,9 +1411,6 @@ bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 /// could fulfill a protocol requirement for it.
 bool isMemberOperator(FuncDecl *decl, Type type);
 
-/// Complain if @objc or dynamic is used without importing Foundation.
-void diagnoseAttrsRequiringFoundation(SourceFile &SF);
-
 /// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
 bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);
 

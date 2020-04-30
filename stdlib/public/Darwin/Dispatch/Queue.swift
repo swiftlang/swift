@@ -12,7 +12,7 @@
 
 // dispatch/queue.h
 
-import _SwiftDispatchOverlayShims
+@_implementationOnly import _SwiftDispatchOverlayShims
 
 public final class DispatchSpecificKey<T> {
 	public init() {}

@@ -5,7 +5,7 @@
 
 // NON-IDENT: error: module name "3333" is not a valid identifier
 
-var c: C? // expected-error {{use of undeclared type 'C'}}
-var u: U? // expected-error {{use of undeclared type 'U'}}
-var qA1: abcde.A? // expected-error {{use of undeclared type 'abcde'}}
-var qA2: aeiou.A? // expected-error {{use of undeclared type 'aeiou'}}
+var c: C? // expected-error {{cannot find type 'C' in scope}}
+var u: U? // expected-error {{cannot find type 'U' in scope}}
+var qA1: abcde.A? // expected-error {{cannot find type 'abcde' in scope}}
+var qA2: aeiou.A? // expected-error {{cannot find type 'aeiou' in scope}}

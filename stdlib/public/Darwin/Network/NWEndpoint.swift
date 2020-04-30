@@ -12,7 +12,7 @@
 
 import Darwin
 import Foundation
-import _SwiftNetworkOverlayShims
+@_implementationOnly import _SwiftNetworkOverlayShims
 
 internal extension sockaddr_in {
 	init(_ address:in_addr, _ port: in_port_t) {

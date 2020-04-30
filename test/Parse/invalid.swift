@@ -18,22 +18,22 @@ func test2o(__owned let x : Int) {}  // expected-warning {{'let' in this positio
 // expected-error @-1 {{'__owned' before a parameter name is not allowed, place it before the parameter type instead}} {{13-20=}}
 
 func test3() {
-  undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}}
+  undeclared_func( // expected-error {{cannot find 'undeclared_func' in scope}}
 } // expected-error {{expected expression in list of expressions}}
 
 func runAction() {} // expected-note {{'runAction' declared here}}
 
 // rdar://16601779
 func foo() {
-  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'; did you mean 'runAction'?}} {{13-21=runAction}} expected-error {{expected ',' separator}} {{32-32=,}}
+  runAction(SKAction.sequence() // expected-error {{cannot find 'SKAction' in scope; did you mean 'runAction'?}} {{13-21=runAction}} expected-error {{expected ',' separator}} {{32-32=,}}
     
     skview!
-    // expected-error @-1 {{use of unresolved identifier 'skview'}}
+    // expected-error @-1 {{cannot find 'skview' in scope}}
 }
 
 super.init() // expected-error {{'super' cannot be used outside of class members}}
 
-switch state { // expected-error {{use of unresolved identifier 'state'}}
+switch state { // expected-error {{cannot find 'state' in scope}}
   let duration : Int = 0 // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
   case 1:
     break
@@ -68,7 +68,7 @@ func d(_ b: String -> <T>() -> T) {} // expected-error {{expected type for funct
 
 // <rdar://problem/22143680> QoI: terrible diagnostic when trying to form a generic protocol
 protocol Animal<Food> {  // expected-error {{protocols do not allow generic parameters; use associated types instead}}
-  func feed(_ food: Food) // expected-error {{use of undeclared type 'Food'}}
+  func feed(_ food: Food) // expected-error {{cannot find type 'Food' in scope}}
 }
 
 

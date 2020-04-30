@@ -2,7 +2,7 @@
 
 // RUN: not %target-typecheck-verify-swift 2>&1 | %FileCheck %s
 
-// CHECK: [[@LINE+1]]:1: error: unexpected error produced: use of unresolved
+// CHECK: [[@LINE+1]]:1: error: unexpected error produced: cannot find 'undefinedFunc' in scope
 undefinedFunc()
 
 // CHECK: [[@LINE+1]]:4: error: expected error not produced

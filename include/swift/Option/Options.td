@@ -135,14 +135,6 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
-def enable_fine_grained_dependencies :
-Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Be more selective about incremental recompilation">;
-
-def disable_fine_grained_dependencies :
-Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Don't be more selective about incremental recompilation">;
-
 def enable_type_fingerprints :
 Flag<["-"], "enable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Enable per-nominal and extension body fingerprints">;
