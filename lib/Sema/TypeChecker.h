@@ -694,16 +694,14 @@ Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 /// to be possible.
 ///
 /// \param convertType The type that the expression is being converted to,
-/// or null if the expression is standalone. The location information is
-/// only used for diagnostics should the conversion fail; it is safe to pass
-/// a TypeLoc without location information.
+/// or null if the expression is standalone.
 ///
 /// \param options Options that control how type checking is performed.
 ///
 /// \returns The type of the top-level expression, or Type() if an
 ///          error occurred.
 Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                         TypeLoc convertType = TypeLoc(),
+                         Type convertType = Type(),
                          ContextualTypePurpose convertTypePurpose = CTP_Unused,
                          TypeCheckExprOptions options = TypeCheckExprOptions());
 
