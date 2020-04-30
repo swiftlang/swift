@@ -39,19 +39,25 @@ report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {}
 
 /// grow_pod - This is an implementation of the grow() method which only works
 /// on POD-like datatypes and is out of line to reduce code duplication.
-void
-#if !defined(_WIN32)
-__attribute__((__weak__, __visibility__("hidden")))
-#endif
-llvm::SmallVectorBase::grow_pod(void *FirstEl, size_t MinCapacity,
-                                size_t TSize) {
-  // Ensure we can fit the new capacity in 32 bits.
-  if (MinCapacity > UINT32_MAX)
+template <class Size_T>
+void SmallVectorBase<Size_T>::grow_pod(void *FirstEl, size_t MinCapacity,
+                                       size_t TSize) {
+  // Ensure we can fit the new capacity.
+  // This is only going to be applicable when the capacity is 32 bit.
+  if (MinCapacity > SizeTypeMax())
     report_bad_alloc_error("SmallVector capacity overflow during allocation");
 
+  // Ensure we can meet the guarantee of space for at least one more element.
+  // The above check alone will not catch the case where grow is called with a
+  // default MinCapacity of 0, but the current capacity cannot be increased.
+  // This is only going to be applicable when the capacity is 32 bit.
+  if (capacity() == SizeTypeMax())
+    report_bad_alloc_error("SmallVector capacity unable to grow");
+
+  // In theory 2*capacity can overflow if the capacity is 64 bit, but the
+  // original capacity would never be large enough for this to be a problem.
   size_t NewCapacity = 2 * capacity() + 1; // Always grow.
-  NewCapacity =
-    std::min(std::max(NewCapacity, MinCapacity), size_t(UINT32_MAX));
+  NewCapacity = std::min(std::max(NewCapacity, MinCapacity), SizeTypeMax());
 
   void *NewElts;
   if (BeginX == FirstEl) {
@@ -67,6 +73,20 @@ llvm::SmallVectorBase::grow_pod(void *FirstEl, size_t MinCapacity,
   this->BeginX = NewElts;
   this->Capacity = NewCapacity;
 }
+
+template
+#if !defined(_WIN32)
+__attribute__((__weak__, __visibility__("hidden")))
+#endif
+void SmallVectorBase<uint32_t>::grow_pod(void *FirstEl, size_t MinCapacity,
+                                         size_t TSize);
+
+template
+#if !defined(_WIN32)
+__attribute__((__weak__, __visibility__("hidden")))
+#endif
+void SmallVectorBase<uint64_t>::grow_pod(void *FirstEl, size_t MinCapacity,
+                                         size_t TSize);
 
 } // end namespace llvm
 #endif // defined(swiftCore_EXPORTS)
