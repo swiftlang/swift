@@ -380,7 +380,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
         // Check that the type witness meets the
         // requirements on the associated type.
         if (auto failed =
-                checkTypeWitness(dc, proto, result.first, result.second)) {
+                checkTypeWitness(result.second, result.first, conformance)) {
           witnessResult.NonViable.push_back(
                           std::make_tuple(result.first,result.second,failed));
           LLVM_DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
@@ -854,7 +854,7 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
   if (defaultType->hasError())
     return Type();
 
-  if (auto failed = checkTypeWitness(dc, proto, assocType, defaultType)) {
+  if (auto failed = checkTypeWitness(defaultType, assocType, conformance)) {
     // Record the failure, if we haven't seen one already.
     if (!failedDefaultedAssocType && !failed.isError()) {
       failedDefaultedAssocType = defaultedAssocType;
@@ -886,7 +886,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
     return Type();
 
   // Make sure that the derived type is sane.
-  if (checkTypeWitness(dc, proto, assocType, derivedType)) {
+  if (checkTypeWitness(derivedType, assocType, conformance)) {
     /// FIXME: Diagnose based on this.
     failedDerivedAssocType = assocType;
     failedDerivedWitness = derivedType;

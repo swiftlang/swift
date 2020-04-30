@@ -562,3 +562,29 @@ extension S31: P34 {} // expected-error {{type 'S31<T>' does not conform to prot
 extension S31 where T: P32 {
   func boo() -> Void {} // expected-note {{candidate has non-matching type '<T> () -> Void' [with A = S31<T>.A]}}
 }
+
+// SR-12707
+
+class SR_12707_C<T> {}
+
+// Inference in the adoptee
+protocol SR_12707_P1 {
+  associatedtype A
+  associatedtype B: SR_12707_C<(A, Self)>
+
+  func foo(arg: B)
+}
+struct SR_12707_Conform_P1: SR_12707_P1 {
+  typealias A = Never
+
+  func foo(arg: SR_12707_C<(A, SR_12707_Conform_P1)>) {}
+}
+
+// Inference in protocol extension
+protocol SR_12707_P2: SR_12707_P1 {}
+extension SR_12707_P2 {
+  func foo(arg: SR_12707_C<(A, Self)>) {}
+}
+struct SR_12707_Conform_P2: SR_12707_P2 {
+  typealias A = Never
+}
