@@ -6,7 +6,9 @@ func getCounter() -> CInt {
   return counter
 }
 
+// CHECK: // clang name: counter
 // CHECK: sil_global @counter : $Int32
+// CHECK: // clang name: Namespaced::counter
 // CHECK: sil_global @{{_ZN10Namespaced7counterE|\?counter@Namespaced@@3HA}} : $Int32
 
 // CHECK: sil hidden @$s4main10getCounters5Int32VyF : $@convention(thin) () -> Int32
