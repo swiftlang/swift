@@ -69,6 +69,12 @@ struct Projection<T> {
   var item: T
 }
 
+func `escapedName`(`x`: Int) {}
+`escapedName`(`x`: 2)
+`escapedName`(`x`:)
+escapedName(`x`: 2)
+escapedName(`x`:)
+
 // RUN: %sourcekitd-test -req=related-idents -pos=6:17 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: START RANGES
 // CHECK1-NEXT: 1:7 - 2
@@ -146,3 +152,16 @@ struct Projection<T> {
 // CHECK10-NEXT: 63:10 - 3
 // CHECK10-NEXT: 64:10 - 3
 // CHECK10-NEXT: END RANGES
+
+// RUN: %sourcekitd-test -req=related-idents -pos=72:6 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK11 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=73:1 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK11 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=73:2 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK11 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=74:1 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK11 %s
+// RUN: %sourcekitd-test -req=related-idents -pos=74:2 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK11 %s
+// CHECK11:      START RANGES
+// CHECK11-NEXT: 72:6 - 13
+// CHECK11-NEXT: 73:1 - 13
+// CHECK11-NEXT: 74:1 - 13
+// CHECK11-NEXT: 75:1 - 11
+// CHECK11-NEXT: 76:1 - 11
+
