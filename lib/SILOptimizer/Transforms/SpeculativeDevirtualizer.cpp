@@ -197,7 +197,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILArgument *Arg =
       Continue->createPhiArgument(AI.getType(), ValueOwnershipKind::Owned);
   if (!isa<TryApplyInst>(AI)) {
-    if (AI.getSubstCalleeType()->isNoReturnFunction(F->getModule())) {
+    if (AI.getSubstCalleeType()->isNoReturnFunction(
+            F->getModule(), AI.getFunction()->getTypeExpansionContext())) {
       IdenBuilder.createUnreachable(AI.getLoc());
       VirtBuilder.createUnreachable(AI.getLoc());
     } else {

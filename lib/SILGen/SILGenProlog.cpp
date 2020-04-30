@@ -114,7 +114,7 @@ public:
     parameters = parameters.slice(1);
 
     auto paramType =
-      SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
+        SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, loc.getAsASTNode<ValueDecl>());
 
