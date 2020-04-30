@@ -131,14 +131,11 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   // Try to resolve the constraint repr. It should be some kind of existential
   // type.
   TypeResolutionOptions options(TypeResolverContext::GenericRequirement);
-  TypeLoc constraintTypeLoc(repr->getConstraint());
   // Pass along the error type if resolving the repr failed.
-  auto resolution = TypeResolution::forInterface(
-      dc, dc->getGenericSignatureOfContext(), options);
-  bool validationError =
-      TypeChecker::validateType(constraintTypeLoc, resolution);
-  auto constraintType = constraintTypeLoc.getType();
-  if (validationError)
+  auto constraintType = TypeResolution::forInterface(
+                            dc, dc->getGenericSignatureOfContext(), options)
+                            .resolveType(repr->getConstraint());
+  if (constraintType->hasError())
     return nullptr;
   
   // Error out if the constraint type isn't a class or existential type.

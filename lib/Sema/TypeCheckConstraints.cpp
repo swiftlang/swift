@@ -1916,12 +1916,11 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-    typeLoc = TypeLoc(typeExpr->getTypeRepr(), Type());
-    bool hadError = TypeChecker::validateType(
-        typeLoc, TypeResolution::forContextual(DC, options));
-
-    if (hadError)
+    auto result = TypeResolution::forContextual(DC, options)
+                      .resolveType(typeExpr->getTypeRepr());
+    if (result->hasError())
       return nullptr;
+    typeLoc = TypeLoc{typeExpr->getTypeRepr(), result};
   }
 
   if (!typeLoc.getType() || !typeLoc.getType()->getAnyNominal())

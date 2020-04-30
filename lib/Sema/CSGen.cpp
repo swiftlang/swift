@@ -23,6 +23,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
@@ -1713,13 +1714,12 @@ namespace {
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             TypeResolutionOptions options(TypeResolverContext::InExpression);
             options |= TypeResolutionFlags::AllowUnboundGenerics;
-            auto tyLoc = TypeLoc{specializations[i]};
-            if (TypeChecker::validateType(
-                    tyLoc, TypeResolution::forContextual(CS.DC, options)))
+            auto result = TypeResolution::forContextual(CS.DC, options)
+                              .resolveType(specializations[i]);
+            if (result->hasError())
               return Type();
 
-            CS.addConstraint(ConstraintKind::Bind,
-                             typeVars[i], tyLoc.getType(),
+            CS.addConstraint(ConstraintKind::Bind, typeVars[i], result,
                              locator);
           }
           
