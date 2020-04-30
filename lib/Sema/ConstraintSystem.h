@@ -25,6 +25,7 @@
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
@@ -455,26 +456,26 @@ public:
 
 namespace constraints {
 
-template <typename T = Expr> T *castToExpr(TypedNode node) {
-  return cast<T>(const_cast<Expr *>(node.get<const Expr *>()));
+template <typename T = Expr> T *castToExpr(ASTNode node) {
+  return cast<T>(node.get<Expr *>());
 }
 
-template <typename T = Expr> T *getAsExpr(TypedNode node) {
-  if (const auto *E = node.dyn_cast<const Expr *>())
-    return dyn_cast_or_null<T>(const_cast<Expr *>(E));
+template <typename T = Expr> T *getAsExpr(ASTNode node) {
+  if (auto *E = node.dyn_cast<Expr *>())
+    return dyn_cast_or_null<T>(E);
   return nullptr;
 }
 
-template <typename T> bool isExpr(TypedNode node) {
-  if (node.isNull() || !node.is<const Expr *>())
+template <typename T> bool isExpr(ASTNode node) {
+  if (node.isNull() || !node.is<Expr *>())
     return false;
 
-  auto *E = node.get<const Expr *>();
+  auto *E = node.get<Expr *>();
   return isa<T>(E);
 }
 
-SourceLoc getLoc(TypedNode node);
-SourceRange getSourceRange(TypedNode node);
+SourceLoc getLoc(ASTNode node);
+SourceRange getSourceRange(ASTNode node);
 
 /// The result of comparing two constraint systems that are a solutions
 /// to the given set of constraints.
@@ -914,10 +915,10 @@ public:
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
   /// The node -> type mappings introduced by this solution.
-  llvm::MapVector<TypedNode, Type> nodeTypes;
+  llvm::MapVector<ASTNode, Type> nodeTypes;
 
   /// Contextual types introduced by this solution.
-  std::vector<std::pair<TypedNode, ContextualTypeInfo>> contextualTypes;
+  std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
   /// Maps AST nodes to their solution application targets.
   llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
@@ -1015,7 +1016,7 @@ public:
                                       bool lookThroughApply = true) const;
 
   ConstraintLocator *
-  getConstraintLocator(TypedNode anchor,
+  getConstraintLocator(ASTNode anchor,
                        ArrayRef<LocatorPathElt> path = {}) const;
 
   ConstraintLocator *getConstraintLocator(ConstraintLocator *baseLocator,
@@ -1024,7 +1025,7 @@ public:
   void setExprTypes(Expr *expr) const;
 
   /// Retrieve the type of the given node, as recorded in this solution.
-  Type getType(TypedNode node) const;
+  Type getType(ASTNode node) const;
 
   /// Resolve type variables present in the raw type, using generic parameter
   /// types where possible.
@@ -1709,7 +1710,7 @@ private:
   /// nodes themselves. This allows us to typecheck and
   /// run through various diagnostics passes without actually mutating
   /// the types on the nodes.
-  llvm::MapVector<TypedNode, Type> NodeTypes;
+  llvm::MapVector<ASTNode, Type> NodeTypes;
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
@@ -1719,7 +1720,7 @@ private:
 
   /// Contextual type information for expressions that are part of this
   /// constraint system.
-  llvm::MapVector<TypedNode, ContextualTypeInfo> contextualTypes;
+  llvm::MapVector<ASTNode, ContextualTypeInfo> contextualTypes;
 
   /// Information about each case label item tracked by the constraint system.
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
@@ -1787,7 +1788,7 @@ private:
 
   /// The nodes for which we have produced types, along with the prior type
   /// each node had before introducing this type.
-  llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
+  llvm::SmallVector<std::pair<ASTNode, Type>, 8> addedNodeTypes;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
@@ -2438,7 +2439,7 @@ public:
   ///
   /// The side tables are used through the expression type checker to avoid mutating nodes until
   /// we know we have successfully type-checked them.
-  void setType(TypedNode node, Type type) {
+  void setType(ASTNode node, Type type) {
     assert(!node.isNull() && "Cannot set type information on null node");
     assert(type && "Expected non-null type");
 
@@ -2455,9 +2456,7 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(TypeLoc &L, Type T) {
-    setType(TypedNode(&L), T);
-  }
+  void setType(TypeLoc &L, Type T) { setType(ASTNode(&L), T); }
 
   void setType(KeyPathExpr *KP, unsigned I, Type T) {
     assert(KP && "Expected non-null key path parameter!");
@@ -2465,12 +2464,10 @@ public:
     KeyPathComponentTypes[std::make_pair(KP, I)] = T.getPointer();
   }
 
-  bool hasType(const TypeLoc &L) const {
-    return hasType(TypedNode(&L));
-  }
+  bool hasType(TypeLoc &L) const { return hasType(ASTNode(&L)); }
 
   /// Check to see if we have a type for a node.
-  bool hasType(TypedNode node) const {
+  bool hasType(ASTNode node) const {
     assert(!node.isNull() && "Expected non-null node");
     return NodeTypes.count(node) > 0;
   }
@@ -2482,7 +2479,7 @@ public:
   }
 
   /// Get the type for an node.
-  Type getType(TypedNode node) const {
+  Type getType(ASTNode node) const {
     assert(hasType(node) && "Expected type to have been set!");
     // FIXME: lvalue differences
     //    assert((!E->getType() ||
@@ -2491,9 +2488,7 @@ public:
     return NodeTypes.find(node)->second;
   }
 
-  Type getType(const TypeLoc &L) const {
-    return getType(TypedNode(&L));
-  }
+  Type getType(TypeLoc &L) const { return getType(ASTNode(&L)); }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
     assert(hasType(KP, I) && "Expected type to have been set!");
@@ -2501,7 +2496,7 @@ public:
   }
 
   /// Retrieve the type of the node, if known.
-  Type getTypeIfAvailable(TypedNode node) const {
+  Type getTypeIfAvailable(ASTNode node) const {
     auto known = NodeTypes.find(node);
     if (known == NodeTypes.end())
       return Type();
@@ -2527,7 +2522,7 @@ public:
     return E;
   }
 
-  void setContextualType(TypedNode node, TypeLoc T,
+  void setContextualType(ASTNode node, TypeLoc T,
                          ContextualTypePurpose purpose) {
     assert(bool(node) && "Expected non-null expression!");
     assert(contextualTypes.count(node) == 0 &&
@@ -2535,28 +2530,28 @@ public:
     contextualTypes[node] = {T, purpose};
   }
 
-  Optional<ContextualTypeInfo> getContextualTypeInfo(TypedNode node) const {
+  Optional<ContextualTypeInfo> getContextualTypeInfo(ASTNode node) const {
     auto known = contextualTypes.find(node);
     if (known == contextualTypes.end())
       return None;
     return known->second;
   }
 
-  Type getContextualType(TypedNode node) const {
+  Type getContextualType(ASTNode node) const {
     auto result = getContextualTypeInfo(node);
     if (result)
       return result->typeLoc.getType();
     return Type();
   }
 
-  TypeLoc getContextualTypeLoc(TypedNode node) const {
+  TypeLoc getContextualTypeLoc(ASTNode node) const {
     auto result = getContextualTypeInfo(node);
     if (result)
       return result->typeLoc;
     return TypeLoc();
   }
 
-  ContextualTypePurpose getContextualTypePurpose(TypedNode node) const {
+  ContextualTypePurpose getContextualTypePurpose(ASTNode node) const {
     auto result = getContextualTypeInfo(node);
     if (result)
       return result->purpose;
@@ -2597,27 +2592,26 @@ public:
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
   ConstraintLocator *
-  getConstraintLocator(TypedNode anchor,
+  getConstraintLocator(ASTNode anchor,
                        ArrayRef<ConstraintLocator::PathElement> path,
                        unsigned summaryFlags);
 
   /// Retrive the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags
   ConstraintLocator *
-  getConstraintLocator(TypedNode anchor,
+  getConstraintLocator(ASTNode anchor,
                        ArrayRef<ConstraintLocator::PathElement> path);
 
   /// Retrieve the constraint locator for the given anchor and
   /// an empty path, uniqued.
-  ConstraintLocator *getConstraintLocator(TypedNode anchor) {
+  ConstraintLocator *getConstraintLocator(ASTNode anchor) {
     return getConstraintLocator(anchor, {}, 0);
   }
 
   /// Retrieve the constraint locator for the given anchor and
   /// path element.
   ConstraintLocator *
-  getConstraintLocator(TypedNode anchor,
-                       ConstraintLocator::PathElement pathElt) {
+  getConstraintLocator(ASTNode anchor, ConstraintLocator::PathElement pathElt) {
     return getConstraintLocator(anchor, llvm::makeArrayRef(pathElt),
                                 pathElt.getNewSummaryFlags());
   }
@@ -2694,7 +2688,7 @@ public:
   ///                       locator if available.
   ConstraintLocator *getCalleeLocator(
       ConstraintLocator *locator, bool lookThroughApply,
-      llvm::function_ref<Type(const Expr *)> getType,
+      llvm::function_ref<Type(Expr *)> getType,
       llvm::function_ref<Type(Type)> simplifyType,
       llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
           getOverloadFor);
@@ -2703,7 +2697,7 @@ public:
                                       bool lookThroughApply = true) {
     return getCalleeLocator(
         locator, lookThroughApply,
-        [&](const Expr *expr) -> Type { return getType(expr); },
+        [&](Expr *expr) -> Type { return getType(expr); },
         [&](Type type) -> Type { return simplifyType(type)->getRValueType(); },
         [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
           return findSelectedOverloadFor(locator);
@@ -3230,18 +3224,18 @@ public:
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
   /// type from the ConstraintSystem expression type map.
-  bool isTypeReference(const Expr *E);
+  bool isTypeReference(Expr *E);
 
   /// Call Expr::isIsStaticallyDerivedMetatype on the given
   /// expression, using a custom accessor for the type on the
   /// expression that reads the type from the ConstraintSystem
   /// expression type map.
-  bool isStaticallyDerivedMetatype(const Expr *E);
+  bool isStaticallyDerivedMetatype(Expr *E);
 
   /// Call TypeExpr::getInstanceType on the given expression, using a
   /// custom accessor for the type on the expression that reads the
   /// type from the ConstraintSystem expression type map.
-  Type getInstanceType(const TypeExpr *E);
+  Type getInstanceType(TypeExpr *E);
 
   /// Call AbstractClosureExpr::getResultType on the given expression,
   /// using a custom accessor for the type on the expression that
@@ -4953,7 +4947,7 @@ ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
                                    ConstraintLocator *locator,
                                    SourceRange &range);
 
-void simplifyLocator(TypedNode &anchor, ArrayRef<LocatorPathElt> &path,
+void simplifyLocator(ASTNode &anchor, ArrayRef<LocatorPathElt> &path,
                      SourceRange &range);
 
 /// Simplify the given locator down to a specific anchor expression,
@@ -4961,14 +4955,14 @@ void simplifyLocator(TypedNode &anchor, ArrayRef<LocatorPathElt> &path,
 ///
 /// \returns the anchor expression if it fully describes the locator, or
 /// null otherwise.
-TypedNode simplifyLocatorToAnchor(ConstraintLocator *locator);
+ASTNode simplifyLocatorToAnchor(ConstraintLocator *locator);
 
 /// Retrieve argument at specified index from given node.
 /// The expression could be "application", "subscript" or "member" call.
 ///
 /// \returns argument expression or `nullptr` if given "base" expression
 /// wasn't of one of the kinds listed above.
-Expr *getArgumentExpr(TypedNode node, unsigned index);
+Expr *getArgumentExpr(ASTNode node, unsigned index);
 
 /// Determine whether given locator points to one of the arguments
 /// associated with the call to an operator. If the operator name

@@ -458,14 +458,14 @@ void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   this->walk(ChildWalker(callback));
 }
 
-bool Expr::isTypeReference(
-    llvm::function_ref<Type(const Expr *)> getType,
-    llvm::function_ref<Decl *(const Expr *)> getDecl) const {
+bool Expr::isTypeReference(llvm::function_ref<Type(Expr *)> getType,
+                           llvm::function_ref<Decl *(Expr *)> getDecl) const {
+  Expr *expr = const_cast<Expr *>(this);
+
   // If the result isn't a metatype, there's nothing else to do.
-  if (!getType(this)->is<AnyMetatypeType>())
+  if (!getType(expr)->is<AnyMetatypeType>())
     return false;
-  
-  const Expr *expr = this;
+
   do {
     // Skip syntax.
     expr = expr->getSemanticsProvidingExpr();
@@ -504,15 +504,15 @@ bool Expr::isTypeReference(
 }
 
 bool Expr::isStaticallyDerivedMetatype(
-    llvm::function_ref<Type(const Expr *)> getType,
-    llvm::function_ref<bool(const Expr *)> isTypeReference) const {
+    llvm::function_ref<Type(Expr *)> getType,
+    llvm::function_ref<bool(Expr *)> isTypeReference) const {
   // The expression must first be a type reference.
-  if (!isTypeReference(this))
+  if (!isTypeReference(const_cast<Expr *>(this)))
     return false;
 
-  auto type = getType(this)
-    ->castTo<AnyMetatypeType>()
-    ->getInstanceType();
+  auto type = getType(const_cast<Expr *>(this))
+                  ->castTo<AnyMetatypeType>()
+                  ->getInstanceType();
 
   // Archetypes are never statically derived.
   if (type->is<ArchetypeType>())
@@ -883,7 +883,7 @@ static ArrayRef<Identifier> getArgumentLabelsFromArgument(
     Expr *arg, SmallVectorImpl<Identifier> &scratch,
     SmallVectorImpl<SourceLoc> *sourceLocs = nullptr,
     bool *hasTrailingClosure = nullptr,
-    llvm::function_ref<Type(const Expr *)> getType = [](const Expr *E) -> Type {
+    llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
       return E->getType();
     }) {
   if (sourceLocs) sourceLocs->clear();
@@ -934,13 +934,13 @@ static ArrayRef<Identifier> getArgumentLabelsFromArgument(
   // FIXME: Shouldn't get here.
   scratch.clear();
   scratch.push_back(Identifier());
-  return scratch;    
+  return scratch;
 }
 
 /// Compute the type of an argument to a call (or call-like) AST
 static void
 computeSingleArgumentType(ASTContext &ctx, Expr *arg, bool implicit,
-                          llvm::function_ref<Type(const Expr *)> getType) {
+                          llvm::function_ref<Type(Expr *)> getType) {
   // Propagate 'implicit' to the argument.
   if (implicit) {
     arg->setImplicit(true);
@@ -970,16 +970,15 @@ computeSingleArgumentType(ASTContext &ctx, Expr *arg, bool implicit,
   arg->setType(TupleType::get(typeElements, ctx));
 }
 
-Expr *
-swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
-                          ArrayRef<Expr *> args,
-                          ArrayRef<Identifier> &argLabels,
-                          ArrayRef<SourceLoc> &argLabelLocs,
-                          SourceLoc rParenLoc,
-                          Expr *trailingClosure, bool implicit,
-                          SmallVectorImpl<Identifier> &argLabelsScratch,
-                          SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
-                          llvm::function_ref<Type(const Expr *)> getType) {
+Expr *swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
+                                ArrayRef<Expr *> args,
+                                ArrayRef<Identifier> &argLabels,
+                                ArrayRef<SourceLoc> &argLabelLocs,
+                                SourceLoc rParenLoc, Expr *trailingClosure,
+                                bool implicit,
+                                SmallVectorImpl<Identifier> &argLabelsScratch,
+                                SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
+                                llvm::function_ref<Type(Expr *)> getType) {
   // Clear out our scratch space.
   argLabelsScratch.clear();
   argLabelLocsScratch.clear();
@@ -1081,7 +1080,7 @@ ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
 ObjectLiteralExpr *
 ObjectLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind,
                           Expr *arg, bool implicit,
-                          llvm::function_ref<Type(const Expr *)> getType) {
+                          llvm::function_ref<Type(Expr *)> getType) {
   // Inspect the argument to dig out the argument labels, their location, and
   // whether there is a trailing closure.
   SmallVector<Identifier, 4> argLabelsScratch;
@@ -1459,11 +1458,10 @@ SubscriptExpr::SubscriptExpr(Expr *base, Expr *index,
   initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
 }
 
-SubscriptExpr *
-SubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
-                      ConcreteDeclRef decl, bool implicit,
-                      AccessSemantics semantics,
-                      llvm::function_ref<Type(const Expr *)> getType) {
+SubscriptExpr *SubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
+                                     ConcreteDeclRef decl, bool implicit,
+                                     AccessSemantics semantics,
+                                     llvm::function_ref<Type(Expr *)> getType) {
   // Inspect the argument to dig out the argument labels, their location, and
   // whether there is a trailing closure.
   SmallVector<Identifier, 4> argLabelsScratch;
@@ -1528,7 +1526,7 @@ DynamicSubscriptExpr::DynamicSubscriptExpr(Expr *base, Expr *index,
 DynamicSubscriptExpr *
 DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
                              ConcreteDeclRef decl, bool implicit,
-                             llvm::function_ref<Type(const Expr *)> getType) {
+                             llvm::function_ref<Type(Expr *)> getType) {
   // Inspect the argument to dig out the argument labels, their location, and
   // whether there is a trailing closure.
   SmallVector<Identifier, 4> argLabelsScratch;
@@ -1652,7 +1650,7 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, Expr *arg,
                            ArrayRef<Identifier> argLabels,
                            ArrayRef<SourceLoc> argLabelLocs,
                            bool hasTrailingClosure, bool implicit, Type type,
-                           llvm::function_ref<Type(const Expr *)> getType) {
+                           llvm::function_ref<Type(Expr *)> getType) {
   SmallVector<Identifier, 4> argLabelsScratch;
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
   if (argLabels.empty()) {
@@ -1678,7 +1676,7 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc,
                            ArrayRef<SourceLoc> argLabelLocs,
                            SourceLoc rParenLoc, Expr *trailingClosure,
                            bool implicit,
-                           llvm::function_ref<Type(const Expr *)> getType) {
+                           llvm::function_ref<Type(Expr *)> getType) {
   SmallVector<Identifier, 4> argLabelsScratch;
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
   Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
@@ -1787,11 +1785,12 @@ void AbstractClosureExpr::setParameterList(ParameterList *P) {
 }
 
 Type AbstractClosureExpr::getResultType(
-    llvm::function_ref<Type(const Expr *)> getType) const {
-  if (getType(this)->hasError())
-    return getType(this);
+    llvm::function_ref<Type(Expr *)> getType) const {
+  auto *E = const_cast<AbstractClosureExpr *>(this);
+  if (getType(E)->hasError())
+    return getType(E);
 
-  return getType(this)->castTo<FunctionType>()->getResult();
+  return getType(E)->castTo<FunctionType>()->getResult();
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {

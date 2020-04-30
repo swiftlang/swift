@@ -54,7 +54,7 @@ namespace swift {
   class ScopeInfo;
   class SourceManager;
   class TupleType;
-  struct TypeLoc;
+  class TypeLoc;
   
   struct EnumElementInfo;
   

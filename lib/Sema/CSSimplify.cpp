@@ -1353,7 +1353,7 @@ static bool isSingleTupleParam(ASTContext &ctx,
 }
 
 static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
-                                            Type type2, TypedNode anchor,
+                                            Type type2, ASTNode anchor,
                                             ArrayRef<LocatorPathElt> path);
 
 static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
@@ -1444,7 +1444,7 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
 
 /// Attempt to fix missing arguments by introducing type variables
 /// and inferring their types from parameters.
-static bool fixMissingArguments(ConstraintSystem &cs, TypedNode anchor,
+static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
                                 SmallVectorImpl<AnyFunctionType::Param> &args,
                                 ArrayRef<AnyFunctionType::Param> params,
                                 unsigned numMissing,
@@ -2562,7 +2562,7 @@ ConstraintSystem::matchTypesBindTypeVar(
 }
 
 static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
-                                            Type type2, TypedNode anchor,
+                                            Type type2, ASTNode anchor,
                                             ArrayRef<LocatorPathElt> path) {
   // Can't fix not yet properly resolved types.
   if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
@@ -2905,7 +2905,7 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
 
   bool isOperatorRef = overload->choice.getDecl()->isOperator();
 
-  auto matchArgToParam = [&](Type argType, Type paramType, TypedNode anchor) {
+  auto matchArgToParam = [&](Type argType, Type paramType, ASTNode anchor) {
     auto *loc = cs.getConstraintLocator(anchor);
     // If argument (and/or parameter) is a generic type let's not even try this
     // fix because it would be impossible to match given types  without delaying
@@ -2974,7 +2974,7 @@ bool ConstraintSystem::repairFailures(
     // explicit call.
     if (fnType->getNumParams() > 0) {
       auto anchor = simplifyLocatorToAnchor(getConstraintLocator(locator));
-      if (!anchor.is<const Expr *>())
+      if (!anchor.is<Expr *>())
         return false;
 
       auto overload = findSelectedOverloadFor(getAsExpr(anchor));
@@ -6307,7 +6307,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   if (!anchor)
     return nullptr;
 
-  auto getType = [&cs](const Expr *expr) -> Type {
+  auto getType = [&cs](Expr *expr) -> Type {
     return cs.simplifyType(cs.getType(expr))->getRValueType();
   };
 
@@ -9219,7 +9219,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   // Only useful to record if no pre-existing fix is associated with
   // current anchor or, in case of anchor being an expression, any of
   // its sub-expressions.
-  llvm::SmallDenseSet<TypedNode> anchors;
+  llvm::SmallDenseSet<ASTNode> anchors;
   for (const auto *fix : Fixes)
     anchors.insert(fix->getAnchor());
 

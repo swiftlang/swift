@@ -767,8 +767,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   bool isVarAndNotProtocol2 = false;
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
-    if (auto *anchor = locator->getAnchor().dyn_cast<const Expr *>()) {
-      auto weight = cs.getExprDepth(const_cast<Expr *>(anchor));
+    if (auto *anchor = locator->getAnchor().dyn_cast<Expr *>()) {
+      auto weight = cs.getExprDepth(anchor);
       if (weight)
         return *weight + 1;
     }

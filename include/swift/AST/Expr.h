@@ -475,22 +475,24 @@ public:
   ///
   /// This distinguishes static references to types, like Int, from metatype
   /// values, "someTy: Any.Type".
-  bool isTypeReference(llvm::function_ref<Type(const Expr *)> getType =
-                           [](const Expr *E) -> Type { return E->getType(); },
-                       llvm::function_ref<Decl *(const Expr *)> getDecl =
-                           [](const Expr *E) -> Decl * {
-                         return nullptr;
-                       }) const;
+  bool isTypeReference(
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      },
+      llvm::function_ref<Decl *(Expr *)> getDecl = [](Expr *E) -> Decl * {
+        return nullptr;
+      }) const;
 
   /// Determine whether this expression refers to a statically-derived metatype.
   ///
   /// This implies `isTypeReference`, but also requires that the referenced type
   /// is not an archetype or dependent type.
   bool isStaticallyDerivedMetatype(
-      llvm::function_ref<Type(const Expr *)> getType =
-          [](const Expr *E) -> Type { return E->getType(); },
-      llvm::function_ref<bool(const Expr *)> isTypeReference =
-          [](const Expr *E) { return E->isTypeReference(); }) const;
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      },
+      llvm::function_ref<bool(Expr *)> isTypeReference =
+          [](Expr *E) { return E->isTypeReference(); }) const;
 
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
@@ -538,11 +540,12 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
-  void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
-            llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
-            llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> getTypeOfKeyPathComponent,
+  void dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getType,
+            llvm::function_ref<Type(TypeLoc &)> getTypeOfTypeLoc,
+            llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+                getTypeOfKeyPathComponent,
             unsigned Indent = 0) const;
-  
+
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
@@ -1183,9 +1186,9 @@ public:
   ///
   /// Note: prefer to use the second entry point, which separates out
   /// arguments/labels/etc.
-  static ObjectLiteralExpr *
-  create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind, Expr *arg,
-         bool implicit, llvm::function_ref<Type(const Expr *)> getType);
+  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+                                   LiteralKind kind, Expr *arg, bool implicit,
+                                   llvm::function_ref<Type(Expr *)> getType);
 
   /// Create a new object literal expression.
   static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
@@ -1778,11 +1781,12 @@ public:
   ///
   /// Note: do not create new callers to this entry point; use the entry point
   /// that takes separate index arguments.
-  static DynamicSubscriptExpr *
-  create(ASTContext &ctx, Expr *base, Expr *index, ConcreteDeclRef decl,
-         bool implicit,
-         llvm::function_ref<Type(const Expr *)> getType =
-             [](const Expr *E) -> Type { return E->getType(); });
+  static DynamicSubscriptExpr *create(
+      ASTContext &ctx, Expr *base, Expr *index, ConcreteDeclRef decl,
+      bool implicit,
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      });
 
   /// getIndex - Retrieve the index of the subscript expression, i.e., the
   /// "offset" into the base value.
@@ -2355,12 +2359,13 @@ public:
   ///
   /// Note: do not create new callers to this entry point; use the entry point
   /// that takes separate index arguments.
-  static SubscriptExpr *
-  create(ASTContext &ctx, Expr *base, Expr *index,
-         ConcreteDeclRef decl = ConcreteDeclRef(), bool implicit = false,
-         AccessSemantics semantics = AccessSemantics::Ordinary,
-         llvm::function_ref<Type(const Expr *)> getType =
-             [](const Expr *E) -> Type { return E->getType(); });
+  static SubscriptExpr *create(
+      ASTContext &ctx, Expr *base, Expr *index,
+      ConcreteDeclRef decl = ConcreteDeclRef(), bool implicit = false,
+      AccessSemantics semantics = AccessSemantics::Ordinary,
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      });
 
   /// Create a new subscript.
   static SubscriptExpr *create(ASTContext &ctx, Expr *base,
@@ -3599,10 +3604,8 @@ public:
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
   /// Retrieve the result type of this closure.
-  Type getResultType(llvm::function_ref<Type(const Expr *)> getType =
-                         [](const Expr *E) -> Type {
-    return E->getType();
-  }) const;
+  Type getResultType(llvm::function_ref<Type(Expr *)> getType =
+                         [](Expr *E) -> Type { return E->getType(); }) const;
 
   /// Return whether this closure is throwing when fully applied.
   bool isBodyThrowing() const;
@@ -4263,12 +4266,13 @@ public:
   /// Create a new call expression.
   ///
   /// Note: prefer to use the entry points that separate out the arguments.
-  static CallExpr *
-  create(ASTContext &ctx, Expr *fn, Expr *arg, ArrayRef<Identifier> argLabels,
-         ArrayRef<SourceLoc> argLabelLocs, bool hasTrailingClosure,
-         bool implicit, Type type = Type(),
-         llvm::function_ref<Type(const Expr *)> getType =
-             [](const Expr *E) -> Type { return E->getType(); });
+  static CallExpr *create(
+      ASTContext &ctx, Expr *fn, Expr *arg, ArrayRef<Identifier> argLabels,
+      ArrayRef<SourceLoc> argLabelLocs, bool hasTrailingClosure, bool implicit,
+      Type type = Type(),
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      });
 
   /// Create a new implicit call expression without any source-location
   /// information.
@@ -4277,11 +4281,12 @@ public:
   /// \param args The call arguments, not including a trailing closure (if any).
   /// \param argLabels The argument labels, whose size must equal args.size(),
   /// or which must be empty.
-  static CallExpr *
-  createImplicit(ASTContext &ctx, Expr *fn, ArrayRef<Expr *> args,
-                 ArrayRef<Identifier> argLabels,
-                 llvm::function_ref<Type(const Expr *)> getType =
-                     [](const Expr *E) -> Type { return E->getType(); }) {
+  static CallExpr *createImplicit(
+      ASTContext &ctx, Expr *fn, ArrayRef<Expr *> args,
+      ArrayRef<Identifier> argLabels,
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      }) {
     return create(ctx, fn, SourceLoc(), args, argLabels, { }, SourceLoc(),
                   /*trailingClosure=*/nullptr, /*implicit=*/true, getType);
   }
@@ -4295,12 +4300,13 @@ public:
   /// \param argLabelLocs The locations of the argument labels, whose size must
   /// equal args.size() or which must be empty.
   /// \param trailingClosure The trailing closure, if any.
-  static CallExpr *
-  create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
-         ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
-         SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
-         llvm::function_ref<Type(const Expr *)> getType =
-             [](const Expr *E) -> Type { return E->getType(); });
+  static CallExpr *create(
+      ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
+      ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
+      SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      });
 
   SourceLoc getStartLoc() const {
     SourceLoc fnLoc = getFn()->getStartLoc();
@@ -5622,18 +5628,15 @@ inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
 ///
 /// \param argLabelLocs The argument label locations, which might be updated by
 /// this function.
-Expr *packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
-                         ArrayRef<Expr *> args,
-                         ArrayRef<Identifier> &argLabels,
-                         ArrayRef<SourceLoc> &argLabelLocs,
-                         SourceLoc rParenLoc,
-                         Expr *trailingClosure, bool implicit,
-                         SmallVectorImpl<Identifier> &argLabelsScratch,
-                         SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
-                         llvm::function_ref<Type(const Expr *)> getType =
-                              [](const Expr *E) -> Type {
-                                return E->getType();
-                              });
+Expr *packSingleArgument(
+    ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
+    ArrayRef<Identifier> &argLabels, ArrayRef<SourceLoc> &argLabelLocs,
+    SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
+    SmallVectorImpl<Identifier> &argLabelsScratch,
+    SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
+    llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+      return E->getType();
+    });
 
 void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
 void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
