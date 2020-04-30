@@ -375,7 +375,7 @@ static void printGenericSpecializationInfo(
     raw_ostream &OS, StringRef Kind, StringRef Name,
     const GenericSpecializationInformation *SpecializationInfo,
     SubstitutionMap Subs = { }) {
-  if (!SpecializationInfo)
+  if (!SpecializationInfo && Subs.empty())
     return;
 
   auto PrintSubstitutions = [&](SubstitutionMap Subs) {
@@ -383,6 +383,11 @@ static void printGenericSpecializationInfo(
     interleave(Subs.getReplacementTypes(),
                [&](Type type) { OS << type; },
                [&] { OS << ", "; });
+    OS << '>';
+    OS << " conformances <";
+    interleave(Subs.getConformances(),
+               [&](ProtocolConformanceRef conf) { conf.print(OS); },
+               [&] { OS << ", ";});
     OS << '>';
   };
 
@@ -716,7 +721,9 @@ public:
       Ctx.printInstructionCallBack(&I);
       if (SILPrintGenericSpecializationInfo) {
         if (auto AI = ApplySite::isa(const_cast<SILInstruction *>(&I)))
-          if (AI.getSpecializationInfo() && AI.getCalleeFunction())
+          if ((AI.getSpecializationInfo() ||
+               !AI.getSubstitutionMap().empty()) &&
+              AI.getCalleeFunction())
             printGenericSpecializationInfo(
                 PrintState.OS, "call-site", AI.getCalleeFunction()->getName(),
                 AI.getSpecializationInfo(), AI.getSubstitutionMap());
