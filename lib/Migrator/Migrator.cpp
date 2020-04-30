@@ -26,8 +26,8 @@
 using namespace swift;
 using namespace swift::migrator;
 
-bool migrator::updateCodeAndEmitRemapIfNeeded(
-    CompilerInstance *Instance, const CompilerInvocation &Invocation) {
+bool migrator::updateCodeAndEmitRemapIfNeeded(CompilerInstance *Instance) {
+  const auto &Invocation = Instance->getInvocation();
   if (!Invocation.getMigratorOptions().shouldRunMigrator())
     return false;
 

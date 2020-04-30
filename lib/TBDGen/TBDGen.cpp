@@ -475,7 +475,6 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
       auto witnessRef = SILDeclRef(witnessDecl);
-      auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
       if (conformanceIsFixed &&
           (isa<SelfProtocolConformance>(rootConformance) ||
            fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef))) {

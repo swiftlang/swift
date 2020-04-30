@@ -494,7 +494,6 @@ public:
 
   bool hasASTContext() const { return Context != nullptr; }
 
-  SILOptions &getSILOptions() { return Invocation.getSILOptions(); }
   const SILOptions &getSILOptions() const { return Invocation.getSILOptions(); }
 
   Lowering::TypeConverter &getSILTypes();
