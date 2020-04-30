@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_C_FUNCTION_INPUTS_EMIT_CALLED_INLINE_FUNCTION_H
+#define TEST_INTEROP_C_FUNCTION_INPUTS_EMIT_CALLED_INLINE_FUNCTION_H
+
 #ifdef __cplusplus
 #define INLINE inline
 #else
@@ -47,3 +50,5 @@ INLINE int calledFromSwift() {
   return calledTransitively();
 #endif
 }
+
+#endif
