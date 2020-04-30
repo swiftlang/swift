@@ -136,7 +136,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   auto resolution = TypeResolution::forInterface(
       dc, dc->getGenericSignatureOfContext(), options);
   bool validationError
-    = TypeChecker::validateType(ctx, constraintTypeLoc, resolution, options);
+    = TypeChecker::validateType(ctx, constraintTypeLoc, resolution);
   auto constraintType = constraintTypeLoc.getType();
   if (validationError)
     return nullptr;
@@ -674,8 +674,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                     : TypeResolverContext::FunctionInput);
         paramOptions |= TypeResolutionFlags::Direct;
 
-        auto type = resolution.withOptions(paramOptions)
-                        .resolveType(typeRepr, paramOptions);
+        auto type = resolution.withOptions(paramOptions).resolveType(typeRepr);
 
         if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
           typeRepr = specifier->getBase();
@@ -696,8 +695,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       if (resultTypeRepr && !isa<OpaqueReturnTypeRepr>(resultTypeRepr)) {
         auto resultType =
             resolution.withOptions(TypeResolverContext::FunctionResult)
-                .resolveType(resultTypeRepr,
-                             TypeResolverContext::FunctionResult);
+                .resolveType(resultTypeRepr);
 
         inferenceSources.emplace_back(resultTypeRepr, resultType);
       }
@@ -940,7 +938,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   auto resolveType = [&](TypeLoc &typeLoc) -> Type {
     Type result;
     if (auto typeRepr = typeLoc.getTypeRepr())
-      result = resolution->resolveType(typeRepr, options);
+      result = resolution->resolveType(typeRepr);
     else
       result = typeLoc.getType();
 
@@ -992,8 +990,8 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   auto resolution = TypeResolution::forStructural(typeAlias, options);
-  auto type = resolution.resolveType(underlyingTypeRepr, options);
-  
+  auto type = resolution.resolveType(underlyingTypeRepr);
+
   auto genericSig = typeAlias->getGenericSignature();
   SubstitutionMap subs;
   if (genericSig)

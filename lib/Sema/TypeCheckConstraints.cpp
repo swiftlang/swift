@@ -1391,7 +1391,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::AllowUnavailable;
     auto resolution = TypeResolution::forContextual(DC, options);
-    auto BaseTy = resolution.resolveType(InnerTypeRepr, options);
+    auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy && BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
@@ -1918,8 +1918,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
     typeLoc = TypeLoc(typeExpr->getTypeRepr(), Type());
     bool hadError = TypeChecker::validateType(
-        getASTContext(), typeLoc, TypeResolution::forContextual(DC, options),
-        options);
+        getASTContext(), typeLoc, TypeResolution::forContextual(DC, options));
 
     if (hadError)
       return nullptr;

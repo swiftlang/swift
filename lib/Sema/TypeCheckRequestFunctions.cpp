@@ -72,7 +72,7 @@ InheritedTypeRequest::evaluate(
 
   Type inheritedType;
   if (typeLoc.getTypeRepr())
-    inheritedType = resolution->resolveType(typeLoc.getTypeRepr(), options);
+    inheritedType = resolution->resolveType(typeLoc.getTypeRepr());
   else
     inheritedType = typeLoc.getType();
 

@@ -1092,7 +1092,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto type = TypeChecker::resolveTypeInContext(
         typeDecl, nullptr,
         TypeResolution::forContextual(useDC, TypeResolverContext::InExpression),
-        TypeResolverContext::InExpression,
         /*isSpecialized=*/false);
 
     checkNestedTypeConstraints(*this, type, locator);

@@ -360,8 +360,7 @@ Type getUInt8Type(ASTContext &ctx);
 
 /// Try to resolve an IdentTypeRepr, returning either the referenced
 /// Type or an ErrorType in case of error.
-Type resolveIdentifierType(TypeResolution resolution, IdentTypeRepr *IdType,
-                           TypeResolutionOptions options);
+Type resolveIdentifierType(TypeResolution resolution, IdentTypeRepr *IdType);
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
@@ -379,11 +378,8 @@ Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 ///
 /// \param resolution The type resolution being performed.
 ///
-/// \param options Options that alter type resolution.
-///
 /// \returns true if type validation failed, or false otherwise.
-bool validateType(ASTContext &Ctx, TypeLoc &Loc, TypeResolution resolution,
-                  TypeResolutionOptions options);
+bool validateType(ASTContext &Ctx, TypeLoc &Loc, TypeResolution resolution);
 
 /// Check for unsupported protocol types in the given declaration.
 void checkUnsupportedProtocolType(Decl *decl);
@@ -414,8 +410,7 @@ void checkUnsupportedProtocolType(ASTContext &ctx,
 ///
 /// \returns the resolved type.
 Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
-                          TypeResolution resolution,
-                          TypeResolutionOptions options, bool isSpecialized);
+                          TypeResolution resolution, bool isSpecialized);
 
 /// Apply generic arguments to the given type.
 ///

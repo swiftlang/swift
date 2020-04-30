@@ -366,10 +366,8 @@ public:
   ///
   /// \param TyR The type representation to check.
   ///
-  /// \param options Options that alter type resolution.
-  ///
   /// \returns a well-formed type or an ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR, TypeResolutionOptions options);
+  Type resolveType(TypeRepr *TyR);
 
   /// Whether this type resolution uses archetypes (vs. generic parameters).
   bool usesArchetypes() const;

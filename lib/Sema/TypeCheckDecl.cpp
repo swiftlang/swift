@@ -817,7 +817,7 @@ DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
   if (defaultDefinition) {
     auto resolution =
         TypeResolution::forInterface(assocType->getDeclContext(), None);
-    return resolution.resolveType(defaultDefinition, None);
+    return resolution.resolveType(defaultDefinition);
   }
 
   return Type();
@@ -1436,7 +1436,7 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
   if (TypeChecker::validateType(
-          Ctx, typeLoc, TypeResolution::forInterface(DC, options), options))
+          Ctx, typeLoc, TypeResolution::forInterface(DC, options)))
     return nullptr;
 
   return typeLoc.getType()->getAnyNominal();
@@ -1771,7 +1771,7 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   auto underlyingLoc = TypeLoc(typeAlias->getUnderlyingTypeRepr());
   if (TypeChecker::validateType(
           typeAlias->getASTContext(), underlyingLoc,
-          TypeResolution::forInterface(typeAlias, options), options)) {
+          TypeResolution::forInterface(typeAlias, options))) {
     typeAlias->setInvalid();
     return ErrorType::get(typeAlias->getASTContext());
   }
@@ -2021,8 +2021,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto *dc = decl->getInnermostDeclContext();
   auto resolution =
       TypeResolution::forInterface(dc, TypeResolverContext::FunctionResult);
-  return resolution.resolveType(
-      resultTyRepr, TypeResolverContext::FunctionResult);
+  return resolution.resolveType(resultTyRepr);
 }
 
 ParamSpecifier
@@ -2125,7 +2124,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   auto &ctx = dc->getASTContext();
   auto resolution = TypeResolution::forInterface(dc, options);
-  if (TypeChecker::validateType(ctx, TL, resolution, options)) {
+  if (TypeChecker::validateType(ctx, TL, resolution)) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }
@@ -2545,7 +2544,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   auto tr = TypeResolution::forStructural(ext->getDeclContext(), options);
-  auto extendedType = tr.resolveType(extendedRepr, options);
+  auto extendedType = tr.resolveType(extendedRepr);
 
   if (extendedType->hasError())
     return error();

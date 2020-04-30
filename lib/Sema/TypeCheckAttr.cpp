@@ -2620,7 +2620,7 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
     auto resolution = TypeResolution::forContextual(PD, None);
-    return resolution.resolveType(typeEraserRepr, /*options=*/None);
+    return resolution.resolveType(typeEraserRepr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -2807,7 +2807,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
     auto resolution = TypeResolution::forContextual(DC, options);
-    T = resolution.resolveType(ProtoTypeLoc.getTypeRepr(), options);
+    T = resolution.resolveType(ProtoTypeLoc.getTypeRepr());
     ProtoTypeLoc.setType(T);
   }
 
@@ -4473,7 +4473,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     options |= TypeResolutionFlags::AllowModule;
     auto resolution =
         TypeResolution::forContextual(derivative->getDeclContext(), options);
-    baseType = resolution.resolveType(baseTypeRepr, options);
+    baseType = resolution.resolveType(baseTypeRepr);
   }
   if (baseType && baseType->hasError())
     return true;
@@ -4985,7 +4985,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
       TypeResolution::forContextual(transpose->getDeclContext(), None);
   Type baseType;
   if (attr->getBaseTypeRepr())
-    baseType = resolution.resolveType(attr->getBaseTypeRepr(), None);
+    baseType = resolution.resolveType(attr->getBaseTypeRepr());
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
                                : defaultUnqualifiedLookupOptions) |
