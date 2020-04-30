@@ -285,6 +285,10 @@ extension CVaListPointer: CustomDebugStringConvertible {
 
 #endif
 
+/// Copy `size` bytes of memory from `src` into `dest`.
+///
+/// The memory regions `src..<src + size` and
+/// `dest..<dest + size` should not overlap.
 @inlinable
 internal func _memcpy(
   dest destination: UnsafeMutableRawPointer,
