@@ -367,3 +367,25 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
 void Evaluator::dumpDependenciesGraphviz() const {
   printDependenciesGraphviz(llvm::dbgs());
 }
+
+void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
+                                                   DeclBaseName name) {
+  if (auto *tracker = getActiveDependencyTracker())
+    tracker->addUsedMember({subject, name}, isActiveSourceCascading());
+}
+
+void evaluator::DependencyCollector::addPotentialMember(
+    NominalTypeDecl *subject) {
+  if (auto *tracker = getActiveDependencyTracker())
+    tracker->addUsedMember({subject, Identifier()}, isActiveSourceCascading());
+}
+
+void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
+  if (auto *tracker = getActiveDependencyTracker())
+    tracker->addTopLevelName(name, isActiveSourceCascading());
+}
+
+void evaluator::DependencyCollector::addDynamicLookupName(DeclBaseName name) {
+  if (auto *tracker = getActiveDependencyTracker())
+    tracker->addDynamicLookupName(name, isActiveSourceCascading());
+}

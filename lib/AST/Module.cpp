@@ -1289,8 +1289,7 @@ OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
 
 template <typename OperatorType>
 void LookupOperatorRequest<OperatorType>::writeDependencySink(
-    Evaluator &evaluator, ReferencedNameTracker &reqTracker,
-    OperatorType *o) const {
+    evaluator::DependencyCollector &reqTracker, OperatorType *o) const {
   auto &desc = std::get<0>(this->getStorage());
   auto *FU = desc.fileOrModule.template get<FileUnit *>();
   auto shouldRegisterDependencyEdge = [&FU](OperatorType *o) -> bool {
@@ -1310,22 +1309,19 @@ void LookupOperatorRequest<OperatorType>::writeDependencySink(
     return;
   }
 
-  reqTracker.addTopLevelName(desc.name, desc.isCascading);
+  reqTracker.addTopLevelName(desc.name);
 }
 
 #define LOOKUP_OPERATOR(Kind)                                                  \
   Kind##Decl *ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) {       \
-    auto result =                                                              \
-        lookupOperatorDeclForName<Kind##Decl>(this, loc, name,                 \
-                                              /*isCascading*/ false);          \
+    auto result = lookupOperatorDeclForName<Kind##Decl>(                       \
+        this, loc, name, /*isCascading*/ false);                               \
     return result ? *result : nullptr;                                         \
   }                                                                            \
-  template Kind##Decl *                                                        \
-  LookupOperatorRequest<Kind##Decl>::evaluate(Evaluator &e,                    \
-                                              OperatorLookupDescriptor) const; \
-  template                                                                     \
-  void LookupOperatorRequest<Kind##Decl>::writeDependencySink(                 \
-           Evaluator &, ReferencedNameTracker &, Kind##Decl *) const;          \
+  template Kind##Decl *LookupOperatorRequest<Kind##Decl>::evaluate(            \
+      Evaluator &e, OperatorLookupDescriptor) const;                           \
+  template void LookupOperatorRequest<Kind##Decl>::writeDependencySink(        \
+      evaluator::DependencyCollector &, Kind##Decl *) const;
 
 LOOKUP_OPERATOR(PrefixOperator)
 LOOKUP_OPERATOR(InfixOperator)

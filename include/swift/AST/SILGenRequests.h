@@ -98,7 +98,8 @@ public:
 
 public:
   // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 class SILGenWholeModuleRequest :
