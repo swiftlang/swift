@@ -1056,7 +1056,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     {
       Expr *exprToCheck = prevValue;
       if (TypeChecker::typeCheckExpression(exprToCheck, ED,
-                                           TypeLoc::withoutLoc(rawTy),
+                                           rawTy,
                                            CTP_EnumCaseRawValue)) {
         TypeChecker::checkEnumElementErrorHandling(elt, exprToCheck);
       }

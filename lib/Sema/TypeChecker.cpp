@@ -653,7 +653,7 @@ swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
-  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, TypeLoc(),
+  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, Type(),
                                                    CTP_Unused);
   return !resultTy;
 }

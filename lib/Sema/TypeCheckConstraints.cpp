@@ -1982,7 +1982,7 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
 
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
-                                      TypeLoc convertType,
+                                      Type convertType,
                                       ContextualTypePurpose convertTypePurpose,
                                       TypeCheckExprOptions options) {
   SolutionApplicationTarget target(
@@ -2106,7 +2106,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             bool isAutoClosure) {
   assert(paramType && !paramType->hasError());
   return typeCheckExpression(
-      defaultValue, DC, TypeLoc::withoutLoc(paramType),
+      defaultValue, DC, paramType,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter);
 }
 
@@ -2481,7 +2481,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     return true;
 
   auto resultTy = TypeChecker::typeCheckExpression(
-      expr, dc, TypeLoc::withoutLoc(boolDecl->getDeclaredType()),
+      expr, dc, boolDecl->getDeclaredType(),
       CTP_Condition);
   return !resultTy;
 }
