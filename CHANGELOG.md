@@ -25,7 +25,7 @@ CHANGELOG
 </details>
 
 Swift 5.3
-----------
+---------
 
 * [SR-7083][]:
 
@@ -652,8 +652,6 @@ Swift 5.1
 
   `Array` and `ContiguousArray` now have `init(unsafeUninitializedCapacity:initializingWith:)`,
   which provides access to the array's uninitialized storage.
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.0
 ---------
@@ -8108,4 +8106,5 @@ Swift 1.0
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
 [SR-11298]: <https://bugs.swift.org/browse/SR-11298>
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>
+[SR-11700]: <https://bugs.swift.org/browse/SR-11700>
 [SR-11841]: <https://bugs.swift.org/browse/SR-11841>
