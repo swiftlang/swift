@@ -73,7 +73,11 @@ ASTNode FailureDiagnostic::getAnchor() const {
 }
 
 Type FailureDiagnostic::getType(ASTNode node, bool wantRValue) const {
-  return resolveType(S.getType(node), /*reconstituteSugar=*/false, wantRValue);
+  return resolveType(getRawType(node), /*reconstituteSugar=*/false, wantRValue);
+}
+
+Type FailureDiagnostic::getRawType(ASTNode node) const {
+  return S.getType(node);
 }
 
 template <typename... ArgTypes>
@@ -3420,7 +3424,8 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
       return false;
   }
 
-  if (auto *defaultableVar = getType(parentExpr)->getAs<TypeVariableType>()) {
+  if (auto *defaultableVar =
+          getRawType(parentExpr)->getAs<TypeVariableType>()) {
     if (solution.DefaultedConstraints.count(
             defaultableVar->getImpl().getLocator()) != 0) {
       emitDiagnostic(diag::unresolved_member_no_inference, getName());

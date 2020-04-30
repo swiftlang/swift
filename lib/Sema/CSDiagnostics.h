@@ -86,6 +86,10 @@ public:
 
   Type getType(ASTNode node, bool wantRValue = true) const;
 
+  /// Get type associated with a given ASTNode without resolving it,
+  /// which means that returned type would have type variables.
+  Type getRawType(ASTNode node) const;
+
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
@@ -205,7 +209,7 @@ protected:
 
   bool isCollectionType(Type type) const {
     auto &cs = getConstraintSystem();
-    return bool(cs.isCollectionType(type));
+    return cs.isCollectionType(type);
   }
 
   bool isArrayType(Type type) const {
