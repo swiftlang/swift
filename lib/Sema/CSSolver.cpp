@@ -993,7 +993,7 @@ void ConstraintSystem::shrink(Expr *expr) {
             // instead of cloning representative.
             auto coercionRepr = typeRepr->clone(CS.getASTContext());
             // Let's try to resolve coercion type from cloned representative.
-            auto resolution = TypeResolution::forContextual(CS.DC);
+            auto resolution = TypeResolution::forContextual(CS.DC, None);
             auto coercionType =
               resolution.resolveType(coercionRepr, None);
 

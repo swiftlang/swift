@@ -54,30 +54,42 @@ using namespace swift;
 
 /// Type resolution.
 
-TypeResolution TypeResolution::forStructural(DeclContext *dc) {
-  return TypeResolution(dc, TypeResolutionStage::Structural);
-}
-
-TypeResolution TypeResolution::forInterface(DeclContext *dc) {
-  return forInterface(dc, dc->getGenericSignatureOfContext());
+TypeResolution TypeResolution::forStructural(DeclContext *dc,
+                                             TypeResolutionOptions options) {
+  return TypeResolution(dc, TypeResolutionStage::Structural, options);
 }
 
 TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            GenericSignature genericSig) {
-  TypeResolution result(dc, TypeResolutionStage::Interface);
+                                            TypeResolutionOptions options) {
+  return forInterface(dc, dc->getGenericSignatureOfContext(), options);
+}
+
+TypeResolution TypeResolution::forInterface(DeclContext *dc,
+                                            GenericSignature genericSig,
+                                            TypeResolutionOptions options) {
+  TypeResolution result(dc, TypeResolutionStage::Interface, options);
   result.complete.genericSig = genericSig;
   result.complete.builder = nullptr;
   return result;
 }
 
-TypeResolution TypeResolution::forContextual(DeclContext *dc) {
-  return forContextual(dc, dc->getGenericEnvironmentOfContext());
+TypeResolution TypeResolution::forContextual(DeclContext *dc,
+                                             TypeResolutionOptions options) {
+  return forContextual(dc, dc->getGenericEnvironmentOfContext(), options);
 }
 
 TypeResolution TypeResolution::forContextual(DeclContext *dc,
-                                             GenericEnvironment *genericEnv) {
-  TypeResolution result(dc, TypeResolutionStage::Contextual);
+                                             GenericEnvironment *genericEnv,
+                                             TypeResolutionOptions options) {
+  TypeResolution result(dc, TypeResolutionStage::Contextual, options);
   result.genericEnv = genericEnv;
+  return result;
+}
+
+TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
+  TypeResolution result(dc, stage, opts);
+  result.genericEnv = genericEnv;
+  result.complete = complete;
   return result;
 }
 
@@ -432,6 +444,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
                                        TypeResolution resolution,
                                        TypeResolutionOptions options,
                                        bool isSpecialized) {
+  assert(resolution.getOptions() == options);
 
   auto fromDC = resolution.getDeclContext();
   ASTContext &ctx = fromDC->getASTContext();
@@ -800,11 +813,12 @@ static Type applyGenericArguments(Type type,
 
   // Resolve the types of the generic arguments.
   options = adjustOptionsForGenericArgs(options);
+  auto genericResolution = resolution.withOptions(options);
 
   SmallVector<Type, 2> args;
   for (auto tyR : genericArgs) {
     // Propagate failure.
-    Type substTy = resolution.resolveType(tyR, options);
+    Type substTy = genericResolution.resolveType(tyR, options);
     if (!substTy || substTy->hasError())
       return ErrorType::get(ctx);
 
@@ -1633,6 +1647,8 @@ Type TypeChecker::resolveIdentifierType(
        TypeResolution resolution,
        IdentTypeRepr *IdType,
        TypeResolutionOptions options) {
+  assert(resolution.getOptions() == options);
+
   auto DC = resolution.getDeclContext();
   ASTContext &ctx = DC->getASTContext();
   auto &diags = ctx.Diags;
@@ -1742,6 +1758,8 @@ static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
 bool TypeChecker::validateType(ASTContext &Context, TypeLoc &Loc,
                                TypeResolution resolution,
                                TypeResolutionOptions options) {
+  assert(resolution.getOptions() == options);
+
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
     return Loc.isError();
@@ -1872,6 +1890,7 @@ namespace {
 
 Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
+  assert(getOptions() == options);
   auto &ctx = getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats,
                                   "resolve-type", TyR);
@@ -1944,9 +1963,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
-    return TypeChecker::resolveIdentifierType(resolution,
-                                              cast<IdentTypeRepr>(repr),
-                                              options);
+    return TypeChecker::resolveIdentifierType(
+        resolution.withOptions(options), cast<IdentTypeRepr>(repr), options);
 
   case TypeReprKind::Function: {
     if (!(options & TypeResolutionFlags::SILType)) {
@@ -2815,7 +2833,8 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     Optional<llvm::SaveAndRestore<TypeResolution>>
       useSILBoxGenericEnv;
     if (auto env = repr->getGenericEnvironment()) {
-      resolveSILBoxGenericParams = TypeResolution::forContextual(DC, env);
+      resolveSILBoxGenericParams =
+          TypeResolution::forContextual(DC, env, options);
       useSILBoxGenericEnv.emplace(resolution, *resolveSILBoxGenericParams);
     }
     
@@ -2895,7 +2914,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
     if (componentTypeEnv) {
       resolveSILFunctionGenericParams =
-        TypeResolution::forContextual(DC, componentTypeEnv);
+          TypeResolution::forContextual(DC, componentTypeEnv, options);
       useSILFunctionGenericEnv.emplace(resolution,
                                        *resolveSILFunctionGenericParams);
     }
@@ -2960,7 +2979,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     Optional<llvm::SaveAndRestore<TypeResolution>> useSILFunctionGenericEnv;
     if (genericEnv) {
       resolveSILFunctionGenericParams =
-        TypeResolution::forContextual(DC, genericEnv);
+          TypeResolution::forContextual(DC, genericEnv, options);
       useSILFunctionGenericEnv.emplace(resolution,
                                        *resolveSILFunctionGenericParams);
     }
@@ -3859,7 +3878,6 @@ void TypeChecker::checkUnsupportedProtocolType(
 
 Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
                                   CustomAttrTypeKind typeKind) {
-  auto resolution = TypeResolution::forContextual(dc);
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   // Property delegates allow their type to be an unbound generic.
@@ -3867,6 +3885,7 @@ Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   ASTContext &ctx = dc->getASTContext();
+  auto resolution = TypeResolution::forContextual(dc, options);
   if (TypeChecker::validateType(ctx, attr->getTypeLoc(), resolution, options))
     return Type();
 

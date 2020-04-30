@@ -49,11 +49,11 @@ InheritedTypeRequest::evaluate(
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
-    resolution = TypeResolution::forStructural(dc);
+    resolution = TypeResolution::forStructural(dc, options);
     break;
 
   case TypeResolutionStage::Interface:
-    resolution = TypeResolution::forInterface(dc);
+    resolution = TypeResolution::forInterface(dc, options);
     break;
 
   case TypeResolutionStage::Contextual: {

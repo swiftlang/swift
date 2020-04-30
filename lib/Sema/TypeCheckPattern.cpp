@@ -465,7 +465,7 @@ public:
 
     // See if the repr resolves to a type.
     Type ty = TypeChecker::resolveIdentifierType(
-        TypeResolution::forContextual(DC), repr, options);
+        TypeResolution::forContextual(DC, options), repr, options);
 
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -563,8 +563,8 @@ public:
       auto *prefixRepr = IdentTypeRepr::create(Context, components);
 
       // See first if the entire repr resolves to a type.
-      Type enumTy = TypeChecker::resolveIdentifierType(TypeResolution::forContextual(DC),
-                                                       prefixRepr, options);
+      Type enumTy = TypeChecker::resolveIdentifierType(
+          TypeResolution::forContextual(DC, options), prefixRepr, options);
       if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
         return nullptr;
 
@@ -761,7 +761,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
   case PatternKind::Typed: {
-    auto resolution = TypeResolution::forContextual(dc);
+    auto resolution = TypeResolution::forContextual(dc, options);
     TypedPattern *TP = cast<TypedPattern>(P);
     return validateTypedPattern(resolution, TP, options);
   }
@@ -1210,7 +1210,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
     // Type-check the type parameter.
     TypeResolutionOptions paramOptions(TypeResolverContext::InExpression);
-    TypeResolution resolution = TypeResolution::forContextual(dc);
+    TypeResolution resolution = TypeResolution::forContextual(dc, paramOptions);
     if (validateType(Context, IP->getCastTypeLoc(), resolution, paramOptions))
       return nullptr;
 

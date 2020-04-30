@@ -2619,7 +2619,7 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    auto resolution = TypeResolution::forContextual(PD);
+    auto resolution = TypeResolution::forContextual(PD, None);
     return resolution.resolveType(typeEraserRepr, /*options=*/None);
   } else {
     auto *LazyResolver = attr->Resolver;
@@ -2806,7 +2806,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-    auto resolution = TypeResolution::forContextual(DC);
+    auto resolution = TypeResolution::forContextual(DC, options);
     T = resolution.resolveType(ProtoTypeLoc.getTypeRepr(), options);
     ProtoTypeLoc.setType(T);
   }
@@ -4467,11 +4467,12 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
         return derivative->getParent() == func->getParent();
       };
 
-  auto resolution = TypeResolution::forContextual(derivative->getDeclContext());
   Type baseType;
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
     TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowModule;
+    auto resolution =
+        TypeResolution::forContextual(derivative->getDeclContext(), options);
     baseType = resolution.resolveType(baseTypeRepr, options);
   }
   if (baseType && baseType->hasError())
@@ -4980,7 +4981,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
       [&](AbstractFunctionDecl *decl) { return true; };
 
-  auto resolution = TypeResolution::forContextual(transpose->getDeclContext());
+  auto resolution =
+      TypeResolution::forContextual(transpose->getDeclContext(), None);
   Type baseType;
   if (attr->getBaseTypeRepr())
     baseType = resolution.resolveType(attr->getBaseTypeRepr(), None);
