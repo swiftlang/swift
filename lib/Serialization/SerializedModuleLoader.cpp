@@ -677,8 +677,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
-    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
-                                                extendedInfo.isSIB());
+    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
@@ -1098,6 +1097,10 @@ void SerializedASTFile::collectLinkLibraries(
   } else {
     File.collectLinkLibraries(callback);
   }
+}
+
+bool SerializedASTFile::isSIB() const {
+  return File.IsSIB;
 }
 
 bool SerializedASTFile::isSystemModule() const {
