@@ -4253,7 +4253,7 @@ namespace {
                                                 { Identifier() });
 
       auto resultTy = TypeChecker::typeCheckExpression(
-          callExpr, cs.DC, TypeLoc::withoutLoc(valueType), CTP_CannotFail);
+          callExpr, cs.DC, valueType, CTP_CannotFail);
       assert(resultTy && "Conversion cannot fail!");
       (void)resultTy;
 
@@ -8059,7 +8059,7 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
     Expr *convertElementExpr = elementExpr;
     if (TypeChecker::typeCheckExpression(
             convertElementExpr, dc,
-            TypeLoc::withoutLoc(optPatternType),
+            optPatternType,
             CTP_CoerceOperand).isNull()) {
       return None;
     }

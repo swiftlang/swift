@@ -134,9 +134,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   TypeLoc constraintTypeLoc(repr->getConstraint());
   // Pass along the error type if resolving the repr failed.
   auto resolution = TypeResolution::forInterface(
-    dc, dc->getGenericSignatureOfContext());
+      dc, dc->getGenericSignatureOfContext(), options);
   bool validationError
-    = TypeChecker::validateType(ctx, constraintTypeLoc, resolution, options);
+    = TypeChecker::validateType(ctx, constraintTypeLoc, resolution);
   auto constraintType = constraintTypeLoc.getType();
   if (validationError)
     return nullptr;
@@ -657,12 +657,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // note them as inference sources.
     if (subscr || func) {
       // Gather requirements from the parameter list.
-      auto resolution = TypeResolution::forStructural(GC);
-
       TypeResolutionOptions options =
           (func ? TypeResolverContext::AbstractFunctionDecl
                 : TypeResolverContext::SubscriptDecl);
 
+      auto resolution = TypeResolution::forStructural(GC, options);
       auto params = func ? func->getParameters() : subscr->getIndices();
       for (auto param : *params) {
         auto *typeRepr = param->getTypeRepr();
@@ -675,7 +674,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                     : TypeResolverContext::FunctionInput);
         paramOptions |= TypeResolutionFlags::Direct;
 
-        auto type = resolution.resolveType(typeRepr, paramOptions);
+        auto type = resolution.withOptions(paramOptions).resolveType(typeRepr);
 
         if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
           typeRepr = specifier->getBase();
@@ -694,8 +693,9 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         }
       }();
       if (resultTypeRepr && !isa<OpaqueReturnTypeRepr>(resultTypeRepr)) {
-        auto resultType = resolution.resolveType(
-            resultTypeRepr, TypeResolverContext::FunctionResult);
+        auto resultType =
+            resolution.withOptions(TypeResolverContext::FunctionResult)
+                .resolveType(resultTypeRepr);
 
         inferenceSources.emplace_back(resultTypeRepr, resultType);
       }
@@ -924,11 +924,11 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
-    resolution = TypeResolution::forStructural(owner.dc);
+    resolution = TypeResolution::forStructural(owner.dc, options);
     break;
 
   case TypeResolutionStage::Interface:
-    resolution = TypeResolution::forInterface(owner.dc);
+    resolution = TypeResolution::forInterface(owner.dc, options);
     break;
 
   case TypeResolutionStage::Contextual:
@@ -938,7 +938,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   auto resolveType = [&](TypeLoc &typeLoc) -> Type {
     Type result;
     if (auto typeRepr = typeLoc.getTypeRepr())
-      result = resolution->resolveType(typeRepr, options);
+      result = resolution->resolveType(typeRepr);
     else
       result = typeLoc.getType();
 
@@ -989,9 +989,9 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
     return ErrorType::get(ctx);
   }
 
-  auto resolution = TypeResolution::forStructural(typeAlias);
-  auto type = resolution.resolveType(underlyingTypeRepr, options);
-  
+  auto resolution = TypeResolution::forStructural(typeAlias, options);
+  auto type = resolution.resolveType(underlyingTypeRepr);
+
   auto genericSig = typeAlias->getGenericSignature();
   SubstitutionMap subs;
   if (genericSig)
