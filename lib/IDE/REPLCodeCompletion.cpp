@@ -83,6 +83,10 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
       return Str;
 
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureExpr:
+      Str += " {";
+      Str += C.getText();
+      break;
     case CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor:
       Str += " {";
       break;

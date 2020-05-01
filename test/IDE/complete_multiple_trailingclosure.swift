@@ -20,11 +20,11 @@ func testGlobalFunc() {
     { 1 } #^GLOBALFUNC_SAMELINE^#
     #^GLOBALFUNC_NEWLINE^#
 // GLOBALFUNC_SAMELINE: Begin completions, 1 items
-// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {() -> String in|}#}[#() -> String#];
 // GLOBALFUNC_SAMELINE: End completions
 
 // GLOBALFUNC_NEWLINE: Begin completions, 1 items
-// GLOBALFUNC_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// GLOBALFUNC_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {() -> String in|}#}[#() -> String#];
 // GLOBALFUNC_NEWLINE: End completions
 
   globalFunc1()
@@ -49,14 +49,14 @@ func testMethod(value: MyStruct) {
   } #^METHOD_SAMELINE^#
   #^METHOD_NEWLINE^#
 // METHOD_SAMELINE: Begin completions, 4 items
-// METHOD_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)?##() -> String#}[#(() -> String)?#];
+// METHOD_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)? {() -> String in|}#}[#(() -> String)?#];
 // METHOD_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .enumFunc()[#Void#];
 // METHOD_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#SimpleEnum#}[#SimpleEnum#];
 // METHOD_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#SimpleEnum#];
 // METHOD_SAMELINE: End completions
 
 // METHOD_NEWLINE: Begin completions
-// METHOD_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)?##() -> String#}[#(() -> String)?#];
+// METHOD_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)? {() -> String in|}#}[#(() -> String)?#];
 // METHOD_NEWLINE-DAG: Keyword[class]/None:                class;
 // METHOD_NEWLINE-DAG: Keyword[if]/None:                   if;
 // METHOD_NEWLINE-DAG: Keyword[try]/None:                  try;
@@ -80,15 +80,15 @@ func testOverloadedInit() {
   #^INIT_OVERLOADED_NEWLINE^#
 
 // INIT_OVERLOADED_SAMELINE: Begin completions, 4 items
-// INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
-// INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {() -> String in|}#}[#() -> String#];
+// INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {() -> String in|}#}[#() -> String#];
 // INIT_OVERLOADED_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
 // INIT_OVERLOADED_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct#];
 // INIT_OVERLOADED_SAMELINE: End completions
 
 // INIT_OVERLOADED_NEWLINE: Begin completions
-// INIT_OVERLOADED_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
-// INIT_OVERLOADED_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OVERLOADED_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {() -> String in|}#}[#() -> String#];
+// INIT_OVERLOADED_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {() -> String in|}#}[#() -> String#];
 // INIT_OVERLOADED_NEWLINE-DAG: Keyword[class]/None:                class;
 // INIT_OVERLOADED_NEWLINE-DAG: Keyword[if]/None:                   if;
 // INIT_OVERLOADED_NEWLINE-DAG: Keyword[try]/None:                  try;
@@ -107,15 +107,15 @@ func testOptionalInit() {
   #^INIT_OPTIONAL_NEWLINE^#
 
 // INIT_OPTIONAL_SAMELINE: Begin completions, 4 items
-// INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
-// INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {() -> String in|}#}[#() -> String#];
+// INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {() -> String in|}#}[#() -> String#];
 // INIT_OPTIONAL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
 // INIT_OPTIONAL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct2#];
 // INIT_OPTIONAL_SAMELINE: End completions
 
 // INIT_OPTIONAL_NEWLINE: Begin completions
-// INIT_OPTIONAL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
-// INIT_OPTIONAL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_OPTIONAL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {() -> String in|}#}[#() -> String#];
+// INIT_OPTIONAL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {() -> String in|}#}[#() -> String#];
 // INIT_OPTIONAL_NEWLINE-DAG: Keyword[class]/None:                class;
 // INIT_OPTIONAL_NEWLINE-DAG: Keyword[if]/None:                   if;
 // INIT_OPTIONAL_NEWLINE-DAG: Keyword[try]/None:                  try;
@@ -135,11 +135,11 @@ func testOptionalInit() {
   #^INIT_REQUIRED_NEWLINE_1^#
 
 // INIT_REQUIRED_SAMELINE_1: Begin completions, 1 items
-// INIT_REQUIRED_SAMELINE_1-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// INIT_REQUIRED_SAMELINE_1-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {() -> String in|}#}[#() -> String#];
 // INIT_REQUIRED_SAMELINE_1: End completions
 
 // INIT_REQUIRED_NEWLINE_1: Begin completions, 1 items
-// INIT_REQUIRED_NEWLINE_1-DAG: Pattern/ExprSpecific:               {#fn2: () -> String##() -> String#}[#() -> String#];
+// INIT_REQUIRED_NEWLINE_1-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {() -> String in|}#}[#() -> String#];
 // INIT_REQUIRED_NEWLINE_1: End completions
 
   // missing 'fn3'.
@@ -151,11 +151,11 @@ func testOptionalInit() {
   #^INIT_REQUIRED_NEWLINE_2^#
 
 // INIT_REQUIRED_SAMELINE_2: Begin completions, 1 items
-// INIT_REQUIRED_SAMELINE_2-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_REQUIRED_SAMELINE_2-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {() -> String in|}#}[#() -> String#];
 // INIT_REQUIRED_SAMELINE_2: End completions
 
 // INIT_REQUIRED_NEWLINE_2: Begin completions, 1 items
-// INIT_REQUIRED_NEWLINE_2-DAG: Pattern/ExprSpecific:               {#fn3: () -> String##() -> String#}[#() -> String#];
+// INIT_REQUIRED_NEWLINE_2-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {() -> String in|}#}[#() -> String#];
 // INIT_REQUIRED_NEWLINE_2: End completions
 
   // Call is completed.
