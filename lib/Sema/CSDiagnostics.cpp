@@ -407,9 +407,8 @@ bool MissingConformanceFailure::diagnoseAsError() {
     if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(findParentExpr(anchor))) {
       auto *caseExpr = binaryOp->getArg()->getElement(0);
 
-      auto &cs = getConstraintSystem();
       llvm::SmallPtrSet<Expr *, 4> anchors;
-      for (const auto *fix : cs.getFixes()) {
+      for (const auto *fix : getSolution().Fixes) {
         if (auto anchor = fix->getAnchor()) {
           if (anchor.is<Expr *>())
             anchors.insert(getAsExpr(anchor));
