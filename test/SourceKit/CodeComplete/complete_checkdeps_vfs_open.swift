@@ -2,6 +2,8 @@ func foo(value: MyStruct) {
   value./*HERE*/
 }
 
+// REQUIRES: shell
+
 // RUN: DEPCHECK_INTERVAL=1
 // RUN: SLEEP_TIME=2
 
