@@ -6859,9 +6859,37 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   llvm_unreachable("Unhandled coercion");
 }
 
+/// Detect if the expression is an assignment to a `self` wrapped property that
+/// has a nonmutating setter, inside a constructor.
+///
+/// We use this to decide when to produce an inout_expr instead of a load_expr
+/// for the sake of emitting a reference required by the assign_by_wrapper
+/// instruction.
+static bool isNonMutatingSetterPWAssignInsideInit(Expr *baseExpr,
+                                                  ValueDecl *member,
+                                                  DeclContext *UseDC) {
+  // Setter is mutating
+  if (cast<AbstractStorageDecl>(member)->isSetterMutating())
+    return false;
+  // Member is not a wrapped property
+  auto *VD = dyn_cast<VarDecl>(member);
+  if (!(VD && VD->hasAttachedPropertyWrapper()))
+    return false;
+  // This is not an expression inside a constructor
+  auto *CD = dyn_cast<ConstructorDecl>(UseDC);
+  if (!CD)
+    return false;
+  // This is not an assignment on self
+  if (!baseExpr->isSelfExprOf(CD))
+    return false;
+
+  return true;
+}
+
 /// Adjust the given type to become the self type when referring to
 /// the given member.
-static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
+static Type adjustSelfTypeForMember(Expr *baseExpr,
+                                    Type baseTy, ValueDecl *member,
                                     AccessSemantics semantics,
                                     DeclContext *UseDC) {
   auto baseObjectTy = baseTy->getWithoutSpecifierType();
@@ -6885,10 +6913,15 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
   bool isSettableFromHere =
       SD->isSettable(UseDC) && SD->isSetterAccessibleFrom(UseDC);
 
-  // If neither the property's getter nor its setter are mutating, the base
-  // can be an rvalue.
-  if (!SD->isGetterMutating()
-      && (!isSettableFromHere || !SD->isSetterMutating()))
+  // If neither the property's getter nor its setter are mutating, and
+  // this is not a nonmutating property wrapper setter,
+  // the base can be an rvalue.
+  // With the exception of assignments to a wrapped property inside a
+  // constructor, where we need to produce a reference to be used on
+  // the assign_by_wrapper instruction. 
+  if (!SD->isGetterMutating() && 
+      (!isSettableFromHere || !SD->isSetterMutating()) &&
+      !isNonMutatingSetterPWAssignInsideInit(baseExpr, member, UseDC))
     return baseObjectTy;
 
   // If we're calling an accessor, keep the base as an inout type, because the
@@ -6918,7 +6951,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
                                          Type baseTy, ValueDecl *member,
                                          AccessSemantics semantics,
                                          ConstraintLocatorBuilder locator) {
-  Type toType = adjustSelfTypeForMember(baseTy, member, semantics, dc);
+  Type toType = adjustSelfTypeForMember(expr, baseTy, member, semantics, dc);
 
   // If our expression already has the right type, we're done.
   Type fromType = cs.getType(expr);
