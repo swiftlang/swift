@@ -1,3 +1,5 @@
+// REQUIRES: VENDOR=apple
+
 // RUN: %empty-directory(%t.mod1)
 // RUN: %empty-directory(%t.mod2)
 // RUN: %empty-directory(%t.sdk)
