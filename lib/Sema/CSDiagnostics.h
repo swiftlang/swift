@@ -202,6 +202,16 @@ protected:
       Type type,
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
+
+  bool isCollectionType(Type type) const {
+    auto &cs = getConstraintSystem();
+    return bool(cs.isCollectionType(type));
+  }
+
+  bool isArrayType(Type type) const {
+    auto &cs = getConstraintSystem();
+    return bool(cs.isArrayType(type));
+  }
 };
 
 /// Base class for all of the diagnostics related to generic requirement

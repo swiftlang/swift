@@ -1261,12 +1261,11 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
                                                    ParameterTypeFlags())});
 
         if (auto info = getFunctionArgApplyInfo(argLoc)) {
-          auto &cs = getConstraintSystem();
           auto paramType = info->getParamType();
           auto argType = getType(inoutExpr)->getWithoutSpecifierType();
 
           PointerTypeKind ptr;
-          if (cs.isArrayType(argType) &&
+          if (isArrayType(argType) &&
               paramType->getAnyPointerElementType(ptr) &&
               (ptr == PTK_UnsafePointer || ptr == PTK_UnsafeRawPointer)) {
             emitDiagnosticAt(inoutExpr->getLoc(),
@@ -3403,9 +3402,8 @@ bool MissingMemberFailure::diagnoseForDynamicCallable() const {
 }
 
 bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
-  auto &cs = getConstraintSystem();
   auto *expr = castToExpr(getAnchor());
-  auto *parentExpr = cs.getParentExpr(expr);
+  auto *parentExpr = findParentExpr(expr);
   auto &solution = getSolution();
 
   if (!(parentExpr && isa<UnresolvedMemberExpr>(expr)))
@@ -3413,17 +3411,16 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
 
   auto parentType = getType(parentExpr);
 
-  if (!cs.isCollectionType(parentType) && !parentType->is<TupleType>())
+  if (!isCollectionType(parentType) && !parentType->is<TupleType>())
     return false;
 
   if (isa<TupleExpr>(parentExpr)) {
-    parentExpr = cs.getParentExpr(parentExpr);
+    parentExpr = findParentExpr(parentExpr);
     if (!parentExpr)
       return false;
   }
 
-  if (auto *defaultableVar =
-          cs.getType(parentExpr)->getAs<TypeVariableType>()) {
+  if (auto *defaultableVar = getType(parentExpr)->getAs<TypeVariableType>()) {
     if (solution.DefaultedConstraints.count(
             defaultableVar->getImpl().getLocator()) != 0) {
       emitDiagnostic(diag::unresolved_member_no_inference, getName());
