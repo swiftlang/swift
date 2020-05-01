@@ -5560,11 +5560,14 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // let's avoid producing a diagnostic second time, because first
   // one would cover both arguments.
   if (getAsExpr(getAnchor()) == rhs && rhsType->is<FunctionType>()) {
-    auto &cs = getConstraintSystem();
-    if (cs.hasFixFor(getConstraintLocator(
-            binaryOp, {ConstraintLocator::ApplyArgument,
-                       LocatorPathElt::ApplyArgToParam(
-                           0, 0, getParameterFlagsAtIndex(0))})))
+    auto *argLoc = getConstraintLocator(
+        binaryOp,
+        {ConstraintLocator::ApplyArgument,
+         LocatorPathElt::ApplyArgToParam(0, 0, getParameterFlagsAtIndex(0))});
+
+    if (llvm::any_of(getSolution().Fixes, [&argLoc](const ConstraintFix *fix) {
+          return fix->getLocator() == argLoc;
+        }))
       return true;
   }
 
