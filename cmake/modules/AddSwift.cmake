@@ -403,18 +403,12 @@ function(_add_host_variant_link_flags target)
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    # FIXME: On Apple platforms, find_program needs to look for "ld64.lld"
-    find_program(LDLLD_PATH "ld.lld")
-    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
-       (SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS AND NOT CMAKE_SYSTEM_NAME STREQUAL WINDOWS))
-      target_link_options(${target} PRIVATE -fuse-ld=lld)
-    elseif(SWIFT_ENABLE_GOLD_LINKER AND
-           "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-      if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-        target_link_options(${target} PRIVATE -fuse-ld=gold.exe)
-      else()
-        target_link_options(${target} PRIVATE -fuse-ld=gold)
-      endif()
+    if(SWIFT_ENABLE_LLD_LINKER)
+      target_link_options(${target} PRIVATE
+        -fuse-ld=lld$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>)
+    elseif(SWIFT_ENABLE_GOLD_LINKER)
+      target_link_options(${target} PRIVATE
+        -fuse-ld=gold$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>)
     endif()
   endif()
 

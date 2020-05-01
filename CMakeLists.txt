@@ -147,12 +147,22 @@ set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
 
 # Indicate whether Swift should attempt to use the lld linker.
-set(SWIFT_ENABLE_LLD_LINKER TRUE CACHE BOOL
+if(CMAKE_SYSTEM_NAME STREQUAL Windows AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+  set(SWIFT_ENABLE_LLD_LINKER_default TRUE)
+else()
+  set(SWIFT_ENABLE_LLD_LINKER_default FALSE)
+endif()
+set(SWIFT_ENABLE_LLD_LINKER ${SWIFT_ENABLE_LLD_LINKER_default} CACHE BOOL
     "Enable using the lld linker when available")
 
 # Indicate whether Swift should attempt to use the gold linker.
 # This is not used on Darwin.
-set(SWIFT_ENABLE_GOLD_LINKER TRUE CACHE BOOL
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin OR CMAKE_SYSTEM_NAME STREQUAL Windows)
+  set(SWIFT_ENABLE_GOLD_LINKER_default FALSE)
+else()
+  set(SWIFT_ENABLE_GOLD_LINKER_default TRUE)
+endif()
+set(SWIFT_ENABLE_GOLD_LINKER ${SWIFT_ENABLE_GOLD_LINKER_default} CACHE BOOL
     "Enable using the gold linker when available")
 
 set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
