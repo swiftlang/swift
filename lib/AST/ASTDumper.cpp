@@ -1229,7 +1229,7 @@ namespace {
       auto identifiers = OD->getIdentifiers();
       for (auto index : indices(identifiers)) {
         OS.indent(Indent + 2);
-        OS << "identifier #" << index << " " << identifiers[index];
+        OS << "identifier #" << index << " " << identifiers[index].Item;
         if (index != identifiers.size() - 1)
           OS << "\n";
       }

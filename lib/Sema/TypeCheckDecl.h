@@ -56,9 +56,7 @@ Optional<AutomaticEnumValueKind> computeAutomaticEnumValueKind(EnumDecl *ED);
 void validatePrecedenceGroup(PrecedenceGroupDecl *PGD);
 
 bool checkDesignatedTypes(OperatorDecl *OD,
-                          ArrayRef<Identifier> identifiers,
-                          ArrayRef<SourceLoc> identifierLocs,
-                          ASTContext &ctx);
+                          ArrayRef<Located<Identifier>> identifiers);
 
 }
 
