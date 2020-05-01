@@ -311,7 +311,7 @@ checks if you know it is safe.
 
 It's important to note that the behavior of the ``&+``, ``&-``, and ``&*``
 operators is fully-defined; the result simply wraps around if it would overflow.
-Thus, ``Int.max + 1`` is guaranteed to be ``Int.min`` (unlike in C, where
+Thus, ``Int.max &+ 1`` is guaranteed to be ``Int.min`` (unlike in C, where
 ``INT_MAX + 1`` is undefined behavior).
 
 Generics
