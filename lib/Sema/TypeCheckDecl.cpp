@@ -1449,18 +1449,13 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 }
 
 bool swift::checkDesignatedTypes(OperatorDecl *OD,
-                                 ArrayRef<Identifier> identifiers,
-                                 ArrayRef<SourceLoc> identifierLocs,
-                                 ASTContext &ctx) {
-  assert(identifiers.size() == identifierLocs.size());
-
-  SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+                                 ArrayRef<Located<Identifier>> identifiers) {
+  auto &ctx = OD->getASTContext();
   auto *DC = OD->getDeclContext();
 
-  for (auto index : indices(identifiers)) {
-    auto *decl = resolveSingleNominalTypeDecl(DC, identifierLocs[index],
-                                              identifiers[index], ctx);
-
+  SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+  for (auto ident : identifiers) {
+    auto *decl = resolveSingleNominalTypeDecl(DC, ident.Loc, ident.Item, ctx);
     if (!decl)
       return true;
 
@@ -1479,63 +1474,58 @@ bool swift::checkDesignatedTypes(OperatorDecl *OD,
 PrecedenceGroupDecl *
 OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
                                          InfixOperatorDecl *IOD) const {
-  auto enableOperatorDesignatedTypes =
-      IOD->getASTContext().TypeCheckerOpts.EnableOperatorDesignatedTypes;
+  auto &ctx = IOD->getASTContext();
+  auto *dc = IOD->getDeclContext();
 
-  auto &Diags = IOD->getASTContext().Diags;
+  auto enableOperatorDesignatedTypes =
+      ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
+
+  auto &Diags = ctx.Diags;
   PrecedenceGroupDecl *group = nullptr;
 
   auto identifiers = IOD->getIdentifiers();
-  auto identifierLocs = IOD->getIdentifierLocs();
-
   if (!identifiers.empty()) {
-    group = TypeChecker::lookupPrecedenceGroup(
-        IOD->getDeclContext(), identifiers[0], identifierLocs[0]);
+    auto name = identifiers[0].Item;
+    auto loc = identifiers[0].Loc;
+
+    group = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
 
     if (group) {
       identifiers = identifiers.slice(1);
-      identifierLocs = identifierLocs.slice(1);
     } else {
       // If we're either not allowing types, or we are allowing them
       // and this identifier is not a type, emit an error as if it's
       // a precedence group.
-      auto *DC = IOD->getDeclContext();
       if (!(enableOperatorDesignatedTypes &&
-            resolveSingleNominalTypeDecl(DC, identifierLocs[0], identifiers[0],
-                                         IOD->getASTContext(),
+            resolveSingleNominalTypeDecl(dc, loc, name, ctx,
                                          TypeResolutionFlags::SilenceErrors))) {
-        Diags.diagnose(identifierLocs[0], diag::unknown_precedence_group,
-                       identifiers[0]);
+        Diags.diagnose(loc, diag::unknown_precedence_group, name);
         identifiers = identifiers.slice(1);
-        identifierLocs = identifierLocs.slice(1);
       }
     }
   }
 
   if (!identifiers.empty() && !enableOperatorDesignatedTypes) {
     assert(!group);
-    Diags.diagnose(identifierLocs[0], diag::unknown_precedence_group,
-                   identifiers[0]);
+    Diags.diagnose(identifiers[0].Loc, diag::unknown_precedence_group,
+                   identifiers[0].Item);
     identifiers = identifiers.slice(1);
-    identifierLocs = identifierLocs.slice(1);
-    assert(identifiers.empty() && identifierLocs.empty());
+    assert(identifiers.empty());
   }
 
   if (!group) {
-    group = TypeChecker::lookupPrecedenceGroup(
-        IOD->getDeclContext(), IOD->getASTContext().Id_DefaultPrecedence,
-        SourceLoc());
+    group = TypeChecker::lookupPrecedenceGroup(dc, ctx.Id_DefaultPrecedence,
+                                               SourceLoc());
   }
 
   if (!group) {
     Diags.diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
-                   IOD->getASTContext().Id_DefaultPrecedence);
+                   ctx.Id_DefaultPrecedence);
   }
 
   auto nominalTypes = IOD->getDesignatedNominalTypes();
   if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
-    if (checkDesignatedTypes(IOD, identifiers, identifierLocs,
-                             IOD->getASTContext())) {
+    if (checkDesignatedTypes(IOD, identifiers)) {
       IOD->setInvalid();
     }
   }
