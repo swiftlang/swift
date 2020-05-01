@@ -2034,6 +2034,7 @@ public:
   void startGroup(UIdent kind, StringRef name) override;
   void endGroup() override;
   void setNextRequestStart(unsigned offset) override;
+  void setReusingASTContext(bool flag) override;
 };
 } // end anonymous namespace
 
@@ -2230,6 +2231,10 @@ void SKGroupedCodeCompletionConsumer::endGroup() {
 void SKGroupedCodeCompletionConsumer::setNextRequestStart(unsigned offset) {
   assert(!Response.isNull());
   Response.set(KeyNextRequestStart, offset);
+}
+void SKGroupedCodeCompletionConsumer::setReusingASTContext(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
 }
 
 //===----------------------------------------------------------------------===//
