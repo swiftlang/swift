@@ -449,7 +449,7 @@ function set_build_options_for_host() {
 
     # Hosts which can be cross-compiled must specify:
     # SWIFT_HOST_TRIPLE and llvm_target_arch.
-    # Hosts which have differing platforn names from their
+    # Hosts which have differing platform names from their
     # SWIFT_HOST_VARIANT_* values should change them here as well.
 
     verify_host_is_supported $host

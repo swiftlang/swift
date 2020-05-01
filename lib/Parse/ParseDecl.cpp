@@ -7537,8 +7537,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   // parse them both as identifiers here and sort it out in type
   // checking.
   SourceLoc colonLoc;
-  SmallVector<Identifier, 4> identifiers;
-  SmallVector<SourceLoc, 4> identifierLocs;
+  SmallVector<Located<Identifier>, 4> identifiers;
   if (Tok.is(tok::colon)) {
     SyntaxParsingContext GroupCtxt(SyntaxContext,
                                    SyntaxKind::OperatorPrecedenceAndTypes);
@@ -7559,16 +7558,16 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
                                        SyntaxKind::IdentifierList);
 
         Identifier name;
-        identifierLocs.push_back(consumeIdentifier(&name));
-        identifiers.push_back(name);
+        auto loc = consumeIdentifier(&name);
+        identifiers.emplace_back(name, loc);
 
         while (Tok.is(tok::comma)) {
           auto comma = consumeToken();
 
           if (Tok.is(tok::identifier)) {
             Identifier name;
-            identifierLocs.push_back(consumeIdentifier(&name));
-            identifiers.push_back(name);
+            auto loc = consumeIdentifier(&name);
+            identifiers.emplace_back(name, loc);
           } else {
             if (Tok.isNot(tok::eof)) {
               auto otherTokLoc = consumeToken();
@@ -7583,12 +7582,13 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       SyntaxParsingContext GroupCtxt(SyntaxContext,
                                      SyntaxKind::IdentifierList);
 
-      identifiers.push_back(Context.getIdentifier(Tok.getText()));
-      identifierLocs.push_back(consumeToken(tok::identifier));
+      Identifier name;
+      auto nameLoc = consumeIdentifier(&name);
+      identifiers.emplace_back(name, nameLoc);
 
       if (isPrefix || isPostfix) {
         diagnose(colonLoc, diag::precedencegroup_not_infix)
-            .fixItRemove({colonLoc, identifierLocs.back()});
+            .fixItRemove({colonLoc, nameLoc});
       }
       // Nothing to complete here, simply consume the token.
       if (Tok.is(tok::code_complete))
@@ -7605,7 +7605,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
       if (Tok.is(tok::r_brace)) {
         SourceLoc lastGoodLoc =
-            !identifierLocs.empty() ? identifierLocs.back() : SourceLoc();
+            !identifiers.empty() ? identifiers.back().Loc : SourceLoc();
         if (lastGoodLoc.isInvalid())
           lastGoodLoc = NameLoc;
         SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
@@ -7623,18 +7623,15 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   if (Attributes.hasAttribute<PrefixAttr>())
     res = new (Context)
         PrefixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc,
-                           Context.AllocateCopy(identifiers),
-                           Context.AllocateCopy(identifierLocs));
+                           Context.AllocateCopy(identifiers));
   else if (Attributes.hasAttribute<PostfixAttr>())
     res = new (Context)
         PostfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc,
-                            Context.AllocateCopy(identifiers),
-                            Context.AllocateCopy(identifierLocs));
+                            Context.AllocateCopy(identifiers));
   else
     res = new (Context)
         InfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc, colonLoc,
-                          Context.AllocateCopy(identifiers),
-                          Context.AllocateCopy(identifierLocs));
+                          Context.AllocateCopy(identifiers));
 
   diagnoseOperatorFixityAttributes(*this, Attributes, res);
 
