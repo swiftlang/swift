@@ -1287,31 +1287,6 @@ OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
   return result.hasValue() ? result.getValue() : nullptr;
 }
 
-template <typename OperatorType>
-void LookupOperatorRequest<OperatorType>::writeDependencySink(
-    evaluator::DependencyCollector &reqTracker, OperatorType *o) const {
-  auto &desc = std::get<0>(this->getStorage());
-  auto *FU = desc.fileOrModule.template get<FileUnit *>();
-  auto shouldRegisterDependencyEdge = [&FU](OperatorType *o) -> bool {
-    if (!o)
-      return true;
-
-    auto *topLevelContext = o->getDeclContext()->getModuleScopeContext();
-    return topLevelContext != FU;
-  };
-
-  // FIXME(Evaluator Incremental Dependencies): This is all needlessly complex.
-  // For one, it does not take into account the fact that precedence groups can
-  // be shadowed, and so should be registered regardless of their defining
-  // module. Second, lookups for operators within the file define a valid named
-  // dependency just as much as lookups outside of the current source file.
-  if (!shouldRegisterDependencyEdge(o)) {
-    return;
-  }
-
-  reqTracker.addTopLevelName(desc.name);
-}
-
 #define LOOKUP_OPERATOR(Kind)                                                  \
   Kind##Decl *ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) {       \
     auto result = lookupOperatorDeclForName<Kind##Decl>(                       \
@@ -1319,15 +1294,20 @@ void LookupOperatorRequest<OperatorType>::writeDependencySink(
     return result ? *result : nullptr;                                         \
   }                                                                            \
   template Kind##Decl *LookupOperatorRequest<Kind##Decl>::evaluate(            \
-      Evaluator &e, OperatorLookupDescriptor) const;                           \
-  template void LookupOperatorRequest<Kind##Decl>::writeDependencySink(        \
-      evaluator::DependencyCollector &, Kind##Decl *) const;
+      Evaluator &e, OperatorLookupDescriptor) const;
 
 LOOKUP_OPERATOR(PrefixOperator)
 LOOKUP_OPERATOR(InfixOperator)
 LOOKUP_OPERATOR(PostfixOperator)
 LOOKUP_OPERATOR(PrecedenceGroup)
 #undef LOOKUP_OPERATOR
+
+void DirectOperatorLookupRequest::writeDependencySink(
+    evaluator::DependencyCollector &reqTracker,
+    TinyPtrVector<OperatorDecl *> ops) const {
+  auto &desc = std::get<0>(getStorage());
+  reqTracker.addTopLevelName(desc.name);
+}
 
 TinyPtrVector<OperatorDecl *>
 DirectOperatorLookupRequest::evaluate(Evaluator &evaluator,
@@ -1355,6 +1335,13 @@ void SourceFile::lookupOperatorDirect(
     Identifier name, OperatorFixity fixity,
     TinyPtrVector<OperatorDecl *> &results) const {
   getCache().lookupOperator(name, fixity, results);
+}
+
+void DirectPrecedenceGroupLookupRequest::writeDependencySink(
+    evaluator::DependencyCollector &reqTracker,
+    TinyPtrVector<PrecedenceGroupDecl *> groups) const {
+  auto &desc = std::get<0>(getStorage());
+  reqTracker.addTopLevelName(desc.name);
 }
 
 TinyPtrVector<PrecedenceGroupDecl *>
