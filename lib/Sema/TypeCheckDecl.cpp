@@ -1505,13 +1505,10 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (!identifiers.empty() && !enableOperatorDesignatedTypes) {
-    assert(!group);
-    Diags.diagnose(identifiers[0].Loc, diag::unknown_precedence_group,
-                   identifiers[0].Item);
-    identifiers = identifiers.slice(1);
-    assert(identifiers.empty());
-  }
+  // Unless operator designed types are enabled, the parser will ensure that
+  // only one identifier is allowed in the clause, which we should have just
+  // handled.
+  assert(identifiers.empty() || enableOperatorDesignatedTypes);
 
   if (!group) {
     group = TypeChecker::lookupPrecedenceGroup(dc, ctx.Id_DefaultPrecedence,
