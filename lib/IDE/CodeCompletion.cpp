@@ -431,6 +431,9 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << C.getText();
       OS << "#]";
       break;
+    case ChunkKind::CallParameterClosureExpr:
+      OS << " {" << C.getText() << "|}";
+      break;
     case ChunkKind::BraceStmtWithCursor:
       OS << " {|}";
       break;
@@ -870,7 +873,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
                                                    bool IsInOut,
                                                    bool IsIUO,
                                                    bool isAutoClosure,
-                                                   bool useUnderscoreLabel) {
+                                                   bool useUnderscoreLabel,
+                                                   bool isLabeledTrailingClosure) {
   CurrentNestingLevel++;
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
@@ -967,7 +971,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
   // function type.
   Ty = Ty->lookThroughAllOptionalTypes();
   if (auto AFT = Ty->getAs<AnyFunctionType>()) {
-    // If this is a closure type, add ChunkKind::CallParameterClosureType.
+    // If this is a closure type, add ChunkKind::CallParameterClosureType or
+    // ChunkKind::CallParameterClosureExpr for labeled trailing closures.
     PrintOptions PO;
     PO.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::None;
@@ -976,9 +981,51 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
     if (ContextTy)
       PO.setBaseType(ContextTy);
-    addChunkWithText(
-        CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
-        AFT->getString(PO));
+
+    if (isLabeledTrailingClosure) {
+      // Expand the closure body.
+      SmallString<32> buffer;
+      llvm::raw_svector_ostream OS(buffer);
+
+      bool returnsVoid = AFT->getResult()->isVoid();
+      bool hasSignature = !returnsVoid || !AFT->getParams().empty();
+      if (hasSignature)
+        OS << "(";
+      bool firstParam = true;
+      for (const auto &param : AFT->getParams()) {
+        if (!firstParam)
+          OS << ", ";
+        firstParam = false;
+
+        if (param.hasLabel()) {
+          OS << param.getLabel();
+        } else {
+          OS << "<#";
+          if (param.isInOut())
+            OS << "inout ";
+          OS << param.getPlainType()->getString(PO);
+          if (param.isVariadic())
+            OS << "...";
+          OS << "#>";
+        }
+      }
+      if (hasSignature)
+        OS << ")";
+      if (!returnsVoid)
+        OS << " -> " << AFT->getResult()->getString(PO);
+
+      if (hasSignature)
+        OS << " in";
+
+      addChunkWithText(
+         CodeCompletionString::Chunk::ChunkKind::CallParameterClosureExpr,
+         OS.str());
+    } else {
+      // Add the closure type.
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
+          AFT->getString(PO));
+    }
   }
 
   if (IsVarArg)
@@ -1337,6 +1384,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::DeclAttrParamColon:
     case ChunkKind::CallParameterType:
     case ChunkKind::CallParameterClosureType:
+    case ChunkKind::CallParameterClosureExpr:
     case ChunkKind::OptionalBegin:
     case ChunkKind::GenericParameterBegin:
     case ChunkKind::DynamicLookupMethodCallTail:
@@ -1370,6 +1418,7 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       switch (C.getKind()) {
       case ChunkKind::TypeAnnotation:
       case ChunkKind::CallParameterClosureType:
+      case ChunkKind::CallParameterClosureExpr:
       case ChunkKind::DeclAttrParamColon:
       case ChunkKind::OptionalMethodCallTail:
         continue;
@@ -2523,7 +2572,8 @@ public:
 
       Builder.addCallParameter(argName, bodyName, paramTy, contextTy,
                                isVariadic, isInOut, isIUO, isAutoclosure,
-                               /*useUnderscoreLabel=*/false);
+                               /*useUnderscoreLabel=*/false,
+                               /*isLabeledTrailingClosure=*/false);
 
       modifiedBuilder = true;
       NeedComma = true;
@@ -4159,7 +4209,8 @@ public:
   }
 
   void addCallArgumentCompletionResults(
-      ArrayRef<PossibleParamInfo> ParamInfos) {
+      ArrayRef<PossibleParamInfo> ParamInfos,
+      bool isLabeledTrailingClosure = false) {
     Type ContextType;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       ContextType = typeContext->getDeclaredTypeInContext();
@@ -4175,7 +4226,8 @@ public:
                                Arg->getPlainType(), ContextType,
                                Arg->isVariadic(), Arg->isInOut(),
                                /*isIUO=*/false, Arg->isAutoClosure(),
-                               /*useUnderscoreLabel=*/true);
+                               /*useUnderscoreLabel=*/true,
+                               isLabeledTrailingClosure);
       auto Ty = Arg->getPlainType();
       if (Arg->isInOut()) {
         Ty = InOutType::get(Ty);
@@ -5926,7 +5978,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     bool allRequired = false;
     if (!params.empty()) {
-      Lookup.addCallArgumentCompletionResults(params);
+      Lookup.addCallArgumentCompletionResults(
+          params, /*isLabeledTrailingClosure=*/true);
       allRequired = llvm::all_of(
           params, [](const PossibleParamInfo &P) { return P.IsRequired; });
     }
