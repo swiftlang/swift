@@ -3921,6 +3921,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     }, [&] {
       out << ", ";
     });
+    out << "\n";
   }
 
   if (failedConstraint) {
