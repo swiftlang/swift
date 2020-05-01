@@ -18,19 +18,19 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#include "clang/AST/ASTContext.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "clang/AST/ASTContext.h"
 
 using namespace swift;
 using namespace ide;
@@ -165,70 +165,111 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
   return newDC;
 }
 
-/// Check if any dependent files are modified since \p timestamp.
-bool areAnyDependentFilesInvalidated(CompilerInstance &CI,
-                                     llvm::vfs::FileSystem &FS,
-                                     StringRef currentFileName,
-                                     llvm::sys::TimePoint<> timestamp) {
-
-  auto isInvalidated = [&](StringRef filePath) -> bool {
-    auto stat = FS.status(filePath);
-    if (!stat)
-      // Missing.
-      return true;
-
-    auto lastModTime = stat->getLastModificationTime();
-    if (lastModTime > timestamp)
-      // Modified.
-      return true;
-
-    // If the last modification time is zero, this file is probably from a
-    // virtual file system. We need to check the content.
-    if (lastModTime == llvm::sys::TimePoint<>()) {
-      if (&CI.getFileSystem() == &FS)
-        return false;
-
-      auto oldContent = CI.getFileSystem().getBufferForFile(filePath);
-      auto newContent = FS.getBufferForFile(filePath);
-      if (!oldContent || !newContent)
-        // (unreachable?)
-        return true;
-
-      if (oldContent.get()->getBuffer() != newContent.get()->getBuffer())
-        // Different content.
-        return true;
-    }
-
-    return false;
-  };
-
+/// For each dependency file in \p CI, run \p callback until the callback
+/// returns \c true. Returns \c true if any callback call returns \c true, \c
+/// false otherwise.
+static bool
+forEachDependencyUntilTrue(CompilerInstance &CI, ModuleDecl *CurrentModule,
+                           unsigned excludeBufferID,
+                           llvm::function_ref<bool(StringRef)> callback) {
   // Check files in the current module.
-  for (FileUnit *file : CI.getMainModule()->getFiles()) {
+  for (FileUnit *file : CurrentModule->getFiles()) {
     StringRef filename;
-    if (auto SF = dyn_cast<SourceFile>(file))
+    if (auto SF = dyn_cast<SourceFile>(file)) {
+      if (SF->getBufferID() == excludeBufferID)
+        continue;
       filename = SF->getFilename();
-    else if (auto LF = dyn_cast<LoadedFile>(file))
+    } else if (auto LF = dyn_cast<LoadedFile>(file))
       filename = LF->getFilename();
     else
       continue;
 
-    // Ignore the current file and synthesized files.
-    if (filename.empty() || filename.front() == '<' ||
-        filename.equals(currentFileName))
+    // Ignore synthesized files.
+    if (filename.empty() || filename.front() == '<')
       continue;
 
-    if (isInvalidated(filename))
+    if (callback(filename))
       return true;
   }
 
   // Check other non-system depenencies (e.g. modules, headers).
   for (auto &dep : CI.getDependencyTracker()->getDependencies()) {
-    if (isInvalidated(dep))
+    if (callback(dep))
       return true;
   }
 
-  // All loaded module files are not modified since the timestamp.
   return false;
+}
+
+/// Collect hash codes of the dependencies into \c Map.
+static void cacheDependencyHashIfNeeded(CompilerInstance &CI,
+                                        ModuleDecl *CurrentModule,
+                                        unsigned excludeBufferID,
+                                        llvm::StringMap<llvm::hash_code> &Map) {
+  auto &FS = CI.getFileSystem();
+  forEachDependencyUntilTrue(
+      CI, CurrentModule, excludeBufferID, [&](StringRef filename) {
+        if (Map.count(filename))
+          return false;
+
+        auto stat = FS.status(filename);
+        if (!stat)
+          return false;
+
+        // We will check the hash only if the modification time of the dependecy
+        // is zero. See 'areAnyDependentFilesInvalidated() below'.
+        if (stat->getLastModificationTime() != llvm::sys::TimePoint<>())
+          return false;
+
+        auto buf = FS.getBufferForFile(filename);
+        Map[filename] = llvm::hash_value(buf.get()->getBuffer());
+        return false;
+      });
+}
+
+/// Check if any dependent files are modified since \p timestamp.
+static bool areAnyDependentFilesInvalidated(
+    CompilerInstance &CI, ModuleDecl *CurrentModule, llvm::vfs::FileSystem &FS,
+    unsigned excludeBufferID, llvm::sys::TimePoint<> timestamp,
+    llvm::StringMap<llvm::hash_code> &Map) {
+
+  return forEachDependencyUntilTrue(
+      CI, CurrentModule, excludeBufferID, [&](StringRef filePath) {
+        auto stat = FS.status(filePath);
+        if (!stat)
+          // Missing.
+          return true;
+
+        auto lastModTime = stat->getLastModificationTime();
+        if (lastModTime > timestamp)
+          // Modified.
+          return true;
+
+        // If the last modification time is zero, this file is probably from a
+        // virtual file system. We need to check the content.
+        if (lastModTime == llvm::sys::TimePoint<>()) {
+          // Get the hash code of the last content.
+          auto oldHashEntry = Map.find(filePath);
+          if (oldHashEntry == Map.end())
+            // Unreachable? Not virtual in old filesystem, but virtual in new
+            // one.
+            return true;
+          auto oldHash = oldHashEntry->second;
+
+          // Calculate the hash code of the current content.
+          auto newContent = FS.getBufferForFile(filePath);
+          if (!newContent)
+            // Unreachable? stat succeeded, but coundn't get the content.
+            return true;
+
+          auto newHash = llvm::hash_value(newContent.get()->getBuffer());
+
+          if (oldHash != newHash)
+            return true;
+        }
+
+        return false;
+      });
 }
 
 } // namespace
@@ -262,8 +303,9 @@ bool CompletionInstance::performCachedOperationIfPossible(
     return false;
 
   if (shouldCheckDependencies()) {
-    if (areAnyDependentFilesInvalidated(CI, *FileSystem, bufferName,
-                                        DependencyCheckedTimestamp))
+    if (areAnyDependentFilesInvalidated(
+            CI, CurrentModule, *FileSystem, SM.getCodeCompletionBufferID(),
+            DependencyCheckedTimestamp, InMemoryDependencyHash))
       return false;
     DependencyCheckedTimestamp = std::chrono::system_clock::now();
   }
@@ -406,6 +448,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
     performImportResolution(*newSF);
     bindExtensions(*newSF);
 
+    CurrentModule = newM;
     traceDC = newM;
 #ifndef NDEBUG
     const auto *reparsedState = newSF->getDelayedParserState();
@@ -432,6 +475,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
   }
 
   CachedReuseCount += 1;
+  cacheDependencyHashIfNeeded(CI, CurrentModule, SM.getCodeCompletionBufferID(),
+                              InMemoryDependencyHash);
 
   return true;
 }
@@ -500,17 +545,24 @@ bool CompletionInstance::performNewOperation(
 void CompletionInstance::cacheCompilerInstance(
     std::unique_ptr<CompilerInstance> CI, llvm::hash_code ArgsHash) {
   CachedCI = std::move(CI);
+  CurrentModule = CachedCI->getMainModule();
   CachedArgHash = ArgsHash;
   auto now = std::chrono::system_clock::now();
   DependencyCheckedTimestamp = now;
   CachedReuseCount = 0;
+  InMemoryDependencyHash.clear();
+  cacheDependencyHashIfNeeded(
+      *CachedCI, CurrentModule,
+      CachedCI->getASTContext().SourceMgr.getCodeCompletionBufferID(),
+      InMemoryDependencyHash);
 }
 
 bool CompletionInstance::shouldCheckDependencies() const {
   assert(CachedCI);
   using namespace std::chrono;
   auto now = system_clock::now();
-  return DependencyCheckedTimestamp + seconds(DependencyCheckIntervalSecond) < now;
+  return DependencyCheckedTimestamp + seconds(DependencyCheckIntervalSecond) <
+         now;
 }
 
 void CompletionInstance::setDependencyCheckIntervalSecond(unsigned Value) {
