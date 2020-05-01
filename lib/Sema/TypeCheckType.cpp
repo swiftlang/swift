@@ -21,7 +21,6 @@
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
 
-#include "swift/Strings.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -35,12 +34,14 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -1740,16 +1741,15 @@ static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
   return !isValid;
 }
 
-bool TypeChecker::validateType(ASTContext &Context, TypeLoc &Loc,
-                               TypeResolution resolution) {
+bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution) {
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
     return Loc.isError();
 
-  if (auto *Stats = Context.Stats)
+  if (auto *Stats = resolution.getASTContext().Stats)
     Stats->getFrontendCounters().NumTypesValidated++;
 
-  Type type = resolution.resolveType(Loc.getTypeRepr());
+  auto type = resolution.resolveType(Loc.getTypeRepr());
   Loc.setType(type);
 
   return type->hasError();
@@ -1872,33 +1872,38 @@ namespace {
 
 Type TypeResolution::resolveType(TypeRepr *TyR) {
   auto &ctx = getASTContext();
-  FrontendStatsTracer StatsTracer(ctx.Stats,
-                                  "resolve-type", TyR);
-  PrettyStackTraceTypeRepr stackTrace(ctx, "resolving", TyR);
+  auto Ty =
+      evaluateOrDefault(ctx.evaluator, ResolveTypeRequest{this, TyR}, Type());
+  if (!Ty)
+    return ErrorType::get(ctx);
+  return Ty;
+}
 
-  TypeResolver typeResolver(*this);
+Type ResolveTypeRequest::evaluate(Evaluator &evaluator,
+                                  TypeResolution *resolution,
+                                  TypeRepr *TyR) const {
+  const auto options = resolution->getOptions();
+  auto &ctx = resolution->getASTContext();
+  auto result =
+      TypeResolver(*resolution).resolveType(TyR, resolution->getOptions());
 
-  auto result = typeResolver.resolveType(TyR, getOptions());
-
-  if (result) {
-    // If we resolved down to an error, make sure to mark the typeRepr as invalid
-    // so we don't produce a redundant diagnostic.
-    if (result->hasError()) {
-      TyR->setInvalid();
-      return result;
-    }
-
-    auto loc = TyR->getLoc();
-
-    if (options.contains(TypeResolutionFlags::SILType)
-        && !result->isLegalSILType()) {
-      ctx.Diags.diagnose(loc, diag::illegal_sil_type, result);
-      return ErrorType::get(ctx);
-    }
-
-    if (validateAutoClosureAttributeUse(ctx.Diags, TyR, result, options))
-      return ErrorType::get(ctx);
+  // If we resolved down to an error, make sure to mark the typeRepr as invalid
+  // so we don't produce a redundant diagnostic.
+  if (result->hasError()) {
+    TyR->setInvalid();
+    return result;
   }
+
+  auto loc = TyR->getLoc();
+
+  if (options.contains(TypeResolutionFlags::SILType)
+      && !result->isLegalSILType()) {
+    ctx.Diags.diagnose(loc, diag::illegal_sil_type, result);
+    return ErrorType::get(ctx);
+  }
+
+  if (validateAutoClosureAttributeUse(ctx.Diags, TyR, result, options))
+    return ErrorType::get(ctx);
 
   return result;
 }
@@ -3866,7 +3871,7 @@ Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
 
   ASTContext &ctx = dc->getASTContext();
   auto resolution = TypeResolution::forContextual(dc, options);
-  if (TypeChecker::validateType(ctx, attr->getTypeLoc(), resolution))
+  if (TypeChecker::validateType(attr->getTypeLoc(), resolution))
     return Type();
 
   // We always require the type to resolve to a nominal type.

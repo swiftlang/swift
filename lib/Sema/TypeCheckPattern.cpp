@@ -694,7 +694,7 @@ static Type validateTypedPattern(TypeResolution resolution,
       hadError = true;
     }
   } else {
-    hadError = TypeChecker::validateType(Context, TL, resolution);
+    hadError = TypeChecker::validateType(TL, resolution);
   }
 
   if (hadError) {
@@ -1211,7 +1211,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     // Type-check the type parameter.
     TypeResolutionOptions paramOptions(TypeResolverContext::InExpression);
     TypeResolution resolution = TypeResolution::forContextual(dc, paramOptions);
-    if (validateType(Context, IP->getCastTypeLoc(), resolution))
+    if (validateType(IP->getCastTypeLoc(), resolution))
       return nullptr;
 
     auto castType = IP->getCastTypeLoc().getType();
