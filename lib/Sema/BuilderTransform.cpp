@@ -73,25 +73,26 @@ class BuilderClosureVisitor
     if (!cs)
       return nullptr;
 
-    // FIXME: Setting a TypeLoc on this expression is necessary in order
+    // FIXME: Setting a base on this expression is necessary in order
     // to get diagnostics if something about this builder call fails,
     // e.g. if there isn't a matching overload for `buildBlock`.
-    // But we can only do this if there isn't a type variable in the type.
-    TypeLoc typeLoc;
-    if (!builderType->hasTypeVariable()) {
-      typeLoc = TypeLoc(new (ctx) FixedTypeRepr(builderType, loc), builderType);
+    TypeExpr *typeExpr;
+    auto simplifiedTy = cs->simplifyType(builderType);
+    if (!simplifiedTy->hasTypeVariable()) {
+      typeExpr = TypeExpr::createImplicitHack(loc, simplifiedTy, ctx);
+    } else {
+      // HACK: If there's not enough information in the constraint system,
+      // create a garbage base type to force it to diagnose
+      // this as an ambiguous expression.
+      typeExpr = TypeExpr::createImplicitHack(loc, ErrorType::get(ctx), ctx);
     }
-
-    auto typeExpr = new (ctx) TypeExpr(typeLoc);
     cs->setType(typeExpr, MetatypeType::get(builderType));
-    cs->setType(&typeExpr->getTypeLoc(), builderType);
 
     SmallVector<SourceLoc, 4> argLabelLocs;
     for (auto i : indices(argLabels)) {
       argLabelLocs.push_back(args[i]->getStartLoc());
     }
 
-    typeExpr->setImplicit();
     auto memberRef = new (ctx) UnresolvedDotExpr(
         typeExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
         /*implicit=*/true);
@@ -123,7 +124,7 @@ class BuilderClosureVisitor
 
         // Function must have the right argument labels, if provided.
         if (!argLabels.empty()) {
-          auto funcLabels = func->getFullName().getArgumentNames();
+          auto funcLabels = func->getName().getArgumentNames();
           if (argLabels.size() > funcLabels.size() ||
               funcLabels.slice(0, argLabels.size()) != argLabels)
             continue;

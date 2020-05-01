@@ -18,28 +18,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
-#endif
-
-#ifndef ERROR
-#  define ERROR(ID,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Options,Text,Signature)
-#endif
-
-#ifndef WARNING
-#  define WARNING(ID,Options,Text,Signature) \
-  DIAG(WARNING,ID,Options,Text,Signature)
-#endif
-
-#ifndef NOTE
-#  define NOTE(ID,Options,Text,Signature) \
-  DIAG(NOTE,ID,Options,Text,Signature)
-#endif
-
-#ifndef FIXIT
-#  define FIXIT(ID, Text, Signature)
-#endif
+#define DEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"
 
 #ifndef REMARK
 #  define REMARK(ID,Options,Text,Signature)   \
@@ -600,6 +580,9 @@ ERROR(expr_keypath_subscript_index_not_hashable, none,
 ERROR(expr_smart_keypath_application_type_mismatch,none,
       "key path of type %0 cannot be applied to a base of type %1",
       (Type, Type))
+ERROR(expr_keypath_root_type_mismatch, none,
+      "key path with root type %0 cannot be applied to a base of type %1",
+      (Type, Type))
 ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
 WARNING(expr_deprecated_writable_keypath,none,
@@ -751,6 +734,9 @@ ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
       "please file a bug report with your project and the crash log",
       (StringRef))
+NOTE(serialization_misc_version,none,
+     "module '%0' full misc version is '%1'",
+     (StringRef, StringRef))
 NOTE(serialization_compatibility_version_mismatch,none,
      "compiling as Swift %0, with '%1' built as Swift %2 "
      "(this is supported but may expose additional compiler issues)",
@@ -809,19 +795,19 @@ ERROR(unspaced_unary_operator,none,
       "unary operators must not be juxtaposed; parenthesize inner expression",
       ())
 
-ERROR(use_unresolved_identifier,none,
-      "use of unresolved %select{identifier|operator}1 %0", (DeclNameRef, bool))
-ERROR(use_unresolved_identifier_corrected,none,
-      "use of unresolved %select{identifier|operator}1 %0; did you mean '%2'?",
+ERROR(cannot_find_in_scope,none,
+      "cannot %select{find|find operator}1 %0 in scope", (DeclNameRef, bool))
+ERROR(cannot_find_in_scope_corrected,none,
+      "cannot %select{find|find operator}1 %0 in scope; did you mean '%2'?",
       (DeclNameRef, bool, StringRef))
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
       (bool, StringRef, StringRef))
-ERROR(use_undeclared_type,none,
-      "use of undeclared type %0", (DeclNameRef))
-ERROR(use_undeclared_type_did_you_mean,none,
-      "use of undeclared type %0; did you mean to use '%1'?", (DeclNameRef, StringRef))
+ERROR(cannot_find_type_in_scope,none,
+      "cannot find type %0 in scope", (DeclNameRef))
+ERROR(cannot_find_type_in_scope_did_you_mean,none,
+      "cannot find type %0 in scope; did you mean to use '%1'?", (DeclNameRef, StringRef))
 NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
 NOTE(note_remapped_type,none,
@@ -902,8 +888,8 @@ ERROR(nonstatic_operator_in_nominal,none,
       "operator %0 declared in type %1 must be 'static'",
       (Identifier, DeclName))
 ERROR(nonstatic_operator_in_extension,none,
-      "operator %0 declared in extension of %1 must be 'static'",
-      (Identifier, TypeRepr*))
+      "operator %0 declared in extension%select{| of %2}1 must be 'static'",
+      (Identifier, bool, TypeRepr*))
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
@@ -2474,6 +2460,9 @@ ERROR(override_throws,none,
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
+ERROR(satisfy_throws_objc,none,
+      "satisfying a throwing @objc %select{method|initializer}0 with "
+      "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
 ERROR(override_optional_mismatch,none,
       "cannot override %0 %select{parameter|index}1 of type %2 with "
@@ -2924,17 +2913,19 @@ ERROR(nscopying_doesnt_conform,none,
       " the NSCopying protocol", ())
 
 // UIApplicationMain/NSApplicationMain attribute
-#define SELECT_APPLICATION_MAIN "select{'UIApplicationMain'|'NSApplicationMain'}"
+#define SELECT_APPLICATION_MAIN "select{'UIApplicationMain'|'NSApplicationMain'|'main'}"
 #define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
+#define SELECT_APPLICATION_TYPE "select{class|class|type}"
+#define SELECT_APPLICATION_TYPES "select{classes|classes|types}"
 
 ERROR(attr_ApplicationMain_not_ApplicationDelegate,none,
       "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
       (unsigned))
 ERROR(attr_generic_ApplicationMain_not_supported,none,
-      "generic %" SELECT_APPLICATION_MAIN "0 classes are not supported",
+      "generic %" SELECT_APPLICATION_MAIN "0 %" SELECT_APPLICATION_TYPES "0 are not supported",
       (unsigned))
 ERROR(attr_ApplicationMain_multiple,none,
-      "%" SELECT_APPLICATION_MAIN "0 attribute can only apply to one class in a module",
+      "%" SELECT_APPLICATION_MAIN "0 attribute can only apply to one %" SELECT_APPLICATION_TYPE "0 in a module",
       (unsigned))
 ERROR(attr_ApplicationMain_with_script,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute cannot be used in a module that contains "
@@ -2943,6 +2934,10 @@ ERROR(attr_ApplicationMain_with_script,none,
 NOTE(attr_ApplicationMain_script_here,none,
      "top-level code defined in this source file",
      ())
+
+ERROR(attr_MainType_without_main,none,
+      "%0 is annotated with @main and must provide a main static function of type () -> Void or () throws -> Void.",
+      (DeclName))
 
 #undef SELECT_APPLICATION_MAIN
 #undef SELECT_APPLICATION_DELEGATE
@@ -2965,8 +2960,6 @@ ERROR(lazy_requires_single_var,none,
 
 ERROR(lazy_must_be_property,none,
       "lazy is only valid for members of a struct or class", ())
-ERROR(lazy_not_observable,none,
-      "lazy properties must not have observers", ())
 ERROR(lazy_not_strong,none,
       "lazy properties cannot be %0", (ReferenceOwnership))
 
@@ -3730,9 +3723,9 @@ ERROR(continue_not_in_this_stmt,none,
       "'continue' cannot be used with %0 statements", (StringRef))
 
 ERROR(unresolved_label,none,
-      "use of unresolved label %0", (Identifier))
+      "cannot find label %0 in scope", (Identifier))
 ERROR(unresolved_label_corrected,none,
-      "use of unresolved label %0; did you mean %1?",
+      "cannot find label %0 in scope; did you mean %1?",
       (Identifier, Identifier))
 
 ERROR(foreach_sequence_does_not_conform_to_expected_protocol,none,
@@ -4968,6 +4961,9 @@ ERROR(property_wrapper_type_requirement_not_accessible,none,
 ERROR(property_wrapper_ambiguous_enclosing_self_subscript, none,
       "property wrapper type %0 has multiple enclosing-self subscripts %1",
       (Type, DeclName))
+ERROR(property_wrapper_dynamic_self_type, none,
+      "property wrapper %select{wrapped value|projected value}0 cannot have "
+      "dynamic Self type", (bool))
 
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
@@ -5123,12 +5119,5 @@ ERROR(atomics_ordering_must_be_constant, none,
       "ordering argument must be a static method or property of %0",
       (Identifier))
 
-#ifndef DIAG_NO_UNDEF
-# if defined(DIAG)
-#  undef DIAG
-# endif
-# undef NOTE
-# undef WARNING
-# undef ERROR
-# undef FIXIT
-#endif
+#define UNDEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"

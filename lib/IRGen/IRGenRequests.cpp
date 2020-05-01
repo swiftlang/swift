@@ -18,6 +18,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/IR/Module.h"
+#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 
 using namespace swift;
 
@@ -30,6 +31,9 @@ namespace swift {
 #undef SWIFT_TYPEID_HEADER
 } // end namespace swift
 
+llvm::orc::ThreadSafeModule GeneratedModule::intoThreadSafeContext() && {
+  return {std::move(Module), std::move(Context)};
+}
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const IRGenDescriptor &desc) {

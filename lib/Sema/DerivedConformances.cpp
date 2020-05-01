@@ -202,7 +202,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   // Note: whenever you update this function, also update
   // TypeChecker::deriveProtocolRequirement.
   ASTContext &ctx = nominal->getASTContext();
-  auto name = requirement->getFullName();
+  const auto name = requirement->getName();
 
   // Local function that retrieves the requirement with the same name as
   // the provided requirement, but within the given known protocol.
@@ -214,9 +214,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    auto conformance = TypeChecker::conformsToProtocol(
-        nominal->getDeclaredInterfaceType(), proto, nominal,
-        ConformanceCheckFlags::SkipConditionalRequirements);
+    auto conformance = nominal->getParentModule()->lookupConformance(
+        nominal->getDeclaredInterfaceType(), proto);
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
@@ -651,7 +650,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
         isa<ExtensionDecl>(ConformanceDecl)) {
       ConformanceDecl->diagnose(
           diag::cannot_synthesize_init_in_extension_of_nonfinal,
-          getProtocolType(), synthesizing->getFullName());
+          getProtocolType(), synthesizing->getName());
       return true;
     }
   }
@@ -835,7 +834,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, Enu
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
       if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                          protocol, DC, None)
+                                          protocol, DC)
               .isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }

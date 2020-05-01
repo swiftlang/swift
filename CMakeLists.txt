@@ -910,7 +910,13 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif()
 
 find_package(Python2 COMPONENTS Interpreter REQUIRED)
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(Python3 COMPONENTS Interpreter)
+if(NOT Python3_Interpreter_FOUND)
+  message(WARNING "Python3 not found, using python2 as a fallback")
+  add_executable(Python3::Interpreter IMPORTED)
+  set_target_properties(Python3::Interpreter PROPERTIES
+    IMPORTED_LOCATION ${Python2_EXECUTABLE})
+endif()
 
 #
 # Find optional dependencies.
@@ -1056,11 +1062,13 @@ if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
       set(SOURCEKIT_RUNTIME_DIR lib)
     endif()
     add_dependencies(sourcekit-inproc BlocksRuntime dispatch)
-    swift_install_in_component(FILES
-                                 $<TARGET_FILE:dispatch>
-                                 $<TARGET_FILE:BlocksRuntime>
-                               DESTINATION ${SOURCEKIT_RUNTIME_DIR}
-                               COMPONENT sourcekit-inproc)
+    if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "OSX|WINDOWS")
+      swift_install_in_component(FILES
+                                   $<TARGET_FILE:dispatch>
+                                   $<TARGET_FILE:BlocksRuntime>
+                                 DESTINATION ${SOURCEKIT_RUNTIME_DIR}
+                                 COMPONENT sourcekit-inproc)
+    endif()
     if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
       swift_install_in_component(FILES
                                    $<TARGET_LINKER_FILE:dispatch>

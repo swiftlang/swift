@@ -223,7 +223,8 @@ public:
   void print(llvm::raw_ostream &OS,
              const PrintOptions &Options = PrintOptions()) const;
   SWIFT_DEBUG_DUMP;
-  
+  void dump(raw_ostream &OS, unsigned Indent = 0) const;
+
   /// walk - This recursively walks the AST rooted at this pattern.
   Pattern *walk(ASTWalker &walker);
   Pattern *walk(ASTWalker &&walker) { return walk(walker); }  

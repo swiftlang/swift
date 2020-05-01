@@ -436,6 +436,18 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 extern "C" void *_objc_empty_cache;
 #endif
 
+template <>
+bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
+  if (auto *metadata = dyn_cast<StructMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<EnumMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<ClassMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+
+  return false;
+}
+
 static void copyMetadataPattern(void **section,
                                 const GenericMetadataPartialPattern *pattern) {
   memcpy(section + pattern->OffsetInWords,
@@ -605,7 +617,10 @@ initializeValueMetadataFromPattern(ValueMetadata *metadata,
     auto extraDataPattern = pattern->getExtraDataPattern();
 
     // Zero memory up to the offset.
-    memset(metadataExtraData, 0, size_t(extraDataPattern->OffsetInWords));
+    // [pre-5.3-extra-data-zeroing] Before Swift 5.3, the runtime did not
+    // correctly zero the zero-prefix of the extra-data pattern.
+    memset(metadataExtraData, 0,
+           size_t(extraDataPattern->OffsetInWords) * sizeof(void *));
 
     // Copy the pattern into the rest of the extra data.
     copyMetadataPattern(metadataExtraData, extraDataPattern);
@@ -648,6 +663,11 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
 
   auto bytes = (char*) cache.getAllocator().Allocate(totalSize, alignof(void*));
 
+#ifndef NDEBUG
+  // Fill the metadata record with garbage.
+  memset(bytes, 0xAA, totalSize);
+#endif
+
   auto addressPoint = bytes + sizeof(ValueMetadata::HeaderType);
   auto metadata = reinterpret_cast<ValueMetadata *>(addressPoint);
 
@@ -671,6 +691,9 @@ swift::swift_getGenericMetadata(MetadataRequest request,
   auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
                               arguments);
   auto result = cache.getOrInsert(key, request, description, arguments);
+
+  assert(
+      !result.second.Value->isCanonicalStaticallySpecializedGenericMetadata());
 
   return result.second;
 }
@@ -5519,18 +5542,6 @@ bool Metadata::satisfiesClassConstraint() const {
 
   // or it's a class.
   return isAnyClass();
-}
-
-template <>
-bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
-  if (auto *metadata = dyn_cast<StructMetadata>(this))
-    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-  if (auto *metadata = dyn_cast<EnumMetadata>(this))
-    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-  if (auto *metadata = dyn_cast<ClassMetadata>(this))
-    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-
-  return false;
 }
 
 #if !NDEBUG

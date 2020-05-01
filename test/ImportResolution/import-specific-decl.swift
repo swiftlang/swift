@@ -19,7 +19,7 @@ var b : B = abcde.B()
 var e : E = aeiou.E()
 
 var u : U = aeiou.U()
-var o : O // expected-error {{use of undeclared type 'O'}}
+var o : O // expected-error {{cannot find type 'O' in scope}}
 
 var o2 = aeiou.O() // expected-error {{module 'aeiou' has no member named 'O'}}
 

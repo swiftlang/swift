@@ -6,9 +6,9 @@
 // RUN: cp %s %t/main.swift
 
 // Need -fine-grained-dependency-include-intrafile to be invarient wrt type-body-fingerprints enabled/disabled
-// RUN: %target-swift-frontend -enable-fine-grained-dependencies -fine-grained-dependency-include-intrafile -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
+// RUN: %target-swift-frontend -fine-grained-dependency-include-intrafile -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 
-// RUN: %target-swift-frontend -enable-fine-grained-dependencies -fine-grained-dependency-include-intrafile -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
+// RUN: %target-swift-frontend -fine-grained-dependency-include-intrafile -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
 // RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t.swiftdeps >%t-processed.swiftdeps
 // RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh <%t-2.swiftdeps >%t-2-processed.swiftdeps
 

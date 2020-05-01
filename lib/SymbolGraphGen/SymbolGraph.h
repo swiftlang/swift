@@ -75,6 +75,15 @@ struct SymbolGraph {
   /// Get the base print options for declaration fragments.
   PrintOptions getDeclarationFragmentsPrintOptions() const;
 
+
+  /// Returns `true` if `VD` is the best known candidate for an
+  /// overload set in `Owner`.
+  bool synthesizedMemberIsBestCandidate(const ValueDecl *VD,
+                                        const NominalTypeDecl *Owner) const;
+
+  /// Get the print options for subHeading declaration fragments.
+  PrintOptions getSubHeadingDeclarationFragmentsPrintOptions() const;
+
   // MARK: - Symbols (Nodes)
 
   /**
@@ -183,13 +192,20 @@ struct SymbolGraph {
   serializeDeclarationFragments(StringRef Key, const Symbol &S,
                                 llvm::json::OStream &OS);
 
-  /// Get the overall declaration fragments for a `ValueDecl` when it is viewed
+  /// Get the declaration fragments for a symbol when viewed in a navigator
+  /// where there is limited horizontal space.
+  void
+  serializeNavigatorDeclarationFragments(StringRef Key,
+                                         const Symbol &S,
+                                         llvm::json::OStream &OS);
+
+  /// Get the declaration fragments for a symbol when it is viewed
   /// as a subheading and/or part of a larger group of symbol listings.
   void
   serializeSubheadingDeclarationFragments(StringRef Key, const Symbol &S,
                                           llvm::json::OStream &OS);
 
-  /// Get the overall declaration for a type declaration.
+  /// Get the overall declaration for a symbol.
   void
   serializeDeclarationFragments(StringRef Key, Type T,
                                 llvm::json::OStream &OS);
@@ -197,11 +213,19 @@ struct SymbolGraph {
   /// Returns `true` if the declaration has a name that makes it
   /// implicitly internal/private, such as underscore prefixes,
   /// and checking every named parent context as well.
-  bool isImplicitlyPrivate(const ValueDecl *VD) const;
+  ///
+  /// \param IgnoreContext If `true`, don't consider
+  /// the context of the symbol to determine whether it is implicitly private.
+  bool isImplicitlyPrivate(const ValueDecl *VD,
+                           bool IgnoreContext = false) const;
 
   /// Returns `true` if the declaration should be included as a node
   /// in the graph.
   bool canIncludeDeclAsNode(const Decl *D) const;
+
+  /// Returns `true` if the declaration is a requirement of a protocol
+  /// or is a default implementation of a protocol
+  bool isRequirementOrDefaultImplementation(const ValueDecl *VD) const;
 };
 
 } // end namespace symbolgraphgen

@@ -3,7 +3,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureRetUnresolved | %FileCheck %s -check-prefix=TestSingleExprClosureRetUnresolved
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosure | %FileCheck %s -check-prefix=TestSingleExprClosure
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureVoid | %FileCheck %s -check-prefix=TestSingleExprClosureVoid
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureUnresolved | %FileCheck %s -check-prefix=TestSingleExprClosureRetUnresolved
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureUnresolved | %FileCheck %s -check-prefix=TestSingleExprClosureUnresolved
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureCall | %FileCheck %s -check-prefix=TestSingleExprClosure
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureGlobal | %FileCheck %s -check-prefix=TestSingleExprClosureGlobal
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprClosureGlobal | %FileCheck %s -check-prefix=TestNonSingleExprClosureGlobal
@@ -151,6 +151,11 @@ struct TestSingleExprClosureUnresolved {
     }()
   }
 }
+// TestSingleExprClosureUnresolved: Begin completions
+// TestSingleExprClosureUnresolved-NOT: notMine
+// TestSingleExprClosureUnresolved: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprClosureUnresolved-NOT: notMine
+// TestSingleExprClosureUnresolved: End completions
 
 struct TestSingleExprClosureCall {
   func void() -> Void {}
@@ -263,7 +268,7 @@ struct TestSingleExprFuncUnresolved {
 
 // TestSingleExprFuncUnresolved: Begin completions
 // TestSingleExprFuncUnresolved-NOT: notMine
-// TestSingleExprFuncUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprFuncUnresolved: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprFuncUnresolved-NOT: notMine
 // TestSingleExprFuncUnresolved: End completions
 }
@@ -373,7 +378,7 @@ struct TestSingleExprAccessorUnresolved {
 
 // TestSingleExprAccessorUnresolved: Begin completions
 // TestSingleExprAccessorUnresolved-NOT: notMine
-// TestSingleExprAccessorUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprAccessorUnresolved: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprAccessorUnresolved-NOT: notMine
 // TestSingleExprAccessorUnresolved: End completions
 }
@@ -525,7 +530,7 @@ struct TestSingleExprSubscriptUnresolved {
 
 // TestSingleExprSubscriptUnresolved: Begin completions
 // TestSingleExprSubscriptUnresolved-NOT: notMine
-// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myEnum[#MyEnum#];
+// TestSingleExprSubscriptUnresolved: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: myEnum[#MyEnum#];
 // TestSingleExprSubscriptUnresolved-NOT: notMine
 // TestSingleExprSubscriptUnresolved: End completions
 }
@@ -630,7 +635,7 @@ enum TopLevelEnum {
   case foo
 }
 
-// TopLevelEnum: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#TopLevelEnum#];
+// TopLevelEnum: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]: foo[#TopLevelEnum#];
 
 var testAccessorUnresolvedTopLevel: TopLevelEnum {
   .#^testAccessorUnresolvedTopLevel^#

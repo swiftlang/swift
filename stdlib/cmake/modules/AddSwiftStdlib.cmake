@@ -958,10 +958,9 @@ function(_add_swift_target_library_single target name)
     if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
       set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
     endif()
-    # Only set the install RPATH if cross-compiling the host tools, in which
-    # case both the NDK and Sysroot paths must be set.
-    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
-       NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+    # Only set the install RPATH if the toolchain and stdlib will be in Termux
+    # or some other native sysroot on Android.
+    if(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
       set_target_properties("${target}"
         PROPERTIES
         INSTALL_RPATH "$ORIGIN")
@@ -1399,6 +1398,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_FREEBSD
 #   Swift modules this library depends on when built for FreeBSD.
 #
+# SWIFT_MODULE_DEPENDS_OPENBSD
+#   Swift modules this library depends on when built for OpenBSD.
+#
 # SWIFT_MODULE_DEPENDS_LINUX
 #   Swift modules this library depends on when built for Linux.
 #
@@ -1518,6 +1520,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS
         SWIFT_MODULE_DEPENDS_CYGWIN
         SWIFT_MODULE_DEPENDS_FREEBSD
+        SWIFT_MODULE_DEPENDS_OPENBSD
         SWIFT_MODULE_DEPENDS_HAIKU
         SWIFT_MODULE_DEPENDS_IOS
         SWIFT_MODULE_DEPENDS_LINUX
@@ -1676,6 +1679,9 @@ function(add_swift_target_library name)
     elseif(${sdk} STREQUAL FREEBSD)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREEBSD})
+    elseif(${sdk} STREQUAL OPENBSD)
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OPENBSD})
     elseif(${sdk} STREQUAL LINUX OR ${sdk} STREQUAL ANDROID)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
@@ -1754,14 +1760,8 @@ function(add_swift_target_library name)
       list(APPEND swiftlib_link_flags_all "-Wl,-z,defs")
     endif()
     # Setting back linker flags which are not supported when making Android build on macOS cross-compile host.
-    if(SWIFTLIB_SHARED)
-      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
-        list(APPEND swiftlib_link_flags_all "-dynamiclib -Wl,-headerpad_max_install_names")
-      elseif(${sdk} STREQUAL ANDROID)
-        list(APPEND swiftlib_link_flags_all "-shared")
-        # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
-        list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
-      endif()
+    if(SWIFTLIB_SHARED AND sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+      list(APPEND swiftlib_link_flags_all "-dynamiclib -Wl,-headerpad_max_install_names")
     endif()
 
     set(sdk_supported_archs
@@ -1901,6 +1901,13 @@ function(add_swift_target_library name)
       endif()
 
      list(APPEND swiftlib_c_compile_flags_all "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
+
+      # Setting back linker flags which are not supported when making Android build on macOS cross-compile host.
+      if(SWIFTLIB_SHARED AND ${sdk} STREQUAL ANDROID)
+        list(APPEND swiftlib_link_flags_all "-shared")
+        # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
+        list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
+      endif()
 
       # Add this library variant.
       _add_swift_target_library_single(

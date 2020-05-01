@@ -118,3 +118,40 @@ func testOSLogInterpolationExtension(a: MyStruct) {
   // the appendInterpolation overload is not marked as constant_evaluable.
   _osLogTestHelper("Error at line: \(a: a)")
 }
+
+func testExplicitOSLogMessageConstruction() {
+  _osLogTestHelper(OSLogMessage(stringLiteral: "world"))
+    // expected-error@-1 {{argument must be a string interpolation}}
+  _osLogTestHelper(
+    OSLogMessage( // expected-error {{argument must be a string interpolation}}
+      stringInterpolation:
+        OSLogInterpolation(
+          literalCapacity: 0,
+          interpolationCount: 0)))
+}
+
+// Test that @_semantics("oslog.log_with_level") permits values of type OSLog and
+// OSLogType to not be constants.
+
+class OSLog { }
+class OSLogType { }
+
+@_semantics("oslog.log_with_level")
+func osLogWithLevel(_ level: OSLogType, log: OSLog, _ message: OSLogMessage) {
+}
+
+func testNonConstantLogObjectLevel(
+  level: OSLogType,
+  log: OSLog,
+  message: OSLogMessage
+) {
+  osLogWithLevel(level, log: log, "message with no payload")
+  var levelOpt: OSLogType? = nil
+  levelOpt = level
+
+  let logClosure = { log }
+  osLogWithLevel(levelOpt!, log: logClosure(), "A string \("hello")")
+
+  osLogWithLevel(level, log: log, message)
+    // expected-error@-1 {{argument must be a string interpolation}}
+}

@@ -44,8 +44,7 @@ bool DerivedConformance::canDeriveTensorGroup(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, tensorGroupProto, DC,
-                                                 None);
+    return (bool)TypeChecker::conformsToProtocol(varType, tensorGroupProto, DC);
   });
 }
 

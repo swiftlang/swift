@@ -239,6 +239,9 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
     return EXIT_FAILURE;
   }
 
+  const auto &MainFile = M->getMainFile(FileUnitKind::SerializedAST);
+  llvm::errs() << "Emitting symbol graph for module file: " << MainFile.getModuleDefiningPath() << '\n';
+
   return symbolgraphgen::emitSymbolGraphForModule(M,
     Options);
 }

@@ -488,7 +488,7 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
 
   // Look through all of the inherited nominals for a superclass or a
   // class-bound protocol.
-  for (const auto found : allInheritedNominals) {
+  for (const auto &found : allInheritedNominals) {
     // Superclass bound.
     if (isa<ClassDecl>(found.Item))
       return true;
@@ -676,8 +676,9 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
       dc->isTypeContext()) {
     const auto operatorName = decl->getBaseIdentifier();
     if (auto ED = dyn_cast<ExtensionDecl>(dc->getAsDecl())) {
-      decl->diagnose(diag::nonstatic_operator_in_extension,
-                     operatorName, ED->getExtendedTypeRepr())
+      decl->diagnose(diag::nonstatic_operator_in_extension, operatorName,
+                     ED->getExtendedTypeRepr() != nullptr,
+                     ED->getExtendedTypeRepr())
           .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
                        "static ");
     } else {
@@ -958,8 +959,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   // primitive literal protocols.
   auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
     ProtocolDecl *proto = ED->getASTContext().getProtocol(protoKind);
-    return TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext(),
-                                           None);
+    return TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext());
   };
 
   static auto otherLiteralProtocolKinds = {
@@ -2433,10 +2433,8 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   TypeChecker::addImplicitConstructors(CD);
 
   auto forceConformance = [&](ProtocolDecl *protocol) {
-    auto ref = TypeChecker::conformsToProtocol(
-        CD->getDeclaredInterfaceType(), protocol, CD,
-        ConformanceCheckFlags::SkipConditionalRequirements, SourceLoc());
-
+    auto ref = CD->getParentModule()->lookupConformance(
+        CD->getDeclaredInterfaceType(), protocol);
     if (ref.isInvalid()) {
       return;
     }

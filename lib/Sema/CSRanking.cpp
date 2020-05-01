@@ -250,10 +250,7 @@ computeSelfTypeRelationship(DeclContext *dc, ValueDecl *decl1,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  auto conformance = TypeChecker::conformsToProtocol(
-                         modelTy, proto, dc,
-                         (ConformanceCheckFlags::InExpression|
-                          ConformanceCheckFlags::SkipConditionalRequirements));
+  auto conformance = dc->getParentModule()->lookupConformance(modelTy, proto);
   if (conformance.isInvalid())
     return {SelfTypeRelationship::Unrelated, conformance};
 
@@ -506,7 +503,7 @@ bool CompareDeclSpecializationRequest::evaluate(
   ConstraintSystem cs(dc, ConstraintSystemOptions());
   bool knownNonSubtype = false;
 
-  auto *locator = cs.getConstraintLocator(nullptr);
+  auto *locator = cs.getConstraintLocator({});
   // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
 
@@ -770,7 +767,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   bool isVarAndNotProtocol2 = false;
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
-    if (auto *anchor = locator->getAnchor()) {
+    if (auto *anchor = locator->getAnchor().dyn_cast<Expr *>()) {
       auto weight = cs.getExprDepth(anchor);
       if (weight)
         return *weight + 1;

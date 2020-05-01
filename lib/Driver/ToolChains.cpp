@@ -127,14 +127,10 @@ static bool addOutputsOfType(ArgStringList &Arguments,
   return Added;
 }
 
-/// Handle arguments common to all invocations of the frontend (compilation,
-/// module-merging, LLDB's REPL, etc).
-static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
-                                  const CommandOutput &output,
-                                  const ArgList &inputArgs,
-                                  ArgStringList &arguments) {
-  const llvm::Triple &Triple = TC.getTriple();
-
+void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
+                                      const CommandOutput &output,
+                                      const ArgList &inputArgs,
+                                      ArgStringList &arguments) const {
   // Only pass -target to the REPL or immediate modes if it was explicitly
   // specified on the command line.
   switch (OI.CompilerMode) {
@@ -220,7 +216,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
-  inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
+  inputArgs.AddAllArgs(arguments, options::OPT_warnings_as_errors,
+                       options::OPT_no_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
@@ -236,10 +233,6 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
   inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_fine_grained_dependencies);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_disable_fine_grained_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_enable_type_fingerprints);
   inputArgs.AddLastArg(arguments, options::OPT_disable_type_fingerprints);
   inputArgs.AddLastArg(arguments,
@@ -379,8 +372,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasArg(options::OPT_parse_stdlib))
     Arguments.push_back("-disable-objc-attr-requires-foundation-module");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
   // Pass along an -import-objc-header arg, replacing the argument with the name
@@ -571,6 +563,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-module";
   case file_types::TY_ImportedModules:
     return "-emit-imported-modules";
+  case file_types::TY_JSONDependencies:
+    return "-scan-dependencies";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -770,8 +764,7 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   if (context.Args.hasArg(options::OPT_parse_stdlib))
     Arguments.push_back("-disable-objc-attr-requires-foundation-module");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
@@ -838,6 +831,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_PCH:
     case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
+    case file_types::TY_JSONDependencies:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:
@@ -990,8 +984,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   Arguments.push_back("-disable-diagnostic-passes");
   Arguments.push_back("-disable-sil-perf-optzns");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
   addOutputsOfType(Arguments, context.Output, context.Args,
@@ -1084,8 +1077,7 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   for (auto &s : getDriver().getSwiftProgramArgs())
     FrontendArgs.push_back(s.c_str());
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        FrontendArgs);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, FrontendArgs);
   addRuntimeLibraryFlags(context.OI, FrontendArgs);
 
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
@@ -1170,8 +1162,7 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
     Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
   addOutputsOfType(Arguments, context.Output, context.Args,

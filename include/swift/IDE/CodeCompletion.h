@@ -534,6 +534,7 @@ enum class CompletionKind {
   AfterIfStmtElse,
   GenericRequirement,
   PrecedenceGroup,
+  StmtLabel,
 };
 
 /// A single code completion result.

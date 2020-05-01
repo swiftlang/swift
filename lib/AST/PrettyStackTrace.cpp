@@ -48,7 +48,7 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
   bool hasPrintedName = false;
   if (auto *named = dyn_cast<ValueDecl>(D)) {
     if (named->hasName()) {
-      out << '\'' << named->getFullName() << '\'';
+      out << '\'' << named->getName() << '\'';
       hasPrintedName = true;
     } else if (auto *accessor = dyn_cast<AccessorDecl>(named)) {
       auto ASD = accessor->getStorage();
@@ -80,7 +80,7 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
           break;
         }
 
-        out << " for " << ASD->getFullName();
+        out << " for " << ASD->getName();
         hasPrintedName = true;
         loc = ASD->getStartLoc();
       }

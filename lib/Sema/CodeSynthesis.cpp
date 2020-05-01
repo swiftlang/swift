@@ -590,7 +590,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
   auto *superclassCallExpr =
     CallExpr::create(ctx, superclassCtorRefExpr, ctorArgs,
-                     superclassCtor->getFullName().getArgumentNames(), { },
+                     superclassCtor->getName().getArgumentNames(), { },
                      /*hasTrailingClosure=*/false, /*implicit=*/true);
 
   if (auto *funcTy = type->getAs<FunctionType>())
@@ -698,7 +698,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Create the initializer declaration, inheriting the name,
   // failability, and throws from the superclass initializer.
   auto ctor =
-    new (ctx) ConstructorDecl(superclassCtor->getFullName(),
+    new (ctx) ConstructorDecl(superclassCtor->getName(),
                               classDecl->getBraces().Start,
                               superclassCtor->isFailable(),
                               /*FailabilityLoc=*/SourceLoc(),
@@ -809,14 +809,14 @@ static void diagnoseMissingRequiredInitializer(
     // Add a dummy body.
     out << " {\n";
     out << indentation << extraIndentation << "fatalError(\"";
-    superInitializer->getFullName().printPretty(out);
+    superInitializer->getName().printPretty(out);
     out << " has not been implemented\")\n";
     out << indentation << "}\n";
   }
 
   // Complain.
   ctx.Diags.diagnose(insertionLoc, diag::required_initializer_missing,
-                     superInitializer->getFullName(),
+                     superInitializer->getName(),
                      superInitializer->getDeclContext()->getDeclaredInterfaceType())
     .fixItInsert(insertionLoc, initializerText);
 
@@ -1130,10 +1130,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       return false;
 
     auto targetType = target->getDeclaredInterfaceType();
-    auto ref = TypeChecker::conformsToProtocol(
-        targetType, protocol, target,
-        ConformanceCheckFlags::SkipConditionalRequirements);
-
+    auto ref = target->getParentModule()->lookupConformance(
+        targetType, protocol);
     if (ref.isInvalid()) {
       return false;
     }

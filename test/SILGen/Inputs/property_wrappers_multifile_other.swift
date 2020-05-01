@@ -7,6 +7,8 @@ public class MyClass {
 
 @propertyWrapper
 public struct PropertyWrapper {
+  public init() { }
+
   public var projectedValue: PropertyWrapper {
     get {
       return self

@@ -294,15 +294,6 @@ past that, so:
      All the same options from above apply, but you'll have to manually deal
      with the work the compiler would have done automatically for you.
 
-   - Invoke `swiftc -c` with `-###`. Then run all of the outputted commands
-     that include `-primary-file`, then run the remaining commands in order
-     (they may have dependencies). If none of the commands have `-primary-file`
-     in them, they're not parallelizable, sorry.
-
-     This is the most hacky approach, because (a) it involves looking for an
-     internal flag in a non-stable interface, and (b) you don't get anything
-     incremental out of this. We could stand some improvements here.
-
    Whatever you do, do *not* invoke the frontend directly.
 
 

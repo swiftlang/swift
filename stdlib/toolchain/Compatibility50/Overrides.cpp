@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Overrides.h"
+#include "../Compatibility51/Overrides.h"
 #include "../../public/runtime/CompatibilityOverride.h"
 
 #include <dlfcn.h>
@@ -30,10 +31,15 @@ struct OverrideSection {
 #include "../../public/runtime/CompatibilityOverride.def"
 };
   
-OverrideSection Overrides
+OverrideSection Swift50Overrides
 __attribute__((used, section("__DATA,__swift_hooks"))) = {
   .version = 0,
   .conformsToProtocol = swift50override_conformsToProtocol,
+  // We use the same hook for conformsToSwiftProtocol as we do for a 5.1
+  // runtime, so reference the override from the Compatibility51 library.
+  // If we're back deploying to Swift 5.0, we also have to support 5.1, so
+  // the Compatibility51 library is always linked when the 50 library is.
+  .conformsToSwiftProtocol = swift51override_conformsToSwiftProtocol,
 };
 
 // Allow this library to get force-loaded by autolinking

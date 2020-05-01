@@ -152,11 +152,9 @@ PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
      "Constants Propagation for Diagnostics")
-// SWIFT_ENABLE_TENSORFLOW
 PASS(DifferentiabilityWitnessDevirtualizer,
      "differentiability-witness-devirtualizer",
      "Inlines Differentiability Witnesses")
-// SWIFT_ENABLE_TENSORFLOW END
 PASS(EagerSpecializer, "eager-specializer",
      "Eager Specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",

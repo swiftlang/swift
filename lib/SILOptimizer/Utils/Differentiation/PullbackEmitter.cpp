@@ -1787,6 +1787,7 @@ SILValue PullbackEmitter::materializeAdjointDirect(AdjointValue val,
   case AdjointValueKind::Concrete:
     return val.getConcreteValue();
   }
+  llvm_unreachable("invalid value kind");
 }
 
 SILValue PullbackEmitter::materializeAdjoint(AdjointValue val,
@@ -1958,6 +1959,7 @@ AdjointValue PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs,
     }
     }
   }
+  llvm_unreachable("invalid LHS kind");
 }
 
 SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
@@ -2007,6 +2009,7 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
     return builder.createTuple(loc, adjointTy, adjElements);
   }
   }
+  llvm_unreachable("invalid tangent space");
 }
 
 void PullbackEmitter::accumulateIndirect(SILValue resultBufAccess,

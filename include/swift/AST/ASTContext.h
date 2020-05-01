@@ -50,6 +50,10 @@ namespace clang {
   class ObjCInterfaceDecl;
 }
 
+namespace llvm {
+  class LLVMContext;
+}
+
 namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
@@ -74,6 +78,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
+  class ModuleDependencies;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class SourceFile;
@@ -87,6 +92,7 @@ namespace swift {
   class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
+  class ModuleDependenciesCache;
   class ModuleLoader;
   class NominalTypeDecl;
   class NormalProtocolConformance;
@@ -744,6 +750,15 @@ public:
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                        bool isClang = false, bool isDWARF = false);
 
+  /// Retrieve the module dependencies for the module with the given name.
+  ///
+  /// \param isUnderlyingClangModule When true, only look for a Clang module
+  /// with the given name, ignoring any Swift modules.
+  Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName,
+      bool isUnderlyingClangModule,
+      ModuleDependenciesCache &cache);
+
   /// Load extensions to the given nominal type from the external
   /// module loaders.
   ///
@@ -986,6 +1001,11 @@ private:
   void registerGenericSignatureBuilder(GenericSignature sig,
                                        GenericSignatureBuilder &&builder);
   friend class GenericSignatureBuilder;
+
+private:
+  friend class IntrinsicInfo;
+  /// Retrieve an LLVMContext that is used for scratch space for intrinsic lookup.
+  llvm::LLVMContext &getIntrinsicScratchContext() const;
 
 public:
   /// Retrieve or create the stored generic signature builder for the given

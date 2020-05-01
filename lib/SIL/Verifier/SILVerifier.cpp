@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-verifier"
+#include "VerifierPrivate.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -44,7 +45,9 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+
 using namespace swift;
+using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
@@ -569,6 +572,12 @@ struct ImmutableAddressUseVerifier {
         if (isConsumingOrMutatingYieldUse(use))
           return true;
         break;
+      case SILInstructionKind::BeginAccessInst:
+        if (cast<BeginAccessInst>(inst)->getAccessKind() != SILAccessKind::Read)
+          return true;
+        break;
+      case SILInstructionKind::EndAccessInst:
+        break;
       case SILInstructionKind::CopyAddrInst:
         if (isConsumingOrMutatingCopyAddrUse(use))
           return true;
@@ -662,6 +671,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
 
   DeadEndBlocks DEBlocks;
+  LoadBorrowNeverInvalidatedAnalysis loadBorrowNeverInvalidatedAnalysis;
   bool SingleFunction = true;
 
   SILVerifier(const SILVerifier&) = delete;
@@ -688,6 +698,8 @@ public:
     }
     llvm::dbgs() << "In function:\n";
     F.print(llvm::dbgs());
+    llvm::dbgs() << "In module:\n";
+    F.getModule().print(llvm::dbgs());
 
     // We abort by default because we want to always crash in
     // the debugger.
@@ -855,10 +867,11 @@ public:
 
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
-        fnConv(F.getConventionsInContext()),
-        TC(F.getModule().Types), OpenedArchetypes(&F), Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)),
-        DEBlocks(&F), SingleFunction(SingleFunction) {
+        fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
+        OpenedArchetypes(&F), Dominance(nullptr),
+        InstNumbers(numInstsInFunction(F)), DEBlocks(&F),
+        loadBorrowNeverInvalidatedAnalysis(DEBlocks),
+        SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
       
@@ -1880,6 +1893,8 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
+    require(loadBorrowNeverInvalidatedAnalysis.isNeverInvalidated(LBI),
+            "Found load borrow that is invalidated by a local write?!");
   }
 
   void checkEndBorrowInst(EndBorrowInst *EBI) {

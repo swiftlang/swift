@@ -1047,7 +1047,15 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   if (isFullyUninitialized) {
     Use.Kind = DIUseKind::Initialization;
   } else if (isFullyInitialized) {
-    Use.Kind = DIUseKind::Assign;
+    // Only re-write assign_by_wrapper to assignment if all fields have been
+    // initialized.
+    if (isa<AssignByWrapperInst>(Use.Inst) &&
+        getAnyUninitializedMemberAtInst(Use.Inst, 0,
+                                        TheMemory.getNumElements()) != -1) {
+      Use.Kind = DIUseKind::Initialization;
+    } else {
+      Use.Kind = DIUseKind::Assign;
+    }
   } else {
     // If it is initialized on some paths, but not others, then we have an
     // inconsistent initialization, which needs dynamic control logic in the

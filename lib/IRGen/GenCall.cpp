@@ -28,7 +28,6 @@
 #include "swift/SIL/SILType.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/Support/Compiler.h"
 
@@ -100,7 +99,7 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
   // dynamic-layout aggregates.
   if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ti)) {
     b.addAttribute(
-      llvm::Attribute::getWithDereferenceableBytes(IGM.LLVMContext,
+      llvm::Attribute::getWithDereferenceableBytes(IGM.getLLVMContext(),
                                          fixedTI->getFixedSize().getValue()));
   }
 }
@@ -116,7 +115,7 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  attrs = attrs.addAttributes(IGM.LLVMContext,
+  attrs = attrs.addAttributes(IGM.getLLVMContext(),
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
@@ -132,7 +131,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM,
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  attrs = attrs.addAttributes(IGM.LLVMContext,
+  attrs = attrs.addAttributes(IGM.getLLVMContext(),
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
@@ -169,7 +168,7 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
   b.addAttribute(llvm::Attribute::NoCapture);
   if (allowSRet)
     b.addAttribute(llvm::Attribute::StructRet);
-  attrs = attrs.addAttributes(IGM.LLVMContext,
+  attrs = attrs.addAttributes(IGM.getLLVMContext(),
                               paramIndex + llvm::AttributeList::FirstArgIndex,
                               b);
 }
@@ -178,7 +177,7 @@ void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
                                          unsigned argIndex) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::SwiftSelf);
-  attrs = attrs.addAttributes(this->LLVMContext,
+  attrs = attrs.addAttributes(this->getLLVMContext(),
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
@@ -199,7 +198,7 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
   b.addDereferenceableAttr(getPointerSize().getValue());
   
   auto attrIndex = argIndex + llvm::AttributeList::FirstArgIndex;
-  attrs = attrs.addAttributes(this->LLVMContext, attrIndex, b);
+  attrs = attrs.addAttributes(this->getLLVMContext(), attrIndex, b);
 }
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
@@ -208,8 +207,8 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::ByVal);
   b.addAttribute(llvm::Attribute::getWithAlignment(
-      IGM.LLVMContext, llvm::Align(align.getValue())));
-  attrs = attrs.addAttributes(IGM.LLVMContext,
+      IGM.getLLVMContext(), llvm::Align(align.getValue())));
+  attrs = attrs.addAttributes(IGM.getLLVMContext(),
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
@@ -220,7 +219,7 @@ void irgen::addExtendAttribute(IRGenModule &IGM, llvm::AttributeList &attrs,
     b.addAttribute(llvm::Attribute::SExt);
   else
     b.addAttribute(llvm::Attribute::ZExt);
-  attrs = attrs.addAttributes(IGM.LLVMContext, index, b);
+  attrs = attrs.addAttributes(IGM.getLLVMContext(), index, b);
 }
 
 namespace swift {
@@ -1517,7 +1516,7 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   auto call = emitCallSite();
 
   // Bail out immediately on a void result.
-  llvm::Value *result = call.getInstruction();
+  llvm::Value *result = call;
   if (result->getType()->isVoidTy())
     return;
 
@@ -1585,7 +1584,7 @@ void CallEmission::emitToUnmappedMemory(Address result) {
 }
 
 /// The private routine to ultimately emit a call or invoke instruction.
-llvm::CallSite CallEmission::emitCallSite() {
+llvm::CallInst *CallEmission::emitCallSite() {
   assert(LastArgWritten == 0);
   assert(!EmittedCall);
   EmittedCall = true;
@@ -1616,7 +1615,7 @@ llvm::CallSite CallEmission::emitCallSite() {
 
     // Insert a call to @llvm.coro.prepare.retcon, then bitcast to the right
     // function type.
-    auto origCallee = call->getCalledValue();
+    auto origCallee = call->getCalledOperand();
     llvm::Value *opaqueCallee = origCallee;
     opaqueCallee =
       IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);
@@ -1660,8 +1659,10 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
   }
 
   assert(!isTrapIntrinsic(fn.getPointer()) && "Use CreateNonMergeableTrap");
-  llvm::CallInst *call =
-    IRBuilderBase::CreateCall(fn.getPointer(), args, bundles);
+  llvm::CallInst *call = IRBuilderBase::CreateCall(
+      cast<llvm::FunctionType>(
+          fn.getPointer()->getType()->getPointerElementType()),
+      fn.getPointer(), args, bundles);
   call->setAttributes(fn.getAttributes());
   call->setCallingConv(fn.getCallingConv());
   return call;
@@ -1731,8 +1732,7 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
 
   // Pull the raw return values out.
   Explosion rawReturnValues;
-  extractScalarResults(IGF, call->getType(), call.getInstruction(),
-                       rawReturnValues);
+  extractScalarResults(IGF, call->getType(), call, rawReturnValues);
 
   auto coroInfo = getCallee().getSignature().getCoroutineInfo();
 
@@ -2841,7 +2841,7 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
 void CallEmission::addAttribute(unsigned index,
                                 llvm::Attribute::AttrKind attr) {
   auto &attrs = CurCallee.getMutableAttributes();
-  attrs = attrs.addAttribute(IGF.IGM.LLVMContext, index, attr);
+  attrs = attrs.addAttribute(IGF.IGM.getLLVMContext(), index, attr);
 }
 
 /// Initialize an Explosion with the parameters of the current

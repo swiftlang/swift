@@ -18,6 +18,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-keywords=false -code-completion-token=METHODNAME_PROTOCOL | %FileCheck %s --check-prefix=NO_COMPLETIONS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-keywords=false -code-completion-token=METHODNAME_CONFORMANCE | %FileCheck %s --check-prefix=METHODNAME_CONFORMANCE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-keywords=false -code-completion-token=TYPEALIASNAME_CONFORMANCE | %FileCheck %s --check-prefix=TYPEALIASNAME_CONFORMANCE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-keywords=false -code-completion-token=METHODNAME_HASSIG | %FileCheck %s --check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-keywords=false -code-completion-token=TYPEALIASNAME_HASSIG | %FileCheck %s --check-prefix=NO_COMPLETIONS
 
 // NO_COMPLETIONS-NOT: Begin completions
 
@@ -59,8 +61,15 @@ struct MyStruct : P {
 // METHODNAME_CONFORMANCE: Begin completions, 1 items
 // METHODNAME_CONFORMANCE-NEXT: Decl[InstanceMethod]/Super: foo() {|}; name=foo()
 // METHODNAME_CONFORMANCE-NEXT: End completions
+
   typealias #^TYPEALIASNAME_CONFORMANCE^#
 // TYPEALIASNAME_CONFORMANCE: Begin completions, 1 items
 // TYPEALIASNAME_CONFORMANCE-NEXT: Decl[AssociatedType]/Super: Assoc = {#(Type)#}; name=Assoc = Type
 // TYPEALIASNAME_CONFORMANCE-NEXT: End completions
+}
+struct MyStruct2: P {
+  func #^METHODNAME_HASSIG^#() (<#parameters#>} {}
+// INVALID
+  typealias #^TYPEALIASNAME_HASSIG^# = <#type#>
+// INVALID
 }

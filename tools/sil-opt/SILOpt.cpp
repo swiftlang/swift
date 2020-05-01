@@ -20,7 +20,6 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -376,6 +375,8 @@ int main(int argc, char **argv) {
   SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
   SILOpts.StripOwnershipAfterSerialization =
       EnableOwnershipLoweringAfterDiagnostics;
+  SILOpts.OptRecordFile = RemarksFilename;
+  SILOpts.OptRecordPasses = RemarksPasses;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
@@ -473,8 +474,7 @@ int main(int argc, char **argv) {
   if (CI.getSILModule())
     CI.getSILModule()->setSerializeSILAction([]{});
 
-  if (RemarksFilename != "") {
-    llvm::remarks::Format remarksFormat = llvm::remarks::Format::YAML;
+  if (!RemarksFilename.empty()) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
         llvm::remarks::parseFormat(RemarksFormat);
     if (llvm::Error E = formatOrErr.takeError()) {
@@ -482,21 +482,17 @@ int main(int argc, char **argv) {
                              diag::error_creating_remark_serializer,
                              toString(std::move(E)));
       HadError = true;
+      SILOpts.OptRecordFormat = llvm::remarks::Format::YAML;
     } else {
-      remarksFormat = *formatOrErr;
+      SILOpts.OptRecordFormat = *formatOrErr;
     }
 
-    auto Pair = createSILRemarkStreamer(*CI.getSILModule(), RemarksFilename,
-                                        RemarksPasses, remarksFormat,
-                                        CI.getDiags(), CI.getSourceMgr());
-    CI.getSILModule()->setSILRemarkStreamer(std::move(Pair.first),
-                                            std::move(Pair.second));
+    CI.getSILModule()->installSILRemarkStreamer();
   }
 
   if (OptimizationGroup == OptGroup::Diagnostics) {
     runSILDiagnosticPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Performance) {
-    runSILOptPreparePasses(*CI.getSILModule());
     runSILOptimizationPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Lowering) {
     runSILLoweringPasses(*CI.getSILModule());
@@ -505,8 +501,7 @@ int main(int argc, char **argv) {
     {
       auto T = irgen::createIRGenModule(
           SILMod, Invocation.getOutputFilenameForAtMostOnePrimary(),
-          Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(),
-          "", getGlobalLLVMContext());
+          Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "");
       runCommandLineSelectedPasses(SILMod, T.second);
       irgen::deleteIRGenModule(T);
     }

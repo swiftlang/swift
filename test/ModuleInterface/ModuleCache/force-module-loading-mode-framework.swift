@@ -10,7 +10,7 @@
 
 // 2. Only interface is present.
 // RUN: %empty-directory(%t/Lib.framework/Modules/Lib.swiftmodule)
-// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.framework/Modules/Lib.swiftmodule/%target-cpu.swiftinterface
+// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.framework/Modules/Lib.swiftmodule/%module-target-triple.swiftinterface
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -F %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -F %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: env SWIFT_FORCE_MODULE_LOADING=only-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -F %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
@@ -29,7 +29,7 @@
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -F %t %s 2>&1 | %FileCheck -check-prefix=FROM-SERIALIZED %s
 
 // 4. Both are present.
-// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.framework/Modules/Lib.swiftmodule/%target-cpu.swiftinterface
+// RUN: cp %S/Inputs/force-module-loading-mode/Lib.swiftinterface %t/Lib.framework/Modules/Lib.swiftmodule/%module-target-triple.swiftinterface
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -F %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: %empty-directory(%t/MCP)
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -F %t 2>&1 | %FileCheck -check-prefix=FROM-SERIALIZED %s

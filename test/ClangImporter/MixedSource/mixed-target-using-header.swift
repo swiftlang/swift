@@ -48,7 +48,7 @@ func testStruct(_ p: Point2D) -> Point2D {
 
 #if !SILGEN
 func testSuppressed() {
-  let _: __int128_t? = nil // expected-error{{use of undeclared type '__int128_t'}}
+  let _: __int128_t? = nil // expected-error{{cannot find type '__int128_t' in scope}}
 }
 #endif
 

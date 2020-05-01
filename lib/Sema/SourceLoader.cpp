@@ -115,17 +115,17 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
-  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx);
+  ImplicitImportInfo importInfo;
+  importInfo.StdlibKind = Ctx.getStdlibModule() ? ImplicitStdlibKind::Stdlib
+                                                : ImplicitStdlibKind::None;
+
+  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx, importInfo);
   if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.LoadedModules[moduleID.Item] = importMod;
 
-  auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;
-  if (!Ctx.getStdlibModule())
-    implicitImportKind = SourceFile::ImplicitModuleImportKind::None;
-
   auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,
-                                          bufferID, implicitImportKind,
+                                          bufferID,
                                           Ctx.LangOpts.CollectParsedToken,
                                           Ctx.LangOpts.BuildSyntaxTree);
   importMod->addFile(*importFile);

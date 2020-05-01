@@ -165,7 +165,8 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 
   lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
                            /*includeInstanceMembers=*/false,
-                           /*includeDerivedRequirements*/false);
+                           /*includeDerivedRequirements*/false,
+                           /*includeProtocolExtensionMembers*/true);
 }
 
 } // anonymous namespace.
@@ -189,7 +190,7 @@ void PrintingConformingMethodListConsumer::handleResult(
     auto resultTy = funcTy->castTo<FunctionType>()->getResult();
 
     OS << "   - Name: ";
-    VD->getFullName().print(OS);
+    VD->getName().print(OS);
     OS << "\n";
 
     OS << "     TypeName: ";

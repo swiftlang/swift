@@ -18,30 +18,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && \
-                        defined(REMARK)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
-#endif
-
-#ifndef ERROR
-#  define ERROR(ID,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Options,Text,Signature)
-#endif
-
-#ifndef WARNING
-#  define WARNING(ID,Options,Text,Signature) \
-  DIAG(WARNING,ID,Options,Text,Signature)
-#endif
-
-#ifndef NOTE
-#  define NOTE(ID,Options,Text,Signature) \
-  DIAG(NOTE,ID,Options,Text,Signature)
-#endif
-
-#ifndef REMARK
-#  define REMARK(ID,Options,Text,Signature)   \
-DIAG(REMARK,ID,Options,Text,Signature)
-#endif
+#define DEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"
 
 WARNING(warning_no_such_sdk,none,
         "no such SDK: '%0'", (StringRef))
@@ -60,6 +38,10 @@ ERROR(error_unsupported_target_arch, none,
 
 ERROR(error_unsupported_opt_for_target, none,
       "unsupported option '%0' for target '%1'", (StringRef, StringRef))
+
+WARNING(warning_inferred_simulator_target,none,
+      "inferring simulator environment for target '%0'; "
+      "use '-target %1' instead", (StringRef, StringRef))
 
 ERROR(error_argument_not_allowed_with, none,
       "argument '%0' is not allowed with '%1'", (StringRef, StringRef))
@@ -94,8 +76,6 @@ ERROR(error_unknown_arg,none,
       "unknown argument: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
       "invalid value '%1' in '%0'", (StringRef, StringRef))
-WARNING(warning_type_fingerprints_require_fine_grained_dependencies,none,
-      "Type fingerprints require fine-grained dependencies", ())
 WARNING(warning_cannot_multithread_batch_mode,none,
       "ignoring -num-threads argument; cannot multithread batch mode", ())
 ERROR(error_unsupported_option_argument,none,
@@ -160,8 +140,6 @@ ERROR(error_stdlib_module_name,none,
 
 ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
-ERROR(error_underlying_module_not_found,none,
-      "underlying Objective-C module %0 not found", (Identifier))
 
 ERROR(error_unable_to_load_supplementary_output_file_map, none,
       "unable to load supplementary output file map '%0': %1",
@@ -212,12 +190,6 @@ ERROR(error_duplicate_input_file,none,
 ERROR(repl_must_be_initialized,none,
       "variables currently must have an initial value when entered at the "
       "top level of the REPL", ())
-
-ERROR(error_doing_code_completion,none,
-      "compiler is in code completion mode (benign diagnostic)", ())
-
-WARNING(completion_reusing_astcontext,none,
-        "completion reusing previous ASTContext (benign diagnostic)", ())
 
 ERROR(verify_encountered_fatal,none,
       "fatal error encountered while in -verify mode", ())
@@ -407,12 +379,5 @@ ERROR(expectation_missing_opening_braces,none,
 ERROR(expectation_missing_closing_braces,none,
       "didn't find '}}' to match '{{' in expectation", ())
 
-#ifndef DIAG_NO_UNDEF
-# if defined(DIAG)
-#  undef DIAG
-# endif
-# undef REMARK
-# undef NOTE
-# undef WARNING
-# undef ERROR
-#endif
+#define UNDEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"

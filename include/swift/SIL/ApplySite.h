@@ -519,6 +519,7 @@ public:
     case FullApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(getInstruction())->getInoutArguments();
     }
+    llvm_unreachable("invalid apply kind");
   }
 
   /// Returns true if \p op is the callee operand of this apply site

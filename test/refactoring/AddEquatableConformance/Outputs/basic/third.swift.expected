@@ -1,0 +1,23 @@
+class TestAddEquatable {
+    var property = "test"
+    private var prop = "test2"
+    let pr = "test3"
+}
+
+extension TestAddEquatable {
+    func test() -> Bool {
+        return true
+    }
+}
+
+extension TestAddEquatable: Equatable {
+    static func == (lhs: TestAddEquatable, rhs: TestAddEquatable) -> Bool {
+        return lhs.property == rhs.property &&
+               lhs.prop == rhs.prop &&
+               lhs.pr == rhs.pr
+    }
+}
+
+
+
+

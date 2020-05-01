@@ -101,6 +101,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_IUO | %FileCheck %s -check-prefix=ARG_PARAMFLAG_IUO
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_VARIADIC | %FileCheck %s -check-prefix=ARG_PARAMFLAG_VARIADIC
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_1 | %FileCheck %s -check-prefix=TUPLEELEM_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_2 | %FileCheck %s -check-prefix=TUPLEELEM_2
 
 var i1 = 1
 var i2 = 2
@@ -591,8 +593,8 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // SUBSCRIPT_1_DOT: Begin completions
 // SUBSCRIPT_1_DOT-NOT: i1
 // SUBSCRIPT_1_DOT-NOT: s1
-// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              max[#Int#]; name=max
-// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              min[#Int#]; name=min
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific:              max[#Int#]; name=max
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/ExprSpecific:              min[#Int#]; name=min
 
   let _ = obj[42, #^SUBSCRIPT_2^#
 // SUBSCRIPT_2: Begin completions, 1 items
@@ -815,4 +817,15 @@ func testPamrameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosu
 // ARG_PARAMFLAG_VARIADIC: Begin completions, 1 items
 // ARG_PARAMFLAG_VARIADIC-DAG: Pattern/ExprSpecific: {#variadicArg: Int...#}[#Int#];
 // ARG_PARAMFLAG_VARIADIC: End completions
+}
+
+func testTupleElement(arg: (SimpleEnum, SimpleEnum)) {
+  testTupleElement(arg: (.foo, .#^TUPLEELEM_1^#))
+// TUPLEELEM_1: Begin completions, 3 items
+// TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
+// TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
+// TUPLEELEM_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// TUPLEELEM_1: End completions
+  testTupleElement(arg: (.foo, .bar, .#^TUPLEELEM_2^#))
+// TUPLEELEM_2-NOT: Begin completions
 }

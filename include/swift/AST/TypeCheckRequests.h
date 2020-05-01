@@ -23,6 +23,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Statistic.h"
@@ -41,12 +42,13 @@ class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
 class SpecializeAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
-struct TypeLoc;
+class TypeLoc;
 class Witness;
 struct TypeWitnessAndDecl;
 class ValueDecl;
@@ -632,6 +634,26 @@ public:
   bool isCached() const;
 };
 
+/// Request information about the l-valueness of composed property wrappers.
+class PropertyWrapperLValuenessRequest :
+    public SimpleRequest<PropertyWrapperLValuenessRequest,
+                         Optional<PropertyWrapperLValueness> (VarDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Optional<PropertyWrapperLValueness>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+};
+
 /// Request information about the backing property for properties that have
 /// attached property wrappers.
 class PropertyWrapperBackingPropertyInfoRequest :
@@ -672,10 +694,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request the most optimal resilience expansion for the code in the context.
-class ResilienceExpansionRequest :
-    public SimpleRequest<ResilienceExpansionRequest,
-                         ResilienceExpansion(DeclContext*),
+/// Request the fragile function kind for the context.
+class FragileFunctionKindRequest :
+    public SimpleRequest<FragileFunctionKindRequest,
+                         FragileFunctionKind(DeclContext*),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -684,15 +706,16 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ResilienceExpansion evaluate(Evaluator &eval, DeclContext *context) const;
+  FragileFunctionKind evaluate(Evaluator &eval, DeclContext *context) const;
 
 public:
   // Caching.
   bool isCached() const { return true; }
 };
 
-void simple_display(llvm::raw_ostream &out,
-                    const ResilienceExpansion &value);
+void simple_display(llvm::raw_ostream &out, FragileFunctionKind value);
+
+void simple_display(llvm::raw_ostream &out, ResilienceExpansion value);
 
 /// Request the custom attribute which attaches a function builder to the
 /// given declaration.
@@ -2320,6 +2343,62 @@ public:
   bool isCached() const {
     return std::get<0>(getStorage())->getAccessorKind() == AccessorKind::DidSet;
   }
+};
+
+/// A module which has been implicitly imported.
+struct ImplicitImport {
+  using ImportOptions = SourceFile::ImportOptions;
+
+  ModuleDecl *Module;
+  ImportOptions Options;
+
+  ImplicitImport(ModuleDecl *module, ImportOptions opts = {})
+      : Module(module), Options(opts) {}
+
+  friend bool operator==(const ImplicitImport &lhs,
+                         const ImplicitImport &rhs) {
+    return lhs.Module == rhs.Module &&
+           lhs.Options.toRaw() == rhs.Options.toRaw();
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const ImplicitImport &import);
+
+/// Computes the loaded modules that should be implicitly imported by each file
+/// of a given module.
+class ModuleImplicitImportsRequest
+    : public SimpleRequest<ModuleImplicitImportsRequest,
+                           ArrayRef<ImplicitImport>(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<ImplicitImport>
+  evaluate(Evaluator &evaluator, ModuleDecl *module) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether a file performs an implementation-only import.
+class HasImplementationOnlyImportsRequest
+    : public SimpleRequest<HasImplementationOnlyImportsRequest,
+                           bool(SourceFile *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

@@ -272,6 +272,13 @@ bool conflicting(ASTContext &ctx,
                  bool *wouldConflictInSwift5 = nullptr,
                  bool skipProtocolExtensionCheck = false);
 
+/// The kind of artificial main to generate.
+enum class ArtificialMainKind : uint8_t {
+  NSApplicationMain,
+  UIApplicationMain,
+  TypeMain,
+};
+
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
 protected:
@@ -778,6 +785,13 @@ public:
   SourceRange getSourceRangeIncludingAttrs() const;
 
   SourceLoc TrailingSemiLoc;
+
+  /// Returns the appropriate kind of entry point to generate for this class,
+  /// based on its attributes.
+  ///
+  /// It is an error to call this on a type that does not have either an
+  /// *ApplicationMain or an main attribute.
+  ArtificialMainKind getArtificialMainKind() const;
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(const char *filename));
@@ -2489,8 +2503,7 @@ public:
   bool isOperator() const { return Name.isOperator(); }
 
   /// Retrieve the full name of the declaration.
-  /// TODO: Rename to getName?
-  DeclName getFullName() const { return Name; }
+  DeclName getName() const { return Name; }
   void setName(DeclName name) { Name = name; }
 
   /// Retrieve the base name of the declaration, ignoring any argument
@@ -2504,7 +2517,7 @@ public:
   /// Generates a DeclNameRef referring to this declaration with as much
   /// specificity as possible.
   DeclNameRef createNameRef() const {
-    return DeclNameRef(getFullName());
+    return DeclNameRef(Name);
   }
 
   /// Retrieve the name to use for this declaration when interoperating
@@ -2833,7 +2846,6 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -3031,6 +3043,10 @@ public:
   /// Retrieve the interface type of the underlying type.
   Type getUnderlyingType() const;
   void setUnderlyingType(Type type);
+
+  /// Returns the interface type of the underlying type if computed, null
+  /// otherwise. Should only be used for dumping.
+  Type getCachedUnderlyingType() const { return UnderlyingTy.getType(); }
 
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
@@ -3824,12 +3840,6 @@ public:
   }
 };
 
-/// The kind of artificial main to generate for a class.
-enum class ArtificialMainKind : uint8_t {
-  NSApplicationMain,
-  UIApplicationMain,
-};
-
 /// This is the base type for AncestryOptions. Each flag describes possible
 /// interesting kinds of superclasses that a class may have.
 enum class AncestryFlags : uint8_t {
@@ -4096,13 +4106,6 @@ public:
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Returns the appropriate kind of entry point to generate for this class,
-  /// based on its attributes.
-  ///
-  /// It is an error to call this on a class that does not have a
-  /// *ApplicationMain attribute.
-  ArtificialMainKind getArtificialMainKind() const;
 
   using NominalTypeDecl::lookupDirect;
 
@@ -4953,7 +4956,7 @@ protected:
   PointerUnion<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
   VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
-          bool issCaptureList, SourceLoc nameLoc, Identifier name,
+          bool isCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
 
 public:
@@ -4968,7 +4971,6 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -5943,7 +5945,7 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    assert(!getName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -6316,6 +6318,8 @@ public:
   }
   bool isCallAsFunctionMethod() const;
 
+  bool isMainTypeMainMethod() const;
+
   SelfAccessKind getSelfAccessKind() const;
 
   void setSelfAccessKind(SelfAccessKind mod) {
@@ -6642,7 +6646,7 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    assert(!getName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -7395,7 +7399,7 @@ public:
     return new (ctx) MissingMemberDecl(DC, name, numVTableEntries, hasStorage);
   }
 
-  DeclName getFullName() const {
+  DeclName getName() const {
     return Name;
   }
 

@@ -126,7 +126,7 @@ void Symbol::serializeNames(llvm::json::OStream &OS) const {
     getPathComponents(PathComponents);
     
     OS.attribute("title", PathComponents.back());
-    // "navigator": null
+    Graph->serializeNavigatorDeclarationFragments("navigator", *this, OS);
     Graph->serializeSubheadingDeclarationFragments("subHeading", *this, OS);
     // "prose": null
   });
@@ -175,9 +175,16 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
 
   OS.attributeObject("docComment", [&](){
     auto LL = Graph->Ctx.getLineList(RC);
-    size_t InitialIndentation = LL.getLines().empty()
+    StringRef FirstNonBlankLine;
+    for (const auto &Line : LL.getLines()) {
+      if (!Line.Text.empty()) {
+        FirstNonBlankLine = Line.Text;
+        break;
+      }
+    }
+    size_t InitialIndentation = FirstNonBlankLine.empty()
       ? 0
-      : markup::measureIndentation(LL.getLines().front().Text);
+      : markup::measureIndentation(FirstNonBlankLine);
     OS.attributeArray("lines", [&](){
       for (const auto &Line : LL.getLines()) {
         // Line object
@@ -185,7 +192,8 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
           // Trim off any initial indentation from the line's
           // text and start of its source range, if it has one.
           if (Line.Range.isValid()) {
-            serializeRange(InitialIndentation,
+            serializeRange(std::min(InitialIndentation,
+                                    Line.FirstNonspaceOffset),
                            Line.Range, Graph->M.getASTContext().SourceMgr, OS);
           }
           auto TrimmedLine = Line.Text.drop_front(std::min(InitialIndentation,
@@ -287,7 +295,7 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
 
 void Symbol::serializeSwiftExtensionMixin(llvm::json::OStream &OS) const {
   if (const auto *Extension
-          = dyn_cast_or_null<ExtensionDecl>(VD->getInnermostDeclContext())) {
+          = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
     ::serialize(Extension, OS);
   }
 }
@@ -437,7 +445,7 @@ Symbol::getPathComponents(SmallVectorImpl<SmallString<32>> &Components) const {
     // Collect the spellings of the fully qualified identifier components.
     while (Decl && !isa<ModuleDecl>(Decl)) {
       SmallString<32> Scratch;
-      Decl->getFullName().getString(Scratch);
+      Decl->getName().getString(Scratch);
       DeclComponents.push_back(Scratch);
       if (const auto *DC = Decl->getDeclContext()) {
         if (const auto *Nominal = DC->getSelfNominalTypeDecl()) {
@@ -456,7 +464,7 @@ Symbol::getPathComponents(SmallVectorImpl<SmallString<32>> &Components) const {
     // existing on another type, such as a default implementation of
     // a protocol. Build a path as if it were defined in the base type.
     SmallString<32> LastPathComponent;
-    VD->getFullName().getString(LastPathComponent);
+    VD->getName().getString(LastPathComponent);
     Components.push_back(LastPathComponent);
     collectPathComponents(BaseTypeDecl, Components);
   } else {

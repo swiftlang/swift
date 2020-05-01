@@ -31,5 +31,5 @@
 
 // LLDB: lldb{{"?}} "--repl=
 // LLDB-NOT: -module-name
-// LLDB-NOT: -target
+// LLDB-NOT: -target{{ }}
 // LLDB: "

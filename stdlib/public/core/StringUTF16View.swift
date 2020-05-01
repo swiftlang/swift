@@ -56,7 +56,7 @@ extension String {
   ///
   ///     let favemoji = "My favorite emoji is 🎉"
   ///     if let i = favemoji.utf16.firstIndex(where: { $0 >= 128 }) {
-  ///         let asciiPrefix = String(favemoji.utf16[..<i])
+  ///         let asciiPrefix = String(favemoji.utf16[..<i])!
   ///         print(asciiPrefix)
   ///     }
   ///     // Prints "My favorite emoji is "
@@ -356,7 +356,7 @@ extension String.UTF16View.Index {
   ///     let stringIndex = cafe.firstIndex(of: "é")!
   ///     let utf16Index = String.Index(stringIndex, within: cafe.utf16)!
   ///
-  ///     print(cafe.utf16[...utf16Index])
+  ///     print(String(cafe.utf16[...utf16Index])!)
   ///     // Prints "Café"
   ///
   /// - Parameters:
@@ -387,7 +387,7 @@ extension String.UTF16View.Index {
   ///     let cafe = "Café 🍵"
   ///     let i = cafe.utf16.firstIndex(of: 32)!
   ///     let j = i.samePosition(in: cafe.unicodeScalars)!
-  ///     print(cafe.unicodeScalars[..<j])
+  ///     print(String(cafe.unicodeScalars[..<j]))
   ///     // Prints "Café"
   ///
   /// - Parameter unicodeScalars: The view to use for the index conversion.

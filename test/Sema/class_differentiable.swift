@@ -563,7 +563,8 @@ extension ConditionalDifferentiableNoDerivativeFixed: Differentiable where T: Di
 
 // TF-265: Test invalid initializer (that uses a non-existent type).
 class InvalidInitializer : Differentiable {
-  init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}
+  // expected-error @+1 {{cannot find type 'NonExistentType' in scope}}
+  init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {}
 }
 
 // Test memberwise initializer synthesis.

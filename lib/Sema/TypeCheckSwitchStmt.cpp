@@ -686,7 +686,7 @@ namespace {
             llvm_unreachable("Attempted to display disjunct to user!");
           } else {
             buffer << "DISJOIN(";
-            interleave(Spaces, [&](const Space &sp) {
+            llvm::interleave(Spaces, [&](const Space &sp) {
               sp.show(buffer, forDisplay);
             }, [&buffer]() { buffer << " |\n"; });
             buffer << ")";
@@ -816,7 +816,7 @@ namespace {
                     Space::forType(TTy->getUnderlyingType(), Identifier()));
               }
             }
-            return Space::forConstructor(tp, eed->getFullName(),
+            return Space::forConstructor(tp, eed->getName(),
                                          constElemSpaces);
           });
 

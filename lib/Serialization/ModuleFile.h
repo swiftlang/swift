@@ -100,6 +100,10 @@ class ModuleFile
   /// modules, which are assumed to contain canonical SIL for an entire module.
   bool IsSIB = false;
 
+  // Full blob from the misc. version field of the metadata block. This should
+  // include the version string of the compiler that built the module.
+  StringRef MiscVersion;
+
 public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {

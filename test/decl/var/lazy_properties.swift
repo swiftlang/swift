@@ -41,9 +41,17 @@ class TestClass {
 
   lazy var k : Int = { () -> Int in return 0 }()+1  // multi-stmt closure
 
-  lazy var l : Int = 42 {  // expected-error {{lazy properties must not have observers}} {{3-8=}}
-    didSet {
-    }
+  lazy var l : Int = 42 {  // Okay
+    didSet {}
+    willSet {}
+  }
+
+  lazy var m : Int = 42 { // Okay
+    didSet {}
+  }
+
+  lazy var n : Int = 42 {
+    willSet {} // Okay
   }
 
   init() {

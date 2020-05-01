@@ -341,7 +341,7 @@ protocol P25b {
 
 protocol P25c {
   associatedtype A: P24
-  associatedtype B where A == X<B> // expected-error{{use of undeclared type 'X'}}
+  associatedtype B where A == X<B> // expected-error{{cannot find type 'X' in scope}}
 }
 
 protocol P25d {

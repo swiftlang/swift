@@ -545,7 +545,7 @@ CompositionTypeRepr *CompositionTypeRepr::create(const ASTContext &C,
 void CompositionTypeRepr::printImpl(ASTPrinter &Printer,
                                     const PrintOptions &Opts) const {
   if (getTypes().empty()) {
-    Printer << "Any";
+    Printer.printKeyword("Any", Opts);
   } else {
     interleave(getTypes(), [&](TypeRepr *T) { printTypeRepr(T, Printer, Opts);},
                [&] { Printer << " & "; });

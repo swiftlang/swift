@@ -178,3 +178,9 @@ var var_with_didset = 10 {
     var thing: NSObject {get}
 }
 #endif
+
+class A {
+  #if true
+  @IBAction @objc func foo(a: Int) {}
+  #endif
+}

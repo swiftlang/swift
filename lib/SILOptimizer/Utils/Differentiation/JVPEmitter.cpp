@@ -221,6 +221,7 @@ SILValue JVPEmitter::materializeTangentDirect(AdjointValue val,
   case AdjointValueKind::Concrete:
     return val.getConcreteValue();
   }
+  llvm_unreachable("invalid value kind");
 }
 
 SILValue JVPEmitter::materializeTangent(AdjointValue val, SILLocation loc) {
@@ -1228,10 +1229,10 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
   assert(!activeResultIndices.empty() && "Result indices cannot be empty");
   LLVM_DEBUG(auto &s = getADDebugStream() << "Active indices: params={";
-             interleave(
+             llvm::interleave(
                  activeParamIndices.begin(), activeParamIndices.end(),
                  [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
-             s << "}, results={"; interleave(
+             s << "}, results={"; llvm::interleave(
                  activeResultIndices.begin(), activeResultIndices.end(),
                  [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
              s << "}\n";);

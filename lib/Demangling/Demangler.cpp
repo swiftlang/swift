@@ -716,8 +716,10 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
     return nullptr;
   
   // Types register as substitutions even when symbolically referenced.
+  // OOPS: Except for opaque type references!
   if (kind == SymbolicReferenceKind::Context &&
-      resolved->getKind() != Node::Kind::OpaqueTypeDescriptorSymbolicReference)
+      resolved->getKind() != Node::Kind::OpaqueTypeDescriptorSymbolicReference &&
+      resolved->getKind() != Node::Kind::OpaqueReturnTypeOf)
     addSubstitution(resolved);
   return resolved;
 }
@@ -1730,6 +1732,14 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
                          createNode(Node::Kind::ImplConvention, attr));
 }
 
+NodePointer Demangler::demangleImplDifferentiability() {
+  // Empty string represents default differentiability.
+  const char *attr = "";
+  if (nextIf('w'))
+    attr = "@noDerivative";
+  return createNode(Node::Kind::ImplDifferentiability, attr);
+}
+
 NodePointer Demangler::demangleImplFunctionType() {
   NodePointer type = createNode(Node::Kind::ImplFunctionType);
 
@@ -1815,8 +1825,10 @@ NodePointer Demangler::demangleImplFunctionType() {
 
   int NumTypesToAdd = 0;
   while (NodePointer Param =
-           demangleImplParamConvention(Node::Kind::ImplParameter)) {
+             demangleImplParamConvention(Node::Kind::ImplParameter)) {
     type = addChild(type, Param);
+    if (NodePointer Diff = demangleImplDifferentiability())
+      Param = addChild(Param, Diff);
     NumTypesToAdd++;
   }
   while (NodePointer Result = demangleImplResultConvention(

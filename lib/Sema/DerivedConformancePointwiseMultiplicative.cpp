@@ -50,7 +50,7 @@ DerivedConformance::canDerivePointwiseMultiplicative(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, proto, DC, None);
+    return (bool)TypeChecker::conformsToProtocol(varType, proto, DC);
   });
 }
 
@@ -67,8 +67,8 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, void *) {
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *nominalTypeExpr = TypeExpr::createForDecl(DeclNameLoc(), nominal,
-                                                  funcDecl, /*Implicit*/ true);
+  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(DeclNameLoc(), nominal,
+                                                  funcDecl, funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
   // Get operator protocol requirement.
@@ -192,8 +192,8 @@ deriveComputedPropertyGetter(AbstractFunctionDecl *funcDecl,
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-  auto *nominalTypeExpr = TypeExpr::createForDecl(DeclNameLoc(), nominal,
-                                                  funcDecl, /*Implicit*/ true);
+  auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(DeclNameLoc(), nominal,
+                                                  funcDecl, funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
   auto createMemberPropertyExpr = [&](VarDecl *member) -> Expr * {
