@@ -2020,8 +2020,7 @@ bool ContextualFailure::diagnoseAsError() {
   }
 
   case ConstraintLocator::RValueAdjustment: {
-    auto &cs = getConstraintSystem();
-
+    auto &solution = getSolution();
     auto overload = getOverloadChoiceIfAvailable(
         getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember));
     if (!(overload && overload->choice.isDecl()))
@@ -2047,8 +2046,11 @@ bool ContextualFailure::diagnoseAsError() {
 
     auto params = fnType->getParams();
 
-    ParameterListInfo info(params, choice,
-                           hasAppliedSelf(cs, overload->choice));
+    ParameterListInfo info(
+        params, choice,
+        hasAppliedSelf(overload->choice, [&solution](Type type) {
+          return solution.simplifyType(type);
+        }));
     auto numMissingArgs = llvm::count_if(
         indices(params), [&info](const unsigned paramIdx) -> bool {
           return !info.hasDefaultArgument(paramIdx);
