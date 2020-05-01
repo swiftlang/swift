@@ -145,13 +145,19 @@ enum swift_metadata_allocation_tag {
   SWIFT_GENERIC_METADATA_CACHE_ALLOCATION = 14,
 };
 
-// Tags other than those defined in swift_metadata_allocation_tag will be used
-// and must be treated as unknown.
 typedef int swift_metadata_allocation_tag_t;
 
+/// A metadata allocation made by the Swift runtime.
 typedef struct swift_metadata_allocation {
+  /// The allocation's tag, which describes what kind of allocation it is. This
+  /// may be one of the values in swift_metadata_allocation_tag, or something
+  /// else, in which case the tag should be considered unknown.
   swift_metadata_allocation_tag_t Tag;
+
+  /// A pointer to the start of the allocation in the remote process.
   swift_reflection_ptr_t Ptr;
+
+  /// The size of the allocation in bytes.
   unsigned Size;
 } swift_metadata_allocation_t;
 
