@@ -183,7 +183,7 @@ const Requirement &RequirementFailure::getRequirement() const {
 
 ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     ConstraintLocator *locator) {
-  auto &cs = getConstraintSystem();
+  auto &solution = getSolution();
   auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
   if (!reqElt.isConditionalRequirement())
     return nullptr;
@@ -192,10 +192,10 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
   auto *typeReqLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
 
   auto result = llvm::find_if(
-      cs.CheckedConformances,
+      solution.Conformances,
       [&](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
               &conformance) { return conformance.first == typeReqLoc; });
-  assert(result != cs.CheckedConformances.end());
+  assert(result != solution.Conformances.end());
 
   auto conformance = result->second;
   assert(conformance.isConcrete());
