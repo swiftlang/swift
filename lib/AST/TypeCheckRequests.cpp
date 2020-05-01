@@ -1501,3 +1501,23 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "implicit import of ";
   simple_display(out, import.Module);
 }
+
+//----------------------------------------------------------------------------//
+// ResolveTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void ResolveTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *repr = std::get<1>(getStorage());
+  diags.diagnose(repr->getLoc(), diag::circular_type_resolution_note, repr);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const TypeResolution *resolution) {
+  out << "while resolving type ";
+}
+
+SourceLoc swift::extractNearestSourceLoc(const TypeRepr *repr) {
+  if (!repr)
+    return SourceLoc();
+  return repr->getLoc();
+}
