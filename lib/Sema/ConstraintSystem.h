@@ -885,6 +885,8 @@ public:
   /// Retrieve the constraint system that this solution solves.
   ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
 
+  DeclContext *getDC() const;
+
   /// The set of type bindings.
   llvm::DenseMap<TypeVariableType *, Type> typeBindings;
   

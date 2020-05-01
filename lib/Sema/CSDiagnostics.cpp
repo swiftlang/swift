@@ -4264,12 +4264,11 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
     return (*fix)->getKind() == kind;
   };
 
-  auto &cs = solution.getConstraintSystem();
   auto *callLocator =
-      cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument);
+      solution.getConstraintLocator(anchor, {ConstraintLocator::ApplyArgument});
 
   auto argFlags = fnType->getParams()[0].getParameterFlags();
-  auto *argLoc = cs.getConstraintLocator(
+  auto *argLoc = solution.getConstraintLocator(
       callLocator, LocatorPathElt::ApplyArgToParam(0, 0, argFlags));
 
   if (!(hasFixFor(FixKind::AllowArgumentTypeMismatch, argLoc) &&
@@ -4298,7 +4297,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto argType = solution.simplifyType(solution.getType(argument));
   auto paramType = fnType->getParams()[1].getPlainType();
 
-  return TypeChecker::isConvertibleTo(argType, paramType, cs.DC);
+  return TypeChecker::isConvertibleTo(argType, paramType, solution.getDC());
 }
 
 std::tuple<Expr *, Expr *, unsigned, bool>
