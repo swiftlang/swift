@@ -1336,12 +1336,33 @@ lookupPrecedenceGroup(const PrecedenceGroupDescriptor &descriptor) {
   }
 }
 
+static PrecedenceGroupDecl *lookupPrecedenceGroupForRelation(
+    DeclContext *dc, PrecedenceGroupDecl::Relation rel,
+    PrecedenceGroupDescriptor::PathDirection direction) {
+  auto &ctx = dc->getASTContext();
+  PrecedenceGroupDescriptor desc{dc, rel.Name, rel.NameLoc, direction};
+  auto result = ctx.evaluator(ValidatePrecedenceGroupRequest{desc});
+  if (!result) {
+    // Handle a cycle error specially. We don't want to default to an empty
+    // result, as we don't want to emit an error about not finding a precedence
+    // group.
+    using Error = CyclicalRequestError<ValidatePrecedenceGroupRequest>;
+    llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
+    return nullptr;
+  }
+  if (!result.get()) {
+    ctx.Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
+  }
+  return result.get();
+}
+
 void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
   assert(PGD && "Cannot validate a null precedence group!");
   if (PGD->isInvalid())
     return;
 
   auto &Diags = PGD->getASTContext().Diags;
+  auto *dc = PGD->getDeclContext();
 
   // Validate the higherThan relationships.
   bool addedHigherThan = false;
@@ -1349,17 +1370,12 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     if (rel.Group)
       continue;
 
-    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
-                                   PrecedenceGroupDescriptor::HigherThan};
-    auto group =
-        evaluateOrDefault(PGD->getASTContext().evaluator,
-                          ValidatePrecedenceGroupRequest{desc}, nullptr);
-    if (group) {
-      rel.Group = group;
+    // TODO: Requestify the lookup of a relation's group.
+    rel.Group = lookupPrecedenceGroupForRelation(
+        dc, rel, PrecedenceGroupDescriptor::HigherThan);
+    if (rel.Group) {
       addedHigherThan = true;
     } else {
-      if (!lookupPrecedenceGroup(desc))
-        Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
       PGD->setInvalid();
     }
   }
@@ -1369,24 +1385,16 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     if (rel.Group)
       continue;
 
-    auto dc = PGD->getDeclContext();
-    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
-                                   PrecedenceGroupDescriptor::LowerThan};
-    auto group =
-        evaluateOrDefault(PGD->getASTContext().evaluator,
-                          ValidatePrecedenceGroupRequest{desc}, nullptr);
-    bool hadError = false;
-    if (group) {
-      rel.Group = group;
-    } else {
-      hadError = true;
-      if (auto *rawGroup = lookupPrecedenceGroup(desc)) {
-        // We already know the lowerThan path is errant, try to use the results
-        // of a raw lookup to enforce the same-module restriction.
-        group = rawGroup;
-      } else {
-        Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
-      }
+    auto *group = lookupPrecedenceGroupForRelation(
+        dc, rel, PrecedenceGroupDescriptor::LowerThan);
+    rel.Group = group;
+
+    // If we didn't find anything, try doing a raw lookup for the group before
+    // diagnosing the 'lowerThan' within the same-module restriction. This can
+    // allow us to diagnose even if we have a precedence group cycle.
+    if (!group) {
+      group = lookupPrecedenceGroup(PrecedenceGroupDescriptor{
+          dc, rel.Name, rel.NameLoc, PrecedenceGroupDescriptor::LowerThan});
     }
 
     if (group &&
@@ -1396,10 +1404,10 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
         Diags.diagnose(group->getNameLoc(), diag::kind_declared_here,
                        DescriptiveDeclKind::PrecedenceGroup);
       }
-      hadError = true;
+      PGD->setInvalid();
     }
 
-    if (hadError)
+    if (!rel.Group)
       PGD->setInvalid();
   }
 
