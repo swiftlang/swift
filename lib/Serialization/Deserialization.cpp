@@ -315,9 +315,6 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
   switch (kind) {
   case decls_block::PAREN_PATTERN: {
-    bool isImplicit;
-    ParenPatternLayout::readRecord(scratch, isImplicit);
-
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
     auto result = ParenPattern::createImplicit(getContext(), subPattern);
@@ -333,9 +330,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   case decls_block::TUPLE_PATTERN: {
     TypeID tupleTypeID;
     unsigned count;
-    bool isImplicit;
 
-    TuplePatternLayout::readRecord(scratch, tupleTypeID, count, isImplicit);
+    TuplePatternLayout::readRecord(scratch, tupleTypeID, count);
 
     SmallVector<TuplePatternElt, 8> elements;
     for ( ; count > 0; --count) {
@@ -363,8 +359,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   case decls_block::NAMED_PATTERN: {
     DeclID varID;
     TypeID typeID;
-    bool isImplicit;
-    NamedPatternLayout::readRecord(scratch, varID, typeID, isImplicit);
+    NamedPatternLayout::readRecord(scratch, varID, typeID);
 
     auto deserialized = getDeclChecked(varID);
     if (!deserialized) {
@@ -381,9 +376,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   }
   case decls_block::ANY_PATTERN: {
     TypeID typeID;
-    bool isImplicit;
 
-    AnyPatternLayout::readRecord(scratch, typeID, isImplicit);
+    AnyPatternLayout::readRecord(scratch, typeID);
     auto result = AnyPattern::createImplicit(getContext());
     recordPatternType(result, getType(typeID));
     restoreOffset.reset();
@@ -391,8 +385,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   }
   case decls_block::TYPED_PATTERN: {
     TypeID typeID;
-    bool isImplicit;
-    TypedPatternLayout::readRecord(scratch, typeID, isImplicit);
+    TypedPatternLayout::readRecord(scratch, typeID);
 
     Expected<Pattern *> subPattern = readPattern(owningDC);
     if (!subPattern) {
@@ -408,8 +401,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
     return result;
   }
   case decls_block::VAR_PATTERN: {
-    bool isImplicit, isLet;
-    VarPatternLayout::readRecord(scratch, isLet, isImplicit);
+    bool isLet;
+    VarPatternLayout::readRecord(scratch, isLet);
 
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
