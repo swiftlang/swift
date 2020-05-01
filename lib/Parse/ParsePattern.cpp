@@ -887,9 +887,14 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
     SyntaxParsingContext TypeAnnoCtx(SyntaxContext, SyntaxKind::TypeAnnotation);
     SourceLoc colonLoc = consumeToken(tok::colon);
     
-    if (result.isNull())  // Recover by creating AnyPattern.
-      result = makeParserErrorResult(new (Context) AnyPattern(colonLoc));
-    
+    if (result.isNull()) {
+      // Recover by creating AnyPattern.
+      auto *AP = new (Context) AnyPattern(colonLoc);
+      if (colonLoc.isInvalid())
+        AP->setImplicit();
+      result = makeParserErrorResult(AP);
+    }
+
     ParserResult<TypeRepr> Ty = parseDeclResultType(diag::expected_type);
     if (Ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
