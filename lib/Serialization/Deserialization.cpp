@@ -3481,7 +3481,7 @@ public:
 
     auto result = MF.createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), name, SourceLoc(), SourceLoc(),
-        ArrayRef<Identifier>{}, ArrayRef<SourceLoc>{});
+        ArrayRef<Located<Identifier>>{});
     result->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
     ctx.evaluator.cacheOutput(
         OperatorPrecedenceGroupRequest{result},

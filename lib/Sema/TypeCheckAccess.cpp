@@ -2006,9 +2006,9 @@ public:
     // FIXME: Handle operator designated types (which also applies to prefix
     // and postfix operators).
     if (auto *precedenceGroup = IOD->getPrecedenceGroup()) {
-      if (!IOD->getIdentifierLocs().empty()) {
+      if (!IOD->getIdentifiers().empty()) {
         checkPrecedenceGroup(precedenceGroup, IOD, IOD->getLoc(),
-                             IOD->getIdentifierLocs().front());
+                             IOD->getIdentifiers().front().Loc);
       }
     }
   }
