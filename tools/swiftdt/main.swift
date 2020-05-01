@@ -115,7 +115,7 @@ func makeReflectionContext(args: inout ArraySlice<String>)
   }
 
   guard let inspector = Inspector(pid: pid) else {
-    argFail("Failed to inspect pid \(pid)")
+    argFail("Failed to inspect pid \(pid) (are you running as root?)")
   }
 
   guard let reflectionContext
