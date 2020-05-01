@@ -561,9 +561,7 @@ Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
 
   auto resolution =
       TypeResolution::forContextual(var->getDeclContext(), options);
-  if (TypeChecker::validateType(var->getASTContext(),
-                                customAttr->getTypeLoc(),
-                                resolution)) {
+  if (TypeChecker::validateType(customAttr->getTypeLoc(), resolution)) {
     return ErrorType::get(var->getASTContext());
   }
 

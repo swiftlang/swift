@@ -249,7 +249,7 @@ static void bindExtensions(SourceFile &SF) {
   // private extensions.
   for (auto import : namelookup::getAllImports(&SF)) {
     // FIXME: Respect the access path?
-    for (auto file : import.second->getFiles()) {
+    for (auto file : import.importedModule->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
       if (!SF)
         continue;
@@ -542,7 +542,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  return TypeChecker::validateType(Ctx, T, resolution);
+  return TypeChecker::validateType(T, resolution);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.

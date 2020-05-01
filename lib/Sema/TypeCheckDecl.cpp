@@ -1431,15 +1431,13 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
     TypeResolutionFlags flags = TypeResolutionFlags(0)) {
   auto *TyR = new (Ctx) SimpleIdentTypeRepr(DeclNameLoc(loc),
                                             DeclNameRef(ident));
-  TypeLoc typeLoc = TypeLoc(TyR);
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (TypeChecker::validateType(
-          Ctx, typeLoc, TypeResolution::forInterface(DC, options)))
+  auto result = TypeResolution::forInterface(DC, options).resolveType(TyR);
+  if (result->hasError())
     return nullptr;
-
-  return typeLoc.getType()->getAnyNominal();
+  return result->getAnyNominal();
 }
 
 bool swift::checkDesignatedTypes(OperatorDecl *OD,
@@ -1768,14 +1766,13 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
     return ErrorType::get(typeAlias->getASTContext());
   }
 
-  auto underlyingLoc = TypeLoc(typeAlias->getUnderlyingTypeRepr());
-  if (TypeChecker::validateType(
-          typeAlias->getASTContext(), underlyingLoc,
-          TypeResolution::forInterface(typeAlias, options))) {
+  auto result = TypeResolution::forInterface(typeAlias, options)
+                    .resolveType(underlyingRepr);
+  if (result->hasError()) {
     typeAlias->setInvalid();
     return ErrorType::get(typeAlias->getASTContext());
   }
-  return underlyingLoc.getType();
+  return result;
 }
 
 /// Bind the given function declaration, which declares an operator, to the
@@ -2120,16 +2117,14 @@ static Type validateParameterType(ParamDecl *decl) {
                        TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
 
-  auto TL = TypeLoc(decl->getTypeRepr());
-
   auto &ctx = dc->getASTContext();
-  auto resolution = TypeResolution::forInterface(dc, options);
-  if (TypeChecker::validateType(ctx, TL, resolution)) {
+  auto Ty = TypeResolution::forInterface(dc, options)
+                .resolveType(decl->getTypeRepr());
+  if (Ty->hasError()) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }
 
-  Type Ty = TL.getType();
   if (decl->isVariadic()) {
     Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
     if (Ty.isNull()) {
@@ -2146,7 +2141,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
     return Ty;
   }
-  return TL.getType();
+  return Ty;
 }
 
 Type

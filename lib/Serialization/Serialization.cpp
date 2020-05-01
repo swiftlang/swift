@@ -951,15 +951,16 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 static void flattenImportPath(const ModuleDecl::ImportedModule &import,
                               SmallVectorImpl<char> &out) {
   llvm::raw_svector_ostream outStream(out);
-  import.second->getReverseFullModuleName().printForward(outStream,
-                                                         StringRef("\0", 1));
+  import.importedModule->getReverseFullModuleName().printForward(
+      outStream, StringRef("\0", 1));
 
-  if (import.first.empty())
+  if (import.accessPath.empty())
     return;
 
   outStream << '\0';
-  assert(import.first.size() == 1 && "can only handle top-level decl imports");
-  auto accessPathElem = import.first.front();
+  assert(import.accessPath.size() == 1 &&
+         "can only handle top-level decl imports");
+  auto accessPathElem = import.accessPath.front();
   outStream << accessPathElem.Item.str();
 }
 
@@ -1046,7 +1047,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
   ModuleDecl *bridgingHeaderModule = clangImporter->getImportedHeaderModule();
-  ModuleDecl::ImportedModule bridgingHeaderImport{{}, bridgingHeaderModule};
+  ModuleDecl::ImportedModule bridgingHeaderImport{ModuleDecl::AccessPathTy(),
+                                                  bridgingHeaderModule};
 
   // Make sure the bridging header module is always at the top of the import
   // list, mimicking how it is processed before any module imports when
@@ -1072,8 +1074,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
 
   ModuleDecl *theBuiltinModule = M->getASTContext().TheBuiltinModule;
   for (auto import : allImports) {
-    if (import.second == theBuiltinModule ||
-        import.second == bridgingHeaderModule) {
+    if (import.importedModule == theBuiltinModule ||
+        import.importedModule == bridgingHeaderModule) {
       continue;
     }
 
@@ -1092,11 +1094,11 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       stableImportControl = ImportControl::ImplementationOnly;
 
     SmallVector<Identifier, 4> spis;
-    M->lookupImportedSPIGroups(import.second, spis);
+    M->lookupImportedSPIGroups(import.importedModule, spis);
 
     ImportedModule.emit(ScratchRecord,
                         static_cast<uint8_t>(stableImportControl),
-                        !import.first.empty(), !spis.empty(), importPath);
+                        !import.accessPath.empty(), !spis.empty(), importPath);
 
     if (!spis.empty()) {
       SmallString<64> out;

@@ -226,6 +226,8 @@ SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
 SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
               Type(ProtocolDecl *, TypeEraserAttr *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
+              Type (TypeResolution *, TypeRepr *), Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
               Cached, NoLocationInfo)

@@ -222,7 +222,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   lastModule->getImportedModules(imports,
                                  ModuleDecl::ImportFilterKind::Private);
   for (auto &import : imports) {
-    implicitImports.AdditionalModules.emplace_back(import.second,
+    implicitImports.AdditionalModules.emplace_back(import.importedModule,
                                                    /*exported*/ false);
   }
 

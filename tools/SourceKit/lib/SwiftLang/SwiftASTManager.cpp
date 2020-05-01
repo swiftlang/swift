@@ -926,7 +926,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
   TopMod->getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports) {
-    ModuleDecl *Mod = Import.second;
+    ModuleDecl *Mod = Import.importedModule;
     if (Mod->isSystemModule())
       continue;
     // FIXME: Setup dependencies on the included headers.
