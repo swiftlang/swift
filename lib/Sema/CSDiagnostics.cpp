@@ -5055,7 +5055,7 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
 
 bool MissingGenericArgumentsFailure::diagnoseParameter(
     Anchor anchor, GenericTypeParamType *GP) const {
-  auto &cs = getConstraintSystem();
+  auto &solution = getSolution();
 
   auto loc = anchor.is<Expr *>() ? anchor.get<Expr *>()->getLoc()
                                  : anchor.get<TypeRepr *>()->getLoc();
@@ -5065,7 +5065,7 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
   // going to be completely cut off from the rest of constraint system,
   // that's why we'd get two fixes in this case which is not ideal.
   if (locator->isForContextualType() &&
-      llvm::count_if(cs.DefaultedConstraints,
+      llvm::count_if(solution.DefaultedConstraints,
                      [&GP](const ConstraintLocator *locator) {
                        return locator->getGenericParameter() == GP;
                      }) > 1) {
@@ -5105,7 +5105,7 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
 
 void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     Anchor anchor) const {
-  auto &cs = getConstraintSystem();
+  auto &solution = getSolution();
   auto *paramDC = getDeclContext();
 
   if (!paramDC)
@@ -5123,7 +5123,9 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
   };
 
   llvm::SmallDenseMap<GenericTypeParamDecl *, Type> params;
-  for (auto *typeVar : cs.getTypeVariables()) {
+  for (auto &entry : solution.typeBindings) {
+    auto *typeVar = entry.first;
+
     auto *GP = typeVar->getImpl().getGenericParameter();
     if (!GP)
       continue;
@@ -5133,7 +5135,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
 
     // If this is one of the defaulted parameter types, attempt
     // to emit placeholder for it instead of `Any`.
-    if (llvm::any_of(cs.DefaultedConstraints,
+    if (llvm::any_of(solution.DefaultedConstraints,
                      [&](const ConstraintLocator *locator) {
                        return GP->getDecl() == getParamDecl(locator);
                      }))
