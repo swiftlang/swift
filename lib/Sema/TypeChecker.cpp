@@ -249,7 +249,7 @@ static void bindExtensions(SourceFile &SF) {
   // private extensions.
   for (auto import : namelookup::getAllImports(&SF)) {
     // FIXME: Respect the access path?
-    for (auto file : import.second->getFiles()) {
+    for (auto file : import.importedModule->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
       if (!SF)
         continue;

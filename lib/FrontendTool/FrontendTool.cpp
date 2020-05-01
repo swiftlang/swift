@@ -422,8 +422,8 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   mainModule->getImportedModules(imports, filter);
 
   SmallPtrSet<ModuleDecl *, 8> importedModules;
-  for (std::pair<ModuleDecl::AccessPathTy, ModuleDecl *> &import : imports)
-    importedModules.insert(import.second);
+  for (ModuleDecl::ImportedModule &import : imports)
+    importedModules.insert(import.importedModule);
 
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
   for (auto &module : ctxt.LoadedModules) {

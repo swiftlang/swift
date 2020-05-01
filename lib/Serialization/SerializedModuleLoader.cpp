@@ -819,12 +819,13 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
   }
 
   case serialization::Status::CircularDependency: {
-    auto circularDependencyIter =
-        llvm::find_if(loadedModuleFile->getDependencies(),
-                      [](const ModuleFile::Dependency &next) {
-                        return next.isLoaded() &&
-                               !next.Import.second->hasResolvedImports();
-                      });
+    auto circularDependencyIter = llvm::find_if(
+        loadedModuleFile->getDependencies(),
+        [](const ModuleFile::Dependency &next) {
+          return next.isLoaded() &&
+                 !(next.Import.hasValue() &&
+                   next.Import->importedModule->hasResolvedImports());
+        });
     assert(circularDependencyIter !=
                loadedModuleFile->getDependencies().end() &&
            "circular dependency reported, but no module with unresolved "
@@ -1088,7 +1089,7 @@ void SerializedASTFile::collectLinkLibrariesFromImports(
   File.getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports)
-    Import.second->collectLinkLibraries(callback);
+    Import.importedModule->collectLinkLibraries(callback);
 }
 
 void SerializedASTFile::collectLinkLibraries(
