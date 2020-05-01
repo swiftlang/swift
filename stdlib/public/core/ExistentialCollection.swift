@@ -51,7 +51,7 @@ public struct AnyIterator<Element> {
   ///     func digits() -> AnyIterator<String> {
   ///         let lazyStrings = (0..<10).lazy.map { String($0) }
   ///         let iterator:
-  ///             LazyMapSequence<(Range<Int>), String>.Iterator
+  ///             LazyMapSequence<Range<Int>, String>.Iterator
   ///             = lazyStrings.makeIterator()
   ///
   ///         return AnyIterator(iterator)
