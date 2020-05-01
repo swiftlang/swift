@@ -27,6 +27,34 @@ CHANGELOG
 Swift 5.3
 ----------
 
+* [SR-7083][]:
+
+  Property observers such as `willSet` and `didSet` are now supported on `lazy` properties:
+
+  ```swift
+  class C {
+    lazy var property: Int = 0 {
+      willSet { print("willSet called!") } // Okay
+      didSet { print("didSet called!") } // Okay
+    }
+  }
+  ```
+
+  Note that the initial value of the property will be forced and made available as the `oldValue` for the `didSet` observer, if the property hasn't been accessed yet.
+  
+  ```swift
+  class C {
+    lazy var property: Int = 0 {
+      didSet { print("Old value: ", oldValue) }
+    }
+  }
+
+  let c = C()
+  c.property = 1 // Prints 'Old value: 0'
+  ```
+
+  This could have side-effects, for example if the lazy property's initializer is doing other work.
+
 * [SE-0268][]:
   
   A `didSet` observer which does not refer to the `oldValue` in its body or does not explicitly request it by placing it in the parameter list (i.e. `didSet(oldValue)`) will no longer trigger a call to the property getter to fetch the `oldValue`.
@@ -8028,6 +8056,7 @@ Swift 1.0
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
 [SR-5719]: <https://bugs.swift.org/browse/SR-5719>
 [SR-6118]: <https://bugs.swift.org/browse/SR-6118>
+[SR-7083]: <https://bugs.swift.org/browse/SR-7083>
 [SR-7139]: <https://bugs.swift.org/browse/SR-7139>
 [SR-7251]: <https://bugs.swift.org/browse/SR-7251>
 [SR-7601]: <https://bugs.swift.org/browse/SR-7601>
