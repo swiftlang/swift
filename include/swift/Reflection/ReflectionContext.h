@@ -28,6 +28,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
+#include "swift/Reflection/RuntimeInternals.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
@@ -772,16 +773,6 @@ public:
     }
   }
 
-  
-
-  struct ConformanceNode {
-    StoredPointer Left, Right;
-    StoredPointer Type;
-    StoredPointer Proto;
-    StoredPointer Description;
-    StoredSize FailureGeneration;
-  };
-
   StoredSignedPointer getTypeContextDescriptor(const TargetMetadata<Runtime> *Metadata) const {
     switch (Metadata->getKind()) {
     case MetadataKind::Class: {
@@ -803,12 +794,15 @@ public:
     }
   }
 
+  /// Iterate the protocol conformance cache tree rooted at NodePtr, calling
+  /// Call with the type and protocol in each node.
   void iterateConformanceTree(StoredPointer NodePtr,
     std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     if (!NodePtr)
       return;
     auto NodeBytes = getReader().readBytes(RemoteAddress(NodePtr), sizeof(Node));
-    auto NodeData = reinterpret_cast<const ConformanceNode *>(NodeBytes.get());
+    auto NodeData =
+      reinterpret_cast<const ConformanceNode<Runtime> *>(NodeBytes.get());
     if (!NodeData)
       return;
     Call(NodeData->Type, NodeData->Proto);
@@ -816,6 +810,9 @@ public:
     iterateConformanceTree(NodeData->Right, Call);
   }
 
+  /// Iterate the protocol conformance cache in the target process, calling Call
+  /// with the type and protocol of each conformance. Returns None on success,
+  /// and a string describing the error on failure.
   llvm::Optional<std::string> iterateConformances(
     std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     std::string ConformancesPointerName =
@@ -836,20 +833,10 @@ public:
     return llvm::None;
   }
   
-  void iterateModules(Demangle::NodePointer Ptr, std::function<void(llvm::StringRef)> Call) {
-    if (Ptr->getKind() == Node::Kind::Module)
-      Call(Ptr->getText());
-    for (auto Child : *Ptr)
-      iterateModules(Child, Call);
-  }
-  
-  struct MetadataAllocation {
-    uint16_t Tag;
-    StoredPointer Ptr;
-    unsigned Size;
-  };
-
-  StoredPointer allocationMetadataPointer(MetadataAllocation Allocation) {
+  /// Fetch the metadata pointer from a metadata allocation, or 0 if this
+  /// allocation's tag is not handled or an error occurred.
+  StoredPointer allocationMetadataPointer(
+    MetadataAllocation<Runtime> Allocation) {
     if (Allocation.Tag == GenericMetadataCacheTag) {
         struct GenericMetadataCacheEntry {
           StoredPointer Left, Right;
@@ -872,9 +859,12 @@ public:
     }
     return 0;
   }
-  
-  llvm::Optional<std::string>
-  iterateMetadataAllocations(std::function<void (MetadataAllocation)> Call) {
+
+  /// Iterate the metadata allocations in the target process, calling Call with
+  /// each allocation found. Returns None on success, and a string describing
+  /// the error on failure.
+  llvm::Optional<std::string> iterateMetadataAllocations(
+    std::function<void (MetadataAllocation<Runtime>)> Call) {
     std::string IterationEnabledName =
       "__swift_debug_metadataAllocationIterationEnabled";
     std::string AllocationPoolPointerName =
@@ -940,7 +930,7 @@ public:
         if (Header->Size == 0)
           break;
         auto RemoteAddr = PoolStart + Offset + sizeof(AllocationHeader);
-        MetadataAllocation Allocation;
+        MetadataAllocation<Runtime> Allocation;
         Allocation.Tag = Header->Tag;
         Allocation.Ptr = RemoteAddr;
         Allocation.Size = Header->Size;

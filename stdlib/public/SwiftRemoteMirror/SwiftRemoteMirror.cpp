@@ -33,8 +33,8 @@ using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
 
-using NativeReflectionContext = swift::reflection::ReflectionContext<
-    External<RuntimeTarget<sizeof(uintptr_t)>>>;
+using Runtime = External<RuntimeTarget<sizeof(uintptr_t)>>;
+using NativeReflectionContext = swift::reflection::ReflectionContext<Runtime>;
 
 struct SwiftReflectionContext {
   NativeReflectionContext *nativeContext;
@@ -629,7 +629,7 @@ swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
   SwiftReflectionContextRef ContextRef,
   swift_metadata_allocation_t Allocation) {
   auto Context = ContextRef->nativeContext;
-  NativeReflectionContext::MetadataAllocation NativeAllocation;
+  MetadataAllocation<Runtime> NativeAllocation;
   NativeAllocation.Tag = Allocation.Tag;
   NativeAllocation.Ptr = Allocation.Ptr;
   NativeAllocation.Size = Allocation.Size;
