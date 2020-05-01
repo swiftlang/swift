@@ -833,7 +833,7 @@ struct DynamicSelfStruct {
 @propertyWrapper
 class DynamicSelf {
   var wrappedValue: Self { self } // expected-error {{property wrapper wrapped value cannot have dynamic Self type}}
-  var projectedValue: Self { self } // expected-error {{property wrapper projected value cannot have dynamic Self type}}
+  var projectedValue: Self? { self } // expected-error {{property wrapper projected value cannot have dynamic Self type}}
 }
 
 struct UseDynamicSelfWrapper {

@@ -501,6 +501,7 @@ public final class Synchronized<Value> {
   }
 }
 
+
 struct SR_12341 {
   @Wrapper var wrapped: Int = 10
   var str: String
@@ -533,6 +534,34 @@ func testSR_12341() {
   _ = SR_12341(condition: true)
 }
 
+@propertyWrapper
+struct NonMutatingSetterWrapper<Value> {
+    var value: Value
+    init(wrappedValue: Value) {
+        value = wrappedValue
+    }
+    var wrappedValue: Value {
+        get { value }
+        nonmutating set {
+            print("  .. nonmutatingSet \(newValue)")
+        }
+    }
+}
+
+struct NonMutatingWrapperTestStruct {
+    @NonMutatingSetterWrapper var SomeProp: Int
+    init(val: Int) {
+        SomeProp = val
+    }
+}
+
+func testNonMutatingSetterStruct() {
+  // CHECK: ## NonMutatingSetterWrapper
+  print("\n## NonMutatingSetterWrapper")
+  let A = NonMutatingWrapperTestStruct(val: 11)
+  // CHECK-NEXT:  .. nonmutatingSet 11
+}
+
 testIntStruct()
 testIntClass()
 testRefStruct()
@@ -543,3 +572,4 @@ testDefaultNilOptIntStruct()
 testComposed()
 testWrapperInitWithDefaultArg()
 testSR_12341()
+testNonMutatingSetterStruct()

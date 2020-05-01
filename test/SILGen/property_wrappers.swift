@@ -845,6 +845,38 @@ struct ObservedObject<ObjectType : AnyObject > {
   }
 }
 
+
+
+// rdar://problem/60600911
+// Ensure assign_by_wrapper is emitted for initialization
+// of a property wrapper with a nonmutating set. Even though such setters
+// take `self` by-value.
+@propertyWrapper
+struct NonMutatingSetterWrapper<Value> {
+    var value: Value
+    init(wrappedValue: Value) {
+        value = wrappedValue
+    }
+    var wrappedValue: Value {
+        get { value }
+        nonmutating set {
+            print("  .. nonmutatingSet \(newValue)")
+        }
+    }
+}
+
+struct NonMutatingWrapperTestStruct {
+    // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers28NonMutatingWrapperTestStructV3valACSi_tcfC : $@convention(method) (Int, @thin NonMutatingWrapperTestStruct.Type) -> NonMutatingWrapperTestStruct {
+    // CHECK: %[[LOAD:[0-9]+]] = load [trivial] %[[SRC:[0-9]+]] : $*NonMutatingWrapperTestStruct
+    // CHECK-NEXT: %[[SET_PA:[0-9]+]] = partial_apply [callee_guaranteed] %[[PW_SETTER:[0-9]+]](%[[LOAD]]) : $@convention(method) (Int, NonMutatingWrapperTestStruct) -> ()
+    // CHECK-NEXT: assign_by_wrapper %[[SETVAL:[0-9]+]] : $Int to %[[ADDR:[0-9]+]] : $*NonMutatingSetterWrapper<Int>, init %[[INIT_PA:[0-9]+]] : $@callee_guaranteed (Int) -> NonMutatingSetterWrapper<Int>, set %[[SET_PA]] : $@callee_guaranteed (Int) -> ()
+    @NonMutatingSetterWrapper var SomeProp: Int
+    init(val: Int) {
+        SomeProp = val
+    }
+}
+
+
 // SR-12443: Crash on property with wrapper override that adds observer.
 @propertyWrapper
 struct BasicIntWrapper {

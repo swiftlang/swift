@@ -406,25 +406,21 @@ PropertyWrapperTypeInfoRequest::evaluate(
     }
   }
 
-  auto diagnoseInvalidDynamicSelf = [&]() -> bool {
-    bool invalidDynamicSelf = false;
-    if (result.projectedValueVar &&
-        result.projectedValueVar->getValueInterfaceType()->is<DynamicSelfType>()) {
-      result.projectedValueVar->diagnose(
-          diag::property_wrapper_dynamic_self_type, /*projectedValue=*/true);
-      invalidDynamicSelf = true;
-    }
+  bool hasInvalidDynamicSelf = false;
+  if (result.projectedValueVar &&
+      result.projectedValueVar->getValueInterfaceType()->hasDynamicSelfType()) {
+    result.projectedValueVar->diagnose(
+        diag::property_wrapper_dynamic_self_type, /*projectedValue=*/true);
+    hasInvalidDynamicSelf = true;
+  }
 
-    if (result.valueVar->getValueInterfaceType()->is<DynamicSelfType>()) {
-      result.valueVar->diagnose(
-          diag::property_wrapper_dynamic_self_type, /*projectedValue=*/false);
-      invalidDynamicSelf = true;
-    }
+  if (result.valueVar->getValueInterfaceType()->hasDynamicSelfType()) {
+    result.valueVar->diagnose(
+        diag::property_wrapper_dynamic_self_type, /*projectedValue=*/false);
+    hasInvalidDynamicSelf = true;
+  }
 
-    return invalidDynamicSelf;
-  };
-
-  if (diagnoseInvalidDynamicSelf())
+  if (hasInvalidDynamicSelf)
     return PropertyWrapperTypeInfo();
 
   return result;
@@ -560,14 +556,12 @@ Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   if (!customAttr)
     return Type();
 
-  auto resolution =
-      TypeResolution::forContextual(var->getDeclContext());
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-  if (TypeChecker::validateType(var->getASTContext(),
-                                customAttr->getTypeLoc(),
-                                resolution, options)) {
+  auto resolution =
+      TypeResolution::forContextual(var->getDeclContext(), options);
+  if (TypeChecker::validateType(customAttr->getTypeLoc(), resolution)) {
     return ErrorType::get(var->getASTContext());
   }
 

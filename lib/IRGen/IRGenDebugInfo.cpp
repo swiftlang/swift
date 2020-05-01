@@ -717,7 +717,7 @@ private:
   }
   
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
-    ModuleDecl *M = IM.second;
+    ModuleDecl *M = IM.importedModule;
     if (Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
       return getOrCreateModule(*ModuleDesc, ModuleDesc->getModuleOrNull());
     StringRef Path = getFilenameFromDC(M);
@@ -1807,7 +1807,7 @@ void IRGenDebugInfoImpl::finalize() {
   SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
   IGM.getSwiftModule()->getImportedModules(ModuleWideImports, ImportFilter);
   for (auto M : ModuleWideImports)
-    if (!ImportedModules.count(M.second))
+    if (!ImportedModules.count(M.importedModule))
       DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
                                     0);
 
@@ -2054,7 +2054,7 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);
   DBuilder.createImportedModule(File, DIMod, File, L.Line);
-  ImportedModules.insert(Imported.second);
+  ImportedModules.insert(Imported.importedModule);
 }
 
 llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(SILFunction &SILFn,

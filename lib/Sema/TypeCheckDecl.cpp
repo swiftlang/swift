@@ -815,8 +815,9 @@ DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
 
   TypeRepr *defaultDefinition = assocType->getDefaultDefinitionTypeRepr();
   if (defaultDefinition) {
-    auto resolution = TypeResolution::forInterface(assocType->getDeclContext());
-    return resolution.resolveType(defaultDefinition, None);
+    auto resolution =
+        TypeResolution::forInterface(assocType->getDeclContext(), None);
+    return resolution.resolveType(defaultDefinition);
   }
 
   return Type();
@@ -1056,7 +1057,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     {
       Expr *exprToCheck = prevValue;
       if (TypeChecker::typeCheckExpression(exprToCheck, ED,
-                                           TypeLoc::withoutLoc(rawTy),
+                                           rawTy,
                                            CTP_EnumCaseRawValue)) {
         TypeChecker::checkEnumElementErrorHandling(elt, exprToCheck);
       }
@@ -1430,15 +1431,13 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
     TypeResolutionFlags flags = TypeResolutionFlags(0)) {
   auto *TyR = new (Ctx) SimpleIdentTypeRepr(DeclNameLoc(loc),
                                             DeclNameRef(ident));
-  TypeLoc typeLoc = TypeLoc(TyR);
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (TypeChecker::validateType(Ctx, typeLoc,
-                                TypeResolution::forInterface(DC), options))
+  auto result = TypeResolution::forInterface(DC, options).resolveType(TyR);
+  if (result->hasError())
     return nullptr;
-
-  return typeLoc.getType()->getAnyNominal();
+  return result->getAnyNominal();
 }
 
 bool swift::checkDesignatedTypes(OperatorDecl *OD,
@@ -1767,14 +1766,13 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
     return ErrorType::get(typeAlias->getASTContext());
   }
 
-  auto underlyingLoc = TypeLoc(typeAlias->getUnderlyingTypeRepr());
-  if (TypeChecker::validateType(typeAlias->getASTContext(), underlyingLoc,
-                                TypeResolution::forInterface(typeAlias),
-                                options)) {
+  auto result = TypeResolution::forInterface(typeAlias, options)
+                    .resolveType(underlyingRepr);
+  if (result->hasError()) {
     typeAlias->setInvalid();
     return ErrorType::get(typeAlias->getASTContext());
   }
-  return underlyingLoc.getType();
+  return result;
 }
 
 /// Bind the given function declaration, which declares an operator, to the
@@ -2018,9 +2016,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   }
 
   auto *dc = decl->getInnermostDeclContext();
-  auto resolution = TypeResolution::forInterface(dc);
-  return resolution.resolveType(
-      resultTyRepr, TypeResolverContext::FunctionResult);
+  auto resolution =
+      TypeResolution::forInterface(dc, TypeResolverContext::FunctionResult);
+  return resolution.resolveType(resultTyRepr);
 }
 
 ParamSpecifier
@@ -2096,7 +2094,6 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
 
 static Type validateParameterType(ParamDecl *decl) {
   auto *dc = decl->getDeclContext();
-  auto resolution = TypeResolution::forInterface(dc);
 
   TypeResolutionOptions options(None);
   if (isa<AbstractClosureExpr>(dc)) {
@@ -2120,15 +2117,14 @@ static Type validateParameterType(ParamDecl *decl) {
                        TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
 
-  auto TL = TypeLoc(decl->getTypeRepr());
-
   auto &ctx = dc->getASTContext();
-  if (TypeChecker::validateType(ctx, TL, resolution, options)) {
+  auto Ty = TypeResolution::forInterface(dc, options)
+                .resolveType(decl->getTypeRepr());
+  if (Ty->hasError()) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }
 
-  Type Ty = TL.getType();
   if (decl->isVariadic()) {
     Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
     if (Ty.isNull()) {
@@ -2145,7 +2141,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
     return Ty;
   }
-  return TL.getType();
+  return Ty;
 }
 
 Type
@@ -2542,8 +2538,8 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   // Compute the extended type.
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
-  auto tr = TypeResolution::forStructural(ext->getDeclContext());
-  auto extendedType = tr.resolveType(extendedRepr, options);
+  auto tr = TypeResolution::forStructural(ext->getDeclContext(), options);
+  auto extendedType = tr.resolveType(extendedRepr);
 
   if (extendedType->hasError())
     return error();

@@ -2766,22 +2766,22 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
 
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
     for (auto next : namelookup::getAllImports(M)) {
-      llvm::outs() << next.second->getName();
-      if (next.second->isClangModule())
+      llvm::outs() << next.importedModule->getName();
+      if (next.importedModule->isClangModule())
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
       scratch.clear();
-      next.second->getImportedModules(scratch,
-                                      ModuleDecl::ImportFilterKind::Public);
+      next.importedModule->getImportedModules(
+          scratch, ModuleDecl::ImportFilterKind::Public);
       // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
       for (auto &import : scratch) {
-        llvm::outs() << "\t" << import.second->getName();
-        for (auto accessPathPiece : import.first) {
+        llvm::outs() << "\t" << import.importedModule->getName();
+        for (auto accessPathPiece : import.accessPath) {
           llvm::outs() << "." << accessPathPiece.Item;
         }
 
-        if (import.second->isClangModule())
+        if (import.importedModule->isClangModule())
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }

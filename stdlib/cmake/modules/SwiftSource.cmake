@@ -364,13 +364,13 @@ function(_compile_swift_files
       )
 
   # Determine the subdirectory where the binary should be placed.
-  compute_library_subdir(library_subdir
-      "${SWIFTFILE_SDK}" "${SWIFTFILE_ARCHITECTURE}")
-
+  set(library_subdir_sdk "${SWIFTFILE_SDK}")
   if(maccatalyst_build_flavor STREQUAL "ios-like")
-  	compute_library_subdir(library_subdir
-      "MACCATALYST" "${SWIFTFILE_ARCHITECTURE}")
+    set(library_subdir_sdk "MACCATALYST")
   endif()
+
+  compute_library_subdir(library_subdir
+    "${library_subdir_sdk}" "${SWIFTFILE_ARCHITECTURE}")
 
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
@@ -466,7 +466,7 @@ function(_compile_swift_files
     list(APPEND swift_flags "-parse-as-library")
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
-    set(module_triple ${SWIFT_SDK_${SWIFTFILE_SDK}_ARCH_${SWIFTFILE_ARCHITECTURE}_MODULE})
+    set(module_triple ${SWIFT_SDK_${library_subdir_sdk}_ARCH_${SWIFTFILE_ARCHITECTURE}_MODULE})
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS OR
        SWIFTFILE_SDK STREQUAL "MACCATALYST")
       set(specific_module_dir "${module_base}.swiftmodule")

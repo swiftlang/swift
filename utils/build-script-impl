@@ -633,6 +633,9 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                 -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
+                # This is needed to make sure to avoid using the wrong architecture
+                # in the compiler checks CMake performs
+                -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
             ;;
     esac

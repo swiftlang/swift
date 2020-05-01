@@ -2028,7 +2028,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
           return error(Status::FailedToLoadBridgingHeader);
       }
       ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
-      dependency.Import = { {}, importedHeaderModule };
+      dependency.Import = ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(),
+                                                     importedHeaderModule};
       continue;
     }
 
@@ -2076,14 +2077,15 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     }
 
     if (scopePath.empty()) {
-      dependency.Import = { {}, module };
+      dependency.Import =
+          ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), module};
     } else {
       auto scopeID = ctx.getIdentifier(scopePath);
       assert(!scopeID.empty() &&
              "invalid decl name (non-top-level decls not supported)");
       Located<Identifier> accessPathElem = { scopeID, SourceLoc() };
-      dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
-                           module};
+      dependency.Import = ModuleDecl::ImportedModule{
+          ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)), module};
     }
 
     // SPI
@@ -2291,7 +2293,7 @@ void ModuleFile::getImportedModules(
     }
 
     assert(dep.isLoaded());
-    results.push_back(dep.Import);
+    results.push_back(*(dep.Import));
   }
 }
 
@@ -2666,7 +2668,7 @@ void ModuleFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
                                     SmallVectorImpl<Identifier> &spiGroups) const {
   for (auto &dep : Dependencies) {
     auto depSpis = dep.spiGroups;
-    if (dep.Import.second == importedModule &&
+    if (dep.Import.hasValue() && dep.Import->importedModule == importedModule &&
         !depSpis.empty()) {
       spiGroups.append(depSpis.begin(), depSpis.end());
     }

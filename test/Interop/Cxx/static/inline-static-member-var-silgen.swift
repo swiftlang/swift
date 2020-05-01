@@ -6,6 +6,7 @@ func readStaticMember() -> CInt {
   return WithInlineStaticMember.staticMember
 }
 
+// CHECK: // clang name: WithInlineStaticMember::staticMember
 // CHECK: sil_global @{{_ZN22WithInlineStaticMember12staticMemberE|\?staticMember@WithInlineStaticMember@@2HA}} : $Int32
 
 // CHECK: sil hidden @$s4main16readStaticMembers5Int32VyF : $@convention(thin) () -> Int32

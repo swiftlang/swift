@@ -1,3 +1,6 @@
+#ifndef TEST_INTEROP_CXX_STATIC_INPUTS_STATIC_MEMBER_VAR_H
+#define TEST_INTEROP_CXX_STATIC_INPUTS_STATIC_MEMBER_VAR_H
+
 class WithStaticMember {
 public:
   static int staticMember;
@@ -37,3 +40,5 @@ class ClassB {
 public:
   static int notUniqueName;
 };
+
+#endif
