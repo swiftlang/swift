@@ -452,10 +452,17 @@ EscapeAnalysis::ConnectionGraph::getNode(SILValue V) {
     targetNode->mergeFlags(false /*isInterior*/, hasReferenceOnly);
     return targetNode;
   }
-  if (isa<SILFunctionArgument>(ptrBase)) {
+  if (auto arg = dyn_cast<SILFunctionArgument>(ptrBase)) {
+    EscapeState escapeKind =
+        arg->getArgumentConvention() ==
+                    SILArgumentConvention::Indirect_In_Guaranteed ||
+                arg->getArgumentConvention() ==
+                    SILArgumentConvention::Direct_Guaranteed
+            ? EscapeState::GuaranteedArguments
+            : EscapeState::AnyArguments;
     Node = allocNode(ptrBase, NodeType::Argument, false, hasReferenceOnly);
     if (!isSummaryGraph)
-      Node->mergeEscapeState(EscapeState::Arguments);
+      Node->mergeEscapeState(escapeKind);
   } else
     Node = allocNode(ptrBase, NodeType::Value, false, hasReferenceOnly);
   return Node;
@@ -1356,7 +1363,8 @@ std::string CGForDotView::getNodeAttributes(const Node *Node) const {
   case EscapeAnalysis::EscapeState::Return:
     attr += "color=\"green\"";
     break;
-  case EscapeAnalysis::EscapeState::Arguments:
+  case EscapeAnalysis::EscapeState::AnyArguments:
+  case EscapeAnalysis::EscapeState::GuaranteedArguments:
     attr += "color=\"blue\"";
     break;
   case EscapeAnalysis::EscapeState::Global:
@@ -1557,7 +1565,8 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
       case EscapeState::Return:
         OS << 'R';
         break;
-      case EscapeState::Arguments:
+      case EscapeState::AnyArguments:
+      case EscapeState::GuaranteedArguments:
         OS << 'A';
         break;
       case EscapeState::Global:

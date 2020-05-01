@@ -256,7 +256,6 @@ private:
   };
 
 public:
-  
   /// Indicates to what a value escapes. Note: the order of values is important.
   enum class EscapeState : char {
 
@@ -264,19 +263,21 @@ public:
     /// The value points to a locally allocated object who's lifetime ends in
     /// the same function.
     None,
-    
+
+    /// The node's value escapes through a guaranteed function argument.
+    GuaranteedArguments,
+
     /// The node's value escapes through the return value.
     /// The value points to a locally allocated object which escapes via the
     /// return instruction.
     Return,
 
-    /// The node's value escapes through a function argument.
-    Arguments,
+    /// The node's value escapes through a non-guaranteed function argument.
+    AnyArguments,
 
     /// The node's value escapes to any global or unidentified memory.
     Global
   };
-
 
   /// A node in the connection graph.
   /// A node basically represents a "pointer" or the "memory content" where a
@@ -552,7 +553,8 @@ public:
         case EscapeState::None:
         case EscapeState::Return:
           return false;
-        case EscapeState::Arguments:
+        case EscapeState::AnyArguments:
+        case EscapeState::GuaranteedArguments:
           return !nodeValue || !isExclusiveArgument(nodeValue);
         case EscapeState::Global:
           return true;
