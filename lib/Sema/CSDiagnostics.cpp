@@ -52,16 +52,20 @@ bool FailureDiagnostic::diagnoseAsNote() {
 }
 
 ASTNode FailureDiagnostic::getAnchor() const {
-  auto &cs = getConstraintSystem();
-
   auto *locator = getLocator();
   // Resolve the locator to a specific expression.
-  SourceRange range;
-  ConstraintLocator *resolved = simplifyLocator(cs, locator, range);
-  if (!resolved || !resolved->getAnchor())
-    return locator->getAnchor();
 
-  auto anchor = resolved->getAnchor();
+  auto anchor = locator->getAnchor();
+
+  {
+    SourceRange range;
+    auto path = locator->getPath();
+
+    simplifyLocator(anchor, path, range);
+    if (!anchor)
+      return locator->getAnchor();
+  }
+
   // FIXME: Work around an odd locator representation that doesn't separate the
   // base of a subscript member from the member access.
   if (locator->isLastElement<LocatorPathElt::SubscriptMember>()) {
@@ -3148,12 +3152,18 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
 }
 
 bool SubscriptMisuseFailure::diagnoseAsError() {
+  auto *locator = getLocator();
   auto &sourceMgr = getASTContext().SourceMgr;
 
   auto *memberExpr = castToExpr<UnresolvedDotExpr>(getRawAnchor());
 
   auto memberRange = getSourceRange();
-  (void)simplifyLocator(getConstraintSystem(), getLocator(), memberRange);
+
+  {
+    auto rawAnchor = getRawAnchor();
+    auto path = locator->getPath();
+    simplifyLocator(rawAnchor, path, memberRange);
+  }
 
   auto nameLoc = DeclNameLoc(memberRange.Start);
 
@@ -3183,7 +3193,7 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
   }
   diag.flush();
 
-  if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
+  if (auto overload = getOverloadChoiceIfAvailable(locator)) {
     emitDiagnosticAt(overload->choice.getDecl(), diag::kind_declared_here,
                      DescriptiveDeclKind::Subscript);
   }
