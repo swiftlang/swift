@@ -445,9 +445,6 @@ endfunction()
 #     [SHARED]
 #     [STATIC]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
-# SWIFT_ENABLE_TENSORFLOW
-#     [EXTRA_RPATHS rpath1 ...]
-# END SWIFT_ENABLE_TENSORFLOW
 #     source1 [source2 source3 ...])
 #
 # target
@@ -462,11 +459,6 @@ endfunction()
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
-# SWIFT_ENABLE_TENSORFLOW
-# EXTRA_RPATHS
-#   List of directories to add to this library's RPATH.
-# END SWIFT_ENABLE_TENSORFLOW
-#
 # source1 ...
 #   Sources to add into this library
 function(_add_swift_host_library_single target)
@@ -475,9 +467,6 @@ function(_add_swift_host_library_single target)
         STATIC)
   set(single_parameter_options)
   set(multiple_parameter_options
-        # SWIFT_ENABLE_TENSORFLOW
-        EXTRA_RPATHS
-        # END SWIFT_ENABLE_TENSORFLOW
         LLVM_LINK_COMPONENTS)
 
   cmake_parse_arguments(ASHLS
@@ -566,28 +555,6 @@ function(_add_swift_host_library_single target)
       PROPERTIES
       INSTALL_RPATH "$ORIGIN")
   endif()
-
-  # SWIFT_ENABLE_TENSORFLOW
-  # Hande extra RPATHs.
-  set(local_rpath "")
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" AND NOT "${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
-    set(local_rpath "$ORIGIN:/usr/lib/swift/linux")
-  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "CYGWIN")
-    set(local_rpath "$ORIGIN:/usr/lib/swift/cygwin")
-  endif()
-  foreach(rpath_element ${SWIFTLIB_SINGLE_EXTRA_RPATHS})
-    if("${local_rpath}" STREQUAL "")
-      set(local_rpath "${rpath_element}")
-    else()
-      set(local_rpath "${local_rpath}:${rpath_element}")
-    endif()
-  endforeach()
-  if(NOT "${local_rpath}" STREQUAL "")
-    set_target_properties("${target}"
-      PROPERTIES
-      INSTALL_RPATH "${local_rpath}")
-  endif()
-  # END SWIFT_ENABLE_TENSORFLOW
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
   set_target_properties("${target}" PROPERTIES FOLDER "Swift libraries")
