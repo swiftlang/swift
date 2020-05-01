@@ -7,7 +7,7 @@
 // RUN: cp %S/Inputs/class-stubs-weak/module.map %t/
 
 // Note: This is the just-built Clang, not the system Clang.
-// RUN: xcrun -sdk %sdk %clang %s -I %t -L %t -fmodules -fobjc-arc -o %t/main -lfirst -lsecond -Wl,-U,_objc_loadClassref -target %target-triple
+// RUN: xcrun -sdk %sdk %clang %s -I %t -L %t -fmodules -fobjc-arc -o %t/main -lfirst -lsecond -target %target-triple
 
 // Now rebuild the library, omitting the weak-exported class
 // RUN: %target-build-swift -emit-library -o %t/libsecond.dylib -I %t %S/Inputs/class-stubs-weak/second.swift -Xlinker -install_name -Xlinker @executable_path/libsecond.dylib -lfirst -L %t -target %target-next-stable-abi-triple
@@ -18,6 +18,8 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: swift_stable_abi
+
+// REQUIRES: rdar62692550
 
 #import <dlfcn.h>
 #import <stdio.h>
@@ -37,7 +39,7 @@
 
 int main(int argc, const char * const argv[]) {
   // Only test the new behavior on a new enough libobjc.
-  if (!dlsym(RTLD_NEXT, "_objc_loadClassref")) {
+  if (!dlsym(RTLD_NEXT, "objc_loadClassref")) {
     fprintf(stderr, "skipping evolution tests; OS too old\n");
     return EXIT_SUCCESS;
   }
