@@ -720,7 +720,7 @@ bool IndexSwiftASTWalker::visitImports(
 
   llvm::SmallPtrSet<ModuleDecl *, 8> Reported;
   for (auto Import : Imports) {
-    ModuleDecl *Mod = Import.second;
+    ModuleDecl *Mod = Import.importedModule;
     bool NewReport = Reported.insert(Mod).second;
     if (!NewReport)
       continue;
@@ -1605,7 +1605,7 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   TopMod.getImportedModules(Imports);
 
   for (auto Import : Imports) {
-    collectRecursiveModuleImports(*Import.second, Visited);
+    collectRecursiveModuleImports(*Import.importedModule, Visited);
   }
 }
 

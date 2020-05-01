@@ -209,26 +209,46 @@ class ModuleDecl : public DeclContext, public TypeDecl {
 
 public:
   typedef ArrayRef<Located<Identifier>> AccessPathTy;
-  typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
-  
+  /// Convenience struct to keep track of a module along with its access path.
+  struct ImportedModule {
+    /// The access path from an import: `import Foo.Bar` -> `Foo.Bar`.
+    ModuleDecl::AccessPathTy accessPath;
+    /// The actual module corresponding to the import.
+    ///
+    /// Invariant: The pointer is non-null.
+    ModuleDecl *importedModule;
+
+    ImportedModule(ModuleDecl::AccessPathTy accessPath,
+                   ModuleDecl *importedModule)
+        : accessPath(accessPath), importedModule(importedModule) {
+      assert(this->importedModule);
+    }
+
+    bool operator==(const ModuleDecl::ImportedModule &other) const {
+      return (this->importedModule == other.importedModule) &&
+             (this->accessPath == other.accessPath);
+    }
+  };
+
   static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name) {
     assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
   
     return AccessPath.empty()
       || DeclName(AccessPath.front().Item).matchesRef(Name);
   }
-  
+
   /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
   class OrderImportedModules {
   public:
     bool operator()(const ImportedModule &lhs,
                     const ImportedModule &rhs) const {
-      if (lhs.second != rhs.second)
-        return std::less<const ModuleDecl *>()(lhs.second, rhs.second);
-      if (lhs.first.data() != rhs.first.data())
-        return std::less<AccessPathTy::iterator>()(lhs.first.begin(),
-                                                   rhs.first.begin());
-      return lhs.first.size() < rhs.first.size();
+      if (lhs.importedModule != rhs.importedModule)
+        return std::less<const ModuleDecl *>()(lhs.importedModule,
+                                               rhs.importedModule);
+      if (lhs.accessPath.data() != rhs.accessPath.data())
+        return std::less<AccessPathTy::iterator>()(lhs.accessPath.begin(),
+                                                   rhs.accessPath.begin());
+      return lhs.accessPath.size() < rhs.accessPath.size();
     }
   };
 
@@ -860,14 +880,14 @@ namespace llvm {
     }
 
     static unsigned getHashValue(const ModuleDecl::ImportedModule &val) {
-      auto pair = std::make_pair(val.first.size(), val.second);
+      auto pair = std::make_pair(val.accessPath.size(), val.importedModule);
       return llvm::DenseMapInfo<decltype(pair)>::getHashValue(pair);
     }
 
     static bool isEqual(const ModuleDecl::ImportedModule &lhs,
                         const ModuleDecl::ImportedModule &rhs) {
-      return lhs.second == rhs.second &&
-             ModuleDecl::isSameAccessPath(lhs.first, rhs.first);
+      return lhs.importedModule == rhs.importedModule &&
+             ModuleDecl::isSameAccessPath(lhs.accessPath, rhs.accessPath);
     }
   };
 }

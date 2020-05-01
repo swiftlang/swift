@@ -1702,8 +1702,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
   // Collect all of the visible declarations.
   SmallVector<ValueDecl *, 4> allDecls;
   for (auto import : namelookup::getAllImports(dc)) {
-    import.second->lookupClassMember(import.first, member.getFullName(),
-                                     allDecls);
+    import.importedModule->lookupClassMember(import.accessPath,
+                                             member.getFullName(), allDecls);
   }
 
   // For each declaration whose context is not something we've
@@ -1745,7 +1745,7 @@ void DeclContext::lookupAllObjCMethods(
        SmallVectorImpl<AbstractFunctionDecl *> &results) const {
   // Collect all of the methods with this selector.
   for (auto import : namelookup::getAllImports(this)) {
-    import.second->lookupObjCMethods(selector, results);
+    import.importedModule->lookupObjCMethods(selector, results);
   }
 
   // Filter out duplicates.

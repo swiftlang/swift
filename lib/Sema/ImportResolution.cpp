@@ -202,7 +202,7 @@ public:
     for (auto &import : SF.getParentModule()->getImplicitImports()) {
       assert(!(SF.Kind == SourceFileKind::SIL &&
                import.Module->isStdlibModule()));
-      ImportedModule importedMod(/*accessPath*/ {}, import.Module);
+      ImportedModule importedMod{ModuleDecl::AccessPathTy(), import.Module};
       boundImports.emplace_back(importedMod, import.Options);
     }
   }
@@ -844,16 +844,16 @@ static bool canCrossImport(const ImportedModuleDesc &import) {
 }
 
 /// Create an UnboundImport for a cross-import overlay.
-UnboundImport::UnboundImport(ASTContext &ctx,
-                             const UnboundImport &base, Identifier overlayName,
+UnboundImport::UnboundImport(ASTContext &ctx, const UnboundImport &base,
+                             Identifier overlayName,
                              const ImportedModuleDesc &declaringImport,
                              const ImportedModuleDesc &bystandingImport)
-  : importLoc(base.importLoc), options(), privateImportFileName(), modulePath(),
-    // If the declaring import was scoped, inherit that scope in the
-    // overlay's import.
-    declPath(declaringImport.module.first),
-    importOrUnderlyingModuleDecl(declaringImport.module.second)
-{
+    : importLoc(base.importLoc), options(), privateImportFileName(),
+      modulePath(),
+      // If the declaring import was scoped, inherit that scope in the
+      // overlay's import.
+      declPath(declaringImport.module.accessPath),
+      importOrUnderlyingModuleDecl(declaringImport.module.importedModule) {
   modulePath = ctx.AllocateCopy(
       ModuleDecl::AccessPathTy( { overlayName, base.modulePath[0].Loc }));
 
@@ -927,7 +927,7 @@ void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
 
     // If this module doesn't declare any cross-imports, we're done with this
     // import.
-    if (!newImport.module.second->mightDeclareCrossImportOverlays())
+    if (!newImport.module.importedModule->mightDeclareCrossImportOverlays())
       continue;
 
     // Fine, we need to do the slow-but-rare thing: check if this import
@@ -975,25 +975,27 @@ void ImportResolver::findCrossImports(
     bool shouldDiagnoseRedundantCrossImports) {
   assert(&declaringImport != &bystandingImport);
 
-  LLVM_DEBUG(
-      llvm::dbgs() << "Discovering cross-imports for '"
-                   << declaringImport.module.second->getName() << "' -> '"
-                   << bystandingImport.module.second->getName() << "'\n");
+  LLVM_DEBUG(llvm::dbgs() << "Discovering cross-imports for '"
+                          << declaringImport.module.importedModule->getName()
+                          << "' -> '"
+                          << bystandingImport.module.importedModule->getName()
+                          << "'\n");
 
   if (ctx.Stats)
     ctx.Stats->getFrontendCounters().NumCrossImportsChecked++;
 
   // Find modules we need to import.
   SmallVector<Identifier, 4> names;
-  declaringImport.module.second->findDeclaredCrossImportOverlays(
-      bystandingImport.module.second->getName(), names, I.importLoc);
+  declaringImport.module.importedModule->findDeclaredCrossImportOverlays(
+      bystandingImport.module.importedModule->getName(), names, I.importLoc);
 
   // If we're diagnosing cases where we cross-import in both directions, get the
   // inverse list. Otherwise, leave the list empty.
   SmallVector<Identifier, 4> oppositeNames;
   if (shouldDiagnoseRedundantCrossImports)
-    bystandingImport.module.second->findDeclaredCrossImportOverlays(
-        declaringImport.module.second->getName(), oppositeNames, I.importLoc);
+    bystandingImport.module.importedModule->findDeclaredCrossImportOverlays(
+        declaringImport.module.importedModule->getName(), oppositeNames,
+        I.importLoc);
 
   if (ctx.Stats && !names.empty())
     ctx.Stats->getFrontendCounters().NumCrossImportsFound++;
@@ -1005,18 +1007,21 @@ void ImportResolver::findCrossImports(
     if (name == SF.getParentModule()->getName())
       continue;
 
-    unboundImports.emplace_back(declaringImport.module.second->getASTContext(),
-                                I, name, declaringImport, bystandingImport);
+    unboundImports.emplace_back(
+        declaringImport.module.importedModule->getASTContext(), I, name,
+        declaringImport, bystandingImport);
 
     if (llvm::is_contained(oppositeNames, name))
       ctx.Diags.diagnose(I.importLoc, diag::cross_imported_by_both_modules,
-                         declaringImport.module.second->getName(),
-                         bystandingImport.module.second->getName(), name);
+                         declaringImport.module.importedModule->getName(),
+                         bystandingImport.module.importedModule->getName(),
+                         name);
 
     if (ctx.LangOpts.EnableCrossImportRemarks)
       ctx.Diags.diagnose(I.importLoc, diag::cross_import_added,
-                         declaringImport.module.second->getName(),
-                         bystandingImport.module.second->getName(), name);
+                         declaringImport.module.importedModule->getName(),
+                         bystandingImport.module.importedModule->getName(),
+                         name);
 
     LLVM_DEBUG({
       auto &crossImportOptions = unboundImports.back().options;
@@ -1047,28 +1052,29 @@ void ImportResolver::addCrossImportableModules(ImportedModuleDesc importDesc) {
 
     // If they are both scoped, and they are *differently* scoped, this import
     // cannot possibly expose anything new. Skip it.
-    if (!importDesc.module.first.empty() && !nextImport.first.empty() &&
-        !ModuleDecl::isSameAccessPath(importDesc.module.first,
-                                      nextImport.first))
+    if (!importDesc.module.accessPath.empty() &&
+        !nextImport.accessPath.empty() &&
+        !ModuleDecl::isSameAccessPath(importDesc.module.accessPath,
+                                      nextImport.accessPath))
       continue;
 
     // If we are importing a submodule, treat it as though we imported its
     // top-level module (or rather, the top-level module's clang overlay if it
     // has one).
-    if (isSubmodule(nextImport.second)) {
-      nextImport.second =
-          nextImport.second->getTopLevelModule(/*overlay=*/true);
+    if (isSubmodule(nextImport.importedModule)) {
+      nextImport.importedModule =
+          nextImport.importedModule->getTopLevelModule(/*overlay=*/true);
 
       // If the rewritten import is now for our own parent module, this was an
       // import of our own clang submodule in a mixed-language module. We don't
       // want to process our own cross-imports.
-      if (nextImport.second == SF.getParentModule())
+      if (nextImport.importedModule == SF.getParentModule())
         continue;
     }
 
     // Drop this module into the ImportDesc so we treat it as imported with the
     // same options and scope as `I`.
-    importDesc.module.second = nextImport.second;
+    importDesc.module.importedModule = nextImport.importedModule;
 
     // Add it to the list of cross-importable modules. If it's already there,
     // we've already done the rest of the work of this loop iteration and can
@@ -1078,12 +1084,12 @@ void ImportResolver::addCrossImportableModules(ImportedModuleDesc importDesc) {
 
     // We don't consider the re-exports of ObjC modules because ObjC re-exports
     // everything, so there isn't enough signal there to work from.
-    if (nextImport.second->isNonSwiftModule())
+    if (nextImport.importedModule->isNonSwiftModule())
       continue;
 
     // Add the module's re-exports to worklist.
-    nextImport.second->getImportedModules(importsWorklist,
-                                          ModuleDecl::ImportFilterKind::Public);
+    nextImport.importedModule->getImportedModules(
+        importsWorklist, ModuleDecl::ImportFilterKind::Public);
   }
 }
 

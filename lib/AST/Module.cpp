@@ -1215,7 +1215,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
   ImportedOperatorsMap<OP_DECL> importedOperators;
   for (auto &imported : SourceFile::Impl::getImportsForSourceFile(SF)) {
     // Protect against source files that contrive to import their own modules.
-    if (imported.module.second == ownModule)
+    if (imported.module.importedModule == ownModule)
       continue;
 
     bool isExported =
@@ -1223,9 +1223,8 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
     if (!includePrivate && !isExported)
       continue;
 
-    Optional<OP_DECL *> maybeOp =
-        lookupOperatorDeclForName<OP_DECL>(imported.module.second, Loc, Name,
-                                           isCascading);
+    Optional<OP_DECL *> maybeOp = lookupOperatorDeclForName<OP_DECL>(
+        imported.module.importedModule, Loc, Name, isCascading);
     if (!maybeOp)
       return None;
     
@@ -1401,7 +1400,7 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
     else
       requiredFilter |= ModuleDecl::ImportFilterKind::Private;
 
-    if (!separatelyImportedOverlays.lookup(desc.module.second).empty())
+    if (!separatelyImportedOverlays.lookup(desc.module.importedModule).empty())
       requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
 
     if (filter.contains(requiredFilter))
@@ -1496,26 +1495,26 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
   std::sort(imports.begin(), imports.end(),
             [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
     // Arbitrarily sort by name to get a deterministic order.
-    if (lhs.second != rhs.second) {
+    if (lhs.importedModule != rhs.importedModule) {
       return std::lexicographical_compare(
-          lhs.second->getReverseFullModuleName(), {},
-          rhs.second->getReverseFullModuleName(), {});
+          lhs.importedModule->getReverseFullModuleName(), {},
+          rhs.importedModule->getReverseFullModuleName(), {});
     }
     using AccessPathElem = Located<Identifier>;
-    return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
-                                        rhs.first.begin(), rhs.first.end(),
-                                        [](const AccessPathElem &lElem,
-                                           const AccessPathElem &rElem) {
-      return lElem.Item.str() < rElem.Item.str();
-    });
+    return std::lexicographical_compare(
+        lhs.accessPath.begin(), lhs.accessPath.end(), rhs.accessPath.begin(),
+        rhs.accessPath.end(),
+        [](const AccessPathElem &lElem, const AccessPathElem &rElem) {
+          return lElem.Item.str() < rElem.Item.str();
+        });
   });
-  auto last = std::unique(imports.begin(), imports.end(),
-                          [](const ImportedModule &lhs,
-                             const ImportedModule &rhs) -> bool {
-    if (lhs.second != rhs.second)
-      return false;
-    return ModuleDecl::isSameAccessPath(lhs.first, rhs.first);
-  });
+  auto last = std::unique(
+      imports.begin(), imports.end(),
+      [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
+        if (lhs.importedModule != rhs.importedModule)
+          return false;
+        return ModuleDecl::isSameAccessPath(lhs.accessPath, rhs.accessPath);
+      });
   imports.erase(last, imports.end());
 }
 
@@ -1676,11 +1675,12 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
   topLevel->getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
-  stack.emplace_back(ModuleDecl::AccessPathTy(),
-                     const_cast<ModuleDecl *>(topLevel));
+  auto topLevelModule =
+      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), topLevel};
+  stack.emplace_back(topLevelModule);
 
   while (!stack.empty()) {
-    auto next = stack.pop_back_val().second;
+    auto next = stack.pop_back_val().importedModule;
 
     if (!visited.insert(next).second)
       continue;
@@ -1888,7 +1888,7 @@ ModuleDecl::getDeclaringModuleAndBystander() {
 
   getImportedModules(imported, ModuleDecl::ImportFilterKind::Public);
   while (!imported.empty()) {
-    ModuleDecl *importedModule = std::get<1>(imported.back());
+    ModuleDecl *importedModule = imported.back().importedModule;
     imported.pop_back();
     if (!seen.insert(importedModule).second)
       continue;
@@ -2107,15 +2107,15 @@ bool SourceFile::hasTestableOrPrivateImport(
         Imports->begin(), Imports->end(),
         [module, queryKind](ImportedModuleDesc desc) -> bool {
           if (queryKind == ImportQueryKind::TestableAndPrivate)
-            return desc.module.second == module &&
+            return desc.module.importedModule == module &&
                    (desc.importOptions.contains(ImportFlags::PrivateImport) ||
                     desc.importOptions.contains(ImportFlags::Testable));
           else if (queryKind == ImportQueryKind::TestableOnly)
-            return desc.module.second == module &&
+            return desc.module.importedModule == module &&
                    desc.importOptions.contains(ImportFlags::Testable);
           else {
             assert(queryKind == ImportQueryKind::PrivateOnly);
-            return desc.module.second == module &&
+            return desc.module.importedModule == module &&
                    desc.importOptions.contains(ImportFlags::PrivateImport);
           }
         });
@@ -2148,7 +2148,7 @@ bool SourceFile::hasTestableOrPrivateImport(
 
   return std::any_of(Imports->begin(), Imports->end(),
                      [module, filename](ImportedModuleDesc desc) -> bool {
-                       return desc.module.second == module &&
+                       return desc.module.importedModule == module &&
                               desc.importOptions.contains(
                                   ImportFlags::PrivateImport) &&
                               desc.filename == filename;
@@ -2171,7 +2171,7 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 
     // If the module is imported this way, it's not imported
     // implementation-only.
-    if (imports.isImportedBy(module, desc.module.second))
+    if (imports.isImportedBy(module, desc.module.importedModule))
       return false;
   }
 
@@ -2183,7 +2183,7 @@ void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
                                     SmallVectorImpl<Identifier> &spiGroups) const {
   for (auto &import : *Imports) {
     if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
-        importedModule == std::get<ModuleDecl*>(import.module)) {
+        importedModule == import.module.importedModule) {
       auto importedSpis = import.spiGroups;
       spiGroups.append(importedSpis.begin(), importedSpis.end());
     }

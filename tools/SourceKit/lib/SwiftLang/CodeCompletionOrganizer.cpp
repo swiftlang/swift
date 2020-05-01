@@ -350,9 +350,9 @@ ImportDepth::ImportDepth(ASTContext &context,
   main->getImportedModules(mainImports, importFilter);
   for (auto &import : mainImports) {
     uint8_t depth = 1;
-    if (auxImports.count(import.second->getName().str()))
+    if (auxImports.count(import.importedModule->getName().str()))
       depth = 0;
-    worklist.emplace_back(import.second, depth);
+    worklist.emplace_back(import.importedModule, depth);
   }
 
   // Fill depths with BFS over module imports.
@@ -380,10 +380,11 @@ ImportDepth::ImportDepth(ASTContext &context,
       uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap
 
       // Implicitly imported sub-modules get the same depth as their parent.
-      if (const clang::Module *CMI = import.second->findUnderlyingClangModule())
+      if (const clang::Module *CMI =
+              import.importedModule->findUnderlyingClangModule())
         if (CM && CMI->isSubModuleOf(CM))
           next = depth;
-      worklist.emplace_back(import.second, next);
+      worklist.emplace_back(import.importedModule, next);
     }
   }
 }

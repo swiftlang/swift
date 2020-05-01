@@ -1952,7 +1952,7 @@ public:
     CurrDeclContext->getParentSourceFile()->getImportedModules(Imported,
                                                                ImportFilter);
     while (!Imported.empty()) {
-      ModuleDecl *MD = Imported.back().second;
+      ModuleDecl *MD = Imported.back().importedModule;
       Imported.pop_back();
       if (!ImportedModules.insert(MD->getNameStr()).second)
         continue;
@@ -3656,7 +3656,7 @@ public:
   void collectOperators(SmallVectorImpl<OperatorDecl *> &results) {
     assert(CurrDeclContext);
     for (auto import : namelookup::getAllImports(CurrDeclContext))
-      import.second->getOperatorDecls(results);
+      import.importedModule->getOperatorDecls(results);
   }
 
   void addPostfixBang(Type resultType) {
@@ -4297,7 +4297,7 @@ public:
       }
     }
     for (auto Import : namelookup::getAllImports(CurrDeclContext)) {
-      auto Module = Import.second;
+      auto Module = Import.importedModule;
       if (Module == CurrModule)
         continue;
 
@@ -5956,8 +5956,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     llvm::DenseSet<CodeCompletionCache::Key> ImportsSeen;
     auto handleImport = [&](ModuleDecl::ImportedModule Import) {
-      ModuleDecl *TheModule = Import.second;
-      ModuleDecl::AccessPathTy Path = Import.first;
+      ModuleDecl *TheModule = Import.importedModule;
+      ModuleDecl::AccessPathTy Path = Import.accessPath;
       if (TheModule->getFiles().empty())
         return;
 
@@ -6028,7 +6028,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       SF->getImportedModules(Imports, ImportFilter);
 
       for (auto Imported : Imports) {
-        for (auto Import : namelookup::getAllImports(Imported.second))
+        for (auto Import : namelookup::getAllImports(Imported.importedModule))
           handleImport(Import);
       }
     }
