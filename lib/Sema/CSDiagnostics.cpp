@@ -150,6 +150,18 @@ Type FailureDiagnostic::restoreGenericParameters(
   });
 }
 
+bool FailureDiagnostic::conformsToKnownProtocol(
+    Type type, KnownProtocolKind protocol) const {
+  auto &cs = getConstraintSystem();
+  return constraints::conformsToKnownProtocol(cs, type, protocol);
+}
+
+Type FailureDiagnostic::isRawRepresentable(Type type,
+                                           KnownProtocolKind protocol) const {
+  auto &cs = getConstraintSystem();
+  return constraints::isRawRepresentable(cs, type, protocol);
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto anchor = getRawAnchor();
 
@@ -2406,9 +2418,8 @@ bool ContextualFailure::diagnoseConversionToBool() const {
 
   // If we're trying to convert something from optional type to an integer, then
   // a comparison against nil was probably expected.
-  auto &cs = getConstraintSystem();
-  if (conformsToKnownProtocol(cs, fromType, KnownProtocolKind::BinaryInteger) &&
-      conformsToKnownProtocol(cs, fromType,
+  if (conformsToKnownProtocol(fromType, KnownProtocolKind::BinaryInteger) &&
+      conformsToKnownProtocol(fromType,
                               KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     StringRef prefix = "((";
     StringRef suffix;
@@ -2503,7 +2514,6 @@ bool ContextualFailure::diagnoseYieldByReferenceMismatch() const {
 bool ContextualFailure::tryRawRepresentableFixIts(
     InFlightDiagnostic &diagnostic,
     KnownProtocolKind rawRepresentableProtocol) const {
-  auto &CS = getConstraintSystem();
   auto anchor = getAnchor();
   auto fromType = getFromType();
   auto toType = getToType();
@@ -2558,14 +2568,14 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     }
   };
 
-  if (conformsToKnownProtocol(CS, fromType, rawRepresentableProtocol)) {
-    if (conformsToKnownProtocol(CS, fromType, KnownProtocolKind::OptionSet) &&
+  if (conformsToKnownProtocol(fromType, rawRepresentableProtocol)) {
+    if (conformsToKnownProtocol(fromType, KnownProtocolKind::OptionSet) &&
         isExpr<IntegerLiteralExpr>(anchor) &&
         castToExpr<IntegerLiteralExpr>(anchor)->getDigitsText() == "0") {
       diagnostic.fixItReplace(::getSourceRange(anchor), "[]");
       return true;
     }
-    if (auto rawTy = isRawRepresentable(CS, toType, rawRepresentableProtocol)) {
+    if (auto rawTy = isRawRepresentable(toType, rawRepresentableProtocol)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
       // or just 'Result(rawValue: <expr>)'.
       std::string convWrapBefore = toType.getString();
@@ -2595,8 +2605,8 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     }
   }
 
-  if (auto rawTy = isRawRepresentable(CS, fromType, rawRepresentableProtocol)) {
-    if (conformsToKnownProtocol(CS, toType, rawRepresentableProtocol)) {
+  if (auto rawTy = isRawRepresentable(fromType, rawRepresentableProtocol)) {
+    if (conformsToKnownProtocol(toType, rawRepresentableProtocol)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
       if (!TypeChecker::isConvertibleTo(rawTy, toType, getDC())) {
@@ -2877,12 +2887,11 @@ void ContextualFailure::tryComputedPropertyFixIts() const {
 }
 
 bool ContextualFailure::isIntegerToStringIndexConversion() const {
-  auto &cs = getConstraintSystem();
   auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
 
   auto fromType = getFromType();
   auto toType = getToType()->getCanonicalType();
-  return (conformsToKnownProtocol(cs, fromType, kind) &&
+  return (conformsToKnownProtocol(fromType, kind) &&
           toType.getString() == "String.CharacterView.Index");
 }
 

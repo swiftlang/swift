@@ -216,6 +216,9 @@ protected:
     auto &cs = getConstraintSystem();
     return bool(cs.isArrayType(type));
   }
+
+  bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol) const;
+  Type isRawRepresentable(Type type, KnownProtocolKind protocol) const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -672,8 +675,7 @@ private:
 
   bool isIntegerType(Type type) const {
     return conformsToKnownProtocol(
-        getConstraintSystem(), type,
-        KnownProtocolKind::ExpressibleByIntegerLiteral);
+        type, KnownProtocolKind::ExpressibleByIntegerLiteral);
   }
 
   /// Return true if the conversion from fromType to toType is
