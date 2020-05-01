@@ -376,7 +376,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto memberAssocContextualType =
         parentDC->mapTypeIntoContext(memberAssocInterfaceType);
     newMember->setInterfaceType(memberAssocInterfaceType);
-    Pattern *memberPattern = new (C) NamedPattern(newMember, /*implicit*/ true);
+    Pattern *memberPattern = NamedPattern::createImplicit(C, newMember);
     memberPattern->setType(memberAssocContextualType);
     memberPattern = TypedPattern::createImplicit(C, memberPattern,
                                                  memberAssocContextualType);

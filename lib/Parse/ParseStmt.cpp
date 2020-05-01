@@ -1093,7 +1093,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
     auto varPattern = new (P.Context) VarPattern(loc, /*isLet*/true,
-                                                 namePattern, /*implicit*/true);
+                                                 namePattern);
+    varPattern->setImplicit();
     patternResult = makeParserResult(varPattern);
   }
 
@@ -1483,7 +1484,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     
     if (ThePattern.isNonNull()) {
       auto *P = new (Context) VarPattern(IntroducerLoc, wasLet,
-                                          ThePattern.get(), /*impl*/false);
+                                          ThePattern.get());
       ThePattern = makeParserResult(Status, P);
     }
 
