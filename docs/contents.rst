@@ -18,7 +18,6 @@ Contents
    StoredAndComputedVariables
    SIL
    TypeChecker
-   DebuggingTheCompiler
    OptimizationTips
    libFuzzerIntegration
    ABI: TypeMetadata <ABI/TypeMetadata>
