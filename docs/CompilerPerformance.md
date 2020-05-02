@@ -84,7 +84,7 @@ highly dependent on **compilation modes**. Information concerning those modes
 that's relevant to compilation performance is recounted in the following
 section; for more details on the driver, see [the driver docs](Driver.md), as
 well as docs on [driver internals](DriverInternals.md)
-and [driver parseable output](DriverParseableOutput.rst).
+and [driver parseable output](DriverParseableOutput.md).
 
 After discussing compilation modes in the following section, we'll also touch on
 large-scale variation in workload that can occur _without_ obvious hotspots, in

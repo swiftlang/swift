@@ -8,7 +8,6 @@ Contents
 
    IndexInvalidation
    AccessControl
-   DriverParseableOutput
    ErrorHandling
    ErrorHandlingRationale
    Generics
