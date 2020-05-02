@@ -14,7 +14,7 @@ The target audience for this document is people who want to integrate the Swift
 compiler into their build system, rather than using Xcode or the package
 manager (`swift build`). If you're looking to work on the driver itself...well,
 this is probably still useful to you, but you should also check out
-[DriverInternals.rst](DriverInternals.rst) and maybe
+[DriverInternals.md](DriverInternals.md) and maybe
 [DependencyAnalysis.md](DependencyAnalysis.md) as well. If you're just using
 Xcode or SwiftPM and want to find out what mysterious command-line options you
 could be passing, `swiftc --help` is a better choice.

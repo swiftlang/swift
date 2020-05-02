@@ -83,7 +83,7 @@ The set of jobs that are run, and the way they spend their time, is itself
 highly dependent on **compilation modes**. Information concerning those modes
 that's relevant to compilation performance is recounted in the following
 section; for more details on the driver, see [the driver docs](Driver.md), as
-well as docs on [driver internals](DriverInternals.rst)
+well as docs on [driver internals](DriverInternals.md)
 and [driver parseable output](DriverParseableOutput.rst).
 
 After discussing compilation modes in the following section, we'll also touch on
