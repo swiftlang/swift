@@ -879,7 +879,7 @@ extension Dictionary {
   ///   - key: The key the look up in the dictionary.
   ///   - defaultValue: The default value to use if `key` doesn't exist in the
   ///     dictionary.
-  /// - Returns: The value associated with `key` in the dictionary`; otherwise,
+  /// - Returns: The value associated with `key` in the dictionary; otherwise,
   ///   `defaultValue`.
   @inlinable
   public subscript(
