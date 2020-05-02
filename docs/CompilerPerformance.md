@@ -1143,7 +1143,7 @@ driver. These files contain the driver's summary-view of the dependencies
 between entities defined and referenced in each source file; it is from these
 files that the driver decides when a file "needs" to be rebuilt because it
 depends on another file that needs to be rebuilt, and so on transitively. The
-file format is [documented here](DependencyAnalysis.rst).
+file format is [documented here](DependencyAnalysis.md).
 
 ### Finding areas in need of general improvement
 

@@ -15,7 +15,7 @@ compiler into their build system, rather than using Xcode or the package
 manager (`swift build`). If you're looking to work on the driver itself...well,
 this is probably still useful to you, but you should also check out
 [DriverInternals.rst](DriverInternals.rst) and maybe
-[DependencyAnalysis.rst](DependencyAnalysis.rst) as well. If you're just using
+[DependencyAnalysis.md](DependencyAnalysis.md) as well. If you're just using
 Xcode or SwiftPM and want to find out what mysterious command-line options you
 could be passing, `swiftc --help` is a better choice.
 
@@ -206,7 +206,7 @@ in becoming more like non-whole-module builds.
 ## Incremental Builds ##
 
 Incremental builds in Swift work by primarily by cross-file dependency
-analysis, described in [DependencyAnalysis.rst](DependencyAnalysis.rst).
+analysis, described in [DependencyAnalysis.md](DependencyAnalysis.md).
 Compiling a single file might be necessary because that file has changed, but
 it could also be because that file depends on something else that might have
 changed. From a build system perspective, the files in a particular module
