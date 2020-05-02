@@ -2657,8 +2657,10 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
     for (auto argRepr : generic->getGenericArgs()) {
       auto argTy = resolveType(argRepr, options);
-      if (!argTy)
-        return Type();
+      // If we cannot resolve the generic parameter, propagate the error out.
+      if (!argTy || argTy->hasError()) {
+        return ErrorType::get(Context);
+      }
       TypeArgsBuf.push_back(argTy);
     }
   }
@@ -2666,8 +2668,10 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   // Use type reconstruction to summon the opaque type decl.
   Demangler demangle;
   auto definingDeclNode = demangle.demangleSymbol(mangledName);
-  if (!definingDeclNode)
-    return Type();
+  if (!definingDeclNode) {
+    diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
+    return ErrorType::get(Context);
+  }
   if (definingDeclNode->getKind() == Node::Kind::Global)
     definingDeclNode = definingDeclNode->getChild(0);
   ASTBuilder builder(Context);
@@ -2677,8 +2681,9 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   
   auto TypeArgs = ArrayRef<Type>(TypeArgsBuf);
   auto ty = builder.resolveOpaqueType(opaqueNode, TypeArgs, ordinal);
-  if (!ty) {
+  if (!ty || ty->hasError()) {
     diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
+    return ErrorType::get(Context);
   }
   return ty;
 }
