@@ -122,6 +122,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Resumption functions from yield-many coroutines.
   PointerAuthSchema YieldManyResumeFunctions;
+
+  /// Resilient class stub initializer callbacks.
+  PointerAuthSchema ResilientClassStubInitCallbacks;
 };
 
 /// The set of options supported by IR generation.
