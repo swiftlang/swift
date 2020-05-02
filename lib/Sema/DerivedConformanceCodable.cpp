@@ -596,8 +596,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
 
   // Full `let container = encoder.container(keyedBy: CodingKeys.self)`
   // binding.
-  auto *containerPattern = new (C) NamedPattern(containerDecl,
-                                                /*implicit=*/true);
+  auto *containerPattern = NamedPattern::createImplicit(C, containerDecl);
   auto *bindingDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, containerPattern, callExpr, funcDC);
   statements.push_back(bindingDecl);
@@ -815,8 +814,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 
     // Full `let container = decoder.container(keyedBy: CodingKeys.self)`
     // binding.
-    auto *containerPattern = new (C) NamedPattern(containerDecl,
-                                                  /*implicit=*/true);
+    auto *containerPattern = NamedPattern::createImplicit(C, containerDecl);
     auto *bindingDecl = PatternBindingDecl::createImplicit(
         C, StaticSpellingKind::None, containerPattern, tryExpr, funcDC);
     statements.push_back(bindingDecl);
