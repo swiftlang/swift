@@ -343,7 +343,7 @@
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2020-04-29-a",
                 "swift-tools-support-core": "0.0.1",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2020-04-29-a",
-                "swift-syntax": "1e524b3edc47e8ff66890d914b8bcd024e061631",
+                "swift-syntax": "swift-DEVELOPMENT-SNAPSHOT-2020-04-29-a",
                 "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2020-04-29-a",
                 "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2020-04-29-a",
                 "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2020-04-29-a",
