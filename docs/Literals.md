@@ -1,5 +1,3 @@
-:orphan:
-
 Literals
 ========
 
@@ -12,12 +10,12 @@ literals, so let's look at those.
 High-Level View
 ---------------
 
-::
+```swift
+window.setTitle("Welcome to Xcode")
+```
 
-  window.setTitle("Welcome to Xcode")
-
-In this case, we have a string literal and an enclosing context. If ``window``
-is an NSWindow, there will only be one possible method named ``setTitle``,
+In this case, we have a string literal and an enclosing context. If `window`
+is an NSWindow, there will only be one possible method named `setTitle`,
 which takes an NSString. Therefore, we want the string literal expression to
 end up being an NSString.
 
@@ -33,35 +31,37 @@ if it is in range for that type.
 The ExpressibleByStringLiteral Protocol
 ---------------------------------------
 
-Here is the ExpressibleByStringLiteral protocol as defined in the standard
+Here is the `ExpressibleByStringLiteral` protocol as defined in the standard
 library's CompilerProtocols.swift::
 
-  /// A type that can be initialized with a string literal.
-  ///
-  /// The `String` and `StaticString` types conform to the
-  /// `ExpressibleByStringLiteral` protocol. You can initialize a variable or
-  /// constant of either of these types using a string literal of any length.
-  ///
-  ///     let picnicGuest = "Deserving porcupine"
-  ///
-  /// Conforming to ExpressibleByStringLiteral
-  /// ========================================
-  ///
-  /// To add `ExpressibleByStringLiteral` conformance to your custom type,
-  /// implement the required initializer.
-  public protocol ExpressibleByStringLiteral
-    : ExpressibleByExtendedGraphemeClusterLiteral {
+```swift
+/// A type that can be initialized with a string literal.
+///
+/// The `String` and `StaticString` types conform to the
+/// `ExpressibleByStringLiteral` protocol. You can initialize a variable or
+/// constant of either of these types using a string literal of any length.
+///
+///     let picnicGuest = "Deserving porcupine"
+///
+/// Conforming to ExpressibleByStringLiteral
+/// ========================================
+///
+/// To add `ExpressibleByStringLiteral` conformance to your custom type,
+/// implement the required initializer.
+public protocol ExpressibleByStringLiteral
+  : ExpressibleByExtendedGraphemeClusterLiteral {
 
-    /// A type that represents a string literal.
-    ///
-    /// Valid types for `StringLiteralType` are `String` and `StaticString`.
-    associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
+  /// A type that represents a string literal.
+  ///
+  /// Valid types for `StringLiteralType` are `String` and `StaticString`.
+  associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
 
-    /// Creates an instance initialized to the given string value.
-    ///
-    /// - Parameter value: The value of the new instance.
-    init(stringLiteral value: StringLiteralType)
-  }
+  /// Creates an instance initialized to the given string value.
+  ///
+  /// - Parameter value: The value of the new instance.
+  init(stringLiteral value: StringLiteralType)
+}
+```
 
 Curiously, the protocol is not defined in terms of primitive types, but in
 terms of any StringLiteralType that the implementer chooses. In most cases,
@@ -77,17 +77,19 @@ points could be constructed...which may be what's desired in some cases.)
 The _ExpressibleByBuiltinStringLiteral Protocol
 -----------------------------------------------
 
-CompilerProtocols.swift contains a second protocol::
+`CompilerProtocols.swift` contains a second protocol::
 
-  // NOTE: the compiler has builtin knowledge of this protocol
-  public protocol _ExpressibleByBuiltinStringLiteral
-    : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+```swift
+// NOTE: the compiler has builtin knowledge of this protocol
+public protocol _ExpressibleByBuiltinStringLiteral
+  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
 
-    init(
-        _builtinStringLiteral start: Builtin.RawPointer,
-        utf8CodeUnitCount: Builtin.Word,
-        isASCII: Builtin.Int1)
-  }
+  init(
+      _builtinStringLiteral start: Builtin.RawPointer,
+      utf8CodeUnitCount: Builtin.Word,
+      isASCII: Builtin.Int1)
+}
+```
 
 The use of builtin types makes it clear that this is *only* for use in the
 standard library. This is the actual primitive function that is used to
@@ -118,9 +120,9 @@ terms of constraints, but it's easiest to understand as a linear process.
 1. Filter the types provided by the context to only include those that are
    ExpressibleByStringLiteral.
 2. Using the associated StringLiteralType, find the appropriate
-   ``_convertFromBuiltinStringLiteral``.
+   `_convertFromBuiltinStringLiteral`.
 3. Using the type from step 1, find the appropriate
-   ``convertFromStringLiteral``.
+   `convertFromStringLiteral`.
 4. Build an expression tree with the appropriate calls.
 
 How about cases where there is no context? ::
@@ -128,13 +130,13 @@ How about cases where there is no context? ::
   var str = "abc"
 
 Here we have nothing to go on, so instead the type checker looks for a global
-type named ``StringLiteralType`` in the current module-scope context, and uses
+type named `StringLiteralType` in the current module-scope context, and uses
 that type if it is actually a ExpressibleByStringLiteral type. This both allows
 different standard libraries to set different default literal types, and allows
 a user to *override* the default type in their own source file.
 
 The real story is even more complicated because of implicit conversions:
-the type expected by ``setTitle`` might not actually be literal-convertible,
+the type expected by `setTitle` might not actually be literal-convertible,
 but something else that *is* literal-convertible can then implicitly convert
 to the proper type. If this makes your head spin, don't worry about it.
 
@@ -143,7 +145,7 @@ Arrays, Dictionaries, and Interpolation
 ---------------------------------------
 
 Array and dictionary literals don't have a Builtin*Convertible form. Instead,
-they just always use a variadic list of elements (``T...``) in the array case
+they just always use a variadic list of elements (`T...`) in the array case
 and (key, value) tuples in the dictionary case. A variadic list is always
 exposed using the standard library's Array type, so there is no separate step
 to jump through.
@@ -152,6 +154,6 @@ The default array literal type is always Array, and the default dictionary
 literal type is always Dictionary.
 
 String interpolations are a bit different: they create an instance of 
-``T.StringInterpolation`` and append each segment to it, then initialize
-an instance of ``T`` with that instance. The default type
-for an interpolated literal without context is also ``StringLiteralType``.
+`T.StringInterpolation` and append each segment to it, then initialize
+an instance of `T` with that instance. The default type
+for an interpolated literal without context is also `StringLiteralType`.
