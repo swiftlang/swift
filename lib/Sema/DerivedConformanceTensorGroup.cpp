@@ -172,14 +172,12 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
   currAddressDecl->setHasNonPatternBindingInit(true);
   currAddressDecl->setInterfaceType(baseAddressType);
 
-  Pattern *currAddressPat = new (C)
-      NamedPattern(currAddressDecl, /*implicit*/ true);
-  currAddressPat = new (C)
-      VarPattern(SourceLoc(), /*isLet*/ false, currAddressPat,
-                 /*implicit*/ true);
-  currAddressPat = new (C)
-      OptionalSomePattern(currAddressPat, currAddressPat->getEndLoc(),
-                          /*implicit*/ true);
+  Pattern *currAddressPat = NamedPattern::createImplicit(C, currAddressDecl);
+  currAddressPat =
+      VarPattern::createImplicit(C, /*isLet*/ false, currAddressPat);
+  currAddressPat =
+      new (C) OptionalSomePattern(currAddressPat, currAddressPat->getEndLoc());
+  currAddressPat->setImplicit();
   StmtConditionElement cond[] = {
       StmtConditionElement(SourceLoc(), currAddressPat, /*Init*/ paramDRE)};
 
