@@ -1299,8 +1299,7 @@ public:
           Ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
       if (nominalTypes.empty() && wantsDesignatedTypes) {
         auto identifiers = OD->getIdentifiers();
-        auto identifierLocs = OD->getIdentifierLocs();
-        if (checkDesignatedTypes(OD, identifiers, identifierLocs, Ctx))
+        if (checkDesignatedTypes(OD, identifiers))
           OD->setInvalid();
       }
       return;

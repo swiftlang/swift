@@ -1336,12 +1336,33 @@ lookupPrecedenceGroup(const PrecedenceGroupDescriptor &descriptor) {
   }
 }
 
+static PrecedenceGroupDecl *lookupPrecedenceGroupForRelation(
+    DeclContext *dc, PrecedenceGroupDecl::Relation rel,
+    PrecedenceGroupDescriptor::PathDirection direction) {
+  auto &ctx = dc->getASTContext();
+  PrecedenceGroupDescriptor desc{dc, rel.Name, rel.NameLoc, direction};
+  auto result = ctx.evaluator(ValidatePrecedenceGroupRequest{desc});
+  if (!result) {
+    // Handle a cycle error specially. We don't want to default to an empty
+    // result, as we don't want to emit an error about not finding a precedence
+    // group.
+    using Error = CyclicalRequestError<ValidatePrecedenceGroupRequest>;
+    llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
+    return nullptr;
+  }
+  if (!result.get()) {
+    ctx.Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
+  }
+  return result.get();
+}
+
 void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
   assert(PGD && "Cannot validate a null precedence group!");
   if (PGD->isInvalid())
     return;
 
   auto &Diags = PGD->getASTContext().Diags;
+  auto *dc = PGD->getDeclContext();
 
   // Validate the higherThan relationships.
   bool addedHigherThan = false;
@@ -1349,17 +1370,12 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     if (rel.Group)
       continue;
 
-    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
-                                   PrecedenceGroupDescriptor::HigherThan};
-    auto group =
-        evaluateOrDefault(PGD->getASTContext().evaluator,
-                          ValidatePrecedenceGroupRequest{desc}, nullptr);
-    if (group) {
-      rel.Group = group;
+    // TODO: Requestify the lookup of a relation's group.
+    rel.Group = lookupPrecedenceGroupForRelation(
+        dc, rel, PrecedenceGroupDescriptor::HigherThan);
+    if (rel.Group) {
       addedHigherThan = true;
     } else {
-      if (!lookupPrecedenceGroup(desc))
-        Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
       PGD->setInvalid();
     }
   }
@@ -1369,24 +1385,16 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     if (rel.Group)
       continue;
 
-    auto dc = PGD->getDeclContext();
-    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
-                                   PrecedenceGroupDescriptor::LowerThan};
-    auto group =
-        evaluateOrDefault(PGD->getASTContext().evaluator,
-                          ValidatePrecedenceGroupRequest{desc}, nullptr);
-    bool hadError = false;
-    if (group) {
-      rel.Group = group;
-    } else {
-      hadError = true;
-      if (auto *rawGroup = lookupPrecedenceGroup(desc)) {
-        // We already know the lowerThan path is errant, try to use the results
-        // of a raw lookup to enforce the same-module restriction.
-        group = rawGroup;
-      } else {
-        Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
-      }
+    auto *group = lookupPrecedenceGroupForRelation(
+        dc, rel, PrecedenceGroupDescriptor::LowerThan);
+    rel.Group = group;
+
+    // If we didn't find anything, try doing a raw lookup for the group before
+    // diagnosing the 'lowerThan' within the same-module restriction. This can
+    // allow us to diagnose even if we have a precedence group cycle.
+    if (!group) {
+      group = lookupPrecedenceGroup(PrecedenceGroupDescriptor{
+          dc, rel.Name, rel.NameLoc, PrecedenceGroupDescriptor::LowerThan});
     }
 
     if (group &&
@@ -1396,10 +1404,10 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
         Diags.diagnose(group->getNameLoc(), diag::kind_declared_here,
                        DescriptiveDeclKind::PrecedenceGroup);
       }
-      hadError = true;
+      PGD->setInvalid();
     }
 
-    if (hadError)
+    if (!rel.Group)
       PGD->setInvalid();
   }
 
@@ -1441,18 +1449,13 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 }
 
 bool swift::checkDesignatedTypes(OperatorDecl *OD,
-                                 ArrayRef<Identifier> identifiers,
-                                 ArrayRef<SourceLoc> identifierLocs,
-                                 ASTContext &ctx) {
-  assert(identifiers.size() == identifierLocs.size());
-
-  SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+                                 ArrayRef<Located<Identifier>> identifiers) {
+  auto &ctx = OD->getASTContext();
   auto *DC = OD->getDeclContext();
 
-  for (auto index : indices(identifiers)) {
-    auto *decl = resolveSingleNominalTypeDecl(DC, identifierLocs[index],
-                                              identifiers[index], ctx);
-
+  SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+  for (auto ident : identifiers) {
+    auto *decl = resolveSingleNominalTypeDecl(DC, ident.Loc, ident.Item, ctx);
     if (!decl)
       return true;
 
@@ -1471,63 +1474,55 @@ bool swift::checkDesignatedTypes(OperatorDecl *OD,
 PrecedenceGroupDecl *
 OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
                                          InfixOperatorDecl *IOD) const {
-  auto enableOperatorDesignatedTypes =
-      IOD->getASTContext().TypeCheckerOpts.EnableOperatorDesignatedTypes;
+  auto &ctx = IOD->getASTContext();
+  auto *dc = IOD->getDeclContext();
 
-  auto &Diags = IOD->getASTContext().Diags;
+  auto enableOperatorDesignatedTypes =
+      ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
+
+  auto &Diags = ctx.Diags;
   PrecedenceGroupDecl *group = nullptr;
 
   auto identifiers = IOD->getIdentifiers();
-  auto identifierLocs = IOD->getIdentifierLocs();
-
   if (!identifiers.empty()) {
-    group = TypeChecker::lookupPrecedenceGroup(
-        IOD->getDeclContext(), identifiers[0], identifierLocs[0]);
+    auto name = identifiers[0].Item;
+    auto loc = identifiers[0].Loc;
+
+    group = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
 
     if (group) {
       identifiers = identifiers.slice(1);
-      identifierLocs = identifierLocs.slice(1);
     } else {
       // If we're either not allowing types, or we are allowing them
       // and this identifier is not a type, emit an error as if it's
       // a precedence group.
-      auto *DC = IOD->getDeclContext();
       if (!(enableOperatorDesignatedTypes &&
-            resolveSingleNominalTypeDecl(DC, identifierLocs[0], identifiers[0],
-                                         IOD->getASTContext(),
+            resolveSingleNominalTypeDecl(dc, loc, name, ctx,
                                          TypeResolutionFlags::SilenceErrors))) {
-        Diags.diagnose(identifierLocs[0], diag::unknown_precedence_group,
-                       identifiers[0]);
+        Diags.diagnose(loc, diag::unknown_precedence_group, name);
         identifiers = identifiers.slice(1);
-        identifierLocs = identifierLocs.slice(1);
       }
     }
   }
 
-  if (!identifiers.empty() && !enableOperatorDesignatedTypes) {
-    assert(!group);
-    Diags.diagnose(identifierLocs[0], diag::unknown_precedence_group,
-                   identifiers[0]);
-    identifiers = identifiers.slice(1);
-    identifierLocs = identifierLocs.slice(1);
-    assert(identifiers.empty() && identifierLocs.empty());
-  }
+  // Unless operator designed types are enabled, the parser will ensure that
+  // only one identifier is allowed in the clause, which we should have just
+  // handled.
+  assert(identifiers.empty() || enableOperatorDesignatedTypes);
 
   if (!group) {
-    group = TypeChecker::lookupPrecedenceGroup(
-        IOD->getDeclContext(), IOD->getASTContext().Id_DefaultPrecedence,
-        SourceLoc());
+    group = TypeChecker::lookupPrecedenceGroup(dc, ctx.Id_DefaultPrecedence,
+                                               SourceLoc());
   }
 
   if (!group) {
     Diags.diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
-                   IOD->getASTContext().Id_DefaultPrecedence);
+                   ctx.Id_DefaultPrecedence);
   }
 
   auto nominalTypes = IOD->getDesignatedNominalTypes();
   if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
-    if (checkDesignatedTypes(IOD, identifiers, identifierLocs,
-                             IOD->getASTContext())) {
+    if (checkDesignatedTypes(IOD, identifiers)) {
       IOD->setInvalid();
     }
   }

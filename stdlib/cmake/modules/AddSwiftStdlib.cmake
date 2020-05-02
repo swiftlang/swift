@@ -2,6 +2,22 @@
 include(AddSwift)
 include(SwiftSource)
 
+function(add_dependencies_multiple_targets)
+  cmake_parse_arguments(
+      ADMT # prefix
+      "" # options
+      "" # single-value args
+      "TARGETS;DEPENDS" # multi-value args
+      ${ARGN})
+  precondition(ADMT_UNPARSED_ARGUMENTS NEGATE MESSAGE "unrecognized arguments: ${ADMT_UNPARSED_ARGUMENTS}")
+
+  if(NOT "${ADMT_DEPENDS}" STREQUAL "")
+    foreach(target ${ADMT_TARGETS})
+      add_dependencies("${target}" ${ADMT_DEPENDS})
+    endforeach()
+  endif()
+endfunction()
+
 # Usage:
 # _add_target_variant_c_compile_link_flags(
 #   SDK sdk
