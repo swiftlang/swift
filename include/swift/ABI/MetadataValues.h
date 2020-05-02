@@ -1164,6 +1164,9 @@ namespace SpecialPointerAuthDiscriminators {
   /// they're important enough to be worth writing in one place.
   const uint16_t OpaqueReadResumeFunction = 56769;
   const uint16_t OpaqueModifyResumeFunction = 3909;
+
+  /// Resilient class stub initializer callback
+  const uint16_t ResilientClassStubInitCallback = 0xC671;
 }
 
 /// The number of arguments that will be passed directly to a generic

@@ -610,7 +610,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
 
-  Pattern *propPat = new (Context) NamedPattern(propDecl, /*implicit*/ true);
+  Pattern *propPat = NamedPattern::createImplicit(Context, propDecl);
   propPat->setType(propertyContextType);
 
   propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
@@ -766,7 +766,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
   indexVar->setImplicit();
 
   // generate: var indexVar
-  Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
+  Pattern *indexPat = NamedPattern::createImplicit(C, indexVar);
   indexPat->setType(intType);
   indexPat = TypedPattern::createImplicit(C, indexPat, intType);
   indexPat->setType(intType);
@@ -887,14 +887,13 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
 
       auto namedPattern = new (C) NamedPattern(payloadVar);
       namedPattern->setImplicit();
-      auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                           namedPattern);
+      auto letPattern = VarPattern::createImplicit(C, /*isLet*/ true,
+                                                   namedPattern);
       elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
                                                 SourceLoc(), letPattern));
     }
 
-    auto pat = TuplePattern::create(C, SourceLoc(), elementPatterns,
-                                    SourceLoc());
+    auto pat = TuplePattern::createImplicit(C, elementPatterns);
     pat->setImplicit();
     return pat;
   }
@@ -910,9 +909,7 @@ DerivedConformance::enumElementPayloadSubpattern(EnumElementDecl *enumElementDec
   namedPattern->setImplicit();
   auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
                                        namedPattern);
-  auto pat = new (C) ParenPattern(SourceLoc(), letPattern, SourceLoc());
-  pat->setImplicit();
-  return pat;
+  return ParenPattern::createImplicit(C, letPattern);
 }
 
 

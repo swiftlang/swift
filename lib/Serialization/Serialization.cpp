@@ -2670,8 +2670,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     switch (pattern->getKind()) {
     case PatternKind::Paren: {
       unsigned abbrCode = S.DeclTypeAbbrCodes[ParenPatternLayout::Code];
-      ParenPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     pattern->isImplicit());
+      ParenPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
       writePattern(cast<ParenPattern>(pattern)->getSubPattern());
       break;
     }
@@ -2681,8 +2680,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       unsigned abbrCode = S.DeclTypeAbbrCodes[TuplePatternLayout::Code];
       TuplePatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                      S.addTypeRef(getPatternType()),
-                                     tuple->getNumElements(),
-                                     tuple->isImplicit());
+                                     tuple->getNumElements());
 
       abbrCode = S.DeclTypeAbbrCodes[TuplePatternEltLayout::Code];
       for (auto &elt : tuple->getElements()) {
@@ -2699,15 +2697,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       unsigned abbrCode = S.DeclTypeAbbrCodes[NamedPatternLayout::Code];
       NamedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                      S.addDeclRef(named->getDecl()),
-                                     S.addTypeRef(getPatternType()),
-                                     named->isImplicit());
+                                     S.addTypeRef(getPatternType()));
       break;
     }
     case PatternKind::Any: {
       unsigned abbrCode = S.DeclTypeAbbrCodes[AnyPatternLayout::Code];
       AnyPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   S.addTypeRef(getPatternType()),
-                                   pattern->isImplicit());
+                                   S.addTypeRef(getPatternType()));
       break;
     }
     case PatternKind::Typed: {
@@ -2715,8 +2711,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[TypedPatternLayout::Code];
       TypedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     S.addTypeRef(getPatternType()),
-                                     typed->isImplicit());
+                                     S.addTypeRef(getPatternType()));
       writePattern(typed->getSubPattern());
       break;
     }
@@ -2732,7 +2727,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[VarPatternLayout::Code];
       VarPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   var->isLet(), var->isImplicit());
+                                   var->isLet());
       writePattern(var->getSubPattern());
       break;
     }

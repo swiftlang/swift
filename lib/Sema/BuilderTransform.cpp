@@ -895,7 +895,7 @@ private:
 
     // Form a new pattern binding to bind the temporary variable to the
     // transformed expression.
-    auto pattern = new (ctx) NamedPattern(temporaryVar,/*implicit=*/true);
+    auto pattern = NamedPattern::createImplicit(ctx, temporaryVar);
     pattern->setType(temporaryVar->getType());
 
     auto pbd = PatternBindingDecl::create(
