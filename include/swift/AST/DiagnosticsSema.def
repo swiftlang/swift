@@ -2686,7 +2686,7 @@ ERROR(implementation_only_override_import_without_attr,none,
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "
-      "synthesized in extension because initializer requirement %1 can only be "
+      "synthesized in extension because initializer requirement %1 can only "
       "be satisfied by a 'required' initializer in the class definition",
       (Type, DeclName))
 ERROR(cannot_synthesize_in_crossfile_extension,none,
