@@ -6,7 +6,6 @@ Contents
 .. toctree::
    :maxdepth: 1
 
-   IndexInvalidation
    AccessControl
    ErrorHandling
    ErrorHandlingRationale
