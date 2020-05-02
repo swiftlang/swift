@@ -26,7 +26,7 @@ Some terms:
 
 - For the purposes of this document, a _module_ is a single distributable unit
   of API. (We use this term for a lot of other things too, though; check out
-  [Lexicon.rst](Lexicon.rst) for the full list.) "Foundation" is a single
+  [Lexicon.md](Lexicon.md) for the full list.) "Foundation" is a single
   module, as is the Swift standard library ("Swift"). An app is a module too.
 
 - A _compilation unit_ is a set of source files that are compiled together. In
