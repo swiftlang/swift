@@ -2056,6 +2056,7 @@ public:
         GenericSignature::get({PD->getProtocolSelfType()},
                               PD->getRequirementSignature());
 
+      llvm::errs() << "\n";
       llvm::errs() << "Protocol requirement signature:\n";
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
