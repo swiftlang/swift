@@ -131,7 +131,7 @@ public enum Result<Success, Failure: Error> {
   ///     do {
   ///         let value = try integerResult.get()
   ///         print("The value is \(value).")
-  ///     } catch error {
+  ///     } catch let error {
   ///         print("Error retrieving the value: \(error)")
   ///     }
   ///     // Prints "The value is 5."
