@@ -52,16 +52,20 @@ bool FailureDiagnostic::diagnoseAsNote() {
 }
 
 ASTNode FailureDiagnostic::getAnchor() const {
-  auto &cs = getConstraintSystem();
-
   auto *locator = getLocator();
   // Resolve the locator to a specific expression.
-  SourceRange range;
-  ConstraintLocator *resolved = simplifyLocator(cs, locator, range);
-  if (!resolved || !resolved->getAnchor())
-    return locator->getAnchor();
 
-  auto anchor = resolved->getAnchor();
+  auto anchor = locator->getAnchor();
+
+  {
+    SourceRange range;
+    auto path = locator->getPath();
+
+    simplifyLocator(anchor, path, range);
+    if (!anchor)
+      return locator->getAnchor();
+  }
+
   // FIXME: Work around an odd locator representation that doesn't separate the
   // base of a subscript member from the member access.
   if (locator->isLastElement<LocatorPathElt::SubscriptMember>()) {
@@ -73,7 +77,11 @@ ASTNode FailureDiagnostic::getAnchor() const {
 }
 
 Type FailureDiagnostic::getType(ASTNode node, bool wantRValue) const {
-  return resolveType(S.getType(node), /*reconstituteSugar=*/false, wantRValue);
+  return resolveType(getRawType(node), /*reconstituteSugar=*/false, wantRValue);
+}
+
+Type FailureDiagnostic::getRawType(ASTNode node) const {
+  return S.getType(node);
 }
 
 template <typename... ArgTypes>
@@ -146,6 +154,18 @@ Type FailureDiagnostic::restoreGenericParameters(
   });
 }
 
+bool FailureDiagnostic::conformsToKnownProtocol(
+    Type type, KnownProtocolKind protocol) const {
+  auto &cs = getConstraintSystem();
+  return constraints::conformsToKnownProtocol(cs, type, protocol);
+}
+
+Type FailureDiagnostic::isRawRepresentable(Type type,
+                                           KnownProtocolKind protocol) const {
+  auto &cs = getConstraintSystem();
+  return constraints::isRawRepresentable(cs, type, protocol);
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto anchor = getRawAnchor();
 
@@ -183,7 +203,7 @@ const Requirement &RequirementFailure::getRequirement() const {
 
 ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     ConstraintLocator *locator) {
-  auto &cs = getConstraintSystem();
+  auto &solution = getSolution();
   auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
   if (!reqElt.isConditionalRequirement())
     return nullptr;
@@ -192,10 +212,10 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
   auto *typeReqLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
 
   auto result = llvm::find_if(
-      cs.CheckedConformances,
+      solution.Conformances,
       [&](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
               &conformance) { return conformance.first == typeReqLoc; });
-  assert(result != cs.CheckedConformances.end());
+  assert(result != solution.Conformances.end());
 
   auto conformance = result->second;
   assert(conformance.isConcrete());
@@ -409,9 +429,8 @@ bool MissingConformanceFailure::diagnoseAsError() {
     if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(findParentExpr(anchor))) {
       auto *caseExpr = binaryOp->getArg()->getElement(0);
 
-      auto &cs = getConstraintSystem();
       llvm::SmallPtrSet<Expr *, 4> anchors;
-      for (const auto *fix : cs.getFixes()) {
+      for (const auto *fix : getSolution().Fixes) {
         if (auto anchor = fix->getAnchor()) {
           if (anchor.is<Expr *>())
             anchors.insert(getAsExpr(anchor));
@@ -1264,12 +1283,11 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
                                                    ParameterTypeFlags())});
 
         if (auto info = getFunctionArgApplyInfo(argLoc)) {
-          auto &cs = getConstraintSystem();
           auto paramType = info->getParamType();
           auto argType = getType(inoutExpr)->getWithoutSpecifierType();
 
           PointerTypeKind ptr;
-          if (cs.isArrayType(argType) &&
+          if (isArrayType(argType) &&
               paramType->getAnyPointerElementType(ptr) &&
               (ptr == PTK_UnsafePointer || ptr == PTK_UnsafeRawPointer)) {
             emitDiagnosticAt(inoutExpr->getLoc(),
@@ -2023,8 +2041,7 @@ bool ContextualFailure::diagnoseAsError() {
   }
 
   case ConstraintLocator::RValueAdjustment: {
-    auto &cs = getConstraintSystem();
-
+    auto &solution = getSolution();
     auto overload = getOverloadChoiceIfAvailable(
         getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember));
     if (!(overload && overload->choice.isDecl()))
@@ -2050,8 +2067,11 @@ bool ContextualFailure::diagnoseAsError() {
 
     auto params = fnType->getParams();
 
-    ParameterListInfo info(params, choice,
-                           hasAppliedSelf(cs, overload->choice));
+    ParameterListInfo info(
+        params, choice,
+        hasAppliedSelf(overload->choice, [&solution](Type type) {
+          return solution.simplifyType(type);
+        }));
     auto numMissingArgs = llvm::count_if(
         indices(params), [&info](const unsigned paramIdx) -> bool {
           return !info.hasDefaultArgument(paramIdx);
@@ -2404,9 +2424,8 @@ bool ContextualFailure::diagnoseConversionToBool() const {
 
   // If we're trying to convert something from optional type to an integer, then
   // a comparison against nil was probably expected.
-  auto &cs = getConstraintSystem();
-  if (conformsToKnownProtocol(cs, fromType, KnownProtocolKind::BinaryInteger) &&
-      conformsToKnownProtocol(cs, fromType,
+  if (conformsToKnownProtocol(fromType, KnownProtocolKind::BinaryInteger) &&
+      conformsToKnownProtocol(fromType,
                               KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     StringRef prefix = "((";
     StringRef suffix;
@@ -2501,7 +2520,6 @@ bool ContextualFailure::diagnoseYieldByReferenceMismatch() const {
 bool ContextualFailure::tryRawRepresentableFixIts(
     InFlightDiagnostic &diagnostic,
     KnownProtocolKind rawRepresentableProtocol) const {
-  auto &CS = getConstraintSystem();
   auto anchor = getAnchor();
   auto fromType = getFromType();
   auto toType = getToType();
@@ -2556,14 +2574,14 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     }
   };
 
-  if (conformsToKnownProtocol(CS, fromType, rawRepresentableProtocol)) {
-    if (conformsToKnownProtocol(CS, fromType, KnownProtocolKind::OptionSet) &&
+  if (conformsToKnownProtocol(fromType, rawRepresentableProtocol)) {
+    if (conformsToKnownProtocol(fromType, KnownProtocolKind::OptionSet) &&
         isExpr<IntegerLiteralExpr>(anchor) &&
         castToExpr<IntegerLiteralExpr>(anchor)->getDigitsText() == "0") {
       diagnostic.fixItReplace(::getSourceRange(anchor), "[]");
       return true;
     }
-    if (auto rawTy = isRawRepresentable(CS, toType, rawRepresentableProtocol)) {
+    if (auto rawTy = isRawRepresentable(toType, rawRepresentableProtocol)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
       // or just 'Result(rawValue: <expr>)'.
       std::string convWrapBefore = toType.getString();
@@ -2593,8 +2611,8 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     }
   }
 
-  if (auto rawTy = isRawRepresentable(CS, fromType, rawRepresentableProtocol)) {
-    if (conformsToKnownProtocol(CS, toType, rawRepresentableProtocol)) {
+  if (auto rawTy = isRawRepresentable(fromType, rawRepresentableProtocol)) {
+    if (conformsToKnownProtocol(toType, rawRepresentableProtocol)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
       if (!TypeChecker::isConvertibleTo(rawTy, toType, getDC())) {
@@ -2875,12 +2893,11 @@ void ContextualFailure::tryComputedPropertyFixIts() const {
 }
 
 bool ContextualFailure::isIntegerToStringIndexConversion() const {
-  auto &cs = getConstraintSystem();
   auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
 
   auto fromType = getFromType();
   auto toType = getToType()->getCanonicalType();
-  return (conformsToKnownProtocol(cs, fromType, kind) &&
+  return (conformsToKnownProtocol(fromType, kind) &&
           toType.getString() == "String.CharacterView.Index");
 }
 
@@ -3137,12 +3154,18 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
 }
 
 bool SubscriptMisuseFailure::diagnoseAsError() {
+  auto *locator = getLocator();
   auto &sourceMgr = getASTContext().SourceMgr;
 
   auto *memberExpr = castToExpr<UnresolvedDotExpr>(getRawAnchor());
 
   auto memberRange = getSourceRange();
-  (void)simplifyLocator(getConstraintSystem(), getLocator(), memberRange);
+
+  {
+    auto rawAnchor = getRawAnchor();
+    auto path = locator->getPath();
+    simplifyLocator(rawAnchor, path, memberRange);
+  }
 
   auto nameLoc = DeclNameLoc(memberRange.Start);
 
@@ -3172,7 +3195,7 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
   }
   diag.flush();
 
-  if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
+  if (auto overload = getOverloadChoiceIfAvailable(locator)) {
     emitDiagnosticAt(overload->choice.getDecl(), diag::kind_declared_here,
                      DescriptiveDeclKind::Subscript);
   }
@@ -3404,9 +3427,8 @@ bool MissingMemberFailure::diagnoseForDynamicCallable() const {
 }
 
 bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
-  auto &cs = getConstraintSystem();
   auto *expr = castToExpr(getAnchor());
-  auto *parentExpr = cs.getParentExpr(expr);
+  auto *parentExpr = findParentExpr(expr);
   auto &solution = getSolution();
 
   if (!(parentExpr && isa<UnresolvedMemberExpr>(expr)))
@@ -3414,17 +3436,17 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
 
   auto parentType = getType(parentExpr);
 
-  if (!cs.isCollectionType(parentType) && !parentType->is<TupleType>())
+  if (!isCollectionType(parentType) && !parentType->is<TupleType>())
     return false;
 
   if (isa<TupleExpr>(parentExpr)) {
-    parentExpr = cs.getParentExpr(parentExpr);
+    parentExpr = findParentExpr(parentExpr);
     if (!parentExpr)
       return false;
   }
 
   if (auto *defaultableVar =
-          cs.getType(parentExpr)->getAs<TypeVariableType>()) {
+          getRawType(parentExpr)->getAs<TypeVariableType>()) {
     if (solution.DefaultedConstraints.count(
             defaultableVar->getImpl().getLocator()) != 0) {
       emitDiagnostic(diag::unresolved_member_no_inference, getName());
@@ -4263,12 +4285,11 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
     return (*fix)->getKind() == kind;
   };
 
-  auto &cs = solution.getConstraintSystem();
   auto *callLocator =
-      cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument);
+      solution.getConstraintLocator(anchor, {ConstraintLocator::ApplyArgument});
 
   auto argFlags = fnType->getParams()[0].getParameterFlags();
-  auto *argLoc = cs.getConstraintLocator(
+  auto *argLoc = solution.getConstraintLocator(
       callLocator, LocatorPathElt::ApplyArgToParam(0, 0, argFlags));
 
   if (!(hasFixFor(FixKind::AllowArgumentTypeMismatch, argLoc) &&
@@ -4297,7 +4318,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto argType = solution.simplifyType(solution.getType(argument));
   auto paramType = fnType->getParams()[1].getPlainType();
 
-  return TypeChecker::isConvertibleTo(argType, paramType, cs.DC);
+  return TypeChecker::isConvertibleTo(argType, paramType, solution.getDC());
 }
 
 std::tuple<Expr *, Expr *, unsigned, bool>
@@ -5055,7 +5076,7 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
 
 bool MissingGenericArgumentsFailure::diagnoseParameter(
     Anchor anchor, GenericTypeParamType *GP) const {
-  auto &cs = getConstraintSystem();
+  auto &solution = getSolution();
 
   auto loc = anchor.is<Expr *>() ? anchor.get<Expr *>()->getLoc()
                                  : anchor.get<TypeRepr *>()->getLoc();
@@ -5065,7 +5086,7 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
   // going to be completely cut off from the rest of constraint system,
   // that's why we'd get two fixes in this case which is not ideal.
   if (locator->isForContextualType() &&
-      llvm::count_if(cs.DefaultedConstraints,
+      llvm::count_if(solution.DefaultedConstraints,
                      [&GP](const ConstraintLocator *locator) {
                        return locator->getGenericParameter() == GP;
                      }) > 1) {
@@ -5105,7 +5126,7 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
 
 void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     Anchor anchor) const {
-  auto &cs = getConstraintSystem();
+  auto &solution = getSolution();
   auto *paramDC = getDeclContext();
 
   if (!paramDC)
@@ -5123,7 +5144,9 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
   };
 
   llvm::SmallDenseMap<GenericTypeParamDecl *, Type> params;
-  for (auto *typeVar : cs.getTypeVariables()) {
+  for (auto &entry : solution.typeBindings) {
+    auto *typeVar = entry.first;
+
     auto *GP = typeVar->getImpl().getGenericParameter();
     if (!GP)
       continue;
@@ -5133,7 +5156,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
 
     // If this is one of the defaulted parameter types, attempt
     // to emit placeholder for it instead of `Any`.
-    if (llvm::any_of(cs.DefaultedConstraints,
+    if (llvm::any_of(solution.DefaultedConstraints,
                      [&](const ConstraintLocator *locator) {
                        return GP->getDecl() == getParamDecl(locator);
                      }))
@@ -5560,11 +5583,14 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // let's avoid producing a diagnostic second time, because first
   // one would cover both arguments.
   if (getAsExpr(getAnchor()) == rhs && rhsType->is<FunctionType>()) {
-    auto &cs = getConstraintSystem();
-    if (cs.hasFixFor(getConstraintLocator(
-            binaryOp, {ConstraintLocator::ApplyArgument,
-                       LocatorPathElt::ApplyArgToParam(
-                           0, 0, getParameterFlagsAtIndex(0))})))
+    auto *argLoc = getConstraintLocator(
+        binaryOp,
+        {ConstraintLocator::ApplyArgument,
+         LocatorPathElt::ApplyArgToParam(0, 0, getParameterFlagsAtIndex(0))});
+
+    if (llvm::any_of(getSolution().Fixes, [&argLoc](const ConstraintFix *fix) {
+          return fix->getLocator() == argLoc;
+        }))
       return true;
   }
 

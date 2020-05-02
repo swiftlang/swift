@@ -2511,6 +2511,8 @@ size_t Solution::getTotalMemory() const {
          Conformances.size() * sizeof(std::pair<ConstraintLocator *, ProtocolConformanceRef>);
 }
 
+DeclContext *Solution::getDC() const { return constraintSystem->DC; }
+
 DeclName OverloadChoice::getName() const {
   switch (getKind()) {
     case OverloadChoiceKind::Decl:
