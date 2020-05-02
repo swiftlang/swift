@@ -2793,7 +2793,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     if (!R) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_lacks_member,
-               PD->getBaseName(), attr->getMemberName())
+               PD->getName(), attr->getMemberName())
         .highlight(attr->getMemberNameLoc().getSourceRange());
     }
 
