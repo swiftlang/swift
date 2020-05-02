@@ -1942,7 +1942,8 @@ public:
       bool isInvalidSuperclass = false;
 
       if (Super->isFinal()) {
-        CD->diagnose(diag::inheritance_from_final_class, Super->getName());
+        CD->diagnose(diag::inheritance_from_final_class,
+                     Super->getDeclaredType());
         // FIXME: should this really be skipping the rest of decl-checking?
         return;
       }
