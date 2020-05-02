@@ -494,7 +494,7 @@ extension SetAlgebra {
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
-  ///     let nonNeighbors = employees.subtract(neighbors)
+  ///     let nonNeighbors = employees.subtracting(neighbors)
   ///     print(nonNeighbors)
   ///     // Prints "["Diana", "Chris", "Alicia"]"
   ///
