@@ -12,9 +12,6 @@ Contents
    ErrorHandling
    ErrorHandlingRationale
    Generics
-   LogicalObjects
-   ObjectInitialization
-   PatternMatching
    StoredAndComputedVariables
    SIL
    TypeChecker
