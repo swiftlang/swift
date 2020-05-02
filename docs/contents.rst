@@ -16,7 +16,6 @@ Contents
    SIL
    TypeChecker
    OptimizationTips
-   libFuzzerIntegration
    ABI: TypeMetadata <ABI/TypeMetadata>
    ABI: TypeLayout <ABI/TypeLayout>
    ABI: Mangling <ABI/Mangling>
