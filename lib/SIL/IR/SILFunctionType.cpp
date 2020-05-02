@@ -305,6 +305,8 @@ getAutoDiffDifferentialType(SILFunctionType *originalFnTy,
                             IndexSubset *parameterIndices, unsigned resultIndex,
                             LookupConformanceFn lookupConformance,
                             TypeConverter &TC) {
+  // Given the tangent type and the corresponding original parameter's
+  // convention, returns the tangent parameter's convention.
   auto getTangentParameterConvention =
       [&](CanType tanType,
           ParameterConvention origParamConv) -> ParameterConvention {
@@ -314,6 +316,8 @@ getAutoDiffDifferentialType(SILFunctionType *originalFnTy,
                                tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
+    // When the tangent type is address only, we must ensure that the tangent
+    // parameter's convention is indirect.
     if (tl.isAddressOnly() && !isIndirectFormalParameter(origParamConv)) {
       switch (origParamConv) {
       case ParameterConvention::Direct_Guaranteed:
@@ -328,6 +332,8 @@ getAutoDiffDifferentialType(SILFunctionType *originalFnTy,
     return origParamConv;
   };
 
+  // Given the tangent type and the corresponding original result's convention,
+  // returns the tangent result's convention.
   auto getTangentResultConvention =
       [&](CanType tanType,
           ResultConvention origResConv) -> ResultConvention {
@@ -337,6 +343,8 @@ getAutoDiffDifferentialType(SILFunctionType *originalFnTy,
                                tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
+    // When the tangent type is address only, we must ensure that the tangent
+    // result's convention is indirect.
     if (tl.isAddressOnly() && !isIndirectFormalResult(origResConv)) {
       switch (origResConv) {
       case ResultConvention::Owned:
