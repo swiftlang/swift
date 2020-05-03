@@ -357,8 +357,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     Idx++;
   }
 
-  auto anyPat = new (C) AnyPattern(SourceLoc());
-  anyPat->setImplicit();
+  auto anyPat = AnyPattern::createImplicit(C);
   auto dfltLabelItem = CaseLabelItem::getDefault(anyPat);
 
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());

@@ -1672,7 +1672,7 @@ namespace {
                      / IGM.getPointerSize());
       } else {
         ExtraClassDescriptorFlags flags;
-        if (hasObjCResilientClassStub(IGM, getType()))
+        if (IGM.hasObjCResilientClassStub(getType()))
           flags.setObjCResilientClassStub(true);
         B.addInt32(flags.getOpaqueValue());
       }
@@ -1694,7 +1694,7 @@ namespace {
             ClassMetadataStrategy::Resilient)
         return;
 
-      if (!hasObjCResilientClassStub(IGM, getType()))
+      if (!IGM.hasObjCResilientClassStub(getType()))
         return;
 
       B.addRelativeAddress(
@@ -3390,8 +3390,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
       // Even non-@objc classes can have Objective-C categories attached, so
       // we always emit a resilient class stub as long as -enable-objc-interop
       // is set.
-      if (hasObjCResilientClassStub(IGM, classDecl)) {
-        emitObjCResilientClassStub(IGM, classDecl);
+      if (IGM.hasObjCResilientClassStub(classDecl)) {
+        IGM.emitObjCResilientClassStub(classDecl);
 
         if (classDecl->isObjC()) {
           auto *stub = IGM.getAddrOfObjCResilientClassStub(

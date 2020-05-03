@@ -2597,7 +2597,7 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
         VD->getAttrs().add(new (Context) ReferenceOwnershipAttr(
           SourceRange(ownershipLocStart, ownershipLocEnd), ownershipKind));
 
-      auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
+      auto pattern = NamedPattern::createImplicit(Context, VD);
 
       auto *PBD = PatternBindingDecl::create(
           Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,

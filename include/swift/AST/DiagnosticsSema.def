@@ -2536,7 +2536,7 @@ NOTE(superclass_here,none,"superclass is declared here", ())
 ERROR(superclass_of_open_not_open,none,
   "superclass %0 of open class must be open", (Type))
 ERROR(inheritance_from_final_class,none,
-      "inheritance from a final class %0", (Identifier))
+      "inheritance from a final class %0", (Type))
 ERROR(inheritance_from_unspecialized_objc_generic_class,none,
       "inheritance from a generic Objective-C class %0 must bind "
       "type parameters of %0 to specific concrete types", (Identifier))
@@ -2686,7 +2686,7 @@ ERROR(implementation_only_override_import_without_attr,none,
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "
-      "synthesized in extension because initializer requirement %1 can only be "
+      "synthesized in extension because initializer requirement %1 can only "
       "be satisfied by a 'required' initializer in the class definition",
       (Type, DeclName))
 ERROR(cannot_synthesize_in_crossfile_extension,none,
