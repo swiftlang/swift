@@ -222,8 +222,7 @@ bool AbstractionPattern::requiresClass() const {
     auto type = getType();
     if (auto archetype = dyn_cast<ArchetypeType>(type))
       return archetype->requiresClass();
-    if (isa<DependentMemberType>(type) ||
-        isa<GenericTypeParamType>(type)) {
+    if (type->isTypeParameter()) {
       if (getKind() == Kind::ClangType) {
         // ObjC generics are always class constrained.
         return true;
