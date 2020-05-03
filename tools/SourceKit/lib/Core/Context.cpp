@@ -29,12 +29,16 @@ bool GlobalConfig::shouldOptimizeForIDE() const {
   return State.OptimizeForIDE;
 }
 
-SourceKit::Context::Context(StringRef RuntimeLibPath,
+SourceKit::Context::Context(
+    StringRef RuntimeLibPath, StringRef DiagnosticDocumentationPath,
     llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
-    LangSupportFactoryFn,
-    bool shouldDispatchNotificationsOnMain) : RuntimeLibPath(RuntimeLibPath),
-    NotificationCtr(new NotificationCenter(shouldDispatchNotificationsOnMain)),
-    Config(new GlobalConfig()) {
+        LangSupportFactoryFn,
+    bool shouldDispatchNotificationsOnMain)
+    : RuntimeLibPath(RuntimeLibPath),
+      DiagnosticDocumentationPath(DiagnosticDocumentationPath),
+      NotificationCtr(
+          new NotificationCenter(shouldDispatchNotificationsOnMain)),
+      Config(new GlobalConfig()) {
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
 }

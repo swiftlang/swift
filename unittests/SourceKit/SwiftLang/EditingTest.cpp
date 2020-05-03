@@ -114,6 +114,7 @@ public:
     // thread may be active trying to use it to post notifications.
     // FIXME: Use shared_ptr ownership to avoid such issues.
     Ctx = new SourceKit::Context(getRuntimeLibPath(),
+                                 /*diagnosticDocumentationPath*/ "",
                                  SourceKit::createSwiftLangSupport,
                                  /*dispatchOnMain=*/false);
     auto localDocUpdState = std::make_shared<DocUpdateMutexState>();
