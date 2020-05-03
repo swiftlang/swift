@@ -50,6 +50,15 @@ subst T: %full_build_root% %exitOnError%
 set build_root=T:
 set install_directory=%build_root%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr
 
+md %build_root%\tmp
+set TMPDIR=%build_root%\tmp
+
+md %build_root%\tmp\org.llvm.clang
+set CUSTOM_CLANG_MODULE_CACHE=%build_root%\tmp\org.llvm.clang.9999
+
+md %build_root%\tmp\org.swift.package-manager
+set SWIFTPM_MODULECACHE_OVERRIDE=%build_root%\tmp\org.swift.package-manager
+
 call :clone_repositories %exitOnError%
 call :download_icu %exitOnError%
 :: TODO: Disabled until we need LLBuild/SwiftPM in this build script.
