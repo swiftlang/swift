@@ -1,5 +1,3 @@
-add_subdirectory(Differentiation)
-
 silopt_register_sources(
   BasicBlockOptUtils.cpp
   CFGOptUtils.cpp

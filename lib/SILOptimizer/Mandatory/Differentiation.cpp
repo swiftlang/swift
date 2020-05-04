@@ -40,12 +40,12 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Differentiation/ADContext.h"
+#include "swift/SILOptimizer/Differentiation/JVPEmitter.h"
+#include "swift/SILOptimizer/Differentiation/Thunk.h"
+#include "swift/SILOptimizer/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
-#include "swift/SILOptimizer/Utils/Differentiation/JVPEmitter.h"
-#include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
-#include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
 using namespace swift;

@@ -16,13 +16,13 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
+#include "swift/SILOptimizer/Differentiation/Thunk.h"
+#include "swift/SILOptimizer/Differentiation/Common.h"
 
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
 namespace swift {
