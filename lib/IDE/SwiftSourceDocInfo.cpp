@@ -131,6 +131,8 @@ static std::vector<CharSourceRange> getLabelRanges(const ParameterList* List,
     } else {
       NameLoc = ParamLoc;
       NameLength = Param->getNameStr().size();
+      if (SM.extractText({NameLoc, 1}) == "`")
+        NameLength += 2;
       LabelRanges.push_back(CharSourceRange(NameLoc, NameLength));
     }
   }
