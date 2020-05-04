@@ -77,8 +77,10 @@ option(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT
     "If not building stdlib, controls whether to build 'stdlib/toolchain' content"
     TRUE)
 
+# `SWIFT_ENABLE_TENSOFRFLOW` affects lit tests, adding "tensorflow" as an
+# available feature.
 option(SWIFT_ENABLE_TENSORFLOW
-    "Enable TensorFlow in the compiler and build the Swift TensorFlow library"
+    "Enable TensorFlow in the compiler"
     FALSE)
 
 # In many cases, the CMake build system needs to determine whether to include

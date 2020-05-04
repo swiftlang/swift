@@ -1698,8 +1698,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
-
                     # SWIFT_ENABLE_TENSORFLOW
+                    # CMake options specific to `tensorflow` branch here.
                     -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
                     # SWIFT_ENABLE_TENSORFLOW END
                     "${swift_cmake_options[@]}"
