@@ -1772,11 +1772,6 @@ class TypeAliasType final
   }
 
 public:
-  /// Retrieve the generic signature used for substitutions.
-  GenericSignature getGenericSignature() const {
-    return getSubstitutionMap().getGenericSignature();
-  }
-
   static TypeAliasType *get(TypeAliasDecl *typealias, Type parent,
                             SubstitutionMap substitutions, Type underlying);
 
