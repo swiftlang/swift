@@ -534,6 +534,18 @@ public:
     return getCalleeArgIndex(op) < getNumIndirectSILResults();
   }
 
+  /// Is this an ApplySite that begins the evaluation of a coroutine.
+  bool beginsCoroutineEvaluation() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+    case FullApplySiteKind::TryApplyInst:
+      return false;
+    case FullApplySiteKind::BeginApplyInst:
+      return true;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
   /// If this is a terminator apply site, then pass the first instruction of
   /// each successor to fun. Otherwise, pass std::next(Inst).
   ///
