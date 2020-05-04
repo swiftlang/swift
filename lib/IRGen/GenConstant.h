@@ -27,6 +27,9 @@ namespace irgen {
 /// Construct a ConstantInt from an IntegerLiteralInst.
 llvm::Constant *emitConstantInt(IRGenModule &IGM, IntegerLiteralInst *ILI);
 
+/// Construct a zero from a zero intializer BuiltinInst.
+llvm::Constant *emitConstantZero(IRGenModule &IGM, BuiltinInst *Bi);
+
 /// Construct a ConstantFP from a FloatLiteralInst.
 llvm::Constant *emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI);
 
