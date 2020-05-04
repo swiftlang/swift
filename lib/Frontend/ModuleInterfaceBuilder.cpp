@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "textual-module-interface"
 
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "ModuleInterfaceBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -134,16 +135,22 @@ void ModuleInterfaceBuilder::configureSubInvocation(
   remarkOnRebuildFromInterface;
 }
 
-bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
-    swift::version::Version &Vers, StringRef &CompilerVersion,
-    llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs) {
-  llvm::vfs::FileSystem &fs = *sourceMgr.getFileSystem();
-  auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
+bool swift::extractSwiftInterfaceVersionAndArgs(
+    SourceManager &SM,
+    DiagnosticEngine &Diags,
+    StringRef InterfacePath,
+    version::Version &Vers,
+    StringRef &CompilerVersion,
+    llvm::StringSaver &SubArgSaver,
+    SmallVectorImpl<const char *> &SubArgs,
+    SourceLoc diagnosticLoc) {
+  llvm::vfs::FileSystem &fs = *SM.getFileSystem();
+  auto FileOrError = swift::vfs::getFileOrSTDIN(fs, InterfacePath);
   if (!FileOrError) {
     // Don't use this->diagnose() because it'll just try to re-open
     // interfacePath.
-    diags.diagnose(diagnosticLoc, diag::error_open_input_file,
-                   interfacePath, FileOrError.getError().message());
+    Diags.diagnose(diagnosticLoc, diag::error_open_input_file,
+                   InterfacePath, FileOrError.getError().message());
     return true;
   }
   auto SB = FileOrError.get()->getBuffer();
@@ -151,18 +158,21 @@ bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
   auto CompRe = getSwiftInterfaceCompilerVersionRegex();
   auto FlagRe = getSwiftInterfaceModuleFlagsRegex();
   SmallVector<StringRef, 1> VersMatches, FlagMatches, CompMatches;
+
   if (!VersRe.match(SB, &VersMatches)) {
-    diagnose(diag::error_extracting_version_from_module_interface);
+    ModuleInterfaceBuilder::diagnose(Diags, SM, InterfacePath, diagnosticLoc,
+      diag::error_extracting_version_from_module_interface);
     return true;
   }
   if (!FlagRe.match(SB, &FlagMatches)) {
-    diagnose(diag::error_extracting_flags_from_module_interface);
+    ModuleInterfaceBuilder::diagnose(Diags, SM, InterfacePath, diagnosticLoc,
+      diag::error_extracting_version_from_module_interface);
     return true;
   }
   assert(VersMatches.size() == 2);
   assert(FlagMatches.size() == 2);
   // FIXME We should diagnose this at a location that makes sense:
-  Vers = swift::version::Version(VersMatches[1], SourceLoc(), &diags);
+  Vers = swift::version::Version(VersMatches[1], SourceLoc(), &Diags);
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], SubArgSaver, SubArgs);
 
   if (CompRe.match(SB, &CompMatches)) {
@@ -175,6 +185,13 @@ bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
   }
 
   return false;
+}
+
+bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
+    swift::version::Version &Vers, StringRef &CompilerVersion,
+    llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs) {
+  return swift::extractSwiftInterfaceVersionAndArgs(sourceMgr, diags,
+    interfacePath, Vers, CompilerVersion, SubArgSaver, SubArgs, diagnosticLoc);
 }
 
 bool ModuleInterfaceBuilder::collectDepsForSerialization(

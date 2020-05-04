@@ -24,6 +24,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
@@ -58,13 +59,48 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
   }
 }
 
+struct InterfaceSubASTContextDelegate: SubASTContextDelegate {
+  bool runInSubContext(ASTContext &ctx, StringRef interfacePath,
+                       llvm::function_ref<bool(ASTContext&)> action) override {
+    // Parse the interface file using the current context to get the additional
+    // compiler arguments we should use when creating a sub-ASTContext.
+    // These arguments are in "swift-module-flags:"
+    version::Version Vers;
+    StringRef CompilerVersion;
+    llvm::BumpPtrAllocator Allocator;
+    llvm::StringSaver SubArgSaver(Allocator);
+    SmallVector<const char *, 64> SubArgs;
+    if (extractSwiftInterfaceVersionAndArgs(ctx.SourceMgr, ctx.Diags,
+                                            interfacePath, Vers, CompilerVersion,
+                                            SubArgSaver, SubArgs)) {
+      return true;
+    }
+    CompilerInvocation invok;
+    CompilerInstance inst;
+    // Use the additional flags to setup the compiler instance.
+    if (invok.parseArgs(SubArgs, ctx.Diags)) {
+      return true;
+    }
+    if (inst.setup(invok)) {
+      return true;
+    }
+    // Add the diag consumers to the sub context to make sure we don't lose
+    // diagnostics.
+    for (auto *consumer: ctx.Diags.getConsumers()) {
+      inst.getDiags().addConsumer(*consumer);
+    }
+    // Run the action under the sub-ASTContext.
+    return action(inst.getASTContext());
+  }
+};
+
 /// Resolve the direct dependencies of the given module.
 static std::vector<ModuleDependencyID> resolveDirectDependencies(
     ASTContext &ctx, ModuleDependencyID module,
     ModuleDependenciesCache &cache) {
   auto knownDependencies = *cache.findDependencies(module.first, module.second);
   auto isSwift = knownDependencies.isSwiftModule();
-
+  InterfaceSubASTContextDelegate ASTDelegate;
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
@@ -73,7 +109,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
 
     // Retrieve the dependencies for this module.
     if (auto found = ctx.getModuleDependencies(
-            dependsOn, onlyClangModule, cache)) {
+            dependsOn, onlyClangModule, cache, ASTDelegate)) {
       result.push_back({dependsOn, found->getKind()});
     }
   }
@@ -115,7 +151,7 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
     // directly depends on these.
     for (const auto &clangDep : allClangModules) {
       if (auto found = ctx.getModuleDependencies(
-              clangDep, /*onlyClangModule=*/false, cache)) {
+              clangDep, /*onlyClangModule=*/false, cache, ASTDelegate)) {
         if (found->getKind() == ModuleDependenciesKind::Swift)
           result.push_back({clangDep, found->getKind()});
       }

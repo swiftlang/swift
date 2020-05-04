@@ -110,6 +110,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/Support/StringSaver.h"
 
 namespace clang {
 class CompilerInstance;
@@ -201,6 +202,14 @@ public:
 std::string
 getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
+bool extractSwiftInterfaceVersionAndArgs(SourceManager &SM,
+                                         DiagnosticEngine &Diags,
+                                         StringRef InterfacePath,
+                                         version::Version &Vers,
+                                         StringRef &CompilerVersion,
+                                         llvm::StringSaver &SubArgSaver,
+                                         SmallVectorImpl<const char *> &SubArgs,
+                                         SourceLoc diagnosticLoc = SourceLoc());
 }
 
 #endif

@@ -93,7 +93,8 @@ public:
   }
 
   Optional<ModuleDependencies> getModuleDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache) override {
+      StringRef moduleName, ModuleDependenciesCache &cache,
+      SubASTContextDelegate &delegate) override {
     // FIXME: Implement?
     return None;
   }

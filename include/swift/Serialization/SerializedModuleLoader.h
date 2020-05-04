@@ -194,7 +194,8 @@ public:
   virtual void verifyAllModules() override;
 
   virtual Optional<ModuleDependencies> getModuleDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache) override;
+      StringRef moduleName, ModuleDependenciesCache &cache,
+      SubASTContextDelegate &delegate) override;
 };
 
 /// Imports serialized Swift modules into an ASTContext.
