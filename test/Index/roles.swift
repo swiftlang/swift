@@ -531,3 +531,10 @@ func test<M>(_: M, value: Int?) {
 // CHECK: [[@LINE-1]]:34 | constructor/Swift | init(_:) | s:14swift_ide_test7FromIntPyxSicfc | Ref,RelCont | rel: 1
     }
 }
+
+func `escapedName`(`x`: Int) {}
+// CHECK: [[@LINE-1]]:6 | function/Swift | escapedName(x:) | {{.*}} | Def | rel: 0
+`escapedName`(`x`: 2)
+// CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref,Call | rel: 0
+`escapedName`(`x`:)
+// CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref | rel: 0

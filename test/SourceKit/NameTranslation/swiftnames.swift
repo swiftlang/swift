@@ -8,7 +8,7 @@ class C1 : NSObject {
 }
 func takeC1(a : Int, b: Int, c :Int) -> C1 {
   let C1Ins = C1(a: a, b: b)
-  C1Ins.foo(a: a, b: b, c: c)
+  C1Ins.`foo`(`a`: a, `b`: b, c: c)
   C1Ins.foo1(a: a, b, c: c)
   C1Ins.foo2(a, b, c: c)
   C1Ins.foo3()
@@ -57,11 +57,16 @@ class C3: NSObject {
 
 // REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(a:b:c:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK1 %s
+// RUN: %sourcekitd-test -req=translate -swift-name '`foo`(`a`:b:c:)' -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK1 %s
+// RUN: %sourcekitd-test -req=translate -swift-name '`foo(`a:b:c:)' -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK1 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(a:b:c:)" -pos=11:11 %s -print-raw-response -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK_RAW1 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "bar(x:y:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECKFEWER1 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "bar(::)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECKMISSING1 %s
+// RUN: %sourcekitd-test -req=translate -swift-name 'bar(`:`:)' -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECKMISSING1 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "(x:y:z:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECKMISSING2 %s
+// RUN: %sourcekitd-test -req=translate -swift-name '`(x:y:z:)' -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECKMISSING2 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(a1:b1:c1:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK2 %s
+// RUN: %sourcekitd-test -req=translate -swift-name '`foo`(a1:`b1`:c1:)' -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK2 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(_:b1:c1:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK3 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo1(_:_:c2:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK4 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo1(_:_:_:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK5 %s

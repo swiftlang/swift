@@ -1158,7 +1158,11 @@ static void handleSemanticRequest(
     else
       return Rec(createErrorRequestInvalid("'key.namekind' is unrecognizable"));
     if (auto Base = Req.getString(KeyBaseName)) {
-      Input.BaseName = Base.getValue();
+      if (Input.NameKind == UIDKindNameSwift) {
+        Input.BaseName = Base.getValue().trim('`');
+      } else {
+        Input.BaseName = Base.getValue();
+      }
     }
     llvm::SmallVector<const char*, 4> ArgParts;
     llvm::SmallVector<const char*, 4> Selectors;
@@ -1170,7 +1174,7 @@ static void handleSemanticRequest(
     }
     std::transform(ArgParts.begin(), ArgParts.end(),
                    std::back_inserter(Input.ArgNames),
-                   [](const char *C) { return StringRef(C); });
+                   [](const char *C) { return StringRef(C).trim('`'); });
     std::transform(Selectors.begin(), Selectors.end(),
                    std::back_inserter(Input.ArgNames),
                    [](const char *C) { return StringRef(C); });
