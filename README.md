@@ -347,8 +347,36 @@ described above.
 
 ## Testing Swift
 
-See [docs/Testing.md](docs/Testing.md), in particular the section on
-[lit.py](docs/Testing.md#using-litpy).
+See [docs/Testing.md](docs/Testing.md), in particular the section on [lit.py](docs/Testing.md#using-litpy).
+
+## Learning More
+
+Be sure to look through the [docs](https://github.com/apple/swift/tree/master/docs)
+directory for more information about the compiler. In particular, the documents
+titled [Debugging the Swift Compiler](docs/DebuggingTheCompiler.md) and
+[Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
+helpful to understand before submitting your first PR.
+
+### Building Documentation
+
+To read the compiler documentation, start by installing the
+[Sphinx](http://sphinx-doc.org) documentation generator tool by running the
+command:
+
+    easy_install -U "Sphinx < 2.0"
+
+Once complete, you can build the Swift documentation by changing directory into
+[docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This
+compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs)
+directory into HTML in the `docs/_build/html` directory.
+
+Many of the docs are out of date, but you can see some historical design
+documents in the `docs` directory.
+
+Another source of documentation is the standard library itself, located in
+`stdlib`. Much of the language is actually implemented in the library
+(including `Int`), and the standard library gives some examples of what can be
+expressed today.
 
 ## Build Dependencies
 

@@ -1,9 +1,3 @@
-:orphan:
-
-.. highlight:: none
-
-.. contents::
-
 Debugging the Swift Compiler
 ============================
 
@@ -19,7 +13,7 @@ Basic Utilities
 Often, the first step to debug a compiler problem is to re-run the compiler
 with a command line, which comes from a crash trace or a build log.
 
-The script ``split-cmdline`` in ``utils/dev-scripts`` splits a command line
+The script `split-cmdline` in `utils/dev-scripts` splits a command line
 into multiple lines. This is helpful to understand and edit long command lines.
 
 Printing the Intermediate Representations
@@ -29,49 +23,63 @@ The most important thing when debugging the compiler is to examine the IR.
 Here is how to dump the IR after the main phases of the Swift compiler
 (assuming you are compiling with optimizations enabled):
 
-#. **Parser**. To print the AST after parsing::
+* **Parser** To print the AST after parsing::
 
-    swiftc -dump-ast -O file.swift
+```bash
+swiftc -dump-ast -O file.swift
+```
 
-#. **SILGen**. To print the SIL immediately after SILGen::
+* **SILGen** To print the SIL immediately after SILGen::
 
-    swiftc -emit-silgen -O file.swift
+```bash
+swiftc -emit-silgen -O file.swift
+```
 
-#. **Mandatory SIL passes**. To print the SIL after the mandatory passes::
+* **Mandatory SIL passes** To print the SIL after the mandatory passes::
 
-    swiftc -emit-sil -Onone file.swift
+```bash
+swiftc -emit-sil -Onone file.swift
+```
 
   Well, this is not quite true, because the compiler is running some passes
   for -Onone after the mandatory passes, too. But for most purposes you will
   get what you want to see.
 
-#. **Performance SIL passes**. To print the SIL after the complete SIL
+* **Performance SIL passes** To print the SIL after the complete SIL
    optimization pipeline::
 
-    swiftc -emit-sil -O file.swift
+```bash
+swiftc -emit-sil -O file.swift
+```
 
-#. **IRGen**. To print the LLVM IR after IR generation::
+* **IRGen** To print the LLVM IR after IR generation::
 
-    swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
+```bash
+swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
+```
 
-4. **LLVM passes**. To print the LLVM IR after LLVM passes::
+* **LLVM passes** To print the LLVM IR after LLVM passes::
 
-    swiftc -emit-ir -O file.swift
+```bash
+swiftc -emit-ir -O file.swift
+```
 
-5. **Code generation**. To print the final generated code::
+* **Code generation** To print the final generated code::
 
-    swiftc -S -O file.swift
+```bash
+swiftc -S -O file.swift
+```
 
 Compilation stops at the phase where you print the output. So if you want to
 print the SIL *and* the LLVM IR, you have to run the compiler twice.
-The output of all these dump options (except ``-dump-ast``) can be redirected
-with an additional ``-o <file>`` option.
+The output of all these dump options (except `-dump-ast`) can be redirected
+with an additional `-o <file>` option.
 
 Debugging Diagnostic Emission
 -----------------------------
 
 Asserting on first emitted Warning/Assert Diagnostic
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------------------------------
 
 When changing the type checker and various SIL passes, one can cause a series of
 cascading diagnostics (errors/warnings) to be emitted. Since Swift does not by
@@ -80,89 +88,91 @@ where to stop in the debugger. Rather than trying to guess/check if one has an
 asserts swift compiler, one can use the following options to cause the
 diagnostic engine to assert on the first error/warning:
 
-* ``-Xllvm -swift-diagnostics-assert-on-error=1``
-* ``-Xllvm -swift-diagnostics-assert-on-warning=1``
+* `-Xllvm -swift-diagnostics-assert-on-error=1`
+* `-Xllvm -swift-diagnostics-assert-on-warning=1`
 
 These allow one to dump a stack trace of where the diagnostic is being emitted
 (if run without a debugger) or drop into the debugger if a debugger is attached.
 
 Finding Diagnostic Names
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------------------------------
 
 Some diagnostics rely heavily on format string arguments, so it can be difficult
 to find their implementation by searching for parts of the emitted message in
 the codebase. To print the corresponding diagnostic name at the end of each
-emitted message, use the ``-Xfrontend -debug-diagnostic-names`` argument.
+emitted message, use the `-Xfrontend -debug-diagnostic-names` argument.
 
 Debugging the Type Checker
 --------------------------
 
 Enabling Logging
-~~~~~~~~~~~~~~~~
+----------------
 
-To enable logging in the type checker, use the following argument: ``-Xfrontend -debug-constraints``.
+To enable logging in the type checker, use the following argument: `-Xfrontend -debug-constraints`.
 This will cause the typechecker to log its internal state as it solves
-constraints and present the final type checked solution, e.g.::
+constraints and present the final type checked solution, e.g.:
 
-  ---Constraint solving for the expression at [test.swift:3:10 - line:3:10]---
-  ---Initial constraints for the given expression---
-  (integer_literal_expr type='$T0' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)
-  Score: 0 0 0 0 0 0 0 0 0 0 0 0 0
-  Contextual Type: Int
-  Type Variables:
-    #0 = $T0 [inout allowed]
+```
+---Constraint solving for the expression at [test.swift:3:10 - line:3:10]---
+---Initial constraints for the given expression---
+(integer_literal_expr type='$T0' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)
+Score: 0 0 0 0 0 0 0 0 0 0 0 0 0
+Contextual Type: Int
+Type Variables:
+  #0 = $T0 [inout allowed]
 
-  Active Constraints:
+Active Constraints:
 
-  Inactive Constraints:
-    $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
-    $T0 conv Int [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
-  ($T0 literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
-  Active bindings: $T0 := Int
-  (trying $T0 := Int
-    (found solution 0 0 0 0 0 0 0 0 0 0 0 0 0)
-  )
-  ---Solution---
-  Fixed score: 0 0 0 0 0 0 0 0 0 0 0 0 0
-  Type variables:
-    $T0 as Int
-
-  Overload choices:
-
-  Constraint restrictions:
-
-  Disjunction choices:
-
-  Conformances:
-    At locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]
-  (normal_conformance type=Int protocol=ExpressibleByIntegerLiteral lazy
-    (normal_conformance type=Int protocol=_ExpressibleByBuiltinIntegerLiteral lazy))
+Inactive Constraints:
+  $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
+  $T0 conv Int [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
+($T0 literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
+Active bindings: $T0 := Int
+(trying $T0 := Int
   (found solution 0 0 0 0 0 0 0 0 0 0 0 0 0)
-  ---Type-checked expression---
-  (call_expr implicit type='Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] arg_labels=_builtinIntegerLiteral:
-    (constructor_ref_call_expr implicit type='(_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10]
-      (declref_expr implicit type='(Int.Type) -> (_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] decl=Swift.(file).Int.init(_builtinIntegerLiteral:) function_ref=single)
-      (type_expr implicit type='Int.Type' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] typerepr='Int'))
-    (tuple_expr implicit type='(_builtinIntegerLiteral: Int2048)' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] names=_builtinIntegerLiteral
-      (integer_literal_expr type='Int2048' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)))
+)
+---Solution---
+Fixed score: 0 0 0 0 0 0 0 0 0 0 0 0 0
+Type variables:
+  $T0 as Int
+
+Overload choices:
+
+Constraint restrictions:
+
+Disjunction choices:
+
+Conformances:
+  At locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]
+(normal_conformance type=Int protocol=ExpressibleByIntegerLiteral lazy
+  (normal_conformance type=Int protocol=_ExpressibleByBuiltinIntegerLiteral lazy))
+(found solution 0 0 0 0 0 0 0 0 0 0 0 0 0)
+---Type-checked expression---
+(call_expr implicit type='Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] arg_labels=_builtinIntegerLiteral:
+  (constructor_ref_call_expr implicit type='(_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10]
+    (declref_expr implicit type='(Int.Type) -> (_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] decl=Swift.(file).Int.init(_builtinIntegerLiteral:) function_ref=single)
+    (type_expr implicit type='Int.Type' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] typerepr='Int'))
+  (tuple_expr implicit type='(_builtinIntegerLiteral: Int2048)' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] names=_builtinIntegerLiteral
+    (integer_literal_expr type='Int2048' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)))
+```
 
 When using the integrated swift-repl, one can dump the same output for each
 expression as one evaluates the expression by enabling constraints debugging by
-typing ``:constraints debug on``::
+typing `:constraints debug on`:
 
-  $ swift -frontend -repl -enable-objc-interop -module-name REPL
-  ***  You are running Swift's integrated REPL,  ***
-  ***  intended for compiler and stdlib          ***
-  ***  development and testing purposes only.    ***
-  ***  The full REPL is built as part of LLDB.   ***
-  ***  Type ':help' for assistance.              ***
-  (swift) :constraints debug on
+    $ swift -frontend -repl -enable-objc-interop -module-name REPL
+    ***  You are running Swift's integrated REPL,  ***
+    ***  intended for compiler and stdlib          ***
+    ***  development and testing purposes only.    ***
+    ***  The full REPL is built as part of LLDB.   ***
+    ***  Type ':help' for assistance.              ***
+    (swift) :constraints debug on
 
 Debugging on SIL Level
 ----------------------
 
 Options for Dumping the SIL
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------
 
 Often it is not sufficient to dump the SIL at the beginning or end of
 the optimization pipeline. The SILPassManager supports useful options
@@ -179,34 +189,34 @@ an option of type 2 to filter the output.
 
 A short (non-exhaustive) list of type 1 options:
 
-* ``-Xllvm -sil-print-all``: Print functions/modules when ever a
+* `-Xllvm -sil-print-all`: Print functions/modules when ever a
   function pass modifies a function and Print the entire module
   (modulo filtering) if a module pass modifies a SILModule.
 
 A short (non-exhaustive) list of type 2 options:
 
-* ``-Xllvm -sil-print-around=$PASS_NAME``: Print a function/module
-  before and after a function pass with name ``$PASS_NAME`` runs on a
+* `-Xllvm -sil-print-around=$PASS_NAME`: Print a function/module
+  before and after a function pass with name `$PASS_NAME` runs on a
   function/module or dump a module before a module pass with name
-  ``$PASS_NAME`` runs on a module.
+  `$PASS_NAME` runs on a module.
 
-* ``-Xllvm -sil-print-before=$PASS_NAME``: Print a function/module
-  before a function pass with name ``$PASS_NAME`` runs on a
+* `-Xllvm -sil-print-before=$PASS_NAME`: Print a function/module
+  before a function pass with name `$PASS_NAME` runs on a
   function/module or dump a module before a module pass with name
-  ``$PASS_NAME`` runs on a module. NOTE: This happens even without
+  `$PASS_NAME` runs on a module. NOTE: This happens even without
   sil-print-all set!
 
-* ``-Xllvm -sil-print-after=$PASS_NAME``: Print a function/module
-  after a function pass with name ``$PASS_NAME`` runs on a
+* `-Xllvm -sil-print-after=$PASS_NAME`: Print a function/module
+  after a function pass with name `$PASS_NAME` runs on a
   function/module or dump a module before a module pass with name
-  ``$PASS_NAME`` runs on a module.
+  `$PASS_NAME` runs on a module.
 
-* ``-Xllvm '-sil-print-only-function=SWIFT_MANGLED_NAME'``: When ever
+* `-Xllvm '-sil-print-only-function=SWIFT_MANGLED_NAME'`: When ever
   one would print a function/module, only print the given function.
 
 These options together allow one to visualize how a
 SILFunction/SILModule is optimized by the optimizer as each
-optimization pass runs easily via formulations like::
+optimization pass runs easily via formulations like:
 
     swiftc -Xllvm '-sil-print-only-function=$myMainFunction' -Xllvm -sil-print-all
 
@@ -214,42 +224,42 @@ NOTE: This may emit a lot of text to stderr, so be sure to pipe the
 output to a file.
 
 Getting CommandLine for swift stdlib from Ninja
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------------------------
 
 If one builds swift using ninja and wants to dump the SIL of the
 stdlib using some of the SIL dumping options from the previous
-section, one can use the following one-liner::
+section, one can use the following one-liner:
 
-  ninja -t commands | grep swiftc | grep Swift.o | grep " -c "
+    ninja -t commands | grep swiftc | grep Swift.o | grep " -c "
 
 This should give one a single command line that one can use for
 Swift.o, perfect for applying the previous sections options to.
 
 Dumping the SIL and other Data in LLDB
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------------
 
 When debugging the Swift compiler with LLDB (or Xcode, of course), there is
 even a more powerful way to examine the data in the compiler, e.g. the SIL.
 Following LLVM's dump() convention, many SIL classes (as well as AST classes)
 provide a dump() function. You can call the dump function with LLDB's
-``expression --`` or ``print`` or ``p`` command.
+`expression --` or `print` or `p` command.
 
-For example, to examine a SIL instruction::
+For example, to examine a SIL instruction:
 
     (lldb) p Inst->dump()
     %12 = struct_extract %10 : $UnsafeMutablePointer<X>, #UnsafeMutablePointer._rawValue // user: %13
 
-To dump a whole function at the beginning of a function pass::
+To dump a whole function at the beginning of a function pass:
 
     (lldb) p getFunction()->dump()
 
 SIL modules and even functions can get very large. Often it is more convenient
 to dump their contents into a file and open the file in a separate editor.
-This can be done with::
+This can be done with:
 
     (lldb) p getFunction()->dump("myfunction.sil")
 
-You can also dump the CFG (control flow graph) of a function::
+You can also dump the CFG (control flow graph) of a function:
 
     (lldb) p Func->viewCFG()
 
@@ -260,14 +270,14 @@ environment setting contains the path to the dot tool.
 
 swift/Basic/Debug.h includes macros to help contributors declare these methods
 with the proper attributes to ensure they'll be available in the debugger. In
-particular, if you see ``SWIFT_DEBUG_DUMP`` in a class declaration, that class
-has a ``dump()`` method you can call.
+particular, if you see `SWIFT_DEBUG_DUMP` in a class declaration, that class
+has a `dump()` method you can call.
 
 Debugging and Profiling on SIL level
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------------
 
 The compiler provides a way to debug and profile on SIL level. To enable SIL
-debugging add the front-end option -gsil together with -g. Example::
+debugging add the front-end option -gsil together with -g. Example:
 
     swiftc -g -Xfrontend -gsil -O test.swift -o a.out
 
@@ -277,12 +287,12 @@ the Swift source code.
 For details see the SILDebugInfoGenerator pass.
 
 To enable SIL debugging and profiling for the Swift standard library, use
-the build-script-impl option ``--build-sil-debugging-stdlib``.
+the build-script-impl option `--build-sil-debugging-stdlib`.
 
 ViewCFG: Regex based CFG Printer
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------
 
-ViewCFG (``./utils/viewcfg``) is a script that parses a textual CFG (e.g. a llvm
+ViewCFG (`./utils/viewcfg`) is a script that parses a textual CFG (e.g. a llvm
 or sil function) and displays a .dot file of the CFG. Since the parsing is done
 using regular expressions (i.e. ignoring language semantics), ViewCFG can:
 
@@ -294,40 +304,40 @@ The script assumes that the relevant text is passed in via stdin and uses open
 to display the .dot file.
 
 Additional, both emacs and vim integration is provided. For vim integration add
-the following commands to your .vimrc::
+the following commands to your .vimrc:
 
-  com! -nargs=? Funccfg silent ?{$?,/^}/w !viewcfg <args>
-  com! -range -nargs=? Viewcfg silent <line1>,<line2>w !viewcfg <args>
+    com! -nargs=? Funccfg silent ?{$?,/^}/w !viewcfg <args>
+    com! -range -nargs=? Viewcfg silent <line1>,<line2>w !viewcfg <args>
 
-This will add::
+This will add:
 
-   :Funccfg        displays the CFG of the current SIL/LLVM function.
-   :<range>Viewcfg displays the sub-CFG of the selected range.
+    :Funccfg        displays the CFG of the current SIL/LLVM function.
+    :<range>Viewcfg displays the sub-CFG of the selected range.
 
-For emacs users, we provide in sil-mode (``./utils/sil-mode.el``) the function::
+For emacs users, we provide in sil-mode (`./utils/sil-mode.el`) the function:
 
     sil-mode-display-function-cfg
 
 To use this feature, placed the point in the sil function that you want viewcfg
-to graph and then run ``sil-mode-display-function-cfg``. This will cause viewcfg
+to graph and then run `sil-mode-display-function-cfg`. This will cause viewcfg
 to be invoked with the sil function body. Note,
-``sil-mode-display-function-cfg`` does not take any arguments.
+`sil-mode-display-function-cfg` does not take any arguments.
 
 **NOTE** viewcfg must be in the $PATH for viewcfg to work.
 
 **NOTE** Since we use open, .dot files should be associated with the Graphviz app for viewcfg to work.
 
 There is another useful script to view the CFG of a disassembled function:
-``./utils/dev-scripts/blockifyasm``.
+`./utils/dev-scripts/blockifyasm`.
 It splits a disassembled function up into basic blocks which can then be
-used with viewcfg::
+used with viewcfg:
 
     (lldb) disassemble
       <copy-paste output to file.s>
     $ blockifyasm < file.s | viewcfg
 
 Using Breakpoints
-~~~~~~~~~~~~~~~~~
+-----------------
 
 LLDB has very powerful breakpoints, which can be utilized in many ways to debug
 the compiler and Swift executables. The examples in this section show the LLDB
@@ -337,35 +347,35 @@ breakpoint'.
 Let's start with a simple example: sometimes you see a function in the SIL
 output and you want to know where the function was created in the compiler.
 In this case you can set a conditional breakpoint in SILFunction constructor
-and check for the function name in the breakpoint condition::
+and check for the function name in the breakpoint condition:
 
     (lldb) br set -c 'hasName("_TFC3nix1Xd")' -f SILFunction.cpp -l 91
 
 Sometimes you may want to know which optimization inserts, removes or moves a
 certain instruction. To find out, set a breakpoint in
-``ilist_traits<SILInstruction>::addNodeToList`` or
-``ilist_traits<SILInstruction>::removeNodeFromList``, which are defined in
-``SILInstruction.cpp``.
-The following command sets a breakpoint which stops if a ``strong_retain``
-instruction is removed::
+`ilist_traits<SILInstruction>:addNodeToList` or
+`ilist_traits<SILInstruction>:removeNodeFromList`, which are defined in
+`SILInstruction.cpp`.
+The following command sets a breakpoint which stops if a `strong_retain`
+instruction is removed:
 
-    (lldb) br set -c 'I->getKind() == ValueKind::StrongRetainInst' -f SILInstruction.cpp -l 63
+    (lldb) br set -c 'I->getKind() == ValueKind:StrongRetainInst' -f SILInstruction.cpp -l 63
 
 The condition can be made more precise e.g. by also testing in which function
-this happens::
+this happens:
 
-    (lldb) br set -c 'I->getKind() == ValueKind::StrongRetainInst &&
+    (lldb) br set -c 'I->getKind() == ValueKind:StrongRetainInst &&
                I->getFunction()->hasName("_TFC3nix1Xd")'
                -f SILInstruction.cpp -l 63
 
 Let's assume the breakpoint hits somewhere in the middle of compiling a large
 file. This is the point where the problem appears. But often you want to break
-a little bit earlier, e.g. at the entrance of the optimization's ``run``
+a little bit earlier, e.g. at the entrance of the optimization's `run`
 function.
 
-To achieve this, set another breakpoint and add breakpoint commands::
+To achieve this, set another breakpoint and add breakpoint commands:
 
-    (lldb) br set -n GlobalARCOpts::run
+    (lldb) br set -n GlobalARCOpts:run
     Breakpoint 2
     (lldb) br com add 2
     > p int $n = $n + 1
@@ -373,40 +383,40 @@ To achieve this, set another breakpoint and add breakpoint commands::
     > DONE
 
 Run the program (this can take quite a bit longer than before). When the first
-breakpoint hits see what value $n has::
+breakpoint hits see what value $n has:
 
     (lldb) p $n
     (int) $n = 5
 
 Now remove the breakpoint commands from the second breakpoint (or create a new
-one) and set the ignore count to $n minus one::
+one) and set the ignore count to $n minus one:
 
     (lldb) br delete 2
-    (lldb) br set -i 4 -n GlobalARCOpts::run
+    (lldb) br set -i 4 -n GlobalARCOpts:run
 
 Run your program again and the breakpoint hits just before the first breakpoint.
 
 Another method for accomplishing the same task is to set the ignore count of the
-breakpoint to a large number, i.e.::
+breakpoint to a large number, i.e.:
 
-    (lldb) br set -i 9999999 -n GlobalARCOpts::run
+    (lldb) br set -i 9999999 -n GlobalARCOpts:run
 
 Then whenever the debugger stops next time (due to hitting another
-breakpoint/crash/assert) you can list the current breakpoints::
+breakpoint/crash/assert) you can list the current breakpoints:
 
     (lldb) br list
-    1: name = 'GlobalARCOpts::run', locations = 1, resolved = 1, hit count = 85 Options: ignore: 1 enabled
+    1: name = 'GlobalARCOpts:run', locations = 1, resolved = 1, hit count = 85 Options: ignore: 1 enabled
 
 which will then show you the number of times that each breakpoint was hit. In
-this case, we know that ``GlobalARCOpts::run`` was hit 85 times. So, now
-we know to ignore swift_getGenericMetadata 84 times, i.e.::
+this case, we know that `GlobalARCOpts:run` was hit 85 times. So, now
+we know to ignore swift_getGenericMetadata 84 times, i.e.:
 
-    (lldb) br set -i 84 -n GlobalARCOpts::run
+    (lldb) br set -i 84 -n GlobalARCOpts:run
 
 A final trick is that one can use the -R option to stop at a relative assembly
 address in lldb. Specifically, lldb resolves the breakpoint normally and then
 just adds the argument -R to the address. So for instance, if I want to stop at
-the address at +38 in the function with the name 'foo', I would write::
+the address at +38 in the function with the name 'foo', I would write:
 
     (lldb) br set -R 38 -n foo
 
@@ -415,7 +425,7 @@ useful in contexts where one wants to set a breakpoint at an assembly address
 that is stable across multiple different invocations of lldb.
 
 LLDB Scripts
-~~~~~~~~~~~~
+------------
 
 LLDB has powerful capabilities of scripting in Python among other languages. An
 often overlooked, but very useful technique is the -s command to lldb. This
@@ -423,7 +433,7 @@ essentially acts as a pseudo-stdin of commands that lldb will read commands
 from. Each time lldb hits a stopping point (i.e. a breakpoint or a
 crash/assert), it will run the earliest command that has not been run yet. As an
 example of this consider the following script (which without any loss of
-generality will be called test.lldb)::
+generality will be called test.lldb):
 
     env DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib
     break set -n swift_getGenericMetadata
@@ -439,7 +449,7 @@ generality will be called test.lldb)::
 TODO: Change this example to apply to the Swift compiler instead of to the
 stdlib unittests.
 
-Then by running ``lldb test -s test.lldb``, lldb will:
+Then by running `lldb test -s test.lldb`, lldb will:
 
 1. Enable guard malloc.
 2. Set a break point on swift_getGenericMetadata and set it to be ignored for 83 hits.
@@ -454,15 +464,15 @@ Using LLDB scripts can enable one to use complex debugger workflows without
 needing to retype the various commands perfectly every time.
 
 Custom LLDB Commands
-~~~~~~~~~~~~~~~~~~~~
+--------------------
 
 If you've ever found yourself repeatedly entering a complex sequence of
 commands within a debug session, consider using custom lldb commands. Custom
 commands are a handy way to automate debugging tasks.
 
 For example, say we need a command that prints the contents of the register
-``rax`` and then steps to the next instruction. Here's how to define that
-command within a debug session::
+`rax` and then steps to the next instruction. Here's how to define that
+command within a debug session:
 
     (lldb) script
     Python Interactive Interpreter. To exit, type 'quit()', 'exit()' or Ctrl-D.
@@ -472,7 +482,7 @@ command within a debug session::
     ...
     >>> ^D
 
-You can call this function using the ``script`` command, or via an alias::
+You can call this function using the `script` command, or via an alias:
 
     (lldb) script custom_step()
     rax = ...
@@ -489,19 +499,19 @@ functionality, such as arbitrary expression evaluation.
 
 There are some pre-defined custom commands which can be especially useful while
 debugging the swift compiler. These commands live in
-``swift/utils/lldb/lldbToolBox.py``. There is a wrapper script available in
-``SWIFT_BINARY_DIR/bin/lldb-with-tools`` which launches lldb with those
+`swift/utils/lldb/lldbToolBox.py`. There is a wrapper script available in
+`SWIFT_BINARY_DIR/bin/lldb-with-tools` which launches lldb with those
 commands loaded.
 
-A command named ``sequence`` is included in lldbToolBox. ``sequence`` runs
+A command named `sequence` is included in lldbToolBox. `sequence` runs
 multiple semicolon separated commands together as one command. This can be used
 to define custom commands using just other lldb commands. For example,
-``custom_step()`` function defined above could be defined as::
+`custom_step()` function defined above could be defined as:
 
     (lldb) command alias cs sequence p/x $rax; stepi
 
 Reducing SIL test cases using bug_reducer
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------------------
 
 There is functionality provided in ./swift/utils/bug_reducer/bug_reducer.py for
 reducing SIL test cases by:
@@ -514,23 +524,23 @@ reducing SIL test cases by:
 For more information and a high level example, see:
 ./swift/utils/bug_reducer/README.md.
 
-Using ``clang-tidy`` to run the Static Analyzer
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using `clang-tidy` to run the Static Analyzer
+-----------------------------------------------
 
-Recent versions of LLVM package the tool ``clang-tidy``. This can be used in
+Recent versions of LLVM package the tool `clang-tidy`. This can be used in
 combination with a json compilation database to run static analyzer checks as
 well as cleanups/modernizations on a code-base. Swift's cmake invocation by
 default creates one of these json databases at the root path of the swift host
-build, for example on macOS::
+build, for example on macOS:
 
     $PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json
 
-Using this file, one invokes ``clang-tidy`` on a specific file in the codebase
-as follows::
+Using this file, one invokes `clang-tidy` on a specific file in the codebase
+as follows:
 
     clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_FILE
 
-One can also use shell regex to visit multiple files in the same directory. Example::
+One can also use shell regex to visit multiple files in the same directory. Example:
 
     clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
 
@@ -546,37 +556,37 @@ it's quite easy to do this manually:
 
 1. Find the offending optimization with bisecting:
 
-  a. Add the compiler option ``-Xllvm -sil-opt-pass-count=<n>``, where ``<n>``
+  a. Add the compiler option `-Xllvm -sil-opt-pass-count=<n>`, where `<n>`
      is the number of optimizations to run.
 
   b. Bisect: find n where the executable crashes, but does not crash
      with n-1. First just try n = 10, 100, 1000, 10000, etc. to find
      an upper bound). Then can either bisect the invocation by hand or
      place the invocation into a script and use
-     ``./llvm-project/llvm/utils/bisect`` to automatically bisect
-     based on the scripts error code. Example invocation::
+     `./llvm-project/llvm/utils/bisect` to automatically bisect
+     based on the scripts error code. Example invocation:
 
        bisect --start=0 --end=10000 ./invoke_swift_passing_N.sh "%(count)s"
 
-  c. Once one finds ``n``, Add another option ``-Xllvm -sil-print-pass-name``. The output can be
-     large, so it's best to redirect stderr to a file (``2> output``).
-     In the output search for the last pass before ``stage Address Lowering``.
-     It should be the ``Run #<n-1>``. This line tells you the name of the bad
+  c. Once one finds `n`, Add another option `-Xllvm -sil-print-pass-name`. The output can be
+     large, so it's best to redirect stderr to a file (`2> output`).
+     In the output search for the last pass before `stage Address Lowering`.
+     It should be the `Run #<n-1>`. This line tells you the name of the bad
      optimization pass and on which function it run.
 
 2. Get the SIL before and after the bad optimization.
 
   a. Add the compiler options
-     ``-Xllvm -sil-print-all -Xllvm -sil-print-only-function='<function>'``
-     where ``<function>`` is the function name (including the preceding ``$``).
+     `-Xllvm -sil-print-all -Xllvm -sil-print-only-function='<function>'`
+     where `<function>` is the function name (including the preceding `$`).
      For example:
-     ``-Xllvm -sil-print-all -Xllvm -sil-print-only-function='$s4test6testityS2iF'``.
+     `-Xllvm -sil-print-all -Xllvm -sil-print-only-function='$s4test6testityS2iF'`.
      Again, the output can be large, so it's best to redirect stderr to a file.
   b. From the output, copy the SIL of the function *before* the bad
      run into a separate file and the SIL *after* the bad run into a file.
   c. Compare both SIL files and try to figure out what the optimization pass
      did wrong. To simplify the comparison, it's sometimes helpful to replace
-     all SIL values (e.g. ``%27``) with a constant string (e.g. ``%x``).
+     all SIL values (e.g. `%27`) with a constant string (e.g. `%x`).
 
 
 Debugging Swift Executables
@@ -593,7 +603,7 @@ One problem that often comes up when debugging Swift code in LLDB is that LLDB
 shows the demangled name instead of the mangled name. This can lead to mistakes
 where due to the length of the mangled names one will look at the wrong
 function. Using the following command, one can find the mangled name of the
-function in the current frame::
+function in the current frame:
 
     (lldb) image lookup -va $pc
     Address: CollectionType3[0x0000000100004db0] (CollectionType3.__TEXT.__text + 16000)
@@ -625,7 +635,7 @@ verbose information relevant to the category into the log as it works. The two
 log channels that are useful for debugging Swift issues are the "types" and
 "expression" log channels.
 
-For more details about any of the information below, please run::
+For more details about any of the information below, please run:
 
     (lldb) help log enable
 
@@ -636,15 +646,15 @@ The "types" log reports on LLDB's process of constructing SwiftASTContexts and
 errors that may occur. The two main tasks here are:
 
 1. Constructing the SwiftASTContext for a specific single Swift module. This is
-   used to implement frame local variable dumping via the lldb ``frame
-   variable`` command, as well as the Xcode locals view. On failure, local
+   used to implement frame local variable dumping via the lldb `frame
+   variable` command, as well as the Xcode locals view. On failure, local
    variables will not have types.
 
 2. Building a SwiftASTContext in which to run Swift expressions using the
    "expression" command. Upon failure, one will see an error like: "Shared Swift
    state for has developed fatal errors and is being discarded."
 
-These errors can be debugged by turning on the types log::
+These errors can be debugged by turning on the types log:
 
     (lldb) log enable -f /tmp/lldb-types-log.txt lldb types
 
@@ -652,10 +662,10 @@ That will write the types log to the file passed to the -f option.
 
 **NOTE** Module loading can happen as a side-effect of other operations in lldb
  (e.g. the "file" command). To be sure that one has enabled logging before /any/
- module loading has occurred, place the command into either::
+ module loading has occurred, place the command into either:
 
-   ~/.lldbinit
-   $PWD/.lldbinit
+    ~/.lldbinit
+    $PWD/.lldbinit
 
 This will ensure that the type import command is run before /any/ modules are
 imported.
@@ -667,7 +677,7 @@ The "expression" log reports on the process of wrapping, parsing, SILGen'ing,
 JITing, and inserting an expression into the current Swift module. Since this can
 only be triggered by the user manually evaluating expression, this can be turned
 on at any point before evaluating an expression. To enable expression logging,
-first run::
+first run:
 
     (lldb) log enable -f /tmp/lldb-expr-log.txt lldb expression
 
@@ -691,66 +701,67 @@ logging, and only then run the bad expression.
 Multiple Logs at a Time
 -----------------------
 
-Note, you can also turn on more than one log at a time as well, e.x.::
+Note, you can also turn on more than one log at a time as well, e.x.:
 
     (lldb) log enable -f /tmp/lldb-types-log.txt lldb types expression
 
 Using git-bisect in the presence of branch forwarding/feature branches
 ======================================================================
 
-``git-bisect`` is a useful tool for finding where a regression was
-introduced. Sadly ``git-bisect`` does not handle long lived branches
+
+`git-bisect` is a useful tool for finding where a regression was
+introduced. Sadly `git-bisect` does not handle long lived branches
 and will in fact choose commits from upstream branches that may be
 missing important content from the downstream branch. As an example,
 consider a situation where one has the following straw man commit flow
-graph::
+graph:
 
     github/master -> github/tensorflow
 
-In this case if one attempts to use ``git-bisect`` on
-github/tensorflow, ``git-bisect`` will sometimes choose commits from
+In this case if one attempts to use `git-bisect` on
+github/tensorflow, `git-bisect` will sometimes choose commits from
 github/master resulting in one being unable to compile/test specific
 tensorflow code that has not been upstreamed yet. Even worse, what if
 we are trying to bisect in between two that were branched from
 github/tensorflow and have had subsequent commits cherry-picked on
 top. Without any loss of generality, lets call those two tags
-``tag-tensorflow-bad`` and ``tag-tensorflow-good``. Since both of
+`tag-tensorflow-bad` and `tag-tensorflow-good`. Since both of
 these tags have had commits cherry-picked on top, they are technically
 not even on the github/tensorflow branch, but rather in a certain
 sense are a tag of a feature branch from master/tensorflow. So,
-``git-bisect`` doesn't even have a clear history to bisect on in
+`git-bisect` doesn't even have a clear history to bisect on in
 multiple ways.
 
 With those constraints in mind, we can bisect! We just need to be
 careful how we do it. Lets assume that we have a test script called
-``test.sh`` that indicates error by the error code. With that in hand,
+`test.sh` that indicates error by the error code. With that in hand,
 we need to compute the least common ancestor of the good/bad
 commits. This is traditionally called the "merge base" of the
-commits. We can compute this as so::
+commits. We can compute this as so:
 
     TAG_MERGE_BASE=$(git merge-base tags/tag-tensorflow-bad tags/tag-tensorflow-good)
 
 Given that both tags were taken from the feature branch, the reader
 can prove to themselves that this commit is guaranteed to be on
-``github/tensorflow`` and not ``github/master`` since all commits from
-``github/master`` are forwarded using git merges.
+`github/tensorflow` and not `github/master` since all commits from
+`github/master` are forwarded using git merges.
 
-Then lets assume that we checked out ``$TAG_MERGE_BASE`` and then ran
-``test.sh`` and did not hit any error. Ok, we can not bisect. Sadly,
-as mentioned above if we run git-bisect in between ``$TAG_MERGE_BASE``
-and ``tags/tag-tensorflow-bad``, ``git-bisect`` will sometimes choose
-commits from ``github/master`` which would cause ``test.sh`` to fail
+Then lets assume that we checked out `$TAG_MERGE_BASE` and then ran
+`test.sh` and did not hit any error. Ok, we can not bisect. Sadly,
+as mentioned above if we run git-bisect in between `$TAG_MERGE_BASE`
+and `tags/tag-tensorflow-bad`, `git-bisect` will sometimes choose
+commits from `github/master` which would cause `test.sh` to fail
 if we are testing tensorflow specific code! To work around this
-problem, we need to start our bisect and then tell ``git-bisect`` to
-ignore those commits by using the skip sub command::
+problem, we need to start our bisect and then tell `git-bisect` to
+ignore those commits by using the skip sub command:
 
     git bisect start tags/tag-tensorflow-bad $TAG_MERGE_BASE
     for rev in $(git rev-list $TAG_MERGE_BASE..tags/tag-tensorflow-bad --merges --first-parent); do
         git rev-list $rev^2 --not $rev^
     done | xargs git bisect skip
 
-Once this has been done, one uses ``git-bisect`` normally. One thing
-to be aware of is that ``git-bisect`` will return a good/bad commits
+Once this has been done, one uses `git-bisect` normally. One thing
+to be aware of is that `git-bisect` will return a good/bad commits
 on the feature branch and if one of those commits is a merge from the
 upstream branch, one will need to analyze the range of commits from
 upstream for the bad commit afterwards. The commit range in the merge

@@ -88,7 +88,7 @@ name when incremental compilation is enabled. A cascading dependency is much
 safer to produce than its private counterpart, but it comes at the cost of
 increased usage of compilation resources - even if those resources are being
 wasted on rebuilding a file that didn't actually require rebuilding.
-See [DependencyAnalysis.rst](DependencyAnalysis.rst).
+See [DependencyAnalysis.md](DependencyAnalysis.md).
 
 ## Clang importer
 
@@ -399,7 +399,7 @@ require further transitive evaluation of dependency edges by the Swift
 driver. Private dependencies are therefore cheaper than cascading
 dependencies, but must be used with the utmost care or dependent files will
 fail to rebuild and the result will most certainly be a miscompile.
-See [DependencyAnalysis.rst](DependencyAnalysis.rst).
+See [DependencyAnalysis](DependencyAnalysis.md).
 
 ## QoI
 
