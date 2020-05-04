@@ -679,10 +679,6 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
-    case ConstraintLocator::GenericArgument: {
-      break;
-    }
-
     case ConstraintLocator::OptionalPayload: {
       // If we have an inout expression, this comes from an
       // InoutToPointer argument mismatch failure.
@@ -709,7 +705,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     }
 
     default:
-      return false;
+      break;
     }
   }
 
