@@ -40,7 +40,6 @@
 #ifndef SWIFT_RUNTIME_METADATAIMPL_H
 #define SWIFT_RUNTIME_METADATAIMPL_H
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"

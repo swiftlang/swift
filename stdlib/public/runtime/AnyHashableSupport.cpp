@@ -73,7 +73,7 @@ static ConcurrentMap<HashableConformanceEntry, /*Destructor*/ false>
   HashableConformances;
 
 template<bool KnownToConformToHashable>
-LLVM_ATTRIBUTE_ALWAYS_INLINE
+SWIFT_ALWAYS_INLINE
 static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
   // Check the cache first.
   if (HashableConformanceEntry *entry =

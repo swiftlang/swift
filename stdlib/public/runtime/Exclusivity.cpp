@@ -46,7 +46,7 @@ static const char *getAccessName(ExclusivityFlags flags) {
   }
 }
 
-LLVM_ATTRIBUTE_ALWAYS_INLINE
+SWIFT_ALWAYS_INLINE
 static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
                                       ExclusivityFlags newFlags, void *newPC,
                                       void *pointer) {
@@ -261,10 +261,10 @@ static SwiftTLSContext &getTLSContext() {
   return *ctx;
 }
 
-#elif SWIFT_TLS_HAS_THREADLOCAL
+#elif __has_feature(cxx_thread_local) || defined(_MSC_VER)
 // Second choice is direct language support for thread-locals.
 
-static LLVM_THREAD_LOCAL SwiftTLSContext TLSContext;
+static thread_local SwiftTLSContext TLSContext;
 
 static SwiftTLSContext &getTLSContext() {
   return TLSContext;

@@ -119,20 +119,20 @@ class WeakReferenceBits {
   uintptr_t bits;
 
  public:
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   WeakReferenceBits() { }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   WeakReferenceBits(HeapObjectSideTableEntry *newValue) {
     setNativeOrNull(newValue);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   bool isNativeOrNull() const {
     return bits == 0  ||  (bits & NativeMarkerMask) == NativeMarkerValue;
   }
     
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   HeapObjectSideTableEntry *getNativeOrNull() const {
     assert(isNativeOrNull());
     if (bits == 0)
@@ -142,7 +142,7 @@ class WeakReferenceBits {
         reinterpret_cast<HeapObjectSideTableEntry *>(bits & ~NativeMarkerMask);
   }
   
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   void setNativeOrNull(HeapObjectSideTableEntry *newValue) {
     assert((uintptr_t(newValue) & NativeMarkerMask) == 0);
     if (newValue)

@@ -75,7 +75,6 @@ static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #include <limits>
 #include <thread>
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/SwiftDtoa.h"
 #include "swift/Basic/Lazy.h"

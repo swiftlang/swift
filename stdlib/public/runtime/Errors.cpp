@@ -224,7 +224,7 @@ static _Unwind_Reason_Code SwiftUnwindFrame(struct _Unwind_Context *context, voi
 }
 #endif
 
-LLVM_ATTRIBUTE_NOINLINE
+SWIFT_NOINLINE
 void swift::printCurrentBacktrace(unsigned framesToSkip) {
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   constexpr unsigned maxSupportedStackDepth = 128;
@@ -255,7 +255,7 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
 // The layout of this struct is CrashReporter ABI, so there are no ABI concerns
 // here.
 extern "C" {
-LLVM_LIBRARY_VISIBILITY
+SWIFT_LIBRARY_VISIBILITY
 struct crashreporter_annotations_t gCRAnnotations
 __attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
     CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
@@ -320,7 +320,7 @@ reportNow(uint32_t flags, const char *message)
 #endif
 }
 
-LLVM_ATTRIBUTE_NOINLINE SWIFT_RUNTIME_EXPORT
+SWIFT_NOINLINE SWIFT_RUNTIME_EXPORT
 void _swift_runtime_on_report(uintptr_t flags, const char *message,
                               RuntimeErrorDetails *details) {
   // Do nothing. This function is meant to be used by the debugger.
@@ -376,7 +376,7 @@ static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
 }
 
 // Report a fatal error to system console, stderr, and crash logs, then abort.
-LLVM_ATTRIBUTE_NORETURN
+SWIFT_NORETURN
 void
 swift::fatalError(uint32_t flags, const char *format, ...)
 {
@@ -419,8 +419,7 @@ swift::warning(uint32_t flags, const char *format, ...)
 }
 
 // Crash when a deleted method is called by accident.
-SWIFT_RUNTIME_EXPORT
-LLVM_ATTRIBUTE_NORETURN
+SWIFT_RUNTIME_EXPORT SWIFT_NORETURN
 void
 swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
