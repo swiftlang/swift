@@ -630,7 +630,7 @@ static void reportAttributes(ASTContext &Ctx,
       case PlatformKind::iOS:
         PlatformUID = PlatformIOS; break;
       case PlatformKind::macCatalyst:
-        PlatformUID = PlatformIOS; break;
+        PlatformUID = PlatformMacCatalyst; break;
       case PlatformKind::OSX:
         PlatformUID = PlatformOSX; break;
       case PlatformKind::tvOS:
