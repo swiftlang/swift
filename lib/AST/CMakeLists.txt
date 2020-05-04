@@ -49,6 +49,7 @@ add_swift_host_library(swiftAST STATIC
   GenericEnvironment.cpp
   GenericSignature.cpp
   GenericSignatureBuilder.cpp
+  GenericSignatureBuilder2.cpp
   Identifier.cpp
   ImportCache.cpp
   IncrementalRanges.cpp

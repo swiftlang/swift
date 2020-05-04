@@ -88,6 +88,7 @@ namespace swift {
   class TupleType;
   class FunctionType;
   class GenericSignatureBuilder;
+  class GenericSignatureBuilder2;
   class ArchetypeType;
   class Identifier;
   class InheritedNameSet;
@@ -973,6 +974,11 @@ public:
   /// Retrieve or create the stored generic signature builder for the given
   /// canonical generic signature and module.
   GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
+                                                     CanGenericSignature sig);
+
+  /// Retrieve or create the stored generic signature builder for the given
+  /// canonical generic signature and module.
+  GenericSignatureBuilder2 *getOrCreateGenericSignatureBuilder2(
                                                      CanGenericSignature sig);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,

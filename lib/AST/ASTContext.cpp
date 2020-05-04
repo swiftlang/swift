@@ -28,6 +28,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/GenericSignatureBuilder2.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
@@ -369,6 +370,10 @@ struct ASTContext::Implementation {
     /// Stored generic signature builders for canonical generic signatures.
     llvm::DenseMap<GenericSignature, std::unique_ptr<GenericSignatureBuilder>>
       GenericSignatureBuilders;
+
+    /// Stored generic signature builders for canonical generic signatures.
+    llvm::DenseMap<GenericSignature, std::unique_ptr<GenericSignatureBuilder2>>
+      GenericSignatureBuilders2;
 
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
@@ -1576,6 +1581,27 @@ void ASTContext::registerGenericSignatureBuilder(
     std::make_unique<GenericSignatureBuilder>(std::move(builder));
 }
 
+GenericSignatureBuilder2 *ASTContext::getOrCreateGenericSignatureBuilder2(
+                                                      CanGenericSignature sig) {
+  // Check whether we already have a generic signature builder for this
+  // signature and module.
+  auto arena = getArena(sig);
+  auto &genericSignatureBuilders =
+      getImpl().getArena(arena).GenericSignatureBuilders2;
+  auto known = genericSignatureBuilders.find(sig);
+  if (known != genericSignatureBuilders.end())
+    return known->second.get();
+
+  // Create a new generic signature builder with the given signature.
+  auto builder = new GenericSignatureBuilder2(*this, sig);
+
+  // Store this generic signature builder (no generic environment yet).
+  genericSignatureBuilders[sig] =
+    std::unique_ptr<GenericSignatureBuilder2>(builder);
+
+  return builder;
+}
+
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig) {
   // Check whether we already have a generic signature builder for this
@@ -1654,6 +1680,10 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   // FIXME: This should be handled lazily in the future, and therefore not
   // required.
   builder->processDelayedRequirements();
+#endif
+
+#ifndef NDEBUG
+  (void) getOrCreateGenericSignatureBuilder2(sig);
 #endif
 
   return builder;
