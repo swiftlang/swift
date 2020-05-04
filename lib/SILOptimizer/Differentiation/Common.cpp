@@ -16,7 +16,7 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SILOptimizer/Utils/Differentiation/Common.h"
+#include "swift/SILOptimizer/Differentiation/Common.h"
 
 namespace swift {
 namespace autodiff {

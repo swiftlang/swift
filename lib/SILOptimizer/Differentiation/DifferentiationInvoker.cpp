@@ -15,7 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILOptimizer/Utils/Differentiation/DifferentiationInvoker.h"
+#include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
+
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"

@@ -17,12 +17,13 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADCONTEXT_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADCONTEXT_H
 
+#include "swift/SILOptimizer/Differentiation/Common.h"
+#include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
+
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILOptimizer/Utils/Differentiation/Common.h"
-#include "swift/SILOptimizer/Utils/Differentiation/DifferentiationInvoker.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallPtrSet.h"

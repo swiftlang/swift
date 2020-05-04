@@ -23,6 +23,7 @@ endmacro()
 
 add_subdirectory(ARC)
 add_subdirectory(Analysis)
+add_subdirectory(Differentiation)
 add_subdirectory(FunctionSignatureTransforms)
 add_subdirectory(IPO)
 add_subdirectory(LoopTransforms)
