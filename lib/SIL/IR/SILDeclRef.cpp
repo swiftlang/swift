@@ -442,12 +442,9 @@ bool SILDeclRef::isTransparent() const {
 
 /// True if the function should have its body serialized.
 IsSerialized_t SILDeclRef::isSerialized() const {
-  DeclContext *dc;
   if (auto closure = getAbstractClosureExpr()) {
-    dc = closure->getLocalContext();
-
-    // Otherwise, ask the AST if we're inside an @inlinable context.
-    if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+    // Ask the AST if we're inside an @inlinable context.
+    if (closure->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       if (isForeign)
         return IsSerializable;
 
@@ -465,6 +462,13 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // Default argument generators are serialized if the containing
   // declaration is public.
   if (isDefaultArgGenerator()) {
+    // Ask the AST if we're inside an @inlinable context.
+    if (d->getDeclContext()->getResilienceExpansion()
+          == ResilienceExpansion::Minimal) {
+      return IsSerialized;
+    }
+
+    // Otherwise, check if the owning declaration is public.
     auto scope =
       d->getFormalAccessScope(/*useDC=*/nullptr,
                               /*treatUsableFromInlineAsPublic=*/true);
@@ -490,7 +494,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   // Note: if 'd' is a function, then 'dc' is the function itself, not
   // its parent context.
-  dc = d->getInnermostDeclContext();
+  auto *dc = d->getInnermostDeclContext();
 
   // Local functions are serializable if their parent function is
   // serializable.
