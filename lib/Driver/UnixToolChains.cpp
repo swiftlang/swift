@@ -287,9 +287,9 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 
   // Link against the desired C++ standard library.
   if (const Arg *A =
-      context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
-    Arguments.push_back(context.Args.MakeArgString(
-        Twine("-stdlib=") + A->getValue()));
+          context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
+    Arguments.push_back(
+        context.Args.MakeArgString(Twine("-stdlib=") + A->getValue()));
   }
 
   // Explicitly pass the target to the linker

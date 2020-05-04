@@ -171,10 +171,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-enable-cxx-interop");
   }
   if (const Arg *arg =
-      inputArgs.getLastArg(options::OPT_experimental_cxx_stdlib)) {
+          inputArgs.getLastArg(options::OPT_experimental_cxx_stdlib)) {
     arguments.push_back("-Xcc");
-    arguments.push_back(inputArgs.MakeArgString(
-        Twine("-stdlib=") + arg->getValue()));
+    arguments.push_back(
+        inputArgs.MakeArgString(Twine("-stdlib=") + arg->getValue()));
   }
 
   // Handle the CPU and its preferences.
@@ -1339,8 +1339,8 @@ const char *ToolChain::getClangLinkerDriver(
   // standard library that `clang++` selects by default may not be the one that
   // is desired.
   const char *LinkerDriver =
-      Args.hasArg(options::OPT_enable_experimental_cxx_interop) ?
-      "clang++" : "clang";
+      Args.hasArg(options::OPT_enable_experimental_cxx_interop) ? "clang++"
+                                                                : "clang";
   if (const Arg *A = Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
