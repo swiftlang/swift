@@ -7106,6 +7106,10 @@ void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
 ArrayRef<AutoDiffConfig>
 AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
   prepareDerivativeFunctionConfigurations();
+  // Check `@differentiable` attributes.
+  for (auto *diffAttr : getAttrs().getAttributes<DifferentiableAttr>())
+    (void)diffAttr->getParameterIndices();
+  // Load derivative configurations from imported modules.
   auto &ctx = getASTContext();
   if (ctx.getCurrentGeneration() > DerivativeFunctionConfigGeneration) {
     unsigned previousGeneration = DerivativeFunctionConfigGeneration;
