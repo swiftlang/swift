@@ -625,6 +625,19 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   }
 }
 
+void SILPassManager::executePassPipelinePlan(const SILPassPipelinePlan &Plan) {
+  for (const SILPassPipeline &Pipeline : Plan.getPipelines()) {
+    setStageName(Pipeline.Name);
+    resetAndRemoveTransformations();
+    for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
+      addPass(Kind);
+      assert(!Pipeline.isFunctionPassPipeline
+             || isa<SILFunctionTransform>(Transformations.back()));
+    }
+    execute();
+  }
+}
+
 void SILPassManager::execute() {
   const SILOptions &Options = getOptions();
 
