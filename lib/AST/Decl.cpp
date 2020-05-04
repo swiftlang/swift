@@ -7106,7 +7106,8 @@ void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
 ArrayRef<AutoDiffConfig>
 AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
   prepareDerivativeFunctionConfigurations();
-  // Check `@differentiable` attributes.
+  // Resolve derivative function configurations from `@differentiable`
+  // attributes by type-checking them.
   for (auto *diffAttr : getAttrs().getAttributes<DifferentiableAttr>())
     (void)diffAttr->getParameterIndices();
   // Load derivative configurations from imported modules.
