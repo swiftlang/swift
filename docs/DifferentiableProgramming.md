@@ -343,7 +343,7 @@ struct Observation {
 func meanError(for model: PodcastSpeedModel, _ observations: [Observation]) -> Float {
     var error: Float = 0
     for observation in observations {
-        error += abs(model.prediction(for: observation.state) - observation.userSpeed)
+        error += abs(model.prediction(for: observation.podcastState) - observation.userSpeed)
     }
     return error / Float(observations.count)
 }
