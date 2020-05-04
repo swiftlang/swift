@@ -44,7 +44,7 @@ positions in several different contexts:
 
 Consider the example:
 
-```
+```swift
 func example<T>(i: Int, t: T) -> (Int, T) {
   let foo = { return ($0, t) }
   return foo(i)
