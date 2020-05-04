@@ -66,4 +66,4 @@
 
 // RUN: %swiftc_driver -driver-print-jobs -profile-use=/dev/null %s | %FileCheck -check-prefix=USE_DEVNULL %s
 // USE_DEVNULL: swift
-// USE_DEVNULL: -profile-use={{/dev/null|(.*local\\\\temp\\\\.*profiling-[^ ]*.o)}}
+// USE_DEVNULL: -profile-use={{/dev/null|(.*profiling-[^ ]*.o)}}
