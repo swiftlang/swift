@@ -1,4 +1,3 @@
-======================================================
 Index Invalidation Rules in the Swift Standard Library
 ======================================================
 
@@ -28,7 +27,7 @@ In C++, validity of an iterator is a property of the iterator itself, since
 iterators can be dereferenced to access collection elements.
 
 In Swift, in order to access a collection element designated by an index,
-subscript operator is applied to the collection, ``C[I]``.  Thus, index is
+subscript operator is applied to the collection, `C[I]`.  Thus, index is
 valid or not only in context of a certain collection instance at a certain
 point of program execution.  A given index can be valid for zero, one or more
 than one collection instance at the same time.
@@ -51,32 +50,32 @@ An arbitrary index instance is not valid for an arbitrary collection instance.
 The following points apply to all collections, defined in the library or by the
 user:
 
-(1) Indices obtained from a collection ``C`` via ``C.startIndex``,
-    ``C.endIndex`` and other collection-specific APIs returning indices, are
-    valid for ``C``.
+(1) Indices obtained from a collection `C` via `C.startIndex`,
+    `C.endIndex` and other collection-specific APIs returning indices, are
+    valid for `C`.
 
-(2) If an index ``I`` is valid for a collection ``C``, a copy of ``I`` is valid
-    for ``C``.
+(2) If an index `I` is valid for a collection `C`, a copy of `I` is valid
+    for `C`.
 
-(3) If an index ``I`` is valid for a collection ``C``, indices obtained from
-    ``I`` via ``I.successor()``, ``I.predecessor()``, and other index-specific
-    APIs, are valid for ``C``.
+(3) If an index `I` is valid for a collection `C`, indices obtained from
+    `I` via `I.successor()`, `I.predecessor()`, and other index-specific
+    APIs, are valid for `C`.
     FIXME: disallow startIndex.predecessor(), endIndex.successor()
 
 (4) **Indices of collections and slices freely interoperate.**
 
-    If an index ``I`` is valid for a collection ``C``, it is also valid for
-    slices of ``C``, provided that ``I`` was in the bounds that were passed to
+    If an index `I` is valid for a collection `C`, it is also valid for
+    slices of `C`, provided that `I` was in the bounds that were passed to
     the slicing subscript.
 
-    If an index ``I`` is valid for a slice obtained from a collection ``C``, it
-    is also valid for ``C`` itself.
+    If an index `I` is valid for a slice obtained from a collection `C`, it
+    is also valid for `C` itself.
 
-(5) If an index ``I`` is valid for a collection ``C``, it is also valid for
-    a copy of ``C``.
+(5) If an index `I` is valid for a collection `C`, it is also valid for
+    a copy of `C`.
 
-(6) If an index ``I`` is valid for a collection ``C``, it continues to be valid
-    after a call to a non-mutating method on ``C``.
+(6) If an index `I` is valid for a collection `C`, it continues to be valid
+    after a call to a non-mutating method on `C`.
 
 (7) Calling a non-mutating method on a collection instance does not invalidate
     any indexes.
@@ -124,56 +123,56 @@ user:
 
 Consequences:
 
-- The setter of ``MutableCollection.subscript(_: Index)`` does not invalidate
+- The setter of `MutableCollection.subscript(_: Index)` does not invalidate
   any indices.  Indices are composites of offsets, so replacing the value does
   not change the shape of the data structure and preserves offsets.
 
 - A value type mutable linked list cannot conform to
-  ``MutableCollectionType``.  An index for a linked list has to be implemented
+  `MutableCollectionType`.  An index for a linked list has to be implemented
   as a pointer to the list node to provide O(1) element access.  Mutating an
   element of a non-uniquely referenced linked list will create a copy of the
   nodes that comprise the list.  Indices obtained before the copy was made
   would point to the old nodes and wouldn't be valid for the copy of the list.
 
   It is still valid to have a value type linked list conform to
-  ``CollectionType``, or to have a reference type mutable linked list conform
-  to ``MutableCollection``.
+  `CollectionType`, or to have a reference type mutable linked list conform
+  to `MutableCollection`.
 
 The following points apply to all collections by default, but specific
 collection implementations can be less strict:
 
 (1) A call to a mutating method on a collection instance, except the setter of
-    ``MutableCollection.subscript(_: Index)``, invalidates all indices for that
+    `MutableCollection.subscript(_: Index)`, invalidates all indices for that
     collection instance.
 
 Consequences:
 
-- Passing a collection as an ``inout`` argument invalidates all indexes for
+- Passing a collection as an `inout` argument invalidates all indexes for
   that collection instance, unless the function explicitly documents stronger
-  guarantees.  (The function can call mutating methods on an ``inout`` argument
+  guarantees.  (The function can call mutating methods on an `inout` argument
   or completely replace it.)
 
-  * ``Swift.swap()`` does not invalidate any indexes.
+  * `Swift.swap()` does not invalidate any indexes.
 
-Additional guarantees for ``Swift.Array``, ``Swift.ContiguousArray``, ``Swift.ArraySlice``
+Additional guarantees for `Swift.Array`, `Swift.ContiguousArray`, `Swift.ArraySlice`
 ==========================================================================================
 
 **Valid array indexes can be created without using Array APIs.**  Array indexes
-are plain integers.  Integers that are dynamically in the range ``0..<A.count``
-are valid indexes for the array or slice ``A``.  It does not matter if an index
+are plain integers.  Integers that are dynamically in the range `0..<A.count`
+are valid indexes for the array or slice `A`.  It does not matter if an index
 was obtained from the collection instance, or derived from input or unrelated
 data.
 
 **Traps are guaranteed.**  Using an invalid index to designate elements of an
 array or an array slice is guaranteed to perform a trap.
 
-Additional guarantees for ``Swift.Dictionary``
+Additional guarantees for `Swift.Dictionary`
 ==============================================
 
 **Insertion into a Dictionary invalidates indexes only on a rehash.**  If a
-``Dictionary`` has enough free buckets (guaranteed by calling an initializer or
+`Dictionary` has enough free buckets (guaranteed by calling an initializer or
 reserving space), then inserting elements does not invalidate indexes.
 
-Note: unlike C++'s ``std::unordered_map``, removing elements from a
-``Dictionary`` invalidates indexes.
+Note: unlike C++'s `std::unordered_map`, removing elements from a
+`Dictionary` invalidates indexes.
 
