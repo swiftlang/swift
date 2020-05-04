@@ -1052,6 +1052,13 @@ public:
   /// invariants.
   void verify(bool SingleFunction = true) const;
 
+  /// Run the SIL ownership verifier to check for ownership invariant failures.
+  ///
+  /// NOTE: The ownership verifier is always run when performing normal IR
+  /// verification, so this verification can be viewed as a subset of
+  /// SILFunction::verify.
+  void verifyOwnership(DeadEndBlocks *deadEndBlocks = nullptr) const;
+
   /// Verify that all non-cond-br critical edges have been split.
   ///
   /// This is a fast subset of the checks performed in the SILVerifier.

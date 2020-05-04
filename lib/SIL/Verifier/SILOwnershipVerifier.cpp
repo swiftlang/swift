@@ -882,39 +882,10 @@ void SILInstruction::verifyOperandOwnership() const {
   }
 }
 
-void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-  if (DisableOwnershipVerification)
-    return;
-
-  // Do not validate SILUndef values.
-  if (isa<SILUndef>(Value))
-    return;
-
-#ifdef NDEBUG
-  // When compiling without asserts enabled, only verify ownership if
-  // -sil-verify-all is set.
-  //
-  // NOTE: We purposely return if we do can not look up a module here to ensure
-  // that if we run into something that we do not understand, we do not assert
-  // in user code even tohugh we aren't going to actually verify (the default
-  // behavior when -sil-verify-all is disabled).
-  auto *Mod = Value->getModule();
-  if (!Mod || !Mod->getOptions().VerifyAll)
-    return;
-#endif
-
-  // Make sure that we are not a value of an instruction in a SILGlobalVariable
-  // block.
-  if (auto *definingInst = getDefiningInstruction()) {
-    if (definingInst->isStaticInitializerInst()) {
-      return;
-    }
-  }
-
-  // Since we do not have SILUndef, we now know that getFunction() should return
-  // a real function. Assert in case this assumption is no longer true.
-  SILFunction *f = (*this)->getFunction();
-  assert(f && "Instructions and arguments should have a function");
+static void verifySILValueHelper(const SILFunction *f, SILValue value,
+                                 DeadEndBlocks *deadEndBlocks) {
+  assert(!isa<SILUndef>(value) &&
+         "We assume we are always passed arguments or instruction results");
 
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
@@ -931,11 +902,89 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
 
   SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
   if (deadEndBlocks) {
-    SILValueOwnershipChecker(*deadEndBlocks, *this, *errorBuilder, liveBlocks)
+    SILValueOwnershipChecker(*deadEndBlocks, value, *errorBuilder, liveBlocks)
         .check();
   } else {
     DeadEndBlocks deadEndBlocks(f);
-    SILValueOwnershipChecker(deadEndBlocks, *this, *errorBuilder, liveBlocks)
+    SILValueOwnershipChecker(deadEndBlocks, value, *errorBuilder, liveBlocks)
         .check();
+  }
+}
+
+void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
+  if (DisableOwnershipVerification)
+    return;
+
+  // Do not validate SILUndef values.
+  if (isa<SILUndef>(*this))
+    return;
+
+#ifdef NDEBUG
+  // When compiling without asserts enabled, only verify ownership if
+  // -sil-verify-all is set.
+  //
+  // NOTE: We purposely return if we do can not look up a module here to ensure
+  // that if we run into something that we do not understand, we do not assert
+  // in user code even tohugh we aren't going to actually verify (the default
+  // behavior when -sil-verify-all is disabled).
+  auto *mod = Value->getModule();
+  if (!mod || !mod->getOptions().VerifyAll)
+    return;
+#endif
+
+  // Make sure that we are not a value of an instruction in a SILGlobalVariable
+  // block.
+  if (auto *definingInst = getDefiningInstruction()) {
+    if (definingInst->isStaticInitializerInst()) {
+      return;
+    }
+  }
+
+  // If we are testing the verifier, bail so we only print errors once when
+  // performing a full verification a function at a time by the
+  // OwnershipVerifierStateDumper pass, instead of additionally in the
+  // SILBuilder and in the actual SIL verifier that may be run by sil-opt.
+  if (IsSILOwnershipVerifierTestingEnabled)
+    return;
+
+  // Since we do not have SILUndef, we now know that getFunction() should return
+  // a real function. Assert in case this assumption is no longer true.
+  auto *f = (*this)->getFunction();
+  assert(f && "Instructions and arguments should have a function");
+  verifySILValueHelper(f, *this, deadEndBlocks);
+}
+
+void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
+  if (DisableOwnershipVerification)
+    return;
+
+#ifdef NDEBUG
+  // When compiling without asserts enabled, only verify ownership if
+  // -sil-verify-all is set.
+  //
+  // NOTE: We purposely return if we do can not look up a module here to ensure
+  // that if we run into something that we do not understand, we do not assert
+  // in user code even tohugh we aren't going to actually verify (the default
+  // behavior when -sil-verify-all is disabled).
+  auto *mod = getParent();
+  if (!mod || !mod->getOptions().VerifyAll)
+    return;
+#endif
+
+  // If the given function has unqualified ownership or we have been asked by
+  // the user not to verify this function, there is nothing to verify.
+  if (!hasOwnership() || !shouldVerifyOwnership())
+    return;
+
+  for (auto &block : *this) {
+    for (auto *arg : block.getArguments()) {
+      verifySILValueHelper(this, arg, deadEndBlocks);
+    }
+
+    for (auto &inst : block) {
+      for (auto result : inst.getResults()) {
+        verifySILValueHelper(this, result, deadEndBlocks);
+      }
+    }
   }
 }
