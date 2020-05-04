@@ -338,7 +338,7 @@ See [docs/Testing.md](docs/Testing.md), in particular the section on [lit.py](do
 
 Be sure to look through the [docs](https://github.com/apple/swift/tree/master/docs)
 directory for more information about the compiler. In particular, the documents
-titled [Debugging the Swift Compiler](docs/DebuggingTheCompiler.rst) and
+titled [Debugging the Swift Compiler](docs/DebuggingTheCompiler.md) and
 [Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
 helpful to understand before submitting your first PR.
 

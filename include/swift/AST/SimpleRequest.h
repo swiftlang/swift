@@ -49,7 +49,7 @@ enum class RequestFlags {
   /// (e.g. \c TypeCheckSourceFileRequest) will require it.
   ///
   /// For further discussion on incremental dependencies
-  /// see DependencyAnalysis.rst.
+  /// see DependencyAnalysis.md.
   DependencySource = 1 << 3,
   /// This request introduces the sink component of a source-sink
   /// incremental dependency pair and is a consumer of the current
@@ -59,7 +59,7 @@ enum class RequestFlags {
   /// (e.g. \c DirectLookupRequest) will require it.
   ///
   /// For further discussion on incremental dependencies
-  /// see DependencyAnalysis.rst.
+  /// see DependencyAnalysis.md.
   DependencySink = 1 << 4,
 };
 
