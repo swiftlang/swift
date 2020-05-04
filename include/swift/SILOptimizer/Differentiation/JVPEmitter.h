@@ -18,12 +18,13 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_JVPEMITTER_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_JVPEMITTER_H
 
+#include "swift/SILOptimizer/Differentiation/AdjointValue.h"
+#include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
+#include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
+
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
-#include "swift/SILOptimizer/Utils/Differentiation/AdjointValue.h"
-#include "swift/SILOptimizer/Utils/Differentiation/DifferentiationInvoker.h"
-#include "swift/SILOptimizer/Utils/Differentiation/LinearMapInfo.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {

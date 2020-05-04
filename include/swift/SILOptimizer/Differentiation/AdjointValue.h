@@ -18,6 +18,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADJOINTVALUE_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADJOINTVALUE_H
 
+#include "swift/AST/Decl.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/ArrayRef.h"
 
