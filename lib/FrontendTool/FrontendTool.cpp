@@ -2184,6 +2184,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                        Invocation.getFrontendOptions().DumpAPIPath);
   }
 
+  // If we're asked to enable private intransitive dependencies, we need to
+  // write over the dependency files we just emitted because we need to
+  // get the dependencies written post-Sema down on disk.
+  // FIXME: Evaluate the impact turning this on universally has.
+  if (Invocation.getLangOptions().EnableExperientalPrivateIntransitiveDependencies) {
+    emitReferenceDependenciesForAllPrimaryInputsIfNeeded(*Instance);
+  }
+
   // Verify reference dependencies of the current compilation job *before*
   // verifying diagnostics so that the former can be tested via the latter.
   if (Invocation.getFrontendOptions().EnableIncrementalDependencyVerifier) {
