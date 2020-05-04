@@ -194,7 +194,7 @@ ninja -C S:\b\xctest check-xctest
 ## Rebuild Foundation
 
 ```cmd
-cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-64" -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -D ENABLE_TESTING=YES -D disptch_DIR=S:/b/libdispatch/cmake/modules -D XCTest_DIR=S:/b/xctest/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
+cmake -B S:\b\foundation -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -D CMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -D ICU_ROOT="S:/Library/icu-64" -D LIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -D LIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -D ENABLE_TESTING=YES -D dispatch_DIR=S:/b/libdispatch/cmake/modules -D XCTest_DIR=S:/b/xctest/cmake/modules -G Ninja -S S:\swift-corelibs-foundation
 ninja -C S:\b\foundation
 ```
 
