@@ -2719,6 +2719,11 @@ SolutionResult ConstraintSystem::salvage() {
     // Solve the system.
     solveImpl(viable);
 
+    // Before removing any "fixed" solutions, let's check
+    // if ambiguity is caused by fixes and diagnose if possible.
+    if (diagnoseAmbiguityWithFixes(viable))
+      return SolutionResult::forAmbiguous(viable);
+
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.
     if (auto best = findBestSolution(viable, /*minimize=*/true)) {
@@ -2727,11 +2732,6 @@ SolutionResult ConstraintSystem::salvage() {
       viable.erase(viable.begin() + 1, viable.end());
       return SolutionResult::forSolved(std::move(viable[0]));
     }
-
-    // Before removing any "fixed" solutions, let's check
-    // if ambiguity is caused by fixes and diagnose if possible.
-    if (diagnoseAmbiguityWithFixes(viable))
-      return SolutionResult::forAmbiguous(viable);
 
     // FIXME: If we were able to actually fix things along the way,
     // we may have to hunt for the best solution. For now, we don't care.
@@ -3071,7 +3071,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
   if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
     return true;
-  
+
   if (auto bestScore = solverState->BestScore) {
     solutions.erase(llvm::remove_if(solutions,
                                     [&](const Solution &solution) {
@@ -3086,6 +3086,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
         }))
       return false;
   }
+
+  if (solutions.size() < 2)
+    return false;
 
   if (diagnoseAmbiguityWithEphemeralPointers(*this, solutions))
     return true;
