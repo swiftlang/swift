@@ -255,6 +255,9 @@ enum class FixKind : uint8_t {
   /// Allow key path root type mismatch when applying a key path that has a
   /// root type not convertible to the type of the base instance.
   AllowKeyPathRootTypeMismatch,
+
+  /// Allow key path to be bound to a function type with more than 1 argument
+  AllowMultiArgFuncKeyPathMismatch
 };
 
 class ConstraintFix {
@@ -1262,6 +1265,26 @@ public:
 
   static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
                                            ConstraintLocator *locator);
+};
+
+class AllowMultiArgFuncKeyPathMismatch final : public ConstraintFix {
+  Type functionType;
+
+  AllowMultiArgFuncKeyPathMismatch(ConstraintSystem &cs, Type fnType,
+                                   ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowMultiArgFuncKeyPathMismatch, locator),
+        functionType(fnType) {}
+
+public:
+  std::string getName() const override {
+    return "allow conversion of a keypath type to a multi-argument function";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowMultiArgFuncKeyPathMismatch *create(ConstraintSystem &cs,
+                                                  Type fnType,
+                                                  ConstraintLocator *locator);
 };
 
 class TreatKeyPathSubscriptIndexAsHashable final : public ConstraintFix {

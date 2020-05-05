@@ -6266,3 +6266,10 @@ bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
                  rootType, baseType);
   return true;
 }
+
+bool MultiArgFuncKeyPathFailure::diagnoseAsError() {
+  // Diagnose use a keypath where a function with multiple arguments is expected
+  emitDiagnostic(diag::expr_keypath_multiparam_func_conversion,
+                 resolveType(functionType));
+  return true;
+}
