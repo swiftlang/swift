@@ -1416,7 +1416,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
 
         @inlinable
-        @usableFromInline
         @_alwaysEmitIntoClient
         internal mutating func _truncateOrZeroExtend(toCount newCount: Int) {
             switch self {
