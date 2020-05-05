@@ -2965,7 +2965,7 @@ findBridgeWitness(const Metadata *T) {
   }
 
   auto w = swift_conformsToObjectiveCBridgeable(T);
-  if (LLVM_LIKELY(w))
+  if (SWIFT_LIKELY(w))
     return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
   // Class and ObjC existential metatypes can be bridged, but metatypes can't
   // directly conform to protocols yet. Use a stand-in conformance for a type
