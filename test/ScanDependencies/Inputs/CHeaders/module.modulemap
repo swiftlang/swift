@@ -22,3 +22,8 @@ module F {
   header "F.h"
   export *
 }
+
+module G {
+  header "G.h"
+  export *
+}

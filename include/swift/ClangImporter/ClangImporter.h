@@ -370,7 +370,8 @@ public:
   void verifyAllModules() override;
 
   Optional<ModuleDependencies> getModuleDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache) override;
+      StringRef moduleName, ModuleDependenciesCache &cache,
+      SubASTContextDelegate &delegate) override;
 
   /// Add dependency information for the bridging header.
   ///

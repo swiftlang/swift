@@ -48,17 +48,31 @@ class ModuleInterfaceBuilder {
   CompilerInvocation subInvocation;
   SmallVector<StringRef, 3> extraDependencies;
 
+public:
+  /// Emit a diagnostic tied to this declaration.
+  template<typename ...ArgTypes>
+  static InFlightDiagnostic diagnose(
+      DiagnosticEngine &Diags,
+      SourceManager &SM,
+      StringRef InterfacePath,
+      SourceLoc Loc,
+      Diag<ArgTypes...> ID,
+      typename detail::PassArgument<ArgTypes>::type... Args) {
+    if (Loc.isInvalid()) {
+      // Diagnose this inside the interface file, if possible.
+      Loc = SM.getLocFromExternalSource(InterfacePath, 1, 1);
+    }
+    return Diags.diagnose(Loc, ID, std::move(Args)...);
+  }
+
+private:
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(
       Diag<ArgTypes...> ID,
       typename detail::PassArgument<ArgTypes>::type... Args) const {
-    SourceLoc loc = diagnosticLoc;
-    if (loc.isInvalid()) {
-      // Diagnose this inside the interface file, if possible.
-      loc = sourceMgr.getLocFromExternalSource(interfacePath, 1, 1);
-    }
-    return diags.diagnose(loc, ID, std::move(Args)...);
+    return diagnose(diags, sourceMgr, interfacePath, diagnosticLoc,
+                    ID, std::move(Args)...);
   }
 
   void configureSubInvocationInputsAndOutputs(StringRef OutPath);
