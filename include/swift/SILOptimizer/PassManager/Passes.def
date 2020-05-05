@@ -314,6 +314,8 @@ PASS(UsePrespecialized, "use-prespecialized",
      "Use Pre-Specialized Functions")
 PASS(OwnershipDumper, "ownership-dumper",
      "Print Ownership information for Testing")
+PASS(OwnershipVerifierTextualErrorDumper, "ownership-verifier-textual-error-dumper",
+     "Run ownership verification on all functions, emitting FileCheck-able textual errors instead of asserting")
 PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
