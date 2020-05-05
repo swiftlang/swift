@@ -282,10 +282,16 @@ class CleanupCloner {
 public:
   CleanupCloner(SILGenFunction &SGF, const ManagedValue &mv);
   CleanupCloner(SILGenBuilder &builder, const ManagedValue &mv);
-  CleanupCloner(SILGenFunction &SGF, const RValue &rv);
-  CleanupCloner(SILGenBuilder &builder, const RValue &rv);
 
   ManagedValue clone(SILValue value) const;
+
+  static void
+  getClonersForRValue(SILGenFunction &SGF, const RValue &rvalue,
+                      SmallVectorImpl<CleanupCloner> &resultingCloners);
+
+  static void
+  getClonersForRValue(SILGenBuilder &builder, const RValue &rvalue,
+                      SmallVectorImpl<CleanupCloner> &resultingCloners);
 };
 
 } // end namespace Lowering

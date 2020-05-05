@@ -210,7 +210,7 @@ any future use of the function must take this into account.
 Although they are not a supported feature for arbitrary libraries at this time,
 public `transparent`_ functions are implicitly marked ``@inlinable``.
 
-.. _transparent: https://github.com/apple/swift/blob/master/docs/TransparentAttr.rst
+.. _transparent: https://github.com/apple/swift/blob/master/docs/TransparentAttr.md
 
 
 Restrictions on Inlinable Functions

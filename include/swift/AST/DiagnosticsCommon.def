@@ -152,6 +152,9 @@ WARNING(warn_property_wrapper_module_scope,none,
         "wrapper %0; please qualify the reference with %1",
         (DeclNameRef, Identifier))
 
+NOTE(circular_type_resolution_note,none,
+     "while resolving type %0", (TypeRepr *))
+
 //------------------------------------------------------------------------------
 // MARK: Cross-import overlay loading diagnostics
 //------------------------------------------------------------------------------

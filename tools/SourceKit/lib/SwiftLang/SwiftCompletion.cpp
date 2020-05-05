@@ -1221,6 +1221,7 @@ void SwiftLangSupport::codeCompleteOpen(
         completionKind = completionCtx.CodeCompletionKind;
         typeContextKind = completionCtx.typeContextKind;
         mayUseImplicitMemberExpr = completionCtx.MayUseImplicitMemberExpr;
+        consumer.setReusingASTContext(completionCtx.ReusingASTContext);
         completions =
             extendCompletions(results, sink, info, nameToPopularity, CCOpts);
       });

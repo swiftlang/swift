@@ -396,7 +396,7 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
   auto &fileMgr = clangCI.getFileManager();
 
   for (auto &import : imports) {
-    ModuleDecl *mod = import.second;
+    ModuleDecl *mod = import.importedModule;
     if (mod->isOnoneSupportModule())
       continue; // ignore the Onone support library.
     if (mod->isSwiftShimsModule())

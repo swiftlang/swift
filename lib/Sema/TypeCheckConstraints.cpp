@@ -1390,8 +1390,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::AllowUnavailable;
-    auto resolution = TypeResolution::forContextual(DC);
-    auto BaseTy = resolution.resolveType(InnerTypeRepr, options);
+    auto resolution = TypeResolution::forContextual(DC, options);
+    auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy && BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
@@ -1916,12 +1916,11 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-    typeLoc = TypeLoc(typeExpr->getTypeRepr(), Type());
-    bool hadError = TypeChecker::validateType(
-        getASTContext(), typeLoc, TypeResolution::forContextual(DC), options);
-
-    if (hadError)
+    auto result = TypeResolution::forContextual(DC, options)
+                      .resolveType(typeExpr->getTypeRepr());
+    if (result->hasError())
       return nullptr;
+    typeLoc = TypeLoc{typeExpr->getTypeRepr(), result};
   }
 
   if (!typeLoc.getType() || !typeLoc.getType()->getAnyNominal())
@@ -1982,7 +1981,7 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
 
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
-                                      TypeLoc convertType,
+                                      Type convertType,
                                       ContextualTypePurpose convertTypePurpose,
                                       TypeCheckExprOptions options) {
   SolutionApplicationTarget target(
@@ -2106,7 +2105,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             bool isAutoClosure) {
   assert(paramType && !paramType->hasError());
   return typeCheckExpression(
-      defaultValue, DC, TypeLoc::withoutLoc(paramType),
+      defaultValue, DC, paramType,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter);
 }
 
@@ -2481,7 +2480,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     return true;
 
   auto resultTy = TypeChecker::typeCheckExpression(
-      expr, dc, TypeLoc::withoutLoc(boolDecl->getDeclaredType()),
+      expr, dc, boolDecl->getDeclaredType(),
       CTP_Condition);
   return !resultTy;
 }
@@ -3195,6 +3194,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     }, [&] {
       out << ", ";
     });
+    out << "\n";
   }
 
   if (failedConstraint) {

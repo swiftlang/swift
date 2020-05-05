@@ -66,7 +66,7 @@ class X {
 // <rdar://problem/17144076> recursive typealias causes a segfault in the type checker
 struct SomeStruct<A> {
   typealias A = A // this is OK now -- the underlying type is the generic parameter 'A'
-  typealias B = B // expected-error {{type alias 'B' references itself}}
+  typealias B = B // expected-error {{type alias 'B' references itself}} expected-note {{while resolving type 'B'}}
 }
 
 // <rdar://problem/27680407> Infinite recursion when using fully-qualified associatedtype name that has not been defined with typealias

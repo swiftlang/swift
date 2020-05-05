@@ -108,7 +108,7 @@ public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:
-    ModuleDecl::ImportedModule Import = {};
+    llvm::Optional<ModuleDecl::ImportedModule> Import = llvm::None;
     const StringRef RawPath;
     const StringRef RawSPIs;
     SmallVector<Identifier, 4> spiGroups;
@@ -146,7 +146,7 @@ public:
     }
 
     bool isLoaded() const {
-      return Import.second != nullptr;
+      return Import.hasValue() && Import->importedModule != nullptr;
     }
 
     bool isExported() const {

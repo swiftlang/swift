@@ -63,21 +63,21 @@ import resilient_objc_class
 // CHECK-SAME:    internal global %objc_full_class_stub {
 // CHECK-SAME:    [[INT]] 0,
 // CHECK-SAME:    [[INT]] 1,
-// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* @"$s31class_update_callback_with_stub17ResilientSubclassCMU"
+// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* {{.*}}@"$s31class_update_callback_with_stub17ResilientSubclassCMU{{(\.ptrauth)?}}"
 // CHECK-SAME:  }
 
 // CHECK-LABEL: @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMt" =
 // CHECK-SAME:    internal global %objc_full_class_stub {
 // CHECK-SAME:    [[INT]] 0,
 // CHECK-SAME:    [[INT]] 1,
-// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMU"
+// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* {{.*}}@"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMU{{(\.ptrauth)?}}"
 // CHECK-SAME:  }
 
 // CHECK-LABEL: @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMt" =
 // CHECK-SAME:    internal global %objc_full_class_stub {
 // CHECK-SAME:    [[INT]] 0,
 // CHECK-SAME:    [[INT]] 1,
-// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMU"
+// CHECK-SAME:    %objc_class* (%objc_class*, i8*)* {{.*}}@"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMU{{(\.ptrauth)?}}"
 // CHECK-SAME:  }
 
 

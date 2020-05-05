@@ -52,11 +52,6 @@ namespace constraints {
   class SolutionResult;
 }
 
-/// A mapping from substitutable types to the protocol-conformance
-/// mappings for those types.
-using ConformanceMap =
-    llvm::DenseMap<SubstitutableType *, SmallVector<ProtocolConformance *, 2>>;
-
 /// Special-case type checking semantics for certain declarations.
 enum class DeclTypeCheckingSemantics {
   /// A normal declaration.
@@ -360,8 +355,7 @@ Type getUInt8Type(ASTContext &ctx);
 
 /// Try to resolve an IdentTypeRepr, returning either the referenced
 /// Type or an ErrorType in case of error.
-Type resolveIdentifierType(TypeResolution resolution, IdentTypeRepr *IdType,
-                           TypeResolutionOptions options);
+Type resolveIdentifierType(TypeResolution resolution, IdentTypeRepr *IdType);
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
@@ -379,11 +373,8 @@ Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 ///
 /// \param resolution The type resolution being performed.
 ///
-/// \param options Options that alter type resolution.
-///
 /// \returns true if type validation failed, or false otherwise.
-bool validateType(ASTContext &Ctx, TypeLoc &Loc, TypeResolution resolution,
-                  TypeResolutionOptions options);
+bool validateType(TypeLoc &Loc, TypeResolution resolution);
 
 /// Check for unsupported protocol types in the given declaration.
 void checkUnsupportedProtocolType(Decl *decl);
@@ -414,8 +405,7 @@ void checkUnsupportedProtocolType(ASTContext &ctx,
 ///
 /// \returns the resolved type.
 Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
-                          TypeResolution resolution,
-                          TypeResolutionOptions options, bool isSpecialized);
+                          TypeResolution resolution, bool isSpecialized);
 
 /// Apply generic arguments to the given type.
 ///
@@ -694,16 +684,14 @@ Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 /// to be possible.
 ///
 /// \param convertType The type that the expression is being converted to,
-/// or null if the expression is standalone. The location information is
-/// only used for diagnostics should the conversion fail; it is safe to pass
-/// a TypeLoc without location information.
+/// or null if the expression is standalone.
 ///
 /// \param options Options that control how type checking is performed.
 ///
 /// \returns The type of the top-level expression, or Type() if an
 ///          error occurred.
 Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                         TypeLoc convertType = TypeLoc(),
+                         Type convertType = Type(),
                          ContextualTypePurpose convertTypePurpose = CTP_Unused,
                          TypeCheckExprOptions options = TypeCheckExprOptions());
 

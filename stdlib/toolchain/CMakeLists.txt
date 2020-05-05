@@ -61,6 +61,11 @@ endif()
 # runtime being patched only through public ABI.
 list(APPEND CXX_COMPILE_FLAGS "-DSWIFT_COMPATIBILITY_LIBRARY=1")
 
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX "10.9")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS "7.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_TVOS "9.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
+
 add_subdirectory(legacy_layouts)
 add_subdirectory(Compatibility50)
 add_subdirectory(Compatibility51)
