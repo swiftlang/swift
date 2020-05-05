@@ -322,10 +322,10 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       add_dependencies(stdlib swift-stdlib-${arch_suffix} swiftImageRegistration-${arch_suffix})
     endif()
 
+    string(TOLOWER "${sdk}" lowercase_sdk)
     # Generate the static-stdlib-args.lnk file used by -static-stdlib option for
     # 'GenericUnix' (eg linux)
     if(${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF)
-      string(TOLOWER "${sdk}" lowercase_sdk)
       if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
         set(ICU_STATICLIB "TRUE")
       else()
