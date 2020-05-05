@@ -83,19 +83,37 @@ void ModuleInterfaceBuilder::configureSubInvocationInputsAndOutputs(
   .setMainAndSupplementaryOutputs({MainOut}, {SOPs});
 }
 
+void swift::inheritOptionsForBuildingInterface(
+    CompilerInvocation &Invok,
+    const SearchPathOptions &SearchPathOpts,
+    const LangOptions &LangOpts) {
+  // Start with a SubInvocation that copies various state from our
+  // invoking ASTContext.
+  Invok.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
+  Invok.setFrameworkSearchPaths(SearchPathOpts.FrameworkSearchPaths);
+  Invok.setSDKPath(SearchPathOpts.SDKPath);
+  Invok.setInputKind(InputFileKind::SwiftModuleInterface);
+  Invok.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
+  Invok.setTargetTriple(LangOpts.Target);
+
+  // Inhibit warnings from the SubInvocation since we are assuming the user
+  // is not in a position to fix them.
+  Invok.getDiagnosticOptions().SuppressWarnings = true;
+
+  // Inherit this setting down so that it can affect error diagnostics (mostly
+  // by making them non-fatal).
+  Invok.getLangOptions().DebuggerSupport = LangOpts.DebuggerSupport;
+
+  // Disable this; deinitializers always get printed with `@objc` even in
+  // modules that don't import Foundation.
+  Invok.getLangOptions().EnableObjCAttrRequiresFoundation = false;
+}
+
 void ModuleInterfaceBuilder::configureSubInvocation(
     const SearchPathOptions &SearchPathOpts,
     const LangOptions &LangOpts,
     ClangModuleLoader *ClangLoader) {
-  // Start with a SubInvocation that copies various state from our
-  // invoking ASTContext.
-  subInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
-  subInvocation.setFrameworkSearchPaths(SearchPathOpts.FrameworkSearchPaths);
-  subInvocation.setSDKPath(SearchPathOpts.SDKPath);
-  subInvocation.setInputKind(InputFileKind::SwiftModuleInterface);
-  subInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
-  subInvocation.setTargetTriple(LangOpts.Target);
-
+  inheritOptionsForBuildingInterface(subInvocation, SearchPathOpts, LangOpts);
   subInvocation.setModuleName(moduleName);
   subInvocation.setClangModuleCachePath(moduleCachePath);
   subInvocation.getFrontendOptions().PrebuiltModuleCachePath =
@@ -111,18 +129,6 @@ void ModuleInterfaceBuilder::configureSubInvocation(
       subInvocation.getClangImporterOptions().DetailedPreprocessingRecord = true;
     }
   }
-
-  // Inhibit warnings from the SubInvocation since we are assuming the user
-  // is not in a position to fix them.
-  subInvocation.getDiagnosticOptions().SuppressWarnings = true;
-
-  // Inherit this setting down so that it can affect error diagnostics (mostly
-  // by making them non-fatal).
-  subInvocation.getLangOptions().DebuggerSupport = LangOpts.DebuggerSupport;
-
-  // Disable this; deinitializers always get printed with `@objc` even in
-  // modules that don't import Foundation.
-  subInvocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
   // Tell the subinvocation to serialize dependency hashes if asked to do so.
   auto &frontendOpts = subInvocation.getFrontendOptions();

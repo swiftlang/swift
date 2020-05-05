@@ -124,6 +124,7 @@ namespace swift {
 
 class LangOptions;
 class SearchPathOptions;
+class CompilerInvocation;
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
@@ -210,6 +211,10 @@ bool extractSwiftInterfaceVersionAndArgs(SourceManager &SM,
                                          llvm::StringSaver &SubArgSaver,
                                          SmallVectorImpl<const char *> &SubArgs,
                                          SourceLoc diagnosticLoc = SourceLoc());
+
+void inheritOptionsForBuildingInterface(CompilerInvocation &Invok,
+                                        const SearchPathOptions &SearchPathOpts,
+                                        const LangOptions &LangOpts);
 }
 
 #endif

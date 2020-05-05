@@ -76,6 +76,9 @@ struct InterfaceSubASTContextDelegate: SubASTContextDelegate {
       return true;
     }
     CompilerInvocation invok;
+
+    // Inherit options from the parent ASTContext so we have all search paths, etc.
+    inheritOptionsForBuildingInterface(invok, ctx.SearchPathOpts, ctx.LangOpts);
     CompilerInstance inst;
     // Use the additional flags to setup the compiler instance.
     if (invok.parseArgs(SubArgs, ctx.Diags)) {
