@@ -293,7 +293,9 @@ dump() const {
 /// Implementation
 ///
 
-struct GenericSignatureBuilder2::Implementation {
+class GenericSignatureBuilder2::Implementation {
+  friend struct GenericSignatureBuilder2::PendingRequirements;
+
   RewriteSystem rewriteSystem;
   llvm::DenseMap<CanType, PendingRequirements> pendingRequirements;
 
@@ -303,12 +305,17 @@ struct GenericSignatureBuilder2::Implementation {
 
   llvm::BumpPtrAllocator allocator;
 
-  void addRequirement(Requirement req);
   void addSameTypeRequirement(CanType lhs, CanType rhs);
 
-  void realizeType(CanType type);
-  void expandType(CanType type);
-  void expandConformance(CanType type, ProtocolDecl *proto);
+  void realizeTypeStep(CanType type);
+  void expandTypeStep(CanType type);
+  void expandConformanceStep(CanType type, ProtocolDecl *proto);
+
+  void doIt();
+
+public:
+  void addRequirement(Requirement req);
+  const PendingRequirements &realizeType(CanType type);
 
   void dump() const;
 };
@@ -474,13 +481,15 @@ realizeType(GenericSignatureBuilder2::Implementation &impl) {
   assert(state == State::Dormant);
   state = State::Realizing;
 
+  // FIXME: Instead of realizing other types should we expand their
+  // parents instead?
   for (auto other : sameType)
     impl.realizeWorklist.push_back(other->getCanonicalType());
 }
 
 void
 GenericSignatureBuilder2::Implementation::
-realizeType(CanType type) {
+realizeTypeStep(CanType type) {
   assert(type->isTypeParameter());
 
   auto canType = rewriteSystem.getCanonicalType(type);
@@ -498,7 +507,7 @@ realizeType(CanType type) {
 
   // Now, expand our parent type.
   if (auto depMemTy = dyn_cast<DependentMemberType>(type))
-    expandType(depMemTy.getBase());
+    expandTypeStep(depMemTy.getBase());
 
   assert(isa<GenericTypeParamType>(type));
 }
@@ -517,7 +526,7 @@ expandType(CanType type, GenericSignatureBuilder2::Implementation &impl) {
 
 void
 GenericSignatureBuilder2::Implementation::
-expandType(CanType type) {
+expandTypeStep(CanType type) {
   assert(type->isTypeParameter());
 
   while (type) {
@@ -547,13 +556,51 @@ expandType(CanType type) {
 
 void
 GenericSignatureBuilder2::Implementation::
-expandConformance(CanType type, ProtocolDecl *proto) {
-  // FIXME: Walk the requirement signature
+expandConformanceStep(CanType substTy, ProtocolDecl *proto) {
+  auto selfTy = proto->getSelfInterfaceType();
+  for (auto req : proto->getRequirementSignature()) {
+    auto substReq = req.subst([&](SubstitutableType *t) -> Type {
+                                if (t->isEqual(selfTy))
+                                  return substTy;
+                                return t;
+                              },
+                              MakeAbstractConformanceForGenericType());
+
+    // FIXME: Can this fail?
+    assert(substReq);
+    addRequirement(*substReq);
+  }
 }
 
 void
-GenericSignatureBuilder2::Implementation::
-dump() const {
+GenericSignatureBuilder2::Implementation::doIt() {
+  for (;;) {
+    bool didIt = false;
+
+    while (!realizeWorklist.empty()) {
+      didIt = true;
+      auto type = realizeWorklist.back();
+      realizeWorklist.pop_back();
+      realizeTypeStep(type);
+    }
+
+    while (!expandWorklist.empty()) {
+      didIt = true;
+
+      CanType canType;
+      ProtocolDecl *proto;
+      std::tie(canType, proto) = expandWorklist.back();
+      expandWorklist.pop_back();
+      expandConformanceStep(canType, proto);
+    }
+
+    if (!didIt)
+      break;
+  }
+}
+
+void
+GenericSignatureBuilder2::Implementation::dump() const {
   llvm::dbgs() << "Rewrite system:\n";
   rewriteSystem.dump();
 
@@ -562,6 +609,15 @@ dump() const {
     llvm::dbgs() << "[" << pair.first << "]\n";
     pair.second.dump();
   }
+}
+
+const GenericSignatureBuilder2::PendingRequirements &
+GenericSignatureBuilder2::Implementation::realizeType(CanType type) {
+  realizeTypeStep(type);
+  doIt();
+
+  auto canType = rewriteSystem.getCanonicalType(type);
+  return pendingRequirements[canType];
 }
 
 GenericSignatureBuilder2::GenericSignatureBuilder2(

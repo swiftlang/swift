@@ -21,7 +21,7 @@ class ASTContext;
 class CanGenericSignature;
 
 class GenericSignatureBuilder2 {
-  struct Implementation;
+  class Implementation;
   class RewriteSystem;
   struct PendingRequirements;
 
