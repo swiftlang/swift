@@ -192,10 +192,10 @@ public:
   }
 #endif
 
-  LLVM_LIBRARY_VISIBILITY
+  SWIFT_LIBRARY_VISIBILITY
   const ClassMetadata *_swift_getClass(const void *object);
 
-  LLVM_LIBRARY_VISIBILITY
+  SWIFT_LIBRARY_VISIBILITY
   bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
 
   static inline
