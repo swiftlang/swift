@@ -23,6 +23,7 @@ class CanGenericSignature;
 class GenericSignatureBuilder2 {
   struct Implementation;
   class RewriteSystem;
+  struct PendingRequirements;
 
   ASTContext &ctx;
   std::unique_ptr<Implementation> impl;

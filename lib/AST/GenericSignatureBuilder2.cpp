@@ -23,9 +23,15 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/GraphTraits.h"
+#include "llvm/Support/Allocator.h"
 #include <vector>
 
 using namespace swift;
+
+///
+/// RewriteSystem
+///
 
 class GenericSignatureBuilder2::RewriteSystem {
   // Simple representation of a rewrite system.
@@ -210,12 +216,143 @@ dump() const {
   }
 }
 
+///
+/// PendingRequirements
+///
+
+struct GenericSignatureBuilder2::PendingRequirements {
+  enum class State {
+    /// Nothing interesting is happening.
+    Dormant,
+
+    /// We are in the process of discovering the canonical type and
+    /// conformances of this potential equivalence class.
+    Realizing,
+
+    /// We are in the process of discovering the nested type
+    /// structure of this potential equivalence class.
+    Expanding
+  };
+
+  State state = State::Dormant;
+
+  SmallVector<ProtocolDecl *, 1> conformsTo;
+  SmallVector<Type, 1> sameType;
+
+  SmallVector<Type, 1> superclass;
+  SmallVector<Type, 1> concreteType;
+  SmallVector<LayoutConstraint, 1> layout;
+
+  void addRequirement(Requirement req,
+                      GenericSignatureBuilder2::Implementation &impl);
+
+  void mergeWith(const PendingRequirements &other,
+                 GenericSignatureBuilder2::Implementation &impl);
+
+  void dump() const;
+};
+
+void
+GenericSignatureBuilder2::PendingRequirements::
+addRequirement(Requirement req,
+               GenericSignatureBuilder2::Implementation &impl) {
+  switch (req.getKind()) {
+  case RequirementKind::Conformance:
+    conformsTo.push_back(req.getSecondType()->castTo<ProtocolType>()->getDecl());
+
+    // FIXME: If we're expanding, add it to worklist.
+    break;
+
+  case RequirementKind::Superclass:
+    // FIXME: Join with existing superclass types, etc.
+    superclass.push_back(req.getSecondType());
+    break;
+
+  case RequirementKind::SameType: {
+    auto second = req.getSecondType();
+    if (second->isTypeParameter()) {
+      sameType.push_back(second);
+
+      // FIXME: If we're realizing, add it to worklist.
+    }
+    else {
+      // FIXME: Join with existing concrete types.
+      concreteType.push_back(second);
+    }
+    break;
+  }
+
+  case RequirementKind::Layout:
+    // FIXME: Join with existing layouts.
+    layout.push_back(req.getLayoutConstraint());
+  }
+}
+
+void
+GenericSignatureBuilder2::PendingRequirements::
+mergeWith(const PendingRequirements &other,
+          GenericSignatureBuilder2::Implementation &impl) {
+  // FIXME: Merge states!
+
+  // FIXME: Join superclass/concreteType/layout
+
+  // FIXME: Depending on the state, queue up requirements
+
+  conformsTo.append(other.conformsTo.begin(), other.conformsTo.end());
+  sameType.append(other.sameType.begin(), other.sameType.end());
+
+  superclass.append(other.superclass.begin(), other.superclass.end());
+  concreteType.append(other.concreteType.begin(), other.concreteType.end());
+  layout.append(other.layout.begin(), other.layout.end());
+}
+
+void
+GenericSignatureBuilder2::PendingRequirements::
+dump() const {
+  if (!conformsTo.empty()) {
+    llvm::dbgs() << "* Conforms to:\n";
+    for (auto *proto : conformsTo) {
+      proto->dumpRef(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+  }
+
+  if (!sameType.empty()) {
+    llvm::dbgs() << "* Same type:\n";
+    for (auto type : sameType) {
+      llvm::dbgs() << type << "\n";
+    }
+  }
+
+  if (!superclass.empty()) {
+    llvm::dbgs() << "* Superclass:\n";
+    for (auto type : superclass) {
+      llvm::dbgs() << type << "\n";
+    }
+  }
+
+  if (!concreteType.empty()) {
+    llvm::dbgs() << "* Concrete type:\n";
+    for (auto type : concreteType) {
+      llvm::dbgs() << type << "\n";
+    }
+  }
+}
+
+///
+/// Implementation
+///
+
 struct GenericSignatureBuilder2::Implementation {
   RewriteSystem rewriteSystem;
-  llvm::DenseMap<CanType, std::vector<Requirement>> pendingRequirements;
+  llvm::DenseMap<CanType, PendingRequirements> pendingRequirements;
+
+  llvm::BumpPtrAllocator allocator;
 
   void addRequirement(Requirement req);
   void addSameTypeRequirement(CanType lhs, CanType rhs);
+
+  void dump() const;
 };
 
 GenericSignatureBuilder2::GenericSignatureBuilder2(
@@ -235,7 +372,7 @@ addRequirement(Requirement req) {
   auto lhs = CanType(req.getFirstType());
   lhs = rewriteSystem.getCanonicalType(lhs);
 
-  pendingRequirements[lhs].push_back(req);
+  pendingRequirements[lhs].addRequirement(req, *this);
 
   switch (req.getKind()) {
   case RequirementKind::Superclass:
@@ -283,10 +420,23 @@ addSameTypeRequirement(CanType lhs, CanType rhs) {
     auto found = pendingRequirements.find(type);
     assert(found != pendingRequirements.end());
 
-    std::copy(found->second.begin(),
-              found->second.end(),
-              std::back_inserter(pendingRequirements[canType]));
+    auto canFound = pendingRequirements.find(canType);
+    assert(canFound != pendingRequirements.end());
 
+    canFound->second.mergeWith(found->second, *this);
     pendingRequirements.erase(found);
+  }
+}
+
+void
+GenericSignatureBuilder2::Implementation::
+dump() const {
+  llvm::dbgs() << "Rewrite system:\n";
+  rewriteSystem.dump();
+
+  llvm::dbgs() << "Pending requirements:\n";
+  for (auto pair : pendingRequirements) {
+    llvm::dbgs() << "[" << pair.first << "]\n";
+    pair.second.dump();
   }
 }
