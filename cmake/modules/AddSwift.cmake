@@ -348,13 +348,11 @@ function(_add_host_variant_link_flags target)
       ${CMAKE_BINARY_DIR}/winsdk_lib_${SWIFT_HOST_VARIANT_ARCH}_symlinks)
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL HAIKU)
     target_link_libraries(${target} PRIVATE
-      atomic
       bsd)
     target_link_options(${target} PRIVATE
       "SHELL:-Xlinker -Bsymbolic")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
     target_link_libraries(${target} PRIVATE
-      atomic
       dl
       log
       # We need to add the math library, which is linked implicitly by libc++
