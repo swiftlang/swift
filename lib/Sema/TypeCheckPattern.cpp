@@ -345,7 +345,10 @@ public:
   
   // Convert a '_' expression to an AnyPattern.
   Pattern *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
-    return new (Context) AnyPattern(E->getLoc(), E->isImplicit());
+    if (E->isImplicit()) {
+      return AnyPattern::createImplicit(Context);
+    }
+    return new (Context) AnyPattern(E->getLoc());
   }
   
   // Cast expressions 'x as T' get resolved to checked cast patterns.
@@ -654,8 +657,8 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
 
     // "if let" implicitly looks inside of an optional, so wrap it in an
     // OptionalSome pattern.
-    InnerP = new (Context) OptionalSomePattern(InnerP, InnerP->getEndLoc(),
-                                               true);
+    InnerP = new (Context) OptionalSomePattern(InnerP, InnerP->getEndLoc());
+    InnerP->setImplicit();
     if (auto *TP = dyn_cast<TypedPattern>(P))
       TP->setSubPattern(InnerP);
     else
@@ -1100,8 +1103,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
       if (TP->getLParenLoc().isValid()) {
         P = new (Context) ParenPattern(TP->getLParenLoc(), sub,
-                                       TP->getRParenLoc(),
-                                       /*implicit*/ TP->isImplicit());
+                                       TP->getRParenLoc());
         P->setType(sub->getType());
       } else {
         P = sub;
@@ -1192,7 +1194,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
                                              NLE->getLoc(),
                                              DeclNameLoc(NLE->getLoc()),
                                              NoneEnumElement->createNameRef(),
-                                             NoneEnumElement, nullptr, false);
+                                             NoneEnumElement, nullptr);
         return TypeChecker::coercePatternToType(
             pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
       }
@@ -1233,8 +1235,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
                                                IP->getStartLoc(),
                                                DeclNameLoc(IP->getEndLoc()),
                                                some->createNameRef(),
-                                               nullptr, sub,
-                                               /*Implicit=*/true);
+                                               nullptr, sub);
+        sub->setImplicit();
       }
 
       P = sub;
@@ -1358,7 +1360,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
                                         baseType->lookThroughAllOptionalTypes(),
                                         EEP->getName(), EEP->getLoc())) {
               P = new (Context)
-                  OptionalSomePattern(EEP, EEP->getEndLoc(), /*implicit*/true);
+                  OptionalSomePattern(EEP, EEP->getEndLoc());
+              P->setImplicit();
               return coercePatternToType(
                   pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
                   options);
@@ -1503,7 +1506,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       SmallVector<TuplePatternElt, 8> elements;
       if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
         for (auto &elt : TTy->getElements()) {
-          auto *subPattern = new (Context) AnyPattern(SourceLoc());
+          auto *subPattern = AnyPattern::createImplicit(Context);
           elements.push_back(TuplePatternElt(elt.getName(), SourceLoc(),
                                              subPattern));
         }
@@ -1512,13 +1515,13 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         assert(parenTy && "Associated value type is neither paren nor tuple?");
         (void)parenTy;
         
-        auto *subPattern = new (Context) AnyPattern(SourceLoc());
+        auto *subPattern = AnyPattern::createImplicit(Context);
         elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),
                                            subPattern));
       }
       Pattern *sub = TuplePattern::createSimple(Context, SourceLoc(),
-                                                elements, SourceLoc(),
-                                                /*implicit*/true);
+                                                elements, SourceLoc());
+      sub->setImplicit();
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
@@ -1542,8 +1545,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     if (castKind) {
       auto isPattern = new (Context) IsPattern(SourceLoc(),
                                                TypeLoc::withoutLoc(enumTy),
-                                               EEP, *castKind,
-                                               /*implicit*/true);
+                                               EEP, *castKind);
+      isPattern->setImplicit();
       isPattern->setType(type);
       P = isPattern;
     }

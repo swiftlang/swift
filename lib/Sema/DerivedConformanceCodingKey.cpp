@@ -298,8 +298,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
                                      /*case body var decls*/ None));
   }
 
-  auto *anyPat = new (C) AnyPattern(SourceLoc());
-  anyPat->setImplicit();
+  auto *anyPat = AnyPattern::createImplicit(C);
   auto dfltLabelItem = CaseLabelItem::getDefault(anyPat);
 
   auto *dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());

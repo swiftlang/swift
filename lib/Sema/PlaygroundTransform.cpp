@@ -763,7 +763,7 @@ public:
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
-    NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/ true);
+    NamedPattern *NP = NamedPattern::createImplicit(Context, VD);
     PatternBindingDecl *PBD = PatternBindingDecl::createImplicit(
         Context, StaticSpellingKind::None, NP, MaybeLoadInitExpr, TypeCheckDC);
 
