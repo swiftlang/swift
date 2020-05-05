@@ -89,9 +89,6 @@ function(_add_host_variant_c_compile_link_flags)
     ""
     ${ARGN})
 
-  get_maccatalyst_build_flavor(maccatalyst_build_flavor
-    "${SWFIT_HOST_VARIANT_SDK}" "")
-
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
   is_darwin_based_sdk("${SWIFT_HOST_VARIANT_SDK}" IS_DARWIN)
@@ -102,12 +99,9 @@ function(_add_host_variant_c_compile_link_flags)
   # MSVC, clang-cl, gcc don't understand -target.
   if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
+      MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     list(APPEND result "-target" "${target}")
-    if(target_variant)
-      list(APPEND result "-target-variant" "${target_variant}")
-    endif()
   endif()
 
   set(_sysroot
@@ -133,21 +127,8 @@ function(_add_host_variant_c_compile_link_flags)
     # side effects are introduced should a new search path be added.
     list(APPEND result
       "-arch" "${SWIFT_HOST_VARIANT_ARCH}"
-      "-F${SWIFT_SDK_${SWIFT_HOST_VARIANT_ARCH}_PATH}/../../../Developer/Library/Frameworks")
-
-    set(add_explicit_version TRUE)
-
-    # iOS-like and zippered libraries get their deployment version from the
-    # target triple
-    if(maccatalyst_build_flavor STREQUAL "ios-like" OR
-        maccatalyst_build_flavor STREQUAL "zippered")
-      set(add_explicit_version FALSE)
-    endif()
-
-    if(add_explicit_version)
-      list(APPEND result
-        "-m${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
-     endif()
+      "-F${SWIFT_SDK_${SWIFT_HOST_VARIANT_ARCH}_PATH}/../../../Developer/Library/Frameworks"
+      "-m${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
   endif()
 
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
@@ -432,9 +413,6 @@ function(_add_host_variant_link_flags target)
         "SHELL:-Xlinker -dead_strip")
     endif()
   endif()
-
-  get_maccatalyst_build_flavor(maccatalyst_build_flavor
-    "${SWIFT_HOST_VARIANT_SDK}" "")
 endfunction()
 
 # Add a single variant of a new Swift library.
