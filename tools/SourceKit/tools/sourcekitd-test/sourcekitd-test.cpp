@@ -548,7 +548,14 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::GlobalConfiguration:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
     if (Opts.OptimizeForIde.hasValue())
-      sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(Opts.OptimizeForIde.getValue()));
+      sourcekitd_request_dictionary_set_int64(
+          Req, KeyOptimizeForIDE,
+          static_cast<int64_t>(Opts.OptimizeForIde.getValue()));
+    if (Opts.CompletionCheckDependencyInterval.hasValue())
+      sourcekitd_request_dictionary_set_int64(
+          Req, KeyCompletionCheckDependencyInterval,
+          static_cast<int64_t>(
+              Opts.CompletionCheckDependencyInterval.getValue()));
     break;
 
   case SourceKitRequest::ProtocolVersion:
