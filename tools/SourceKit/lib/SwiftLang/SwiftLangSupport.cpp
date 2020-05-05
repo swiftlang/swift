@@ -257,6 +257,13 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
 };
 }
 
+static void
+configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
+                            std::shared_ptr<GlobalConfig> GlobalConfig) {
+  CompletionInst->setDependencyCheckIntervalSecond(
+      GlobalConfig->getCompletionCheckDependencyInterval());
+}
+
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
       CCCache(new SwiftCompletionCache) {
@@ -270,7 +277,8 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
                                              SKCtx.getGlobalConfiguration(),
                                              Stats, RuntimeResourcePath);
 
-  CompletionInst = std::make_unique<CompletionInstance>();
+  CompletionInst = std::make_shared<CompletionInstance>();
+  configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
 
   // By default, just use the in-memory cache.
   CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
@@ -280,6 +288,11 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
+}
+
+void SwiftLangSupport::globalConfigurationUpdated(
+    std::shared_ptr<GlobalConfig> Config) {
+  configureCompletionInstance(CompletionInst, Config);
 }
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {

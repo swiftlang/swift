@@ -179,6 +179,8 @@ UID_KEYS = [
     KEY('OptimizeForIDE', 'key.optimize_for_ide'),
     KEY('RequiredBystanders', 'key.required_bystanders'),
     KEY('ReusingASTContext', 'key.reusingastcontext'),
+    KEY('CompletionCheckDependencyInterval',
+        'key.completion_check_dependency_interval'),
 ]
 
 

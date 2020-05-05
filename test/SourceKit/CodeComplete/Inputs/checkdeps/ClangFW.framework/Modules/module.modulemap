@@ -1,0 +1,4 @@
+framework module ClangFW {
+  umbrella header "ClangFW.h"
+  export *
+}
