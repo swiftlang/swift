@@ -5448,16 +5448,6 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     if (parsingLimitedSyntax)
       return makeParserSuccess();
 
-    // In an extension, add a getter to prevent an "extensions must not contain
-    // stored properties" error.
-    if (Flags.contains(PD_InExtension)) {
-      auto getter = createAccessorFunc(
-          Tok.getLoc(), /*ValueNamePattern*/ nullptr, GenericParams, Indices,
-          StaticLoc, Flags, AccessorKind::Get, storage, this,
-          /*AccessorKeywordLoc*/ SourceLoc());
-      accessors.add(getter);
-    }
-
     diagnose(accessors.RBLoc, diag::computed_property_no_accessors,
              /*subscript*/ Indices != nullptr);
     return makeParserError();
