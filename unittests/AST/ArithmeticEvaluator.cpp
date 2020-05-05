@@ -220,7 +220,8 @@ TEST(ArithmeticEvaluator, Simple) {
   DiagnosticEngine diags(sourceMgr);
   Evaluator evaluator(diags,
                       /*debugDumpCycles=*/false,
-                      /*buildDependencyGraph=*/true);
+                      /*buildDependencyGraph=*/true,
+                      /*privateDependencies*/false);
   evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
@@ -345,7 +346,8 @@ TEST(ArithmeticEvaluator, Cycle) {
   DiagnosticEngine diags(sourceMgr);
   Evaluator evaluator(diags,
                       /*debugDumpCycles=*/false,
-                      /*buildDependencyGraph=*/false);
+                      /*buildDependencyGraph=*/false,
+                      /*privateDependencies*/false);
   evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
