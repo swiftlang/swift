@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// REQUIRES: SR12732
-
 import StdlibUnittest
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin.C
