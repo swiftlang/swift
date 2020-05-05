@@ -17,16 +17,23 @@
 using namespace SourceKit;
 
 GlobalConfig::Settings
-GlobalConfig::update(Optional<bool> OptimizeForIDE) {
+GlobalConfig::update(Optional<bool> OptimizeForIDE,
+                     Optional<unsigned> CompletionCheckDependencyInterval) {
   llvm::sys::ScopedLock L(Mtx);
   if (OptimizeForIDE.hasValue())
     State.OptimizeForIDE = *OptimizeForIDE;
+  if (CompletionCheckDependencyInterval.hasValue())
+    State.CompletionCheckDependencyInterval = *CompletionCheckDependencyInterval;
   return State;
 };
 
 bool GlobalConfig::shouldOptimizeForIDE() const {
   llvm::sys::ScopedLock L(Mtx);
   return State.OptimizeForIDE;
+}
+unsigned GlobalConfig::getCompletionCheckDependencyInterval() const {
+  llvm::sys::ScopedLock L(Mtx);
+  return State.CompletionCheckDependencyInterval;
 }
 
 SourceKit::Context::Context(StringRef RuntimeLibPath,
