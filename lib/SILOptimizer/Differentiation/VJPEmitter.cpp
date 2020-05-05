@@ -97,8 +97,12 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     switch (origResConv) {
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
-      conv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
-                            : ParameterConvention::Direct_Guaranteed;
+      if (tl.isAddressOnly()) {
+        conv = ParameterConvention::Indirect_In_Guaranteed;
+      } else {
+        conv = tl.isTrivial() ? ParameterConvention::Direct_Unowned
+                              : ParameterConvention::Direct_Guaranteed;
+      }
       break;
     case ResultConvention::Unowned:
     case ResultConvention::UnownedInnerPointer:
@@ -123,8 +127,12 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
-      conv =
-          tl.isTrivial() ? ResultConvention::Unowned : ResultConvention::Owned;
+      if (tl.isAddressOnly()) {
+        conv = ResultConvention::Indirect;
+      } else {
+        conv = tl.isTrivial() ? ResultConvention::Unowned
+                              : ResultConvention::Owned;
+      }
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
