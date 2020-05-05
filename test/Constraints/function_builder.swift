@@ -41,6 +41,8 @@ struct TupleBuilder {
   static func buildEither<T,U>(second value: U) -> Either<T,U> {
     return .second(value)
   }
+
+  static func buildArray<T>(_ array: [T]) -> [T] { return array }
 }
 
 func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
@@ -664,3 +666,26 @@ tuplifyWithOpt(true) { c in
   "1"
   3.14159
 }
+
+// Test for-each loops with buildArray.
+// CHECK: testForEach
+// CHECK-SAME: (1, "separator")
+// CHECK-SAME: (2, "separator")
+// CHECK-SAME: (3, "separator")
+// CHECK-SAME: (4, "separator")
+// CHECK-SAME: (5, "separator")
+// CHECK-SAME: (6, "separator")
+// CHECK-SAME: (7, "separator")
+// CHECK-SAME: (8, "separator")
+// CHECK-SAME: (9, "separator")
+// CHECK-SAME: (10, "separator")
+tuplify(true) { c in
+  "testForEach"
+  for i in 0 ..< (c ? 10 : 5) {
+    i + 1
+    "separator"
+  }
+}
+
+
+
