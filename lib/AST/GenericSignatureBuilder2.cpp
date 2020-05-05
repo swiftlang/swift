@@ -246,7 +246,7 @@ struct GenericSignatureBuilder2::PendingRequirements {
   void addRequirement(Requirement req, CanType canType,
                       GenericSignatureBuilder2::Implementation &impl);
 
-  void mergeWith(const PendingRequirements &other,
+  void mergeWith(PendingRequirements &other, CanType canType,
                  GenericSignatureBuilder2::Implementation &impl);
 
   void realizeType(GenericSignatureBuilder2::Implementation &impl);
@@ -297,6 +297,7 @@ struct GenericSignatureBuilder2::Implementation {
   RewriteSystem rewriteSystem;
   llvm::DenseMap<CanType, PendingRequirements> pendingRequirements;
 
+  // FIXME: Unique worklist entries either here or in PendingRequirements
   std::vector<CanType> realizeWorklist;
   std::vector<std::pair<CanType, ProtocolDecl *>> expandWorklist;
 
@@ -370,13 +371,32 @@ addRequirement(Requirement req, CanType canType,
 
 void
 GenericSignatureBuilder2::PendingRequirements::
-mergeWith(const PendingRequirements &other,
+mergeWith(PendingRequirements &other,
+          CanType canType,
           GenericSignatureBuilder2::Implementation &impl) {
-  // FIXME: Merge states!
+  assert(canType->isTypeParameter());
+
+  if (state != other.state) {
+    if (state == State::Dormant && other.state == State::Realizing) {
+      realizeType(impl);
+    } else if (state == State::Dormant && other.state == State::Expanding) {
+      realizeType(impl);
+      expandType(canType, impl);
+    } else if (state == State::Realizing && other.state == State::Expanding) {
+      expandType(canType, impl);
+    } else if (state == State::Realizing && other.state == State::Dormant) {
+      other.realizeType(impl);
+    } else if (state == State::Expanding && other.state == State::Dormant) {
+      other.realizeType(impl);
+      other.expandType(canType, impl);
+    } else if (state == State::Expanding && other.state == State::Realizing) {
+      other.expandType(canType, impl);
+    }
+
+    assert(state == other.state);
+  }
 
   // FIXME: Join superclass/concreteType/layout
-
-  // FIXME: Depending on the state, queue up requirements
 
   conformsTo.append(other.conformsTo.begin(), other.conformsTo.end());
   sameType.append(other.sameType.begin(), other.sameType.end());
@@ -443,7 +463,7 @@ addSameTypeRequirement(CanType lhs, CanType rhs) {
     auto canFound = pendingRequirements.find(canType);
     assert(canFound != pendingRequirements.end());
 
-    canFound->second.mergeWith(found->second, *this);
+    canFound->second.mergeWith(found->second, canType, *this);
     pendingRequirements.erase(found);
   }
 }
