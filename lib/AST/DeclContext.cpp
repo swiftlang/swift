@@ -348,6 +348,13 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       auto *VD = cast<ValueDecl>(dc->getAsDecl());
       assert(VD->hasParameterList());
 
+      if (VD->getDeclContext()->isLocalContext()) {
+        auto kind = VD->getDeclContext()->getFragileFunctionKind();
+        if (kind.kind != FragileFunctionKind::None)
+          return {FragileFunctionKind::DefaultArgument,
+                  kind.allowUsableFromInline};
+      }
+
       auto effectiveAccess =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
