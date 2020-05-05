@@ -3769,11 +3769,18 @@ SILType SILType::subst(SILModule &M, SubstitutionMap subs,
   if (!hasArchetype() && !hasTypeParameter() &&
       !getASTType()->hasOpaqueArchetype())
     return *this;
-  SILTypeSubstituter STST(M.Types, context, QuerySubstitutionMap{subs},
-                          LookUpConformanceInSubstitutionMap(subs),
-                          subs.getGenericSignature().getCanonicalSignature(),
-                          false);
-  return STST.subst(*this);
+
+  // Pass the TypeSubstitutionFn and LookupConformanceFn as arguments so that
+  // the llvm::function_ref value's scope spans the STST.subst call since
+  // SILTypeSubstituter captures these functions.
+  auto result = [&](TypeSubstitutionFn subsFn,
+                    LookupConformanceFn conformancesFn) -> SILType {
+    SILTypeSubstituter STST(M.Types, context, subsFn, conformancesFn,
+                            subs.getGenericSignature().getCanonicalSignature(),
+                            false);
+    return STST.subst(*this);
+  }(QuerySubstitutionMap{subs}, LookUpConformanceInSubstitutionMap(subs));
+  return result;
 }
 
 /// Apply a substitution to this polymorphic SILFunctionType so that
