@@ -36,6 +36,9 @@ public:
     ///
     /// At the time of writing this just means ignoring .swiftsourceinfo files.
     bool OptimizeForIDE = false;
+
+    /// Interval second for checking dependencies in fast code completion.
+    unsigned CompletionCheckDependencyInterval = 5;
   };
 
 private:
@@ -43,8 +46,10 @@ private:
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  Settings update(Optional<bool> OptimizeForIDE);
+  Settings update(Optional<bool> OptimizeForIDE,
+                  Optional<unsigned> CompletionCheckDependencyInterval);
   bool shouldOptimizeForIDE() const;
+  unsigned getCompletionCheckDependencyInterval() const;
 };
 
 class Context {

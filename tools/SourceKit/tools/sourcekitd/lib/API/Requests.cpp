@@ -444,9 +444,21 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     if (!Req.getInt64(KeyOptimizeForIDE, EditorMode, true)) {
       OptimizeForIDE = EditorMode;
     }
+    Optional<unsigned> CompletionCheckDependencyInterval;
+    int64_t IntervalValue = 0;
+    if (!Req.getInt64(KeyCompletionCheckDependencyInterval,
+                      IntervalValue, /*isOptional=*/true))
+      CompletionCheckDependencyInterval = IntervalValue;
 
-    GlobalConfig::Settings UpdatedConfig = Config->update(OptimizeForIDE);
+    GlobalConfig::Settings UpdatedConfig = Config->update(
+        OptimizeForIDE, CompletionCheckDependencyInterval);
+
+    getGlobalContext().getSwiftLangSupport().globalConfigurationUpdated(Config);
+
     dict.set(KeyOptimizeForIDE, UpdatedConfig.OptimizeForIDE);
+    dict.set(KeyCompletionCheckDependencyInterval,
+             UpdatedConfig.CompletionCheckDependencyInterval);
+
     return Rec(RB.createResponse());
   }
   if (ReqUID == RequestProtocolVersion) {
@@ -2032,6 +2044,7 @@ public:
   void startGroup(UIdent kind, StringRef name) override;
   void endGroup() override;
   void setNextRequestStart(unsigned offset) override;
+  void setReusingASTContext(bool flag) override;
 };
 } // end anonymous namespace
 
@@ -2228,6 +2241,10 @@ void SKGroupedCodeCompletionConsumer::endGroup() {
 void SKGroupedCodeCompletionConsumer::setNextRequestStart(unsigned offset) {
   assert(!Response.isNull());
   Response.set(KeyNextRequestStart, offset);
+}
+void SKGroupedCodeCompletionConsumer::setReusingASTContext(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
 }
 
 //===----------------------------------------------------------------------===//
