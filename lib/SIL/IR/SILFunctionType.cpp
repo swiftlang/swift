@@ -3088,30 +3088,31 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
   // If the constant refers to a derivative function, get the SIL type of the
   // original function and use it to compute the derivative SIL type.
   //
-  // This is necessary because the "lowered AST derivative function type" (BC)
+  // This is necessary because the "lowered AST derivative function type" (bc)
   // may differ from the "derivative type of the lowered original function type"
-  // (AD):
+  // (ad):
   //
-  // +--------------------+       lowering      +--------------------+
-  // | AST orig.  fn type |  -------(A)------>  | SIL orig.  fn type |
-  // +--------------------+                     +--------------------+
-  //         |                                                |
-  //    (B, Sema)   getAutoDiffDerivativeFunctionType     (D, here)
-  //         V                                                V
-  // +--------------------+       lowering      +--------------------+
-  // | AST deriv. fn type |  -------(C)------>  | SIL deriv. fn type |
-  // +--------------------+                     +--------------------+
+  // ┌────────────────────┐       lowering      ┌────────────────────┐
+  // │ AST orig.  fn type │  ───────(a)──────►  │ SIL orig.  fn type │
+  // └────────────────────┘                     └────────────────────┘
+  //         │                                                │
+  //    (b, Sema)   getAutoDiffDerivativeFunctionType     (d, here)
+  //         │                                                │
+  //         ▼                                                ▼
+  // ┌────────────────────┐       lowering      ┌────────────────────┐
+  // │ AST deriv. fn type │  ───────(c)──────►  │ SIL deriv. fn type │
+  // └────────────────────┘                     └────────────────────┘
   //
-  // (AD) does not always commute with (BC):
-  // - (BC) is the result of computing the AST derivative type (Sema), then
+  // (ad) does not always commute with (bc):
+  // - (bc) is the result of computing the AST derivative type (Sema), then
   //   lowering it via SILGen. This is the default lowering behavior, but may
   //   break SIL typing invariants because expected lowered derivative types are
   //   computed from lowered original function types.
-  // - (AD) is the result of lowering the original function type, then computing
+  // - (ad) is the result of lowering the original function type, then computing
   //   its derivative type. This is the expected lowered derivative type,
   //   preserving SIL typing invariants.
   //
-  // Always use (AD) to compute lowered derivative function types.
+  // Always use (ad) to compute lowered derivative function types.
   if (auto *derivativeId = constant.derivativeFunctionIdentifier) {
     // Get lowered original function type.
     auto origFnConstantInfo = getConstantInfo(

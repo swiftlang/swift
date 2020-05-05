@@ -450,6 +450,8 @@ public:
   // LangSupport Interface
   //==========================================================================//
 
+  void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) override;
+
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
                    ArrayRef<const char *> Args) override;
 

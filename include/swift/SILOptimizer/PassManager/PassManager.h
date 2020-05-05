@@ -261,16 +261,7 @@ public:
     }
   }
 
-  void executePassPipelinePlan(const SILPassPipelinePlan &Plan) {
-    for (const SILPassPipeline &Pipeline : Plan.getPipelines()) {
-      setStageName(Pipeline.Name);
-      resetAndRemoveTransformations();
-      for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
-        addPass(Kind);
-      }
-      execute();
-    }
-  }
+  void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 
 private:
   void execute();

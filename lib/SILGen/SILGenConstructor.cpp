@@ -698,7 +698,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     if (NeedsBoxForSelf) {
       SILLocation prologueLoc = RegularLocation(ctor);
       prologueLoc.markAsPrologue();
-      // SEMANTIC ARC TODO: When the verifier is complete, review this.
       B.emitStoreValueOperation(prologueLoc, selfArg.forward(*this),
                                 VarLocs[selfDecl].value,
                                 StoreOwnershipQualifier::Init);
