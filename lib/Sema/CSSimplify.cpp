@@ -4394,34 +4394,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto meta1 = cast<AnyMetatypeType>(desugar1);
       auto meta2 = cast<AnyMetatypeType>(desugar2);
 
-      auto instanceType1 = meta1->getInstanceType();
-      auto instanceType2 = meta2->getInstanceType();
-
       // A.Type < B.Type if A < B and both A and B are classes.
       // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
-      // and Q.Type are both existential metatypes.
-      auto getSubKind = [&]() -> ConstraintKind {
-        auto subKind = std::min(kind, ConstraintKind::Subtype);
-
-        // If we have existential metatypes, we need to perform subtyping.
-        if (!isa<MetatypeType>(meta1))
-          return subKind;
-
-        // If the LHS cannot be a type with a superclass, we can perform a bind.
-        if (!instanceType1->isTypeVariableOrMember() &&
-            !instanceType1->mayHaveSuperclass())
-          return ConstraintKind::Bind;
-
-        // If the RHS cannot be a class type, we can perform a bind.
-        if (!instanceType2->isTypeVariableOrMember() &&
-            !instanceType2->getClassOrBoundGenericClass())
-          return ConstraintKind::Bind;
-
-        return subKind;
-      };
+      // and Q.Type are both existential metatypes
+      auto subKind = std::min(kind, ConstraintKind::Subtype);
+      // If instance types can't have a subtype relationship
+      // it means that such types can be simply equated.
+      auto instanceType1 = meta1->getInstanceType();
+      auto instanceType2 = meta2->getInstanceType();
+      if (isa<MetatypeType>(meta1) &&
+          !(instanceType1->mayHaveSuperclass() &&
+            instanceType2->getClassOrBoundGenericClass())) {
+        subKind = ConstraintKind::Bind;
+      }
 
       auto result =
-          matchTypes(instanceType1, instanceType2, getSubKind(), subflags,
+          matchTypes(instanceType1, instanceType2, subKind, subflags,
                      locator.withPathElement(ConstraintLocator::InstanceType));
 
       // If matching of the instance types resulted in the failure make sure
