@@ -18,9 +18,11 @@
 
 #include "swift/AST/GenericSignatureBuilder2.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/DenseMap.h"
 #include <vector>
 
 using namespace swift;
@@ -208,20 +210,30 @@ dump() const {
   }
 }
 
+struct GenericSignatureBuilder2::Implementation {
+  RewriteSystem rewriteSystem;
+  llvm::DenseMap<CanType, std::vector<Requirement>> pendingRequirements;
+
+  void addRequirement(Requirement req);
+  void addSameTypeRequirement(CanType lhs, CanType rhs);
+};
+
 GenericSignatureBuilder2::GenericSignatureBuilder2(
   ASTContext &ctx, CanGenericSignature sig)
   : ctx(ctx) {
-  rewriteSystem.reset(new RewriteSystem());
+  impl.reset(new Implementation());
 
   for (auto req : sig->getRequirements())
-    addRequirement(req);
+    impl->addRequirement(req);
 }
 
 GenericSignatureBuilder2::~GenericSignatureBuilder2() = default;
 
-void GenericSignatureBuilder2::addRequirement(Requirement req) {
+void
+GenericSignatureBuilder2::Implementation::
+addRequirement(Requirement req) {
   auto lhs = CanType(req.getFirstType());
-  lhs = rewriteSystem->getCanonicalType(lhs);
+  lhs = rewriteSystem.getCanonicalType(lhs);
 
   pendingRequirements[lhs].push_back(req);
 
@@ -248,14 +260,16 @@ void GenericSignatureBuilder2::addRequirement(Requirement req) {
   }
 }
 
-void GenericSignatureBuilder2::addSameTypeRequirement(CanType lhs, CanType rhs) {
-  rewriteSystem->addRewriteRule(lhs, rhs);
+void
+GenericSignatureBuilder2::Implementation::
+addSameTypeRequirement(CanType lhs, CanType rhs) {
+  rewriteSystem.addRewriteRule(lhs, rhs);
 
   // Find pending requirements anchored by types that are no longer canonical.
   std::vector<std::pair<CanType, CanType>> nowCanonical;
   for (const auto &pair : pendingRequirements) {
     auto type = pair.first;
-    auto canType = rewriteSystem->getCanonicalType(type);
+    auto canType = rewriteSystem.getCanonicalType(type);
     if (type != canType)
       nowCanonical.emplace_back(canType, type);
   }

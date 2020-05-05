@@ -13,24 +13,19 @@
 #ifndef SWIFT_GENERICSIGNATUREBUILDER2_H
 #define SWIFT_GENERICSIGNATUREBUILDER2_H
 
-#include <vector>
-#include "llvm/ADT/DenseMap.h"
+#include <memory>
 
 namespace swift {
 
-class CanType;
 class ASTContext;
 class CanGenericSignature;
-class Requirement;
 
 class GenericSignatureBuilder2 {
+  struct Implementation;
   class RewriteSystem;
-  ASTContext &ctx;
-  std::unique_ptr<RewriteSystem> rewriteSystem;
-  llvm::DenseMap<CanType, std::vector<Requirement>> pendingRequirements;
 
-  void addRequirement(Requirement req);
-  void addSameTypeRequirement(CanType lhs, CanType rhs);
+  ASTContext &ctx;
+  std::unique_ptr<Implementation> impl;
 
 public:
   GenericSignatureBuilder2(ASTContext &ctx, CanGenericSignature sig);
