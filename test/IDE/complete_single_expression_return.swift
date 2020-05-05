@@ -62,7 +62,7 @@ struct TestSingleExprClosureRet {
 // TestSingleExprClosureRet: Begin completions
 // TestSingleExprClosureRet-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
 // TestSingleExprClosureRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
-// TestSingleExprClosureRet-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: void()[#Void#];
+// TestSingleExprClosureRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
 // TestSingleExprClosureRet: End completions
 }
 
@@ -236,7 +236,7 @@ struct TestSingleExprFuncRet {
 // TestSingleExprFuncRet: Begin completions
 // TestSingleExprFuncRet-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
 // TestSingleExprFuncRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
-// TestSingleExprFuncRet-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: void()[#Void#];
+// TestSingleExprFuncRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
 // TestSingleExprFuncRet: End completions
 }
 
@@ -346,7 +346,7 @@ struct TestSingleExprAccessorRet {
 // TestSingleExprAccessorRet: Begin completions
 // TestSingleExprAccessorRet-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
 // TestSingleExprAccessorRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
-// TestSingleExprAccessorRet-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: void()[#Void#];
+// TestSingleExprAccessorRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
 // TestSingleExprAccessorRet: End completions
 }
 
@@ -498,7 +498,7 @@ struct TestSingleExprSubscriptRet {
 // TestSingleExprSubscriptRet: Begin completions
 // TestSingleExprSubscriptRet-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
 // TestSingleExprSubscriptRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: int()[#Int#];
-// TestSingleExprSubscriptRet-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: void()[#Void#];
+// TestSingleExprSubscriptRet-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
 // TestSingleExprSubscriptRet: End completions
 }
 

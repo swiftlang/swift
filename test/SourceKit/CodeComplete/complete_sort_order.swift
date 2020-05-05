@@ -200,7 +200,6 @@ func test6() {
 // VOID_1_RAW-NEXT: key.typename: "Void",
 // VOID_1_RAW-NEXT: key.context: source.codecompletion.context.local,
 // VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
-// VOID_1_RAW-NEXT: key.not_recommended: 1,
 
 
 
