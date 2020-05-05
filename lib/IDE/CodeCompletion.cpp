@@ -1240,11 +1240,6 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       typeRelation =
           calculateMaxTypeRelationForDecl(AssociatedDecl, declTypeContext);
 
-    if (typeRelation == CodeCompletionResult::Invalid) {
-      IsNotRecommended = true;
-      NotRecReason = CodeCompletionResult::NotRecommendedReason::TypeMismatch;
-    }
-
     return new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
         /*NotRecommended=*/IsNotRecommended, NotRecReason,
