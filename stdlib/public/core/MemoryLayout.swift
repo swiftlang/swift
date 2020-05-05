@@ -37,8 +37,8 @@
 ///
 ///     let count = 4
 ///     let pointPointer = UnsafeMutableRawPointer.allocate(
-///             bytes: count * MemoryLayout<Point>.stride,
-///             alignedTo: MemoryLayout<Point>.alignment)
+///             byteCount: count * MemoryLayout<Point>.stride,
+///             alignment: MemoryLayout<Point>.alignment)
 @frozen // namespace
 public enum MemoryLayout<T> {
   /// The contiguous memory footprint of `T`, in bytes.

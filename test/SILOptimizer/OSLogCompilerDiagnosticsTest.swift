@@ -27,7 +27,7 @@ extension OSLogInterpolation {
 
 func testOSLogInterpolationExtension(a: A) {
   _osLogTestHelper("Error at line: \(a: a)")
-    // expected-error @-1 {{invalid log message; do not define extensions to types defined in the os module}}
+    // expected-error @-1 {{invalid log message; extending types defined in the os module is not supported}}
     // expected-note @-2 {{'OSLogInterpolation.appendLiteral(_:)' failed evaluation}}
     // expected-note @-3 {{value mutable by an unevaluated instruction is not a constant}}
 }
@@ -58,10 +58,10 @@ func testUnreachableLogCall(c: Color)  {
 
 // Passing InOut values to the logger should not crash the compiler.
 func foo(_ mutableValue: inout String) {
+  // expected-note@-1 {{parameter 'mutableValue' is declared 'inout'}}
    _osLogTestHelper("FMFLabelledLocation: initialized with coder \(mutableValue)")
-    // expected-error@-1 {{escaping closure captures 'inout' parameter 'mutableValue'}}
-    // expected-note@-3 {{parameter 'mutableValue' is declared 'inout'}}
-    // expected-note@-3 {{captured here}}
+    // expected-error@-1 {{escaping autoclosure captures 'inout' parameter 'mutableValue'}}
+    // expected-note@-2 {{pass a copy of 'mutableValue'}}
 }
 
 // This is an extension used only for testing a diagnostic that doesn't arise
@@ -87,6 +87,6 @@ func testUnreachableLogCallComplex(c: Color)  {
   default: // expected-warning {{default will never be executed}}
     _osLogTestHelper("Some call \(c)")
       // expected-warning@-1 {{os log call will never be executed and may have undiagnosed errors}}
-      // expected-error@-2 {{globalStringTablePointer builtin must used only on string literals}}
+      // expected-error@-2 {{globalStringTablePointer builtin must be used only on string literals}}
   }
 }

@@ -179,9 +179,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
       break;
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
-    // Eat the code completion token because we handled it.
-    consumeToken(tok::code_complete);
-    return makeParserCodeCompletionResult<TypeRepr>();
+    return makeParserCodeCompletionResult<TypeRepr>(
+        new (Context) ErrorTypeRepr(consumeToken(tok::code_complete)));
   case tok::l_square: {
     auto Result = parseTypeCollection();
     if (Result.hasSyntax())
@@ -407,11 +406,10 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
   ParserResult<TypeRepr> ty =
     parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
-  if (ty.hasCodeCompletion())
-    return makeParserCodeCompletionResult<TypeRepr>();
   if (ty.isNull())
-    return nullptr;
+    return ty;
   auto tyR = ty.get();
+  auto status = ParserStatus(ty);
 
   // Parse a throws specifier.
   // Don't consume 'throws', if the next token is not '->', so we can emit a
@@ -442,10 +440,11 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     }
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
-    if (SecondHalf.hasCodeCompletion())
-      return makeParserCodeCompletionResult<TypeRepr>();
-    if (SecondHalf.isNull())
-      return nullptr;
+    if (SecondHalf.isNull()) {
+      status.setIsParseError();
+      return status;
+    }
+    status |= SecondHalf;
 
     if (SyntaxContext->isEnabled()) {
       ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
@@ -594,8 +593,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   if (specifierLoc.isValid() || !attrs.empty())
     SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
-  return makeParserResult(applyAttributeToType(tyR, attrs, specifier,
-                                               specifierLoc));
+  return makeParserResult(status, applyAttributeToType(tyR, attrs, specifier,
+                                                       specifierLoc));
 }
 
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
@@ -844,8 +843,6 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID,
                                                      HandleCodeCompletion);
-  if (FirstType.hasCodeCompletion())
-    return makeParserCodeCompletionResult<TypeRepr>();
   if (FirstType.isNull())
     return FirstType;
   if (!Tok.isContextualPunctuator("&")) {
@@ -1255,8 +1252,6 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
     auto sizeEx = parseExprBasic(diag::expected_expr);
     if (sizeEx.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
-    if (sizeEx.isNull())
-      return makeParserErrorResult(Base);
   }
   
   SourceLoc rsquareLoc;

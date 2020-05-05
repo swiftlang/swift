@@ -28,7 +28,6 @@
 #include "swift/SIL/SILType.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/Support/Compiler.h"
 
@@ -1517,7 +1516,7 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   auto call = emitCallSite();
 
   // Bail out immediately on a void result.
-  llvm::Value *result = call.getInstruction();
+  llvm::Value *result = call;
   if (result->getType()->isVoidTy())
     return;
 
@@ -1585,7 +1584,7 @@ void CallEmission::emitToUnmappedMemory(Address result) {
 }
 
 /// The private routine to ultimately emit a call or invoke instruction.
-llvm::CallSite CallEmission::emitCallSite() {
+llvm::CallInst *CallEmission::emitCallSite() {
   assert(LastArgWritten == 0);
   assert(!EmittedCall);
   EmittedCall = true;
@@ -1616,7 +1615,7 @@ llvm::CallSite CallEmission::emitCallSite() {
 
     // Insert a call to @llvm.coro.prepare.retcon, then bitcast to the right
     // function type.
-    auto origCallee = call->getCalledValue();
+    auto origCallee = call->getCalledOperand();
     llvm::Value *opaqueCallee = origCallee;
     opaqueCallee =
       IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);
@@ -1733,8 +1732,7 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
 
   // Pull the raw return values out.
   Explosion rawReturnValues;
-  extractScalarResults(IGF, call->getType(), call.getInstruction(),
-                       rawReturnValues);
+  extractScalarResults(IGF, call->getType(), call, rawReturnValues);
 
   auto coroInfo = getCallee().getSignature().getCoroutineInfo();
 

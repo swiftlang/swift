@@ -1,0 +1,14 @@
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/maccatalyst-sdk/ -Fsystem-iosmac SECRET_SEARCH_PATH -v -n -o %t/output > %t.txt
+RUN: %FileCheck %s < %t.txt
+RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
+
+CHECK-DAG: maccatalyst-sdk/System/Library/Frameworks{{\\|/}}FMWK.framework{{\\|/}}Modules{{\\|/}}FMWK.swiftmodule{{\\|/}}x86_64-apple-macos.swiftinterface -o {{.+}}/output{{\\|/}}FMWK.swiftmodule{{\\|/}}x86_64-apple-macos.swiftmodule
+CHECK-DAG: -Fsystem SECRET_SEARCH_PATH -Fsystem {{.+}}maccatalyst-sdk/System{{\\|/}}iOSSupport{{\\|/}}System{{\\|/}}Library{{\\|/}}Frameworks {{.+}}maccatalyst-sdk/System/iOSSupport/System/Library/Frameworks{{\\|/}}FMWK.framework{{\\|/}}Modules{{\\|/}}FMWK.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftinterface -o {{.+}}/output{{\\|/}}FMWK.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftmodule
+CHECK-DAG: maccatalyst-sdk/usr/lib/swift{{\\|/}}Foo.swiftmodule{{\\|/}}x86_64-apple-macos.swiftinterface -o {{.+}}output{{\\|/}}Foo.swiftmodule{{\\|/}}x86_64-apple-macos.swiftmodule
+CHECK-DAG: -Fsystem SECRET_SEARCH_PATH -Fsystem {{.+}}maccatalyst-sdk/System{{\\|/}}iOSSupport{{\\|/}}System{{\\|/}}Library{{\\|/}}Frameworks {{.+}}maccatalyst-sdk/System/iOSSupport/usr/lib/swift{{\\|/}}Foo.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftinterface -o {{.+}}output{{\\|/}}Foo.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftmodule
+
+CHECK-DAG: -Fsystem SECRET_SEARCH_PATH -Fsystem {{.+}}maccatalyst-sdk/System{{\\|/}}iOSSupport{{\\|/}}System{{\\|/}}Library{{\\|/}}Frameworks {{.+}}maccatalyst-sdk/System/Library/Frameworks{{\\|/}}Zippered.framework{{\\|/}}Modules{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftinterface -o {{.+}}/output{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftmodule
+CHECK-DAG: maccatalyst-sdk/System/Library/Frameworks{{\\|/}}Zippered.framework{{\\|/}}Modules{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64-apple-macos.swiftinterface -o {{.+}}/output{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64-apple-macos.swiftmodule
+
+NEGATIVE-NOT: iOSSupport{{.+}}{{macos|x86_64}}.swiftmodule
+NEGATIVE-NOT: SECRET_SEARCH_PATH{{.+}}{{macos|x86_64}}.swiftmodule

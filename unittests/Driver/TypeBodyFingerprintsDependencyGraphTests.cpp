@@ -1,6 +1,5 @@
 #include "MockingFineGrainedDependencyGraphs.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
-#include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
 #include "gtest/gtest.h"

@@ -134,7 +134,7 @@ bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
   // the given source file.
   bool importsDifferentiationModule = false;
   for (auto import : namelookup::getAllImports(&SF)) {
-    if (import.second->getName() == ctx.Id_Differentiation) {
+    if (import.importedModule->getName() == ctx.Id_Differentiation) {
       importsDifferentiationModule = true;
       break;
     }

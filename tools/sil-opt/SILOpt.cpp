@@ -461,7 +461,7 @@ int main(int argc, char **argv) {
   if (CI.getSILModule())
     CI.getSILModule()->setSerializeSILAction([]{});
 
-  if (RemarksFilename != "") {
+  if (!RemarksFilename.empty()) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
         llvm::remarks::parseFormat(RemarksFormat);
     if (llvm::Error E = formatOrErr.takeError()) {
@@ -480,7 +480,6 @@ int main(int argc, char **argv) {
   if (OptimizationGroup == OptGroup::Diagnostics) {
     runSILDiagnosticPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Performance) {
-    runSILOptPreparePasses(*CI.getSILModule());
     runSILOptimizationPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Lowering) {
     runSILLoweringPasses(*CI.getSILModule());

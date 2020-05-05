@@ -26,9 +26,9 @@
 using namespace swift;
 using namespace constraints;
 
-void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
+void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, ASTNode anchor,
                                 ArrayRef<PathElement> path) {
-  id.AddPointer(anchor);
+  id.AddPointer(anchor.getOpaqueValue());
   id.AddInteger(path.size());
   for (auto elt : path) {
     id.AddInteger(elt.getKind());
@@ -149,7 +149,7 @@ bool LocatorPathElt::isResultOfSingleExprFunction() const {
 /// Determine whether given locator points to the subscript reference
 /// e.g. `foo[0]` or `\Foo.[0]`
 bool ConstraintLocator::isSubscriptMemberRef() const {
-  auto *anchor = getAnchor();
+  auto anchor = getAnchor();
   auto path = getPath();
 
   if (!anchor || path.empty())
@@ -159,16 +159,16 @@ bool ConstraintLocator::isSubscriptMemberRef() const {
 }
 
 bool ConstraintLocator::isKeyPathType() const {
-  auto *anchor = getAnchor();
+  auto anchor = getAnchor();
   auto path = getPath();
   // The format of locator should be `<keypath expr> -> key path type`
-  if (!anchor || !isa<KeyPathExpr>(anchor) || path.size() != 1)
+  if (!anchor || !isExpr<KeyPathExpr>(anchor) || path.size() != 1)
     return false;
   return path.back().getKind() == ConstraintLocator::KeyPathType;
 }
 
 bool ConstraintLocator::isKeyPathRoot() const {
-  auto *anchor = getAnchor();
+  auto anchor = getAnchor();
   auto path = getPath();
 
   if (!anchor || path.empty())
@@ -178,7 +178,7 @@ bool ConstraintLocator::isKeyPathRoot() const {
 }
 
 bool ConstraintLocator::isKeyPathValue() const {
-  auto *anchor = getAnchor();
+  auto anchor = getAnchor();
   auto path = getPath();
 
   if (!anchor || path.empty())
@@ -194,7 +194,7 @@ bool ConstraintLocator::isResultOfKeyPathDynamicMemberLookup() const {
 }
 
 bool ConstraintLocator::isKeyPathSubscriptComponent() const {
-  auto *anchor = getAnchor();
+  auto *anchor = getAsExpr(getAnchor());
   auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
   if (!KPE)
     return false;
@@ -270,11 +270,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
   
   out << "locator@" << (void*) this << " [";
 
-  if (anchor) {
-    out << Expr::getKindName(anchor->getKind());
+  if (auto *expr = anchor.dyn_cast<Expr *>()) {
+    out << Expr::getKindName(expr->getKind());
     if (sm) {
       out << '@';
-      anchor->getLoc().print(out, *sm);
+      expr->getLoc().print(out, *sm);
     }
   }
 

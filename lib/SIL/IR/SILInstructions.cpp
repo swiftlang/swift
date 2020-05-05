@@ -751,6 +751,7 @@ getExtracteeType(
         LookUpConformanceInModule(module.getSwiftModule()));
     return SILType::getPrimitiveObjectType(transposeFnTy);
   }
+  llvm_unreachable("invalid extractee");
 }
 
 LinearFunctionExtractInst::LinearFunctionExtractInst(

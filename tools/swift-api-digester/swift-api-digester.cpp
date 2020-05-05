@@ -27,6 +27,7 @@
 // the output of api-digester will include such changes.
 
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/IDE/APIDigesterData.h"
 #include <functional>
@@ -77,6 +78,10 @@ ProtReqWhiteList("protocol-requirement-white-list",
 
 static llvm::cl::opt<std::string>
 OutputFile("o", llvm::cl::desc("Output file"),
+           llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+OutputDir("output-dir", llvm::cl::desc("Directory path to where we dump the generated Json files"),
            llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
@@ -244,10 +249,21 @@ BaselineFilePath("baseline-path",
                  llvm::cl::desc("The path to the Json file that we should use as the baseline"),
                  llvm::cl::cat(Category));
 
+static llvm::cl::opt<std::string>
+BaselineDirPath("baseline-dir",
+                 llvm::cl::desc("The path to a directory containing baseline files: macos.json, iphoneos.json, appletvos.json, watchos.json, and iosmac.json"),
+                 llvm::cl::cat(Category));
+
 static llvm::cl::opt<bool>
 UseEmptyBaseline("empty-baseline",
                 llvm::cl::desc("Use empty baseline for diagnostics"),
                 llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+SerializedDiagPath("serialize-diagnostics-path",
+                   llvm::cl::desc("Serialize diagnostics to a path"),
+                   llvm::cl::cat(Category));
+
 } // namespace options
 
 namespace {
@@ -2275,6 +2291,20 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
   }
 }
 
+static std::unique_ptr<DiagnosticConsumer>
+createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
+  if (!options::SerializedDiagPath.empty()) {
+    FailOnError = true;
+    return serialized_diagnostics::createConsumer(options::SerializedDiagPath);
+  } else if (options::CompilerStyleDiags) {
+    FailOnError = true;
+    return std::make_unique<PrintingDiagnosticConsumer>();
+  } else {
+    FailOnError = false;
+    return std::make_unique<ModuleDifferDiagsConsumer>(true, OS);
+  }
+}
+
 static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                              SDKNodeRoot *RightModule, StringRef OutputPath,
                              llvm::StringSet<> ProtocolReqWhitelist) {
@@ -2291,9 +2321,9 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
     OS = FileOS.get();
   }
-  std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
-    std::make_unique<PrintingDiagnosticConsumer>():
-    std::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
+  bool FailOnError;
+  std::unique_ptr<DiagnosticConsumer> pConsumer =
+    createDiagConsumer(*OS, FailOnError);
 
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
@@ -2307,7 +2337,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   // Find member hoist changes to help refine diagnostics.
   findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
   DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
-  return options::CompilerStyleDiags && Ctx.getDiags().hadAnyError() ? 1 : 0;
+  return FailOnError && Ctx.getDiags().hadAnyError() ? 1 : 0;
 }
 
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
@@ -2662,6 +2692,64 @@ static ComparisonInputMode checkComparisonInputMode() {
     return ComparisonInputMode::BaselineJson;
 }
 
+static std::string getDefaultBaselineDir(const char *Main) {
+  llvm::SmallString<128> BaselineDir;
+  // The path of the swift-api-digester executable.
+  std::string ExePath = llvm::sys::fs::getMainExecutable(Main,
+    reinterpret_cast<void *>(&anchorForGetMainExecutable));
+  BaselineDir.append(ExePath);
+  llvm::sys::path::remove_filename(BaselineDir); // Remove /swift-api-digester
+  llvm::sys::path::remove_filename(BaselineDir); // Remove /bin
+  llvm::sys::path::append(BaselineDir, "lib", "swift", "FrameworkABIBaseline");
+  return BaselineDir.str().str();
+}
+
+static std::string getEmptyBaselinePath(const char *Main) {
+  llvm::SmallString<128> BaselinePath(getDefaultBaselineDir(Main));
+  llvm::sys::path::append(BaselinePath, "nil.json");
+  return BaselinePath.str().str();
+}
+
+static StringRef getBaselineFilename(llvm::Triple Triple) {
+  if (Triple.isMacCatalystEnvironment())
+    return "iosmac.json";
+  else if (Triple.isMacOSX())
+    return "macos.json";
+  else if (Triple.isiOS())
+    return "iphoneos.json";
+  else if (Triple.isTvOS())
+    return "appletvos.json";
+  else if (Triple.isWatchOS())
+    return "watchos.json";
+  else if (Triple.isOSLinux())
+    return "linux.json";
+  else if (Triple.isOSWindows())
+    return "windows.json";
+  else {
+    llvm::errs() << "Unsupported triple target\n";
+    exit(1);
+  }
+}
+
+static std::string getDefaultBaselinePath(const char *Main, StringRef Module,
+                                          llvm::Triple Triple,
+                                          bool ABI) {
+  llvm::SmallString<128> BaselinePath(getDefaultBaselineDir(Main));
+  llvm::sys::path::append(BaselinePath, Module);
+  // Look for ABI or API baseline
+  llvm::sys::path::append(BaselinePath, ABI? "ABI": "API");
+  llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
+  return BaselinePath.str().str();
+}
+
+static std::string getCustomBaselinePath(llvm::Triple Triple, bool ABI) {
+  llvm::SmallString<128> BaselinePath(options::BaselineDirPath);
+  // Look for ABI or API baseline
+  llvm::sys::path::append(BaselinePath, ABI? "ABI": "API");
+  llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
+  return BaselinePath.str().str();
+}
+
 static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
   SwiftDeclCollector Collector(Ctx);
   // If the baseline path has been given, honor that.
@@ -2677,41 +2765,17 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
 
   assert(Modules.size() == 1 &&
          "Cannot find builtin baseline for more than one module");
-  // The path of the swift-api-digester executable.
-  std::string ExePath = llvm::sys::fs::getMainExecutable(Main,
-    reinterpret_cast<void *>(&anchorForGetMainExecutable));
-  llvm::SmallString<128> BaselinePath(ExePath);
-  llvm::sys::path::remove_filename(BaselinePath); // Remove /swift-api-digester
-  llvm::sys::path::remove_filename(BaselinePath); // Remove /bin
-  llvm::sys::path::append(BaselinePath, "lib", "swift", "FrameworkABIBaseline");
-  if (options::UseEmptyBaseline) {
-    // Use the empty baseline for comparison.
-    llvm::sys::path::append(BaselinePath, "nil.json");
+  std::string Path;
+  if (!options::BaselineDirPath.empty()) {
+    Path = getCustomBaselinePath(Invok.getLangOptions().Target,
+                                 Ctx.checkingABI());
+  } else if (options::UseEmptyBaseline) {
+    Path = getEmptyBaselinePath(Main);
   } else {
-    llvm::sys::path::append(BaselinePath, Modules.begin()->getKey());
-    // Look for ABI or API baseline
-    if (Ctx.checkingABI())
-      llvm::sys::path::append(BaselinePath, "ABI");
-    else
-      llvm::sys::path::append(BaselinePath, "API");
-    // Look for deployment target specific baseline files.
-    auto Triple = Invok.getLangOptions().Target;
-    if (Triple.isMacCatalystEnvironment())
-      llvm::sys::path::append(BaselinePath, "iosmac.json");
-    else if (Triple.isMacOSX())
-      llvm::sys::path::append(BaselinePath, "macos.json");
-    else if (Triple.isiOS())
-      llvm::sys::path::append(BaselinePath, "iphoneos.json");
-    else if (Triple.isTvOS())
-      llvm::sys::path::append(BaselinePath, "appletvos.json");
-    else if (Triple.isWatchOS())
-      llvm::sys::path::append(BaselinePath, "watchos.json");
-    else {
-      llvm::errs() << "Unsupported triple target\n";
-      exit(1);
-    }
+    Path = getDefaultBaselinePath(Main, Modules.begin()->getKey(),
+                                  Invok.getLangOptions().Target,
+                                  Ctx.checkingABI());
   }
-  StringRef Path = BaselinePath.str();
   if (!fs::exists(Path)) {
     llvm::errs() << "Baseline at " << Path << " does not exist\n";
     exit(1);
@@ -2721,6 +2785,24 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
   }
   Collector.deSerialize(Path);
   return Collector.getSDKRoot();
+}
+
+static std::string getJsonOutputFilePath(llvm::Triple Triple, bool ABI) {
+  if (!options::OutputFile.empty())
+    return options::OutputFile;
+  if (!options::OutputDir.empty()) {
+    llvm::SmallString<128> OutputPath(options::OutputDir);
+    llvm::sys::path::append(OutputPath, ABI? "ABI": "API");
+    if (!llvm::sys::fs::exists(OutputPath.str())) {
+      llvm::errs() << "Baseline directory " << OutputPath.str()
+                   << " doesn't exist\n";
+      exit(1);
+    }
+    llvm::sys::path::append(OutputPath, getBaselineFilename(Triple));
+    return OutputPath.str();
+  }
+  llvm::errs() << "Unable to decide output file path\n";
+  exit(1);
 }
 
 int main(int argc, char *argv[]) {
@@ -2741,7 +2823,9 @@ int main(int argc, char *argv[]) {
   switch (options::Action) {
   case ActionType::DumpSDK:
     return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
+      dumpSDKContent(InitInvok, Modules,
+                     getJsonOutputFilePath(InitInvok.getLangOptions().Target, Opts.ABI),
+                     Opts);
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
     ComparisonInputMode Mode = checkComparisonInputMode();

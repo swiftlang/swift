@@ -332,7 +332,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
         // If we didn't parse a type, then we already diagnosed that the type
         // was invalid.  Remember that.
-        if (type.isParseError() && !type.hasCodeCompletion())
+        if (type.isNull() && !type.hasCodeCompletion())
           param.isInvalid = true;
       } else if (paramContext != Parser::ParameterContextKind::Closure) {
         diagnose(Tok, diag::expected_parameter_colon);
@@ -887,9 +887,14 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
     SyntaxParsingContext TypeAnnoCtx(SyntaxContext, SyntaxKind::TypeAnnotation);
     SourceLoc colonLoc = consumeToken(tok::colon);
     
-    if (result.isNull())  // Recover by creating AnyPattern.
-      result = makeParserErrorResult(new (Context) AnyPattern(colonLoc));
-    
+    if (result.isNull()) {
+      // Recover by creating AnyPattern.
+      auto *AP = new (Context) AnyPattern(colonLoc);
+      if (colonLoc.isInvalid())
+        AP->setImplicit();
+      result = makeParserErrorResult(AP);
+    }
+
     ParserResult<TypeRepr> Ty = parseDeclResultType(diag::expected_type);
     if (Ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
@@ -968,7 +973,7 @@ ParserResult<Pattern> Parser::parsePattern() {
       auto VD = new (Context) VarDecl(
         /*IsStatic*/false, introducer, /*IsCaptureList*/false,
         consumeToken(tok::kw__), Identifier(), CurDeclContext);
-      return makeParserResult(new (Context) NamedPattern(VD, /*implicit*/true));
+      return makeParserResult(NamedPattern::createImplicit(Context, VD));
     }
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));

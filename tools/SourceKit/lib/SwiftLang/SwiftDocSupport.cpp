@@ -630,7 +630,7 @@ static void reportAttributes(ASTContext &Ctx,
       case PlatformKind::iOS:
         PlatformUID = PlatformIOS; break;
       case PlatformKind::macCatalyst:
-        PlatformUID = PlatformIOS; break;
+        PlatformUID = PlatformMacCatalyst; break;
       case PlatformKind::OSX:
         PlatformUID = PlatformOSX; break;
       case PlatformKind::tvOS:
@@ -869,7 +869,7 @@ static void addParameters(const AbstractFunctionDecl *FD,
                           SourceManager &SM,
                           unsigned BufferID) {
   ArrayRef<Identifier> ArgNames;
-  DeclName Name = FD->getFullName();
+  DeclName Name = FD->getName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
@@ -882,7 +882,7 @@ static void addParameters(const SubscriptDecl *D,
                           SourceManager &SM,
                           unsigned BufferID) {
   ArrayRef<Identifier> ArgNames;
-  DeclName Name = D->getFullName();
+  DeclName Name = D->getName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }

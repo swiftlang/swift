@@ -99,8 +99,7 @@ public:
   bool renameBase(CharSourceRange Range, RefactoringRangeKind RangeKind) {
     assert(Range.isValid());
 
-    StringRef Existing = Range.str();
-    if (Existing != Old.base())
+    if (stripBackticks(Range).str() != Old.base())
       return true;
     doRenameBase(Range, RangeKind);
     return false;
@@ -131,6 +130,27 @@ public:
   bool isOperator() const { return Lexer::isOperator(Old.base()); }
 
 private:
+
+  /// Returns the range of the  (possibly escaped) identifier at the start of
+  /// \p Range and updates \p IsEscaped to indicate whether it's escaped or not.
+  CharSourceRange getLeadingIdentifierRange(CharSourceRange Range, bool &IsEscaped) {
+    assert(Range.isValid() && Range.getByteLength());
+    IsEscaped = Range.str().front() == '`';
+    SourceLoc Start = Range.getStart();
+    if (IsEscaped)
+      Start = Start.getAdvancedLoc(1);
+    return Lexer::getCharSourceRangeFromSourceRange(SM, Start);
+  }
+
+  CharSourceRange stripBackticks(CharSourceRange Range) {
+    StringRef Content = Range.str();
+    if (Content.size() < 3 || Content.front() != '`' || Content.back() != '`') {
+      return Range;
+    }
+    return CharSourceRange(Range.getStart().getAdvancedLoc(1),
+                           Range.getByteLength() - 2);
+  }
+
   void splitAndRenameLabel(CharSourceRange Range, LabelRangeType RangeType,
                            size_t NameIndex) {
     switch (RangeType) {
@@ -218,13 +238,15 @@ private:
 
   bool labelRangeMatches(CharSourceRange Range, LabelRangeType RangeType, StringRef Expected) {
     if (Range.getByteLength()) {
-      CharSourceRange ExistingLabelRange =
-          Lexer::getCharSourceRangeFromSourceRange(SM, Range.getStart());
+      bool IsEscaped = false;
+      CharSourceRange ExistingLabelRange = getLeadingIdentifierRange(Range, IsEscaped);
       StringRef ExistingLabel = ExistingLabelRange.str();
+      bool IsSingleName = Range == ExistingLabelRange ||
+        (IsEscaped && Range.getByteLength() == ExistingLabel.size() + 2);
 
       switch (RangeType) {
       case LabelRangeType::NoncollapsibleParam:
-        if (ExistingLabelRange == Range && Expected.empty()) // subscript([x]: Int)
+        if (IsSingleName && Expected.empty()) // subscript([x]: Int)
           return true;
         LLVM_FALLTHROUGH;
       case LabelRangeType::CallArg:
@@ -775,7 +797,7 @@ static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
                                llvm::SmallVectorImpl<DeclContext *> &Scopes) {
   Scopes.clear();
   if (!getAvailableRenameForDecl(VD, RefInfo).hasValue()) {
-    Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getFullName());
+    Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getName());
     return;
   }
 
@@ -888,7 +910,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
   if (It != Declared.end()) {
     DiagEngine.diagnose(It->VD->getLoc(),
                         diag::value_decl_referenced_out_of_range,
-                        It->VD->getFullName());
+                        It->VD->getName());
     return ExtractCheckResult();
   }
 
@@ -2560,8 +2582,8 @@ struct ConvertToTernaryExprInfo {
         if (!ThenRef || !ThenRef->getDecl() || !ElseRef || !ElseRef->getDecl())
           return nullptr;
 
-        auto ThenName = ThenRef->getDecl()->getFullName();
-        auto ElseName = ElseRef->getDecl()->getFullName();
+        const auto ThenName = ThenRef->getDecl()->getName();
+        const auto ElseName = ElseRef->getDecl()->getName();
 
         if (ThenName.compare(ElseName) != 0)
           return nullptr;
@@ -3169,6 +3191,250 @@ bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
   
   generateMemberwiseInit(EditConsumer, SM, memberVector, targetLocation);
   
+  return false;
+}
+
+class AddEquatableContext {
+
+  /// Declaration context
+  DeclContext *DC;
+
+  /// Adopter type
+  Type Adopter;
+
+  /// Start location of declaration context brace
+  SourceLoc StartLoc;
+
+  /// Array of all inherited protocols' locations
+  ArrayRef<TypeLoc> ProtocolsLocations;
+
+  /// Array of all conformed protocols
+  SmallVector<swift::ProtocolDecl *, 2> Protocols;
+
+  /// Start location of declaration,
+  /// a place to write protocol name
+  SourceLoc ProtInsertStartLoc;
+
+  /// Stored properties of extending adopter
+  ArrayRef<VarDecl *> StoredProperties;
+
+  /// Range of internal members in declaration
+  DeclRange Range;
+
+  bool conformsToEquatableProtocol() {
+    for (ProtocolDecl *Protocol : Protocols) {
+      if (Protocol->getKnownProtocolKind() == KnownProtocolKind::Equatable) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool isRequirementValid() {
+    auto Reqs = getProtocolRequirements();
+    if (Reqs.empty()) {
+      return false;
+    }
+    auto Req = dyn_cast<FuncDecl>(Reqs[0]);
+    return Req && Req->getParameters()->size() == 2;
+  }
+
+  bool isPropertiesListValid() {
+    return !getUserAccessibleProperties().empty();
+  }
+
+  void printFunctionBody(ASTPrinter &Printer, StringRef ExtraIndent,
+  ParameterList *Params);
+
+  std::vector<ValueDecl *> getProtocolRequirements();
+
+  std::vector<VarDecl *> getUserAccessibleProperties();
+
+public:
+
+  AddEquatableContext(NominalTypeDecl *Decl) : DC(Decl),
+  Adopter(Decl->getDeclaredType()), StartLoc(Decl->getBraces().Start),
+  ProtocolsLocations(Decl->getInherited()),
+  Protocols(Decl->getAllProtocols()), ProtInsertStartLoc(Decl->getNameLoc()),
+  StoredProperties(Decl->getStoredProperties()), Range(Decl->getMembers()) {};
+
+  AddEquatableContext(ExtensionDecl *Decl) : DC(Decl),
+  Adopter(Decl->getExtendedType()), StartLoc(Decl->getBraces().Start),
+  ProtocolsLocations(Decl->getInherited()),
+  Protocols(Decl->getExtendedNominal()->getAllProtocols()),
+  ProtInsertStartLoc(Decl->getExtendedTypeRepr()->getEndLoc()),
+  StoredProperties(Decl->getExtendedNominal()->getStoredProperties()), Range(Decl->getMembers()) {};
+
+  AddEquatableContext() : DC(nullptr), Adopter(), ProtocolsLocations(),
+  Protocols(), StoredProperties(), Range(nullptr, nullptr) {};
+
+  static AddEquatableContext getDeclarationContextFromInfo(ResolvedCursorInfo Info);
+
+  std::string getInsertionTextForProtocol();
+
+  std::string getInsertionTextForFunction(SourceManager &SM);
+
+  bool isValid() {
+    // FIXME: Allow to generate explicit == method for declarations which already have
+    // compiler-generated == method
+    return StartLoc.isValid() && ProtInsertStartLoc.isValid() &&
+    !conformsToEquatableProtocol() && isPropertiesListValid() &&
+    isRequirementValid();
+  }
+
+  SourceLoc getStartLocForProtocolDecl() {
+    if (ProtocolsLocations.empty()) {
+      return ProtInsertStartLoc;
+    }
+    return ProtocolsLocations.back().getSourceRange().Start;
+  }
+
+  bool isMembersRangeEmpty() {
+    return Range.empty();
+  }
+
+  SourceLoc getInsertStartLoc();
+};
+
+SourceLoc AddEquatableContext::
+getInsertStartLoc() {
+  SourceLoc MaxLoc = StartLoc;
+  for (auto Mem : Range) {
+    if (Mem->getEndLoc().getOpaquePointerValue() >
+        MaxLoc.getOpaquePointerValue()) {
+      MaxLoc = Mem->getEndLoc();
+    }
+  }
+  return MaxLoc;
+}
+
+std::string AddEquatableContext::
+getInsertionTextForProtocol() {
+  StringRef ProtocolName = getProtocolName(KnownProtocolKind::Equatable);
+  std::string Buffer;
+  llvm::raw_string_ostream OS(Buffer);
+  if (ProtocolsLocations.empty()) {
+    OS << ": " << ProtocolName;
+    return Buffer;
+  }
+  OS << ", " << ProtocolName;
+  return Buffer;
+}
+
+std::string AddEquatableContext::
+getInsertionTextForFunction(SourceManager &SM) {
+  auto Reqs = getProtocolRequirements();
+  auto Req = dyn_cast<FuncDecl>(Reqs[0]);
+  auto Params = Req->getParameters();
+  StringRef ExtraIndent;
+  StringRef CurrentIndent =
+    Lexer::getIndentationForLine(SM, getInsertStartLoc(), &ExtraIndent);
+  std::string Indent;
+  if (isMembersRangeEmpty()) {
+    Indent = (CurrentIndent + ExtraIndent).str();
+  } else {
+    Indent = CurrentIndent.str();
+  }
+  PrintOptions Options = PrintOptions::printVerbose();
+  Options.PrintDocumentationComments = false;
+  Options.setBaseType(Adopter);
+  Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
+    Printer << " {";
+    Printer.printNewline();
+    printFunctionBody(Printer, ExtraIndent, Params);
+    Printer.printNewline();
+    Printer << "}";
+  };
+  std::string Buffer;
+  llvm::raw_string_ostream OS(Buffer);
+  ExtraIndentStreamPrinter Printer(OS, Indent);
+  Printer.printNewline();
+  if (!isMembersRangeEmpty()) {
+    Printer.printNewline();
+  }
+  Reqs[0]->print(Printer, Options);
+  return Buffer;
+}
+
+std::vector<VarDecl *> AddEquatableContext::
+getUserAccessibleProperties() {
+  std::vector<VarDecl *> PublicProperties;
+  for (VarDecl *Decl : StoredProperties) {
+    if (Decl->Decl::isUserAccessible()) {
+      PublicProperties.push_back(Decl);
+    }
+  }
+  return PublicProperties;
+}
+
+std::vector<ValueDecl *> AddEquatableContext::
+getProtocolRequirements() {
+  std::vector<ValueDecl *> Collection;
+  auto Proto = DC->getASTContext().getProtocol(KnownProtocolKind::Equatable);
+  for (auto Member : Proto->getMembers()) {
+    auto Req = dyn_cast<ValueDecl>(Member);
+    if (!Req || Req->isInvalid() || !Req->isProtocolRequirement()) {
+      continue;
+    }
+    Collection.push_back(Req);
+  }
+  return Collection;
+}
+
+AddEquatableContext AddEquatableContext::
+getDeclarationContextFromInfo(ResolvedCursorInfo Info) {
+  if (Info.isInvalid()) {
+    return AddEquatableContext();
+  }
+  if (!Info.IsRef) {
+    if (auto *NomDecl = dyn_cast<NominalTypeDecl>(Info.ValueD)) {
+      return AddEquatableContext(NomDecl);
+    }
+  } else if (auto *ExtDecl = Info.ExtTyRef) {
+    return AddEquatableContext(ExtDecl);
+  }
+  return AddEquatableContext();
+}
+
+void AddEquatableContext::
+printFunctionBody(ASTPrinter &Printer, StringRef ExtraIndent, ParameterList *Params) {
+  llvm::SmallString<128> Return;
+  llvm::raw_svector_ostream SS(Return);
+  SS << tok::kw_return;
+  StringRef Space = " ";
+  StringRef AdditionalSpace = "       ";
+  StringRef Point = ".";
+  StringRef Join = " == ";
+  StringRef And = " &&";
+  auto Props = getUserAccessibleProperties();
+  auto FParam = Params->get(0)->getName();
+  auto SParam = Params->get(1)->getName();
+  auto Prop = Props[0]->getName();
+  Printer << ExtraIndent << Return << Space
+  << FParam << Point << Prop << Join << SParam << Point << Prop;
+  if (Props.size() > 1) {
+    std::for_each(Props.begin() + 1, Props.end(), [&](VarDecl *VD){
+      auto Name = VD->getName();
+      Printer << And;
+      Printer.printNewline();
+      Printer << ExtraIndent << AdditionalSpace << FParam << Point
+      << Name << Join << SParam << Point << Name;
+    });
+  }
+}
+
+bool RefactoringActionAddEquatableConformance::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+  return AddEquatableContext::getDeclarationContextFromInfo(Tok).isValid();
+}
+
+bool RefactoringActionAddEquatableConformance::
+performChange() {
+  auto Context = AddEquatableContext::getDeclarationContextFromInfo(CursorInfo);
+  EditConsumer.insertAfter(SM, Context.getStartLocForProtocolDecl(),
+                           Context.getInsertionTextForProtocol());
+  EditConsumer.insertAfter(SM, Context.getInsertStartLoc(),
+                           Context.getInsertionTextForFunction(SM));
   return false;
 }
 

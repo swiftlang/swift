@@ -1821,7 +1821,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
     auto origMeta = origType.getAs<MetatypeType>();
     if (!origMeta) {
       // If the metatype matches a dependent type, it must be thick.
-      assert(origType.isTypeParameter());
+      assert(origType.isTypeParameterOrOpaqueArchetype());
       repr = MetatypeRepresentation::Thick;
     } else {
       // Otherwise, we're thin if the metatype is thinnable both

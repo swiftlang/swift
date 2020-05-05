@@ -781,10 +781,13 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
     }
   }
 
-  // ReleaseValueInst of an unowned type is an unowned_release.
-  if (OperandTy.is<UnownedStorageType>())
-    return Builder.createUnownedRelease(RVI->getLoc(), Operand,
+  // ReleaseValueInst of a loadable reference storage type needs the
+  // corresponding release instruction.
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  if (OperandTy.is<Name##StorageType>())                                       \
+    return Builder.create##Name##Release(RVI->getLoc(), Operand,               \
                                         RVI->getAtomicity());
+#include "swift/AST/ReferenceStorage.def"
 
   // ReleaseValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule()))
@@ -821,10 +824,13 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
     }
   }
 
-  // RetainValueInst of an unowned type is an unowned_retain.
-  if (OperandTy.is<UnownedStorageType>())
-    return Builder.createUnownedRetain(RVI->getLoc(), Operand,
+  // RetainValueInst of a loadable reference storage type needs the
+  // corresponding retain instruction.
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  if (OperandTy.is<Name##StorageType>())                                       \
+    return Builder.create##Name##Retain(RVI->getLoc(), Operand,                \
                                        RVI->getAtomicity());
+#include "swift/AST/ReferenceStorage.def"
 
   // RetainValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule())) {
@@ -1021,6 +1027,7 @@ static SILValue createValueFromAddr(SILValue addr, SILBuilder *builder,
     // Just return anything not null for the dry-run.
     return elems[0];
   }
+  llvm_unreachable("invalid kind");
 }
 
 /// Simplify the following two frontend patterns:

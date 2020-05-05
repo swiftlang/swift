@@ -155,3 +155,78 @@ bb9(%29 : $Optional<AA>):
 
 }
 
+// -----------------------------------------------------------------------------
+// Test jump-threading through a non-pure address producer.
+//
+// BB3 cannot (currently) be cloned because the block cloner does not
+// know how to sink address producers unless they are pure address
+// projections. init_existential_addr is not a pure projection. It's
+// address is transitively used outside bb3 via %17 =
+// tuple_element_addr. Test that cloning is inhibited. If cloning did
+// happen, then it would either need to sink init_existential_addr, or
+// SSA would be incorrectly updated.
+
+enum FakeOptional<T> {
+case some(T)
+case none
+}
+
+struct S {
+}
+
+struct T {
+    let s: S
+}
+
+class C {
+    func method() -> Any
+    func f() -> FakeOptional<T>
+}
+
+// Make BB3 is not jump-threaded. And init_existential_addr is not cloned
+//
+// CHECK-LABEL: sil hidden @nonPureAddressProducer : $@convention(method) (@guaranteed C) -> @out Any {
+// CHECK: bb0(%0 : $*Any, %1 : $C):
+// CHECK:   switch_enum %{{.*}} : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+// CHECK: bb3(%{{.*}} : $FakeOptional<Int64>):
+// CHECK:   init_existential_addr %0 : $*Any, $(FakeOptional<Int64>, FakeOptional<S>)
+// CHECK:   switch_enum %{{.*}} : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
+// CHECK-LABEL: } // end sil function 'nonPureAddressProducer'
+sil hidden @nonPureAddressProducer : $@convention(method) (@guaranteed C) -> @out Any {
+bb0(%0 : $*Any, %1 : $C):
+  %3 = class_method %1 : $C, #C.f : (C) -> () -> FakeOptional<T>, $@convention(method) (@guaranteed C) -> FakeOptional<T>
+  %4 = apply %3(%1) : $@convention(method) (@guaranteed C) -> FakeOptional<T>
+  switch_enum %4 : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = struct $Int64 (%7 : $Builtin.Int64)
+  %9 = enum $FakeOptional<Int64>, #FakeOptional.some!enumelt, %8 : $Int64
+  br bb3(%9 : $FakeOptional<Int64>)
+
+bb2:
+  %11 = enum $FakeOptional<Int64>, #FakeOptional.none!enumelt
+  br bb3(%11 : $FakeOptional<Int64>)
+
+bb3(%13 : $FakeOptional<Int64>):
+  %15 = init_existential_addr %0 : $*Any, $(FakeOptional<Int64>, FakeOptional<S>)
+  %16 = tuple_element_addr %15 : $*(FakeOptional<Int64>, FakeOptional<S>), 0
+  %17 = tuple_element_addr %15 : $*(FakeOptional<Int64>, FakeOptional<S>), 1
+  store %13 to %16 : $*FakeOptional<Int64>
+  switch_enum %4 : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
+
+bb4(%20 : $T):
+  %21 = struct_extract %20 : $T, #T.s
+  %22 = enum $FakeOptional<S>, #FakeOptional.some!enumelt, %21 : $S
+  store %22 to %17 : $*FakeOptional<S>
+  br bb5
+
+bb5:
+  %25 = tuple ()
+  return %25 : $()
+
+bb6:
+  %27 = enum $FakeOptional<S>, #FakeOptional.none!enumelt
+  store %27 to %17 : $*FakeOptional<S>
+  br bb5
+}

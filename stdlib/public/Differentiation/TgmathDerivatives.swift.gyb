@@ -16,7 +16,7 @@ import Swift
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin.C.tgmath
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -130,6 +130,7 @@ func _${derivative_kind}Trunc<T: FloatingPoint & Differentiable> (
 }
 %end # for derivative_kind in ['jvp', 'vjp']:
 
+// Unary functions
 %for derivative_kind in ['jvp', 'vjp']:
 %  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
 %  for T in ['Float', 'Double', 'Float80']:
@@ -271,3 +272,30 @@ func _${derivative_kind}Erfc(_ x: ${T}) -> (value: ${T}, ${linear_map_kind}: (${
 %    end # if T == 'Float80':
 %  end # for T in ['Float', 'Double', 'Float80']:
 %end # for derivative_kind in ['jvp', 'vjp']:
+
+// Binary functions
+%for T in ['Float', 'Float80']:
+%  if T == 'Float80':
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%  end
+@inlinable
+@derivative(of: pow)
+func _vjpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T})) {
+  let value = pow(x, y)
+  return (value, { v in (
+    v * y * pow(x, y - 1), v * value * log(x.isLessThanOrEqualTo(0) ? ${T}(1) : x)
+  ) })
+}
+
+@inlinable
+@derivative(of: pow)
+func _jvpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, differential: (${T}, ${T}) -> ${T}) {
+  let value = pow(x, y)
+  return (value, { (dx, dy) in
+    dx * y * pow(x, y - 1) + dy * value * log(x.isLessThanOrEqualTo(0) ? ${T}(1) : x)
+  })
+}
+%  if T == 'Float80':
+#endif
+%  end # if T == 'Float80':
+%end # for T in ['Float', 'Float80']:

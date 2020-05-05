@@ -17,6 +17,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1047,7 +1048,15 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   if (isFullyUninitialized) {
     Use.Kind = DIUseKind::Initialization;
   } else if (isFullyInitialized) {
-    Use.Kind = DIUseKind::Assign;
+    // Only re-write assign_by_wrapper to assignment if all fields have been
+    // initialized.
+    if (isa<AssignByWrapperInst>(Use.Inst) &&
+        getAnyUninitializedMemberAtInst(Use.Inst, 0,
+                                        TheMemory.getNumElements()) != -1) {
+      Use.Kind = DIUseKind::Initialization;
+    } else {
+      Use.Kind = DIUseKind::Assign;
+    }
   } else {
     // If it is initialized on some paths, but not others, then we have an
     // inconsistent initialization, which needs dynamic control logic in the
@@ -1793,6 +1802,20 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   if ((isa<LoadInst>(Inst) || isa<LoadBorrowInst>(Inst)) &&
       TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf()) {
     if (!shouldEmitError(Inst)) return;
+
+    // Ignore loads used only for a set-by-value (nonmutating) setter
+    // since it will be deleted by lowering anyway.
+    auto load = cast<SingleValueInstruction>(Inst);
+    if (auto Op = load->getSingleUse()) {
+      if (auto PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
+        if (std::find_if(PAI->use_begin(), PAI->use_end(),
+                         [](auto PAIUse) {
+                           return isa<AssignByWrapperInst>(PAIUse->getUser());
+                         }) != PAI->use_end()) {
+          return;
+        }
+      }
+    }
 
     diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
     noteUninitializedMembers(Use);

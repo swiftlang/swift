@@ -191,7 +191,7 @@ protocol P6 {
   func bar(x: Int) // expected-note{{protocol requires function 'bar(x:)' with type '(Int) -> ()'}}
 }
 struct X6 : P6 { // expected-error{{type 'X6' does not conform to protocol 'P6'}}
-  func foo(_ x: Missing) { } // expected-error{{use of undeclared type 'Missing'}}
+  func foo(_ x: Missing) { } // expected-error{{cannot find type 'Missing' in scope}}
   func bar() { }
 }
 
@@ -219,7 +219,7 @@ struct X6Ownership : P6Ownership { // expected-error{{type 'X6Ownership' does no
 }
 
 protocol P7 {
-  func foo(_ x: Blarg) // expected-error{{use of undeclared type 'Blarg'}}
+  func foo(_ x: Blarg) // expected-error{{cannot find type 'Blarg' in scope}}
 }
 
 struct X7 : P7 { }

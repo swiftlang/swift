@@ -113,6 +113,7 @@ public:
     case AutoDiffDerivativeFunctionKind::VJP:
       return VJP;
     }
+    llvm_unreachable("invalid derivative type");
   }
   void setJVP(SILFunction *jvp) { JVP = jvp; }
   void setVJP(SILFunction *vjp) { VJP = vjp; }

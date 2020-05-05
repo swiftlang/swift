@@ -34,6 +34,7 @@
 #include "swift/LLVMPasses/Passes.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -479,22 +480,6 @@ bool swift::performLLVM(const IRGenOptions &Opts,
                         const version::Version &effectiveLanguageVersion,
                         StringRef OutputFilename,
                         UnifiedStatsReporter *Stats) {
-#ifndef NDEBUG
-// FIXME: Some bots are failing. See: rdar://54708850
-//#define DEBUG_VERIFY_GENERATED_CODE
-#endif
-
-#ifdef DEBUG_VERIFY_GENERATED_CODE
-  // To check that we only skip generating code when it would have no effect, in
-  // assertion builds we still generate the code, but write it into a temporary
-  // file that we compare to the original file.
-
-  /// The OutputFilename originally passed to us, if we are generating code for
-  /// an assertion. Empty if not.
-  StringRef OriginalOutputFilename = "";
-  /// Scratch buffer for temporary file's name.
-  SmallString<64> AssertScratch;
-#endif
 
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
@@ -517,24 +502,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
         !Opts.PrintInlineTree &&
         !needsRecompile(OutputFilename, HashData, HashGlobal, DiagMutex)) {
       // The llvm IR did not change. We don't need to re-create the object file.
-#ifndef DEBUG_VERIFY_GENERATED_CODE
       return false;
-#else
-      // ...but we're in an asserts build, so we want to check that assumption.
-      auto AssertSuffix = llvm::sys::path::filename(OutputFilename);
-
-      auto EC = llvm::sys::fs::createTemporaryFile("assert", AssertSuffix,
-                                                   AssertScratch);
-      if (EC) {
-        diagnoseSync(Diags, DiagMutex,
-                     SourceLoc(), diag::error_opening_output,
-                     AssertScratch, EC.message());
-        return true;
-      }
-
-      OriginalOutputFilename = OutputFilename;
-      OutputFilename = AssertScratch;
-#endif
     }
 
     // Store the hash in the global variable so that it is written into the
@@ -621,42 +589,6 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     if (DiagMutex)
       DiagMutex->unlock();
   }
-#ifdef DEBUG_VERIFY_GENERATED_CODE
-  if (!OriginalOutputFilename.empty()) {
-    // We're done changing the file; make sure it's saved before we compare.
-    RawOS->close();
-
-    auto result =
-        swift::areFilesDifferent(OutputFilename, OriginalOutputFilename,
-                                 /*allowDestinationErrors=*/false);
-
-    if (!result)
-      // File system error.
-      llvm::report_fatal_error(
-          Twine("Error comparing files: ") + result.getError().message()
-      );
-
-    switch (*result) {
-    case FileDifference::DifferentContents:
-      llvm::report_fatal_error(
-          "Swift skipped an LLVM compile that would have changed output; pass "
-          "-Xfrontend -disable-incremental-llvm-codegen to work around this bug"
-      );
-      // Note for future debuggers: If you see this error, either you changed
-      // LLVM and need to clean your build folder to rebuild everything with it,
-      // or IRGenOptions::writeLLVMCodeGenOptionsTo() doesn't account for a flag
-      // that changed LLVM's output between this compile and the previous one.
-
-    case FileDifference::SameContents:
-      // Removing the file is best-effort.
-      (void)llvm::sys::fs::remove(OutputFilename);
-      break;
-
-    case FileDifference::IdenticalFile:
-      llvm_unreachable("one of these should be a temporary file");
-    }
-  }
-#endif
 
   return false;
 }
@@ -728,6 +660,10 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
   opts.YieldOnceResumeFunctions =
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
+
+  opts.ResilientClassStubInitCallbacks =
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::ResilientClassStubInitCallback);
 }
 
 std::unique_ptr<llvm::TargetMachine>
@@ -884,7 +820,7 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   NewUsed->setSection("llvm.metadata");
 }
 
-static void initLLVMModule(const IRGenModule &IGM, ModuleDecl &M) {
+static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
   
@@ -902,12 +838,17 @@ static void initLLVMModule(const IRGenModule &IGM, ModuleDecl &M) {
 
   auto *MDNode = IGM.getModule()->getOrInsertNamedMetadata("swift.module.flags");
   auto &Context = IGM.getModule()->getContext();
-  auto *Value = M.isStdlibModule() ? llvm::ConstantInt::getTrue(Context)
-                                   : llvm::ConstantInt::getFalse(Context);
+  auto *Value = SIL.getSwiftModule()->isStdlibModule()
+              ? llvm::ConstantInt::getTrue(Context)
+              : llvm::ConstantInt::getFalse(Context);
   MDNode->addOperand(llvm::MDTuple::get(Context,
                                         {llvm::MDString::get(Context,
                                                              "standard-library"),
                                          llvm::ConstantAsMetadata::get(Value)}));
+
+  if (auto *streamer = SIL.getSILRemarkStreamer()) {
+    streamer->intoLLVMContext(Module->getContext());
+  }
 }
 
 std::pair<IRGenerator *, IRGenModule *>
@@ -926,7 +867,7 @@ swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
       *irgen, std::move(targetMachine), nullptr, "", OutputFilename,
       MainInputFilenameForDebugInfo, PrivateDiscriminator);
 
-  initLLVMModule(*IGM, *SILMod->getSwiftModule());
+  initLLVMModule(*IGM, *SILMod);
 
   return std::pair<IRGenerator *, IRGenModule *>(irgen, IGM);
 }
@@ -969,7 +910,7 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                   PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
                   PrivateDiscriminator);
 
-  initLLVMModule(IGM, *SILMod->getSwiftModule());
+  initLLVMModule(IGM, *SILMod);
 
   // Run SIL level IRGen preparation passes.
   runIRGenPreparePasses(*SILMod, IGM);
@@ -1217,7 +1158,7 @@ static void performParallelIRGeneration(
                         nextSF->getPrivateDiscriminator().str());
     IGMcreated = true;
 
-    initLLVMModule(*IGM, *SILMod->getSwiftModule());
+    initLLVMModule(*IGM, *SILMod);
     if (!DidRunSILCodeGenPreparePasses) {
       // Run SIL level IRGen preparation passes on the module the first time
       // around.
@@ -1431,7 +1372,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
                   OutputPath, OutputPath, "", "");
-  initLLVMModule(IGM, *SILMod.getSwiftModule());
+  initLLVMModule(IGM, SILMod);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
       llvm::ConstantDataArray::getString(IGM.getLLVMContext(),

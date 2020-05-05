@@ -161,34 +161,29 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 static ModuleDecl *
 typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
                    std::unique_ptr<llvm::MemoryBuffer> Buffer) {
-  using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
   assert(MostRecentModule);
   ASTContext &Ctx = MostRecentModule->getASTContext();
 
-  auto REPLModule = ModuleDecl::create(Ctx.getIdentifier(Name), Ctx);
-  auto BufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(Buffer));
-  auto ImportKind = ImplicitModuleImportKind::None;
-  auto &REPLInputFile = *new (Ctx) SourceFile(*REPLModule, SourceFileKind::REPL,
-                                              BufferID, ImportKind);
-  REPLModule->addFile(REPLInputFile);
+  // Import the last module.
+  ImplicitImportInfo implicitImports;
+  implicitImports.AdditionalModules.emplace_back(MostRecentModule,
+                                                 /*exported*/ false);
 
-  ModuleDecl::ImportedModule ImportOfMostRecentModule{
-      /*AccessPath*/{}, MostRecentModule};
-  REPLInputFile.addImports(SourceFile::ImportedModuleDesc(
-      ImportOfMostRecentModule, SourceFile::ImportOptions()));
-
-  SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  MostRecentModule->getImportedModules(Imports,
+  // Carry over the private imports from the last module.
+  SmallVector<ModuleDecl::ImportedModule, 8> imports;
+  MostRecentModule->getImportedModules(imports,
                                        ModuleDecl::ImportFilterKind::Private);
-  if (!Imports.empty()) {
-    SmallVector<SourceFile::ImportedModuleDesc, 8> ImportsWithOptions;
-    for (auto Import : Imports) {
-      ImportsWithOptions.emplace_back(SourceFile::ImportedModuleDesc(
-          Import, SourceFile::ImportFlags::Exported));
-    }
-    REPLInputFile.addImports(ImportsWithOptions);
+  for (auto &import : imports) {
+    implicitImports.AdditionalModules.emplace_back(import.importedModule,
+                                                   /*exported*/ true);
   }
 
+  auto *REPLModule =
+      ModuleDecl::create(Ctx.getIdentifier(Name), Ctx, implicitImports);
+  auto BufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(Buffer));
+  auto &REPLInputFile =
+      *new (Ctx) SourceFile(*REPLModule, SourceFileKind::REPL, BufferID);
+  REPLModule->addFile(REPLInputFile);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }

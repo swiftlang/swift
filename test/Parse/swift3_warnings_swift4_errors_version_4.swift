@@ -16,7 +16,7 @@ let z: protocol<P1, P2> // expected-error {{'protocol<...>' composition syntax h
 func bar(f: @noescape () -> ()) {} // expected-error {{unknown attribute 'noescape'}}
 
 func baz(f: @autoclosure(escaping) () -> ()) {}
-// expected-error @-1 {{use of undeclared type 'escaping'}}
+// expected-error @-1 {{cannot find type 'escaping' in scope}}
 // expected-error @-2 {{unnamed parameters must be written with the empty name '_'}}
 // expected-error @-3 {{expected ',' separator}}
 

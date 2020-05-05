@@ -1428,6 +1428,16 @@ bool shouldSuppressDeclImport(const clang::Decl *decl);
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 
+/// Add command-line arguments for a normal import of Clang code.
+void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
+                                  ASTContext &ctx,
+                                  const ClangImporterOptions &importerOpts);
+
+/// Add command-line arguments common to all imports of Clang code.
+void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
+                                  ASTContext &ctx,
+                                  const ClangImporterOptions &importerOpts);
+
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
 static T *dynCastIgnoringCompatibilityAlias(Decl *D) {

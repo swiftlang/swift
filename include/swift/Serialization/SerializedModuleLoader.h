@@ -135,6 +135,9 @@ protected:
     return false;
   }
 
+  /// Scan the given serialized module file to determine dependencies.
+  llvm::ErrorOr<ModuleDependencies> scanModuleFile(Twine modulePath);
+
 public:
   virtual ~SerializedModuleLoaderBase();
   SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;
@@ -189,6 +192,9 @@ public:
       llvm::SetVector<AutoDiffConfig> &results) override;
 
   virtual void verifyAllModules() override;
+
+  virtual Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache) override;
 };
 
 /// Imports serialized Swift modules into an ASTContext.
@@ -300,16 +306,15 @@ class SerializedASTFile final : public LoadedFile {
 
   ModuleFile &File;
 
-  bool IsSIB;
-
-  SerializedASTFile(ModuleDecl &M, ModuleFile &file, bool isSIB = false)
-    : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
+  SerializedASTFile(ModuleDecl &M, ModuleFile &file)
+    : LoadedFile(FileUnitKind::SerializedAST, M), File(file) {}
 
   void
   collectLinkLibrariesFromImports(ModuleDecl::LinkLibraryCallback callback) const;
 
 public:
-  bool isSIB() const { return IsSIB; }
+  /// Whether this represents a '.sib' file.
+  bool isSIB() const;
 
   /// Returns the language version that was used to compile the contents of this
   /// file.
@@ -410,11 +415,13 @@ public:
 
   virtual StringRef getModuleDefiningPath() const override;
 
-  ClassDecl *getMainClass() const override;
+  Decl *getMainDecl() const override;
 
   bool hasEntryPoint() const override;
 
   virtual const clang::Module *getUnderlyingClangModule() const override;
+
+  virtual ModuleDecl *getUnderlyingModuleIfOverlay() const override;
 
   virtual bool getAllGenericSignatures(
                    SmallVectorImpl<GenericSignature> &genericSignatures)

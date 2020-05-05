@@ -26,9 +26,9 @@ class NonSub {}
 @_specialize(where T == Int)
 // CHECK: @_specialize(exported: false, kind: full, where T == S<Int>)
 @_specialize(where T == S<Int>)
-@_specialize(where T == Int, U == Int) // expected-error{{use of undeclared type 'U'}},
+@_specialize(where T == Int, U == Int) // expected-error{{cannot find type 'U' in scope}},
 // expected-error@-1{{Only one concrete type should be used in the same-type requirement in '_specialize' attribute}}
-@_specialize(where T == T1) // expected-error{{use of undeclared type 'T1'}}
+@_specialize(where T == T1) // expected-error{{cannot find type 'T1' in scope}}
 public func oneGenericParam<T>(_ t: T) -> T {
   return t
 }
@@ -51,7 +51,7 @@ class G<T> {
   @_specialize(where T == Int)
   @_specialize(where T == T) // expected-error{{Only concrete type same-type requirements are supported by '_specialize' attribute}}
   @_specialize(where T == S<T>) // expected-error{{Only concrete type same-type requirements are supported by '_specialize' attribute}}
-  @_specialize(where T == Int, U == Int) // expected-error{{use of undeclared type 'U'}}
+  @_specialize(where T == Int, U == Int) // expected-error{{cannot find type 'U' in scope}}
   // expected-error@-1{{Only one concrete type should be used in the same-type requirement in '_specialize' attribute}}
   func noGenericParams() {}
 
@@ -108,13 +108,13 @@ public func funcWithEmptySpecializeAttr<X: P, Y>(x: X, y: Y) {
 }
 
 
-@_specialize(where X:_Trivial(8), Y:_Trivial(32), Z == Int) // expected-error{{use of undeclared type 'Z'}}
+@_specialize(where X:_Trivial(8), Y:_Trivial(32), Z == Int) // expected-error{{cannot find type 'Z' in scope}}
 // expected-error@-1{{Only one concrete type should be used in the same-type requirement in '_specialize' attribute}}
 @_specialize(where X:_Trivial(8), Y:_Trivial(32, 4))
 @_specialize(where X == Int) // expected-error{{too few type parameters are specified in '_specialize' attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'Y' in '_specialize' attribute}}
 @_specialize(where Y:_Trivial(32)) // expected-error {{too few type parameters are specified in '_specialize' attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'X' in '_specialize' attribute}}
 @_specialize(where Y: P) // expected-error{{Only same-type and layout requirements are supported by '_specialize' attribute}} expected-error{{too few type parameters are specified in '_specialize' attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'X' in '_specialize' attribute}}
-@_specialize(where Y: MyClass) // expected-error{{use of undeclared type 'MyClass'}} expected-error{{too few type parameters are specified in '_specialize' attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'X' in '_specialize' attribute}}
+@_specialize(where Y: MyClass) // expected-error{{cannot find type 'MyClass' in scope}} expected-error{{too few type parameters are specified in '_specialize' attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'X' in '_specialize' attribute}}
 // expected-error@-1{{Only conformances to protocol types are supported by '_specialize' attribute}}
 @_specialize(where X:_Trivial(8), Y == Int)
 @_specialize(where X == Int, Y == Int)
@@ -122,7 +122,7 @@ public func funcWithEmptySpecializeAttr<X: P, Y>(x: X, y: Y) {
 // expected-warning@-1{{redundant same-type constraint 'X' == 'Int'}}
 // expected-note@-2{{same-type constraint 'X' == 'Int' written here}}
 @_specialize(where Y:_Trivial(32), X == Float)
-@_specialize(where X1 == Int, Y1 == Int) // expected-error{{use of undeclared type 'X1'}} expected-error{{use of undeclared type 'Y1'}} expected-error{{too few type parameters are specified in '_specialize' attribute (got 0, but expected 2)}} expected-error{{Missing constraint for 'X' in '_specialize' attribute}} expected-error{{Missing constraint for 'Y' in '_specialize' attribute}}
+@_specialize(where X1 == Int, Y1 == Int) // expected-error{{cannot find type 'X1' in scope}} expected-error{{cannot find type 'Y1' in scope}} expected-error{{too few type parameters are specified in '_specialize' attribute (got 0, but expected 2)}} expected-error{{Missing constraint for 'X' in '_specialize' attribute}} expected-error{{Missing constraint for 'Y' in '_specialize' attribute}}
 // expected-error@-1 2{{Only one concrete type should be used in the same-type requirement in '_specialize' attribute}}
 public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {
 }
@@ -148,7 +148,7 @@ public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {
 @_specialize(kind: partial, exported: true, where X == Int, Y == Int) // expected-warning{{'exported: true' has no effect in '_specialize' attribute}}
 @_specialize(kind: partial, kind: partial, where X == Int, Y == Int) // expected-error{{parameter 'kind' was already defined in '_specialize' attribute}}
 
-@_specialize(where X == Int, Y == Int, exported: true, kind: partial) // expected-error{{use of undeclared type 'exported'}} expected-error{{use of undeclared type 'kind'}} expected-error{{use of undeclared type 'partial'}} expected-error{{expected type}}
+@_specialize(where X == Int, Y == Int, exported: true, kind: partial) // expected-error{{cannot find type 'exported' in scope}} expected-error{{cannot find type 'kind' in scope}} expected-error{{cannot find type 'partial' in scope}} expected-error{{expected type}}
 // expected-error@-1 2{{Only conformances to protocol types are supported by '_specialize' attribute}}
 public func anotherFuncWithTwoGenericParameters<X: P, Y>(x: X, y: Y) {
 }

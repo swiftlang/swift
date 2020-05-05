@@ -2,6 +2,22 @@
 include(AddSwift)
 include(SwiftSource)
 
+function(add_dependencies_multiple_targets)
+  cmake_parse_arguments(
+      ADMT # prefix
+      "" # options
+      "" # single-value args
+      "TARGETS;DEPENDS" # multi-value args
+      ${ARGN})
+  precondition(ADMT_UNPARSED_ARGUMENTS NEGATE MESSAGE "unrecognized arguments: ${ADMT_UNPARSED_ARGUMENTS}")
+
+  if(NOT "${ADMT_DEPENDS}" STREQUAL "")
+    foreach(target ${ADMT_TARGETS})
+      add_dependencies("${target}" ${ADMT_DEPENDS})
+    endforeach()
+  endif()
+endfunction()
+
 # Usage:
 # _add_target_variant_c_compile_link_flags(
 #   SDK sdk
@@ -958,10 +974,9 @@ function(_add_swift_target_library_single target name)
     if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
       set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
     endif()
-    # Only set the install RPATH if cross-compiling the host tools, in which
-    # case both the NDK and Sysroot paths must be set.
-    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
-       NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+    # Only set the install RPATH if the toolchain and stdlib will be in Termux
+    # or some other native sysroot on Android.
+    if(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
       set_target_properties("${target}"
         PROPERTIES
         INSTALL_RPATH "$ORIGIN")
@@ -1399,6 +1414,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_FREEBSD
 #   Swift modules this library depends on when built for FreeBSD.
 #
+# SWIFT_MODULE_DEPENDS_OPENBSD
+#   Swift modules this library depends on when built for OpenBSD.
+#
 # SWIFT_MODULE_DEPENDS_LINUX
 #   Swift modules this library depends on when built for Linux.
 #
@@ -1518,6 +1536,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS
         SWIFT_MODULE_DEPENDS_CYGWIN
         SWIFT_MODULE_DEPENDS_FREEBSD
+        SWIFT_MODULE_DEPENDS_OPENBSD
         SWIFT_MODULE_DEPENDS_HAIKU
         SWIFT_MODULE_DEPENDS_IOS
         SWIFT_MODULE_DEPENDS_LINUX
@@ -1676,6 +1695,9 @@ function(add_swift_target_library name)
     elseif(${sdk} STREQUAL FREEBSD)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREEBSD})
+    elseif(${sdk} STREQUAL OPENBSD)
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OPENBSD})
     elseif(${sdk} STREQUAL LINUX OR ${sdk} STREQUAL ANDROID)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})

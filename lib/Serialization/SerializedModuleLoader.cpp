@@ -14,6 +14,7 @@
 #include "ModuleFile.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
@@ -35,7 +36,7 @@ using swift::version::Version;
 namespace {
 
 /// Apply \c body for each target-specific module file base name to search from
-/// most to least desiable.
+/// most to least desirable.
 void forEachTargetModuleBasename(const ASTContext &Ctx,
                                  llvm::function_ref<void(StringRef)> body) {
   auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
@@ -49,14 +50,10 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
   // names checked in "#if arch(...)". Fall back to that name in the one case
   // where it's different from what Swift 4.2 supported:
   // - 32-bit ARM platforms (formerly "arm")
-  // - arm64e (formerly shared with "arm64")
   // We should be able to drop this once there's an Xcode that supports the
   // new names.
-  if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
+  if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm) {
     body("arm");
-  else if (Ctx.LangOpts.Target.getSubArch() ==
-           llvm::Triple::SubArchType::AArch64SubArch_E) {
-    body("arm64");
   }
 }
 
@@ -350,6 +347,46 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   return std::error_code();
 }
 
+llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
+    Twine modulePath) {
+  // Open the module file
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  auto moduleBuf = fs.getBufferForFile(modulePath);
+  if (!moduleBuf)
+    return moduleBuf.getError();
+
+  // Load the module file without validation.
+  std::unique_ptr<ModuleFile> loadedModuleFile;
+  bool isFramework = false;
+  serialization::ValidationInfo loadInfo =
+      ModuleFile::load(modulePath.str(),
+                       std::move(moduleBuf.get()),
+                       nullptr,
+                       nullptr,
+                       isFramework, loadedModuleFile,
+                       nullptr);
+
+  // Map the set of dependencies over to the "module dependencies".
+  auto dependencies = ModuleDependencies::forSwiftModule(modulePath.str());
+  llvm::StringSet<> addedModuleNames;
+  for (const auto &dependency : loadedModuleFile->getDependencies()) {
+    // FIXME: Record header dependency?
+    if (dependency.isHeader())
+      continue;
+
+    // Find the top-level module name.
+    auto modulePathStr = dependency.getPrettyPrintedPath();
+    StringRef moduleName = modulePathStr;
+    auto dotPos = moduleName.find('.');
+    if (dotPos != std::string::npos)
+      moduleName = moduleName.slice(0, dotPos);
+
+    dependencies.addModuleDependency(moduleName, addedModuleNames);
+  }
+
+  return std::move(dependencies);
+}
+
 std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID,
     const SerializedModuleBaseName &BaseName,
@@ -640,8 +677,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
-    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
-                                                extendedInfo.isSIB());
+    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
@@ -782,12 +818,13 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
   }
 
   case serialization::Status::CircularDependency: {
-    auto circularDependencyIter =
-        llvm::find_if(loadedModuleFile->getDependencies(),
-                      [](const ModuleFile::Dependency &next) {
-                        return next.isLoaded() &&
-                               !next.Import.second->hasResolvedImports();
-                      });
+    auto circularDependencyIter = llvm::find_if(
+        loadedModuleFile->getDependencies(),
+        [](const ModuleFile::Dependency &next) {
+          return next.isLoaded() &&
+                 !(next.Import.hasValue() &&
+                   next.Import->importedModule->hasResolvedImports());
+        });
     assert(circularDependencyIter !=
                loadedModuleFile->getDependencies().end() &&
            "circular dependency reported, but no module with unresolved "
@@ -1051,7 +1088,7 @@ void SerializedASTFile::collectLinkLibrariesFromImports(
   File.getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports)
-    Import.second->collectLinkLibraries(callback);
+    Import.importedModule->collectLinkLibraries(callback);
 }
 
 void SerializedASTFile::collectLinkLibraries(
@@ -1061,6 +1098,10 @@ void SerializedASTFile::collectLinkLibraries(
   } else {
     File.collectLinkLibraries(callback);
   }
+}
+
+bool SerializedASTFile::isSIB() const {
+  return File.IsSIB;
 }
 
 bool SerializedASTFile::isSystemModule() const {
@@ -1216,6 +1257,10 @@ StringRef SerializedASTFile::getFilename() const {
 
 StringRef SerializedASTFile::getTargetTriple() const {
   return File.getTargetTriple();
+}
+
+ModuleDecl *SerializedASTFile::getUnderlyingModuleIfOverlay() const {
+  return File.getUnderlyingModule();
 }
 
 const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {

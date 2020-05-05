@@ -22,7 +22,7 @@ public struct SmallResilientStruct {
   let x: Int32 = 0
 }
 
-// CHECK: @smallGlobal = {{(dllexport )?}}{{(protected )?}}global [[BUFFER:\[(12|24) x i8\]]] zeroinitializer
+// CHECK: @smallGlobal = {{(dllexport )?}}{{(protected )?}}global [[BUFFER:\[(12|24) x i8\]]] zeroinitializer{{.*}}align {{(8|4)}}
 sil_global [let] @smallGlobal : $SmallResilientStruct
 
 //
@@ -77,7 +77,7 @@ bb0:
 sil @testLargeGlobal : $@convention(thin) () -> () {
 bb0:
   // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_slowAlloc([[INT]] 32, [[INT]] 7)
-  // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align 1
+  // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align {{(8|4)}}
   alloc_global @largeGlobal
 
   // CHECK: [[VALUE:%.*]] = load %T17global_resilience20LargeResilientStructV*, %T17global_resilience20LargeResilientStructV** bitcast ([[BUFFER]]* @largeGlobal to %T17global_resilience20LargeResilientStructV**)

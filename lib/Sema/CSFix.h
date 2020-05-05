@@ -17,6 +17,8 @@
 #ifndef SWIFT_SEMA_CSFIX_H
 #define SWIFT_SEMA_CSFIX_H
 
+#include "ConstraintLocator.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
@@ -251,6 +253,10 @@ enum class FixKind : uint8_t {
 
   /// A warning fix that allows a coercion to perform a force-cast.
   AllowCoercionToForceCast,
+  
+  /// Allow key path root type mismatch when applying a key path that has a
+  /// root type not convertible to the type of the base instance.
+  AllowKeyPathRootTypeMismatch,
 };
 
 class ConstraintFix {
@@ -308,7 +314,7 @@ public:
   /// Retrieve anchor expression associated with this fix.
   /// NOTE: such anchor comes directly from locator without
   /// any simplication attempts.
-  Expr *getAnchor() const;
+  ASTNode getAnchor() const;
   ConstraintLocator *getLocator() const { return Locator; }
 
 protected:
@@ -1766,6 +1772,32 @@ public:
   static AllowCoercionToForceCast *create(ConstraintSystem &cs, Type fromType,
                                           Type toType,
                                           ConstraintLocator *locator);
+};
+
+/// Attempt to fix a key path application where the key path type cannot be
+/// applied to a base instance of another type.
+///
+/// \code
+/// func f(_ bar: Bar , keyPath: KeyPath<Foo, Int> ) {
+///   bar[keyPath: keyPath]
+/// }
+/// \endcode
+class AllowKeyPathRootTypeMismatch : public ContextualMismatch {
+protected:
+  AllowKeyPathRootTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                               ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowKeyPathRootTypeMismatch, lhs, rhs,
+                           locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow key path root type mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowKeyPathRootTypeMismatch *
+  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -210,35 +210,32 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
 
   Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 
-  // Create a new module and file for the code completion buffer, similar to how
-  // we handle new lines of REPL input.
-  auto *newModule =
-      ModuleDecl::create(Ctx.getIdentifier("REPL_Code_Completion"), Ctx);
-  auto &newSF =
-      *new (Ctx) SourceFile(*newModule, SourceFileKind::REPL, *BufferID,
-                            SourceFile::ImplicitModuleImportKind::None);
-  newModule->addFile(newSF);
-
   // Import the last module.
   auto *lastModule = SF.getParentModule();
-  ModuleDecl::ImportedModule importOfLastModule{/*AccessPath*/ {}, lastModule};
-  newSF.addImports(SourceFile::ImportedModuleDesc(importOfLastModule,
-                                                  SourceFile::ImportOptions()));
+
+  ImplicitImportInfo implicitImports;
+  implicitImports.AdditionalModules.emplace_back(lastModule,
+                                                 /*exported*/ false);
 
   // Carry over the private imports from the last module.
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
   lastModule->getImportedModules(imports,
                                  ModuleDecl::ImportFilterKind::Private);
-  if (!imports.empty()) {
-    SmallVector<SourceFile::ImportedModuleDesc, 8> importsWithOptions;
-    for (auto &import : imports) {
-      importsWithOptions.emplace_back(
-          SourceFile::ImportedModuleDesc(import, SourceFile::ImportOptions()));
-    }
-    newSF.addImports(importsWithOptions);
+  for (auto &import : imports) {
+    implicitImports.AdditionalModules.emplace_back(import.importedModule,
+                                                   /*exported*/ false);
   }
 
-  performTypeChecking(newSF);
+  // Create a new module and file for the code completion buffer, similar to how
+  // we handle new lines of REPL input.
+  auto *newModule = ModuleDecl::create(
+      Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports);
+  auto &newSF =
+      *new (Ctx) SourceFile(*newModule, SourceFileKind::REPL, *BufferID);
+  newModule->addFile(newSF);
+
+  performImportResolution(newSF);
+  bindExtensions(newSF);
 
   performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
 

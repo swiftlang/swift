@@ -119,6 +119,17 @@ func testOSLogInterpolationExtension(a: MyStruct) {
   _osLogTestHelper("Error at line: \(a: a)")
 }
 
+func testExplicitOSLogMessageConstruction() {
+  _osLogTestHelper(OSLogMessage(stringLiteral: "world"))
+    // expected-error@-1 {{argument must be a string interpolation}}
+  _osLogTestHelper(
+    OSLogMessage( // expected-error {{argument must be a string interpolation}}
+      stringInterpolation:
+        OSLogInterpolation(
+          literalCapacity: 0,
+          interpolationCount: 0)))
+}
+
 // Test that @_semantics("oslog.log_with_level") permits values of type OSLog and
 // OSLogType to not be constants.
 

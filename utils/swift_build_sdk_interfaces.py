@@ -241,29 +241,11 @@ def looks_like_iosmac(interface_base):
     return 'ios-macabi' in interface_base
 
 
-def rename_interface_for_iosmac_if_needed(interface_base, module_path):
-    """Hack: Both macOS and iOSMac use 'x86_64' as the short name for a module
-    interface file, and while we want to move away from this it's something we
-    need to handle in the short term. Manually rename these to the full form of
-    the target-specific module when we're obviously on macOS or iOSMac.
-    """
-    if interface_base != 'x86_64':
-        return interface_base
-    if '/iOSSupport/' in module_path:
-        return 'x86_64-apple-ios-macabi'
-    if '/MacOS' in module_path:
-        return 'x86_64-apple-macos'
-    return interface_base
-
-
 def process_module(module_file):
     global args, shared_output_lock
     try:
         interface_base, _ = \
             os.path.splitext(os.path.basename(module_file.path))
-        interface_base = \
-            rename_interface_for_iosmac_if_needed(interface_base,
-                                                  module_file.path)
 
         swiftc = os.getenv('SWIFT_EXEC',
                            os.path.join(os.path.dirname(__file__), 'swiftc'))

@@ -77,7 +77,7 @@ struct SupplementaryOutputPaths {
   /// visibility" within a module, that becomes very important for any sort of
   /// incremental build. These files are consumed by the Swift driver to decide
   /// whether a source file needs to be recompiled during a build. See
-  /// docs/DependencyAnalysis.rst for more information.
+  /// docs/DependencyAnalysis.md for more information.
   ///
   /// \sa swift::emitReferenceDependencies
   /// \sa DependencyGraph

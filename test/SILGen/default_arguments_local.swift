@@ -57,3 +57,16 @@ class ArtClass<T> {
     return 0
   }
 }
+
+// Default arguments of local functions inside @inlinable contexts should be serialized.
+// https://bugs.swift.org/browse/SR-12404
+
+// CHECK-LABEL: sil [serialized] [ossa] @$s23default_arguments_local5outeryyF : $@convention(thin) () -> () {
+@inlinable public func outer() {
+  // CHECK-LABEL: sil shared [serialized] [ossa] @$s23default_arguments_local5outeryyF5innerL_1xySi_tFfA_ : $@convention(thin) () -> Int {
+
+  // CHECK-LABEL: sil shared [serializable] [ossa] @$s23default_arguments_local5outeryyF5innerL_1xySi_tF : $@convention(thin) (Int) -> () {
+  func inner(x: Int = 0) {}
+
+  inner()
+}

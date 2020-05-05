@@ -167,10 +167,10 @@ namespace {
   };
 
   static DeclName getDescriptiveName(AbstractFunctionDecl *AFD) {
-    DeclName name = AFD->getFullName();
+    DeclName name = AFD->getName();
     if (!name) {
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        name = accessor->getStorage()->getFullName();
+        name = accessor->getStorage()->getName();
       }
     }
     return name;
@@ -495,7 +495,7 @@ public:
                                        diag::return_non_failable_init)
           .highlight(E->getSourceRange());
         getASTContext().Diags.diagnose(ctor->getLoc(), diag::make_init_failable,
-                    ctor->getFullName())
+                    ctor->getName())
           .fixItInsertAfter(ctor->getLoc(), "?");
         RS->setResult(nullptr);
         return RS;
@@ -524,7 +524,7 @@ public:
     }
 
     auto exprTy = TypeChecker::typeCheckExpression(E, DC,
-                                                   TypeLoc::withoutLoc(ResultTy),
+                                                   ResultTy,
                                                    ctp, options);
     RS->setResult(E);
 
@@ -585,7 +585,7 @@ public:
       }
 
       TypeChecker::typeCheckExpression(exprToCheck, DC,
-                                       TypeLoc::withoutLoc(contextType),
+                                       contextType,
                                        contextTypePurpose);
 
       // Propagate the change into the inout expression we stripped before.
@@ -608,7 +608,7 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredType();
     if (!exnType) return TS;
 
-    TypeChecker::typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType),
+    TypeChecker::typeCheckExpression(E, DC, exnType,
                                      CTP_ThrowStmt);
     TS->setSubExpr(E);
     
@@ -1533,10 +1533,10 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       }
 
       auto diagID = diag::expression_unused_result_call;
-      if (callee->getFullName().isOperator())
+      if (callee->getName().isOperator())
         diagID = diag::expression_unused_result_operator;
       
-      DE.diagnose(fn->getLoc(), diagID, callee->getFullName())
+      DE.diagnose(fn->getLoc(), diagID, callee->getName())
         .highlight(SR1).highlight(SR2);
     } else
       DE.diagnose(fn->getLoc(), diag::expression_unused_result_unknown,
@@ -1592,7 +1592,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       }
 
       auto resultTy =
-          TypeChecker::typeCheckExpression(SubExpr, DC, TypeLoc(),
+          TypeChecker::typeCheckExpression(SubExpr, DC, Type(),
                                            CTP_Unused, options);
 
       // If a closure expression is unused, the user might have intended
@@ -1673,7 +1673,7 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
 
   DiagnosticSuppression suppression(ctor->getASTContext().Diags);
   auto resultTy =
-      TypeChecker::typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
+      TypeChecker::typeCheckExpression(r, ctor, Type(), CTP_Unused,
                                        TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;

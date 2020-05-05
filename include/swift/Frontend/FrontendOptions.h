@@ -33,6 +33,9 @@ namespace swift {
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
 
+  /// A list of arbitrary modules to import and make implicitly visible.
+  std::vector<std::string> ImplicitImportModuleNames;
+
 public:
   FrontendInputsAndOutputs InputsAndOutputs;
 
@@ -43,9 +46,6 @@ public:
                          llvm::function_ref<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
-
-  /// A list of arbitrary modules to import and make implicitly visible.
-  std::vector<std::string> ImplicitImportModuleNames;
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
@@ -132,6 +132,8 @@ public:
 
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
+
+    ScanDependencies,   ///< Scan dependencies of Swift source files
   };
 
   /// Indicates the action the user requested that the frontend perform.
@@ -151,9 +153,6 @@ public:
   /// When true, check if all required SwiftOnoneSupport symbols are present in
   /// the module.
   bool CheckOnoneSupportCompleteness = false;
-
-  /// If set, inserts instrumentation useful for testing the debugger.
-  bool DebuggerTestingTransform = false;
 
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
@@ -220,20 +219,6 @@ public:
   /// Indicates whether or not the Clang importer should print statistics upon
   /// termination.
   bool PrintClangStats = false;
-
-  /// Indicates whether the playground transformation should be applied.
-  bool PlaygroundTransform = false;
-  
-  /// Indicates whether the AST should be instrumented to simulate a debugger's
-  /// program counter. Similar to the PlaygroundTransform, this will instrument
-  /// the AST with function calls that get called when you would see a program
-  /// counter move in a debugger. To adopt this implement the
-  /// __builtin_pc_before and __builtin_pc_after functions.
-  bool PCMacro = false;
-
-  /// Indicates whether the playground transformation should omit
-  /// instrumentation that has a high runtime performance impact.
-  bool PlaygroundHighPerformance = false;
 
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
@@ -321,6 +306,12 @@ public:
   getPrimarySpecificPathsForAtMostOnePrimary() const;
   const PrimarySpecificPaths &
       getPrimarySpecificPathsForPrimary(StringRef) const;
+
+  /// Retrieves the list of arbitrary modules to import and make implicitly
+  /// visible.
+  ArrayRef<std::string> getImplicitImportModuleNames() const {
+    return ImplicitImportModuleNames;
+  }
 
 private:
   static bool canActionEmitDependencies(ActionType);

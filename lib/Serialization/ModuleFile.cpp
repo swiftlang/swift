@@ -1341,7 +1341,8 @@ static bool areCompatibleArchitectures(const llvm::Triple &moduleTarget,
 
 static bool areCompatibleOSs(const llvm::Triple &moduleTarget,
                              const llvm::Triple &ctxTarget) {
-  if (moduleTarget.getEnvironment() != ctxTarget.getEnvironment())
+  if ((!moduleTarget.hasEnvironment() && ctxTarget.isSimulatorEnvironment()) ||
+      (!ctxTarget.hasEnvironment() && moduleTarget.isSimulatorEnvironment()))
     return false;
 
   if (moduleTarget.getOS() == ctxTarget.getOS())
@@ -2027,7 +2028,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
           return error(Status::FailedToLoadBridgingHeader);
       }
       ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
-      dependency.Import = { {}, importedHeaderModule };
+      dependency.Import = ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(),
+                                                     importedHeaderModule};
       continue;
     }
 
@@ -2075,14 +2077,15 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     }
 
     if (scopePath.empty()) {
-      dependency.Import = { {}, module };
+      dependency.Import =
+          ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), module};
     } else {
       auto scopeID = ctx.getIdentifier(scopePath);
       assert(!scopeID.empty() &&
              "invalid decl name (non-top-level decls not supported)");
       Located<Identifier> accessPathElem = { scopeID, SourceLoc() };
-      dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
-                           module};
+      dependency.Import = ModuleDecl::ImportedModule{
+          ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)), module};
     }
 
     // SPI
@@ -2147,7 +2150,7 @@ void ModuleFile::lookupValue(DeclName name,
           continue;
         }
         auto VD = cast<ValueDecl>(declOrError.get());
-        if (name.isSimpleName() || VD->getFullName().matchesRef(name))
+        if (name.isSimpleName() || VD->getName().matchesRef(name))
           results.push_back(VD);
       }
     }
@@ -2290,7 +2293,7 @@ void ModuleFile::getImportedModules(
     }
 
     assert(dep.isLoaded());
-    results.push_back(dep.Import);
+    results.push_back(*(dep.Import));
   }
 }
 
@@ -2590,7 +2593,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
     } else {
       for (auto item : *iter) {
         auto vd = cast<ValueDecl>(getDecl(item.second));
-        if (!vd->getFullName().matchesRef(name))
+        if (!vd->getName().matchesRef(name))
           continue;
         
         auto dc = vd->getDeclContext();
@@ -2665,7 +2668,7 @@ void ModuleFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
                                     SmallVectorImpl<Identifier> &spiGroups) const {
   for (auto &dep : Dependencies) {
     auto depSpis = dep.spiGroups;
-    if (dep.Import.second == importedModule &&
+    if (dep.Import.hasValue() && dep.Import->importedModule == importedModule &&
         !depSpis.empty()) {
       spiGroups.append(depSpis.begin(), depSpis.end());
     }
@@ -2977,9 +2980,9 @@ bool SerializedASTFile::getAllGenericSignatures(
   return true;
 }
 
-ClassDecl *SerializedASTFile::getMainClass() const {
+Decl *SerializedASTFile::getMainDecl() const {
   assert(hasEntryPoint());
-  return cast_or_null<ClassDecl>(File.getDecl(File.Bits.EntryPointDeclID));
+  return File.getDecl(File.Bits.EntryPointDeclID);
 }
 
 const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {

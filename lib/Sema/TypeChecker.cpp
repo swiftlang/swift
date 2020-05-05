@@ -249,7 +249,7 @@ static void bindExtensions(SourceFile &SF) {
   // private extensions.
   for (auto import : namelookup::getAllImports(&SF)) {
     // FIXME: Respect the access path?
-    for (auto file : import.second->getFiles()) {
+    for (auto file : import.importedModule->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
       if (!SF)
         continue;
@@ -382,6 +382,18 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     performWholeModuleTypeChecking(*SF);
   }
 
+  // Perform various AST transforms we've been asked to perform.
+  if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)
+    performDebuggerTestingTransform(*SF);
+
+  if (!Ctx.hadError() && Ctx.LangOpts.PCMacro)
+    performPCMacro(*SF);
+
+  // Playground transform knows to look out for PCMacro's changes and not
+  // to playground log them.
+  if (!Ctx.hadError() && Ctx.LangOpts.PlaygroundTransform)
+    performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundHighPerformance);
+
   return std::make_tuple<>();
 }
 
@@ -389,7 +401,6 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
-  diagnoseAttrsRequiringFoundation(SF);
   diagnoseObjCMethodConflicts(SF);
   diagnoseObjCUnsatisfiedOptReqConflicts(SF);
   diagnoseUnintendedObjCMethodOverrides(SF);
@@ -527,11 +538,11 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
-  auto resolution = TypeResolution::forContextual(DC, GenericEnv);
+  auto resolution = TypeResolution::forContextual(DC, GenericEnv, options);
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  return TypeChecker::validateType(Ctx, T, resolution, options);
+  return TypeChecker::validateType(T, resolution);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
@@ -642,7 +653,7 @@ swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
-  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, TypeLoc(),
+  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, Type(),
                                                    CTP_Unused);
   return !resultTy;
 }

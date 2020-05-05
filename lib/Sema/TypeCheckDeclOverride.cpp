@@ -220,8 +220,8 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
                                         ValueDecl *parentDecl) {
   // If the number of argument labels does not match, these overrides cannot
   // be compatible.
-  if (decl->getFullName().getArgumentNames().size() !=
-        parentDecl->getFullName().getArgumentNames().size())
+  if (decl->getName().getArgumentNames().size() !=
+        parentDecl->getName().getArgumentNames().size())
     return false;
 
   // If the parent declaration is not in a class (or extension thereof) or
@@ -495,11 +495,11 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
   switch (attempt) {
   case OverrideCheckingAttempt::PerfectMatch:
     diags.diagnose(decl, diag::override_multiple_decls_base,
-                   decl->getFullName());
+                   decl->getName());
     break;
   case OverrideCheckingAttempt::BaseName:
     diags.diagnose(decl, diag::override_multiple_decls_arg_mismatch,
-                   decl->getFullName());
+                   decl->getName());
     break;
   case OverrideCheckingAttempt::MismatchedOptional:
   case OverrideCheckingAttempt::MismatchedTypes:
@@ -526,9 +526,9 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
 
     auto diag = diags.diagnose(matchDecl, diag::overridden_near_match_here,
                                matchDecl->getDescriptiveKind(),
-                               matchDecl->getFullName());
+                               matchDecl->getName());
     if (attempt == OverrideCheckingAttempt::BaseName) {
-      fixDeclarationName(diag, decl, matchDecl->getFullName());
+      fixDeclarationName(diag, decl, matchDecl->getName());
     }
   }
 }
@@ -827,7 +827,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   case OverrideCheckingAttempt::PerfectMatch:
   case OverrideCheckingAttempt::MismatchedOptional:
   case OverrideCheckingAttempt::MismatchedTypes:
-    name = decl->getFullName();
+    name = decl->getName();
     break;
   case OverrideCheckingAttempt::BaseName:
   case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:
@@ -1053,12 +1053,12 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
 
   // If the name of our match differs from the name we were looking for,
   // complain.
-  if (decl->getFullName() != baseDecl->getFullName()) {
+  if (decl->getName() != baseDecl->getName()) {
     auto diag = diags.diagnose(decl, diag::override_argument_name_mismatch,
                                isa<ConstructorDecl>(decl),
-                               decl->getFullName(),
-                               baseDecl->getFullName());
-    fixDeclarationName(diag, decl, baseDecl->getFullName());
+                               decl->getName(),
+                               baseDecl->getName());
+    fixDeclarationName(diag, decl, baseDecl->getName());
     emittedMatchError = true;
   }
 
@@ -1139,7 +1139,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       noteFixableMismatchedTypes(decl, baseDecl);
       diags.diagnose(baseDecl, diag::overridden_near_match_here,
                      baseDecl->getDescriptiveKind(),
-                     baseDecl->getFullName());
+                     baseDecl->getName());
       emittedMatchError = true;
 
     } else if (!isa<AccessorDecl>(method) &&
@@ -1171,7 +1171,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       noteFixableMismatchedTypes(decl, baseDecl);
       diags.diagnose(baseDecl, diag::overridden_near_match_here,
                      baseDecl->getDescriptiveKind(),
-                     baseDecl->getFullName());
+                     baseDecl->getName());
       emittedMatchError = true;
 
     } else if (mayHaveMismatchedOptionals) {
@@ -1325,8 +1325,8 @@ bool swift::checkOverrides(ValueDecl *decl) {
     case OverrideCheckingAttempt::BaseName:
       // Don't keep looking if this is already a simple name, or if there
       // are no arguments.
-      if (decl->getFullName() == decl->getBaseName() ||
-          decl->getFullName().getArgumentNames().empty())
+      if (decl->getName() == decl->getBaseName() ||
+          decl->getName().getArgumentNames().empty())
         return false;
       break;
     case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:
@@ -1448,6 +1448,7 @@ namespace  {
     UNINTERESTING_ATTR(Specialize)
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
+    UNINTERESTING_ATTR(MainType)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
@@ -1531,7 +1532,7 @@ namespace  {
       // Complain.
       Diags.diagnose(Override, diag::override_swift3_objc_inference,
                      Override->getDescriptiveKind(),
-                     Override->getFullName(),
+                     Override->getName(),
                      Base->getDeclContext()
                        ->getSelfNominalTypeDecl()
                        ->getName());

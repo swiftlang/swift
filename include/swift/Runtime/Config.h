@@ -154,6 +154,14 @@
 # elif SWIFT_BNI_XCODE_BUILD
 #  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
 
+// Compatibility hook libraries cannot rely on the "is swift" bit being either
+// value, since they must work with both OS and Xcode versions of the libraries.
+// Generate a reference to a nonexistent symbol so that we get obvious linker
+// errors if we try.
+# elif SWIFT_COMPATIBILITY_LIBRARY
+extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTLY__;
+#  define SWIFT_CLASS_IS_SWIFT_MASK __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTLY__
+
 // Other builds (such as local builds on developers' computers)
 // dynamically choose the bit at runtime based on the current OS
 // version.

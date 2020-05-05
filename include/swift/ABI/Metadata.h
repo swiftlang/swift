@@ -3373,6 +3373,7 @@ public:
   /// class metadata.
   ///
   /// See also: [pre-5.2-extra-data-zeroing]
+  /// See also: [pre-5.3-extra-data-zeroing]
   const GenericMetadataPartialPattern *getExtraDataPattern() const {
     assert(asSelf()->hasExtraDataPattern());
     return this->template getTrailingObjects<GenericMetadataPartialPattern>();

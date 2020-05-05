@@ -27,6 +27,11 @@ module WinSDK [system] {
       export *
     }
 
+    module com {
+      header "combaseapi.h"
+      export *
+    }
+
     module compress {
       header "compressapi.h"
       export *
@@ -203,11 +208,26 @@ module WinSDK [system] {
     link "DnsAPI.Lib"
   }
 
+  module WinGDI {
+    header "wingdi.h"
+    export *
+
+    link "Gdi32.Lib"
+  }
+
   module WinReg {
     header "winreg.h"
     export *
 
     link "AdvAPI32.Lib"
+  }
+
+  module WinRPC {
+    header "../shared/rpc.h"
+    header "../shared/rpcndr.h"
+    export *
+
+    link "RpcRT4.Lib"
   }
 }
 

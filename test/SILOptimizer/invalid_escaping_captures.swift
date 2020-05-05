@@ -189,3 +189,61 @@ public struct SelfEscapeFromInit {
 
   public mutating func handler() {}
 }
+
+func autoclosureTakesEscaping(_ x: @escaping @autoclosure () ->Int) {}
+
+// Test that captures of escaping autoclosure are diagnosed correctly.
+func badCaptureInAutoclosure(x: inout Int) {
+    // expected-note@-1 {{parameter 'x' is declared 'inout'}}
+    // expected-note@-2 {{parameter 'x' is declared 'inout'}}
+
+  autoclosureTakesEscaping(x)
+    // expected-error@-1 {{escaping autoclosure captures 'inout' parameter 'x'}}
+    // expected-note@-2 {{pass a copy of 'x'}}
+
+  autoclosureTakesEscaping((x + 1) - 100)
+    // expected-error@-1 {{escaping autoclosure captures 'inout' parameter 'x'}}
+    // expected-note@-2 {{pass a copy of 'x'}}
+}
+
+// Test that transitive captures in autoclosures are diagnosed correctly.
+func badTransitiveCaptureInClosures(x: inout Int) -> ((Int) -> Void) {
+    // expected-note@-1 {{parameter 'x' is declared 'inout'}}
+    // expected-note@-2 {{parameter 'x' is declared 'inout'}}
+    // expected-note@-3 {{parameter 'x' is declared 'inout'}}
+
+  // Test capture of x by an autoclosure within a non-escaping closure.
+  let _ = { (y: Int) in
+    autoclosureTakesEscaping(x + y)
+      // expected-error@-1 {{escaping autoclosure captures 'inout' parameter 'x'}}
+      // expected-note@-2 {{pass a copy of 'x'}}
+  }
+
+  // Test capture of x by an autoclosure within an escaping closure.
+  let escapingClosure = { (y: Int) in
+      // expected-error@-1 {{escaping closure captures 'inout' parameter 'x'}}
+
+    autoclosureTakesEscaping(x + y)
+      // expected-note@-1 {{captured indirectly by this call}}
+      // expected-note@-2 {{captured here}}
+
+      // expected-error@-4 {{escaping autoclosure captures 'inout' parameter 'x'}}
+      // expected-note@-5 {{pass a copy of 'x'}}
+  }
+  return escapingClosure
+}
+
+// Test that captures of mutating 'self' in escaping autoclosures are diagnosed correctly.
+struct S {
+  var i = 0
+  init() {
+    autoclosureTakesEscaping(i)
+      // expected-error@-1 {{escaping autoclosure captures mutating 'self' parameter}}
+      // expected-note@-2 {{pass a copy of 'self'}}
+  }
+  mutating func method() {
+    autoclosureTakesEscaping(i)
+      // expected-error@-1 {{escaping autoclosure captures mutating 'self' parameter}}
+      // expected-note@-2 {{pass a copy of 'self'}}
+  }
+}

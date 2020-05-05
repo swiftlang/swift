@@ -55,7 +55,7 @@ storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
       nonconformingProperties.push_back(propertyDecl);
 
     if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                         DC, None)) {
+                                         DC)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -294,9 +294,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     }
 
     // case (.<elt>(let l0, let l1, ...), .<elt>(let r0, let r1, ...))
-    auto caseTuplePattern = TuplePattern::create(C, SourceLoc(), {
-      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) },
-                                                 SourceLoc());
+    auto caseTuplePattern = TuplePattern::createImplicit(C, {
+      TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) });
     caseTuplePattern->setImplicit();
 
     auto labelItem = CaseLabelItem(caseTuplePattern);
@@ -338,8 +337,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   // We only generate this if the enum has more than one case. If it has exactly
   // one case, then that single case statement is already exhaustive.
   if (elementCount > 1) {
-    auto defaultPattern = new (C) AnyPattern(SourceLoc());
-    defaultPattern->setImplicit();
+    auto defaultPattern = AnyPattern::createImplicit(C);
     auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                 /*implicit*/ true);
@@ -954,7 +952,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
   if (TypeChecker::conformsToProtocol(
-          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC, None)
+          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC)
           .isInvalid()) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
@@ -962,7 +960,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC, None)
+  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC)
           .isInvalid()) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
@@ -999,7 +997,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 
-  Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
+  Pattern *hashValuePat = NamedPattern::createImplicit(C, hashValueDecl);
   hashValuePat->setType(intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
   hashValuePat->setType(intType);

@@ -21,8 +21,8 @@ let _: Int = forwardWithUnderlyingPointer // expected-error {{cannot convert val
 let _: Int = forwardObjCPointer // expected-error {{cannot convert value of type '(OpaquePointer) -> Void' to specified type 'Int'}}
 
 // FIXME: It would be nice to import these as unavailable somehow instead.
-let _: Int = forwardWithUnderlyingValue // expected-error {{use of unresolved identifier 'forwardWithUnderlyingValue'}}
-let _: Int = forwardObjCValue // expected-error {{use of unresolved identifier 'forwardObjCValue'}}
+let _: Int = forwardWithUnderlyingValue // expected-error {{cannot find 'forwardWithUnderlyingValue' in scope}}
+let _: Int = forwardObjCValue // expected-error {{cannot find 'forwardObjCValue' in scope}}
 
 // Note that if /these/ start getting imported as unavailable, the error will
 // also mention that there's a missing argument, since the second argument isn't

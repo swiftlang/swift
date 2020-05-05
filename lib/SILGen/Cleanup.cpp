@@ -349,11 +349,19 @@ CleanupCloner::CleanupCloner(SILGenFunction &SGF, const ManagedValue &mv)
 CleanupCloner::CleanupCloner(SILGenBuilder &builder, const ManagedValue &mv)
     : CleanupCloner(builder.getSILGenFunction(), mv) {}
 
-CleanupCloner::CleanupCloner(SILGenFunction &SGF, const RValue &rv)
-    : SGF(SGF), hasCleanup(rv.isPlusOne(SGF)), isLValue(false) {}
+void CleanupCloner::getClonersForRValue(
+    SILGenBuilder &builder, const RValue &rvalue,
+    SmallVectorImpl<CleanupCloner> &resultingCloners) {
+  return getClonersForRValue(builder.getSILGenFunction(), rvalue,
+                             resultingCloners);
+}
 
-CleanupCloner::CleanupCloner(SILGenBuilder &builder, const RValue &rv)
-    : CleanupCloner(builder.getSILGenFunction(), rv) {}
+void CleanupCloner::getClonersForRValue(
+    SILGenFunction &SGF, const RValue &rvalue,
+    SmallVectorImpl<CleanupCloner> &resultingCloners) {
+  transform(rvalue.values, std::back_inserter(resultingCloners),
+            [&](ManagedValue mv) { return CleanupCloner(SGF, mv); });
+}
 
 ManagedValue CleanupCloner::clone(SILValue value) const {
   if (isLValue) {

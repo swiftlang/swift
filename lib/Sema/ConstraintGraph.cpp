@@ -1165,43 +1165,14 @@ bool ConstraintGraph::contractEdges() {
         log << "\n";
       }
 
-      // Merge the edges and remove the constraint.
-      removeEdge(constraint);
+      // Merge the edges and retire the constraint.
+      CS.retireConstraint(constraint);
       if (rep1 != rep2)
         CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
       didContractEdges = true;
     }
   }
   return didContractEdges;
-}
-
-void ConstraintGraph::removeEdge(Constraint *constraint) {
-  bool isExistingConstraint = false;
-
-  for (auto &active : CS.ActiveConstraints) {
-    if (&active == constraint) {
-      CS.ActiveConstraints.erase(constraint);
-      isExistingConstraint = true;
-      break;
-    }
-  }
-
-  for (auto &inactive : CS.InactiveConstraints) {
-    if (&inactive == constraint) {
-      CS.InactiveConstraints.erase(constraint);
-      isExistingConstraint = true;
-      break;
-    }
-  }
-
-  if (CS.solverState) {
-    if (isExistingConstraint)
-      CS.solverState->retireConstraint(constraint);
-    else
-      CS.solverState->removeGeneratedConstraint(constraint);
-  }
-
-  removeConstraint(constraint);
 }
 
 void ConstraintGraph::optimize() {

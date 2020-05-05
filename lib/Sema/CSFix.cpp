@@ -34,7 +34,7 @@ using namespace constraints;
 
 ConstraintFix::~ConstraintFix() {}
 
-Expr *ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
+ASTNode ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
 
 void ConstraintFix::print(llvm::raw_ostream &Out) const {
   Out << "[fix: ";
@@ -135,10 +135,10 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
   if (fromType->hasTypeVariable() || toType->hasTypeVariable())
     return nullptr;
 
-  auto *expr = locator->getAnchor();
-  if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
-    expr = assignExpr->getSrc();
-  auto *coerceExpr = dyn_cast<CoerceExpr>(expr);
+  auto anchor = locator->getAnchor();
+  if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
+    anchor = assignExpr->getSrc();
+  auto *coerceExpr = getAsExpr<CoerceExpr>(anchor);
   if (!coerceExpr)
     return nullptr;
 
@@ -264,7 +264,7 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
            locator->isLastElement<LocatorPathElt::FunctionArgument>());
 
     auto &cs = solution.getConstraintSystem();
-    auto *anchor = locator->getAnchor();
+    auto anchor = locator->getAnchor();
     auto contextualType = cs.getContextualType(anchor);
     auto exprType = cs.getType(anchor);
     return std::make_tuple(cs.getContextualTypePurpose(anchor), exprType,
@@ -273,15 +273,15 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
     return std::make_tuple(CTP_CallArgument,
                            argApplyInfo->getArgType(),
                            argApplyInfo->getParamType());
-  } else if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
+  } else if (auto *coerceExpr = getAsExpr<CoerceExpr>(locator->getAnchor())) {
     return std::make_tuple(CTP_CoerceOperand,
                            solution.getType(coerceExpr->getSubExpr()),
                            solution.getType(coerceExpr));
-  } else if (auto *assignExpr = dyn_cast<AssignExpr>(locator->getAnchor())) {
+  } else if (auto *assignExpr = getAsExpr<AssignExpr>(locator->getAnchor())) {
     return std::make_tuple(CTP_AssignSource,
                            solution.getType(assignExpr->getSrc()),
                            solution.getType(assignExpr->getDest()));
-  } else if (auto *call = dyn_cast<CallExpr>(locator->getAnchor())) {
+  } else if (auto *call = getAsExpr<CallExpr>(locator->getAnchor())) {
     assert(isa<TypeExpr>(call->getFn()));
     return std::make_tuple(
         CTP_Initialization,
@@ -500,8 +500,9 @@ DefineMemberBasedOnUse::diagnoseForAmbiguity(CommonFixesArray commonFixes) const
       concreteBaseType = baseType;
 
     if (concreteBaseType->getCanonicalType() != baseType->getCanonicalType()) {
-      getConstraintSystem().getASTContext().Diags.diagnose(getAnchor()->getLoc(),
-          diag::unresolved_member_no_inference, Name);
+      auto &DE = getConstraintSystem().getASTContext().Diags;
+      DE.diagnose(getLoc(getAnchor()), diag::unresolved_member_no_inference,
+                  Name);
       return true;
     }
   }
@@ -655,7 +656,7 @@ bool RemoveExtraneousArguments::diagnose(const Solution &solution,
 
 bool RemoveExtraneousArguments::isMinMaxNameShadowing(
     ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
-  auto *anchor = dyn_cast_or_null<CallExpr>(locator.getAnchor());
+  auto *anchor = getAsExpr<CallExpr>(locator.getAnchor());
   if (!anchor)
     return false;
 
@@ -663,7 +664,7 @@ bool RemoveExtraneousArguments::isMinMaxNameShadowing(
     if (auto *baseExpr = dyn_cast<DeclRefExpr>(UDE->getBase())) {
       auto *decl = baseExpr->getDecl();
       if (baseExpr->isImplicit() && decl &&
-          decl->getFullName() == cs.getASTContext().Id_self) {
+          decl->getName() == cs.getASTContext().Id_self) {
         auto memberName = UDE->getName();
         return memberName.isSimpleName("min") || memberName.isSimpleName("max");
       }
@@ -1001,7 +1002,9 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
 bool IgnoreAssignmentDestinationType::diagnose(const Solution &solution,
                                                bool asNote) const {
   auto &cs = getConstraintSystem();
-  auto *AE = cast<AssignExpr>(getAnchor());
+  auto *AE = getAsExpr<AssignExpr>(getAnchor());
+
+  assert(AE);
 
   // Let's check whether this is a situation of chained assignment where
   // one of the steps in the chain is an assignment to self e.g.
@@ -1292,4 +1295,18 @@ AllowCoercionToForceCast::create(ConstraintSystem &cs, Type fromType,
                                  Type toType, ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowCoercionToForceCast(cs, fromType, toType, locator);
+}
+
+bool AllowKeyPathRootTypeMismatch::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  KeyPathRootTypeMismatchFailure failure(solution, getFromType(), getToType(),
+                                         getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowKeyPathRootTypeMismatch *
+AllowKeyPathRootTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowKeyPathRootTypeMismatch(cs, lhs, rhs, locator);
 }

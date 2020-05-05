@@ -273,7 +273,7 @@
 ///         }
 ///     }
 ///     // Prints "Response 200: OK"
-///     // Prints "Response 403: Access Forbidden"
+///     // Prints "Response 403: Access forbidden"
 ///     // Prints "Unknown response 301"
 ///
 /// You can also update, modify, or remove keys and values from a dictionary
@@ -351,7 +351,7 @@
 /// the corresponding key-value pair as a non-optional tuple.
 ///
 ///     print(imagePaths[glyphIndex!])
-///     // Prints "("star", "/glyphs/star.png")"
+///     // Prints "(key: "star", value: "/glyphs/star.png")"
 ///
 /// A dictionary's indices stay valid across additions to the dictionary as
 /// long as the dictionary has enough capacity to store the added values
@@ -696,7 +696,7 @@ extension Dictionary: Collection {
   ///     } else {
   ///         print("Didn't find 'Japan' as a value in the dictionary.")
   ///     }
-  ///     // Prints "("JP", "Japan")"
+  ///     // Prints "(key: "JP", value: "Japan")"
   ///     // Prints "Japan's country code is 'JP'."
   ///
   /// - Parameter position: The position of the key-value pair to access.
@@ -851,7 +851,7 @@ extension Dictionary {
   ///         print("Response \(code): \(message)")
   ///     }
   ///     // Prints "Response 200: OK"
-  ///     // Prints "Response 403: Access Forbidden"
+  ///     // Prints "Response 403: Access forbidden"
   ///     // Prints "Response 301: Unknown response"
   ///
   /// When a dictionary's `Value` type has value semantics, you can use this
@@ -862,7 +862,7 @@ extension Dictionary {
   ///     let message = "Hello, Elle!"
   ///     var letterCounts: [Character: Int] = [:]
   ///     for letter in message {
-  ///         letterCounts[letter, defaultValue: 0] += 1
+  ///         letterCounts[letter, default: 0] += 1
   ///     }
   ///     // letterCounts == ["H": 1, "e": 2, "l": 4, "o": 1, ...]
   ///
@@ -879,7 +879,7 @@ extension Dictionary {
   ///   - key: The key the look up in the dictionary.
   ///   - defaultValue: The default value to use if `key` doesn't exist in the
   ///     dictionary.
-  /// - Returns: The value associated with `key` in the dictionary`; otherwise,
+  /// - Returns: The value associated with `key` in the dictionary; otherwise,
   ///   `defaultValue`.
   @inlinable
   public subscript(
@@ -933,7 +933,7 @@ extension Dictionary {
   ///     let data = ["a": "1", "b": "three", "c": "///4///"]
   ///
   ///     let m: [String: Int?] = data.mapValues { str in Int(str) }
-  ///     // ["a": 1, "b": nil, "c": nil]
+  ///     // ["a": Optional(1), "b": nil, "c": nil]
   ///
   ///     let c: [String: Int] = data.compactMapValues { str in Int(str) }
   ///     // ["a": 1]
@@ -1183,7 +1183,7 @@ extension Dictionary {
   /// If the key isn't found in the dictionary, `removeValue(forKey:)` returns
   /// `nil`.
   ///
-  ///     if let value = hues.removeValueForKey("Cerise") {
+  ///     if let value = hues.removeValue(forKey: "Cerise") {
   ///         print("The value \(value) was removed.")
   ///     } else {
   ///         print("No value found for that key.")

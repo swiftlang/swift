@@ -789,3 +789,38 @@ func test_combination_of_keypath_and_string_lookups() {
     _ = outer.hello.world // Ok
   }
 }
+
+// SR-12626
+@dynamicMemberLookup
+struct SR12626 {
+  var i: Int
+
+  subscript(dynamicMember member: KeyPath<SR12626, Int>) -> Int {
+    get { self[keyPath: member] }
+    set { self[keyPath: member] = newValue } // expected-error {{cannot assign through subscript: 'member' is a read-only key path}}
+  }
+}
+
+// SR-12245
+public struct SR12425_S {}
+
+@dynamicMemberLookup
+public struct SR12425_R {}
+
+internal var rightStructInstance: SR12425_R = SR12425_R()
+
+public extension SR12425_R {
+  subscript<T>(dynamicMember member: WritableKeyPath<SR12425_S, T>) -> T {
+      get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+      set { rightStructInstance[keyPath: member] = newValue } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+  }
+}
+
+@dynamicMemberLookup
+public struct SR12425_R1 {}
+
+public extension SR12425_R1 {
+  subscript<T>(dynamicMember member: KeyPath<SR12425_R1, T>) -> T {
+    get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_R1' cannot be applied to a base of type 'SR12425_R'}}
+  }
+}

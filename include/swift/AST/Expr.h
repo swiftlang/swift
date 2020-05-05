@@ -475,31 +475,31 @@ public:
   ///
   /// This distinguishes static references to types, like Int, from metatype
   /// values, "someTy: Any.Type".
-  bool isTypeReference(llvm::function_ref<Type(const Expr *)> getType =
-                           [](const Expr *E) -> Type { return E->getType(); },
-                       llvm::function_ref<Decl *(const Expr *)> getDecl =
-                           [](const Expr *E) -> Decl * {
-                         return nullptr;
-                       }) const;
+  bool isTypeReference(
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      },
+      llvm::function_ref<Decl *(Expr *)> getDecl = [](Expr *E) -> Decl * {
+        return nullptr;
+      }) const;
 
   /// Determine whether this expression refers to a statically-derived metatype.
   ///
   /// This implies `isTypeReference`, but also requires that the referenced type
   /// is not an archetype or dependent type.
   bool isStaticallyDerivedMetatype(
-      llvm::function_ref<Type(const Expr *)> getType =
-          [](const Expr *E) -> Type { return E->getType(); },
-      llvm::function_ref<bool(const Expr *)> isTypeReference =
-          [](const Expr *E) { return E->isTypeReference(); }) const;
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      },
+      llvm::function_ref<bool(Expr *)> isTypeReference =
+          [](Expr *E) { return E->isTypeReference(); }) const;
 
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
   bool isImplicit() const {
     return Bits.Expr.Implicit;
   }
-  void setImplicit(bool Implicit = true) {
-    Bits.Expr.Implicit = Implicit;
-  }
+  void setImplicit(bool Implicit = true);
 
   /// Retrieves the declaration that is being referenced by this
   /// expression, if any.
@@ -540,11 +540,12 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
-  void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
-            llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
-            llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> getTypeOfKeyPathComponent,
+  void dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getType,
+            llvm::function_ref<Type(TypeLoc &)> getTypeOfTypeLoc,
+            llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+                getTypeOfKeyPathComponent,
             unsigned Indent = 0) const;
-  
+
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
@@ -1185,9 +1186,9 @@ public:
   ///
   /// Note: prefer to use the second entry point, which separates out
   /// arguments/labels/etc.
-  static ObjectLiteralExpr *
-  create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind, Expr *arg,
-         bool implicit, llvm::function_ref<Type(const Expr *)> getType);
+  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+                                   LiteralKind kind, Expr *arg, bool implicit,
+                                   llvm::function_ref<Type(Expr *)> getType);
 
   /// Create a new object literal expression.
   static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
@@ -1333,40 +1334,63 @@ public:
   }
 };
 
-/// A reference to a type in expression context, spelled out as a TypeLoc.
+/// A reference to a type in expression context.
 ///
-/// The type of this expression is always \c MetaTypeType.
+/// The type of this expression is always \c MetatypeType.
 class TypeExpr : public Expr {
-  TypeLoc Info;
-  TypeExpr(Type Ty);
+  TypeRepr *Repr;
 public:
-  // Create a TypeExpr with location information.
-  TypeExpr(TypeLoc Ty);
+  /// Create a \c TypeExpr from a parsed \c TypeRepr.
+  TypeExpr(TypeRepr *Ty);
 
-  // The type of a TypeExpr is always a metatype type.  Return the instance
-  // type, ErrorType if an error, or null if not set yet.
-  Type getInstanceType(llvm::function_ref<bool(const Expr *)> hasType =
-                           [](const Expr *E) -> bool { return !!E->getType(); },
-                       llvm::function_ref<Type(const Expr *)> getType =
-                           [](const Expr *E) -> Type {
-                         return E->getType();
-                       }) const;
+  /// Retrieves the corresponding instance type of the type referenced by this
+  /// expression.
+  ///
+  /// If this node has no type, the resulting instance type is also the
+  /// null \c Type(). If the type of this node is not a \c MetatypeType, the
+  /// resulting instance type is \c ErrorType.
+  Type getInstanceType() const;
 
-  // Create an implicit TypeExpr, which has no location information.
-  static TypeExpr *createImplicit(Type Ty, ASTContext &C) {
-    return new (C) TypeExpr(Ty);
-  }
+public:
+  /// Create an implicit \c TypeExpr.
+  ///
+  /// The given type is required to be non-null and must be not be
+  /// a \c MetatypeType as this function will wrap the given type in one.
+  ///
+  /// FIXME: This behavior is bizarre.
+  static TypeExpr *createImplicit(Type Ty, ASTContext &C);
 
-  // Create an implicit TypeExpr, with location information even though it
-  // shouldn't have one.  This is presently used to work around other location
-  // processing bugs.  If you have an implicit location, use createImplicit.
+  /// Create an implicit \c TypeExpr that has artificial
+  /// location information attached.
+  ///
+  /// The given type is required to be non-null and must be not be
+  /// a \c MetatypeType as this function will wrap the given type in one.
+  ///
+  /// FIXME: This behavior is bizarre.
+  ///
+  /// Due to limitations in the modeling of certain AST elements, implicit
+  /// \c TypeExpr nodes are often the only source of location information the
+  /// expression checker has when it comes time to diagnose an error.
   static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C);
 
-  
-  /// Create a TypeExpr for a TypeDecl at the specified location.
-  static TypeExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D,
-                                 DeclContext *DC,
-                                 bool isImplicit);
+  /// Create an implicit \c TypeExpr for a given \c TypeDecl at the specified location.
+  ///
+  /// The given type is required to be non-null and must be not be
+  /// a \c MetatypeType as this function will wrap the given type in one.
+  ///
+  /// FIXME: This behavior is bizarre.
+  ///
+  /// Unlike the non-implicit case, the given location is not required to be
+  /// valid.
+  static TypeExpr *createImplicitForDecl(DeclNameLoc Loc, TypeDecl *D,
+                                         DeclContext *DC, Type ty);
+
+public:
+  /// Create a \c TypeExpr for a given \c TypeDecl at the specified location.
+  ///
+  /// The given location must be valid. If it is not, you must use
+  /// \c TypeExpr::createImplicitForDecl instead.
+  static TypeExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D, DeclContext *DC);
 
   /// Create a TypeExpr for a member TypeDecl of the given parent TypeDecl.
   static TypeExpr *createForMemberDecl(DeclNameLoc ParentNameLoc,
@@ -1389,13 +1413,11 @@ public:
                                             SourceRange AngleLocs,
                                             ASTContext &C);
 
-  TypeLoc &getTypeLoc() { return Info; }
-  TypeLoc getTypeLoc() const { return Info; }
-  TypeRepr *getTypeRepr() const { return Info.getTypeRepr(); }
+  TypeRepr *getTypeRepr() const { return Repr; }
   // NOTE: TypeExpr::getType() returns the type of the expr node, which is the
   // metatype of what is stored as an operand type.
   
-  SourceRange getSourceRange() const { return Info.getSourceRange(); }
+  SourceRange getSourceRange() const;
   // TODO: optimize getStartLoc() and getEndLoc() when TypeLoc allows it.
 
   static bool classof(const Expr *E) {
@@ -1759,11 +1781,12 @@ public:
   ///
   /// Note: do not create new callers to this entry point; use the entry point
   /// that takes separate index arguments.
-  static DynamicSubscriptExpr *
-  create(ASTContext &ctx, Expr *base, Expr *index, ConcreteDeclRef decl,
-         bool implicit,
-         llvm::function_ref<Type(const Expr *)> getType =
-             [](const Expr *E) -> Type { return E->getType(); });
+  static DynamicSubscriptExpr *create(
+      ASTContext &ctx, Expr *base, Expr *index, ConcreteDeclRef decl,
+      bool implicit,
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      });
 
   /// getIndex - Retrieve the index of the subscript expression, i.e., the
   /// "offset" into the base value.
@@ -2336,12 +2359,13 @@ public:
   ///
   /// Note: do not create new callers to this entry point; use the entry point
   /// that takes separate index arguments.
-  static SubscriptExpr *
-  create(ASTContext &ctx, Expr *base, Expr *index,
-         ConcreteDeclRef decl = ConcreteDeclRef(), bool implicit = false,
-         AccessSemantics semantics = AccessSemantics::Ordinary,
-         llvm::function_ref<Type(const Expr *)> getType =
-             [](const Expr *E) -> Type { return E->getType(); });
+  static SubscriptExpr *create(
+      ASTContext &ctx, Expr *base, Expr *index,
+      ConcreteDeclRef decl = ConcreteDeclRef(), bool implicit = false,
+      AccessSemantics semantics = AccessSemantics::Ordinary,
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      });
 
   /// Create a new subscript.
   static SubscriptExpr *create(ASTContext &ctx, Expr *base,
@@ -3367,7 +3391,7 @@ public:
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
-    private llvm::TrailingObjects<UnresolvedSpecializeExpr, TypeLoc> {
+    private llvm::TrailingObjects<UnresolvedSpecializeExpr, TypeRepr *> {
   friend TrailingObjects;
 
   Expr *SubExpr;
@@ -3376,31 +3400,27 @@ class UnresolvedSpecializeExpr final : public Expr,
 
   UnresolvedSpecializeExpr(Expr *SubExpr,
                            SourceLoc LAngleLoc,
-                           ArrayRef<TypeLoc> UnresolvedParams,
+                           ArrayRef<TypeRepr *> UnresolvedParams,
                            SourceLoc RAngleLoc)
     : Expr(ExprKind::UnresolvedSpecialize, /*Implicit=*/false),
       SubExpr(SubExpr), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
     Bits.UnresolvedSpecializeExpr.NumUnresolvedParams = UnresolvedParams.size();
     std::uninitialized_copy(UnresolvedParams.begin(), UnresolvedParams.end(),
-                            getTrailingObjects<TypeLoc>());
+                            getTrailingObjects<TypeRepr *>());
   }
 
 public:
   static UnresolvedSpecializeExpr *
   create(ASTContext &ctx, Expr *SubExpr, SourceLoc LAngleLoc,
-         ArrayRef<TypeLoc> UnresolvedParams, SourceLoc RAngleLoc);
+         ArrayRef<TypeRepr *> UnresolvedParams, SourceLoc RAngleLoc);
   
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
   
   /// Retrieve the list of type parameters. These parameters have not yet
   /// been bound to archetypes of the entity to be specialized.
-  ArrayRef<TypeLoc> getUnresolvedParams() const {
-    return {getTrailingObjects<TypeLoc>(),
-            Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
-  }
-  MutableArrayRef<TypeLoc> getUnresolvedParams() {
-    return {getTrailingObjects<TypeLoc>(),
+  ArrayRef<TypeRepr *> getUnresolvedParams() const {
+    return {getTrailingObjects<TypeRepr *>(),
             Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
   }
   
@@ -3584,10 +3604,8 @@ public:
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
   /// Retrieve the result type of this closure.
-  Type getResultType(llvm::function_ref<Type(const Expr *)> getType =
-                         [](const Expr *E) -> Type {
-    return E->getType();
-  }) const;
+  Type getResultType(llvm::function_ref<Type(Expr *)> getType =
+                         [](Expr *E) -> Type { return E->getType(); }) const;
 
   /// Return whether this closure is throwing when fully applied.
   bool isBodyThrowing() const;
@@ -3687,7 +3705,7 @@ class ClosureExpr : public AbstractClosureExpr {
   SourceLoc InLoc;
 
   /// The explicitly-specified result type.
-  TypeLoc ExplicitResultType;
+  TypeExpr *ExplicitResultType;
 
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
@@ -3695,7 +3713,7 @@ class ClosureExpr : public AbstractClosureExpr {
 public:
   ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
-              SourceLoc inLoc, TypeLoc explicitResultType,
+              SourceLoc inLoc, TypeExpr *explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
@@ -3754,15 +3772,15 @@ public:
     return ThrowsLoc;
   }
 
-  /// Retrieve the explicit result type location information.
-  TypeLoc &getExplicitResultTypeLoc() {
+  Type getExplicitResultType() const {
     assert(hasExplicitResultType() && "No explicit result type");
-    return ExplicitResultType;
+    return ExplicitResultType->getInstanceType();
   }
-  
-  void setExplicitResultType(SourceLoc arrowLoc, TypeLoc resultType) {
-    ArrowLoc = arrowLoc;
-    ExplicitResultType = resultType;
+  void setExplicitResultType(Type ty);
+
+  TypeRepr *getExplicitResultTypeRepr() const {
+    assert(hasExplicitResultType() && "No explicit result type");
+    return ExplicitResultType->getTypeRepr();
   }
 
   /// Determine whether the closure has a single expression for its
@@ -4128,9 +4146,9 @@ public:
       DefaultArgsOwner(defaultArgsOwner), ParamIndex(paramIndex), Loc(loc),
       ContextOrCallerSideExpr(dc) { }
 
-  SourceRange getSourceRange() const {
-    return Loc;
-  }
+  SourceRange getSourceRange() const { return {}; }
+
+  SourceLoc getArgumentListLoc() const { return Loc; }
 
   ConcreteDeclRef getDefaultArgsOwner() const {
     return DefaultArgsOwner;
@@ -4248,12 +4266,13 @@ public:
   /// Create a new call expression.
   ///
   /// Note: prefer to use the entry points that separate out the arguments.
-  static CallExpr *
-  create(ASTContext &ctx, Expr *fn, Expr *arg, ArrayRef<Identifier> argLabels,
-         ArrayRef<SourceLoc> argLabelLocs, bool hasTrailingClosure,
-         bool implicit, Type type = Type(),
-         llvm::function_ref<Type(const Expr *)> getType =
-             [](const Expr *E) -> Type { return E->getType(); });
+  static CallExpr *create(
+      ASTContext &ctx, Expr *fn, Expr *arg, ArrayRef<Identifier> argLabels,
+      ArrayRef<SourceLoc> argLabelLocs, bool hasTrailingClosure, bool implicit,
+      Type type = Type(),
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      });
 
   /// Create a new implicit call expression without any source-location
   /// information.
@@ -4262,11 +4281,12 @@ public:
   /// \param args The call arguments, not including a trailing closure (if any).
   /// \param argLabels The argument labels, whose size must equal args.size(),
   /// or which must be empty.
-  static CallExpr *
-  createImplicit(ASTContext &ctx, Expr *fn, ArrayRef<Expr *> args,
-                 ArrayRef<Identifier> argLabels,
-                 llvm::function_ref<Type(const Expr *)> getType =
-                     [](const Expr *E) -> Type { return E->getType(); }) {
+  static CallExpr *createImplicit(
+      ASTContext &ctx, Expr *fn, ArrayRef<Expr *> args,
+      ArrayRef<Identifier> argLabels,
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      }) {
     return create(ctx, fn, SourceLoc(), args, argLabels, { }, SourceLoc(),
                   /*trailingClosure=*/nullptr, /*implicit=*/true, getType);
   }
@@ -4280,12 +4300,13 @@ public:
   /// \param argLabelLocs The locations of the argument labels, whose size must
   /// equal args.size() or which must be empty.
   /// \param trailingClosure The trailing closure, if any.
-  static CallExpr *
-  create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
-         ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
-         SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
-         llvm::function_ref<Type(const Expr *)> getType =
-             [](const Expr *E) -> Type { return E->getType(); });
+  static CallExpr *create(
+      ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
+      ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
+      SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
+      llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+        return E->getType();
+      });
 
   SourceLoc getStartLoc() const {
     SourceLoc fnLoc = getFn()->getStartLoc();
@@ -4485,8 +4506,7 @@ class ExplicitCastExpr : public Expr {
   TypeLoc CastTy;
 
 protected:
-  ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc, TypeLoc castTy,
-                   Type resultTy)
+  ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc, TypeLoc castTy)
     : Expr(kind, /*Implicit=*/false), SubExpr(sub), AsLoc(AsLoc), CastTy(castTy)
   {}
 
@@ -4542,8 +4562,8 @@ StringRef getCheckedCastKindName(CheckedCastKind kind);
 class CheckedCastExpr : public ExplicitCastExpr {
 public:
   CheckedCastExpr(ExprKind kind,
-                  Expr *sub, SourceLoc asLoc, TypeLoc castTy, Type resultTy)
-    : ExplicitCastExpr(kind, sub, asLoc, castTy, resultTy)
+                  Expr *sub, SourceLoc asLoc, TypeLoc castTy)
+    : ExplicitCastExpr(kind, sub, asLoc, castTy)
   {
     Bits.CheckedCastExpr.CastKind = unsigned(CheckedCastKind::Unresolved);
   }
@@ -4578,7 +4598,7 @@ public:
   ForcedCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc exclaimLoc,
                         TypeLoc type)
     : CheckedCastExpr(ExprKind::ForcedCheckedCast,
-                      sub, asLoc, type, type.getType()),
+                      sub, asLoc, type),
       ExclaimLoc(exclaimLoc)
   {
   }
@@ -4607,7 +4627,7 @@ public:
   ConditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc questionLoc,
                              TypeLoc type)
     : CheckedCastExpr(ExprKind::ConditionalCheckedCast,
-                      sub, asLoc, type, type.getType()),
+                      sub, asLoc, type),
       QuestionLoc(questionLoc)
   { }
   
@@ -4632,8 +4652,7 @@ public:
 class IsExpr : public CheckedCastExpr {
 public:
   IsExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
-    : CheckedCastExpr(ExprKind::Is,
-                      sub, isLoc, type, Type())
+    : CheckedCastExpr(ExprKind::Is, sub, isLoc, type)
   {}
   
   IsExpr(SourceLoc isLoc, TypeLoc type)
@@ -4656,7 +4675,7 @@ class CoerceExpr : public ExplicitCastExpr {
 
 public:
   CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
-    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type, type.getType())
+    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type)
   { }
 
   CoerceExpr(SourceLoc asLoc, TypeLoc type)
@@ -4666,7 +4685,7 @@ public:
 private:
   CoerceExpr(SourceRange initRange, Expr *literal, TypeLoc type)
     : ExplicitCastExpr(ExprKind::Coerce, literal, initRange.Start,
-                       type, type.getType()), InitRangeEnd(initRange.End)
+                       type), InitRangeEnd(initRange.End)
   { setImplicit(); }
 
 public:
@@ -4917,25 +4936,20 @@ public:
 class EditorPlaceholderExpr : public Expr {
   Identifier Placeholder;
   SourceLoc Loc;
-  TypeLoc PlaceholderTy;
+  TypeRepr *PlaceholderTy;
   TypeRepr *ExpansionTyR;
   Expr *SemanticExpr;
 
 public:
   EditorPlaceholderExpr(Identifier Placeholder, SourceLoc Loc,
-                        TypeLoc PlaceholderTy,
-                        TypeRepr *ExpansionTyR)
-    : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
-      Placeholder(Placeholder), Loc(Loc),
-      PlaceholderTy(PlaceholderTy),
-      ExpansionTyR(ExpansionTyR),
-      SemanticExpr(nullptr) {
-  }
+                        TypeRepr *PlaceholderTy, TypeRepr *ExpansionTyR)
+      : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
+        Placeholder(Placeholder), Loc(Loc), PlaceholderTy(PlaceholderTy),
+        ExpansionTyR(ExpansionTyR), SemanticExpr(nullptr) {}
 
   Identifier getPlaceholder() const { return Placeholder; }
   SourceRange getSourceRange() const { return Loc; }
-  TypeLoc &getTypeLoc() { return PlaceholderTy; }
-  TypeLoc getTypeLoc() const { return PlaceholderTy; }
+  TypeRepr *getPlaceholderTypeRepr() const { return PlaceholderTy; }
   SourceLoc getTrailingAngleBracketLoc() const {
     return Loc.getAdvancedLoc(Placeholder.getLength() - 1);
   }
@@ -5614,18 +5628,15 @@ inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
 ///
 /// \param argLabelLocs The argument label locations, which might be updated by
 /// this function.
-Expr *packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
-                         ArrayRef<Expr *> args,
-                         ArrayRef<Identifier> &argLabels,
-                         ArrayRef<SourceLoc> &argLabelLocs,
-                         SourceLoc rParenLoc,
-                         Expr *trailingClosure, bool implicit,
-                         SmallVectorImpl<Identifier> &argLabelsScratch,
-                         SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
-                         llvm::function_ref<Type(const Expr *)> getType =
-                              [](const Expr *E) -> Type {
-                                return E->getType();
-                              });
+Expr *packSingleArgument(
+    ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
+    ArrayRef<Identifier> &argLabels, ArrayRef<SourceLoc> &argLabelLocs,
+    SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
+    SmallVectorImpl<Identifier> &argLabelsScratch,
+    SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
+    llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
+      return E->getType();
+    });
 
 void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
 void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
