@@ -2277,10 +2277,13 @@ namespace {
             getTypeForPattern(
               cast<VarPattern>(pattern)->getSubPattern(), locator,
               externalPatternType, bindPatternVarsOneWay));
+
       case PatternKind::Any: {
         return setType(
-            CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                  TVO_CanBindToNoEscape));
+            externalPatternType
+                ? externalPatternType
+                : CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                        TVO_CanBindToNoEscape));
       }
 
       case PatternKind::Named: {
@@ -2382,7 +2385,7 @@ namespace {
         Type subPatternType = getTypeForPattern(
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-            Type(), bindPatternVarsOneWay);
+            openedType, bindPatternVarsOneWay);
 
         CS.addConstraint(
             ConstraintKind::Conversion, subPatternType, openedType,
