@@ -89,7 +89,7 @@ class SILValueOwnershipChecker {
 
   /// The builder that the checker uses to emit error messages, crash if asked
   /// for, or supply back interesting info to the caller.
-  LinearLifetimeChecker::ErrorBuilder errorBuilder;
+  LinearLifetimeChecker::ErrorBuilder &errorBuilder;
 
   /// The list of lifetime ending users that we found. Only valid if check is
   /// successful.
@@ -113,7 +113,7 @@ class SILValueOwnershipChecker {
 public:
   SILValueOwnershipChecker(
       DeadEndBlocks &deadEndBlocks, SILValue value,
-      LinearLifetimeChecker::ErrorBuilder errorBuilder,
+      LinearLifetimeChecker::ErrorBuilder &errorBuilder,
       llvm::SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks)
       : result(), deadEndBlocks(deadEndBlocks), value(value),
         errorBuilder(errorBuilder), visitedBlocks(visitedBlocks) {
@@ -882,8 +882,10 @@ void SILInstruction::verifyOperandOwnership() const {
   }
 }
 
-static void verifySILValueHelper(const SILFunction *f, SILValue value,
-                                 DeadEndBlocks *deadEndBlocks) {
+static void
+verifySILValueHelper(const SILFunction *f, SILValue value,
+                     LinearLifetimeChecker::ErrorBuilder &errorBuilder,
+                     DeadEndBlocks *deadEndBlocks) {
   assert(!isa<SILUndef>(value) &&
          "We assume we are always passed arguments or instruction results");
 
@@ -892,21 +894,13 @@ static void verifySILValueHelper(const SILFunction *f, SILValue value,
   if (!f->hasOwnership() || !f->shouldVerifyOwnership())
     return;
 
-  using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
-  Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
-  if (IsSILOwnershipVerifierTestingEnabled) {
-    errorBuilder.emplace(*f, BehaviorKind::PrintMessageAndReturnFalse);
-  } else {
-    errorBuilder.emplace(*f, BehaviorKind::PrintMessageAndAssert);
-  }
-
   SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
   if (deadEndBlocks) {
-    SILValueOwnershipChecker(*deadEndBlocks, value, *errorBuilder, liveBlocks)
+    SILValueOwnershipChecker(*deadEndBlocks, value, errorBuilder, liveBlocks)
         .check();
   } else {
     DeadEndBlocks deadEndBlocks(f);
-    SILValueOwnershipChecker(deadEndBlocks, value, *errorBuilder, liveBlocks)
+    SILValueOwnershipChecker(deadEndBlocks, value, errorBuilder, liveBlocks)
         .check();
   }
 }
@@ -951,7 +945,11 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   // a real function. Assert in case this assumption is no longer true.
   auto *f = (*this)->getFunction();
   assert(f && "Instructions and arguments should have a function");
-  verifySILValueHelper(f, *this, deadEndBlocks);
+
+  using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
+  LinearLifetimeChecker::ErrorBuilder errorBuilder(
+      *f, BehaviorKind::PrintMessageAndAssert);
+  verifySILValueHelper(f, *this, errorBuilder, deadEndBlocks);
 }
 
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
@@ -976,14 +974,26 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   if (!hasOwnership() || !shouldVerifyOwnership())
     return;
 
+  using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
+  unsigned errorCounter = 0;
+  Optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
+  if (IsSILOwnershipVerifierTestingEnabled) {
+    errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndReturnFalse,
+                         &errorCounter);
+  } else {
+    errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndAssert);
+  }
+
   for (auto &block : *this) {
     for (auto *arg : block.getArguments()) {
-      verifySILValueHelper(this, arg, deadEndBlocks);
+      LinearLifetimeChecker::ErrorBuilder newBuilder = *errorBuilder;
+      verifySILValueHelper(this, arg, newBuilder, deadEndBlocks);
     }
 
     for (auto &inst : block) {
       for (auto result : inst.getResults()) {
-        verifySILValueHelper(this, result, deadEndBlocks);
+        LinearLifetimeChecker::ErrorBuilder newBuilder = *errorBuilder;
+        verifySILValueHelper(this, result, newBuilder, deadEndBlocks);
       }
     }
   }
