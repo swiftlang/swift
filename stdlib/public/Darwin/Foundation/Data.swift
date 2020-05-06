@@ -2388,16 +2388,17 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         // Copy as much as we can in one shot.
         let underestimatedCount = elements.underestimatedCount
         let originalCount = _representation.count
-        _representation.count += underestimatedCount
-        var (iter, endIndex): (S.Iterator, Int) = _representation.withUnsafeMutableBytes { buffer in
+        resetBytes(in: self.endIndex ..< self.endIndex + underestimatedCount)
+        var (iter, copiedCount): (S.Iterator, Int) = _representation.withUnsafeMutableBytes { buffer in
+            assert(buffer.count == originalCount + underestimatedCount)
             let start = buffer.baseAddress!.assumingMemoryBound(to: UInt8.self) + originalCount
             let b = UnsafeMutableBufferPointer(start: start, count: buffer.count - originalCount)
             return elements._copyContents(initializing: b)
         }
-        guard endIndex == underestimatedCount else {
+        guard copiedCount == underestimatedCount else {
             // We can't trap here. We have to allow an underfilled buffer
             // to emulate the previous implementation.
-            _representation.replaceSubrange(originalCount + endIndex ..< _representation.endIndex, with: nil, count: 0)
+            _representation.replaceSubrange(startIndex + originalCount + copiedCount ..< endIndex, with: nil, count: 0)
             return
         }
 
