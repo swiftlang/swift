@@ -75,7 +75,9 @@ sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $TMP_DIR/$
 # Copy nightly-toolchain's host environment stdlib into toolchain
 
 if [[ "$(uname)" == "Linux" ]]; then
-  cp -a $NIGHTLY_TOOLCHAIN/usr/lib/* $TMP_DIR/$TOOLCHAIN_NAME/usr/lib
+  cp -a $NIGHTLY_TOOLCHAIN/usr/lib/lib* $TMP_DIR/$TOOLCHAIN_NAME/usr/lib
+  cp -a $NIGHTLY_TOOLCHAIN/usr/lib/swift $TMP_DIR/$TOOLCHAIN_NAME/usr/lib
+  cp -a $NIGHTLY_TOOLCHAIN/usr/lib/swift_static $TMP_DIR/$TOOLCHAIN_NAME/usr/lib
 else
   cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/macosx $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
 fi
