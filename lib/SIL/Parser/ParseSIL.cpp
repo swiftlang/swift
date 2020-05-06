@@ -121,7 +121,14 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   SILParserState parserState(silMod.get());
   Parser parser(*bufferID, *SF, parserState.Impl.get());
   PrettyStackTraceParser StackTrace(parser);
-  parser.parseTopLevelSIL();
+
+  auto hadError = parser.parseTopLevelSIL();
+  if (hadError) {
+    // The rest of the SIL pipeline expects well-formed SIL, so if we encounter
+    // a parsing error, just return an empty SIL module.
+    return SILModule::createEmptyModule(mod, desc.conv, desc.opts,
+                                        desc.isWholeModule());
+  }
   return silMod;
 }
 
