@@ -327,7 +327,7 @@ HeapObject *swift::swift_allocEmptyBox() {
 }
 
 // Forward-declare this, but define it after swift_release.
-extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE LLVM_ATTRIBUTE_USED void
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
 _swift_release_dealloc(HeapObject *object);
 
 static HeapObject *_swift_retain_(HeapObject *object) {

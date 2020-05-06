@@ -72,6 +72,12 @@
 #define SWIFT_NOINLINE
 #endif
 
+#if __has_attribute(used)
+#define SWIFT_USED __attribute__((__used__))
+#else
+#define SWIFT_USED
+#endif
+
 #if __has_attribute(unavailable)
 #define SWIFT_ATTRIBUTE_UNAVAILABLE __attribute__((__unavailable__))
 #else
