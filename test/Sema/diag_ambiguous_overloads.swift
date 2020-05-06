@@ -126,3 +126,28 @@ func getCounts(_ scheduler: sr5154_Scheduler, _ handler: @escaping ([Count]) -> 
   })
 }
 
+// SR-12689
+func SR12689(_ u: UnsafeBufferPointer<UInt16>) {}
+
+let array : [UInt16] = [1, 2]
+
+array.withUnsafeBufferPointer {
+    SR12689(UnsafeRawPointer($0).bindMemory(to: UInt16.self, capacity: 1)) // expected-error {{no exact matches in call to initializer}}
+    // expected-note@-1 {{found candidate with type '(Builtin.RawPointer) -> UnsafeRawPointer'}}
+    // expected-note@-2 {{found candidate with type '(UnsafeMutableRawPointer) -> UnsafeRawPointer'}}
+    // expected-note@-3 {{found candidate with type '(OpaquePointer) -> UnsafeRawPointer'}}
+    // expected-note@-4 {{found candidate with type '(UnsafeRawPointer) -> UnsafeRawPointer'}}
+    UnsafeRawPointer($0) as UnsafeBufferPointer<UInt16> // expected-error {{no exact matches in call to initializer}}
+    // expected-note@-1 {{found candidate with type '(Builtin.RawPointer) -> UnsafeRawPointer'}}
+    // expected-note@-2 {{found candidate with type '(UnsafeMutableRawPointer) -> UnsafeRawPointer'}}
+    // expected-note@-3 {{found candidate with type '(OpaquePointer) -> UnsafeRawPointer'}}
+    // expected-note@-4 {{found candidate with type '(UnsafeRawPointer) -> UnsafeRawPointer'}}
+}
+
+func SR12689_1(_ u: Int) -> String { "" } // expected-note 2 {{found this candidate}}
+func SR12689_1(_ u: String) -> Double { 0 } // expected-note 2 {{found this candidate}}
+
+func SR12689_2(_ u: Int) {}
+
+SR12689_2(SR12689_1(1 as Double)) // expected-error {{no exact matches in call to global function 'SR12689_1'}}
+SR12689_1(1 as Double) as Int // expected-error {{no exact matches in call to global function 'SR12689_1'}}
