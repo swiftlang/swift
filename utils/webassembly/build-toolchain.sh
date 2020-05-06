@@ -39,6 +39,8 @@ $BUILD_SCRIPT \
   --install_destdir="$SOURCE_PATH/install" \
   --installable_package="$INSTALLABLE_PACKAGE" \
   --install-prefix=/$TOOLCHAIN_NAME/usr \
+  --swift-install-components "autolink-driver;compiler;clang-builtin-headers;stdlib;sdk-overlay;parser-lib;editor-integration;tools;testsuite-tools;toolchain-tools;license;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers;clang-resource-dir-symlink"
+  --llvm-install-components "clang" \
   --install-swift \
   --llvm-install-components "clang" \
   --darwin-toolchain-bundle-identifier="${BUNDLE_IDENTIFIER}" \
@@ -74,7 +76,7 @@ sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $TMP_DIR/$
 # Copy nightly-toolchain's host environment stdlib into toolchain
 
 if [[ "$(uname)" == "Linux" ]]; then
-  cp -a $NIGHTLY_TOOLCHAIN/usr/lib/* $TMP_DIR/$TOOLCHAIN_NAME/usr/lib || true
+  cp -a $NIGHTLY_TOOLCHAIN/usr/lib/* $TMP_DIR/$TOOLCHAIN_NAME/usr/lib
 else
   cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/macosx $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
 fi
