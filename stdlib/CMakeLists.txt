@@ -5,6 +5,45 @@
 # standard library from the Swift compiler build.
 project(swift-stdlib LANGUAGES C CXX)
 
+# NOTE: This is meant to provide a transition from the toolchain-integrated
+# build to the standalone build.  This variable should be replaced with
+# `CMAKE_BUILD_TYPE`.  Currently, although this defaults to `CMAKE_BUILD_TYPE`,
+# it is a cache variable, allowing the user to override the value by explicitly
+# specifying `SWIFT_STDLIB_BUILD_TYPE`.
+set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
+  "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
+
+if(DEFINED SWIFT_STDLIB_ASSERTIONS)
+  # NOTE: this clause is meant to help transition away from use of
+  # `SWIFT_STDLIB_ASSERTIONS`.  This was used in the code base along with
+  # `LLVM_ENABLE_ASSERTIONS`.  Rather than have two different options,
+  # consolidate into a single option.
+  message(WARNING "Use of `SWIFT_STDLIB_ASSERTIONS` to control assertions in the swift standard library is deprecated and will be removed in a future release.  Please use `SWIFT_RUNTIME_ENABLE_ASSERTIONS` to toggle the assertions behaviour of the Swift runtime")
+  set(SWIFT_RUNTIME_ENABLE_ASSERTIONS_default ${SWIFT_STDLIB_ASSERTIONS})
+elseif(DEFINED LLVM_ENABLE_ASSERTIONS)
+  # NOTE: this clause is meant to help transition away from use of
+  # `LLVM_ENABLE_ASSERTIONS`.  This was used in the code base along with
+  # `SWIFT_STDLIB_ASSERTIONS`.  Rather than have two different options,
+  # consolidate into a single option.
+  message(WARNING "Use of `LLVM_ENABLE_ASSERTIONS` to control assertions in the swift standard library is deprecated and will be removed in a future release.  Please use `SWIFT_RUNTIME_ENABLE_ASSERTIONS` to toggle the assertions behaviour of the Swift runtime")
+  set(SWIFT_RUNTIME_ENABLE_ASSERTIONS_default ${LLVM_ENABLE_ASSERTIONS})
+else()
+  # NOTE: this clause can be removed when the standard library becomes a fully
+  # standalone build.
+  if(SWIFT_STDLIB_BUILD_TYPE MATCHES DEBUG)
+    set(SWIFT_RUNTIME_ENABLE_ASSERTIONS_default YES)
+  else()
+    set(SWIFT_RUNTIME_ENABLE_ASSERTIONS_default NO)
+  endif()
+endif()
+option(SWIFT_RUNTIME_ENABLE_ASSERTIONS
+  "Unexpected conditions in the runtime will assert rather than silently continue"
+  ${SWIFT_RUNTIME_ENABLE_ASSERTIONS_default})
+
+option(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+  "Ovewrite memory for deallocated Swift objects"
+  ${SWIFT_RUNTIME_ENABLE_ASSERTIONS})
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")

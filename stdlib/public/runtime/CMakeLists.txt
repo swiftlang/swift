@@ -73,9 +73,9 @@ set(swift_runtime_sources
 
 # When we're building with assertions, include the demangle node dumper to aid
 # in debugging.
-if (LLVM_ENABLE_ASSERTIONS)
+if(SWIFT_RUNTIME_ENABLE_ASSERTIONS)
   list(APPEND swift_runtime_sources "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
-endif(LLVM_ENABLE_ASSERTIONS)
+endif()
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES

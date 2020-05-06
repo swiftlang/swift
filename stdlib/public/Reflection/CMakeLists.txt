@@ -14,10 +14,10 @@ set(swiftReflection_SOURCES
 
 # When we're building with assertions, include the demangle node dumper to aid
 # in debugging.
-if (LLVM_ENABLE_ASSERTIONS)
+if(SWIFT_RUNTIME_ENABLE_ASSERTIONS)
   list(APPEND swiftReflection_SOURCES
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
-endif(LLVM_ENABLE_ASSERTIONS)
+endif()
 
 add_swift_target_library(swiftReflection STATIC
   ${swiftReflection_SOURCES}

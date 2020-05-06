@@ -183,8 +183,6 @@ endif()
 # stdlib cmake.
 #
 
-set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
-    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
 # Allow the user to specify the standard library CMAKE_MSVC_RUNTIME_LIBRARY
 # value.  The following values are valid:
 #   - MultiThreaded (/MT)
@@ -199,16 +197,6 @@ endif()
 set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY
   ${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY_default}
   CACHE STRING "MSVC Runtime Library for the standard library")
-
-is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
-if(swift_optimized)
-  set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
-else()
-  set(SWIFT_STDLIB_ASSERTIONS_default TRUE)
-endif()
-option(SWIFT_STDLIB_ASSERTIONS
-    "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
-    "${SWIFT_STDLIB_ASSERTIONS_default}")
 
 option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
@@ -335,16 +323,6 @@ option(SWIFT_SIL_VERIFY_ALL
 option(SWIFT_EMIT_SORTED_SIL_OUTPUT
     "Sort SIL output by name to enable diffing of output"
     FALSE)
-
-if(SWIFT_STDLIB_ASSERTIONS)
-  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_default TRUE)
-else()
-  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_default FALSE)
-endif()
-
-option(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
-    "Overwrite memory for deallocated Swift objects"
-    "${SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_default}")
 
 option(SWIFT_STDLIB_SIL_DEBUGGING
     "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
@@ -829,34 +807,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
 
-if(SWIFT_INCLUDE_TOOLS)
-  message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
-  message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
-  message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
-  message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
-  message(STATUS "")
-else()
-  message(STATUS "Not building host Swift tools")
-  message(STATUS "")
-endif()
-
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
-  message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
-  message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
-  message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
-  message(STATUS "")
-
-  message(STATUS "Building Swift runtime with:")
-  message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
-  message(STATUS "")
-
-  message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
-  message(STATUS "")
-else()
-  message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
-  message(STATUS "")
-endif()
-
 #
 # Find required dependencies.
 #
@@ -1154,4 +1104,33 @@ if(XCODE)
       ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.def)
   add_custom_target(Miscellaneous
       SOURCES ${SWIFT_TOPLEVEL_HEADERS})
+endif()
+
+
+if(SWIFT_INCLUDE_TOOLS)
+  message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
+  message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
+  message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
+  message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
+  message(STATUS "")
+else()
+  message(STATUS "Not building host Swift tools")
+  message(STATUS "")
+endif()
+
+if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
+  message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
+  message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
+  message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "")
+
+  message(STATUS "Building Swift runtime with:")
+  message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
+  message(STATUS "")
+
+  message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
+  message(STATUS "")
+else()
+  message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
+  message(STATUS "")
 endif()
