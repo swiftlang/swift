@@ -823,7 +823,7 @@ protected:
     auto bodyVarRef = buildVarRef(bodyVar, endLoc);
     Expr *arrayAppendCall = CallExpr::create(
         ctx, arrayAppendRef, endLoc, { bodyVarRef } , { Identifier() },
-        { endLoc }, endLoc, /*trailingClosure=*/nullptr, /*implicit=*/true);
+        { endLoc }, endLoc, /*trailingClosures=*/{}, /*implicit=*/true);
     arrayAppendCall = cs->generateConstraints(arrayAppendCall, dc);
     if (!arrayAppendCall) {
       hadError = true;
