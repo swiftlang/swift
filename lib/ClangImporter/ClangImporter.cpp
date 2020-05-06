@@ -2400,7 +2400,7 @@ public:
   FilteringDeclaredDeclConsumer(swift::VisibleDeclConsumer &consumer,
                                 const ClangModuleUnit *CMU)
       : NextConsumer(consumer), ModuleFilter(CMU) {
-    assert(CMU);
+    assert(CMU && CMU->isTopLevel() && "Only top-level modules supported");
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
