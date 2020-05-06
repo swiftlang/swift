@@ -4541,7 +4541,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   attr->setOriginalFunction(originalAFD);
 
   // Returns true if:
-  // - Original function and derivative function has the same access level.
+  // - Original function and derivative function have the same access level.
   // - Original function is public and derivative function is internal
   //   `@usableFromInline`. This is the only special case.
   auto compatibleAccessLevels = [&]() {
@@ -4553,21 +4553,16 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Check access level compatibility for original and derivative functions.
   if (!compatibleAccessLevels()) {
-    auto diagID = diag::derivative_attr_access_level_higher_than_original;
-    AccessLevel originalAccess;
-    AccessLevel derivativeAccess;
-    if (originalAFD->getEffectiveAccess() < derivative->getEffectiveAccess()) {
-      originalAccess =
-          originalAFD->getFormalAccessScope().accessLevelForDiagnostics();
-      derivativeAccess = derivative->getEffectiveAccess();
-    } else {
-      diagID = diag::derivative_attr_access_level_lower_than_original;
-      originalAccess = originalAFD->getEffectiveAccess();
-      derivativeAccess =
-          derivative->getFormalAccessScope().accessLevelForDiagnostics();
-    }
-    diags.diagnose(originalName.Loc, diagID, originalAFD->getName(),
-                   originalAccess, derivative->getName(), derivativeAccess);
+    auto originalAccess = originalAFD->getFormalAccess();
+    auto derivativeAccess =
+        derivative->getFormalAccessScope().accessLevelForDiagnostics();
+    diags.diagnose(originalName.Loc,
+                   diag::derivative_attr_access_level_mismatch,
+                   originalAFD->getName(), originalAccess,
+                   derivative->getName(), derivativeAccess);
+    auto fixItDiag =
+        derivative->diagnose(diag::derivative_attr_fix_access, originalAccess);
+    fixItAccess(fixItDiag, derivative, originalAccess);
     return true;
   }
 
