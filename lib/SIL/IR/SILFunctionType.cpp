@@ -42,12 +42,13 @@ using namespace swift;
 using namespace swift::Lowering;
 
 SILType SILFunctionType::substInterfaceType(SILModule &M,
-                                            SILType interfaceType) const {
+                                            SILType interfaceType,
+                                            TypeExpansionContext context) const {
   // Apply pattern substitutions first, then invocation substitutions.
   if (auto subs = getPatternSubstitutions())
-    interfaceType = interfaceType.subst(M, subs);
+    interfaceType = interfaceType.subst(M, subs, context);
   if (auto subs = getInvocationSubstitutions())
-    interfaceType = interfaceType.subst(M, subs);
+    interfaceType = interfaceType.subst(M, subs, context);
   return interfaceType;
 }
 
@@ -102,33 +103,39 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
 }
 
 CanType SILParameterInfo::getArgumentType(SILModule &M,
-                                          const SILFunctionType *t) const {
+                                          const SILFunctionType *t,
+                                          TypeExpansionContext context) const {
   // TODO: We should always require a function type.
   if (t)
-    return t->substInterfaceType(M,
-                          SILType::getPrimitiveAddressType(getInterfaceType()))
-            .getASTType();
-  
+    return t
+        ->substInterfaceType(
+            M, SILType::getPrimitiveAddressType(getInterfaceType()), context)
+        .getASTType();
+
   return getInterfaceType();
 }
 
 CanType SILResultInfo::getReturnValueType(SILModule &M,
-                                          const SILFunctionType *t) const {
+                                          const SILFunctionType *t,
+                                          TypeExpansionContext context) const {
   // TODO: We should always require a function type.
   if (t)
-    return t->substInterfaceType(M,
-                          SILType::getPrimitiveAddressType(getInterfaceType()))
-            .getASTType();
+    return t
+        ->substInterfaceType(
+            M, SILType::getPrimitiveAddressType(getInterfaceType()), context)
+        .getASTType();
 
   return getInterfaceType();
 }
 
-SILType SILFunctionType::getDirectFormalResultsType(SILModule &M) {
+SILType
+SILFunctionType::getDirectFormalResultsType(SILModule &M,
+                                            TypeExpansionContext context) {
   CanType type;
   if (getNumDirectFormalResults() == 0) {
     type = getASTContext().TheEmptyTupleType;
   } else if (getNumDirectFormalResults() == 1) {
-    type = getSingleDirectFormalResult().getReturnValueType(M, this);
+    type = getSingleDirectFormalResult().getReturnValueType(M, this, context);
   } else {
     auto &cache = getMutableFormalResultsCache();
     if (cache) {
@@ -137,7 +144,7 @@ SILType SILFunctionType::getDirectFormalResultsType(SILModule &M) {
       SmallVector<TupleTypeElt, 4> elts;
       for (auto result : getResults())
         if (!result.isFormalIndirect())
-          elts.push_back(result.getReturnValueType(M, this));
+          elts.push_back(result.getReturnValueType(M, this, context));
       type = CanType(TupleType::get(elts, getASTContext()));
       cache = type;
     }
@@ -166,18 +173,21 @@ SILType SILFunctionType::getAllResultsInterfaceType() {
   return SILType::getPrimitiveObjectType(type);
 }
 
-SILType SILFunctionType::getAllResultsSubstType(SILModule &M) {
-  return substInterfaceType(M, getAllResultsInterfaceType());
+SILType SILFunctionType::getAllResultsSubstType(SILModule &M,
+                                                TypeExpansionContext context) {
+  return substInterfaceType(M, getAllResultsInterfaceType(), context);
 }
 
 SILType SILFunctionType::getFormalCSemanticResult(SILModule &M) {
   assert(getLanguage() == SILFunctionLanguage::C);
   assert(getNumResults() <= 1);
-  return getDirectFormalResultsType(M);
+  return getDirectFormalResultsType(M, TypeExpansionContext::minimal());
 }
 
-CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
-  auto selfTy = getSelfParameter().getArgumentType(M, this);
+CanType
+SILFunctionType::getSelfInstanceType(SILModule &M,
+                                     TypeExpansionContext context) const {
+  auto selfTy = getSelfParameter().getArgumentType(M, this, context);
 
   // If this is a static method, get the instance type.
   if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
@@ -187,10 +197,11 @@ CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
 }
 
 ClassDecl *
-SILFunctionType::getWitnessMethodClass(SILModule &M) const {
+SILFunctionType::getWitnessMethodClass(SILModule &M,
+                                       TypeExpansionContext context) const {
   // TODO: When witnesses use substituted types, we'd get this from the
   // substitution map.
-  auto selfTy = getSelfInstanceType(M);
+  auto selfTy = getSelfInstanceType(M, context);
   auto genericSig = getSubstGenericSignature();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
     assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
@@ -3577,7 +3588,10 @@ public:
           auto witnessConformance = substWitnessConformance(origType);
           substType = substType->withPatternSpecialization(nullptr, subs,
                                                            witnessConformance);
-
+          if (typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes()) {
+            substType =
+              substType->substituteOpaqueArchetypes(TC, typeExpansionContext);
+          }
           return substType;
         }
         // else fall down to component substitution
@@ -3804,6 +3818,25 @@ SILType SILType::subst(TypeConverter &tc, SubstitutionMap subs) const {
 }
 SILType SILType::subst(SILModule &M, SubstitutionMap subs) const{
   return subst(M.Types, subs);
+}
+
+SILType SILType::subst(SILModule &M, SubstitutionMap subs,
+                       TypeExpansionContext context) const {
+  if (!hasArchetype() && !hasTypeParameter() &&
+      !getASTType()->hasOpaqueArchetype())
+    return *this;
+
+  // Pass the TypeSubstitutionFn and LookupConformanceFn as arguments so that
+  // the llvm::function_ref value's scope spans the STST.subst call since
+  // SILTypeSubstituter captures these functions.
+  auto result = [&](TypeSubstitutionFn subsFn,
+                    LookupConformanceFn conformancesFn) -> SILType {
+    SILTypeSubstituter STST(M.Types, context, subsFn, conformancesFn,
+                            subs.getGenericSignature().getCanonicalSignature(),
+                            false);
+    return STST.subst(*this);
+  }(QuerySubstitutionMap{subs}, LookUpConformanceInSubstitutionMap(subs));
+  return result;
 }
 
 /// Apply a substitution to this polymorphic SILFunctionType so that
@@ -4234,9 +4267,11 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
       return ABICompatibilityCheckResult::DifferentReturnValueConventions;
 
     if (!areABICompatibleParamsOrReturns(
-                         result1.getSILStorageType(context.getModule(), this),
-                         result2.getSILStorageType(context.getModule(), other),
-                         &context)) {
+            result1.getSILStorageType(context.getModule(), this,
+                                      context.getTypeExpansionContext()),
+            result2.getSILStorageType(context.getModule(), other,
+                                      context.getTypeExpansionContext()),
+            &context)) {
       return ABICompatibilityCheckResult::ABIIncompatibleReturnValues;
     }
   }
@@ -4251,9 +4286,11 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
       return ABICompatibilityCheckResult::DifferentErrorResultConventions;
 
     if (!areABICompatibleParamsOrReturns(
-                           error1.getSILStorageType(context.getModule(), this),
-                           error2.getSILStorageType(context.getModule(), other),
-                           &context))
+            error1.getSILStorageType(context.getModule(), this,
+                                     context.getTypeExpansionContext()),
+            error2.getSILStorageType(context.getModule(), other,
+                                     context.getTypeExpansionContext()),
+            &context))
       return ABICompatibilityCheckResult::ABIIncompatibleErrorResults;
   }
 
@@ -4270,9 +4307,11 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
     if (param1.getConvention() != param2.getConvention())
       return {ABICompatibilityCheckResult::DifferingParameterConvention, i};
     if (!areABICompatibleParamsOrReturns(
-                           param1.getSILStorageType(context.getModule(), this),
-                           param2.getSILStorageType(context.getModule(), other),
-                           &context))
+            param1.getSILStorageType(context.getModule(), this,
+                                     context.getTypeExpansionContext()),
+            param2.getSILStorageType(context.getModule(), other,
+                                     context.getTypeExpansionContext()),
+            &context))
       return {ABICompatibilityCheckResult::ABIIncompatibleParameterType, i};
   }
 

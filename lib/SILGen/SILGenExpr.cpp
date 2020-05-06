@@ -2772,9 +2772,9 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
   auto entry = thunk->begin();
   auto resultArgTy = signature->getSingleResult().getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.F.getTypeExpansionContext());
   auto baseArgTy = signature->getParameters()[0].getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.F.getTypeExpansionContext());
   if (genericEnv) {
     resultArgTy = genericEnv->mapTypeIntoContext(SGM.M, resultArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
@@ -2784,7 +2784,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   SILValue indexPtrArg;
   if (!indexes.empty()) {
     auto indexArgTy = signature->getParameters()[1].getSILStorageType(
-        SGM.M, signature);
+        SGM.M, signature, subSGF.F.getTypeExpansionContext());
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
   
@@ -2922,9 +2922,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   auto entry = thunk->begin();
   auto valueArgTy = signature->getParameters()[0].getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.getTypeExpansionContext());
   auto baseArgTy = signature->getParameters()[1].getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.getTypeExpansionContext());
   if (genericEnv) {
     valueArgTy = genericEnv->mapTypeIntoContext(SGM.M, valueArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
@@ -2935,7 +2935,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   
   if (!indexes.empty()) {
     auto indexArgTy = signature->getParameters()[2].getSILStorageType(
-        SGM.M, signature);
+        SGM.M, signature, subSGF.getTypeExpansionContext());
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
 
@@ -3089,10 +3089,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
-    auto lhsPtr =
-      entry->createFunctionArgument(params[0].getSILStorageType(SGM.M, signature));
-    auto rhsPtr =
-      entry->createFunctionArgument(params[1].getSILStorageType(SGM.M, signature));
+    auto lhsPtr = entry->createFunctionArgument(params[0].getSILStorageType(
+        SGM.M, signature, subSGF.getTypeExpansionContext()));
+    auto rhsPtr = entry->createFunctionArgument(params[1].getSILStorageType(
+        SGM.M, signature, subSGF.getTypeExpansionContext()));
 
     Scope scope(subSGF, loc);
 
@@ -3264,8 +3264,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
-    auto indexPtr = entry->createFunctionArgument(
-                                params[0].getSILStorageType(SGM.M, signature));
+    auto indexPtr = entry->createFunctionArgument(params[0].getSILStorageType(
+        SGM.M, signature, subSGF.getTypeExpansionContext()));
 
     SILValue hashCode;
 
