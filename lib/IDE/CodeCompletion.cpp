@@ -356,12 +356,14 @@ CodeCompletionString *CodeCompletionString::create(llvm::BumpPtrAllocator &Alloc
 
 void CodeCompletionString::print(raw_ostream &OS) const {
   unsigned PrevNestingLevel = 0;
-  for (auto C : getChunks()) {
+  auto chunks = getChunks();
+  for (auto I = chunks.begin(), E = chunks.end(); I != E; ++I) {
     bool AnnotatedTextChunk = false;
-    if (C.getNestingLevel() < PrevNestingLevel) {
+
+    if (I->getNestingLevel() < PrevNestingLevel) {
       OS << "#}";
     }
-    switch (C.getKind()) {
+    switch (I->getKind()) {
     using ChunkKind = Chunk::ChunkKind;
     case ChunkKind::AccessControlKeyword:
     case ChunkKind::DeclAttrKeyword:
@@ -390,7 +392,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::BaseName:
     case ChunkKind::TypeIdSystem:
     case ChunkKind::TypeIdUser:
-      AnnotatedTextChunk = C.isAnnotation();
+      AnnotatedTextChunk = I->isAnnotation();
       LLVM_FALLTHROUGH;
     case ChunkKind::CallParameterName:
     case ChunkKind::CallParameterInternalName:
@@ -401,11 +403,11 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::GenericParameterName:
       if (AnnotatedTextChunk)
         OS << "['";
-      else if (C.getKind() == ChunkKind::CallParameterInternalName)
+      else if (I->getKind() == ChunkKind::CallParameterInternalName)
         OS << "(";
-      else if (C.getKind() == ChunkKind::CallParameterClosureType)
+      else if (I->getKind() == ChunkKind::CallParameterClosureType)
         OS << "##";
-      for (char Ch : C.getText()) {
+      for (char Ch : I->getText()) {
         if (Ch == '\n')
           OS << "\\n";
         else
@@ -413,7 +415,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       }
       if (AnnotatedTextChunk)
         OS << "']";
-      else if (C.getKind() == ChunkKind::CallParameterInternalName)
+      else if (I->getKind() == ChunkKind::CallParameterInternalName)
         OS << ")";
       break;
     case ChunkKind::OptionalBegin:
@@ -424,21 +426,32 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       break;
     case ChunkKind::DynamicLookupMethodCallTail:
     case ChunkKind::OptionalMethodCallTail:
-      OS << C.getText();
+      OS << I->getText();
       break;
+    case ChunkKind::TypeAnnotationBegin: {
+      OS << "[#";
+      ++I;
+      auto level = I->getNestingLevel();
+      for (; I != E && !I->endsPreviousNestedGroup(level); ++I)
+        if (I->hasText())
+          OS << I->getText();
+      --I;
+      OS << "#]";
+      continue;
+    }
     case ChunkKind::TypeAnnotation:
       OS << "[#";
-      OS << C.getText();
+      OS << I->getText();
       OS << "#]";
       break;
     case ChunkKind::CallParameterClosureExpr:
-      OS << " {" << C.getText() << "|}";
+      OS << " {" << I->getText() << "|}";
       break;
     case ChunkKind::BraceStmtWithCursor:
       OS << " {|}";
       break;
     }
-    PrevNestingLevel = C.getNestingLevel();
+    PrevNestingLevel = I->getNestingLevel();
   }
   while (PrevNestingLevel > 0) {
     OS << "#}";
@@ -779,6 +792,15 @@ static ArrayRef<std::pair<StringRef, StringRef>> copyStringPairArray(
   return llvm::makeArrayRef(Buff, Arr.size());
 }
 
+void CodeCompletionResultBuilder::withNestedGroup(
+    CodeCompletionString::Chunk::ChunkKind Kind,
+    llvm::function_ref<void()> body) {
+  CurrentNestingLevel++;
+  addSimpleChunk(Kind);
+  body();
+  CurrentNestingLevel--;
+}
+
 void CodeCompletionResultBuilder::addChunkWithText(
     CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
   addChunkWithTextNoCopy(Kind, copyString(*Sink.Allocator, Text));
@@ -826,22 +848,26 @@ class AnnotatedTypePrinter : public ASTPrinter {
     }
   }
 
+  void flush() {
+    if (Buffer.empty())
+      return;
+    Builder.addChunkWithText(CurrChunkKind, Buffer);
+    Buffer.clear();
+  }
+
 public:
   AnnotatedTypePrinter(CodeCompletionResultBuilder &Builder) : Builder(Builder) {}
 
   ~AnnotatedTypePrinter() {
-    // Add remaining buffer.
-    Builder.addChunkWithText(CurrChunkKind, Buffer);
+    // Flush the remainings.
+    flush();
   }
 
   void printText(StringRef Text) override {
     if (CurrChunkKind != NextChunkKind) {
-      // If the next desired kind is different from the current buffer, flush the
-      // current buffer.
-      if (!Buffer.empty()) {
-        Builder.addChunkWithText(CurrChunkKind, Buffer);
-        Buffer.clear();
-      }
+      // If the next desired kind is different from the current buffer, flush
+      // the current buffer.
+      flush();
       CurrChunkKind = NextChunkKind;
     }
     Buffer.append(Text);
@@ -961,13 +987,10 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
   if (ContextTy)
     PO.setBaseType(ContextTy);
   if (shouldAnnotateResults()) {
-    CurrentNestingLevel++;
-    addSimpleChunk(ChunkKind::CallParameterTypeBegin);
-    {
+    withNestedGroup(ChunkKind::CallParameterTypeBegin, [&]() {
       AnnotatedTypePrinter printer(*this);
       Ty->print(printer, PO);
-    }
-    CurrentNestingLevel--;
+    });
   } else {
     std::string TypeName = Ty->getString(PO);
     addChunkWithText(ChunkKind::CallParameterType, TypeName);
@@ -1037,6 +1060,30 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
   if (IsVarArg)
     addEllipsis();
   CurrentNestingLevel--;
+}
+
+void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
+                                                    StringRef suffix) {
+  T = T->getReferenceStorageReferent();
+
+  // Replace '()' with 'Void'.
+  if (T->isVoid())
+    T = T->getASTContext().getVoidDecl()->getDeclaredInterfaceType();
+
+  if (shouldAnnotateResults()) {
+    withNestedGroup(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin,
+                    [&]() {
+                      AnnotatedTypePrinter printer(*this);
+                      T->print(printer, PO);
+                      if (!suffix.empty())
+                        printer.printText(suffix);
+                    });
+  } else {
+    auto str = T.getString(PO);
+    if (!suffix.empty())
+      str += suffix.str();
+    addTypeAnnotation(str);
+  }
 }
 
 StringRef CodeCompletionContext::copyString(StringRef Str) {
@@ -1396,6 +1443,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::DynamicLookupMethodCallTail:
     case ChunkKind::OptionalMethodCallTail:
     case ChunkKind::TypeAnnotation:
+    case ChunkKind::TypeAnnotationBegin:
       continue;
 
     case ChunkKind::BraceStmtWithCursor:
@@ -1417,17 +1465,25 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
   auto FirstTextChunk = getFirstTextChunkIndex();
   int TextSize = 0;
   if (FirstTextChunk.hasValue()) {
-    for (auto C : getChunks().slice(*FirstTextChunk)) {
+    auto chunks = getChunks().slice(*FirstTextChunk);
+
+    for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
       using ChunkKind = Chunk::ChunkKind;
 
-      bool shouldPrint = !C.isAnnotation();
-      switch (C.getKind()) {
+      bool shouldPrint = !i->isAnnotation();
+      switch (i->getKind()) {
       case ChunkKind::TypeAnnotation:
       case ChunkKind::CallParameterClosureType:
       case ChunkKind::CallParameterClosureExpr:
       case ChunkKind::DeclAttrParamColon:
       case ChunkKind::OptionalMethodCallTail:
         continue;
+      case ChunkKind::TypeAnnotationBegin: {
+        auto level = i->getNestingLevel();
+        do { ++i; } while (i != e && !i->endsPreviousNestedGroup(level));
+        --i;
+        continue;
+      }
       case ChunkKind::ThrowsKeyword:
       case ChunkKind::RethrowsKeyword:
         shouldPrint = true; // Even when they're annotations.
@@ -1436,9 +1492,9 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
         break;
       }
 
-      if (C.hasText() && shouldPrint) {
-        TextSize += C.getText().size();
-        OS << C.getText();
+      if (i->hasText() && shouldPrint) {
+        TextSize += i->getText().size();
+        OS << i->getText();
       }
     }
   }
@@ -1526,8 +1582,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
                                         SemanticContextKind::CurrentNominal,
                                         {});
     Builder.setKeywordKind(CodeCompletionKeywordKind::kw_super);
-    Builder.addTextChunk("super");
-    Builder.addTypeAnnotation(ST.getString());
+    Builder.addKeyword("super");
+    Builder.addTypeAnnotation(ST, PrintOptions());
   }
 
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
@@ -1688,6 +1744,29 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
     return KnownProtocolKind::ExpressibleByUnicodeScalarLiteral;
   case CodeCompletionLiteralKind::Tuple:
     llvm_unreachable("no such protocol kind");
+  }
+
+  llvm_unreachable("Unhandled CodeCompletionLiteralKind in switch.");
+}
+
+static Type
+defaultTypeLiteralKind(CodeCompletionLiteralKind kind, ASTContext &Ctx) {
+  switch (kind) {
+  case CodeCompletionLiteralKind::BooleanLiteral:
+    return Ctx.getBoolDecl()->getDeclaredType();
+  case CodeCompletionLiteralKind::IntegerLiteral:
+    return Ctx.getIntDecl()->getDeclaredType();
+  case CodeCompletionLiteralKind::StringLiteral:
+    return Ctx.getStringDecl()->getDeclaredType();
+  case CodeCompletionLiteralKind::ArrayLiteral:
+    return Ctx.getArrayDecl()->getDeclaredType();
+  case CodeCompletionLiteralKind::DictionaryLiteral:
+    return Ctx.getDictionaryDecl()->getDeclaredType();
+  case CodeCompletionLiteralKind::NilLiteral:
+  case CodeCompletionLiteralKind::ColorLiteral:
+  case CodeCompletionLiteralKind::ImageLiteral:
+  case CodeCompletionLiteralKind::Tuple:
+    return Type();
   }
 
   llvm_unreachable("Unhandled CodeCompletionLiteralKind in switch.");
@@ -2193,17 +2272,12 @@ public:
   }
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
-    T = T->getReferenceStorageReferent();
-    if (T->isVoid()) {
-      Builder.addTypeAnnotation("Void");
-    } else {
-      PrintOptions PO;
-      PO.OpaqueReturnTypePrinting =
-          PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
-        PO.setBaseType(typeContext->getDeclaredTypeInContext());
-      Builder.addTypeAnnotation(T.getString(PO));
-    }
+    PrintOptions PO;
+    PO.OpaqueReturnTypePrinting =
+        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+      PO.setBaseType(typeContext->getDeclaredTypeInContext());
+    Builder.addTypeAnnotation(T, PO);
   }
 
   void addTypeAnnotationForImplicitlyUnwrappedOptional(
@@ -2218,14 +2292,13 @@ public:
       suffix = "?";
     }
 
-    T = T->getReferenceStorageReferent();
     PrintOptions PO;
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       PO.setBaseType(typeContext->getDeclaredTypeInContext());
-    Builder.addTypeAnnotation(T.getString(PO) + suffix);
+    Builder.addTypeAnnotation(T, PO, suffix);
   }
 
   /// For printing in code completion results, replace archetypes with
@@ -2883,12 +2956,8 @@ public:
       else if (FD->getAttrs().hasAttribute<OptionalAttr>())
         Builder.addOptionalMethodCallTail();
 
-      llvm::SmallString<32> TypeStr;
-
       if (!AFT) {
-        llvm::raw_svector_ostream OS(TypeStr);
-        FunctionType.print(OS);
-        Builder.addTypeAnnotation(OS.str());
+        Builder.addTypeAnnotation(FunctionType, PrintOptions());
         return;
       }
 
@@ -2909,10 +2978,41 @@ public:
         addThrows(Builder, AFT, FD);
       }
 
-      Type ResultType = AFT->getResult();
-
       // Build type annotation.
-      {
+      Type ResultType = AFT->getResult();
+      // As we did with parameters in addParamPatternFromFunction,
+      // for regular methods we'll print '!' after implicitly
+      // unwrapped optional results.
+      bool IsIUO =
+          !IsImplicitlyCurriedInstanceMethod &&
+          FD->isImplicitlyUnwrappedOptional();
+
+      PrintOptions PO;
+      PO.OpaqueReturnTypePrinting =
+          PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+      PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        PO.setBaseType(typeContext->getDeclaredTypeInContext());
+
+      if (Builder.shouldAnnotateResults()) {
+        Builder.withNestedGroup(
+            CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin, [&] {
+              AnnotatedTypePrinter printer(Builder);
+              if (IsImplicitlyCurriedInstanceMethod) {
+                auto *FnType = ResultType->castTo<AnyFunctionType>();
+                AnyFunctionType::printParams(FnType->getParams(), printer,
+                                             PrintOptions());
+                ResultType = FnType->getResult();
+                printer.printText(" -> ");
+              }
+
+              // What's left is the result type.
+              if (ResultType->isVoid())
+                ResultType = Ctx.getVoidDecl()->getDeclaredInterfaceType();
+              ResultType.print(printer, PO);
+            });
+      } else {
+        llvm::SmallString<32> TypeStr;
         llvm::raw_svector_ostream OS(TypeStr);
         if (IsImplicitlyCurriedInstanceMethod) {
           auto *FnType = ResultType->castTo<AnyFunctionType>();
@@ -2922,26 +3022,11 @@ public:
         }
 
         // What's left is the result type.
-        if (ResultType->isVoid()) {
-          OS << "Void";
-        } else {
-          // As we did with parameters in addParamPatternFromFunction,
-          // for regular methods we'll print '!' after implicitly
-          // unwrapped optional results.
-          bool IsIUO =
-              !IsImplicitlyCurriedInstanceMethod &&
-              FD->isImplicitlyUnwrappedOptional();
-
-          PrintOptions PO;
-          PO.OpaqueReturnTypePrinting =
-              PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-          PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
-          if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
-            PO.setBaseType(typeContext->getDeclaredTypeInContext());
-          ResultType.print(OS, PO);
-        }
+        if (ResultType->isVoid())
+          ResultType = Ctx.getVoidDecl()->getDeclaredInterfaceType();
+        ResultType.print(OS, PO);
+        Builder.addTypeAnnotation(TypeStr);
       }
-      Builder.addTypeAnnotation(TypeStr);
 
       if (isUnresolvedMemberIdealType(ResultType))
         Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
@@ -3904,8 +3989,7 @@ public:
   }
 
   void addTypeRelationFromProtocol(CodeCompletionResultBuilder &builder,
-                                   CodeCompletionLiteralKind kind,
-                                   StringRef defaultTypeName) {
+                                   CodeCompletionLiteralKind kind) {
     // Check for matching ExpectedTypes.
     auto *P = Ctx.getProtocol(protocolForLiteralKind(kind));
     for (auto T : expectedTypeContext.possibleTypes) {
@@ -3934,8 +4018,8 @@ public:
     }
 
     // Fallback to showing the default type.
-    if (!defaultTypeName.empty()) {
-      builder.addTypeAnnotation(defaultTypeName);
+    if (auto defaultTy = defaultTypeLiteralKind(kind, Ctx)) {
+      builder.addTypeAnnotation(defaultTy, PrintOptions());
       builder.setExpectedTypeRelation(
           expectedTypeContext.possibleTypes.empty()
               ? CodeCompletionResult::ExpectedTypeRelation::Unknown
@@ -3957,7 +4041,7 @@ public:
       builder.setLiteralKind(literalKind);
       builder.setKeywordKind(kwKind);
       builder.addBaseName(name);
-      addTypeRelationFromProtocol(builder, literalKind, defaultTypeName);
+      addTypeRelationFromProtocol(builder, literalKind);
     };
 
     addFromProto("#function", CodeCompletionKeywordKind::pound_function,
@@ -3990,7 +4074,7 @@ public:
       builder.setLiteralKind(kind);
 
       consumer(builder);
-      addTypeRelationFromProtocol(builder, kind, defaultTypeName);
+      addTypeRelationFromProtocol(builder, kind);
     };
 
     // FIXME: the pedantically correct way is to resolve Swift.*LiteralType.
@@ -5392,8 +5476,13 @@ static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "some", CodeCompletionKeywordKind::None, "some");
 }
 
-static void addAnyTypeKeyword(CodeCompletionResultSink &Sink) {
-  addKeyword(Sink, "Any", CodeCompletionKeywordKind::None, "Any");
+static void addAnyTypeKeyword(CodeCompletionResultSink &Sink, Type T) {
+  CodeCompletionResultBuilder Builder(Sink,
+                                      CodeCompletionResult::ResultKind::Keyword,
+                                      SemanticContextKind::None, {});
+  Builder.setKeywordKind(CodeCompletionKeywordKind::None);
+  Builder.addKeyword("Any");
+  Builder.addTypeAnnotation(T, PrintOptions());
 }
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
@@ -5448,7 +5537,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addSuperKeyword(Sink);
     addLetVarKeywords(Sink);
     addExprKeywords(Sink);
-    addAnyTypeKeyword(Sink);
+    addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
     break;
 
   case CompletionKind::CaseStmtKeyword:
@@ -5473,7 +5562,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     LLVM_FALLTHROUGH;
   }
   case CompletionKind::TypeSimpleBeginning:
-    addAnyTypeKeyword(Sink);
+    addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
     break;
 
   case CompletionKind::NominalMemberBeginning: {
@@ -6005,7 +6094,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         addSuperKeyword(Sink);
         addLetVarKeywords(Sink);
         addExprKeywords(Sink);
-        addAnyTypeKeyword(Sink);
+        addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
         DoPostfixExprBeginning();
       } else {
         //   foo() {} <HERE>
@@ -6227,10 +6316,13 @@ void PrintingCodeCompletionConsumer::handleResults(
     if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
       continue;
     Result->printPrefix(OS);
-    if (PrintAnnotatedDescription)
+    if (PrintAnnotatedDescription) {
       printCodeCompletionResultDescriptionAnnotated(*Result, OS, /*leadingPunctuation=*/false);
-    else
+      OS << "; typename=";
+      printCodeCompletionResultTypeNameAnnotated(*Result, OS);
+    } else {
       Result->getCompletionString()->print(OS);
+    }
 
     llvm::SmallString<64> Name;
     llvm::raw_svector_ostream NameOs(Name);
