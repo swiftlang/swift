@@ -99,8 +99,7 @@ public:
   bool renameBase(CharSourceRange Range, RefactoringRangeKind RangeKind) {
     assert(Range.isValid());
 
-    StringRef Existing = Range.str();
-    if (Existing != Old.base())
+    if (stripBackticks(Range).str() != Old.base())
       return true;
     doRenameBase(Range, RangeKind);
     return false;
@@ -131,6 +130,27 @@ public:
   bool isOperator() const { return Lexer::isOperator(Old.base()); }
 
 private:
+
+  /// Returns the range of the  (possibly escaped) identifier at the start of
+  /// \p Range and updates \p IsEscaped to indicate whether it's escaped or not.
+  CharSourceRange getLeadingIdentifierRange(CharSourceRange Range, bool &IsEscaped) {
+    assert(Range.isValid() && Range.getByteLength());
+    IsEscaped = Range.str().front() == '`';
+    SourceLoc Start = Range.getStart();
+    if (IsEscaped)
+      Start = Start.getAdvancedLoc(1);
+    return Lexer::getCharSourceRangeFromSourceRange(SM, Start);
+  }
+
+  CharSourceRange stripBackticks(CharSourceRange Range) {
+    StringRef Content = Range.str();
+    if (Content.size() < 3 || Content.front() != '`' || Content.back() != '`') {
+      return Range;
+    }
+    return CharSourceRange(Range.getStart().getAdvancedLoc(1),
+                           Range.getByteLength() - 2);
+  }
+
   void splitAndRenameLabel(CharSourceRange Range, LabelRangeType RangeType,
                            size_t NameIndex) {
     switch (RangeType) {
@@ -218,13 +238,15 @@ private:
 
   bool labelRangeMatches(CharSourceRange Range, LabelRangeType RangeType, StringRef Expected) {
     if (Range.getByteLength()) {
-      CharSourceRange ExistingLabelRange =
-          Lexer::getCharSourceRangeFromSourceRange(SM, Range.getStart());
+      bool IsEscaped = false;
+      CharSourceRange ExistingLabelRange = getLeadingIdentifierRange(Range, IsEscaped);
       StringRef ExistingLabel = ExistingLabelRange.str();
+      bool IsSingleName = Range == ExistingLabelRange ||
+        (IsEscaped && Range.getByteLength() == ExistingLabel.size() + 2);
 
       switch (RangeType) {
       case LabelRangeType::NoncollapsibleParam:
-        if (ExistingLabelRange == Range && Expected.empty()) // subscript([x]: Int)
+        if (IsSingleName && Expected.empty()) // subscript([x]: Int)
           return true;
         LLVM_FALLTHROUGH;
       case LabelRangeType::CallArg:

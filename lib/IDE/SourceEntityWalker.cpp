@@ -119,8 +119,12 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   bool IsExtension = false;
 
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->hasName() && !VD->isImplicit())
+    if (VD->hasName() && !VD->isImplicit()) {
+      SourceManager &SM = VD->getASTContext().SourceMgr;
       NameLen = VD->getBaseName().userFacingName().size();
+      if (Loc.isValid() && SM.extractText({Loc, 1}) == "`")
+        NameLen += 2;
+    }
 
     auto ReportParamList = [&](ParameterList *PL) {
       for (auto *PD : *PL) {
@@ -670,7 +674,11 @@ bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
 
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
-  return passReference(D, Ty, Loc.getBaseNameLoc(), Loc.getSourceRange(), Data);
+  SourceManager &SM = D->getASTContext().SourceMgr;
+  SourceLoc BaseStart = Loc.getBaseNameLoc(), BaseEnd = BaseStart;
+  if (SM.extractText({BaseStart, 1}) == "`")
+    BaseEnd = Lexer::getLocForEndOfToken(SM, BaseStart.getAdvancedLoc(1));
+  return passReference(D, Ty, BaseStart, {BaseStart, BaseEnd}, Data);
 }
 
 bool SemaAnnotator::
