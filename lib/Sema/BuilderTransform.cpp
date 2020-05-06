@@ -101,7 +101,7 @@ class BuilderClosureVisitor
     SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
     Expr *result = CallExpr::create(ctx, memberRef, openLoc, args,
                                     argLabels, argLabelLocs, closeLoc,
-                                    /*trailing closure*/ nullptr,
+                                    /*trailing closures*/{},
                                     /*implicit*/true);
 
     return result;
@@ -823,7 +823,7 @@ protected:
     auto bodyVarRef = buildVarRef(bodyVar, endLoc);
     Expr *arrayAppendCall = CallExpr::create(
         ctx, arrayAppendRef, endLoc, { bodyVarRef } , { Identifier() },
-        { endLoc }, endLoc, /*trailingClosure=*/nullptr, /*implicit=*/true);
+        { endLoc }, endLoc, /*trailingClosures=*/{}, /*implicit=*/true);
     arrayAppendCall = cs->generateConstraints(arrayAppendCall, dc);
     if (!arrayAppendCall) {
       hadError = true;
