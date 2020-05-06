@@ -83,6 +83,9 @@
   // treat macOS 10.14 as an "older OS."
 #if __MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_14
   RPATH_INSTALL_NAME_DIRECTIVE(10, 14)
+  // SWIFT_ENABLE_TENSORFLOW
+  // For TensorFlow, keep using @rpath instead of system paths
+  RPATH_INSTALL_NAME_DIRECTIVE(10, 15)
 #endif
 
 #else

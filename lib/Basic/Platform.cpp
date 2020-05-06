@@ -81,9 +81,9 @@ bool swift::triplesAreValidForZippering(const llvm::Triple &target,
 
 bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
   if (triple.isMacOSX()) {
-    // macOS 10.14.4 contains a copy of Swift, but the linker will still use an
-    // rpath-based install name until 10.15.
-    return triple.isMacOSXVersionLT(10, 15);
+    // SWIFT_ENABLE_TENSORFLOW
+    // For TensorFlow, use the toolchain libs, not system ones
+    return false;
   }
 
   if (triple.isiOS()) {
