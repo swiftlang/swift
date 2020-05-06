@@ -40,6 +40,7 @@ $BUILD_SCRIPT \
   --installable_package="$INSTALLABLE_PACKAGE" \
   --install-prefix=/$TOOLCHAIN_NAME/usr \
   --install-swift \
+  --llvm-install-components "clang" \
   --darwin-toolchain-bundle-identifier="${BUNDLE_IDENTIFIER}" \
   --darwin-toolchain-display-name="${DISPLAY_NAME}" \
   --darwin-toolchain-display-name-short="${DISPLAY_NAME_SHORT}" \
@@ -61,7 +62,6 @@ cd $TMP_DIR/$TOOLCHAIN_NAME
 
 # Merge wasi-sdk and toolchain
 cp -r $WASI_SDK_PATH/lib/clang usr/lib
-cp -a $SOURCE_PATH/build/Ninja-ReleaseAssert/llvm-*/bin/clang* usr/bin
 cp -a $WASI_SDK_PATH/bin/*ld usr/bin
 cp -r $WASI_SDK_PATH/share/wasi-sysroot usr/share
 
