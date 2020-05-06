@@ -84,6 +84,7 @@ bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
     // SWIFT_ENABLE_TENSORFLOW
     // For TensorFlow, use the toolchain libs, not system ones
     return false;
+    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   if (triple.isiOS()) {
