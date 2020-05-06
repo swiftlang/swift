@@ -23,6 +23,7 @@
 
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILFunction.h"
 
 namespace swift {
 
@@ -180,7 +181,10 @@ public:
   }
 
   /// Return the type.
-  SILType getType() const { return getSubstCalleeConv().getSILResultType(); }
+  SILType getType() const {
+    return getSubstCalleeConv().getSILResultType(
+        getFunction()->getTypeExpansionContext());
+  }
 
   /// Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {

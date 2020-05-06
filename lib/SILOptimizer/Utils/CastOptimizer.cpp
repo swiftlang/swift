@@ -443,12 +443,13 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
 
 static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
                             swift::SILModule &M,
-                            swift::SILFunctionConventions &substConv) {
+                            swift::SILFunctionConventions &substConv,
+                            TypeExpansionContext context) {
   // DestTy is the type which we want to convert to
   SILType DestTy =
       SILType::getPrimitiveObjectType(BridgedTargetTy->getCanonicalType());
   // ConvTy  is the return type of the _bridgeToObjectiveCImpl()
-  auto ConvTy = substConv.getSILResultType().getObjectType();
+  auto ConvTy = substConv.getSILResultType(context).getObjectType();
   if (ConvTy == DestTy) {
     // Destination is the same type
     return true;
@@ -640,7 +641,8 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
 
   // Check that this is a case that the authors of this code thought it could
   // handle.
-  if (!canOptimizeCast(BridgedTargetTy, M, substConv)) {
+  if (!canOptimizeCast(BridgedTargetTy, M, substConv,
+                       F->getTypeExpansionContext())) {
     return nullptr;
   }
 

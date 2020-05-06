@@ -1510,7 +1510,8 @@ void LoadableStorageAllocation::convertApplyResults() {
         continue;
       }
       auto resultContextTy = origSILFunctionType->substInterfaceType(
-                                       pass.F->getModule(), resultStorageType);
+          pass.F->getModule(), resultStorageType,
+          pass.F->getTypeExpansionContext());
       auto newSILType = pass.getNewSILType(origSILFunctionType,
                                            resultContextTy);
       auto *newVal = allocateForApply(currIns, newSILType.getObjectType());

@@ -362,8 +362,9 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
     assert(!param.isFormalIndirect());
-    auto paramTy = param.getSILStorageType(fnConv.silConv.getModule(),
-                                           fnConv.funcTy);
+    auto paramTy =
+        param.getSILStorageType(fnConv.silConv.getModule(), fnConv.funcTy,
+                                TypeExpansionContext::minimal());
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
@@ -1322,7 +1323,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
     // alloc_box. Otherwise, it is on the specific iterated copy_value that we
     // started with.
     SILParameterInfo CPInfo = CalleePInfo[Index - NumIndirectResults];
-    assert(calleeConv.getSILType(CPInfo) == Box->getType() &&
+    assert(calleeConv.getSILType(CPInfo, B.getTypeExpansionContext()) ==
+               Box->getType() &&
            "SILType of parameter info does not match type of parameter");
     releasePartialApplyCapturedArg(B, PAI->getLoc(), Box, CPInfo);
     ++NumCapturesPromoted;

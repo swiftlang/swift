@@ -627,15 +627,17 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     ManagedValue optName = emitManagedRValueWithCleanup(optNameValue);
 
     // Fix up the string parameters to have the right type.
-    SILType nameArgTy = fnConv.getSILArgumentType(3);
-    assert(nameArgTy == fnConv.getSILArgumentType(2));
+    SILType nameArgTy =
+        fnConv.getSILArgumentType(3, B.getTypeExpansionContext());
+    assert(nameArgTy ==
+           fnConv.getSILArgumentType(2, B.getTypeExpansionContext()));
     (void)nameArgTy;
     assert(optName.getType() == nameArgTy);
     SILValue nilValue =
         getOptionalNoneValue(mainClass, getTypeLowering(OptNSStringTy));
 
     // Fix up argv to have the right type.
-    auto argvTy = fnConv.getSILArgumentType(1);
+    auto argvTy = fnConv.getSILArgumentType(1, B.getTypeExpansionContext());
 
     SILType unwrappedTy = argvTy;
     if (Type innerTy = argvTy.getASTType()->getOptionalObjectType()) {
@@ -666,7 +668,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     B.createApply(mainClass, UIApplicationMain, SubstitutionMap(), args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, ctx), 0);
-    auto rType = F.getConventions().getSingleSILResultType();
+    auto rType =
+        F.getConventions().getSingleSILResultType(B.getTypeExpansionContext());
     if (r->getType() != rType)
       r = B.createStruct(mainClass, rType, r);
 
@@ -714,7 +717,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     B.createApply(mainClass, NSApplicationMain, SubstitutionMap(), args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
-    auto rType = F.getConventions().getSingleSILResultType();
+    auto rType =
+        F.getConventions().getSingleSILResultType(B.getTypeExpansionContext());
     if (r->getType() != rType)
       r = B.createStruct(mainClass, rType, r);
     B.createReturn(mainClass, r);
@@ -751,7 +755,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     B.setInsertionPoint(exitBlock);
     SILValue exitCode = exitBlock->createPhiArgument(builtinInt32Type,
                                                      ValueOwnershipKind::None);
-    auto returnType = F.getConventions().getSingleSILResultType();
+    auto returnType = F.getConventions().getSingleSILResultType(B.getTypeExpansionContext());
     if (exitCode->getType() != returnType)
       exitCode = B.createStruct(moduleLoc, returnType, exitCode);
     B.createReturn(moduleLoc, exitCode);

@@ -508,8 +508,10 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   if (FTy->getNumParameters() != 3)
     return;
 
-  SILType cacheType = FTy->getParameters()[2].getSILStorageType(*Module, FTy)
-                                             .getObjectType();
+  SILType cacheType =
+      FTy->getParameters()[2]
+          .getSILStorageType(*Module, FTy, TypeExpansionContext::minimal())
+          .getObjectType();
   NominalTypeDecl *cacheDecl = cacheType.getNominalOrBoundGenericNominal();
   if (!cacheDecl)
     return;

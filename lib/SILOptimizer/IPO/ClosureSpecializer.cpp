@@ -649,7 +649,11 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
              || ParamConv == ParameterConvention::Indirect_Inout
              || ParamConv == ParameterConvention::Indirect_InoutAliasable);
     } else {
-      ParamConv = ClosedOverFunConv.getSILType(PInfo).isTrivial(*ClosureUser)
+      ParamConv = ClosedOverFunConv
+                          .getSILType(PInfo, CallSiteDesc.getApplyInst()
+                                                 .getFunction()
+                                                 ->getTypeExpansionContext())
+                          .isTrivial(*ClosureUser)
                       ? ParameterConvention::Direct_Unowned
                       : ParameterConvention::Direct_Owned;
     }
@@ -814,6 +818,7 @@ void ClosureSpecCloner::populateCloned() {
   // such arguments. After this pass is done the only thing that will reference
   // the arguments is the partial apply that we will create.
   SILFunction *ClosedOverFun = CallSiteDesc.getClosureCallee();
+  SILBuilder &Builder = getBuilder();
   auto ClosedOverFunConv = ClosedOverFun->getConventions();
   unsigned NumTotalParams = ClosedOverFunConv.getNumParameters();
   unsigned NumNotCaptured = NumTotalParams - CallSiteDesc.getNumArguments();
@@ -821,7 +826,8 @@ void ClosureSpecCloner::populateCloned() {
   llvm::DenseMap<SILValue, SILValue> CapturedMap;
   unsigned idx = 0;
   for (auto &PInfo : ClosedOverFunConv.getParameters().slice(NumNotCaptured)) {
-    auto paramTy = ClosedOverFunConv.getSILType(PInfo);
+    auto paramTy =
+        ClosedOverFunConv.getSILType(PInfo, Builder.getTypeExpansionContext());
     // Get the type in context of the new function.
     paramTy = Cloned->getLoweredType(paramTy);
     SILValue MappedValue = ClonedEntryBB->createFunctionArgument(paramTy);
@@ -831,7 +837,6 @@ void ClosureSpecCloner::populateCloned() {
     CapturedMap[CapturedVal] = MappedValue;
   }
 
-  SILBuilder &Builder = getBuilder();
   Builder.setInsertionPoint(ClonedEntryBB);
 
   // Clone FRI and PAI, and replace usage of the removed closure argument
