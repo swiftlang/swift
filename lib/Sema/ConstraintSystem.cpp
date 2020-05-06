@@ -2958,6 +2958,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // Collect aggregated fixes from all solutions
   using LocatorAndKind = std::pair<ConstraintLocator *, FixKind>;
   using SolutionAndFix = std::pair<const Solution *, const ConstraintFix *>;
+  using AggregatedEntry = std::pair<LocatorAndKind,
+                              llvm::SmallVector<SolutionAndFix, 4>>;
   llvm::SmallMapVector<LocatorAndKind, llvm::SmallVector<SolutionAndFix, 4>, 4>
       aggregatedFixes;
   for (const auto &solution : solutions) {
@@ -2966,134 +2968,174 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       aggregatedFixes[key].emplace_back(&solution, fix);
     }
   }
+  
+  auto getAggregatedFixAnchor = [](const AggregatedEntry &aggregatedFix) {
+    auto *locator = aggregatedFix.first.first;
+    auto anchor = locator->getAnchor();
+    // Assignment failures are all about the source expression, because
+    // they treat destination as a contextual type.
+    if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
+      anchor = assignExpr->getSrc();
 
-  // If there is an overload difference, let's see if there's a common callee
-  // locator for all of the fixes.
-  auto ambiguousOverload = llvm::find_if(solutionDiff.overloads,
-      [&](const auto &overloadDiff) {
-        return llvm::all_of(aggregatedFixes, [&](const auto &aggregatedFix) {
-          auto *locator = aggregatedFix.first.first;
-          auto anchor = locator->getAnchor();
-          // Assignment failures are all about the source expression, because
-          // they treat destination as a contextual type.
-          if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
-            anchor = assignExpr->getSrc();
+    if (auto *callExpr = getAsExpr<CallExpr>(anchor)) {
+      if (!isa<TypeExpr>(callExpr->getDirectCallee()))
+        anchor = callExpr->getDirectCallee();
+    } else if (auto *applyExpr = getAsExpr<ApplyExpr>(anchor)) {
+      anchor = applyExpr->getFn();
+    }
+    return anchor;
+  };
+  
+  SmallPtrSet<SolutionDiff::OverloadDiff* , 4> ambiguosOverloads;
 
-          if (auto *callExpr = getAsExpr<CallExpr>(anchor)) {
-            if (!isa<TypeExpr>(callExpr->getDirectCallee()))
-              anchor = callExpr->getDirectCallee();
-          } else if (auto *applyExpr = getAsExpr<ApplyExpr>(anchor)) {
-            anchor = applyExpr->getFn();
-          }
-
-          return overloadDiff.locator->getAnchor() == anchor;
+  bool diagnosed = false;
+  for (const AggregatedEntry &aggregatedFix : aggregatedFixes) {
+    auto ambiguousOverload =
+        llvm::find_if(solutionDiff.overloads, [&](const auto &overloadDiff) {
+          return overloadDiff.locator->getAnchor() ==
+                 getAggregatedFixAnchor(aggregatedFix);
         });
-      });
 
-  // If we didn't find an ambiguous overload, diagnose the common fixes.
-  if (ambiguousOverload == solutionDiff.overloads.end()) {
-    bool diagnosed = false;
-    for (auto fixes: aggregatedFixes) {
+    if (ambiguousOverload == solutionDiff.overloads.end()) {
       // A common fix must appear in all solutions
-      auto &commonFixes = fixes.second;
-      if (commonFixes.size() != solutions.size()) continue;
+      auto &commonFixes = aggregatedFix.second;
+      if (commonFixes.size() != solutions.size())
+        continue;
 
       auto *firstFix = commonFixes.front().second;
       diagnosed |= firstFix->diagnoseForAmbiguity(commonFixes);
+    } else {
+      ambiguosOverloads.insert(ambiguousOverload);
     }
-    return diagnosed;
   }
 
-  auto *commonCalleeLocator = ambiguousOverload->locator;
-  auto *decl = ambiguousOverload->choices.front().getDecl();
-  assert(solverState);
+  if (diagnosed)
+    return true;
 
-  bool diagnosed = true;
-  {
-    DiagnosticTransaction transaction(getASTContext().Diags);
+  // If all non-overloaded common fixes do not appear in all solutions
+  // nor are diagnosed for ambiguity, let's try to fall back to common
+  // anchor diagnostic.
 
-    auto commonAnchor = commonCalleeLocator->getAnchor();
-    if (auto *callExpr = getAsExpr<CallExpr>(commonAnchor))
-      commonAnchor = callExpr->getDirectCallee();
-    auto &DE = getASTContext().Diags;
-    const auto name = decl->getName();
+  if (ambiguosOverloads.empty())
+    return false;
 
-    // Emit an error message for the ambiguity.
-    if (aggregatedFixes.size() == 1 &&
-        aggregatedFixes.front().first.first->isForContextualType()) {
-      auto anchor = aggregatedFixes.front().first.first->getAnchor();
-      auto baseName = name.getBaseName();
-      DE.diagnose(getLoc(commonAnchor), diag::no_candidates_match_result_type,
-                  baseName.userFacingName(), getContextualType(anchor));
-    } else if (name.isOperator()) {
-      auto *anchor = castToExpr(commonCalleeLocator->getAnchor());
+  diagnosed = true;
+  for (auto ambiguousOverload : ambiguosOverloads) {
+    auto *commonCalleeLocator = ambiguousOverload->locator;
+    auto *decl = ambiguousOverload->choices.front().getDecl();
+    assert(solverState);
 
-      // If operator is "applied" e.g. `1 + 2` there are tailored
-      // diagnostics in case of ambiguity, but if it's referenced
-      // e.g. `arr.sort(by: <)` it's better to produce generic error
-      // and a note per candidate.
-      if (auto *parentExpr = getParentExpr(anchor)) {
-        if (isa<ApplyExpr>(parentExpr)) {
-          diagnoseOperatorAmbiguity(*this, name.getBaseIdentifier(), solutions,
-                                    commonCalleeLocator);
-          return true;
+    {
+      DiagnosticTransaction transaction(getASTContext().Diags);
+
+      auto commonAnchor = commonCalleeLocator->getAnchor();
+      if (auto *callExpr = getAsExpr<CallExpr>(commonAnchor))
+        commonAnchor = callExpr->getDirectCallee();
+      auto &DE = getASTContext().Diags;
+      const auto name = decl->getName();
+
+      // Emit an error message for the ambiguity.
+      if (aggregatedFixes.size() == 1 &&
+          aggregatedFixes.front().first.first->isForContextualType()) {
+        auto anchor = aggregatedFixes.front().first.first->getAnchor();
+        auto baseName = name.getBaseName();
+        DE.diagnose(getLoc(commonAnchor), diag::no_candidates_match_result_type,
+                    baseName.userFacingName(), getContextualType(anchor));
+      } else if (name.isOperator()) {
+        auto *anchor = castToExpr(commonCalleeLocator->getAnchor());
+
+        // If operator is "applied" e.g. `1 + 2` there are tailored
+        // diagnostics in case of ambiguity, but if it's referenced
+        // e.g. `arr.sort(by: <)` it's better to produce generic error
+        // and a note per candidate.
+        if (auto *parentExpr = getParentExpr(anchor)) {
+          if (isa<ApplyExpr>(parentExpr)) {
+            diagnoseOperatorAmbiguity(*this, name.getBaseIdentifier(),
+                                      solutions, commonCalleeLocator);
+            return true;
+          }
         }
-      }
 
-      DE.diagnose(anchor->getLoc(), diag::no_overloads_match_exactly_in_call,
-                  /*isApplication=*/false, decl->getDescriptiveKind(),
-                  name.isSpecial(), name.getBaseName());
-    } else {
-      bool isApplication =
-          llvm::any_of(ArgumentInfos, [&](const auto &argInfo) {
-            return argInfo.first->getAnchor() == commonAnchor;
-          });
-
-      DE.diagnose(getLoc(commonAnchor),
-                  diag::no_overloads_match_exactly_in_call, isApplication,
-                  decl->getDescriptiveKind(), name.isSpecial(),
-                  name.getBaseName());
-    }
-
-    // Produce candidate notes
-    SmallPtrSet<ValueDecl *, 4> distinctChoices;
-    llvm::SmallSet<CanType, 4> candidateTypes;
-    for (const auto &solution: solutions) {
-      auto overload = solution.getOverloadChoice(commonCalleeLocator);
-      auto *decl = overload.choice.getDecl();
-      auto type = solution.simplifyType(overload.openedType);
-      // Skip if we've already produced a note for this overload
-      if (!distinctChoices.insert(decl).second)
-        continue;
-
-      if (solution.Fixes.size() == 1) {
-        diagnosed &=
-            solution.Fixes.front()->diagnose(solution, /*asNote*/ true);
-      } else if (llvm::all_of(solution.Fixes,
-                              [&](ConstraintFix *fix) {
-                                return fix->getLocator()
-                                  ->findLast<LocatorPathElt::ApplyArgument>().hasValue();
-                              })) {
-        // All fixes have to do with arguments, so let's show the parameter lists.
-        auto *fn = type->getAs<AnyFunctionType>();
-        assert(fn);
-        DE.diagnose(decl->getLoc(),
-                    diag::candidate_partial_match,
-                    fn->getParamListAsString(fn->getParams()));
+        DE.diagnose(anchor->getLoc(), diag::no_overloads_match_exactly_in_call,
+                    /*isApplication=*/false, decl->getDescriptiveKind(),
+                    name.isSpecial(), name.getBaseName());
       } else {
-        // Emit a general "found candidate" note
-        if (decl->getLoc().isInvalid()) {
-          if (candidateTypes.insert(type->getCanonicalType()).second)
-            DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type, type);
+        bool isApplication =
+            llvm::any_of(ArgumentInfos, [&](const auto &argInfo) {
+              return argInfo.first->getAnchor() == commonAnchor;
+            });
+
+        DE.diagnose(getLoc(commonAnchor),
+                    diag::no_overloads_match_exactly_in_call, isApplication,
+                    decl->getDescriptiveKind(), name.isSpecial(),
+                    name.getBaseName());
+      }
+
+      // Produce candidate notes
+      SmallPtrSet<ValueDecl *, 4> distinctChoices;
+      llvm::SmallSet<CanType, 4> candidateTypes;
+      for (const auto &solution : solutions) {
+        auto overload = solution.getOverloadChoice(commonCalleeLocator);
+        auto *decl = overload.choice.getDecl();
+        auto type = solution.simplifyType(overload.openedType);
+        // Skip if we've already produced a note for this overload
+        if (!distinctChoices.insert(decl).second)
+          continue;
+
+        if (solution.Fixes.size() == 1) {
+          diagnosed &=
+              solution.Fixes.front()->diagnose(solution, /*asNote*/ true);
         } else {
-          DE.diagnose(decl->getLoc(), diag::found_candidate);
+          auto emitGeneralFoundCandidate = [&]() {
+            // Emit a general "found candidate" note
+            if (decl->getLoc().isInvalid()) {
+              if (candidateTypes.insert(type->getCanonicalType()).second)
+                DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type,
+                            type);
+            } else {
+              DE.diagnose(decl->getLoc(), diag::found_candidate);
+            }
+          };
+
+          if (llvm::all_of(solution.Fixes, [](ConstraintFix *fix) {
+                return fix->getLocator()
+                    ->findLast<LocatorPathElt::ApplyArgument>()
+                    .hasValue();
+              })) {
+
+            // All fixes have to do with arguments, so let's show the parameter
+            // lists.
+            auto *fn = type->getAs<AnyFunctionType>();
+            assert(fn);
+
+            if (fn->getNumParams() == 1) {
+              // For single param functions if we have a re-label fix,
+              // let's prefer note that instead of a general mismatch.
+              auto relabelFix =
+                  llvm::find_if(solution.Fixes, [](ConstraintFix *fix) {
+                    return fix->getKind() == FixKind::RelabelArguments;
+                  });
+              if (relabelFix != solution.Fixes.end()) {
+                (*relabelFix)->diagnose(solution, /*asNote*/ true);
+              } else {
+                emitGeneralFoundCandidate();
+              }
+              continue;
+            }
+
+            DE.diagnose(decl->getLoc(), diag::candidate_partial_match,
+                        fn->getParamListAsString(fn->getParams()));
+
+          } else {
+            emitGeneralFoundCandidate();
+          }
         }
       }
-    }
 
-    // If not all of the fixes produced a note, we can't diagnose this.
-    if (!diagnosed)
-      transaction.abort();
+      // If not all of the fixes produced a note, we can't diagnose this.
+      if (!diagnosed)
+        transaction.abort();
+    }
   }
 
   return diagnosed;
