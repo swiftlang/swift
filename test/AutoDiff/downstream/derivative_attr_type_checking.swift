@@ -153,6 +153,7 @@ func vjpFooExtraGenericRequirements<T : FloatingPoint & Differentiable & BinaryI
 
 // Test cross-file derivative registration.
 extension FloatingPoint where Self: Differentiable {
+  @usableFromInline
   @derivative(of: rounded)
   func vjpRounded() -> (value: Self, pullback: (TangentVector) -> TangentVector) {
     fatalError()

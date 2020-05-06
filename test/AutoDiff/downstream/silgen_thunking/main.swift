@@ -152,23 +152,15 @@ where Dummy: Differentiable & ExpressibleByIntegerLiteral {
 
 // Test thunk linkage.
 
-public func hasPrivateDerivative(_ x: Float) -> Float { x }
-
-@derivative(of: hasPrivateDerivative)
-fileprivate func privateDerivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
-  (x, { $0 })
-}
-
-// CHECK-LABEL: sil private [thunk] [always_inline] [ossa] @AD__$s4main20hasPrivateDerivativeyS2fF__vjp_src_0_wrt_0
-
 public func hasInternalDerivative(_ x: Float) -> Float { x }
 
+@usableFromInline
 @derivative(of: hasInternalDerivative)
 internal func internalDerivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   (x, { $0 })
 }
 
-// CHECK-LABEL: sil hidden [thunk] [always_inline] [ossa] @AD__$s4main21hasInternalDerivativeyS2fF__vjp_src_0_wrt_0
+// CHECK-LABEL: sil [thunk] [always_inline] [ossa] @AD__$s4main21hasInternalDerivativeyS2fF__vjp_src_0_wrt_0
 
 public func hasPublicDerivative(_ x: Float) -> Float { x }
 
