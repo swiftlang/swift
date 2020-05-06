@@ -322,7 +322,23 @@ def extract_symbols(install_destdir, install_prefix, install_symroot, jobs):
 def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="""Builds Swift Syntax Parser library.""",
+        description="""
+Builds Swift Syntax Parser library.
+
+Example invocations:
+
+* Building for host (macOS, linux):
+
+  $ utils/build-parser-lib --release --no-assertions --build-dir /tmp/parser-lib-build
+
+* Building for iOS
+
+  $ utils/build-parser-lib --release --no-assertions --build-dir \
+/tmp/parser-lib-build-iossim --host iphonesimulator --architectures x86_64
+  $ utils/build-parser-lib --release --no-assertions --build-dir \
+/tmp/parser-lib-build-ios --host iphoneos --architectures arm64
+
+""",
     )
     optbuilder = parser.to_builder()
     option = optbuilder.add_option
