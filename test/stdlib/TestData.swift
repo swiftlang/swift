@@ -3968,7 +3968,8 @@ DataTests.test("test_validateMutation_slice_withUnsafeMutableBytes") { TestData(
 DataTests.test("test_validateMutation_slice_appendBytes") { TestData().test_validateMutation_slice_appendBytes() }
 DataTests.test("test_validateMutation_slice_appendData") { TestData().test_validateMutation_slice_appendData() }
 DataTests.test("test_validateMutation_slice_appendBuffer") { TestData().test_validateMutation_slice_appendBuffer() }
-DataTests.test("test_validateMutation_slice_appendSequence") { TestData().test_validateMutation_slice_appendSequence() }
+// rdar://62866069
+//DataTests.test("test_validateMutation_slice_appendSequence") { TestData().test_validateMutation_slice_appendSequence() }
 DataTests.test("test_validateMutation_slice_appendContentsOf") { TestData().test_validateMutation_slice_appendContentsOf() }
 DataTests.test("test_validateMutation_slice_resetBytes") { TestData().test_validateMutation_slice_resetBytes() }
 DataTests.test("test_validateMutation_slice_replaceSubrange") { TestData().test_validateMutation_slice_replaceSubrange() }
@@ -4016,7 +4017,8 @@ DataTests.test("test_validateMutation_slice_immutableBacking_withUnsafeMutableBy
 DataTests.test("test_validateMutation_slice_immutableBacking_appendBytes") { TestData().test_validateMutation_slice_immutableBacking_appendBytes() }
 DataTests.test("test_validateMutation_slice_immutableBacking_appendData") { TestData().test_validateMutation_slice_immutableBacking_appendData() }
 DataTests.test("test_validateMutation_slice_immutableBacking_appendBuffer") { TestData().test_validateMutation_slice_immutableBacking_appendBuffer() }
-DataTests.test("test_validateMutation_slice_immutableBacking_appendSequence") { TestData().test_validateMutation_slice_immutableBacking_appendSequence() }
+// rdar://62866069
+//DataTests.test("test_validateMutation_slice_immutableBacking_appendSequence") { TestData().test_validateMutation_slice_immutableBacking_appendSequence() }
 DataTests.test("test_validateMutation_slice_immutableBacking_appendContentsOf") { TestData().test_validateMutation_slice_immutableBacking_appendContentsOf() }
 DataTests.test("test_validateMutation_slice_immutableBacking_resetBytes") { TestData().test_validateMutation_slice_immutableBacking_resetBytes() }
 DataTests.test("test_validateMutation_slice_immutableBacking_replaceSubrange") { TestData().test_validateMutation_slice_immutableBacking_replaceSubrange() }
@@ -4112,7 +4114,8 @@ DataTests.test("test_validateMutation_slice_customBacking_withUnsafeMutableBytes
 DataTests.test("test_validateMutation_slice_customBacking_appendBytes") { TestData().test_validateMutation_slice_customBacking_appendBytes() }
 DataTests.test("test_validateMutation_slice_customBacking_appendData") { TestData().test_validateMutation_slice_customBacking_appendData() }
 DataTests.test("test_validateMutation_slice_customBacking_appendBuffer") { TestData().test_validateMutation_slice_customBacking_appendBuffer() }
-DataTests.test("test_validateMutation_slice_customBacking_appendSequence") { TestData().test_validateMutation_slice_customBacking_appendSequence() }
+// rdar://62866069
+//DataTests.test("test_validateMutation_slice_customBacking_appendSequence") { TestData().test_validateMutation_slice_customBacking_appendSequence() }
 DataTests.test("test_validateMutation_slice_customBacking_appendContentsOf") { TestData().test_validateMutation_slice_customBacking_appendContentsOf() }
 DataTests.test("test_validateMutation_slice_customBacking_resetBytes") { TestData().test_validateMutation_slice_customBacking_resetBytes() }
 DataTests.test("test_validateMutation_slice_customBacking_replaceSubrange") { TestData().test_validateMutation_slice_customBacking_replaceSubrange() }
