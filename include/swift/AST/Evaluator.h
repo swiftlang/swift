@@ -245,7 +245,8 @@ public:
   /// diagnostics through the given diagnostics engine.
   Evaluator(DiagnosticEngine &diags,
             bool debugDumpCycles,
-            bool buildDependencyGraph);
+            bool buildDependencyGraph,
+            bool enableExperimentalPrivateDeps);
 
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);

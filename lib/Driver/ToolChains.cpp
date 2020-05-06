@@ -250,6 +250,9 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_enable_experimental_concise_pound_file);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_experimental_private_intransitive_dependencies);
+
   // SWIFT_ENABLE_TENSORFLOW
   inputArgs.AddLastArg(
       arguments, options::OPT_enable_experimental_forward_mode_differentiation);

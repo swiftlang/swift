@@ -791,10 +791,9 @@ static bool compileLLVMIR(CompilerInstance &Instance) {
                                  inputsAndOutputs.getFilenameOfFirstInput());
 
   if (!FileBufOrErr) {
-    Instance.getASTContext().Diags.diagnose(
-        SourceLoc(), diag::error_open_input_file,
-        inputsAndOutputs.getFilenameOfFirstInput(),
-        FileBufOrErr.getError().message());
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
+                                 inputsAndOutputs.getFilenameOfFirstInput(),
+                                 FileBufOrErr.getError().message());
     return true;
   }
   llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
@@ -806,9 +805,9 @@ static bool compileLLVMIR(CompilerInstance &Instance) {
   if (!Module) {
     // TODO: Translate from the diagnostic info to the SourceManager location
     // if available.
-    Instance.getASTContext().Diags.diagnose(
-        SourceLoc(), diag::error_parse_input_file,
-        inputsAndOutputs.getFilenameOfFirstInput(), Err.getMessage());
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
+                                 inputsAndOutputs.getFilenameOfFirstInput(),
+                                 Err.getMessage());
     return true;
   }
   return performLLVM(Invocation.getIRGenOptions(), Instance.getASTContext(),
@@ -927,7 +926,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasReferenceDependenciesPath() &&
       Instance.getPrimarySourceFiles().empty()) {
-    Instance.getASTContext().Diags.diagnose(
+    Instance.getDiags().diagnose(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
     return;
   }
@@ -936,40 +935,39 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
-      auto LangOpts = Invocation.getLangOptions();
+      const auto LangOpts = Invocation.getLangOptions();
       (void)fine_grained_dependencies::emitReferenceDependencies(
-          Instance.getASTContext().Diags, SF,
-          *Instance.getDependencyTracker(),
+          Instance.getDiags(), SF, *Instance.getDependencyTracker(),
           referenceDependenciesFilePath,
           LangOpts.EmitFineGrainedDependencySourcefileDotFiles);
     }
   }
 }
 static void
-emitSwiftRangesForAllPrimaryInputsIfNeeded(const CompilerInstance &Instance) {
+emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
       Instance.getPrimarySourceFiles().empty()) {
-    Instance.getASTContext().Diags.diagnose(
-        SourceLoc(), diag::emit_swift_ranges_without_primary_file);
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::emit_swift_ranges_without_primary_file);
     return;
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
     const std::string &swiftRangesFilePath =
         Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
     if (!swiftRangesFilePath.empty()) {
-      (void)Instance.emitSwiftRanges(Instance.getASTContext().Diags, SF,
+      (void)Instance.emitSwiftRanges(Instance.getDiags(), SF,
                                      swiftRangesFilePath);
     }
   }
 }
 static void emitCompiledSourceForAllPrimaryInputsIfNeeded(
-    const CompilerInstance &Instance) {
+    CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasCompiledSourcePath() &&
       Instance.getPrimarySourceFiles().empty()) {
-    Instance.getASTContext().Diags.diagnose(
+    Instance.getDiags().diagnose(
         SourceLoc(), diag::emit_compiled_source_without_primary_file);
     return;
   }
@@ -977,7 +975,7 @@ static void emitCompiledSourceForAllPrimaryInputsIfNeeded(
     const std::string &compiledSourceFilePath =
         Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
     if (!compiledSourceFilePath.empty()) {
-      (void)Instance.emitCompiledSource(Instance.getASTContext().Diags, SF,
+      (void)Instance.emitCompiledSource(Instance.getDiags(), SF,
                                         compiledSourceFilePath);
     }
   }
@@ -1037,9 +1035,8 @@ static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(Path, EC, llvm::sys::fs::F_None);
   if (EC) {
-    module->getASTContext().Diags.diagnose(SourceLoc(),
-                                           diag::error_opening_output,
-                                           Path, EC.message());
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_opening_output, Path,
+                                 EC.message());
     return true;
   }
   OS << "// Automatically generated C source file from the Swift compiler \n"
@@ -1254,7 +1251,7 @@ static bool performCompile(CompilerInstance &Instance,
     scanDependencies(Instance);
   }
 
-  (void)emitMakeDependenciesIfNeeded(Context.Diags,
+  (void)emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                      Instance.getDependencyTracker(), opts);
 
   if (Action == FrontendOptions::ActionType::ResolveImports ||
@@ -2185,6 +2182,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance->getMainModule(),
                        Invocation.getFrontendOptions().DumpAPIPath);
+  }
+
+  // If we're asked to enable private intransitive dependencies, we need to
+  // write over the dependency files we just emitted because we need to
+  // get the dependencies written post-Sema down on disk.
+  // FIXME: Evaluate the impact turning this on universally has.
+  if (Invocation.getLangOptions().EnableExperientalPrivateIntransitiveDependencies) {
+    emitReferenceDependenciesForAllPrimaryInputsIfNeeded(*Instance);
   }
 
   // Verify reference dependencies of the current compilation job *before*
