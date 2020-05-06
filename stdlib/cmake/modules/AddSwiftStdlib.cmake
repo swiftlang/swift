@@ -1137,14 +1137,6 @@ function(_add_swift_target_library_single target name)
     MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
     )
 
-  if(SWIFTLIB_IS_STDLIB)
-    # We don't ever want to link against the ABI-breakage checking symbols
-    # in the standard library, runtime, or overlays because they only rely
-    # on the header parts of LLVM's ADT.
-    list(APPEND c_compile_flags
-      "-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1")
-  endif()
-
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
     if(libkind STREQUAL SHARED)
       list(APPEND c_compile_flags -D_WINDLL)
