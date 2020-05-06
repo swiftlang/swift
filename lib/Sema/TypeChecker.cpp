@@ -227,7 +227,7 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   nominal->addExtension(ext);
 }
 
-static void bindExtensions(SourceFile &SF) {
+void swift::bindExtensions(ModuleDecl &mod) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
@@ -245,20 +245,15 @@ static void bindExtensions(SourceFile &SF) {
   // resolved to a worklist.
   SmallVector<ExtensionDecl *, 8> worklist;
 
-  // FIXME: The current source file needs to be handled specially, because of
-  // private extensions.
-  for (auto import : namelookup::getAllImports(&SF)) {
-    // FIXME: Respect the access path?
-    for (auto file : import.importedModule->getFiles()) {
-      auto SF = dyn_cast<SourceFile>(file);
-      if (!SF)
-        continue;
+  for (auto file : mod.getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
 
-      for (auto D : SF->getTopLevelDecls()) {
-        if (auto ED = dyn_cast<ExtensionDecl>(D))
-          if (!tryBindExtension(ED))
-            worklist.push_back(ED);
-      }
+    for (auto D : SF->getTopLevelDecls()) {
+      if (auto ED = dyn_cast<ExtensionDecl>(D))
+        if (!tryBindExtension(ED))
+          worklist.push_back(ED);
     }
   }
 
@@ -353,11 +348,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       // file before type checking.
       TypeChecker::buildTypeRefinementContextHierarchy(*SF);
     }
-
-    // Resolve extensions. This has to occur first during type checking,
-    // because the extensions need to be wired into the AST for name lookup
-    // to work.
-    ::bindExtensions(*SF);
 
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {
@@ -700,10 +690,6 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
-}
-
-void swift::bindExtensions(SourceFile &SF) {
-  ::bindExtensions(SF);
 }
 
 LookupResult

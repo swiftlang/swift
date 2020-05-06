@@ -446,7 +446,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
     // Re-process the whole file (parsing will be lazily triggered). Still
     // re-use imported modules.
     performImportResolution(*newSF);
-    bindExtensions(*newSF);
+    bindExtensions(*newM);
 
     CurrentModule = newM;
     traceDC = newM;
