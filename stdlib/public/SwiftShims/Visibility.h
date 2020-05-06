@@ -149,6 +149,14 @@
 #define SWIFT_FALLTHROUGH
 #endif
 
+#if __cplusplus >= 201402l && __has_cpp_attribute(nodiscard)
+#define SWIFT_NODISCARD [[nodiscard]]
+#elif __has_cpp_attribute(clang::warn_unused_result)
+#define SWIFT_NODISCARD [[clang::warn_unused_result]]
+#else
+#define SWIFT_NODISCARD
+#endif
+
 
 /// Attributes for runtime-stdlib interfaces.
 /// Use these for C implementations that are imported into Swift via SwiftShims
