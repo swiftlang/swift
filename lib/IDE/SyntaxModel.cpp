@@ -1214,7 +1214,13 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
         if (!passNode({SyntaxNodeKind::AttributeBuiltin, Next.Range}))
           return false;
       } else {
-          assert(0 && "Attribute's TokenNodes already consumed?");
+        // Only mispelled attributes, corrected in the AST but not
+        // recognised or present in TokenNodes should get us here.
+        // E.g. @availability(...) comes through as if @available(...) was
+        // specified, but there's no TokenNode because we don't highlight them
+        // (to indicate they're invalid).
+        assert(Next.Range.getStart() == D->getRange().Start &&
+               "Attribute's TokenNodes already consumed?");
       }
     } else {
         assert(0 && "No TokenNodes?");
