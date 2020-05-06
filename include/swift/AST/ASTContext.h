@@ -121,12 +121,7 @@ namespace swift {
   class UnifiedStatsReporter;
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
-  // SWIFT_ENABLE_TENSORFLOW
-  struct AutoDiffConfig;
-  struct AutoDiffDerivativeFunctionKind;
-  class DerivativeAttr;
-  class DifferentiableAttr;
-  // SWIFT_ENABLE_TENSORFLOW END
+  struct SubASTContextDelegate;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -757,7 +752,8 @@ public:
   Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName,
       bool isUnderlyingClangModule,
-      ModuleDependenciesCache &cache);
+      ModuleDependenciesCache &cache,
+      SubASTContextDelegate &delegate);
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.

@@ -1630,13 +1630,14 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
-    ModuleDependenciesCache &cache) {
+    ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) {
   for (auto &loader : getImpl().ModuleLoaders) {
     if (isUnderlyingClangModule &&
         loader.get() != getImpl().TheClangModuleLoader)
       continue;
 
-    if (auto dependencies = loader->getModuleDependencies(moduleName, cache))
+    if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                          delegate))
       return dependencies;
   }
 

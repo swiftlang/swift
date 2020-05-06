@@ -110,6 +110,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/Support/StringSaver.h"
 
 namespace clang {
 class CompilerInstance;
@@ -123,6 +124,7 @@ namespace swift {
 
 class LangOptions;
 class SearchPathOptions;
+class CompilerInvocation;
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
@@ -201,6 +203,18 @@ public:
 std::string
 getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
+bool extractSwiftInterfaceVersionAndArgs(SourceManager &SM,
+                                         DiagnosticEngine &Diags,
+                                         StringRef InterfacePath,
+                                         version::Version &Vers,
+                                         StringRef &CompilerVersion,
+                                         llvm::StringSaver &SubArgSaver,
+                                         SmallVectorImpl<const char *> &SubArgs,
+                                         SourceLoc diagnosticLoc = SourceLoc());
+
+void inheritOptionsForBuildingInterface(CompilerInvocation &Invok,
+                                        const SearchPathOptions &SearchPathOpts,
+                                        const LangOptions &LangOpts);
 }
 
 #endif

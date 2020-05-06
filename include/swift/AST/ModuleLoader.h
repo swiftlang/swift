@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "swift/AST/ModuleDependencies.h"
 
 namespace llvm {
 class FileCollector;
@@ -85,6 +86,15 @@ public:
   /// Return the underlying clang::DependencyCollector that this
   /// class wraps.
   std::shared_ptr<clang::DependencyCollector> getClangCollector();
+};
+
+/// Abstract interface to run an action in a sub ASTContext.
+struct SubASTContextDelegate {
+  virtual bool runInSubContext(ASTContext &ctx, StringRef interfacePath,
+    llvm::function_ref<bool(ASTContext&)> action) {
+    llvm_unreachable("function should be overriden");
+  }
+  virtual ~SubASTContextDelegate() = default;
 };
 
 /// Abstract interface that loads named modules into the AST.
@@ -189,7 +199,7 @@ public:
   /// if no such module exists.
   virtual Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName,
-      ModuleDependenciesCache &cache) = 0;
+      ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) = 0;
 };
 
 } // namespace swift

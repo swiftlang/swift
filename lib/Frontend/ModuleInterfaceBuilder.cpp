@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "textual-module-interface"
 
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "ModuleInterfaceBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -82,19 +83,37 @@ void ModuleInterfaceBuilder::configureSubInvocationInputsAndOutputs(
   .setMainAndSupplementaryOutputs({MainOut}, {SOPs});
 }
 
+void swift::inheritOptionsForBuildingInterface(
+    CompilerInvocation &Invok,
+    const SearchPathOptions &SearchPathOpts,
+    const LangOptions &LangOpts) {
+  // Start with a SubInvocation that copies various state from our
+  // invoking ASTContext.
+  Invok.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
+  Invok.setFrameworkSearchPaths(SearchPathOpts.FrameworkSearchPaths);
+  Invok.setSDKPath(SearchPathOpts.SDKPath);
+  Invok.setInputKind(InputFileKind::SwiftModuleInterface);
+  Invok.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
+  Invok.setTargetTriple(LangOpts.Target);
+
+  // Inhibit warnings from the SubInvocation since we are assuming the user
+  // is not in a position to fix them.
+  Invok.getDiagnosticOptions().SuppressWarnings = true;
+
+  // Inherit this setting down so that it can affect error diagnostics (mostly
+  // by making them non-fatal).
+  Invok.getLangOptions().DebuggerSupport = LangOpts.DebuggerSupport;
+
+  // Disable this; deinitializers always get printed with `@objc` even in
+  // modules that don't import Foundation.
+  Invok.getLangOptions().EnableObjCAttrRequiresFoundation = false;
+}
+
 void ModuleInterfaceBuilder::configureSubInvocation(
     const SearchPathOptions &SearchPathOpts,
     const LangOptions &LangOpts,
     ClangModuleLoader *ClangLoader) {
-  // Start with a SubInvocation that copies various state from our
-  // invoking ASTContext.
-  subInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
-  subInvocation.setFrameworkSearchPaths(SearchPathOpts.FrameworkSearchPaths);
-  subInvocation.setSDKPath(SearchPathOpts.SDKPath);
-  subInvocation.setInputKind(InputFileKind::SwiftModuleInterface);
-  subInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
-  subInvocation.setTargetTriple(LangOpts.Target);
-
+  inheritOptionsForBuildingInterface(subInvocation, SearchPathOpts, LangOpts);
   subInvocation.setModuleName(moduleName);
   subInvocation.setClangModuleCachePath(moduleCachePath);
   subInvocation.getFrontendOptions().PrebuiltModuleCachePath =
@@ -111,18 +130,6 @@ void ModuleInterfaceBuilder::configureSubInvocation(
     }
   }
 
-  // Inhibit warnings from the SubInvocation since we are assuming the user
-  // is not in a position to fix them.
-  subInvocation.getDiagnosticOptions().SuppressWarnings = true;
-
-  // Inherit this setting down so that it can affect error diagnostics (mostly
-  // by making them non-fatal).
-  subInvocation.getLangOptions().DebuggerSupport = LangOpts.DebuggerSupport;
-
-  // Disable this; deinitializers always get printed with `@objc` even in
-  // modules that don't import Foundation.
-  subInvocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
-
   // Tell the subinvocation to serialize dependency hashes if asked to do so.
   auto &frontendOpts = subInvocation.getFrontendOptions();
   frontendOpts.SerializeModuleInterfaceDependencyHashes =
@@ -134,16 +141,22 @@ void ModuleInterfaceBuilder::configureSubInvocation(
   remarkOnRebuildFromInterface;
 }
 
-bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
-    swift::version::Version &Vers, StringRef &CompilerVersion,
-    llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs) {
-  llvm::vfs::FileSystem &fs = *sourceMgr.getFileSystem();
-  auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
+bool swift::extractSwiftInterfaceVersionAndArgs(
+    SourceManager &SM,
+    DiagnosticEngine &Diags,
+    StringRef InterfacePath,
+    version::Version &Vers,
+    StringRef &CompilerVersion,
+    llvm::StringSaver &SubArgSaver,
+    SmallVectorImpl<const char *> &SubArgs,
+    SourceLoc diagnosticLoc) {
+  llvm::vfs::FileSystem &fs = *SM.getFileSystem();
+  auto FileOrError = swift::vfs::getFileOrSTDIN(fs, InterfacePath);
   if (!FileOrError) {
     // Don't use this->diagnose() because it'll just try to re-open
     // interfacePath.
-    diags.diagnose(diagnosticLoc, diag::error_open_input_file,
-                   interfacePath, FileOrError.getError().message());
+    Diags.diagnose(diagnosticLoc, diag::error_open_input_file,
+                   InterfacePath, FileOrError.getError().message());
     return true;
   }
   auto SB = FileOrError.get()->getBuffer();
@@ -151,18 +164,21 @@ bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
   auto CompRe = getSwiftInterfaceCompilerVersionRegex();
   auto FlagRe = getSwiftInterfaceModuleFlagsRegex();
   SmallVector<StringRef, 1> VersMatches, FlagMatches, CompMatches;
+
   if (!VersRe.match(SB, &VersMatches)) {
-    diagnose(diag::error_extracting_version_from_module_interface);
+    ModuleInterfaceBuilder::diagnose(Diags, SM, InterfacePath, diagnosticLoc,
+      diag::error_extracting_version_from_module_interface);
     return true;
   }
   if (!FlagRe.match(SB, &FlagMatches)) {
-    diagnose(diag::error_extracting_flags_from_module_interface);
+    ModuleInterfaceBuilder::diagnose(Diags, SM, InterfacePath, diagnosticLoc,
+      diag::error_extracting_version_from_module_interface);
     return true;
   }
   assert(VersMatches.size() == 2);
   assert(FlagMatches.size() == 2);
   // FIXME We should diagnose this at a location that makes sense:
-  Vers = swift::version::Version(VersMatches[1], SourceLoc(), &diags);
+  Vers = swift::version::Version(VersMatches[1], SourceLoc(), &Diags);
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], SubArgSaver, SubArgs);
 
   if (CompRe.match(SB, &CompMatches)) {
@@ -175,6 +191,13 @@ bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
   }
 
   return false;
+}
+
+bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
+    swift::version::Version &Vers, StringRef &CompilerVersion,
+    llvm::StringSaver &SubArgSaver, SmallVectorImpl<const char *> &SubArgs) {
+  return swift::extractSwiftInterfaceVersionAndArgs(sourceMgr, diags,
+    interfacePath, Vers, CompilerVersion, SubArgSaver, SubArgs, diagnosticLoc);
 }
 
 bool ModuleInterfaceBuilder::collectDepsForSerialization(
