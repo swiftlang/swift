@@ -2174,34 +2174,13 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    // Split the module path.
-    std::vector<StringRef> ModuleName;
-    while (!ModuleToPrint.empty()) {
-      StringRef SubModuleName;
-      std::tie(SubModuleName, ModuleToPrint) = ModuleToPrint.split('.');
-      ModuleName.push_back(SubModuleName);
-    }
-    assert(!ModuleName.empty());
-
-    // FIXME: If ModuleToPrint is a submodule, get its top-level module, which
-    // will be the DeclContext for all of its Decls since we don't have first-
-    // class submodules.
-    if (ModuleName.size() > 1) {
-      M = getModuleByFullName(Context, ModuleName[0]);
-      if (!M) {
-        llvm::errs() << "error: could not find module '" << ModuleName[0]
-                     << "'\n";
-        ExitCode = 1;
-        continue;
-      }
-    }
     std::vector<StringRef> GroupNames;
     for (StringRef G : GroupsToPrint) {
       GroupNames.push_back(G);
     }
 
-    printSubmoduleInterface(M, ModuleName, GroupNames, TraversalOptions,
-                            *Printer, Options, SynthesizeExtensions);
+    printModuleInterface(M, GroupNames, TraversalOptions, *Printer, Options,
+                         SynthesizeExtensions);
   }
 
   return ExitCode;

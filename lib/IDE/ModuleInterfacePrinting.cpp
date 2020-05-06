@@ -189,17 +189,6 @@ printTypeInterface(ModuleDecl *M, StringRef TypeUSR, ASTPrinter &Printer,
                             Printer, TypeName, Error);
 }
 
-void swift::ide::printModuleInterface(ModuleDecl *M, Optional<StringRef> Group,
-                                      ModuleTraversalOptions TraversalOptions,
-                                      ASTPrinter &Printer,
-                                      const PrintOptions &Options,
-                                      const bool PrintSynthesizedExtensions) {
-  printSubmoduleInterface(M, M->getName().str(),
-                          Group.hasValue() ? Group.getValue() : ArrayRef<StringRef>(),
-                          TraversalOptions, Printer, Options,
-                          PrintSynthesizedExtensions);
-}
-
 static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   // Don't print empty curly braces while printing the module interface.
   AdjustedOptions.FunctionDefinitions = false;
@@ -230,7 +219,7 @@ static bool extensionHasClangNode(ExtensionDecl *ext) {
 
 Optional<StringRef>
 swift::ide::findGroupNameForUSR(ModuleDecl *M, StringRef USR) {
-  for (auto File : M->getFiles()) {
+  for (auto File : M->getTopLevelModule()->getFiles()) {
     if (auto Name = File->getGroupNameByUSR(USR)) {
       return Name;
     }
@@ -539,15 +528,22 @@ static void printCrossImportOverlays(ModuleDecl *Declaring, ASTContext &Ctx,
   }
 }
 
-void swift::ide::printSubmoduleInterface(
-       ModuleDecl *M,
-       ArrayRef<StringRef> FullModuleName,
+void swift::ide::printModuleInterface(
+       ModuleDecl *TargetMod,
        ArrayRef<StringRef> GroupNames,
        ModuleTraversalOptions TraversalOptions,
        ASTPrinter &Printer,
        const PrintOptions &Options,
        const bool PrintSynthesizedExtensions) {
-  auto &SwiftContext = M->getASTContext();
+
+  // Clang submodules aren't handled well by `getDisplayDecls()` (no decls are
+  // returned), so map them to their top-level module and filter out the extra
+  // results below.
+  const clang::Module *TargetClangMod = TargetMod->findUnderlyingClangModule();
+  ModuleDecl *TopLevelMod = TargetMod->getTopLevelModule();
+  bool IsSubmodule = TargetMod != TopLevelMod;
+
+  auto &SwiftContext = TopLevelMod->getASTContext();
   auto &Importer =
       static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
 
@@ -555,9 +551,8 @@ void swift::ide::printSubmoduleInterface(
   adjustPrintOptions(AdjustedOptions);
 
   SmallVector<Decl *, 1> Decls;
-  M->getDisplayDecls(Decls);
+  TopLevelMod->getDisplayDecls(Decls);
 
-  const clang::Module *InterestingClangModule = nullptr;
   SmallVector<ImportDecl *, 1> ImportDecls;
   llvm::DenseSet<const clang::Module *> ClangModulesForImports;
   SmallVector<Decl *, 1> SwiftDecls;
@@ -565,27 +560,13 @@ void swift::ide::printSubmoduleInterface(
                  SmallVector<std::pair<Decl *, clang::SourceLocation>, 1>>
     ClangDecls;
 
-  // Drop top-level module name.
-  FullModuleName = FullModuleName.slice(1);
-
-  InterestingClangModule = M->findUnderlyingClangModule();
-  if (InterestingClangModule) {
-    for (StringRef Name : FullModuleName) {
-      InterestingClangModule = InterestingClangModule->findSubmodule(Name);
-      if (!InterestingClangModule)
-        return;
-    }
-  } else {
-    assert(FullModuleName.empty());
-  }
-
   // If we're printing recursively, find all of the submodules to print.
-  if (InterestingClangModule) {
+  if (TargetClangMod) {
     if (TraversalOptions) {
       SmallVector<const clang::Module *, 8> Worklist;
       SmallPtrSet<const clang::Module *, 8> Visited;
-      Worklist.push_back(InterestingClangModule);
-      Visited.insert(InterestingClangModule);
+      Worklist.push_back(TargetClangMod);
+      Visited.insert(TargetClangMod);
       while (!Worklist.empty()) {
         const clang::Module *CM = Worklist.pop_back_val();
         if (!(TraversalOptions & ModuleTraversal::VisitHidden) &&
@@ -604,17 +585,17 @@ void swift::ide::printSubmoduleInterface(
         }
       }
     } else {
-      ClangDecls.insert({ InterestingClangModule, {} });
+      ClangDecls.insert({ TargetClangMod, {} });
     }
   }
 
-  // Collect those submodules that are actually imported but have no import decls
-  // in the module.
+  // Collect those submodules that are actually imported but have no import
+  // decls in the module.
   llvm::SmallPtrSet<const clang::Module *, 16> NoImportSubModules;
-  if (InterestingClangModule) {
+  if (TargetClangMod) {
     // Assume all submodules are missing.
-    for (auto It =InterestingClangModule->submodule_begin();
-         It != InterestingClangModule->submodule_end(); It++) {
+    for (auto It = TargetClangMod->submodule_begin();
+         It != TargetClangMod->submodule_end(); It++) {
       NoImportSubModules.insert(*It);
     }
   }
@@ -631,18 +612,18 @@ void swift::ide::printSubmoduleInterface(
     }
 
     auto ShouldPrintImport = [&](ImportDecl *ImportD) -> bool {
-      if (!InterestingClangModule)
+      if (!TargetClangMod)
         return true;
-      auto ClangMod = ImportD->getClangModule();
-      if (!ClangMod)
+      auto ImportedMod = ImportD->getClangModule();
+      if (!ImportedMod)
         return true;
-      if (!ClangMod->isSubModule())
+      if (!ImportedMod->isSubModule())
         return true;
-      if (ClangMod == InterestingClangModule)
+      if (ImportedMod == TargetClangMod)
         return false;
       // FIXME: const-ness on the clang API.
-      return ClangMod->isSubModuleOf(
-                          const_cast<clang::Module*>(InterestingClangModule));
+      return ImportedMod->isSubModuleOf(
+        const_cast<clang::Module*>(TargetClangMod));
     };
 
     if (auto ID = dyn_cast<ImportDecl>(D)) {
@@ -690,14 +671,16 @@ void swift::ide::printSubmoduleInterface(
       }
     }
 
-    if (FullModuleName.empty()) {
+    if (!IsSubmodule) {
       // If group name is given and the decl does not belong to the group, skip it.
       if (!GroupNames.empty()){
-        if (auto Target = D->getGroupName()) {
+        if (auto TargetGroup = D->getGroupName()) {
           if (std::find(GroupNames.begin(), GroupNames.end(),
-                        Target.getValue()) != GroupNames.end()) {
-            FileRangedDecls.insert(std::make_pair(D->getSourceFileName().getValue(),
-              std::vector<Decl*>())).first->getValue().push_back(D);
+                        TargetGroup.getValue()) != GroupNames.end()) {
+            FileRangedDecls.insert({
+              D->getSourceFileName().getValue(),
+              std::vector<Decl*>()
+            }).first->getValue().push_back(D);
           }
         }
         continue;
@@ -725,8 +708,9 @@ void swift::ide::printSubmoduleInterface(
   }
 
   // Create the missing import decls and add to the collector.
-  for (auto *SM : NoImportSubModules) {
-    ImportDecls.push_back(createImportDecl(M->getASTContext(), M, SM, {}));
+  for (auto *SubMod : NoImportSubModules) {
+    ImportDecls.push_back(createImportDecl(TopLevelMod->getASTContext(),
+                                           TopLevelMod, SubMod, {}));
   }
 
   // Sort imported clang declarations in source order *within a submodule*.
@@ -760,7 +744,7 @@ void swift::ide::printSubmoduleInterface(
   };
 
   // Imports from the stdlib are internal details that don't need to be exposed.
-  if (!M->isStdlibModule()) {
+  if (!TargetMod->isStdlibModule()) {
     for (auto *D : ImportDecls)
       PrintDecl(D);
     Printer << "\n";
@@ -785,8 +769,7 @@ void swift::ide::printSubmoduleInterface(
     }
   }
 
-  if (!(TraversalOptions & ModuleTraversal::SkipOverlay) ||
-      !InterestingClangModule) {
+  if (!(TraversalOptions & ModuleTraversal::SkipOverlay) || !TargetClangMod) {
     for (auto *D : SwiftDecls) {
       if (PrintDecl(D))
         Printer << "\n";
@@ -796,8 +779,8 @@ void swift::ide::printSubmoduleInterface(
     // also print the decls from any underscored Swift cross-import overlays it
     // is the underlying module of, transitively.
     if (GroupNames.empty()) {
-      printCrossImportOverlays(M, SwiftContext, *PrinterToUse, AdjustedOptions,
-                               PrintSynthesizedExtensions);
+      printCrossImportOverlays(TargetMod, SwiftContext, *PrinterToUse,
+                               AdjustedOptions, PrintSynthesizedExtensions);
     }
   }
 }
