@@ -186,22 +186,18 @@ int main(int argc, char **argv) {
   if (CI.getASTContext().hadError())
     return 1;
 
-  // Load the SIL if we have a module. We have to do this after SILParse
-  // creating the unfortunate double if statement.
-  if (Invocation.hasSerializedAST()) {
-    assert(!CI.hasSILModule() &&
-           "performSema() should not create a SILModule.");
-    CI.createSILModule();
-    std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
-        CI.getASTContext(), CI.getSILModule(), nullptr);
+  auto SILMod = performSILGeneration(CI.getMainModule(), CI.getSILTypes(),
+                                     CI.getSILOptions());
 
-    if (extendedInfo.isSIB())
-      SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
-    else
-      SL->getAll();
+  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
+  // us.
+  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
+    auto SL = SerializedSILLoader::create(
+        CI.getASTContext(), SILMod.get(), nullptr);
+    SL->getAll();
   }
 
-  nmModule(CI.getSILModule());
+  nmModule(SILMod.get());
 
   return CI.getASTContext().hadError();
 }
