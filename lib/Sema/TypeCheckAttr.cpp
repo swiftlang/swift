@@ -4562,7 +4562,17 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
                    derivative->getName(), derivativeAccess);
     auto fixItDiag =
         derivative->diagnose(diag::derivative_attr_fix_access, originalAccess);
-    fixItAccess(fixItDiag, derivative, originalAccess);
+    // If original access is public, suggest adding `@usableFromInline` to
+    // derivative.
+    if (originalAccess == AccessLevel::Public) {
+      fixItDiag.fixItInsert(
+          derivative->getAttributeInsertionLoc(/*forModifier*/ false),
+          "@usableFromInline ");
+    }
+    // Otherwise, suggest changing derivative access level.
+    else {
+      fixItAccess(fixItDiag, derivative, originalAccess);
+    }
     return true;
   }
 

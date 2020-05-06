@@ -3064,8 +3064,8 @@ ERROR(derivative_attr_access_level_mismatch,none,
        /*derivative*/ DeclName, /*derivative*/ AccessLevel))
 NOTE(derivative_attr_fix_access,none,
      "mark the derivative function as "
-     "'%select{private|fileprivate|internal|public|open}0' to match the "
-     "original function", (AccessLevel))
+     "'%select{private|fileprivate|internal|@usableFromInline|@usableFromInline}0' "
+     "to match the original function", (AccessLevel))
 
 // @transpose
 ERROR(transpose_attr_invalid_linearity_parameter_or_result,none,
