@@ -1066,17 +1066,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
                                         FrontendObserver *observer) {
-  auto mod = Instance.getMainModule();
-  if (auto SM = Instance.takeSILModule()) {
-    const PrimarySpecificPaths PSPs =
-        Instance.getPrimarySpecificPathsForAtMostOnePrimary();
-    return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
-                                         ReturnValue, observer);
-  }
-
   const auto &Invocation = Instance.getInvocation();
   const SILOptions &SILOpts = Invocation.getSILOptions();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
+
+  auto *mod = Instance.getMainModule();
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.

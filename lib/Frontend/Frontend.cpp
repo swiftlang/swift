@@ -814,13 +814,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF);
-
-    // Parse the SIL decls if needed.
-    // TODO: Requestify SIL parsing.
-    if (TheSILModule) {
-      SILParserState SILContext(TheSILModule.get());
-      parseSourceFileSIL(SF, &SILContext);
-    }
   });
 
   finishTypeChecking();
