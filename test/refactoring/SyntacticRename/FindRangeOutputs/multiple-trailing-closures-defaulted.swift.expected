@@ -1,0 +1,9 @@
+func /*test:def*/<base>test</base>(<arglabel index=0>x</arglabel><param index=0></param>: () -> () = {}, <arglabel index=1>_</arglabel><param index=1> xx</param>: () -> () = {}, <arglabel index=2>y</arglabel><param index=2></param>: () -> () = {}, <arglabel index=3>z</arglabel><param index=3></param>: ()->() = {}) {}
+
+/*test:call*/<base>test</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>{}, <callcombo index=1></callcombo>{}) {}
+/*test:call*/<base>test</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>{}) {} <sel index=3>z</sel>: {}
+/*test:call*/<base>test</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>{}, <callcombo index=1></callcombo>{}) {}
+/*test:call*/<base>test</base> {} <sel index=2>y</sel>: {}
+/*test:call*/<base>test</base>(<callarg index=2>y</callarg><callcolon index=2>: </callcolon>{}) {}
+
+

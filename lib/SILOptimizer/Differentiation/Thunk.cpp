@@ -320,7 +320,8 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     }
     // Convert indirect result to direct result.
     if (fromRes.isFormalIndirect()) {
-      SILType resultTy = fromConv.getSILType(fromRes);
+      SILType resultTy =
+          fromConv.getSILType(fromRes, builder.getTypeExpansionContext());
       assert(resultTy.isAddress());
       auto *indRes = createAllocStack(resultTy);
       arguments.push_back(indRes);
@@ -343,7 +344,8 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     }
     // Convert indirect parameter to direct parameter.
     if (fromParam.isFormalIndirect()) {
-      auto paramTy = fromConv.getSILType(fromType->getParameters()[paramIdx]);
+      auto paramTy = fromConv.getSILType(fromType->getParameters()[paramIdx],
+                                         builder.getTypeExpansionContext());
       if (!paramTy.hasArchetype())
         paramTy = thunk->mapTypeIntoContext(paramTy);
       assert(paramTy.isAddress());
@@ -400,7 +402,8 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     }
     // Store direct results to indirect results.
     assert(toRes.isFormalIndirect());
-    SILType resultTy = toConv.getSILType(toRes);
+    SILType resultTy =
+        toConv.getSILType(toRes, builder.getTypeExpansionContext());
     assert(resultTy.isAddress());
     auto indRes = *toIndResultsIter++;
     builder.createStore(loc, *fromDirResultsIter++, indRes,

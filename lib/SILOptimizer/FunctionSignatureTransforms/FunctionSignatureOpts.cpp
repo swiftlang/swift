@@ -583,7 +583,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
   SILValue ReturnValue;
   SILType LoweredType = NewF->getLoweredType();
-  SILType ResultType = NewF->getConventions().getSILResultType();
+  SILType ResultType = NewF->getConventions().getSILResultType(
+      Builder.getTypeExpansionContext());
   auto GenCalleeType = NewF->getLoweredFunctionType();
   auto SubstCalleeSILType = LoweredType;
   SubstitutionMap Subs;
@@ -596,7 +597,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
         M, Subs, Builder.getTypeExpansionContext());
     SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
     SILFunctionConventions Conv(SubstCalleeType, M);
-    ResultType = Conv.getSILResultType();
+    ResultType = Conv.getSILResultType(Builder.getTypeExpansionContext());
   }
   auto FunctionTy = LoweredType.castTo<SILFunctionType>();
   if (FunctionTy->hasErrorResult()) {
@@ -620,7 +621,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   }
 
   // Set up the return results.
-  if (NewF->isNoReturnFunction()) {
+  if (NewF->isNoReturnFunction(Builder.getTypeExpansionContext())) {
     Builder.createUnreachable(Loc);
   } else {
     Builder.createReturn(Loc, ReturnValue);

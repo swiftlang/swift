@@ -10,15 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Runtime/Config.h"
+#include "../SwiftShims/Visibility.h"
+#include "Private.h"
+#include "SwiftHashableSupport.h"
+#include "SwiftValue.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Casting.h"
-#include "Private.h"
-#include "SwiftValue.h"
-#include "SwiftHashableSupport.h"
 
 using namespace swift;
 using namespace swift::hashable_support;
@@ -72,9 +73,9 @@ struct HashableConformanceEntry {
 static ConcurrentMap<HashableConformanceEntry, /*Destructor*/ false>
   HashableConformances;
 
-template<bool KnownToConformToHashable>
-LLVM_ATTRIBUTE_ALWAYS_INLINE
-static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
+template <bool KnownToConformToHashable>
+SWIFT_ALWAYS_INLINE static const Metadata *
+findHashableBaseTypeImpl(const Metadata *type) {
   // Check the cache first.
   if (HashableConformanceEntry *entry =
           HashableConformances.find(HashableConformanceKey{type})) {

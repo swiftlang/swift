@@ -700,12 +700,14 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     for (SILResultInfo RI : SubstitutedType->getIndirectFormalResults()) {
       assert(RI.isFormalIndirect());
 
-      auto ResultTy = substConv.getSILType(RI);
+      auto ResultTy = substConv.getSILType(RI, getResilienceExpansion());
       ResultTy = Callee->mapTypeIntoContext(ResultTy);
       auto &TL = M.Types.getTypeLowering(ResultTy,
                                          getResilienceExpansion());
 
-      if (TL.isLoadable() && !RI.getReturnValueType(M, SubstitutedType)->isVoid() &&
+      if (TL.isLoadable() &&
+          !RI.getReturnValueType(M, SubstitutedType, getResilienceExpansion())
+               ->isVoid() &&
           shouldExpand(M, ResultTy)) {
         Conversions.set(IdxForResult);
         if (TL.isTrivial())
@@ -722,7 +724,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     auto IdxToInsert = IdxForParam;
     ++IdxForParam;
 
-    auto ParamTy = substConv.getSILType(PI);
+    auto ParamTy = substConv.getSILType(PI, getResilienceExpansion());
     ParamTy = Callee->mapTypeIntoContext(ParamTy);
     auto &TL = M.Types.getTypeLowering(ParamTy,
                                        getResilienceExpansion());
@@ -808,10 +810,10 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   SmallVector<SILResultInfo, 8> SpecializedResults;
   SmallVector<SILYieldInfo, 8> SpecializedYields;
   SmallVector<SILParameterInfo, 8> SpecializedParams;
-
+  auto context = getResilienceExpansion();
   unsigned IndirectResultIdx = 0;
   for (SILResultInfo RI : SubstFTy->getResults()) {
-    RI = RI.getUnsubstituted(M, SubstFTy);
+    RI = RI.getUnsubstituted(M, SubstFTy, context);
     if (RI.isFormalIndirect()) {
       bool isTrivial = TrivialArgs.test(IndirectResultIdx);
       if (isFormalResultConverted(IndirectResultIdx++)) {
@@ -830,7 +832,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   }
   unsigned ParamIdx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
-    PI = PI.getUnsubstituted(M, SubstFTy);
+    PI = PI.getUnsubstituted(M, SubstFTy, context);
     bool isTrivial = TrivialArgs.test(param2ArgIndex(ParamIdx));
     if (!isParamConverted(ParamIdx++)) {
       // No conversion: re-use the original, substituted parameter info.
@@ -854,7 +856,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   }
   for (SILYieldInfo YI : SubstFTy->getYields()) {
     // For now, always re-use the original, substituted yield info.
-    SpecializedYields.push_back(YI.getUnsubstituted(M, SubstFTy));
+    SpecializedYields.push_back(YI.getUnsubstituted(M, SubstFTy, context));
   }
 
   auto Signature = SubstFTy->isPolymorphic()
@@ -2001,7 +2003,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
                                       A->isNonThrowing());
     if (StoreResultTo) {
       assert(substConv.useLoweredAddresses());
-      if (!CalleeSILSubstFnTy.isNoReturnFunction(Builder.getModule())) {
+      if (!CalleeSILSubstFnTy.isNoReturnFunction(
+              Builder.getModule(), Builder.getTypeExpansionContext())) {
         // Store the direct result to the original result address.
         fixUsedVoidType(A, Loc, Builder);
         Builder.createStore(Loc, NewAI, StoreResultTo,
@@ -2135,9 +2138,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     // Need to store the direct results to the original indirect address.
     Builder.createStore(Loc, ReturnValue, ReturnValueAddr,
                         StoreOwnershipQualifier::Unqualified);
-    SILType VoidTy =
-        OrigPAI->getSubstCalleeType()
-               ->getDirectFormalResultsType(M);
+    SILType VoidTy = OrigPAI->getSubstCalleeType()->getDirectFormalResultsType(
+        M, Builder.getTypeExpansionContext());
     assert(VoidTy.isVoid());
     ReturnValue = Builder.createTuple(Loc, VoidTy, {});
   }
@@ -2160,12 +2162,14 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
   Builder.createTryApply(Loc, FRI, Subs, Arguments, NormalBB, ErrorBB);
   auto *ErrorVal = ErrorBB->createPhiArgument(
-      SpecializedFunc->mapTypeIntoContext(specConv.getSILErrorType()),
+      SpecializedFunc->mapTypeIntoContext(
+          specConv.getSILErrorType(Builder.getTypeExpansionContext())),
       ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(ErrorBB);
   Builder.createThrow(Loc, ErrorVal);
   SILValue ReturnValue = NormalBB->createPhiArgument(
-      SpecializedFunc->mapTypeIntoContext(specConv.getSILResultType()),
+      SpecializedFunc->mapTypeIntoContext(
+          specConv.getSILResultType(Builder.getTypeExpansionContext())),
       ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(NormalBB);
   return ReturnValue;
@@ -2214,8 +2218,8 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
       // Store the result later.
       // FIXME: This only handles a single result! Partial specialization could
       // induce some combination of direct and indirect results.
-      SILType ResultTy =
-          SpecializedFunc->mapTypeIntoContext(substConv.getSILType(substRI));
+      SILType ResultTy = SpecializedFunc->mapTypeIntoContext(
+          substConv.getSILType(substRI, Builder.getTypeExpansionContext()));
       assert(ResultTy.isAddress());
       assert(!ReturnValueAddr);
       ReturnValueAddr = EntryBB->createFunctionArgument(ResultTy);
@@ -2236,7 +2240,8 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
       assert(!specConv.isSILIndirect(SpecType->getParameters()[paramIdx]));
       // Instead of passing the address, pass the loaded value.
       SILType ParamTy = SpecializedFunc->mapTypeIntoContext(
-          substConv.getSILType(SubstType->getParameters()[paramIdx]));
+          substConv.getSILType(SubstType->getParameters()[paramIdx],
+                               Builder.getTypeExpansionContext()));
       assert(ParamTy.isAddress());
       SILArgument *SpecArg = *SpecArgIter++;
       SILArgument *NewArg =
