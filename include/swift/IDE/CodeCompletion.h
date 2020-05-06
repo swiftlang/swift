@@ -575,7 +575,6 @@ public:
 
   enum NotRecommendedReason {
     Redundant,
-    TypeMismatch,
     Deprecated,
     NoReason,
   };
@@ -705,6 +704,7 @@ public:
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ArrayRef<std::pair<StringRef, StringRef>> DocWords,
+                       ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind)
       : Kind(ResultKind::Declaration),
         KnownOperatorKind(unsigned(KnownOperatorKind)),
@@ -712,10 +712,10 @@ public:
         NotRecommended(NotRecommended), NotRecReason(NotRecReason),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords) {
+        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
+        TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
-    TypeDistance = ExpectedTypeRelation::Unknown;
     assert(!isOperator() ||
            getOperatorKind() != CodeCompletionOperatorKind::None);
   }

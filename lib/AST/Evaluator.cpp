@@ -60,12 +60,22 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-Evaluator::Evaluator(DiagnosticEngine &diags,
-                     bool debugDumpCycles,
-                     bool buildDependencyGraph)
-  : diags(diags),
-    debugDumpCycles(debugDumpCycles),
-    buildDependencyGraph(buildDependencyGraph) { }
+static evaluator::DependencyCollector::Mode
+computeDependencyModeFromFlags(bool enableExperimentalPrivateDeps) {
+  using Mode = evaluator::DependencyCollector::Mode;
+  if (enableExperimentalPrivateDeps) {
+    return Mode::ExperimentalPrivateDependencies;
+  }
+  return Mode::StatusQuo;
+}
+
+Evaluator::Evaluator(DiagnosticEngine &diags, bool debugDumpCycles,
+                     bool buildDependencyGraph,
+                     bool enableExperimentalPrivateDeps)
+    : diags(diags), debugDumpCycles(debugDumpCycles),
+      buildDependencyGraph(buildDependencyGraph),
+      collector{computeDependencyModeFromFlags(enableExperimentalPrivateDeps)} {
+}
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;

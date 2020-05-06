@@ -33,14 +33,15 @@ class ModuleDependencyScanner : public SerializedModuleLoaderBase {
   ErrorOr<ModuleDependencies> scanInterfaceFile(
       Twine moduleInterfacePath);
 
+  SubASTContextDelegate &astDelegate;
 public:
   Optional<ModuleDependencies> dependencies;
 
   ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                          Identifier moduleName)
+                          Identifier moduleName, SubASTContextDelegate &astDelegate)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
-        moduleName(moduleName) { }
+        moduleName(moduleName), astDelegate(astDelegate) { }
 
   virtual std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID,
@@ -94,42 +95,47 @@ public:
 
 ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     Twine moduleInterfacePath) {
-  // Open the interface file.
-  auto &fs = *Ctx.SourceMgr.getFileSystem();
-  auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
-  if (!interfaceBuf)
-    return interfaceBuf.getError();
-
-  // Create a source file.
-  unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
-  auto moduleDecl = ModuleDecl::create(moduleName, Ctx);
-  auto sourceFile = new (Ctx) SourceFile(
-      *moduleDecl, SourceFileKind::Interface, bufferID);
-
   // Create a module filename.
   // FIXME: Query the module interface loader to determine an appropriate
   // name for the module, which includes an appropriate hash.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> modulePath = moduleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
-
-  // Walk the source file to find the import declarations.
-  llvm::StringSet<> alreadyAddedModules;
-  auto dependencies = ModuleDependencies::forSwiftInterface(
+  ModuleDependencies Result = ModuleDependencies::forSwiftInterface(
       modulePath.str().str(), moduleInterfacePath.str());
+  std::error_code code;
+  auto hasError = astDelegate.runInSubContext(Ctx,
+                                                 moduleInterfacePath.str(),
+                                                 [&](ASTContext &Ctx) {
+    // Open the interface file.
+    auto &fs = *Ctx.SourceMgr.getFileSystem();
+    auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
+    if (!interfaceBuf) {
+      code = interfaceBuf.getError();
+      return true;
+    }
 
-  // FIXME: Suppressing diagnostics here is incorrect, and is currently
-  // used to paper over the fact that we should be creating a fresh
-  // ASTContext using the command-line arguments from the .swiftinterface
-  // file.
-  DiagnosticSuppression suppression(Ctx.Diags);
-  
-  dependencies.addModuleDependencies(*sourceFile, alreadyAddedModules);
-  return dependencies;
+    // Create a source file.
+    unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
+    auto moduleDecl = ModuleDecl::create(moduleName, Ctx);
+    auto sourceFile = new (Ctx) SourceFile(
+        *moduleDecl, SourceFileKind::Interface, bufferID);
+
+    // Walk the source file to find the import declarations.
+    llvm::StringSet<> alreadyAddedModules;
+    Result.addModuleDependencies(*sourceFile, alreadyAddedModules);
+    return false;
+  });
+
+  if (hasError) {
+    return code;
+  }
+  return Result;
 }
 
 Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
-    StringRef moduleName, ModuleDependenciesCache &cache) {
+    StringRef moduleName, ModuleDependenciesCache &cache,
+    SubASTContextDelegate &delegate) {
   // Check whether we've cached this result.
   if (auto found = cache.findDependencies(
           moduleName, ModuleDependenciesKind::Swift))
@@ -137,7 +143,7 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
 
   // Check whether there is a module with this name that we can import.
   auto moduleId = Ctx.getIdentifier(moduleName);
-  ModuleDependencyScanner scanner(Ctx, LoadMode, moduleId);
+  ModuleDependencyScanner scanner(Ctx, LoadMode, moduleId, delegate);
   if (!scanner.canImportModule({moduleId, SourceLoc()}))
     return None;
 
