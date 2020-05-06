@@ -326,10 +326,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   BufferIndirectlyCausingDiagnosticRAII cpr(*SF);
 
-  // Make sure that import resolution has been completed before doing any type
-  // checking.
-  performImportResolution(*SF);
-
   // Could build scope maps here because the AST is stable now.
 
   {
