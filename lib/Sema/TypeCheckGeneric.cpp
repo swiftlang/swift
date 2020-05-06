@@ -622,13 +622,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   } else if (const auto *where = GC->getTrailingWhereClause()) {
     // If there is no generic context for the where clause to
     // rely on, diagnose that now and bail out.
-    if (GC->getParent()->isModuleScopeContext()) {
+    if (!GC->isGenericContext()) {
       GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
-                                         diag::where_nongeneric_toplevel);
-      return nullptr;
-    } else if (!GC->isGenericContext()) {
-      GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
-                                         diag::where_nongeneric_ctx);
+                                         GC->getParent()->isModuleScopeContext()
+                                             ? diag::where_nongeneric_toplevel
+                                             : diag::where_nongeneric_ctx);
       return nullptr;
     }
 
