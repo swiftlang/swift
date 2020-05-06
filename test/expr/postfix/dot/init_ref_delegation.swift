@@ -323,12 +323,12 @@ class TestOverloadSets {
     self.init(5, 5) // expected-error{{extra argument in call}}
   }
   
-  convenience init(a : Z0) { // expected-note{{candidate has partially matching parameter list (a: Z0)}}
+  convenience init(a : Z0) { // expected-note{{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
     self.init(42 as Int8) // expected-error{{no exact matches in call to initializer}}
   }
   
-  init(value: Int) { /* ... */ } // expected-note{{candidate has partially matching parameter list (value: Int)}}
-  init(value: Double) { /* ... */ } // expected-note{{candidate has partially matching parameter list (value: Double)}}
+  init(value: Int) { /* ... */ } // expected-note{{incorrect labels for candidate (have: '(_:)', expected: '(value:)')}}
+  init(value: Double) { /* ... */ } // expected-note{{incorrect labels for candidate (have: '(_:)', expected: '(value:)')}}
 }
 
 class TestNestedExpr {

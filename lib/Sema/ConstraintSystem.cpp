@@ -3009,13 +3009,14 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     }
   }
 
+  // If any of the non-overloaded common fixes appear in all solutions
+  // and can be diagnosed by the diagnoseForAmbiguity implementation,
+  // we diagnose and be done.
   if (diagnosed)
     return true;
 
-  // If all non-overloaded common fixes do not appear in all solutions
-  // nor are diagnosed for ambiguity, let's try to fall back to common
-  // anchor diagnostic.
-
+  // Otherwise let's try to fall back to overload common anchor
+  // diagnostic if possible.
   if (ambiguosOverloads.empty())
     return false;
 

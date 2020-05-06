@@ -39,15 +39,15 @@ class B {
   init() {
   }
 
-  init(x:Int) { // expected-note{{candidate has partially matching parameter list (x: Int)}}
+  init(x:Int) { // expected-note{{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
   }
 
-  init(a:UnicodeScalar) { // expected-note {{candidate has partially matching parameter list (a: UnicodeScalar)}}
+  init(a:UnicodeScalar) { // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
   }
-  init(b:UnicodeScalar) { // expected-note{{candidate has partially matching parameter list (b: UnicodeScalar)}}
+  init(b:UnicodeScalar) { // expected-note{{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
   }
 
-  init(z:Float) { // expected-note{{candidate has partially matching parameter list (z: Float)}}
+  init(z:Float) { // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(z:)')}}
     super.init() // expected-error{{'super' members cannot be referenced in a root class}}
   }
 }
