@@ -376,10 +376,7 @@ static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
 }
 
 // Report a fatal error to system console, stderr, and crash logs, then abort.
-LLVM_ATTRIBUTE_NORETURN
-void
-swift::fatalError(uint32_t flags, const char *format, ...)
-{
+SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
   va_list args;
   va_start(args, format);
 
@@ -419,14 +416,10 @@ swift::warning(uint32_t flags, const char *format, ...)
 }
 
 // Crash when a deleted method is called by accident.
-SWIFT_RUNTIME_EXPORT
-LLVM_ATTRIBUTE_NORETURN
-void
-swift_deletedMethodError() {
+SWIFT_RUNTIME_EXPORT SWIFT_NORETURN void swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "Fatal error: Call of deleted method\n");
 }
-
 
 // Crash due to a retain count overflow.
 // FIXME: can't pass the object's address from InlineRefCounts without hacks
