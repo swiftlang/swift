@@ -42,7 +42,6 @@ $BUILD_SCRIPT \
   --swift-install-components "autolink-driver;compiler;clang-builtin-headers;stdlib;sdk-overlay;parser-lib;editor-integration;tools;testsuite-tools;toolchain-tools;license;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers;clang-resource-dir-symlink"
   --llvm-install-components "clang" \
   --install-swift \
-  --llvm-install-components "clang" \
   --darwin-toolchain-bundle-identifier="${BUNDLE_IDENTIFIER}" \
   --darwin-toolchain-display-name="${DISPLAY_NAME}" \
   --darwin-toolchain-display-name-short="${DISPLAY_NAME_SHORT}" \
