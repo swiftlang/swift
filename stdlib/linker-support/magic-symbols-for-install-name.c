@@ -86,6 +86,7 @@
   // SWIFT_ENABLE_TENSORFLOW
   // For TensorFlow, keep using @rpath instead of system paths
   RPATH_INSTALL_NAME_DIRECTIVE(10, 15)
+  // SWIFT_ENABLE_TENSORFLOW END
 #endif
 
 #else
