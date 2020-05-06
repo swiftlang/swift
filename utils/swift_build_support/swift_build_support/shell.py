@@ -195,6 +195,15 @@ def copytree(src, dest, dry_run=None, echo=True):
     shutil.copytree(src, dest)
 
 
+def symlink(source, dest, dry_run=None, echo=True):
+    dry_run = _coerce_dry_run(dry_run)
+    if dry_run or echo:
+        _echo_command(dry_run, ['ln', '-s', source, dest])
+    if dry_run:
+        return
+    os.symlink(source, dest)
+
+
 # Initialized later
 lock = None
 
