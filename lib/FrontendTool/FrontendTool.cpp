@@ -1461,30 +1461,24 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
   }
 }
 
-enum class DeallocatableResources {
-  None,
-  SILModule,
-  SILModuleAndASTContext,
-};
-static DeallocatableResources
-computeDeallocatableResources(const CompilerInstance &Instance) {
-  // If the stats reporter is installed, we need the ASTContext and SILModule
-  // to live through the entire compilation process.
+static void freeASTContextIfPossible(CompilerInstance &Instance) {
+  // If the stats reporter is installed, we need the ASTContext to live through
+  // the entire compilation process.
   if (Instance.getASTContext().Stats) {
-    return DeallocatableResources::None;
+    return;
   }
 
   // If we're going to dump the API of the module, we cannot tear down
   // the ASTContext, as that would cause the module to be freed prematurely.
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   if (!opts.DumpAPIPath.empty()) {
-    return DeallocatableResources::SILModule;
+    return;
   }
 
   // Verifying incremental dependencies relies on access to the Swift Module's
-  // source files. We can still free the SIL module, though.
+  // source files.
   if (opts.EnableIncrementalDependencyVerifier) {
-    return DeallocatableResources::SILModule;
+    return;
   }
 
   // If there are multiple primary inputs it is too soon to free
@@ -1493,29 +1487,14 @@ computeDeallocatableResources(const CompilerInstance &Instance) {
   // unlikely to reduce the peak heap size. So, only optimize the
   // single-primary-case (or WMO).
   if (opts.InputsAndOutputs.hasMultiplePrimaryInputs()) {
-    return DeallocatableResources::SILModule;
+    return;
   }
 
-  return DeallocatableResources::SILModuleAndASTContext;
-}
+  // Make sure we emit dependencies now, because we can't do it after the
+  // context is gone.
+  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
 
-static void freeDeallocatableResourcesIfPossible(CompilerInstance &Instance) {
-  switch (computeDeallocatableResources(Instance)) {
-  case DeallocatableResources::None:
-    break;
-  case DeallocatableResources::SILModule:
-    Instance.freeSILModule();
-    break;
-  case DeallocatableResources::SILModuleAndASTContext:
-    Instance.freeSILModule();
-
-    // Make sure we emit dependencies now, because we can't do it after the
-    // context is gone.
-    emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
-
-    Instance.freeASTContext();
-    break;
-  }
+  Instance.freeASTContext();
 }
 
 static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
@@ -1528,7 +1507,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
       Instance.getASTContext().LangOpts.EffectiveLanguageVersion;
 
   // Free up some compiler resources now that we have an IRModule.
-  freeDeallocatableResourcesIfPossible(Instance);
+  freeASTContextIfPossible(Instance);
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
