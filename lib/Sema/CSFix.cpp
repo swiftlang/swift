@@ -366,6 +366,32 @@ bool AllowFunctionTypeMismatch::coalesceAndDiagnose(
   return failure.diagnose(asNote);
 }
 
+bool AllowFunctionTypeMismatch::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
+  const Solution *solution;
+  const ConstraintFix *fix;
+  std::tie(solution, fix) = commonFixes.front();
+  auto applyInfo = solution->getFunctionArgApplyInfo(fix->getLocator());
+  if (!applyInfo)
+    return false;
+  
+  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(applyInfo->getArgExpr())) {
+    auto &DE = getConstraintSystem().getASTContext().Diags;
+    
+    DE.diagnose(ODRE->getLoc(), diag::no_candidates_match_argument_type,
+                ODRE->getDecls()[0]->getName().getBaseName().userFacingName(),
+                applyInfo->getParamType());
+    
+    for (auto decl : ODRE->getDecls()) {
+      if (decl->getLoc().isValid())
+        DE.diagnose(decl->getLoc(), diag::found_candidate_type,
+                    decl->getInterfaceType());
+    }
+    return true;
+  }
+  
+  return false;
+}
+
 bool AllowFunctionTypeMismatch::diagnose(const Solution &solution,
                                          bool asNote) const {
   return coalesceAndDiagnose(solution, {}, asNote);

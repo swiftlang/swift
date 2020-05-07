@@ -245,6 +245,10 @@ ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
       (StringRef, Type))
 
+ERROR(no_candidates_match_argument_type,none,
+      "no '%0' candidates produce the expected parameter type %1",
+      (StringRef, Type))
+
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
 ERROR(cannot_infer_closure_result_type,none,

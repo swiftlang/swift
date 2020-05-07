@@ -1062,7 +1062,9 @@ public:
   bool coalesceAndDiagnose(const Solution &solution,
                            ArrayRef<ConstraintFix *> secondaryFixes,
                            bool asNote = false) const override;
-
+  
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 };
 
