@@ -5504,7 +5504,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   }
 }
 
-void MetadataAllocator::Deallocate(const void *allocation, size_t size) {
+void MetadataAllocator::Deallocate(const void *allocation, size_t size,
+                                   size_t alignment) {
   __asan_poison_memory_region(allocation, size);
 
   if (size > PoolRange::MaxPoolAllocationSize) {

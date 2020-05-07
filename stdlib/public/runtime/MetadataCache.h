@@ -33,7 +33,7 @@ public:
   LLVM_ATTRIBUTE_RETURNS_NONNULL void *Allocate(size_t size, size_t alignment);
   using AllocatorBase<MetadataAllocator>::Allocate;
 
-  void Deallocate(const void *Ptr, size_t size);
+  void Deallocate(const void *Ptr, size_t size, size_t alignment);
   using AllocatorBase<MetadataAllocator>::Deallocate;
 
   void PrintStats() const {}
