@@ -3064,6 +3064,13 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readImpl = ReadImplKind::Stored;
     }
 
+  // Extensions can't have stored properties. If there are braces, assume
+  // this is an incomplete computed property. This avoids an "extensions
+  // must not contain stored properties" error later on.
+  } else if (isa<ExtensionDecl>(storage->getDeclContext()) &&
+             storage->getBracesRange().isValid()) {
+    readImpl = ReadImplKind::Get;
+
   // Otherwise, it's stored.
   } else {
     readImpl = ReadImplKind::Stored;
