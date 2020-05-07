@@ -8,7 +8,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: |
-        git checkout master
-        git remote add apple https://github.com/apple/swift.git
-        git pull apple master
-        git push origin master
+          git checkout master
+          git remote add apple https://github.com/apple/swift.git
+          git pull apple master
+          git push origin master
