@@ -235,7 +235,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   auto *newModule = ModuleDecl::create(
       Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports);
   auto &newSF =
-      *new (Ctx) SourceFile(*newModule, SourceFileKind::REPL, *BufferID);
+      *new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID);
   newModule->addFile(newSF);
 
   performImportResolution(newSF);
@@ -255,8 +255,6 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
 
   CompletionStrings.clear();
   CookedResults.clear();
-
-  assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
 
   unsigned BufferID;
   doCodeCompletion(SF, EnteredCode, &BufferID,

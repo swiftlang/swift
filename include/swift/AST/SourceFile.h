@@ -524,7 +524,6 @@ public:
   bool isScriptMode() const {
     switch (Kind) {
     case SourceFileKind::Main:
-    case SourceFileKind::REPL:
       return true;
 
     case SourceFileKind::Library:

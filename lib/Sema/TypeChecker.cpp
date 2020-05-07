@@ -394,8 +394,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   // FIXME: some playgrounds tests (playground_lvalues.swift) fail with
   // verification enabled.
 #if 0
-  if (SF.Kind != SourceFileKind::REPL &&
-      SF.Kind != SourceFileKind::SIL &&
+  if (SF.Kind != SourceFileKind::SIL &&
       !Ctx.LangOpts.DebuggerSupport) {
     Ctx.verifyAllLoadedModules();
   }

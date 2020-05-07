@@ -783,7 +783,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
     // Create the initial empty REPL file. This only exists to feed in the
     // implicit imports such as the standard library.
     auto *replFile =
-        createSourceFileForMainModule(SourceFileKind::REPL, /*BufferID*/ None);
+        createSourceFileForMainModule(SourceFileKind::Main, /*BufferID*/ None);
     performImportResolution(*replFile);
     return;
   }
