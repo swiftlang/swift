@@ -31,17 +31,17 @@ struct HeapObject;
 }
 
 SWIFT_CC(swift)
-SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE LLVM_ATTRIBUTE_USED
-void _swift_leaks_startTrackingObjects(const char *);
+SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE SWIFT_USED void
+_swift_leaks_startTrackingObjects(const char *);
 
 SWIFT_CC(swift)
-SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE LLVM_ATTRIBUTE_USED
-int _swift_leaks_stopTrackingObjects(const char *);
+SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE SWIFT_USED int
+_swift_leaks_stopTrackingObjects(const char *);
 
-SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE LLVM_ATTRIBUTE_USED void
+SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE SWIFT_USED void
 _swift_leaks_startTrackingObject(swift::HeapObject *);
 
-SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE LLVM_ATTRIBUTE_USED void
+SWIFT_RUNTIME_EXPORT SWIFT_NOINLINE SWIFT_USED void
 _swift_leaks_stopTrackingObject(swift::HeapObject *);
 
 #define SWIFT_LEAKS_START_TRACKING_OBJECT(obj)                                 \

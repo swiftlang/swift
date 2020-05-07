@@ -522,15 +522,14 @@ SymbolGraph::serializeNavigatorDeclarationFragments(StringRef Key,
   DeclarationFragmentPrinter Printer(OS, Key);
 
   if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
-    Printer.printTypeRef(TD->getInterfaceType(), TD, TD->getName(),
-                         PrintNameContext::Normal);
-    return;
+    Printer.printAbridgedType(TD, /*PrintKeyword=*/false);
+  } else {
+    auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
+    if (S.getSynthesizedBaseType()) {
+      Options.setBaseType(S.getSynthesizedBaseType());
+    }
+    S.getSymbolDecl()->print(Printer, Options);
   }
-  auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
-  if (S.getSynthesizedBaseType()) {
-    Options.setBaseType(S.getSynthesizedBaseType());
-  }
-  S.getSymbolDecl()->print(Printer, Options);
 }
 
 void
@@ -540,7 +539,7 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
   DeclarationFragmentPrinter Printer(OS, Key);
 
   if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
-    Printer.printAbridgedType(TD);
+    Printer.printAbridgedType(TD, /*PrintKeyword=*/true);
   } else {
     auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
     if (S.getSynthesizedBaseType()) {

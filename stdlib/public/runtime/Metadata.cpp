@@ -4142,9 +4142,7 @@ StringRef swift::getStringForMetadataKind(MetadataKind kind) {
 /***************************************************************************/
 
 #ifndef NDEBUG
-template <>
-LLVM_ATTRIBUTE_USED
-void Metadata::dump() const {
+template <> SWIFT_USED void Metadata::dump() const {
   printf("TargetMetadata.\n");
   printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
   printf("Value Witnesses: %p.\n", getValueWitnesses());
@@ -4197,9 +4195,7 @@ void Metadata::dump() const {
 #endif
 }
 
-template <>
-LLVM_ATTRIBUTE_USED
-void ContextDescriptor::dump() const {
+template <> SWIFT_USED void ContextDescriptor::dump() const {
   printf("TargetTypeContextDescriptor.\n");
   printf("Flags: 0x%x.\n", this->Flags.getIntValue());
   printf("Parent: %p.\n", this->Parent.get());
@@ -4211,9 +4207,7 @@ void ContextDescriptor::dump() const {
   }
 }
 
-template<>
-LLVM_ATTRIBUTE_USED
-void EnumDescriptor::dump() const {
+template <> SWIFT_USED void EnumDescriptor::dump() const {
   printf("TargetEnumDescriptor.\n");
   printf("Flags: 0x%x.\n", this->Flags.getIntValue());
   printf("Parent: %p.\n", this->Parent.get());
@@ -4688,8 +4682,9 @@ swift_getAssociatedTypeWitnessSlowImpl(
 #endif
   
   // If the low bit of the witness is clear, it's already a metadata pointer.
-  if (LLVM_LIKELY((uintptr_t(witness) &
-        ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+  if (SWIFT_LIKELY((reinterpret_cast<uintptr_t>(witness) &
+                    ProtocolRequirementFlags::AssociatedTypeMangledNameBit) ==
+                   0)) {
     // Cached metadata pointers are always complete.
     return MetadataResponse{(const Metadata *)witness, MetadataState::Complete};
   }
@@ -4809,8 +4804,9 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                                           extraDiscriminator));
 #endif
 
-  if (LLVM_LIKELY((uintptr_t(witness) &
-        ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+  if (SWIFT_LIKELY((reinterpret_cast<uintptr_t>(witness) &
+                    ProtocolRequirementFlags::AssociatedTypeMangledNameBit) ==
+                   0)) {
     // Cached metadata pointers are always complete.
     return MetadataResponse{(const Metadata *)witness, MetadataState::Complete};
   }
@@ -4861,8 +4857,9 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
 #endif
 
   // Fast path: we've already resolved this to a witness table, so return it.
-  if (LLVM_LIKELY((uintptr_t(witness) &
-         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+  if (SWIFT_LIKELY((reinterpret_cast<uintptr_t>(witness) &
+                    ProtocolRequirementFlags::AssociatedTypeMangledNameBit) ==
+                   0)) {
     return static_cast<const WitnessTable *>(witness);
   }
 
@@ -4937,8 +4934,9 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
 #endif
 
   // Fast path: we've already resolved this to a witness table, so return it.
-  if (LLVM_LIKELY((uintptr_t(witness) &
-         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+  if (SWIFT_LIKELY((reinterpret_cast<uintptr_t>(witness) &
+                    ProtocolRequirementFlags::AssociatedTypeMangledNameBit) ==
+                   0)) {
     return static_cast<const WitnessTable *>(witness);
   }
 
