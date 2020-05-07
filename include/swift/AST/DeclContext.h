@@ -567,22 +567,6 @@ public:
   LLVM_READONLY
   ASTContext &getASTContext() const;
 
-  /// Retrieve the set of protocols whose conformances will be
-  /// associated with this declaration context.
-  ///
-  /// This function differs from \c getLocalConformances() in that it
-  /// returns protocol declarations, not protocol conformances, and
-  /// therefore does not require the protocol conformances to be
-  /// formed.
-  ///
-  /// \param lookupKind The kind of lookup to perform.
-  ///
-  /// FIXME: This likely makes more sense on IterableDeclContext or
-  /// something similar.
-  SmallVector<ProtocolDecl *, 2>
-  getLocalProtocols(ConformanceLookupKind lookupKind
-                      = ConformanceLookupKind::All) const;
-
   /// Retrieve the set of protocol conformances associated with this
   /// declaration context.
   ///
@@ -593,14 +577,6 @@ public:
   SmallVector<ProtocolConformance *, 2>
   getLocalConformances(ConformanceLookupKind lookupKind
                          = ConformanceLookupKind::All) const;
-
-  /// Retrieve diagnostics discovered while expanding conformances for this
-  /// declaration context. This operation then removes those diagnostics from
-  /// consideration, so subsequent calls to this function with the same
-  /// declaration context that have not had any new extensions bound
-  /// will see an empty array.
-  SmallVector<ConformanceDiagnostic, 4>
-  takeConformanceDiagnostics() const;
 
   /// Retrieves a list of separately imported overlays which are shadowing
   /// \p declaring. If any \p overlays are returned, qualified lookups into
@@ -815,6 +791,26 @@ public:
   /// Determine whether this was deserialized (and thus SerialID is
   /// valid).
   bool wasDeserialized() const;
+
+  /// Retrieve the set of protocols whose conformances will be
+  /// associated with this declaration context.
+  ///
+  /// This function differs from \c getLocalConformances() in that it
+  /// returns protocol declarations, not protocol conformances, and
+  /// therefore does not require the protocol conformances to be
+  /// formed.
+  ///
+  /// \param lookupKind The kind of lookup to perform.
+  SmallVector<ProtocolDecl *, 2>
+  getLocalProtocols(ConformanceLookupKind lookupKind
+                      = ConformanceLookupKind::All) const;
+
+  /// Retrieve diagnostics discovered while expanding conformances for this
+  /// declaration context. This operation then removes those diagnostics from
+  /// consideration, so subsequent calls to this function with the same
+  /// declaration context that have not had any new extensions bound
+  /// will see an empty array.
+  SmallVector<ConformanceDiagnostic, 4> takeConformanceDiagnostics() const;
 
   /// Return 'this' as a \c Decl.
   const Decl *getDecl() const;
