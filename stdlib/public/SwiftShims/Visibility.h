@@ -72,6 +72,12 @@
 #define SWIFT_NOINLINE
 #endif
 
+#if __has_attribute(noreturn)
+#define SWIFT_NORETURN __attribute__((__noreturn__))
+#else
+#define SWIFT_NORETURN
+#endif
+
 #if __has_attribute(used)
 #define SWIFT_USED __attribute__((__used__))
 #else
