@@ -1116,9 +1116,9 @@ namespace {
 
     /// Gather protocol records for all of the explicitly-specified Objective-C
     /// protocol conformances.
-    void visitConformances(DeclContext *dc) {
+    void visitConformances(const IterableDeclContext *idc) {
       llvm::SmallSetVector<ProtocolDecl *, 2> protocols;
-      for (auto conformance : dc->getLocalConformances(
+      for (auto conformance : idc->getLocalConformances(
                                 ConformanceLookupKind::OnlyExplicit)) {
         ProtocolDecl *proto = conformance->getProtocol();
         getObjCProtocols(proto, protocols);

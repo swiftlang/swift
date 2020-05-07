@@ -1586,8 +1586,9 @@ private:
   void addRuntimeResolvableType(GenericTypeDecl *nominal);
   void maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque);
 
-  /// Add all conformances of the given \c DeclContext LazyWitnessTables.
-  void addLazyConformances(DeclContext *dc);
+  /// Add all conformances of the given \c IterableDeclContext
+  /// LazyWitnessTables.
+  void addLazyConformances(const IterableDeclContext *idc);
 
 //--- Global context emission --------------------------------------------------
 public:

@@ -2730,7 +2730,8 @@ bool RefactoringActionConvertToTernaryExpr::performChange() {
 /// these stubs should be filled.
 class FillProtocolStubContext {
 
-  std::vector<ValueDecl*> getUnsatisfiedRequirements(const DeclContext *DC);
+  std::vector<ValueDecl*>
+  getUnsatisfiedRequirements(const IterableDeclContext *IDC);
 
   /// Context in which the content should be filled; this could be either a
   /// nominal type declaraion or an extension declaration.
@@ -2801,12 +2802,12 @@ getContextFromCursorInfo(ResolvedCursorInfo CursorInfo) {
 }
 
 std::vector<ValueDecl*> FillProtocolStubContext::
-getUnsatisfiedRequirements(const DeclContext *DC) {
+getUnsatisfiedRequirements(const IterableDeclContext *IDC) {
   // The results to return.
   std::vector<ValueDecl*> NonWitnessedReqs;
 
   // For each conformance of the extended nominal.
-  for(ProtocolConformance *Con : DC->getLocalConformances()) {
+  for(ProtocolConformance *Con : IDC->getLocalConformances()) {
 
     // Collect non-witnessed requirements.
     Con->forEachNonWitnessedRequirement(

@@ -2259,7 +2259,8 @@ void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
 /// must also be reported so it can be checked as well.
 class LookupAllConformancesInContextRequest
     : public SimpleRequest<LookupAllConformancesInContextRequest,
-                           ProtocolConformanceLookupResult(const DeclContext *),
+                           ProtocolConformanceLookupResult(
+                               const IterableDeclContext *),
                            RequestFlags::Uncached |
                                RequestFlags::DependencySink |
                                RequestFlags::DependencySource> {
@@ -2271,7 +2272,7 @@ private:
 
   // Evaluation.
   ProtocolConformanceLookupResult
-  evaluate(Evaluator &evaluator, const DeclContext *DC) const;
+  evaluate(Evaluator &evaluator, const IterableDeclContext *IDC) const;
 
 public:
   // Incremental dependencies

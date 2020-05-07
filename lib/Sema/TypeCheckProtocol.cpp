@@ -5023,8 +5023,8 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
 
 SmallVector<ProtocolConformance *, 2>
 LookupAllConformancesInContextRequest::evaluate(
-    Evaluator &eval, const DeclContext *DC) const {
-  return DC->getLocalConformances(ConformanceLookupKind::All);
+    Evaluator &eval, const IterableDeclContext *IDC) const {
+  return IDC->getLocalConformances(ConformanceLookupKind::All);
 }
 
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
@@ -5050,7 +5050,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // Check each of the conformances associated with this context.
   auto conformances =
       evaluateOrDefault(dc->getASTContext().evaluator,
-                        LookupAllConformancesInContextRequest{dc}, {});
+                        LookupAllConformancesInContextRequest{idc}, {});
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();

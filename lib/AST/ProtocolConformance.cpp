@@ -1343,11 +1343,13 @@ IterableDeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
 }
 
 SmallVector<ProtocolConformance *, 2>
-DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
+IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
+    const {
   SmallVector<ProtocolConformance *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
+  const auto dc = getAsGenericContext();
+  const auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal) {
     return result;
   }
@@ -1366,7 +1368,7 @@ DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
   nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
     nominal,
-    const_cast<DeclContext *>(this),
+    const_cast<GenericContext *>(dc),
     lookupKind,
     nullptr,
     &result,

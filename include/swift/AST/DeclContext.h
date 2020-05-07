@@ -567,17 +567,6 @@ public:
   LLVM_READONLY
   ASTContext &getASTContext() const;
 
-  /// Retrieve the set of protocol conformances associated with this
-  /// declaration context.
-  ///
-  /// \param lookupKind The kind of lookup to perform.
-  ///
-  /// FIXME: This likely makes more sense on IterableDeclContext or
-  /// something similar.
-  SmallVector<ProtocolConformance *, 2>
-  getLocalConformances(ConformanceLookupKind lookupKind
-                         = ConformanceLookupKind::All) const;
-
   /// Retrieves a list of separately imported overlays which are shadowing
   /// \p declaring. If any \p overlays are returned, qualified lookups into
   /// \p declaring should be performed into \p overlays instead; since they
@@ -804,6 +793,14 @@ public:
   SmallVector<ProtocolDecl *, 2>
   getLocalProtocols(ConformanceLookupKind lookupKind
                       = ConformanceLookupKind::All) const;
+
+  /// Retrieve the set of protocol conformances associated with this
+  /// declaration context.
+  ///
+  /// \param lookupKind The kind of lookup to perform.
+  SmallVector<ProtocolConformance *, 2>
+  getLocalConformances(ConformanceLookupKind lookupKind
+                         = ConformanceLookupKind::All) const;
 
   /// Retrieve diagnostics discovered while expanding conformances for this
   /// declaration context. This operation then removes those diagnostics from

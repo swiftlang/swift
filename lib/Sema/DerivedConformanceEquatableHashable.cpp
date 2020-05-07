@@ -1026,11 +1026,11 @@ getHashValueRequirement(ASTContext &C) {
 }
 
 static ProtocolConformance *
-getHashableConformance(Decl *parentDecl) {
+getHashableConformance(const Decl *parentDecl) {
   ASTContext &C = parentDecl->getASTContext();
-  auto DC = cast<DeclContext>(parentDecl);
+  const auto IDC = cast<IterableDeclContext>(parentDecl);
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-  for (auto conformance: DC->getLocalConformances()) {
+  for (auto conformance: IDC->getLocalConformances()) {
     if (conformance->getProtocol() == hashableProto) {
       return conformance;
     }
