@@ -888,7 +888,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.setInputKind(InputFileKind::SwiftREPL);
+  Invocation.setInputKind(InputFileKind::Swift);
 
   CompilerInstance CI;
 
