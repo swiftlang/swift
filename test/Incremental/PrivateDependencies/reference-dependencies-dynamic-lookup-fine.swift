@@ -29,10 +29,12 @@ import Foundation
   // CHECK-DAG:  dynamicLookup implementation  '' bar true
   // CHECK-DAG:  dynamicLookup interface  '' bar true
 
+  // DUPLICATE-NOT:  dynamicLookup implementation  '' bar true
   // DUPLICATE:  dynamicLookup implementation  '' bar true
-  // DUPLICATE:  dynamicLookup implementation  '' bar true
+  // DUPLICATE-NOT:  dynamicLookup implementation  '' bar true
+  // DUPLICATE-NOT:  dynamicLookup interface  '' bar true
   // DUPLICATE:  dynamicLookup interface  '' bar true
-  // DUPLICATE:  dynamicLookup interface  '' bar true
+  // DUPLICATE-NOT:  dynamicLookup interface  '' bar true
   func bar(_ x: Int, y: Int) {}
   func bar(_ str: String) {}
     
