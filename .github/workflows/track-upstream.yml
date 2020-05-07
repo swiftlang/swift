@@ -7,8 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: |
-          git checkout master
+      - name: Push master from upstream
+        run: |
           git remote add apple https://github.com/apple/swift.git
+          git fetch
+          git checkout -b master --track origin/master
           git pull apple master
           git push origin master
