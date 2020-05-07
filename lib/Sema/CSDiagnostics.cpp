@@ -2627,7 +2627,8 @@ bool ContextualFailure::tryIntegerCastFixIts(
   auto fromType = getFromType();
   auto toType = getToType();
 
-  if (!isIntegerType(fromType) || !isIntegerType(toType))
+  if (!isExpressibleByIntegerLiteralType(fromType) ||
+      !isExpressibleByIntegerLiteralType(toType))
     return false;
 
   auto getInnerCastedExpr = [&](const Expr *expr) -> Expr * {
@@ -2657,8 +2658,11 @@ bool ContextualFailure::tryIntegerCastFixIts(
     }
   }
 
-  // Add a wrapping integer cast.
-  std::string convWrapBefore = toType.getString();
+  // Add a wrapping integer cast using numeric cast or Integer initializer.
+  bool isBinaryIntToIntConversion =
+      isBinaryIntegerType(fromType) && isBinaryIntegerType(toType);
+  std::string convWrapBefore =
+      isBinaryIntToIntConversion ? "numericCast" : toType.getString();
   convWrapBefore += "(";
   std::string convWrapAfter = ")";
   SourceRange exprRange = getSourceRange();

@@ -656,10 +656,16 @@ private:
   /// property
   void tryComputedPropertyFixIts() const;
 
-  bool isIntegerType(Type type) const {
+  bool isExpressibleByIntegerLiteralType(Type type) const {
     return conformsToKnownProtocol(
         getConstraintSystem(), type,
         KnownProtocolKind::ExpressibleByIntegerLiteral);
+  }
+
+  bool isBinaryIntegerType(Type type) const {
+    return conformsToKnownProtocol(
+        getConstraintSystem(), type,
+        KnownProtocolKind::BinaryInteger);
   }
 
   /// Return true if the conversion from fromType to toType is
