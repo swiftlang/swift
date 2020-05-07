@@ -99,7 +99,10 @@ public:
   ///
   /// Subheadings for types don't include the complete declaration line
   /// including generics and inheritance.
-  void printAbridgedType(const GenericTypeDecl *TD);
+  ///
+  /// \param TD The type declaration to print.
+  /// \param PrintKeyword Print the corresponding keyword introducer if `true`.
+  void printAbridgedType(const GenericTypeDecl *TD, bool PrintKeyword);
 
   void printDeclLoc(const Decl *D) override;
 
