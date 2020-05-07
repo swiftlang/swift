@@ -779,15 +779,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   // references, this can be removed.
   (void)MainModule->getImplicitImports();
 
-  if (Invocation.getInputKind() == InputFileKind::SwiftREPL) {
-    // Create the initial empty REPL file. This only exists to feed in the
-    // implicit imports such as the standard library.
-    auto *replFile =
-        createSourceFileForMainModule(SourceFileKind::Main, /*BufferID*/ None);
-    performImportResolution(*replFile);
-    return;
-  }
-
   // Make sure the main file is the first file in the module, so do this now.
   if (MainBufferID != NO_SUCH_BUFFER) {
     (void)createSourceFileForMainModule(Invocation.getSourceFileKind(),
