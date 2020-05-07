@@ -380,6 +380,12 @@ var x12: X {
 
 var x13: X {} // expected-error {{computed property must have accessors specified}}
 
+struct X14 {}
+extension X14 {
+  var x14: X {
+  } // expected-error {{computed property must have accessors specified}}
+}
+
 // Type checking problems
 struct Y { }
 var y: Y
