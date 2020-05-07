@@ -35,11 +35,7 @@ using namespace swift;
 /// Check whether a given \p decl has a @_semantics attribute with the given
 /// attribute name \c attrName.
 static bool hasSemanticsAttr(ValueDecl *decl, StringRef attrName) {
-  for (auto semantics : decl->getAttrs().getAttributes<SemanticsAttr>()) {
-    if (semantics->Value.equals(attrName))
-      return true;
-  }
-  return false;
+  return decl->getAttrs().hasSemanticsAttr(attrName);
 }
 
 /// Return true iff  the given \p structDecl has a name that matches one of the
