@@ -182,8 +182,8 @@ namespace swift {
 }
 
 // FIXME: HACK: copied from HeapObject.cpp
-extern "C" SWIFT_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
-void _swift_release_dealloc(swift::HeapObject *object);
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE LLVM_ATTRIBUTE_USED void
+_swift_release_dealloc(swift::HeapObject *object);
 
 namespace swift {
 
@@ -697,19 +697,19 @@ class RefCounts {
 
   // Out-of-line slow paths.
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   void incrementSlow(RefCountBits oldbits, uint32_t inc) SWIFT_CC(PreserveMost);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   bool tryIncrementSlow(RefCountBits oldbits);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   bool tryIncrementNonAtomicSlow(RefCountBits oldbits);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   void incrementUnownedSlow(uint32_t inc);
 
   public:

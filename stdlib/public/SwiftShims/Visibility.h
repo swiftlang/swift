@@ -66,6 +66,12 @@
 #define SWIFT_ALWAYS_INLINE
 #endif
 
+#if __has_attribute(noinline)
+#define SWIFT_NOINLINE __attribute__((__noinline__))
+#else
+#define SWIFT_NOINLINE
+#endif
+
 #if __has_attribute(unavailable)
 #define SWIFT_ATTRIBUTE_UNAVAILABLE __attribute__((__unavailable__))
 #else
