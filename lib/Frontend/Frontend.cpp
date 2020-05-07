@@ -529,7 +529,6 @@ static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
   case InputFileKind::SIL:
     return true;
   case InputFileKind::SwiftLibrary:
-  case InputFileKind::SwiftREPL:
   case InputFileKind::LLVM:
   case InputFileKind::None:
     return false;
@@ -778,15 +777,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   // FIXME: Once deserialization loads all the modules it needs for cross
   // references, this can be removed.
   (void)MainModule->getImplicitImports();
-
-  if (Invocation.getInputKind() == InputFileKind::SwiftREPL) {
-    // Create the initial empty REPL file. This only exists to feed in the
-    // implicit imports such as the standard library.
-    auto *replFile =
-        createSourceFileForMainModule(SourceFileKind::Main, /*BufferID*/ None);
-    performImportResolution(*replFile);
-    return;
-  }
 
   // Make sure the main file is the first file in the module, so do this now.
   if (MainBufferID != NO_SUCH_BUFFER) {

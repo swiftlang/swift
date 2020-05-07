@@ -25,7 +25,6 @@ enum class InputFileKind {
   None,
   Swift,
   SwiftLibrary,
-  SwiftREPL,
   SwiftModuleInterface,
   SIL,
   LLVM
