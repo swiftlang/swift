@@ -48,6 +48,20 @@ $BUILD_SCRIPT \
   --darwin-toolchain-name="${TOOLCHAIN_NAME}" \
   --darwin-toolchain-version="${TOOLCHAIN_VERSION}" \
   --darwin-toolchain-alias="swift" \
+  --skip-build-benchmarks \
+  --build-stdlib-deployment-targets "wasi-wasm32" \
+  --build-swift-dynamic-sdk-overlay false \
+  --build-swift-dynamic-stdlib false \
+  --build-swift-static-sdk-overlay \
+  --build-swift-static-stdlib \
+  --llvm-targets-to-build "X86;WebAssembly" \
+  --stdlib-deployment-targets "wasi-wasm32" \
+  --wasi-icu-data "$SOURCE_PATH/icu_out/lib/libicudata.a" \
+  --wasi-icu-i18n "$SOURCE_PATH/icu_out/lib/libicui18n.a" \
+  --wasi-icu-i18n-include "$SOURCE_PATH/icu_out/include" \
+  --wasi-icu-uc "$SOURCE_PATH/icu_out/lib/libicuuc.a" \
+  --wasi-icu-uc-include "$SOURCE_PATH/icu_out/include" \
+  --wasi-sdk "$SOURCE_PATH/wasi-sdk" \
   "$@"
 
 
