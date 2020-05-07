@@ -355,11 +355,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
 
-    // If we're in REPL mode, inject temporary result variables and other stuff
-    // that the REPL needs to synthesize.
-    if (SF->Kind == SourceFileKind::REPL && !Ctx.hadError())
-      TypeChecker::processREPLTopLevel(*SF);
-
     typeCheckDelayedFunctions(*SF);
   }
 
@@ -399,8 +394,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   // FIXME: some playgrounds tests (playground_lvalues.swift) fail with
   // verification enabled.
 #if 0
-  if (SF.Kind != SourceFileKind::REPL &&
-      SF.Kind != SourceFileKind::SIL &&
+  if (SF.Kind != SourceFileKind::SIL &&
       !Ctx.LangOpts.DebuggerSupport) {
     Ctx.verifyAllLoadedModules();
   }
