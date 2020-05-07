@@ -1393,7 +1393,7 @@ void RLEContext::processBasicBlocksForGenKillSet() {
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
     LLVM_DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
                             << " for Gen/Kill:\n";
-               BB->print(llvm::dbgs(), printCtx));
+               BB->print(printCtx));
 
     BlockState &S = getBlockState(BB);
 

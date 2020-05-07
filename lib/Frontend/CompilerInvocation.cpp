@@ -196,8 +196,6 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
     return SourceFileKind::Main;
   case InputFileKind::SwiftLibrary:
     return SourceFileKind::Library;
-  case InputFileKind::SwiftREPL:
-    return SourceFileKind::REPL;
   case InputFileKind::SwiftModuleInterface:
     return SourceFileKind::Interface;
   case InputFileKind::SIL:
@@ -433,6 +431,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
+
+  if (Args.hasArg(OPT_experimental_private_intransitive_dependencies))
+    Opts.EnableExperientalPrivateIntransitiveDependencies = true;
 
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);

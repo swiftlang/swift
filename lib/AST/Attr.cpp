@@ -1850,8 +1850,7 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
       initContext(initContext) {
   hasArgLabelLocs = !argLabelLocs.empty();
   numArgLabels = argLabels.size();
-  initializeCallArguments(argLabels, argLabelLocs,
-                          /*hasTrailingClosure=*/false);
+  initializeCallArguments(argLabels, argLabelLocs);
 }
 
 CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
@@ -1868,16 +1867,15 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
   Expr *arg = nullptr;
   if (hasInitializer) {
     arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                             rParenLoc, nullptr, implicit, argLabelsScratch,
-                             argLabelLocsScratch);
+                             rParenLoc, /*trailingClosures=*/{}, implicit,
+                             argLabelsScratch, argLabelLocsScratch);
   }
 
   SourceRange range(atLoc, type.getSourceRange().End);
   if (arg)
     range.End = arg->getEndLoc();
 
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
-                                 /*hasTrailingClosure=*/false);
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
   void *mem = ctx.Allocate(size, alignof(CustomAttr));
   return new (mem) CustomAttr(atLoc, range, type, initContext, arg, argLabels,
                               argLabelLocs, implicit);

@@ -9,3 +9,7 @@ module MemoryLayout {
 module MemberVariables {
   header "member-variables.h"
 }
+
+module ProtocolConformance {
+  header "protocol-conformance.h"
+}

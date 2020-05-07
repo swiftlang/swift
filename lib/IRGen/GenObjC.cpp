@@ -775,7 +775,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     assert(origMethodType->getNumIndirectFormalResults() == 1);
     formalIndirectResult = params.claimNext();
   } else {
-    SILType appliedResultTy = origMethodType->getDirectFormalResultsType(IGM.getSILModule());
+    SILType appliedResultTy = origMethodType->getDirectFormalResultsType(
+        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
     indirectedResultTI =
       &cast<LoadableTypeInfo>(IGM.getTypeInfo(appliedResultTy));
     auto &nativeSchema = indirectedResultTI->nativeReturnValueSchema(IGM);
@@ -804,8 +805,12 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     }
     // Otherwise, we have a loadable type that can either be passed directly or
     // indirectly.
-    assert(info.getSILStorageType(IGM.getSILModule(), origMethodType).isObject());
-    auto curSILType = info.getSILStorageType(IGM.getSILModule(), origMethodType);
+    assert(info.getSILStorageType(IGM.getSILModule(), origMethodType,
+                                  IGM.getMaximalTypeExpansionContext())
+               .isObject());
+    auto curSILType =
+        info.getSILStorageType(IGM.getSILModule(), origMethodType,
+                               IGM.getMaximalTypeExpansionContext());
     auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(curSILType));
 
     // Load the indirectly passed parameter.
@@ -858,8 +863,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     emission.emitToExplosion(result, false);
     cleanup();
     auto &callee = emission.getCallee();
-    auto resultType =
-    callee.getOrigFunctionType()->getDirectFormalResultsType(IGM.getSILModule());
+    auto resultType = callee.getOrigFunctionType()->getDirectFormalResultsType(
+        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
     subIGF.emitScalarReturn(resultType, resultType, result,
                             true /*isSwiftCCReturn*/, false);
   }
@@ -1080,8 +1085,8 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   // TODO. Encode type qualifier, 'in', 'inout', etc. for the parameter.
   std::string paramsString;
   for (auto param : params) {
-    auto clangType = IGM.getClangType(
-                            param.getArgumentType(IGM.getSILModule(), fnType));
+    auto clangType = IGM.getClangType(param.getArgumentType(
+        IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext()));
     if (clangType.isNull())
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     

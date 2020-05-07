@@ -100,7 +100,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     if (!D)
       return nullptr;
     auto *parentDC = newDC->getParent();
-    unsigned N;
+    unsigned N = ~0U;
 
     if (auto accessor = dyn_cast<AccessorDecl>(D)) {
       // The AST for accessors is like:
@@ -140,7 +140,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
   newDC = SF;
   do {
     auto N = IndexStack.pop_back_val();
-    Decl *D;
+    Decl *D = nullptr;
     if (auto parentSF = dyn_cast<SourceFile>(newDC))
       D = getElementAt(parentSF->getTopLevelDecls(), N);
     else if (auto parentIDC = dyn_cast<IterableDeclContext>(newDC->getAsDecl()))
@@ -148,14 +148,14 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     else
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
 
-    if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+    if (auto storage = dyn_cast_or_null<AbstractStorageDecl>(D)) {
       if (IndexStack.empty())
         return nullptr;
       auto accessorN = IndexStack.pop_back_val();
       D = getElementAt(storage->getAllAccessors(), accessorN);
     }
 
-    newDC = dyn_cast<DeclContext>(D);
+    newDC = dyn_cast_or_null<DeclContext>(D);
     if (!newDC)
       return nullptr;
   } while (!IndexStack.empty());
@@ -352,7 +352,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
     DeclContext *DC =
         getEquivalentDeclContextFromSourceFile(newInfo.ParentContext, oldSF);
-    if (!DC)
+    if (!DC || !isa<AbstractFunctionDecl>(DC))
       return false;
 
     // OK, we can perform fast completion for this. Update the orignal delayed
@@ -446,7 +446,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
     // Re-process the whole file (parsing will be lazily triggered). Still
     // re-use imported modules.
     performImportResolution(*newSF);
-    bindExtensions(*newSF);
+    bindExtensions(*newM);
 
     CurrentModule = newM;
     traceDC = newM;

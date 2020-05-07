@@ -845,7 +845,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
 
     SmallVector<Identifier, 4> yieldLabels;
     SmallVector<SourceLoc, 4> yieldLabelLocs;
-    Expr *trailingClosure = nullptr;
+    SmallVector<TrailingClosure, 2> trailingClosures;
 
     status = parseExprList(tok::l_paren, tok::r_paren,
                            /*postfix (allow trailing closure)*/ false,
@@ -853,9 +853,9 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
                            lpLoc,
                            yields, yieldLabels, yieldLabelLocs,
                            rpLoc,
-                           trailingClosure,
+                           trailingClosures,
                            SyntaxKind::ExprList);
-    assert(trailingClosure == nullptr);
+    assert(trailingClosures.empty());
     assert(yieldLabels.empty());
     assert(yieldLabelLocs.empty());
   } else {

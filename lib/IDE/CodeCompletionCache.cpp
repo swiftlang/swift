@@ -251,7 +251,8 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
           context, numBytesToErase, string, declKind, moduleName,
           notRecommended, CodeCompletionResult::NotRecommendedReason::NoReason,
           briefDocComment, copyStringArray(*V.Sink.Allocator, assocUSRs),
-          copyStringPairArray(*V.Sink.Allocator, declKeywords), opKind);
+          copyStringPairArray(*V.Sink.Allocator, declKeywords),
+          CodeCompletionResult::Unknown, opKind);
     } else {
       result = new (*V.Sink.Allocator)
           CodeCompletionResult(kind, context, numBytesToErase, string,

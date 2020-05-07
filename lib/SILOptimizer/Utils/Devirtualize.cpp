@@ -410,8 +410,9 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
     return SubstitutionMap();
 
   // Add any generic substitutions for the base class.
-  Type baseSelfType = baseCalleeType->getSelfParameter()
-                                    .getArgumentType(module, baseCalleeType);
+  Type baseSelfType = baseCalleeType->getSelfParameter().getArgumentType(
+      module, baseCalleeType,
+      applySite.getFunction()->getTypeExpansionContext());
   if (auto metatypeType = baseSelfType->getAs<MetatypeType>())
     baseSelfType = metatypeType->getInstanceType();
 
@@ -436,8 +437,9 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   SubstitutionMap origSubMap = applySite.getSubstitutionMap();
 
   Type calleeSelfType =
-      applySite.getOrigCalleeType()->getSelfParameter()
-               .getArgumentType(module, applySite.getOrigCalleeType());
+      applySite.getOrigCalleeType()->getSelfParameter().getArgumentType(
+          module, applySite.getOrigCalleeType(),
+          applySite.getFunction()->getTypeExpansionContext());
   if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
     calleeSelfType = metatypeType->getInstanceType();
   auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
@@ -491,7 +493,8 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
   SILBasicBlock *normalBB = oldTAI->getNormalBB();
   SILBasicBlock *resultBB = nullptr;
 
-  SILType newResultTy = conv.getSILResultType();
+  SILType newResultTy =
+      conv.getSILResultType(builder.getTypeExpansionContext());
 
   // Does the result value need to be casted?
   auto oldResultTy = normalBB->getArgument(0)->getType();
@@ -776,7 +779,8 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
   SmallVector<SILValue, 8> newArgBorrows;
 
   auto indirectResultArgIter = applySite.getIndirectSILResults().begin();
-  for (auto resultTy : substConv.getIndirectSILResultTypes()) {
+  for (auto resultTy : substConv.getIndirectSILResultTypes(
+           applySite.getFunction()->getTypeExpansionContext())) {
     auto castRes = castValueToABICompatibleType(
         &builder, loc, *indirectResultArgIter, indirectResultArgIter->getType(),
         resultTy);
@@ -788,7 +792,8 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
   auto paramArgIter = applySite.getArgumentsWithoutIndirectResults().begin();
   // Skip the last parameter, which is `self`. Add it below.
   for (auto param : substConv.getParameters()) {
-    auto paramType = substConv.getSILType(param);
+    auto paramType =
+        substConv.getSILType(param, builder.getTypeExpansionContext());
     SILValue arg = *paramArgIter;
     if (builder.hasOwnership() && arg->getType().isObject()
         && arg.getOwnershipKind() == ValueOwnershipKind::Owned
@@ -961,8 +966,12 @@ swift::getWitnessMethodSubstitutions(SILModule &module, ApplySite applySite,
 
   auto *mod = module.getSwiftModule();
   bool isSelfAbstract =
-    witnessFnTy->getSelfInstanceType(module)->is<GenericTypeParamType>();
-  auto *classWitness = witnessFnTy->getWitnessMethodClass(module);
+      witnessFnTy
+          ->getSelfInstanceType(
+              module, applySite.getFunction()->getTypeExpansionContext())
+          ->is<GenericTypeParamType>();
+  auto *classWitness = witnessFnTy->getWitnessMethodClass(
+      module, applySite.getFunction()->getTypeExpansionContext());
 
   return ::getWitnessMethodSubstitutions(mod, cRef, requirementSig,
                                          witnessThunkSig, origSubs,
@@ -992,10 +1001,11 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
 
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
-  auto calleeCanType = f->getLoweredFunctionTypeInContext(
-      TypeExpansionContext(*applySite.getFunction()));
-  auto substCalleeCanType = calleeCanType->substGenericArgs(
-      module, subMap, TypeExpansionContext(*applySite.getFunction()));
+  auto typeExpansionContext =
+      applySite.getFunction()->getTypeExpansionContext();
+  auto calleeCanType = f->getLoweredFunctionTypeInContext(typeExpansionContext);
+  auto substCalleeCanType =
+      calleeCanType->substGenericArgs(module, subMap, typeExpansionContext);
 
   // Collect arguments from the apply instruction.
   SmallVector<SILValue, 4> arguments;
@@ -1008,7 +1018,8 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
   unsigned substArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
   for (auto arg : applySite.getArguments()) {
     auto paramInfo = substConv.getSILArgumentConvention(substArgIdx);
-    auto paramType = substConv.getSILArgumentType(substArgIdx++);
+    auto paramType =
+        substConv.getSILArgumentType(substArgIdx++, typeExpansionContext);
     if (arg->getType() != paramType) {
       if (argBuilder.hasOwnership()
           && applySite.getKind() != ApplySiteKind::PartialApplyInst

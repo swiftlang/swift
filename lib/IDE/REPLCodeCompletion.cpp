@@ -83,6 +83,10 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
       return Str;
 
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureExpr:
+      Str += " {";
+      Str += C.getText();
+      break;
     case CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor:
       Str += " {";
       break;
@@ -231,11 +235,11 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   auto *newModule = ModuleDecl::create(
       Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports);
   auto &newSF =
-      *new (Ctx) SourceFile(*newModule, SourceFileKind::REPL, *BufferID);
+      *new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID);
   newModule->addFile(newSF);
 
   performImportResolution(newSF);
-  bindExtensions(newSF);
+  bindExtensions(*newModule);
 
   performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
 
@@ -251,8 +255,6 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
 
   CompletionStrings.clear();
   CookedResults.clear();
-
-  assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
 
   unsigned BufferID;
   doCodeCompletion(SF, EnteredCode, &BufferID,

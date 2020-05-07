@@ -511,6 +511,12 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
+def experimental_private_intransitive_dependencies : Flag<["-"],
+    "experimental-private-intransitive-dependencies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable experimental dependency tracking that never cascades">;
+
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

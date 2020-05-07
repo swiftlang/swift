@@ -121,6 +121,7 @@ namespace swift {
   class UnifiedStatsReporter;
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
+  struct SubASTContextDelegate;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -719,7 +720,8 @@ public:
   Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName,
       bool isUnderlyingClangModule,
-      ModuleDependenciesCache &cache);
+      ModuleDependenciesCache &cache,
+      SubASTContextDelegate &delegate);
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.

@@ -16,7 +16,7 @@ requiring manual intervention of the source maintainer.
 -----------------
 
 Force inlining (at least at -O for now). See the discussion in
-:ref:`transparent-attribute`.
+docs/TransparentAttr.md.
 
 @_specialize directs the compiler to specialize generics
 --------------------------------------------------------

@@ -490,12 +490,13 @@ public:
   }
   
   SILFunction &getFunction() { return F; }
+  const SILFunction &getFunction() const { return F; }
   SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
   const SILOptions &getOptions() { return getModule().getOptions(); }
 
   // Returns the type expansion context for types in this function.
-  TypeExpansionContext getTypeExpansionContext() {
+  TypeExpansionContext getTypeExpansionContext() const {
     return TypeExpansionContext(getFunction());
   }
 
@@ -531,17 +532,19 @@ public:
   }
 
   SILType getSILInterfaceType(SILParameterInfo param) const {
-    return silConv.getSILType(param, CanSILFunctionType());
+    return silConv.getSILType(param, CanSILFunctionType(),
+                              getTypeExpansionContext());
   }
   SILType getSILInterfaceType(SILResultInfo result) const {
-    return silConv.getSILType(result, CanSILFunctionType());
+    return silConv.getSILType(result, CanSILFunctionType(),
+                              getTypeExpansionContext());
   }
 
   SILType getSILType(SILParameterInfo param, CanSILFunctionType fnTy) const {
-    return silConv.getSILType(param, fnTy);
+    return silConv.getSILType(param, fnTy, getTypeExpansionContext());
   }
   SILType getSILType(SILResultInfo result, CanSILFunctionType fnTy) const {
-    return silConv.getSILType(result, fnTy);
+    return silConv.getSILType(result, fnTy, getTypeExpansionContext());
   }
 
   SILType getSILTypeInContext(SILResultInfo result, CanSILFunctionType fnTy) {

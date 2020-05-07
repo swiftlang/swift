@@ -113,7 +113,22 @@ private:
   llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
 
 public:
-  DependencyCollector() = default;
+  enum class Mode {
+    // Enables the current "status quo" behavior of the dependency collector.
+    //
+    // By default, the dependency collector moves to register dependencies in
+    // the referenced name trackers at the top of the active dependency stack.
+    StatusQuo,
+    // Enables an experimental mode to only register private dependencies.
+    //
+    // This mode restricts the dependency collector to ignore changes of
+    // scope. This has practical effect of charging all unqualified lookups to
+    // the primary file being acted upon instead of to the destination file.
+    ExperimentalPrivateDependencies,
+  };
+  Mode mode;
+
+  explicit DependencyCollector(Mode mode) : mode{mode} {};
 
 public:
   /// Registers a named reference from the current dependency scope to a member
@@ -206,19 +221,43 @@ public:
   };
 
 private:
+  /// Returns the first dependency source registered with the tracker, or
+  /// \c nullptr if no dependency sources have been registered.
+  SourceFile *getFirstDependencySourceOrNull() const {
+    if (dependencySources.empty())
+      return nullptr;
+    return dependencySources.front().getPointer();
+  }
+
   /// If there is an active dependency source, returns its
   /// \c ReferencedNameTracker. Else, returns \c nullptr.
   ReferencedNameTracker *getActiveDependencyTracker() const {
-    if (auto *source = getActiveDependencySourceOrNull())
-      return source->getRequestBasedReferencedNameTracker();
-    return nullptr;
+    SourceFile *source = nullptr;
+    switch (mode) {
+    case Mode::StatusQuo:
+      source = getActiveDependencySourceOrNull();
+      break;
+    case Mode::ExperimentalPrivateDependencies:
+      source = getFirstDependencySourceOrNull();
+      break;
+    }
+    
+    if (!source)
+      return nullptr;
+
+    return source->getRequestBasedReferencedNameTracker();
   }
 
   /// Returns \c true if the scope of the current active source cascades.
   ///
   /// If there is no active scope, the result always cascades.
   bool isActiveSourceCascading() const {
-    return getActiveSourceScope() == evaluator::DependencyScope::Cascading;
+    switch (mode) {
+    case Mode::StatusQuo:
+      return getActiveSourceScope() == evaluator::DependencyScope::Cascading;
+    case Mode::ExperimentalPrivateDependencies:
+      return false;
+    }
   }
 };
 } // end namespace evaluator

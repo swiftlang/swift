@@ -39,6 +39,7 @@ void swift::ide::printCodeCompletionResultDescription(
 
       if (C.is(ChunkKind::TypeAnnotation) ||
           C.is(ChunkKind::CallParameterClosureType) ||
+          C.is(ChunkKind::CallParameterClosureExpr) ||
           C.is(ChunkKind::Whitespace))
         continue;
 
@@ -117,6 +118,7 @@ class AnnotatingDescriptionPrinter {
       break;
     case ChunkKind::TypeAnnotation:
     case ChunkKind::CallParameterClosureType:
+    case ChunkKind::CallParameterClosureExpr:
     case ChunkKind::Whitespace:
       // ignore;
       break;

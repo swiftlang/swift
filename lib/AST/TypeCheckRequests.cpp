@@ -1468,7 +1468,6 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
     // skip verification and avoid caching it.
 #ifndef NDEBUG
     if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
-        SF->Kind != SourceFileKind::REPL &&
         SF->Kind != SourceFileKind::SIL &&
         !Ctx.LangOpts.DebuggerSupport) {
       Ctx.verifyAllLoadedModules();

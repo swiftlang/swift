@@ -286,6 +286,7 @@ struct SwiftStatistics {
 class SwiftLangSupport : public LangSupport {
   std::shared_ptr<NotificationCenter> NotificationCtr;
   std::string RuntimeResourcePath;
+  std::string DiagnosticDocumentationPath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
   SwiftInterfaceGenMap IFaceGenContexts;
@@ -306,6 +307,9 @@ public:
   }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }
+  StringRef getDiagnosticDocumentationPath() const {
+    return DiagnosticDocumentationPath;
+  }
 
   std::shared_ptr<SwiftASTManager> getASTManager() { return ASTMgr; }
 

@@ -79,36 +79,64 @@ class LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::ErrorBuilder {
   StringRef functionName;
   ErrorBehaviorKind behavior;
   Optional<Error> error;
-
-  // NOTE: This is only here so that we can emit a unique id for all errors to
-  // ease working with FileCheck.
-  static unsigned errorMessageCount;
+  unsigned *errorMessageCounter;
 
 public:
   ErrorBuilder(const SILFunction &fn,
-               LinearLifetimeChecker::ErrorBehaviorKind behavior)
-      : functionName(fn.getName()), behavior(behavior), error(Error()) {}
+               LinearLifetimeChecker::ErrorBehaviorKind behavior,
+               unsigned *errorMessageCounter = nullptr)
+      : functionName(fn.getName()), behavior(behavior), error(Error()),
+        errorMessageCounter(errorMessageCounter) {}
 
   ErrorBuilder(const SILFunction &fn,
-               LinearLifetimeChecker::ErrorBehaviorKind::inner_t behavior)
-      : functionName(fn.getName()), behavior(behavior), error(Error()) {}
+               LinearLifetimeChecker::ErrorBehaviorKind::inner_t behavior,
+               unsigned *errorMessageCounter = nullptr)
+      : ErrorBuilder(fn, LinearLifetimeChecker::ErrorBehaviorKind(behavior),
+                     errorMessageCounter) {}
 
-  Error getFinalError() && {
+  ErrorBuilder(const ErrorBuilder &other)
+      : functionName(other.functionName), behavior(other.behavior),
+        error(other.error), errorMessageCounter(other.errorMessageCounter) {}
+
+  ErrorBuilder &operator=(const ErrorBuilder &other) {
+    functionName = other.functionName;
+    behavior = other.behavior;
+    error = other.error;
+    errorMessageCounter = other.errorMessageCounter;
+    return *this;
+  }
+
+  Error consumeAndGetFinalError() && {
     auto result = *error;
     error = None;
+    errorMessageCounter = nullptr;
     return result;
+  }
+
+  void tryDumpErrorCounter() const {
+    if (!errorMessageCounter) {
+      return;
+    }
+    llvm::errs() << "Error#: " << *errorMessageCounter << ". ";
+  }
+
+  void tryIncrementErrorCounter() {
+    if (!errorMessageCounter) {
+      return;
+    }
+    ++(*errorMessageCounter);
   }
 
   bool handleLeak(llvm::function_ref<void()> &&messagePrinterFunc) {
     error->foundLeak = true;
 
     if (behavior.shouldPrintMessage()) {
-      llvm::errs() << "Error#: " << errorMessageCount
-                   << ". Begin Error in Function: '" << functionName << "'\n";
+      tryDumpErrorCounter();
+      llvm::errs() << "Begin Error in Function: '" << functionName << "'\n";
       messagePrinterFunc();
-      llvm::errs() << "Error#: " << errorMessageCount
-                   << ". End Error in Function: '" << functionName << "'\n";
-      ++errorMessageCount;
+      tryDumpErrorCounter();
+      llvm::errs() << "End Error in Function: '" << functionName << "'\n";
+      tryIncrementErrorCounter();
     }
 
     if (behavior.shouldReturnFalseOnLeak()) {
@@ -139,14 +167,15 @@ private:
                    bool quiet = false) const {
     if (behavior.shouldPrintMessage()) {
       if (!quiet) {
-        llvm::errs() << "Error#: " << errorMessageCount
-                     << ". Begin Error in Function: '" << functionName << "'\n";
+        tryDumpErrorCounter();
+        llvm::errs() << "Begin Error in Function: '" << functionName << "'\n";
       }
       messagePrinterFunc();
       if (!quiet) {
-        llvm::errs() << "Error#: " << errorMessageCount
-                     << ". End Error in Function: '" << functionName << "'\n";
-        ++errorMessageCount;
+        tryDumpErrorCounter();
+        llvm::errs() << "End Error in Function: '" << functionName << "'\n";
+        auto *self = const_cast<ErrorBuilder *>(this);
+        self->tryIncrementErrorCounter();
       }
     }
 

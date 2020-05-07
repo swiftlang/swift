@@ -2461,7 +2461,7 @@ void SILBasicBlock::print(raw_ostream &OS) const {
   SILPrinter(Ctx).print(this);
 }
 
-void SILBasicBlock::print(raw_ostream &OS, SILPrintContext &Ctx) const {
+void SILBasicBlock::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 

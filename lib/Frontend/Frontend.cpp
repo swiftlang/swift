@@ -529,7 +529,6 @@ static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
   case InputFileKind::SIL:
     return true;
   case InputFileKind::SwiftLibrary:
-  case InputFileKind::SwiftREPL:
   case InputFileKind::LLVM:
   case InputFileKind::None:
     return false;
@@ -779,15 +778,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   // references, this can be removed.
   (void)MainModule->getImplicitImports();
 
-  if (Invocation.getInputKind() == InputFileKind::SwiftREPL) {
-    // Create the initial empty REPL file. This only exists to feed in the
-    // implicit imports such as the standard library.
-    auto *replFile =
-        createSourceFileForMainModule(SourceFileKind::REPL, /*BufferID*/ None);
-    performImportResolution(*replFile);
-    return;
-  }
-
   // Make sure the main file is the first file in the module, so do this now.
   if (MainBufferID != NO_SUCH_BUFFER) {
     (void)createSourceFileForMainModule(Invocation.getSourceFileKind(),
@@ -806,12 +796,13 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   }) && "some files have not yet had their imports resolved");
   MainModule->setHasResolvedImports();
 
-  forEachFileToTypeCheck([&](SourceFile &SF) {
-    if (LimitStage == SourceFile::ImportsResolved) {
-      bindExtensions(SF);
-      return;
-    }
+  bindExtensions(*MainModule);
 
+  // If the limiting AST stage is import resolution, we're done.
+  if (LimitStage == SourceFile::ImportsResolved)
+    return;
+
+  forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF);
 
     // Parse the SIL decls if needed.
@@ -821,11 +812,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
       parseSourceFileSIL(SF, &SILContext);
     }
   });
-
-  // If the limiting AST stage is import resolution, we're done.
-  if (LimitStage <= SourceFile::ImportsResolved) {
-    return;
-  }
 
   finishTypeChecking();
 }

@@ -2673,7 +2673,11 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitForceValueExpr(ForceValueExpr *E) {
-    printCommon(E, "force_value_expr") << '\n';
+    printCommon(E, "force_value_expr");
+    if (E->isForceOfImplicitlyUnwrappedOptional())
+      PrintWithColorRAII(OS, ExprModifierColor) << " implicit_iuo_unwrap";
+    OS << '\n';
+
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

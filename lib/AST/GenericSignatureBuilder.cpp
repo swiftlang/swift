@@ -2601,18 +2601,9 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     return nullptr;
 
   // Always refer to the archetype anchor.
-  if (assocType)
-    assocType = assocType->getAssociatedTypeAnchor();
-
-  // If we were asked for a complete, well-formed archetype, make sure we
-  // process delayed requirements if anything changed.
-  SWIFT_DEFER {
-    if (kind == ArchetypeResolutionKind::CompleteWellFormed)
-      builder.processDelayedRequirements();
-  };
+  assocType = assocType->getAssociatedTypeAnchor();
 
   Identifier name = assocType->getName();
-  auto *proto = assocType->getProtocol();
 
   // Look for either an unresolved potential archetype (which we can resolve
   // now) or a potential archetype with the appropriate associated type.
@@ -2656,6 +2647,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   if (shouldUpdatePA) {
     // If there's a superclass constraint that conforms to the protocol,
     // add the appropriate same-type relationship.
+    const auto proto = assocType->getProtocol();
     if (proto) {
       if (auto superSource = builder.resolveSuperConformance(this, proto)) {
         maybeAddSameTypeRequirementForNestedType(resultPA, superSource,
@@ -2669,6 +2661,11 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
       concretizeNestedTypeFromConcreteParent(this, resultPA, builder);
     }
   }
+
+  // If we were asked for a complete, well-formed archetype, make sure we
+  // process delayed requirements if anything changed.
+  if (kind == ArchetypeResolutionKind::CompleteWellFormed)
+    builder.processDelayedRequirements();
 
   return resultPA;
 }
@@ -3520,16 +3517,20 @@ GenericSignatureBuilder::lookupConformance(CanType dependentType,
 }
 
 /// Resolve any unresolved dependent member types using the given builder.
-static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
-                                        Type type) {
+static Type resolveDependentMemberTypes(
+                                GenericSignatureBuilder &builder,
+                                Type type,
+                                ArchetypeResolutionKind resolutionKind
+                                  = ArchetypeResolutionKind::WellFormed) {
   if (!type->hasTypeParameter()) return type;
 
-  return type.transformRec([&builder](TypeBase *type) -> Optional<Type> {
+  return type.transformRec([&resolutionKind,
+                            &builder](TypeBase *type) -> Optional<Type> {
     if (!type->isTypeParameter())
       return None;
 
     auto resolved = builder.maybeResolveEquivalenceClass(
-        Type(type), ArchetypeResolutionKind::WellFormed, true);
+        Type(type), resolutionKind, true);
 
     if (!resolved)
       return ErrorType::get(Type(type));
@@ -3554,7 +3555,8 @@ static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
         equivClass->recursiveConcreteType = false;
       };
 
-      return resolveDependentMemberTypes(builder, equivClass->concreteType);
+      return resolveDependentMemberTypes(builder, equivClass->concreteType,
+                                         resolutionKind);
     }
 
     return equivClass->getAnchor(builder, builder.getGenericParams());
@@ -3733,7 +3735,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
   // FIXME: Generic typealiases contradict the assumption above.
   // If there is a type parameter somewhere in this type, resolve it.
   if (type->hasTypeParameter()) {
-    Type resolved = resolveDependentMemberTypes(*this, type);
+    Type resolved = resolveDependentMemberTypes(*this, type, resolutionKind);
     if (resolved->hasError() && !type->hasError())
       return ResolvedType::forUnresolved(nullptr);
 
@@ -3761,7 +3763,7 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
     return ResolvedType(pa);
 
   // Determine what kind of resolution we want.
-  Type type = paOrT.dyn_cast<Type>();
+  Type type = paOrT.get<Type>();
   ArchetypeResolutionKind resolutionKind =
     ArchetypeResolutionKind::WellFormed;
   if (!source.isExplicit() && source.isRecursive(type, *this))

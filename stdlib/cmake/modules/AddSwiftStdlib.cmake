@@ -522,7 +522,6 @@ endfunction()
 #     [LINK_LIBRARIES dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
-#     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
@@ -567,9 +566,6 @@ endfunction()
 #
 # FRAMEWORK_DEPENDS_WEAK
 #   System frameworks this library depends on that should be weakly-linked.
-#
-# LLVM_LINK_COMPONENTS
-#   LLVM components this library depends on.
 #
 # C_COMPILE_FLAGS
 #   Extra compile flags (C, C++, ObjC).
@@ -637,7 +633,6 @@ function(_add_swift_target_library_single target name)
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         LINK_FLAGS
         LINK_LIBRARIES
-        LLVM_LINK_COMPONENTS
         PRIVATE_LINK_LIBRARIES
         SWIFT_COMPILE_FLAGS
         MODULE_TARGETS)
@@ -1097,11 +1092,6 @@ function(_add_swift_target_library_single target name)
     endforeach()
   endforeach()
 
-  if(NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    # Call llvm_config() only for libraries that are part of the compiler.
-    swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_LINK_COMPONENTS})
-  endif()
-
   # Collect compile and link flags for the static and non-static targets.
   # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
   set(c_compile_flags ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS})
@@ -1150,14 +1140,6 @@ function(_add_swift_target_library_single target name)
     RESULT_VAR_NAME c_compile_flags
     MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
     )
-
-  if(SWIFTLIB_IS_STDLIB)
-    # We don't ever want to link against the ABI-breakage checking symbols
-    # in the standard library, runtime, or overlays because they only rely
-    # on the header parts of LLVM's ADT.
-    list(APPEND c_compile_flags
-      "-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1")
-  endif()
 
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
     if(libkind STREQUAL SHARED)
@@ -1357,7 +1339,6 @@ endfunction()
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
-#     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
 #     [TARGET_SDKS sdk1...]
 #     [C_COMPILE_FLAGS flag1...]
@@ -1438,9 +1419,6 @@ endfunction()
 #
 # FRAMEWORK_DEPENDS_WEAK
 #   System frameworks this library depends on that should be weak-linked
-#
-# LLVM_LINK_COMPONENTS
-#   LLVM components this library depends on.
 #
 # FILE_DEPENDS
 #   Additional files this library depends on.
@@ -1532,7 +1510,6 @@ function(add_swift_target_library name)
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         LINK_FLAGS
         LINK_LIBRARIES
-        LLVM_LINK_COMPONENTS
         PRIVATE_LINK_LIBRARIES
         SWIFT_COMPILE_FLAGS
         SWIFT_COMPILE_FLAGS_IOS
@@ -1954,7 +1931,6 @@ function(add_swift_target_library name)
         LINK_LIBRARIES ${swiftlib_link_libraries}
         FRAMEWORK_DEPENDS ${swiftlib_framework_depends_flattened}
         FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
-        LLVM_LINK_COMPONENTS ${SWIFTLIB_LLVM_LINK_COMPONENTS}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
         C_COMPILE_FLAGS ${swiftlib_c_compile_flags_all}
         SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_flags_arch} ${swiftlib_swift_compile_private_frameworks_flag}
@@ -2278,8 +2254,7 @@ function(_add_swift_target_executable_single name)
     SDK)
   set(multiple_parameter_options
     COMPILE_FLAGS
-    DEPENDS
-    LLVM_LINK_COMPONENTS)
+    DEPENDS)
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "${options}"
     "${single_parameter_options}"
@@ -2384,8 +2359,6 @@ function(_add_swift_target_executable_single name)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_LINK_COMPONENTS})
-
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than
   # `clang++` as we explicitly link against the C++ runtime.  We were previously
   # actually passing `-nostdlib++` to avoid the C++ runtime linkage.
@@ -2409,7 +2382,7 @@ function(add_swift_target_executable name)
   cmake_parse_arguments(SWIFTEXE_TARGET
     "EXCLUDE_FROM_ALL;;BUILD_WITH_STDLIB"
     ""
-    "DEPENDS;LLVM_LINK_COMPONENTS;LINK_LIBRARIES"
+    "DEPENDS;LINK_LIBRARIES"
     ${ARGN})
 
   set(SWIFTEXE_TARGET_SOURCES ${SWIFTEXE_TARGET_UNPARSED_ARGUMENTS})
@@ -2442,7 +2415,6 @@ function(add_swift_target_executable name)
           ${VARIANT_NAME}
           ${SWIFTEXE_TARGET_SOURCES}
           DEPENDS ${SWIFTEXE_TARGET_DEPENDS_with_suffix}
-          LLVM_LINK_COMPONENTS ${SWIFTEXE_TARGET_LLVM_LINK_COMPONENTS}
           SDK "${sdk}"
           ARCHITECTURE "${arch}")
 
