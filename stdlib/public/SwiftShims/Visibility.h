@@ -30,6 +30,10 @@
 #define __has_builtin(builtin) 0
 #endif
 
+#if !defined(__has_cpp_attribute)
+#define __has_cpp_attribute(attribute) 0
+#endif
+
 #if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
@@ -131,6 +135,18 @@
 #define SWIFT_RUNTIME_EXPORT extern "C" SWIFT_EXPORT_ATTRIBUTE
 #else
 #define SWIFT_RUNTIME_EXPORT SWIFT_EXPORT_ATTRIBUTE
+#endif
+
+#if __cplusplus > 201402l && __has_cpp_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH [[fallthrough]]
+#elif __has_cpp_attribute(gnu::fallthrough)
+#define SWIFT_FALLTHROUGH [[gnu::fallthrough]]
+#elif __has_cpp_attribute(clang::fallthrough)
+#define SWIFT_FALLTHROUGH [[clang::fallthrough]]
+#elif __has_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH __attribute__((__fallthrough__))
+#else
+#define SWIFT_FALLTHROUGH
 #endif
 
 

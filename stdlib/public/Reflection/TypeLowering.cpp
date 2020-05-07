@@ -1118,7 +1118,7 @@ public:
       switch (FD->Kind) {
       case FieldDescriptorKind::Class:
         Refcounting = ReferenceCounting::Native;
-        LLVM_FALLTHROUGH;
+        SWIFT_FALLTHROUGH;
 
       case FieldDescriptorKind::ObjCClass:
         addAnyObject();

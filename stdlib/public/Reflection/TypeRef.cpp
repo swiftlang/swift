@@ -537,7 +537,7 @@ public:
       }
 
       // Otherwise it requires a tuple wrapper.
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     }
 
     // This covers both none and multiple parameters.
