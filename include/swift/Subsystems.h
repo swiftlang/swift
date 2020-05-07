@@ -140,7 +140,7 @@ namespace swift {
   void performPCMacro(SourceFile &SF);
 
   /// Bind all 'extension' visible from \p SF to the extended nominal.
-  void bindExtensions(SourceFile &SF);
+  void bindExtensions(ModuleDecl &mod);
 
   /// Once import resolution is complete, this walks the AST to resolve types
   /// and diagnose problems therein.
