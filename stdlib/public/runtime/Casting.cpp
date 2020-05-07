@@ -39,7 +39,6 @@
 #include "swift/Runtime/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/Support/Compiler.h"
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #include "SwiftObject.h"
