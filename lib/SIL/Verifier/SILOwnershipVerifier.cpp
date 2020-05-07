@@ -964,7 +964,7 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   // that if we run into something that we do not understand, we do not assert
   // in user code even tohugh we aren't going to actually verify (the default
   // behavior when -sil-verify-all is disabled).
-  auto *mod = getParent();
+  auto *mod = &getModule();
   if (!mod || !mod->getOptions().VerifyAll)
     return;
 #endif
