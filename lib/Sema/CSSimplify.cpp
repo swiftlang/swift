@@ -3109,9 +3109,15 @@ bool ConstraintSystem::repairFailures(
       // position (which doesn't require explicit `&`) decays into
       // a `Bind` of involved object types, same goes for explicit
       // `&` conversion from l-value to inout type.
+      //
+      // In case of regular argument conversion although explicit `&`
+      // is required we still want to diagnose the problem as one
+      // about mutability instead of suggesting to add `&` which wouldn't
+      // be correct.
       auto kind = (isExpr<InOutExpr>(anchor) ||
                    (rhs->is<InOutType>() &&
-                    matchKind == ConstraintKind::OperatorArgumentConversion))
+                    (matchKind == ConstraintKind::ArgumentConversion ||
+                     matchKind == ConstraintKind::OperatorArgumentConversion)))
                       ? ConstraintKind::Bind
                       : matchKind;
 
