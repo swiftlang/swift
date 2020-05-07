@@ -1,0 +1,14 @@
+name: Keep track of upstream changes
+on:
+  schedule:
+    - cron: '0 * * * *'
+jobs:
+  nightly-distribution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: |
+        git checkout master
+        git remote add apple https://github.com/apple/swift.git
+        git pull apple master
+        git push origin master
