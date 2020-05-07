@@ -248,7 +248,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
 // This is noinline to preserve this frame in stack traces.
 // We want "dynamicCastFailure" to appear in crash logs even we crash 
 // during the diagnostic because some Metadata is invalid.
-LLVM_ATTRIBUTE_NORETURN SWIFT_NOINLINE void
+SWIFT_NORETURN SWIFT_NOINLINE void
 swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                                 const void *targetType, const char *targetName,
                                 const char *message) {
@@ -260,11 +260,9 @@ swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                     message ? message : "");
 }
 
-LLVM_ATTRIBUTE_NORETURN
-void 
-swift::swift_dynamicCastFailure(const Metadata *sourceType,
-                                const Metadata *targetType, 
-                                const char *message) {
+SWIFT_NORETURN void swift::swift_dynamicCastFailure(const Metadata *sourceType,
+                                                    const Metadata *targetType,
+                                                    const char *message) {
   std::string sourceName = nameForMetadata(sourceType);
   std::string targetName = nameForMetadata(targetType);
 
