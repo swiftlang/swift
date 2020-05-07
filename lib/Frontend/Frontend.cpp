@@ -806,12 +806,13 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   }) && "some files have not yet had their imports resolved");
   MainModule->setHasResolvedImports();
 
-  forEachFileToTypeCheck([&](SourceFile &SF) {
-    if (LimitStage == SourceFile::ImportsResolved) {
-      bindExtensions(SF);
-      return;
-    }
+  bindExtensions(*MainModule);
 
+  // If the limiting AST stage is import resolution, we're done.
+  if (LimitStage == SourceFile::ImportsResolved)
+    return;
+
+  forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF);
 
     // Parse the SIL decls if needed.
@@ -821,11 +822,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
       parseSourceFileSIL(SF, &SILContext);
     }
   });
-
-  // If the limiting AST stage is import resolution, we're done.
-  if (LimitStage <= SourceFile::ImportsResolved) {
-    return;
-  }
 
   finishTypeChecking();
 }

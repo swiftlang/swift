@@ -184,6 +184,8 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
   auto &REPLInputFile =
       *new (Ctx) SourceFile(*REPLModule, SourceFileKind::REPL, BufferID);
   REPLModule->addFile(REPLInputFile);
+  performImportResolution(REPLInputFile);
+  bindExtensions(*REPLModule);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }

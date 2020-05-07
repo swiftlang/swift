@@ -239,7 +239,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   newModule->addFile(newSF);
 
   performImportResolution(newSF);
-  bindExtensions(newSF);
+  bindExtensions(*newModule);
 
   performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
 
