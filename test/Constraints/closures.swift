@@ -972,6 +972,7 @@ func test_correct_inference_of_closure_result_in_presence_of_optionals() {
   }
 }
 
+
 // rdar://problem/59741308 - inference fails with tuple element has to joined to supertype
 func rdar_59741308() {
   class Base {

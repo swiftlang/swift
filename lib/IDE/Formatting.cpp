@@ -128,6 +128,13 @@ static bool hasExplicitAccessors(VarDecl *VD) {
                               Getter->getAccessorKeywordLoc().isValid());
 }
 
+static ClosureExpr *findTrailingClosureFromArgument(Expr *arg) {
+  if (auto TC = dyn_cast_or_null<ClosureExpr>(arg))
+    return TC;
+  if (auto TCL = dyn_cast_or_null<CaptureListExpr>(arg))
+    return TCL->getClosureBody();
+  return nullptr;
+}
 
 /// An indentation context of the target location
 struct IndentContext {
@@ -381,8 +388,14 @@ protected:
 public:
   explicit RangeWalker(SourceManager &SM) : SM(SM) {}
 
+  /// Called for every range bounded by a pair of parens, braces, square
+  /// brackets, or angle brackets.
+  ///
   /// \returns true to continue walking.
   virtual bool handleRange(SourceLoc L, SourceLoc R, SourceLoc ContextLoc) = 0;
+
+  /// Called for ranges that have a separate ContextLoc but no bounding tokens.
+  virtual void handleImplicitRange(SourceRange Range, SourceLoc ContextLoc) = 0;
 
 private:
   bool handleBraces(SourceLoc L, SourceLoc R, SourceLoc ContextLoc) {
@@ -626,8 +639,7 @@ private:
       } else {
         Arg = cast<SubscriptExpr>(E)->getIndex();
       }
-      ClosureExpr *TC = nullptr;
-      CaptureListExpr *TCL = nullptr;
+
       if (auto *PE = dyn_cast_or_null<ParenExpr>(Arg)) {
         if (isa<SubscriptExpr>(E)) {
           if (!handleSquares(PE->getLParenLoc(), PE->getRParenLoc(), ContextLoc))
@@ -637,10 +649,9 @@ private:
             return Stop;
         }
         if (PE->hasTrailingClosure()) {
-          if (auto *Last = PE->getSubExpr()) {
-            TC = dyn_cast<ClosureExpr>(Last);
-            TCL = dyn_cast<CaptureListExpr>(Last);
-          }
+          if (auto CE = findTrailingClosureFromArgument(PE->getSubExpr()))
+            if (!handleBraceStmt(CE->getBody(), ContextLoc))
+              return Stop;
         }
       } else if (auto *TE = dyn_cast_or_null<TupleExpr>(Arg)) {
         if (isa<SubscriptExpr>(E)) {
@@ -650,17 +661,12 @@ private:
           if (!handleParens(TE->getLParenLoc(), TE->getRParenLoc(), ContextLoc))
             return Stop;
         }
-        if (TE->hasTrailingClosure()) {
-          if (auto *Last = TE->getElements().back()) {
-            TC = dyn_cast<ClosureExpr>(Last);
-            TCL = dyn_cast<CaptureListExpr>(Last);
-          }
+        if (TE->hasAnyTrailingClosures()) {
+          SourceRange Range(TE->getTrailingElements().front()->getStartLoc(),
+                            TE->getEndLoc());
+          handleImplicitRange(Range, ContextLoc);
         }
       }
-      if (TC && !handleBraceStmt(TC->getBody(), ContextLoc))
-        return Stop;
-      if (TCL && !handleBraceStmt(TCL->getClosureBody()->getBody(), ContextLoc))
-        return Stop;
     }
     return Continue;
   }
@@ -717,6 +723,16 @@ class OutdentChecker: protected RangeWalker {
                           SourceRange CheckRange,  RangeKind CheckRangeKind)
   : RangeWalker(SM), CheckRange(CheckRange), CheckRangeKind(CheckRangeKind) {
     assert(CheckRange.isValid());
+  }
+
+  void handleImplicitRange(SourceRange Range, SourceLoc ContextLoc) override {
+    assert(Range.isValid() && ContextLoc.isValid());
+
+    // Ignore ranges outside of the open/closed check range.
+    if (!isInCheckRange(Range.Start, Range.End))
+      return;
+
+    propagateContextLocs(ContextLoc, Range.Start, Range.End);
   }
 
   bool handleRange(SourceLoc L, SourceLoc R, SourceLoc ContextLoc) override {
@@ -2317,35 +2333,48 @@ private:
         Arg = cast<SubscriptExpr>(E)->getIndex();
       }
 
-      ClosureExpr *TCE = nullptr;
-      CaptureListExpr *TCL = nullptr;
+      auto getIndentContextFromTrailingClosure =
+          [&](Expr *arg) -> Optional<IndentContext> {
+        if (auto CE = findTrailingClosureFromArgument(arg)) {
+          SourceRange Range = CE->getSourceRange();
+          if (Range.isValid() && (TrailingTarget || overlapsTarget(Range))) {
+            if (auto CLE = dyn_cast<CaptureListExpr>(arg))
+              return getIndentContextFrom(CLE, ContextLoc);
+            return getIndentContextFrom(CE, ContextLoc);
+          }
+        }
+        return None;
+      };
+
       if (auto *PE = dyn_cast_or_null<ParenExpr>(Arg)) {
         if (auto Ctx = getIndentContextFrom(PE, ContextLoc))
           return Ctx;
         if (PE->hasTrailingClosure()) {
-          Expr *Last = PE->getSubExpr();
-          TCE = dyn_cast_or_null<ClosureExpr>(Last);
-          TCL = dyn_cast_or_null<CaptureListExpr>(Last);
+          if (auto Ctx = getIndentContextFromTrailingClosure(PE->getSubExpr()))
+            return Ctx;
         }
       } else if (auto *TE = dyn_cast_or_null<TupleExpr>(Arg)) {
-        if (auto Ctx = getIndentContextFrom(TE, ContextLoc)) {
+        if (auto Ctx = getIndentContextFrom(TE, ContextLoc))
           return Ctx;
-        }
-        if (TE->hasTrailingClosure()) {
-          Expr *Last = TE->getElements().back();
-          TCE = dyn_cast_or_null<ClosureExpr>(Last);
-          TCL = dyn_cast_or_null<CaptureListExpr>(Last);
-        }
-      }
 
-      if (TCL) {
-        SourceRange Range = TCL->getSourceRange();
-        if (Range.isValid() && (TrailingTarget || overlapsTarget(Range)))
-          return getIndentContextFrom(TCL, ContextLoc);
-      } else if (TCE) {
-        SourceRange Range = TCE->getSourceRange();
-        if (Range.isValid() && (TrailingTarget || overlapsTarget(Range)))
-          return getIndentContextFrom(TCE, ContextLoc);
+        if (TE->hasAnyTrailingClosures()) {
+          Expr *Unlabeled = TE->getTrailingElements().front();
+          SourceRange ClosuresRange(Unlabeled->getStartLoc(), TE->getEndLoc());
+
+          if (overlapsTarget(ClosuresRange) || TrailingTarget) {
+            SourceRange ContextToEnd(ContextLoc, ClosuresRange.End);
+            ContextLoc = CtxOverride.propagateContext(SM, ContextLoc,
+                                                      IndentContext::LineStart,
+                                                      ClosuresRange.Start,
+                                                      SourceLoc());
+            if (!TrailingTarget) {
+              return IndentContext {
+                ContextLoc,
+                !OutdentChecker::hasOutdent(SM, ContextToEnd, E)
+              };
+            }
+          }
+        }
       }
     }
 
@@ -2486,9 +2515,7 @@ private:
     }
 
     ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
-    auto NumElems = TE->getNumElements();
-    if (TE->hasTrailingClosure())
-      --NumElems;
+    auto NumElems = TE->getNumElements() - TE->getNumTrailingElements();
     for (auto I : range(NumElems)) {
       SourceRange ElemRange = TE->getElementNameLoc(I);
       if (Expr *Elem = TE->getElement(I))

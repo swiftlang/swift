@@ -963,22 +963,22 @@ computeSingleArgumentType(ASTContext &ctx, Expr *arg, bool implicit,
   arg->setType(TupleType::get(typeElements, ctx));
 }
 
-Expr *
-swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
-                          ArrayRef<Expr *> args,
-                          ArrayRef<Identifier> &argLabels,
-                          ArrayRef<SourceLoc> &argLabelLocs,
-                          SourceLoc rParenLoc,
-                          Expr *trailingClosure, bool implicit,
-                          SmallVectorImpl<Identifier> &argLabelsScratch,
-                          SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
-                          llvm::function_ref<Type(const Expr *)> getType) {
+Expr *swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
+                                ArrayRef<Expr *> args,
+                                ArrayRef<Identifier> &argLabels,
+                                ArrayRef<SourceLoc> &argLabelLocs,
+                                SourceLoc rParenLoc,
+                                ArrayRef<TrailingClosure> trailingClosures,
+                                bool implicit,
+                                SmallVectorImpl<Identifier> &argLabelsScratch,
+                                SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
+                                llvm::function_ref<Type(const Expr *)> getType) {
   // Clear out our scratch space.
   argLabelsScratch.clear();
   argLabelLocsScratch.clear();
 
   // Construct a TupleExpr or ParenExpr, as appropriate, for the argument.
-  if (!trailingClosure) {
+  if (trailingClosures.empty()) {
     // Do we have a single, unlabeled argument?
     if (args.size() == 1 && (argLabels.empty() || argLabels[0].empty())) {
       auto arg = new (ctx) ParenExpr(lParenLoc, args[0], rParenLoc,
@@ -1009,11 +1009,14 @@ swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
     return arg;
   }
 
-  // If we have no other arguments, represent the trailing closure as a
+  // If we have no other arguments, represent the a single trailing closure as a
   // parenthesized expression.
-  if (args.empty()) {
-    auto arg = new (ctx) ParenExpr(lParenLoc, trailingClosure, rParenLoc,
-                                   /*hasTrailingClosure=*/true);
+  if (args.empty() && trailingClosures.size() == 1 &&
+      trailingClosures.front().LabelLoc.isInvalid()) {
+    auto &trailingClosure = trailingClosures.front();
+    auto arg =
+        new (ctx) ParenExpr(lParenLoc, trailingClosure.ClosureExpr, rParenLoc,
+                            /*hasTrailingClosure=*/true);
     computeSingleArgumentType(ctx, arg, implicit, getType);
     argLabelsScratch.push_back(Identifier());
     argLabels = argLabelsScratch;
@@ -1023,36 +1026,61 @@ swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
 
   assert(argLabels.empty() || args.size() == argLabels.size());
 
+  unsigned numRegularArgs = args.size();
+
   // Form a tuple, including the trailing closure.
   SmallVector<Expr *, 4> argsScratch;
-  argsScratch.reserve(args.size() + 1);
+  argsScratch.reserve(numRegularArgs + trailingClosures.size());
   argsScratch.append(args.begin(), args.end());
-  argsScratch.push_back(trailingClosure);
+  for (const auto &closure : trailingClosures)
+    argsScratch.push_back(closure.ClosureExpr);
   args = argsScratch;
 
-  argLabelsScratch.reserve(args.size());
-  if (argLabels.empty()) {
-    argLabelsScratch.assign(args.size(), Identifier());
-  } else {
-    argLabelsScratch.append(argLabels.begin(), argLabels.end());
-    argLabelsScratch.push_back(Identifier());
-  }
-  argLabels = argLabelsScratch;
+  {
+    if (argLabels.empty()) {
+      argLabelsScratch.resize(numRegularArgs);
+    } else {
+      argLabelsScratch.append(argLabels.begin(), argLabels.end());
+    }
 
-  if (!argLabelLocs.empty()) {
-    argLabelLocsScratch.reserve(argLabelLocs.size() + 1);
-    argLabelLocsScratch.append(argLabelLocs.begin(), argLabelLocs.end());
-    argLabelLocsScratch.push_back(SourceLoc());
+    for (const auto &closure : trailingClosures)
+      argLabelsScratch.push_back(closure.Label);
+
+    argLabels = argLabelsScratch;
+  }
+
+  {
+    if (argLabelLocs.empty()) {
+      argLabelLocsScratch.resize(numRegularArgs);
+    } else {
+      argLabelLocsScratch.append(argLabelLocs.begin(), argLabelLocs.end());
+    }
+
+    for (const auto &closure : trailingClosures)
+      argLabelLocsScratch.push_back(closure.LabelLoc);
+
     argLabelLocs = argLabelLocsScratch;
   }
 
-  auto arg = TupleExpr::create(ctx, lParenLoc, args, argLabels,
-                               argLabelLocs, rParenLoc,
-                               /*HasTrailingClosure=*/true,
+  Optional<unsigned> unlabeledTrailingClosureIndex;
+  if (!trailingClosures.empty() && trailingClosures[0].Label.empty())
+    unlabeledTrailingClosureIndex = args.size() - trailingClosures.size();
+
+  auto arg = TupleExpr::create(ctx, lParenLoc, rParenLoc, args, argLabels,
+                               argLabelLocs,
+                               unlabeledTrailingClosureIndex,
                                /*Implicit=*/false);
   computeSingleArgumentType(ctx, arg, implicit, getType);
-
   return arg;
+}
+
+Optional<unsigned>
+Expr::getUnlabeledTrailingClosureIndexOfPackedArgument() const {
+  if (auto PE = dyn_cast<ParenExpr>(this))
+    return PE->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  if (auto TE = dyn_cast<TupleExpr>(this))
+    return TE->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  return None;
 }
 
 ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
@@ -1068,7 +1096,7 @@ ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
   Bits.ObjectLiteralExpr.NumArgLabels = argLabels.size();
   Bits.ObjectLiteralExpr.HasArgLabelLocs = !argLabelLocs.empty();
   Bits.ObjectLiteralExpr.HasTrailingClosure = hasTrailingClosure;
-  initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);  
+  initializeCallArguments(argLabels, argLabelLocs);
 }
 
 ObjectLiteralExpr *
@@ -1085,7 +1113,7 @@ ObjectLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind,
                                                  &hasTrailingClosure,
                                                  getType);
 
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs, hasTrailingClosure);
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
 
   void *memory = ctx.Allocate(size, alignof(ObjectLiteralExpr));
   return new (memory) ObjectLiteralExpr(poundLoc, kind, arg, argLabels,
@@ -1101,21 +1129,21 @@ ObjectLiteralExpr *ObjectLiteralExpr::create(ASTContext &ctx,
                                              ArrayRef<Identifier> argLabels,
                                              ArrayRef<SourceLoc> argLabelLocs,
                                              SourceLoc rParenLoc,
-                                             Expr *trailingClosure,
+                                             ArrayRef<TrailingClosure> trailingClosures,
                                              bool implicit) {
   SmallVector<Identifier, 4> argLabelsScratch;
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
   Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc, trailingClosure, implicit,
-                                 argLabelsScratch, argLabelLocsScratch);
+                                 rParenLoc,
+                                 trailingClosures, implicit, argLabelsScratch,
+                                 argLabelLocsScratch);
 
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
-                                 trailingClosure != nullptr);
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
 
   void *memory = ctx.Allocate(size, alignof(ObjectLiteralExpr));
   return new (memory) ObjectLiteralExpr(poundLoc, kind, arg, argLabels,
                                         argLabelLocs,
-                                        trailingClosure != nullptr, implicit);
+                                        trailingClosures.size() == 1, implicit);
 }
 
 StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
@@ -1238,7 +1266,7 @@ SourceRange TupleExpr::getSourceRange() const {
     }
   }
   
-  if (hasTrailingClosure() || RParenLoc.isInvalid()) {
+  if (hasAnyTrailingClosures() || RParenLoc.isInvalid()) {
     if (getNumElements() == 0) {
       return { SourceLoc(), SourceLoc() };
     } else {
@@ -1261,14 +1289,15 @@ SourceRange TupleExpr::getSourceRange() const {
   }
 }
 
-TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
+TupleExpr::TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
+                     ArrayRef<Expr *> SubExprs,
                      ArrayRef<Identifier> ElementNames, 
                      ArrayRef<SourceLoc> ElementNameLocs,
-                     SourceLoc RParenLoc, bool HasTrailingClosure, 
+                     Optional<unsigned> FirstTrailingArgumentAt,
                      bool Implicit, Type Ty)
   : Expr(ExprKind::Tuple, Implicit, Ty),
-    LParenLoc(LParenLoc), RParenLoc(RParenLoc) {
-  Bits.TupleExpr.HasTrailingClosure = HasTrailingClosure;
+    LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+    FirstTrailingArgumentAt(FirstTrailingArgumentAt) {
   Bits.TupleExpr.HasElementNames = !ElementNames.empty();
   Bits.TupleExpr.HasElementNameLocations = !ElementNameLocs.empty();
   Bits.TupleExpr.NumElements = SubExprs.size();
@@ -1297,11 +1326,27 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
 }
 
 TupleExpr *TupleExpr::create(ASTContext &ctx,
-                             SourceLoc LParenLoc, 
+                             SourceLoc LParenLoc,
                              ArrayRef<Expr *> SubExprs,
-                             ArrayRef<Identifier> ElementNames, 
+                             ArrayRef<Identifier> ElementNames,
                              ArrayRef<SourceLoc> ElementNameLocs,
-                             SourceLoc RParenLoc, bool HasTrailingClosure, 
+                             SourceLoc RParenLoc,
+                             bool HasTrailingClosure,
+                             bool Implicit, Type Ty) {
+  Optional<unsigned> FirstTrailingArgumentAt =
+      HasTrailingClosure ? SubExprs.size() - 1 : Optional<unsigned>();
+
+  return create(ctx, LParenLoc, RParenLoc, SubExprs, ElementNames,
+                ElementNameLocs, FirstTrailingArgumentAt, Implicit, Ty);
+}
+
+TupleExpr *TupleExpr::create(ASTContext &ctx,
+                             SourceLoc LParenLoc,
+                             SourceLoc RParenLoc,
+                             ArrayRef<Expr *> SubExprs,
+                             ArrayRef<Identifier> ElementNames,
+                             ArrayRef<SourceLoc> ElementNameLocs,
+                             Optional<unsigned> FirstTrailingArgumentAt,
                              bool Implicit, Type Ty) {
   assert(!Ty || isa<TupleType>(Ty.getPointer()));
   auto hasNonEmptyIdentifier = [](ArrayRef<Identifier> Ids) -> bool {
@@ -1321,23 +1366,23 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                                                       ElementNames.size(),
                                                       ElementNameLocs.size());
   void *mem = ctx.Allocate(size, alignof(TupleExpr));
-  return new (mem) TupleExpr(LParenLoc, SubExprs, ElementNames, ElementNameLocs,
-                             RParenLoc, HasTrailingClosure, Implicit, Ty);
+  return new (mem) TupleExpr(LParenLoc, RParenLoc, SubExprs, ElementNames,
+                             ElementNameLocs,
+                             FirstTrailingArgumentAt, Implicit, Ty);
 }
 
 TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
                                   SourceLoc RParenLoc, bool Implicit) {
-  return create(ctx, LParenLoc, { }, { }, { }, RParenLoc, 
-                /*HasTrailingClosure=*/false, Implicit, 
+  return create(ctx, LParenLoc, RParenLoc, {}, {}, {},
+                /*FirstTrailingArgumentAt=*/None, Implicit,
                 TupleType::getEmpty(ctx));
 }
 
 TupleExpr *TupleExpr::createImplicit(ASTContext &ctx, ArrayRef<Expr *> SubExprs,
                                      ArrayRef<Identifier> ElementNames) {
-  return create(ctx, SourceLoc(), SubExprs, ElementNames, { }, SourceLoc(),
-                /*HasTrailingClosure=*/false, /*Implicit=*/true, Type());
+  return create(ctx, SourceLoc(), SourceLoc(), SubExprs, ElementNames, {},
+                /*FirstTrailingArgumentAt=*/None, /*Implicit=*/true, Type());
 }
-
 
 ArrayExpr *ArrayExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                              ArrayRef<Expr*> Elements,
@@ -1449,7 +1494,7 @@ SubscriptExpr::SubscriptExpr(Expr *base, Expr *index,
   Bits.SubscriptExpr.NumArgLabels = argLabels.size();
   Bits.SubscriptExpr.HasArgLabelLocs = !argLabelLocs.empty();
   Bits.SubscriptExpr.HasTrailingClosure = hasTrailingClosure;
-  initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
+  initializeCallArguments(argLabels, argLabelLocs);
 }
 
 SubscriptExpr *
@@ -1467,7 +1512,7 @@ SubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
                                                  &hasTrailingClosure,
                                                  getType);
 
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs, hasTrailingClosure);
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
 
   void *memory = ctx.Allocate(size, alignof(SubscriptExpr));
   return new (memory) SubscriptExpr(base, index, argLabels, argLabelLocs,
@@ -1481,7 +1526,7 @@ SubscriptExpr *SubscriptExpr::create(ASTContext &ctx, Expr *base,
                                      ArrayRef<Identifier> indexArgLabels,
                                      ArrayRef<SourceLoc> indexArgLabelLocs,
                                      SourceLoc rSquareLoc,
-                                     Expr *trailingClosure,
+                                     ArrayRef<TrailingClosure> trailingClosures,
                                      ConcreteDeclRef decl,
                                      bool implicit,
                                      AccessSemantics semantics) {
@@ -1489,17 +1534,16 @@ SubscriptExpr *SubscriptExpr::create(ASTContext &ctx, Expr *base,
   SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
   Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
                                    indexArgLabelLocs, rSquareLoc,
-                                   trailingClosure, implicit,
+                                   trailingClosures, implicit,
                                    indexArgLabelsScratch,
                                    indexArgLabelLocsScratch);
 
-  size_t size = totalSizeToAlloc(indexArgLabels, indexArgLabelLocs,
-                                 trailingClosure != nullptr);
+  size_t size = totalSizeToAlloc(indexArgLabels, indexArgLabelLocs);
 
   void *memory = ctx.Allocate(size, alignof(SubscriptExpr));
   return new (memory) SubscriptExpr(base, index, indexArgLabels,
                                     indexArgLabelLocs,
-                                    trailingClosure != nullptr,
+                                    trailingClosures.size() == 1,
                                     decl, implicit, semantics);
 }
 
@@ -1514,7 +1558,7 @@ DynamicSubscriptExpr::DynamicSubscriptExpr(Expr *base, Expr *index,
   Bits.DynamicSubscriptExpr.NumArgLabels = argLabels.size();
   Bits.DynamicSubscriptExpr.HasArgLabelLocs = !argLabelLocs.empty();
   Bits.DynamicSubscriptExpr.HasTrailingClosure = hasTrailingClosure;
-  initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
+  initializeCallArguments(argLabels, argLabelLocs);
   if (implicit) setImplicit(implicit);
 }
 
@@ -1532,7 +1576,7 @@ DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
                                                  &hasTrailingClosure,
                                                  getType);
 
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs, hasTrailingClosure);
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
 
   void *memory = ctx.Allocate(size, alignof(DynamicSubscriptExpr));
   return new (memory) DynamicSubscriptExpr(base, index, argLabels, argLabelLocs,
@@ -1552,7 +1596,7 @@ UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
   Bits.UnresolvedMemberExpr.NumArgLabels = argLabels.size();
   Bits.UnresolvedMemberExpr.HasArgLabelLocs = !argLabelLocs.empty();
   Bits.UnresolvedMemberExpr.HasTrailingClosure = hasTrailingClosure;
-  initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
+  initializeCallArguments(argLabels, argLabelLocs);
 }
 
 UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
@@ -1560,7 +1604,7 @@ UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
                                                    DeclNameLoc nameLoc,
                                                    DeclNameRef name,
                                                    bool implicit) {
-  size_t size = totalSizeToAlloc({ }, { }, /*hasTrailingClosure=*/false);
+  size_t size = totalSizeToAlloc({ }, { });
 
   void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
   return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, nullptr,
@@ -1577,23 +1621,20 @@ UnresolvedMemberExpr::create(ASTContext &ctx, SourceLoc dotLoc,
                              ArrayRef<Identifier> argLabels,
                              ArrayRef<SourceLoc> argLabelLocs,
                              SourceLoc rParenLoc,
-                             Expr *trailingClosure,
+                             ArrayRef<TrailingClosure> trailingClosures,
                              bool implicit) {
   SmallVector<Identifier, 4> argLabelsScratch;
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
-  Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels,
-                                 argLabelLocs, rParenLoc,
-                                 trailingClosure, implicit,
-                                 argLabelsScratch,
-                                 argLabelLocsScratch);
+  Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
+                                 rParenLoc, trailingClosures, implicit,
+                                 argLabelsScratch, argLabelLocsScratch);
 
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
-                                 trailingClosure != nullptr);
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
 
   void *memory = ctx.Allocate(size, alignof(UnresolvedMemberExpr));
   return new (memory) UnresolvedMemberExpr(dotLoc, nameLoc, name, arg,
                                            argLabels, argLabelLocs,
-                                           trailingClosure != nullptr,
+                                           trailingClosures.size() == 1,
                                            implicit);
 }
 
@@ -1628,6 +1669,13 @@ bool ApplyExpr::hasTrailingClosure() const {
   return false;
 }
 
+Optional<unsigned> ApplyExpr::getUnlabeledTrailingClosureIndex() const {
+  if (auto call = dyn_cast<CallExpr>(this))
+    return call->getUnlabeledTrailingClosureIndex();
+
+  return None;
+}
+
 CallExpr::CallExpr(Expr *fn, Expr *arg, bool Implicit,
                    ArrayRef<Identifier> argLabels,
                    ArrayRef<SourceLoc> argLabelLocs,
@@ -1638,13 +1686,14 @@ CallExpr::CallExpr(Expr *fn, Expr *arg, bool Implicit,
   Bits.CallExpr.NumArgLabels = argLabels.size();
   Bits.CallExpr.HasArgLabelLocs = !argLabelLocs.empty();
   Bits.CallExpr.HasTrailingClosure = hasTrailingClosure;
-  initializeCallArguments(argLabels, argLabelLocs, hasTrailingClosure);
+  initializeCallArguments(argLabels, argLabelLocs);
 }
 
 CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, Expr *arg,
                            ArrayRef<Identifier> argLabels,
                            ArrayRef<SourceLoc> argLabelLocs,
-                           bool hasTrailingClosure, bool implicit, Type type,
+                           bool hasTrailingClosure,
+                           bool implicit, Type type,
                            llvm::function_ref<Type(const Expr *)> getType) {
   SmallVector<Identifier, 4> argLabelsScratch;
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
@@ -1658,7 +1707,7 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, Expr *arg,
     argLabelLocs = argLabelLocsScratch;
   }
 
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs, hasTrailingClosure);
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
 
   void *memory = ctx.Allocate(size, alignof(CallExpr));
   return new (memory) CallExpr(fn, arg, implicit, argLabels, argLabelLocs,
@@ -1669,22 +1718,22 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc,
                            ArrayRef<Expr *> args,
                            ArrayRef<Identifier> argLabels,
                            ArrayRef<SourceLoc> argLabelLocs,
-                           SourceLoc rParenLoc, Expr *trailingClosure,
+                           SourceLoc rParenLoc,
+                           ArrayRef<TrailingClosure> trailingClosures,
                            bool implicit,
                            llvm::function_ref<Type(const Expr *)> getType) {
   SmallVector<Identifier, 4> argLabelsScratch;
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
   Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc, trailingClosure, implicit,
+                                 rParenLoc,  trailingClosures, implicit,
                                  argLabelsScratch, argLabelLocsScratch,
                                  getType);
 
-  size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
-                                 trailingClosure != nullptr);
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs);
 
   void *memory = ctx.Allocate(size, alignof(CallExpr));
   return new (memory) CallExpr(fn, arg, implicit, argLabels, argLabelLocs,
-                               trailingClosure != nullptr, Type());
+                               trailingClosures.size() == 1, Type());
 }
 
 Expr *CallExpr::getDirectCallee() const {
@@ -2137,14 +2186,14 @@ KeyPathExpr::Component::forSubscript(ASTContext &ctx,
                              ArrayRef<Identifier> indexArgLabels,
                              ArrayRef<SourceLoc> indexArgLabelLocs,
                              SourceLoc rSquareLoc,
-                             Expr *trailingClosure,
+                             ArrayRef<TrailingClosure> trailingClosures,
                              Type elementType,
                              ArrayRef<ProtocolConformanceRef> indexHashables) {
   SmallVector<Identifier, 4> indexArgLabelsScratch;
   SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
   Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
                                    indexArgLabelLocs, rSquareLoc,
-                                   trailingClosure, /*implicit*/ false,
+                                   trailingClosures, /*implicit*/ false,
                                    indexArgLabelsScratch,
                                    indexArgLabelLocsScratch);
   return forSubscriptWithPrebuiltIndexExpr(subscript, index,
@@ -2161,17 +2210,15 @@ KeyPathExpr::Component::forUnresolvedSubscript(ASTContext &ctx,
                                          ArrayRef<Identifier> indexArgLabels,
                                          ArrayRef<SourceLoc> indexArgLabelLocs,
                                          SourceLoc rSquareLoc,
-                                         Expr *trailingClosure) {
+                                         ArrayRef<TrailingClosure> trailingClosures) {
   SmallVector<Identifier, 4> indexArgLabelsScratch;
   SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
-  Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
-                                   indexArgLabelLocs, rSquareLoc,
-                                   trailingClosure, /*implicit*/ false,
-                                   indexArgLabelsScratch,
-                                   indexArgLabelLocsScratch);
-  return forUnresolvedSubscriptWithPrebuiltIndexExpr(ctx, index,
-                                               indexArgLabels,
-                                               lSquareLoc);
+  Expr *index = packSingleArgument(
+      ctx, lSquareLoc, indexArgs, indexArgLabels, indexArgLabelLocs, rSquareLoc,
+      trailingClosures, /*implicit*/ false,
+      indexArgLabelsScratch, indexArgLabelLocsScratch);
+  return forUnresolvedSubscriptWithPrebuiltIndexExpr(ctx, index, indexArgLabels,
+                                                     lSquareLoc);
 }
 
 KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,

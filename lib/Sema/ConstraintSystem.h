@@ -2173,7 +2173,7 @@ public:
 
   struct ArgumentInfo {
     ArrayRef<Identifier> Labels;
-    bool HasTrailingClosure;
+    Optional<unsigned> UnlabeledTrailingClosureIndex;
   };
 
   /// A mapping from the constraint locators for references to various
@@ -4886,7 +4886,8 @@ public:
 /// \param args The arguments.
 /// \param params The parameters.
 /// \param paramInfo Declaration-level information about the parameters.
-/// \param hasTrailingClosure Whether the last argument is a trailing closure.
+/// \param unlabeledTrailingClosureIndex The index of an unlabeled trailing closure,
+///   if any.
 /// \param allowFixes Whether to allow fixes when matching arguments.
 ///
 /// \param listener Listener that will be notified when certain problems occur,
@@ -4898,7 +4899,7 @@ public:
 bool matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                         ArrayRef<AnyFunctionType::Param> params,
                         const ParameterListInfo &paramInfo,
-                        bool hasTrailingClosure,
+                        Optional<unsigned> unlabeledTrailingClosureIndex,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);

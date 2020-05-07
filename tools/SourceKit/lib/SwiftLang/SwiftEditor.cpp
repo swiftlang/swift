@@ -1469,16 +1469,13 @@ public:
       :NameRange(NameRange), TypeRange(TypeRange) { }
   };
 
-private:
-
   struct ClosureInfo {
     std::vector<Param> Params;
     CharSourceRange ReturnTypeRange;
   };
 
+private:
   SourceManager &SM;
-  ClosureInfo TargetClosureInfo;
-  EditorPlaceholderExpr *PHE = nullptr;
 
   class PlaceholderFinder: public ASTWalker {
     SourceLoc PlaceholderLoc;
@@ -1572,12 +1569,11 @@ private:
     return ClosureWalker.FoundFunctionTypeRepr;
   }
 
-  bool scanClosureType(SourceFile &SF, SourceLoc PlaceholderLoc) {
+  bool scanClosureType(EditorPlaceholderExpr *PHE,
+                       ClosureInfo &TargetClosureInfo) {
     TargetClosureInfo.Params.clear();
     TargetClosureInfo.ReturnTypeRange = CharSourceRange();
-    PlaceholderFinder Finder(PlaceholderLoc, PHE);
-    SF.walk(Finder);
-    if (!PHE || !PHE->getTypeForExpansion())
+    if (!PHE->getTypeForExpansion())
       return false;
     ClosureTypeWalker PW(SM, TargetClosureInfo);
     PHE->getTypeForExpansion()->walk(PW);
@@ -1700,33 +1696,61 @@ private:
     return std::make_pair(CE, true);
   }
 
-  bool shouldUseTrailingClosureInTuple(TupleExpr *TE,
-                                       SourceLoc PlaceHolderStartLoc,
-                                       bool &isWrappedWithBraces) {
+  struct ParamClosureInfo {
+    Optional<ClosureInfo> placeholderClosure;
+    bool isNonPlacholderClosure = false;
+    bool isWrappedWithBraces = false;
+  };
+
+  /// Scan the given TupleExpr collecting parameter closure information and
+  /// returning the index of the given target placeholder (if found).
+  Optional<unsigned> scanTupleExpr(TupleExpr *TE, SourceLoc targetPlacholderLoc,
+                                   std::vector<ParamClosureInfo> &outParams) {
     if (TE->getElements().empty())
-      return false;
+      return llvm::None;
 
-    for (unsigned I = 0, N = TE->getNumElements(); I < N; ++ I) {
-      bool IsLast = I == N - 1;
-      Expr *E = TE->getElement(I);
+    outParams.clear();
+    outParams.reserve(TE->getNumElements());
 
-      // Placeholders wrapped in braces {<#T##() -> Int#>} can also
-      // be valid for trailing syntax.
+    Optional<unsigned> targetPlacholderIndex;
+
+    for (Expr *E : TE->getElements()) {
+      outParams.emplace_back();
+      auto &outParam = outParams.back();
+
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         if (CE->hasSingleExpressionBody() &&
-            CE->getSingleExpressionBody()->getStartLoc()
-              == PlaceHolderStartLoc) {
-          // We found the placeholder.
-          isWrappedWithBraces = true;
-          return IsLast;
+            CE->getSingleExpressionBody()->getStartLoc() ==
+                targetPlacholderLoc) {
+          targetPlacholderIndex = outParams.size() - 1;
+          if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(
+                  CE->getSingleExpressionBody())) {
+            outParam.isWrappedWithBraces = true;
+            ClosureInfo info;
+            if (scanClosureType(PHE, info))
+              outParam.placeholderClosure = info;
+            continue;
+          }
         }
-      } else if (IsLast) {
-        return E->getStartLoc() == PlaceHolderStartLoc;
+        // else...
+        outParam.isNonPlacholderClosure = true;
+        continue;
+      }
+
+      if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(E)) {
+        ClosureInfo info;
+        if (scanClosureType(PHE, info))
+          outParam.placeholderClosure = info;
       } else if (containClosure(E)) {
-        return false;
+        outParam.isNonPlacholderClosure = true;
+      }
+
+      if (E->getStartLoc() == targetPlacholderLoc) {
+        targetPlacholderIndex = outParams.size() - 1;
       }
     }
-    return false;
+
+    return targetPlacholderIndex;
   }
 
 public:
@@ -1735,45 +1759,91 @@ public:
   /// Retrieves the parameter list, return type and context info for
   /// a typed completion placeholder in a function call.
   /// For example: foo.bar(aaa, <#T##(Int, Int) -> Bool#>).
-  bool scan(SourceFile &SF, unsigned BufID, unsigned Offset,
-             unsigned Length, std::function<void(Expr *Args,
-                                                 bool UseTrailingClosure,
-                                                 bool isWrappedWithBraces,
-                                                 ArrayRef<Param>,
-                                                 CharSourceRange)> Callback,
-            std::function<bool(EditorPlaceholderExpr*)> NonClosureCallback) {
+  bool scan(SourceFile &SF, unsigned BufID, unsigned Offset, unsigned Length,
+            std::function<void(Expr *Args, bool UseTrailingClosure,
+                               bool isWrappedWithBraces, const ClosureInfo &)>
+                OneClosureCallback,
+            std::function<void(TupleExpr *Args, unsigned FirstTrailingIndex,
+                               ArrayRef<ClosureInfo> trailingClosures)>
+                MultiClosureCallback,
+            std::function<bool(EditorPlaceholderExpr *)> NonClosureCallback) {
 
     SourceLoc PlaceholderStartLoc = SM.getLocForOffset(BufID, Offset);
 
     // See if the placeholder is encapsulated with an EditorPlaceholderExpr
-    // and retrieve parameter and return type ranges.
-    if (!scanClosureType(SF, PlaceholderStartLoc)) {
+    EditorPlaceholderExpr *PHE = nullptr;
+    PlaceholderFinder Finder(PlaceholderStartLoc, PHE);
+    SF.walk(Finder);
+    if (!PHE)
       return NonClosureCallback(PHE);
-    }
+
+    // Retrieve parameter and return type ranges.
+    ClosureInfo TargetClosureInfo;
+    if (!scanClosureType(PHE, TargetClosureInfo))
+      return NonClosureCallback(PHE);
 
     // Now we need to see if we can suggest trailing closure expansion,
     // and if the call parens can be removed in that case.
     // We'll first find the enclosing CallExpr, and then do further analysis.
-    bool UseTrailingClosure = false;
-    bool isWrappedWithBraces = false;
+    std::vector<ParamClosureInfo> params;
+    Optional<unsigned> targetPlacholderIndex;
     auto ECE = enclosingCallExprArg(SF, PlaceholderStartLoc);
     Expr *Args = ECE.first;
     if (Args && ECE.second) {
       if (isa<ParenExpr>(Args)) {
-        UseTrailingClosure = true;
+        params.emplace_back();
+        params.back().placeholderClosure = TargetClosureInfo;
+        targetPlacholderIndex = 0;
       } else if (auto *TE = dyn_cast<TupleExpr>(Args)) {
-        UseTrailingClosure = shouldUseTrailingClosureInTuple(
-                               TE, PlaceholderStartLoc,
-                               isWrappedWithBraces);
+        targetPlacholderIndex = scanTupleExpr(TE, PlaceholderStartLoc, params);
       }
     }
 
-    Callback(Args, UseTrailingClosure, isWrappedWithBraces,
-             TargetClosureInfo.Params,
-             TargetClosureInfo.ReturnTypeRange);
+    // If there was no appropriate parent call expression, it's non-trailing.
+    if (!targetPlacholderIndex.hasValue()) {
+      OneClosureCallback(Args, /*useTrailingClosure=*/false,
+                         /*isWrappedWithBraces=*/false, TargetClosureInfo);
+      return true;
+    }
+
+    const unsigned end = params.size();
+    unsigned firstTrailingIndex = end;
+
+    // Find the first parameter eligible to be trailing.
+    while (firstTrailingIndex != 0) {
+      unsigned i = firstTrailingIndex - 1;
+      if (params[i].isNonPlacholderClosure ||
+          !params[i].placeholderClosure.hasValue())
+        break;
+      firstTrailingIndex = i;
+    }
+
+    if (firstTrailingIndex > targetPlacholderIndex) {
+      // Target comes before the eligible trailing closures.
+      OneClosureCallback(Args, /*isTrailing=*/false,
+                         params[*targetPlacholderIndex].isWrappedWithBraces,
+                         TargetClosureInfo);
+      return true;
+    } else if (targetPlacholderIndex == end - 1 &&
+               firstTrailingIndex == end - 1) {
+      // Target is the only eligible trailing closure.
+      OneClosureCallback(Args, /*isTrailing=*/true,
+                         params[*targetPlacholderIndex].isWrappedWithBraces,
+                         TargetClosureInfo);
+      return true;
+    }
+
+    // There are multiple trailing closures.
+    SmallVector<ClosureInfo, 4> trailingClosures;
+    trailingClosures.reserve(params.size() - firstTrailingIndex);
+    for (const auto &param :
+         llvm::makeArrayRef(params).slice(firstTrailingIndex)) {
+      trailingClosures.push_back(*param.placeholderClosure);
+    }
+    MultiClosureCallback(cast<TupleExpr>(Args), firstTrailingIndex,
+                         trailingClosures);
     return true;
   }
-
 };
 
 } // anonymous namespace
@@ -2060,11 +2130,55 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());
 }
 
-bool isReturningVoid(SourceManager &SM, CharSourceRange Range) {
+bool isReturningVoid(const SourceManager &SM, CharSourceRange Range) {
   if (Range.isInvalid())
     return false;
   StringRef Text = SM.extractText(Range);
   return "()" == Text || "Void" == Text;
+}
+
+static void
+printClosureBody(const PlaceholderExpansionScanner::ClosureInfo &closure,
+                 llvm::raw_ostream &OS, const SourceManager &SM) {
+  bool ReturningVoid = isReturningVoid(SM, closure.ReturnTypeRange);
+
+  bool HasSignature = !closure.Params.empty() ||
+                      (closure.ReturnTypeRange.isValid() && !ReturningVoid);
+  bool FirstParam = true;
+  if (HasSignature)
+    OS << "(";
+  for (auto &Param : closure.Params) {
+    if (!FirstParam)
+      OS << ", ";
+    FirstParam = false;
+    if (Param.NameRange.isValid()) {
+      // If we have a parameter name, just output the name as is and skip
+      // the type. For example:
+      // <#(arg1: Int, arg2: Int)#> turns into (arg1, arg2).
+      OS << SM.extractText(Param.NameRange);
+    } else {
+      // If we only have the parameter type, output the type as a
+      // placeholder. For example:
+      // <#(Int, Int)#> turns into (<#Int#>, <#Int#>).
+      OS << "<#";
+      OS << SM.extractText(Param.TypeRange);
+      OS << "#>";
+    }
+  }
+  if (HasSignature)
+    OS << ") ";
+  if (closure.ReturnTypeRange.isValid()) {
+    auto ReturnTypeText = SM.extractText(closure.ReturnTypeRange);
+
+    // We need return type if it is not Void.
+    if (!ReturningVoid) {
+      OS << "-> ";
+      OS << ReturnTypeText << " ";
+    }
+  }
+  if (HasSignature)
+    OS << "in";
+  OS << "\n" << getCodePlaceholder() << "\n";
 }
 
 void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
@@ -2087,8 +2201,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
   Scanner.scan(SF, BufID, Offset, Length,
           [&](Expr *Args,
               bool UseTrailingClosure, bool isWrappedWithBraces,
-              ArrayRef<PlaceholderExpansionScanner::Param> ClosureParams,
-              CharSourceRange ClosureReturnTypeRange) {
+              const PlaceholderExpansionScanner::ClosureInfo &closure) {
 
       unsigned EffectiveOffset = Offset;
       unsigned EffectiveLength = Length;
@@ -2132,54 +2245,58 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         }
         // Trailing closure syntax handling will replace braces anyway.
         bool printBraces = !isWrappedWithBraces || UseTrailingClosure;
+
         if (printBraces)
           OS << "{ ";
-
-        bool ReturningVoid = isReturningVoid(SM, ClosureReturnTypeRange);
-
-        bool HasSignature = !ClosureParams.empty() ||
-                            (ClosureReturnTypeRange.isValid() && !ReturningVoid);
-        bool FirstParam = true;
-        if (HasSignature)
-          OS << "(";
-        for (auto &Param: ClosureParams) {
-          if (!FirstParam)
-            OS << ", ";
-          FirstParam = false;
-          if (Param.NameRange.isValid()) {
-            // If we have a parameter name, just output the name as is and skip
-            // the type. For example:
-            // <#(arg1: Int, arg2: Int)#> turns into (arg1, arg2).
-            OS << SM.extractText(Param.NameRange);
-          }
-          else {
-            // If we only have the parameter type, output the type as a
-            // placeholder. For example:
-            // <#(Int, Int)#> turns into (<#Int#>, <#Int#>).
-            OS << "<#";
-            OS << SM.extractText(Param.TypeRange);
-            OS << "#>";
-          }
-        }
-        if (HasSignature)
-          OS << ") ";
-        if (ClosureReturnTypeRange.isValid()) {
-          auto ReturnTypeText = SM.extractText(ClosureReturnTypeRange);
-
-          // We need return type if it is not Void.
-          if (!ReturningVoid) {
-            OS << "-> ";
-            OS << ReturnTypeText << " ";
-          }
-        }
-        if (HasSignature)
-          OS << "in";
-        OS << "\n" << getCodePlaceholder() << "\n";
+        printClosureBody(closure, OS, SM);
         if (printBraces)
           OS << "}";
       }
       Consumer.handleSourceText(ExpansionStr);
       Consumer.recordAffectedRange(EffectiveOffset, EffectiveLength);
+
+    },[&](TupleExpr *args, unsigned firstTrailingIndex,
+          ArrayRef<PlaceholderExpansionScanner::ClosureInfo> trailingClosures) {
+      unsigned EffectiveOffset = Offset;
+      unsigned EffectiveLength = Length;
+      llvm::SmallString<128> ExpansionStr;
+      {
+        llvm::raw_svector_ostream OS(ExpansionStr);
+
+        assert(args->getNumElements() - firstTrailingIndex == trailingClosures.size());
+        if (firstTrailingIndex == 0) {
+          // foo(<....>) -> foo { <...> }
+          EffectiveOffset = SM.getLocOffsetInBuffer(args->getStartLoc(), BufID);
+          OS << " ";
+        } else {
+          // foo(blah, <....>) -> foo(blah) { <...> }
+          SourceLoc beforeTrailingLoc = Lexer::getLocForEndOfToken(SM,
+              args->getElements()[firstTrailingIndex - 1]->getEndLoc());
+          EffectiveOffset = SM.getLocOffsetInBuffer(beforeTrailingLoc, BufID);
+          OS << ") ";
+        }
+
+        unsigned End = SM.getLocOffsetInBuffer(args->getEndLoc(), BufID);
+        EffectiveLength = (End + 1) - EffectiveOffset;
+
+        unsigned argI = firstTrailingIndex;
+        for (unsigned i = 0; argI != args->getNumElements(); ++i, ++argI) {
+          const auto &closure = trailingClosures[i];
+          if (i == 0) {
+            OS << "{ ";
+          } else {
+            auto label = args->getElementName(argI);
+            OS << " " << (label.empty() ? "_" : label.str()) << ": { ";
+          }
+          printClosureBody(closure, OS, SM);
+          OS << "}";
+        }
+        OS << "\n";
+      }
+
+      Consumer.handleSourceText(ExpansionStr);
+      Consumer.recordAffectedRange(EffectiveOffset, EffectiveLength);
+
     }, [&](EditorPlaceholderExpr *PHE) {
       if (!PHE)
         return false;

@@ -198,6 +198,9 @@ public:
 
   virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
 
+  virtual void completeLabeledTrailingClosure(CodeCompletionExpr *E,
+                                              bool isAtStartOfLine) {};
+
   virtual void completeReturnStmt(CodeCompletionExpr *E) {};
 
   /// Complete a yield statement.  A missing yield index means that the
