@@ -2259,6 +2259,8 @@ namespace {
 
       switch (pattern->getKind()) {
       case PatternKind::Paren: {
+        auto *paren = cast<ParenPattern>(pattern);
+
         // Parentheses don't affect the canonical type, but record them as
         // type sugar.
         if (externalPatternType &&
@@ -2267,13 +2269,14 @@ namespace {
               ->getUnderlyingType();
         }
 
-        return setType(
-            ParenType::get(
-              CS.getASTContext(),
-              getTypeForPattern(
-                cast<ParenPattern>(pattern)->getSubPattern(), locator,
-                externalPatternType,
-                bindPatternVarsOneWay)));
+        auto underlyingType =
+            getTypeForPattern(paren->getSubPattern(), locator,
+                              externalPatternType, bindPatternVarsOneWay);
+
+        if (!underlyingType)
+          return Type();
+
+        return setType(ParenType::get(CS.getASTContext(), underlyingType));
       }
       case PatternKind::Var:
         // Var doesn't affect the type.
@@ -2378,10 +2381,14 @@ namespace {
 
         Type type = TypeChecker::typeCheckPattern(contextualPattern);
 
+        if (!type)
+          return Type();
+
         // Look through reference storage types.
         type = type->getReferenceStorageReferent();
 
         Type openedType = CS.openUnboundGenericType(type, locator);
+        assert(openedType);
 
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
         // Determine the subpattern type. It will be convertible to the
@@ -2390,6 +2397,9 @@ namespace {
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             openedType, bindPatternVarsOneWay);
+
+        if (!subPatternType)
+          return Type();
 
         CS.addConstraint(
             ConstraintKind::Conversion, subPatternType, openedType,
@@ -2433,6 +2443,10 @@ namespace {
               eltPattern,
               locator.withPathElement(LocatorPathElt::PatternMatch(eltPattern)),
               externalEltType, bindPatternVarsOneWay);
+
+          if (!eltTy)
+            return Type();
+
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
 
@@ -2460,6 +2474,9 @@ namespace {
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             externalPatternType, bindPatternVarsOneWay);
 
+        if (!subPatternType)
+          return Type();
+
         return setType(OptionalType::get(subPatternType));
       }
 
@@ -2468,15 +2485,24 @@ namespace {
 
         Type castType =
             resolveTypeReferenceInExpression(isPattern->getCastTypeLoc());
+
+        if (!castType)
+          return Type();
+
         castType = CS.openUnboundGenericType(
             castType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+
+        assert(castType);
 
         auto *subPattern = isPattern->getSubPattern();
         Type subPatternType = getTypeForPattern(
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             castType, bindPatternVarsOneWay);
+
+        if (!subPatternType)
+          return Type();
 
         // Make sure we can cast from the subpattern type to the type we're
         // checking; if it's impossible, fail.
@@ -2510,10 +2536,15 @@ namespace {
           Type parentType =
             resolveTypeReferenceInExpression(enumPattern->getParentType());
 
+          if (!parentType)
+            return Type();
+
           parentType = CS.openUnboundGenericType(
               parentType, CS.getConstraintLocator(
                               locator, {LocatorPathElt::PatternMatch(pattern),
                                         ConstraintLocator::ParentType}));
+
+          assert(parentType);
 
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
@@ -2547,6 +2578,10 @@ namespace {
           // types.
           Type subPatternType = getTypeForPattern(
               subPattern, locator, Type(), bindPatternVarsOneWay);
+
+          if (!subPatternType)
+            return Type();
+
           SmallVector<AnyFunctionType::Param, 4> params;
           AnyFunctionType::decomposeInput(subPatternType, params);
 
