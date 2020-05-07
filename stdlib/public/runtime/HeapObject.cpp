@@ -327,8 +327,8 @@ HeapObject *swift::swift_allocEmptyBox() {
 }
 
 // Forward-declare this, but define it after swift_release.
-extern "C" SWIFT_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
-void _swift_release_dealloc(HeapObject *object);
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE LLVM_ATTRIBUTE_USED void
+_swift_release_dealloc(HeapObject *object);
 
 static HeapObject *_swift_retain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);

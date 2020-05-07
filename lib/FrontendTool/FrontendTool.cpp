@@ -1290,9 +1290,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
   emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
+
+  SWIFT_DEFER {
+    // We might have freed the ASTContext already, but in that case we must have
+    // emitted the dependencies first.
+    if (Instance.hasASTContext())
+      emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+  };
 
   emitIndexData(Instance);
 
@@ -1508,6 +1514,11 @@ static void freeDeallocatableResourcesIfPossible(CompilerInstance &Instance) {
     break;
   case DeallocatableResources::SILModuleAndASTContext:
     Instance.freeSILModule();
+
+    // Make sure we emit dependencies now, because we can't do it after the
+    // context is gone.
+    emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+
     Instance.freeASTContext();
     break;
   }
@@ -2182,14 +2193,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance->getMainModule(),
                        Invocation.getFrontendOptions().DumpAPIPath);
-  }
-
-  // If we're asked to enable private intransitive dependencies, we need to
-  // write over the dependency files we just emitted because we need to
-  // get the dependencies written post-Sema down on disk.
-  // FIXME: Evaluate the impact turning this on universally has.
-  if (Invocation.getLangOptions().EnableExperientalPrivateIntransitiveDependencies) {
-    emitReferenceDependenciesForAllPrimaryInputsIfNeeded(*Instance);
   }
 
   // Verify reference dependencies of the current compilation job *before*

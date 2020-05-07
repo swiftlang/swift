@@ -116,6 +116,7 @@ public:
 
   CursorInfoTest()
       : Ctx(*new SourceKit::Context(getRuntimeLibPath(),
+                                    /*diagnosticDocumentationPath*/ "",
                                     SourceKit::createSwiftLangSupport,
                                     /*dispatchOnMain=*/false)) {
     // This is avoiding destroying \p SourceKit::Context because another

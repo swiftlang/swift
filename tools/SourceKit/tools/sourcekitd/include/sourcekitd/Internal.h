@@ -174,6 +174,7 @@ sourcekitd_uid_t SKDUIDFromUIdent(SourceKit::UIdent UID);
 SourceKit::UIdent UIdentFromSKDUID(sourcekitd_uid_t uid);
 
 std::string getRuntimeLibPath();
+std::string getDiagnosticDocumentationPath();
 
 void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
 

@@ -78,11 +78,10 @@ endfunction()
 
 # Usage:
 # _add_host_variant_c_compile_link_flags(
-#   ANALYZE_CODE_COVERAGE analyze_code_coverage
 #   RESULT_VAR_NAME result_var_name
 # )
 function(_add_host_variant_c_compile_link_flags)
-  set(oneValueArgs RESULT_VAR_NAME ANALYZE_CODE_COVERAGE)
+  set(oneValueArgs RESULT_VAR_NAME)
   cmake_parse_arguments(CFLAGS
     ""
     "${oneValueArgs}"
@@ -131,11 +130,6 @@ function(_add_host_variant_c_compile_link_flags)
       "-m${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
   endif()
 
-  if(CFLAGS_ANALYZE_CODE_COVERAGE)
-    list(APPEND result "-fprofile-instr-generate"
-                       "-fcoverage-mapping")
-  endif()
-
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
   if (_lto_flag_out)
     list(APPEND result "${_lto_flag_out}")
@@ -146,9 +140,7 @@ endfunction()
 
 
 function(_add_host_variant_c_compile_flags target)
-  _add_host_variant_c_compile_link_flags(
-    ANALYZE_CODE_COVERAGE FALSE
-    RESULT_VAR_NAME result)
+  _add_host_variant_c_compile_link_flags(RESULT_VAR_NAME result)
   target_compile_options(${target} PRIVATE
     ${result})
 
@@ -313,9 +305,7 @@ function(_add_host_variant_c_compile_flags target)
 endfunction()
 
 function(_add_host_variant_link_flags target)
-  _add_host_variant_c_compile_link_flags(
-    ANALYZE_CODE_COVERAGE ${SWIFT_ANALYZE_CODE_COVERAGE}
-    RESULT_VAR_NAME result)
+  _add_host_variant_c_compile_link_flags(RESULT_VAR_NAME result)
   target_link_options(${target} PRIVATE
     ${result})
 
