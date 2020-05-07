@@ -333,12 +333,13 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
+  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath();
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
-  ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments,
-                                             SKCtx.getGlobalConfiguration(),
-                                             Stats, RuntimeResourcePath);
+  ASTMgr = std::make_shared<SwiftASTManager>(
+      EditorDocuments, SKCtx.getGlobalConfiguration(), Stats,
+      RuntimeResourcePath, DiagnosticDocumentationPath);
 
   CompletionInst = std::make_shared<CompletionInstance>();
   configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
