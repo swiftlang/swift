@@ -4682,8 +4682,9 @@ swift_getAssociatedTypeWitnessSlowImpl(
 #endif
   
   // If the low bit of the witness is clear, it's already a metadata pointer.
-  if (LLVM_LIKELY((uintptr_t(witness) &
-        ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+  if (SWIFT_LIKELY((reinterpret_cast<uintptr_t>(witness) &
+                    ProtocolRequirementFlags::AssociatedTypeMangledNameBit) ==
+                   0)) {
     // Cached metadata pointers are always complete.
     return MetadataResponse{(const Metadata *)witness, MetadataState::Complete};
   }
@@ -4803,8 +4804,9 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                                           extraDiscriminator));
 #endif
 
-  if (LLVM_LIKELY((uintptr_t(witness) &
-        ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+  if (SWIFT_LIKELY((reinterpret_cast<uintptr_t>(witness) &
+                    ProtocolRequirementFlags::AssociatedTypeMangledNameBit) ==
+                   0)) {
     // Cached metadata pointers are always complete.
     return MetadataResponse{(const Metadata *)witness, MetadataState::Complete};
   }
@@ -4855,8 +4857,9 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
 #endif
 
   // Fast path: we've already resolved this to a witness table, so return it.
-  if (LLVM_LIKELY((uintptr_t(witness) &
-         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+  if (SWIFT_LIKELY((reinterpret_cast<uintptr_t>(witness) &
+                    ProtocolRequirementFlags::AssociatedTypeMangledNameBit) ==
+                   0)) {
     return static_cast<const WitnessTable *>(witness);
   }
 
@@ -4931,8 +4934,9 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
 #endif
 
   // Fast path: we've already resolved this to a witness table, so return it.
-  if (LLVM_LIKELY((uintptr_t(witness) &
-         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+  if (SWIFT_LIKELY((reinterpret_cast<uintptr_t>(witness) &
+                    ProtocolRequirementFlags::AssociatedTypeMangledNameBit) ==
+                   0)) {
     return static_cast<const WitnessTable *>(witness);
   }
 
