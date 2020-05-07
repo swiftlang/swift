@@ -1,4 +1,4 @@
-name: Keep track of upstream changes
+name: Track upstream
 on:
   schedule:
     - cron: '0 * * * *'
