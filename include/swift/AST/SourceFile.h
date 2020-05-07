@@ -172,7 +172,7 @@ private:
 
   /// The list of top-level declarations in the source file. This is \c None if
   /// they have not yet been parsed.
-  /// FIXME: Once addTopLevelDecl/prependTopLevelDecl/truncateTopLevelDecls
+  /// FIXME: Once addTopLevelDecl/prependTopLevelDecl
   /// have been removed, this can become an optional ArrayRef.
   Optional<std::vector<Decl *>> Decls;
 
@@ -230,15 +230,6 @@ public:
     if (!Decls)
       return None;
     return llvm::makeArrayRef(*Decls);
-  }
-
-  /// Truncates the list of top-level decls so it contains \c count elements. Do
-  /// not add any additional uses of this function.
-  void truncateTopLevelDecls(unsigned count) {
-    // Force decl parsing if we haven't already.
-    (void)getTopLevelDecls();
-    assert(count <= Decls->size() && "Can only truncate top-level decls!");
-    Decls->resize(count);
   }
 
   /// Retrieve the parsing options for the file.
