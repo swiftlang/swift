@@ -1,0 +1,15 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s
+
+sil_stage canonical
+
+import Builtin
+
+// Make sure we can read in two debug_values with the same argument number but
+// different names.
+sil @test : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// %0 "y"
+bb0(%0 : $Builtin.Int32):
+  debug_value %0 : $Builtin.Int32, let, name "y", argno 1
+  debug_value %0 : $Builtin.Int32, let, name "x", argno 1
+  return %0 : $Builtin.Int32
+}
