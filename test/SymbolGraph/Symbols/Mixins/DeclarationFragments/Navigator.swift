@@ -17,9 +17,8 @@ public struct MyStruct<S> { public var x: S
 // MYSTRUCT-NEXT:      "title": "MyStruct",
 // MYSTRUCT-NEXT:      "navigator": [
 // MYSTRUCT-NEXT:          {
-// MYSTRUCT-NEXT:              "kind": "typeIdentifier"
+// MYSTRUCT-NEXT:              "kind": "identifier"
 // MYSTRUCT-NEXT:              "spelling": "MyStruct"
-// MYSTRUCT-NEXT:              "preciseIdentifier": "s:9Navigator8MyStructV"
 // MYSTRUCT-NEXT:          }
 // MYSTRUCT-NEXT:      ]
 
