@@ -292,3 +292,36 @@ bb0(%1 : $@thick MyClass4.Type):
   dealloc_stack %2 : $*MyClass4
   return %7 : $MyClass4
 }
+
+// A failable initializer: Int.init?(i:) that doesn't initialize along all paths.
+sil hidden [ossa] @intInitExtension : $@convention(method) (Int, Bool) -> Optional<Int> {
+bb0(%0 : $Int, %1 : $Bool):
+  %2 = alloc_stack $Int, var, name "self"
+  %3 = mark_uninitialized [delegatingself] %2 : $*Int
+  %5 = metatype $@thin Int.Type
+  %6 = struct_extract %1 : $Bool, #Bool._value
+  cond_br %6, bb1, bb2
+
+bb1:
+  %14 = begin_access [modify] [static] %3 : $*Int
+  assign %0 to %14 : $*Int
+  end_access %14 : $*Int
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %19 = load [trivial] %3 : $*Int // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+  %20 = enum $Optional<Int>, #Optional.some!enumelt, %19 : $Int
+  dealloc_stack %2 : $*Int
+  br bb5(%20 : $Optional<Int>)
+
+bb4:
+  dealloc_stack %2 : $*Int
+  %24 = enum $Optional<Int>, #Optional.none!enumelt
+  br bb5(%24 : $Optional<Int>)
+
+bb5(%26 : $Optional<Int>):
+    return %26 : $Optional<Int>
+}
