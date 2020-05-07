@@ -355,11 +355,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
 
-    // If we're in REPL mode, inject temporary result variables and other stuff
-    // that the REPL needs to synthesize.
-    if (SF->Kind == SourceFileKind::REPL && !Ctx.hadError())
-      TypeChecker::processREPLTopLevel(*SF);
-
     typeCheckDelayedFunctions(*SF);
   }
 
