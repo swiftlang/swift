@@ -3,7 +3,7 @@ on:
   schedule:
     - cron: '0 * * * *'
 jobs:
-  nightly-distribution:
+  track-upstream:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
