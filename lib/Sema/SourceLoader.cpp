@@ -131,6 +131,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   importMod->addFile(*importFile);
   performImportResolution(*importFile);
   importMod->setHasResolvedImports();
+  bindExtensions(*importMod);
   return importMod;
 }
 

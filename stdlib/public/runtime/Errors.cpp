@@ -224,7 +224,7 @@ static _Unwind_Reason_Code SwiftUnwindFrame(struct _Unwind_Context *context, voi
 }
 #endif
 
-LLVM_ATTRIBUTE_NOINLINE
+SWIFT_NOINLINE
 void swift::printCurrentBacktrace(unsigned framesToSkip) {
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   constexpr unsigned maxSupportedStackDepth = 128;
@@ -255,7 +255,7 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
 // The layout of this struct is CrashReporter ABI, so there are no ABI concerns
 // here.
 extern "C" {
-LLVM_LIBRARY_VISIBILITY
+SWIFT_LIBRARY_VISIBILITY
 struct crashreporter_annotations_t gCRAnnotations
 __attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
     CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
@@ -320,9 +320,9 @@ reportNow(uint32_t flags, const char *message)
 #endif
 }
 
-LLVM_ATTRIBUTE_NOINLINE SWIFT_RUNTIME_EXPORT
-void _swift_runtime_on_report(uintptr_t flags, const char *message,
-                              RuntimeErrorDetails *details) {
+SWIFT_NOINLINE SWIFT_RUNTIME_EXPORT void
+_swift_runtime_on_report(uintptr_t flags, const char *message,
+                         RuntimeErrorDetails *details) {
   // Do nothing. This function is meant to be used by the debugger.
 
   // The following is necessary to avoid calls from being optimized out.

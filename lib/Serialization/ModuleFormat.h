@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 555; // add @main attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 556; // dont serialize Pattern::isImplicit
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1448,16 +1448,14 @@ namespace decls_block {
   >;
 
   using ParenPatternLayout = BCRecordLayout<
-    PAREN_PATTERN,
-    BCFixed<1> // implicit?
+    PAREN_PATTERN
     // The sub-pattern trails the record.
   >;
 
   using TuplePatternLayout = BCRecordLayout<
     TUPLE_PATTERN,
     TypeIDField, // type
-    BCVBR<5>,    // arity
-    BCFixed<1>   // implicit?
+    BCVBR<5>     // arity
     // The elements trail the record.
   >;
 
@@ -1470,28 +1468,24 @@ namespace decls_block {
   using NamedPatternLayout = BCRecordLayout<
     NAMED_PATTERN,
     DeclIDField, // associated VarDecl
-    TypeIDField, // type
-    BCFixed<1>   // implicit?
+    TypeIDField  // type
   >;
 
   using AnyPatternLayout = BCRecordLayout<
     ANY_PATTERN,
-    TypeIDField, // type
-    BCFixed<1>   // implicit?
+    TypeIDField  // type
     // FIXME: is the type necessary?
   >;
 
   using TypedPatternLayout = BCRecordLayout<
     TYPED_PATTERN,
-    TypeIDField, // associated type
-    BCFixed<1>   // implicit?
+    TypeIDField  // associated type
     // The sub-pattern trails the record.
   >;
 
   using VarPatternLayout = BCRecordLayout<
     VAR_PATTERN,
-    BCFixed<1>, // isLet?
-    BCFixed<1>  // implicit?
+    BCFixed<1>  // isLet?
     // The sub-pattern trails the record.
   >;
 

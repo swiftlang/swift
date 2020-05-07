@@ -174,7 +174,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
   MostRecentModule->getImportedModules(imports,
                                        ModuleDecl::ImportFilterKind::Private);
   for (auto &import : imports) {
-    implicitImports.AdditionalModules.emplace_back(import.second,
+    implicitImports.AdditionalModules.emplace_back(import.importedModule,
                                                    /*exported*/ true);
   }
 
@@ -184,6 +184,8 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
   auto &REPLInputFile =
       *new (Ctx) SourceFile(*REPLModule, SourceFileKind::REPL, BufferID);
   REPLModule->addFile(REPLInputFile);
+  performImportResolution(REPLInputFile);
+  bindExtensions(*REPLModule);
   performTypeChecking(REPLInputFile);
   return REPLModule;
 }

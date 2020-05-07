@@ -1229,7 +1229,7 @@ namespace {
       auto identifiers = OD->getIdentifiers();
       for (auto index : indices(identifiers)) {
         OS.indent(Indent + 2);
-        OS << "identifier #" << index << " " << identifiers[index];
+        OS << "identifier #" << index << " " << identifiers[index].Item;
         if (index != identifiers.size() - 1)
           OS << "\n";
       }
@@ -2673,7 +2673,11 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitForceValueExpr(ForceValueExpr *E) {
-    printCommon(E, "force_value_expr") << '\n';
+    printCommon(E, "force_value_expr");
+    if (E->isForceOfImplicitlyUnwrappedOptional())
+      PrintWithColorRAII(OS, ExprModifierColor) << " implicit_iuo_unwrap";
+    OS << '\n';
+
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

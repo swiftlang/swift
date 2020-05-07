@@ -32,8 +32,6 @@
 
 using namespace swift;
 
-unsigned LinearLifetimeChecker::ErrorBuilder::errorMessageCount = 0;
-
 //===----------------------------------------------------------------------===//
 //                                Declarations
 //===----------------------------------------------------------------------===//
@@ -61,7 +59,7 @@ struct State {
   ///
   /// It also handles any asserts/messages that need to be emitted if we are
   /// supposed to fail hard.
-  LinearLifetimeChecker::ErrorBuilder errorBuilder;
+  LinearLifetimeChecker::ErrorBuilder &errorBuilder;
 
   /// The blocks that we have already visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
@@ -92,7 +90,7 @@ struct State {
   SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        LinearLifetimeChecker::ErrorBuilder errorBuilder,
+        LinearLifetimeChecker::ErrorBuilder &errorBuilder,
         Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(value), beginInst(value->getDefiningInsertionPoint()),
@@ -578,7 +576,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
       });
     }
 
-    return std::move(state.errorBuilder).getFinalError();
+    return std::move(state.errorBuilder).consumeAndGetFinalError();
   }
 
   // Ok, we may have multiple consuming uses. Add the user block of each of our
@@ -613,7 +611,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
   // ...and then check that the end state shows that we have a valid linear
   // typed value.
   state.checkDataflowEndState(deadEndBlocks);
-  return std::move(state.errorBuilder).getFinalError();
+  return std::move(state.errorBuilder).consumeAndGetFinalError();
 }
 
 LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(

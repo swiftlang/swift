@@ -556,14 +556,12 @@ Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   if (!customAttr)
     return Type();
 
-  auto resolution =
-      TypeResolution::forContextual(var->getDeclContext());
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-  if (TypeChecker::validateType(var->getASTContext(),
-                                customAttr->getTypeLoc(),
-                                resolution, options)) {
+  auto resolution =
+      TypeResolution::forContextual(var->getDeclContext(), options);
+  if (TypeChecker::validateType(customAttr->getTypeLoc(), resolution)) {
     return ErrorType::get(var->getASTContext());
   }
 
@@ -749,10 +747,10 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
       if (endLoc.isInvalid() && startLoc.isValid())
         endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
-      auto *init = CallExpr::create(
-         ctx, typeExpr, startLoc, {initializer}, {argName},
-         {initializer->getStartLoc()}, endLoc,
-         nullptr, /*implicit=*/true);
+      auto *init =
+          CallExpr::create(ctx, typeExpr, startLoc, {initializer}, {argName},
+                           {initializer->getStartLoc()}, endLoc,
+                           /*trailingClosures=*/{}, /*implicit=*/true);
       initializer = init;
 
       if (!innermostInit)
@@ -785,9 +783,9 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
     if (endLoc.isInvalid() && startLoc.isValid())
       endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
-    auto *init = CallExpr::create(
-        ctx, typeExpr, startLoc, elements, elementNames, elementLocs,
-        endLoc, nullptr, /*implicit=*/true);
+    auto *init = CallExpr::create(ctx, typeExpr, startLoc, elements,
+                                   elementNames, elementLocs, endLoc,
+                                   /*trailingClosures=*/{}, /*implicit=*/true);
     initializer = init;
 
     if (!innermostInit)

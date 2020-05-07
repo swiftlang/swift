@@ -891,7 +891,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     lookupExpr = SubscriptExpr::create(
         ctx, wrapperMetatype, SourceLoc(), args,
         subscriptDecl->getName().getArgumentNames(), { }, SourceLoc(),
-        nullptr, subscriptDecl, /*Implicit=*/true);
+        /*trailingClosures=*/{}, subscriptDecl, /*Implicit=*/true);
 
     // FIXME: Since we're not resolving overloads or anything, we should be
     // building fully type-checked AST above; we already have all the
@@ -1264,13 +1264,12 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   Tmp1VD->setHasNonPatternBindingInit();
   Tmp1VD->setImplicit();
 
-  auto *Named = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
+  auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD);
   Named->setType(Tmp1VD->getType());
-  auto *Let = new (Ctx) VarPattern(SourceLoc(), /*let*/true, Named,
-                                   /*implict*/true);
+  auto *Let = VarPattern::createImplicit(Ctx, /*let*/true, Named);
   Let->setType(Named->getType());
-  auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc(),
-                                             /*implicit*/true);
+  auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc());
+  Some->setImplicit();
   Some->setElementDecl(Ctx.getOptionalSomeDecl());
   Some->setType(OptionalType::get(Let->getType()));
 
@@ -1332,7 +1331,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   InitValue = new (Ctx) LazyInitializerExpr(InitValue);
   InitValue->setType(initType);
 
-  Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
+  Pattern *Tmp2PBDPattern = NamedPattern::createImplicit(Ctx, Tmp2VD);
   Tmp2PBDPattern =
     TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, Tmp2VD->getType());
 
@@ -1575,7 +1574,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
                                    Ctx.getIdentifier("tmp"), Set);
       OldValue->setImplicit();
       OldValue->setInterfaceType(VD->getValueInterfaceType());
-      auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
+      auto *tmpPattern = NamedPattern::createImplicit(Ctx, OldValue);
       auto *tmpPBD = PatternBindingDecl::createImplicit(
           Ctx, StaticSpellingKind::None, tmpPattern, OldValueExpr, Set);
       SetterBody.push_back(tmpPBD);
@@ -2305,7 +2304,7 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
 
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
-  Pattern *PBDPattern = new (Context) NamedPattern(Storage, /*implicit*/true);
+  Pattern *PBDPattern = NamedPattern::createImplicit(Context, Storage);
   PBDPattern->setType(StorageTy);
   PBDPattern = TypedPattern::createImplicit(Context, PBDPattern, StorageTy);
   auto *InitExpr = new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
@@ -2378,7 +2377,7 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   addMemberToContextIfNeeded(property, dc, var);
 
   // Create the pattern binding declaration for the property.
-  Pattern *pbdPattern = new (ctx) NamedPattern(property, /*implicit=*/true);
+  Pattern *pbdPattern = NamedPattern::createImplicit(ctx, property);
   pbdPattern->setType(propertyType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, propertyType);
   auto pbd = PatternBindingDecl::createImplicit(
@@ -2649,7 +2648,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   addMemberToContextIfNeeded(backingVar, dc, var);
 
   // Create the pattern binding declaration for the backing property.
-  Pattern *pbdPattern = new (ctx) NamedPattern(backingVar, /*implicit=*/true);
+  Pattern *pbdPattern = NamedPattern::createImplicit(ctx, backingVar);
   pbdPattern->setType(storageType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
@@ -3064,6 +3063,13 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     } else {
       readImpl = ReadImplKind::Stored;
     }
+
+  // Extensions can't have stored properties. If there are braces, assume
+  // this is an incomplete computed property. This avoids an "extensions
+  // must not contain stored properties" error later on.
+  } else if (isa<ExtensionDecl>(storage->getDeclContext()) &&
+             storage->getBracesRange().isValid()) {
+    readImpl = ReadImplKind::Get;
 
   // Otherwise, it's stored.
   } else {

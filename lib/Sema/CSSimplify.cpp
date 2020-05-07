@@ -125,7 +125,7 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
 
 static bool areConservativelyCompatibleArgumentLabels(
     OverloadChoice choice, SmallVectorImpl<FunctionType::Param> &args,
-    bool hasTrailingClosure) {
+    Optional<unsigned> unlabeledTrailingClosureArgIndex) {
   ValueDecl *decl = nullptr;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -166,7 +166,8 @@ static bool areConservativelyCompatibleArgumentLabels(
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
-  return !matchCallArguments(args, params, paramInfo, hasTrailingClosure,
+  return !matchCallArguments(args, params, paramInfo,
+                             unlabeledTrailingClosureArgIndex,
                              /*allow fixes*/ false, listener,
                              unusedParamBindings);
 }
@@ -218,11 +219,13 @@ bool constraints::
 matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                    ArrayRef<AnyFunctionType::Param> params,
                    const ParameterListInfo &paramInfo,
-                   bool hasTrailingClosure,
+                   Optional<unsigned> unlabeledTrailingClosureArgIndex,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
   assert(params.size() == paramInfo.size() && "Default map does not match");
+  assert(!unlabeledTrailingClosureArgIndex ||
+         *unlabeledTrailingClosureArgIndex < args.size());
 
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
@@ -429,58 +432,123 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     haveUnfulfilledParams = true;
   };
 
-  // If we have a trailing closure, it maps to the last parameter.
-  if (hasTrailingClosure && numParams > 0) {
-    unsigned lastParamIdx = numParams - 1;
-    bool lastAcceptsTrailingClosure =
-        acceptsTrailingClosure(params[lastParamIdx]);
+  // If we have an unlabeled trailing closure, we match trailing closure
+  // labels from the end, then match the trailing closure arg.
+  if (unlabeledTrailingClosureArgIndex) {
+    unsigned unlabeledArgIdx = *unlabeledTrailingClosureArgIndex;
 
-    // If the last parameter is defaulted, this might be
-    // an attempt to use a trailing closure with previous
-    // parameter that accepts a function type e.g.
-    //
-    // func foo(_: () -> Int, _ x: Int = 0) {}
-    // foo { 42 }
-    if (!lastAcceptsTrailingClosure && numParams > 1 &&
-        paramInfo.hasDefaultArgument(lastParamIdx)) {
-      auto paramType = params[lastParamIdx - 1].getPlainType();
-      // If the parameter before defaulted last accepts.
-      if (paramType->is<AnyFunctionType>()) {
-        lastAcceptsTrailingClosure = true;
-        lastParamIdx -= 1;
+    // One past the next parameter index to look at.
+    unsigned prevParamIdx = numParams;
+
+    // Scan backwards to match any labeled trailing closures.
+    for (unsigned argIdx = numArgs - 1; argIdx != unlabeledArgIdx; --argIdx) {
+      bool claimed = false;
+
+      // We do this scan on a copy of prevParamIdx so that, if it fails,
+      // we'll restart at this same point for the next trailing closure.
+      unsigned prevParamIdxForArg = prevParamIdx;
+      while (prevParamIdxForArg > 0) {
+        prevParamIdxForArg -= 1;
+        unsigned paramIdx = prevParamIdxForArg;
+
+        // Check for an exact label match.
+        const auto &param = params[paramIdx];
+        if (param.getLabel() == args[argIdx].getLabel()) {
+          parameterBindings[paramIdx].push_back(argIdx);
+          claim(param.getLabel(), argIdx);
+
+          // Future arguments should search prior to this parameter.
+          prevParamIdx = prevParamIdxForArg;
+          claimed = true;
+          break;
+        }
+      }
+
+      // If we ran out of parameters, there's no match for this argument.
+      // TODO: somehow fall through to report out-of-order arguments?
+      if (!claimed) {
+        if (listener.extraArgument(argIdx))
+          return true;
       }
     }
 
-    bool isExtraClosure = false;
-    // If there is no suitable last parameter to accept the trailing closure,
+    // Okay, we've matched all the labeled closures; scan backwards from
+    // there to match the unlabeled trailing closure.
+    Optional<unsigned> unlabeledParamIdx;
+    if (prevParamIdx > 0) {
+      unsigned paramIdx = prevParamIdx - 1;
+
+      bool lastAcceptsTrailingClosure =
+          acceptsTrailingClosure(params[paramIdx]);
+
+      // If the last parameter is defaulted, this might be
+      // an attempt to use a trailing closure with previous
+      // parameter that accepts a function type e.g.
+      //
+      // func foo(_: () -> Int, _ x: Int = 0) {}
+      // foo { 42 }
+      //
+      // FIXME: shouldn't this skip multiple arguments and look for
+      // something that acceptsTrailingClosure rather than just something
+      // with a function type?
+      if (!lastAcceptsTrailingClosure && paramIdx > 0 &&
+          paramInfo.hasDefaultArgument(paramIdx)) {
+        auto paramType = params[paramIdx - 1].getPlainType();
+        // If the parameter before defaulted last accepts.
+        if (paramType->is<AnyFunctionType>()) {
+          lastAcceptsTrailingClosure = true;
+          paramIdx -= 1;
+        }
+      }
+
+      if (lastAcceptsTrailingClosure)
+        unlabeledParamIdx = paramIdx;
+    }
+
+    // If there's no suitable last parameter to accept the trailing closure,
     // notify the listener and bail if we need to.
-    if (!lastAcceptsTrailingClosure) {
-      if (numArgs > numParams) {
+    if (!unlabeledParamIdx) {
+      // Try to use a specialized diagnostic for an extra closure.
+      bool isExtraClosure = false;
+      if (prevParamIdx == 0) {
+        isExtraClosure = true;
+      } else if (unlabeledArgIdx > 0) {
         // Argument before the trailing closure.
-        unsigned prevArg = numArgs - 2;
+        unsigned prevArg = unlabeledArgIdx - 1;
         auto &arg = args[prevArg];
         // If the argument before trailing closure matches
         // last parameter, this is just a special case of
         // an extraneous argument.
-        const auto param = params[numParams - 1];
+        const auto param = params[prevParamIdx - 1];
         if (param.hasLabel() && param.getLabel() == arg.getLabel()) {
           isExtraClosure = true;
-          if (listener.extraArgument(numArgs - 1))
-            return true;
         }
       }
 
-      if (!isExtraClosure &&
-          listener.trailingClosureMismatch(lastParamIdx, numArgs - 1))
-        return true;
+      if (isExtraClosure) {
+        if (listener.extraArgument(unlabeledArgIdx))
+          return true;
+      } else {
+        if (listener.trailingClosureMismatch(prevParamIdx - 1,
+                                             unlabeledArgIdx))
+          return true;
+      }
+
+      if (isExtraClosure) {
+        // Claim the unlabeled trailing closure without an associated
+        // parameter to suppress further complaints about it.
+        claim(Identifier(), unlabeledArgIdx, /*ignoreNameClash=*/true);
+      } else {
+        unlabeledParamIdx = prevParamIdx - 1;
+      }
     }
 
-    // Claim the parameter/argument pair.
-    claim(params[lastParamIdx].getLabel(), numArgs - 1,
-          /*ignoreNameClash=*/true);
-    // Let's claim the trailing closure unless it's an extra argument.
-    if (!isExtraClosure)
-      parameterBindings[lastParamIdx].push_back(numArgs - 1);
+    if (unlabeledParamIdx) {
+      // Claim the parameter/argument pair.
+      claim(params[*unlabeledParamIdx].getLabel(), unlabeledArgIdx,
+            /*ignoreNameClash=*/true);
+      parameterBindings[*unlabeledParamIdx].push_back(unlabeledArgIdx);
+    }
   }
 
   {
@@ -1037,7 +1105,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ArgumentFailureTracker listener(cs, argsWithLabels, params,
                                     parameterBindings, locator);
     if (constraints::matchCallArguments(
-            argsWithLabels, params, paramInfo, argInfo->HasTrailingClosure,
+            argsWithLabels, params, paramInfo,
+            argInfo->UnlabeledTrailingClosureIndex,
             cs.shouldAttemptFixes(), listener, parameterBindings))
       return cs.getTypeMatchFailure(locator);
 
@@ -3040,9 +3109,15 @@ bool ConstraintSystem::repairFailures(
       // position (which doesn't require explicit `&`) decays into
       // a `Bind` of involved object types, same goes for explicit
       // `&` conversion from l-value to inout type.
+      //
+      // In case of regular argument conversion although explicit `&`
+      // is required we still want to diagnose the problem as one
+      // about mutability instead of suggesting to add `&` which wouldn't
+      // be correct.
       auto kind = (isExpr<InOutExpr>(anchor) ||
                    (rhs->is<InOutType>() &&
-                    matchKind == ConstraintKind::OperatorArgumentConversion))
+                    (matchKind == ConstraintKind::ArgumentConversion ||
+                     matchKind == ConstraintKind::OperatorArgumentConversion)))
                       ? ConstraintKind::Bind
                       : matchKind;
 
@@ -4392,34 +4467,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto meta1 = cast<AnyMetatypeType>(desugar1);
       auto meta2 = cast<AnyMetatypeType>(desugar2);
 
-      auto instanceType1 = meta1->getInstanceType();
-      auto instanceType2 = meta2->getInstanceType();
-
       // A.Type < B.Type if A < B and both A and B are classes.
       // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
-      // and Q.Type are both existential metatypes.
-      auto getSubKind = [&]() -> ConstraintKind {
-        auto subKind = std::min(kind, ConstraintKind::Subtype);
-
-        // If we have existential metatypes, we need to perform subtyping.
-        if (!isa<MetatypeType>(meta1))
-          return subKind;
-
-        // If the LHS cannot be a type with a superclass, we can perform a bind.
-        if (!instanceType1->isTypeVariableOrMember() &&
-            !instanceType1->mayHaveSuperclass())
-          return ConstraintKind::Bind;
-
-        // If the RHS cannot be a class type, we can perform a bind.
-        if (!instanceType2->isTypeVariableOrMember() &&
-            !instanceType2->getClassOrBoundGenericClass())
-          return ConstraintKind::Bind;
-
-        return subKind;
-      };
+      // and Q.Type are both existential metatypes
+      auto subKind = std::min(kind, ConstraintKind::Subtype);
+      // If instance types can't have a subtype relationship
+      // it means that such types can be simply equated.
+      auto instanceType1 = meta1->getInstanceType();
+      auto instanceType2 = meta2->getInstanceType();
+      if (isa<MetatypeType>(meta1) &&
+          !(instanceType1->mayHaveSuperclass() &&
+            instanceType2->getClassOrBoundGenericClass())) {
+        subKind = ConstraintKind::Bind;
+      }
 
       auto result =
-          matchTypes(instanceType1, instanceType2, getSubKind(), subflags,
+          matchTypes(instanceType1, instanceType2, subKind, subflags,
                      locator.withPathElement(ConstraintLocator::InstanceType));
 
       // If matching of the instance types resulted in the failure make sure
@@ -7999,7 +8062,8 @@ retry_after_fail:
           FunctionType::relabelParams(argsWithLabels, argumentInfo->Labels);
 
           if (!areConservativelyCompatibleArgumentLabels(
-                  choice, argsWithLabels, argumentInfo->HasTrailingClosure)) {
+                  choice, argsWithLabels,
+                  argumentInfo->UnlabeledTrailingClosureIndex)) {
             labelMismatch = true;
             return false;
           }

@@ -86,6 +86,10 @@ public:
 
   Type getType(ASTNode node, bool wantRValue = true) const;
 
+  /// Get type associated with a given ASTNode without resolving it,
+  /// which means that returned type would have type variables.
+  Type getRawType(ASTNode node) const;
+
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
@@ -202,6 +206,19 @@ protected:
       Type type,
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
+
+  bool isCollectionType(Type type) const {
+    auto &cs = getConstraintSystem();
+    return cs.isCollectionType(type);
+  }
+
+  bool isArrayType(Type type) const {
+    auto &cs = getConstraintSystem();
+    return bool(cs.isArrayType(type));
+  }
+
+  bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol) const;
+  Type isRawRepresentable(Type type, KnownProtocolKind protocol) const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -658,8 +675,7 @@ private:
 
   bool isIntegerType(Type type) const {
     return conformsToKnownProtocol(
-        getConstraintSystem(), type,
-        KnownProtocolKind::ExpressibleByIntegerLiteral);
+        type, KnownProtocolKind::ExpressibleByIntegerLiteral);
   }
 
   /// Return true if the conversion from fromType to toType is

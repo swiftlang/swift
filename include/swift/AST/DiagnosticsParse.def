@@ -1750,6 +1750,17 @@ ERROR(availability_query_repeated_platform, none,
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,
       "unknown %0 syntax exists in the source", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: multiple trailing closures diagnostics
+//------------------------------------------------------------------------------
+ERROR(expected_argument_label_followed_by_closure_literal,none,
+      "expected an argument label followed by a closure literal", ())
+ERROR(expected_closure_literal,none,
+      "expected a closure literal", ())
+
+ERROR(expected_multiple_closures_block_rbrace,none,
+      "expected '}' at the end of a trailing closures block", ())
+
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(sil_const_expected_int_datatype,PointsToFirstBadToken,
       "expected integer datatype ('i[0-9]+', e.g. 'i32')", ())

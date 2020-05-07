@@ -156,6 +156,12 @@ public:
     /// closure type if CallParameterType is a TypeAliasType.
     CallParameterClosureType,
 
+    /// An expanded closure expression for the value of a parameter, including
+    /// the left and right braces and possible signature. The preferred
+    /// position to put the cursor after the completion result is inserted
+    /// into the editor buffer is between the braces.
+    CallParameterClosureExpr,
+
     /// A placeholder for \c ! or \c ? in a call to a method found by dynamic
     /// lookup.
     ///
@@ -224,6 +230,7 @@ public:
            Kind == ChunkKind::DeclAttrParamKeyword ||
            Kind == ChunkKind::CallParameterType ||
            Kind == ChunkKind::CallParameterClosureType ||
+           Kind == ChunkKind::CallParameterClosureExpr ||
            Kind == ChunkKind::GenericParameterName ||
            Kind == ChunkKind::DynamicLookupMethodCallTail ||
            Kind == ChunkKind::OptionalMethodCallTail ||
@@ -525,6 +532,7 @@ enum class CompletionKind {
   AttributeDeclParen,
   PoundAvailablePlatform,
   CallArg,
+  LabeledTrailingClosure,
   ReturnStmtExpr,
   YieldStmtExpr,
   ForEachSequence,
@@ -575,7 +583,6 @@ public:
 
   enum NotRecommendedReason {
     Redundant,
-    TypeMismatch,
     Deprecated,
     NoReason,
   };
@@ -705,6 +712,7 @@ public:
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ArrayRef<std::pair<StringRef, StringRef>> DocWords,
+                       ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind)
       : Kind(ResultKind::Declaration),
         KnownOperatorKind(unsigned(KnownOperatorKind)),
@@ -712,10 +720,10 @@ public:
         NotRecommended(NotRecommended), NotRecReason(NotRecReason),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords) {
+        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
+        TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
-    TypeDistance = ExpectedTypeRelation::Unknown;
     assert(!isOperator() ||
            getOperatorKind() != CodeCompletionOperatorKind::None);
   }

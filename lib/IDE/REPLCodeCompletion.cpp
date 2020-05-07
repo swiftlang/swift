@@ -83,6 +83,10 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
       return Str;
 
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureExpr:
+      Str += " {";
+      Str += C.getText();
+      break;
     case CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor:
       Str += " {";
       break;
@@ -222,7 +226,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   lastModule->getImportedModules(imports,
                                  ModuleDecl::ImportFilterKind::Private);
   for (auto &import : imports) {
-    implicitImports.AdditionalModules.emplace_back(import.second,
+    implicitImports.AdditionalModules.emplace_back(import.importedModule,
                                                    /*exported*/ false);
   }
 
@@ -235,7 +239,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   newModule->addFile(newSF);
 
   performImportResolution(newSF);
-  bindExtensions(newSF);
+  bindExtensions(*newModule);
 
   performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
 

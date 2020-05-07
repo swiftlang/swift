@@ -590,13 +590,16 @@ private:
   static SILType getResultTypeForDebugInfo(IRGenModule &IGM,
                                            CanSILFunctionType fnTy) {
     if (fnTy->getNumResults() == 1) {
-      return fnTy->getResults()[0].getSILStorageType(IGM.getSILModule(), fnTy);
+      return fnTy->getResults()[0].getSILStorageType(
+          IGM.getSILModule(), fnTy, IGM.getMaximalTypeExpansionContext());
     } else if (!fnTy->getNumIndirectFormalResults()) {
-      return fnTy->getDirectFormalResultsType(IGM.getSILModule());
+      return fnTy->getDirectFormalResultsType(
+          IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
     } else {
       SmallVector<TupleTypeElt, 4> eltTys;
       for (auto &result : fnTy->getResults()) {
-        eltTys.push_back(result.getReturnValueType(IGM.getSILModule(), fnTy));
+        eltTys.push_back(result.getReturnValueType(
+            IGM.getSILModule(), fnTy, IGM.getMaximalTypeExpansionContext()));
       }
       return SILType::getPrimitiveAddressType(
           CanType(TupleType::get(eltTys, fnTy->getASTContext())));
@@ -621,7 +624,9 @@ private:
     // type. We currently represent a function with one n-tuple argument
     // as an n-ary function.
     for (auto Param : FnTy->getParameters())
-      createParameterType(Parameters, IGM.silConv.getSILType(Param, FnTy));
+      createParameterType(
+          Parameters, IGM.silConv.getSILType(
+                          Param, FnTy, IGM.getMaximalTypeExpansionContext()));
 
     return DBuilder.getOrCreateTypeArray(Parameters);
   }
@@ -717,7 +722,7 @@ private:
   }
   
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
-    ModuleDecl *M = IM.second;
+    ModuleDecl *M = IM.importedModule;
     if (Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
       return getOrCreateModule(*ModuleDesc, ModuleDesc->getModuleOrNull());
     StringRef Path = getFilenameFromDC(M);
@@ -1807,7 +1812,7 @@ void IRGenDebugInfoImpl::finalize() {
   SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
   IGM.getSwiftModule()->getImportedModules(ModuleWideImports, ImportFilter);
   for (auto M : ModuleWideImports)
-    if (!ImportedModules.count(M.second))
+    if (!ImportedModules.count(M.importedModule))
       DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
                                     0);
 
@@ -2054,7 +2059,7 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);
   DBuilder.createImportedModule(File, DIMod, File, L.Line);
-  ImportedModules.insert(Imported.second);
+  ImportedModules.insert(Imported.importedModule);
 }
 
 llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(SILFunction &SILFn,
@@ -2164,8 +2169,10 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (FnTy)
     if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
       auto DTI = DebugTypeInfo::getFromTypeInfo(
-          ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy),
-          IGM.getTypeInfo(IGM.silConv.getSILType(*ErrorInfo, FnTy)));
+          ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy,
+                                        IGM.getMaximalTypeExpansionContext()),
+          IGM.getTypeInfo(IGM.silConv.getSILType(
+              *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext())));
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 

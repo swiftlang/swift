@@ -1470,3 +1470,16 @@ func gericArgToParamInout(_ x: inout [[Int]]) { // expected-note {{change variab
   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
   // expected-error@-2 {{inout argument could be set to a value with a type other than '[[Int]]'; use a value declared as type '[[String]]?' instead}}
 }
+
+// SR-12725
+struct SR12725<E> {} // expected-note {{arguments to generic parameter 'E' ('Int' and 'Double') are expected to be equal}}
+func generic<T>(_ value: inout T, _ closure: (SR12725<T>) -> Void) {}
+
+let arg: Int
+generic(&arg) { (g: SR12725<Double>) -> Void in } // expected-error {{cannot convert value of type '(SR12725<Double>) -> Void' to expected argument type '(SR12725<Int>) -> Void'}}
+
+// rdar://problem/62428353 - bad error message for passing `T` where `inout T` was expected
+func rdar62428353<T>(_ t: inout T) {
+  let v = t // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  rdar62428353(v) // expected-error {{cannot pass immutable value as inout argument: 'v' is a 'let' constant}}
+}

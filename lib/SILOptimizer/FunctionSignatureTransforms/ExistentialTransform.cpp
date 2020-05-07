@@ -162,7 +162,8 @@ void ExistentialSpecializerCloner::cloneArguments(
     auto iter = ArgToGenericTypeMap.find(ArgDesc.Index);
     if (iter == ArgToGenericTypeMap.end()) {
       // Clone arguments that are not rewritten.
-      auto Ty = params[ArgDesc.Index].getArgumentType(M, NewFTy);
+      auto Ty = params[ArgDesc.Index].getArgumentType(
+          M, NewFTy, NewF.getTypeExpansionContext());
       auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoContext(Ty));
       auto MappedTy =
           LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
@@ -301,7 +302,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
   for (auto const &IdxIt : ExistentialArgDescriptor) {
     int Idx = IdxIt.first;
     auto &param = params[Idx];
-    auto PType = param.getArgumentType(M, FTy);
+    auto PType = param.getArgumentType(M, FTy, F->getTypeExpansionContext());
     assert(PType.isExistentialType());
     /// Generate new generic parameter.
     auto *NewGenericParam = GenericTypeParamType::get(Depth, GPIdx++, Ctx);
@@ -537,7 +538,7 @@ void ExistentialTransform::populateThunkBody() {
   SILValue ReturnValue;
   auto FunctionTy = NewF->getLoweredFunctionType();
   SILFunctionConventions Conv(SubstCalleeType, M);
-  SILType ResultType = Conv.getSILResultType();
+  SILType ResultType = Conv.getSILResultType(Builder.getTypeExpansionContext());
 
   /// If the original function has error results,  we need to generate a
   /// try_apply to call a function with an error result.
@@ -548,7 +549,8 @@ void ExistentialTransform::populateThunkBody() {
         NormalBlock->createPhiArgument(ResultType, ValueOwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
 
-    SILType Error = Conv.getSILType(FunctionTy->getErrorResult());
+    SILType Error = Conv.getSILType(FunctionTy->getErrorResult(),
+                                    Builder.getTypeExpansionContext());
     auto *ErrorArg =
         ErrorBlock->createPhiArgument(Error, ValueOwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, SubMap, ApplyArgs, NormalBlock,
@@ -580,7 +582,7 @@ void ExistentialTransform::populateThunkBody() {
       Builder.createDeallocStack(cleanupLoc, Temp.DeallocStackEntry);
   }
   /// Set up the return results.
-  if (NewF->isNoReturnFunction()) {
+  if (NewF->isNoReturnFunction(Builder.getTypeExpansionContext())) {
     Builder.createUnreachable(Loc);
   } else {
     Builder.createReturn(Loc, ReturnValue);

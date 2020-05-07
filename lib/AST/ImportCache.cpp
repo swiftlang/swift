@@ -55,25 +55,26 @@ void ImportSet::Profile(
     ArrayRef<ModuleDecl::ImportedModule> topLevelImports) {
   ID.AddInteger(topLevelImports.size());
   for (auto import : topLevelImports) {
-    ID.AddInteger(import.first.size());
-    for (auto accessPathElt : import.first) {
+    ID.AddInteger(import.accessPath.size());
+    for (auto accessPathElt : import.accessPath) {
       ID.AddPointer(accessPathElt.Item.getAsOpaquePointer());
     }
-    ID.AddPointer(import.second);
+    ID.AddPointer(import.importedModule);
   }
 }
 
 static void collectExports(ModuleDecl::ImportedModule next,
                            SmallVectorImpl<ModuleDecl::ImportedModule> &stack) {
   SmallVector<ModuleDecl::ImportedModule, 4> exports;
-  next.second->getImportedModulesForLookup(exports);
+  next.importedModule->getImportedModulesForLookup(exports);
   for (auto exported : exports) {
-    if (next.first.empty())
+    if (next.accessPath.empty())
       stack.push_back(exported);
-    else if (exported.first.empty()) {
-      exported.first = next.first;
+    else if (exported.accessPath.empty()) {
+      exported.accessPath = next.accessPath;
       stack.push_back(exported);
-    } else if (ModuleDecl::isSameAccessPath(next.first, exported.first)) {
+    } else if (ModuleDecl::isSameAccessPath(next.accessPath,
+                                            exported.accessPath)) {
       stack.push_back(exported);
     }
   }
@@ -97,7 +98,7 @@ ImportCache::getImportSet(ASTContext &ctx,
       continue;
 
     topLevelImports.push_back(next);
-    if (next.second == headerImportModule)
+    if (next.importedModule == headerImportModule)
       hasHeaderImportModule = true;
   }
 
@@ -127,7 +128,7 @@ ImportCache::getImportSet(ASTContext &ctx,
       continue;
 
     transitiveImports.push_back(next);
-    if (next.second == headerImportModule)
+    if (next.importedModule == headerImportModule)
       hasHeaderImportModule = true;
 
     collectExports(next, stack);
@@ -173,7 +174,9 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
     ctx.Stats->getFrontendCounters().ImportSetCacheMiss++;
 
   SmallVector<ModuleDecl::ImportedModule, 4> imports;
-  imports.emplace_back(ModuleDecl::AccessPathTy(), mod);
+
+  imports.emplace_back(
+      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), mod});
 
   if (file) {
     ModuleDecl::ImportFilter importFilter;
@@ -220,10 +223,10 @@ ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
   SmallVector<ModuleDecl::AccessPathTy, 1> accessPaths;
   for (auto next : getImportSet(dc).getAllImports()) {
     // If we found 'mod', record the access path.
-    if (next.second == mod) {
+    if (next.importedModule == mod) {
       // Make sure the list of access paths is unique.
-      if (!llvm::is_contained(accessPaths, next.first))
-        accessPaths.push_back(next.first);
+      if (!llvm::is_contained(accessPaths, next.accessPath))
+        accessPaths.push_back(next.accessPath);
     }
   }
 
@@ -258,7 +261,8 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
   SmallVector<ModuleDecl::ImportedModule, 4> stack;
   llvm::SmallDenseSet<ModuleDecl::ImportedModule, 32> visited;
 
-  stack.emplace_back(ModuleDecl::AccessPathTy(), currentMod);
+  stack.emplace_back(
+      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), currentMod});
 
   if (auto *file = dyn_cast<FileUnit>(dc)) {
     ModuleDecl::ImportFilter importFilter;
@@ -278,15 +282,15 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
       continue;
 
     // Don't visit the 'other' module's re-exports.
-    if (next.second == other)
+    if (next.importedModule == other)
       continue;
 
     // If we found 'mod' via some access path, remember the access
     // path.
-    if (next.second == mod) {
+    if (next.importedModule == mod) {
       // Make sure the list of access paths is unique.
-      if (!llvm::is_contained(accessPaths, next.first))
-        accessPaths.push_back(next.first);
+      if (!llvm::is_contained(accessPaths, next.accessPath))
+        accessPaths.push_back(next.accessPath);
     }
 
     collectExports(next, stack);

@@ -2174,34 +2174,13 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    // Split the module path.
-    std::vector<StringRef> ModuleName;
-    while (!ModuleToPrint.empty()) {
-      StringRef SubModuleName;
-      std::tie(SubModuleName, ModuleToPrint) = ModuleToPrint.split('.');
-      ModuleName.push_back(SubModuleName);
-    }
-    assert(!ModuleName.empty());
-
-    // FIXME: If ModuleToPrint is a submodule, get its top-level module, which
-    // will be the DeclContext for all of its Decls since we don't have first-
-    // class submodules.
-    if (ModuleName.size() > 1) {
-      M = getModuleByFullName(Context, ModuleName[0]);
-      if (!M) {
-        llvm::errs() << "error: could not find module '" << ModuleName[0]
-                     << "'\n";
-        ExitCode = 1;
-        continue;
-      }
-    }
     std::vector<StringRef> GroupNames;
     for (StringRef G : GroupsToPrint) {
       GroupNames.push_back(G);
     }
 
-    printSubmoduleInterface(M, ModuleName, GroupNames, TraversalOptions,
-                            *Printer, Options, SynthesizeExtensions);
+    printModuleInterface(M, GroupNames, TraversalOptions, *Printer, Options,
+                         SynthesizeExtensions);
   }
 
   return ExitCode;
@@ -2766,22 +2745,22 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
 
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
     for (auto next : namelookup::getAllImports(M)) {
-      llvm::outs() << next.second->getName();
-      if (next.second->isClangModule())
+      llvm::outs() << next.importedModule->getName();
+      if (next.importedModule->isClangModule())
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
       scratch.clear();
-      next.second->getImportedModules(scratch,
-                                      ModuleDecl::ImportFilterKind::Public);
+      next.importedModule->getImportedModules(
+          scratch, ModuleDecl::ImportFilterKind::Public);
       // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
       for (auto &import : scratch) {
-        llvm::outs() << "\t" << import.second->getName();
-        for (auto accessPathPiece : import.first) {
+        llvm::outs() << "\t" << import.importedModule->getName();
+        for (auto accessPathPiece : import.accessPath) {
           llvm::outs() << "." << accessPathPiece.Item;
         }
 
-        if (import.second->isClangModule())
+        if (import.importedModule->isClangModule())
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }

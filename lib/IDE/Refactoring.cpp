@@ -99,8 +99,7 @@ public:
   bool renameBase(CharSourceRange Range, RefactoringRangeKind RangeKind) {
     assert(Range.isValid());
 
-    StringRef Existing = Range.str();
-    if (Existing != Old.base())
+    if (stripBackticks(Range).str() != Old.base())
       return true;
     doRenameBase(Range, RangeKind);
     return false;
@@ -109,10 +108,12 @@ public:
   /// Adds replacements to rename the given label ranges
   /// \return true if the label ranges do not match the old name
   bool renameLabels(ArrayRef<CharSourceRange> LabelRanges,
+                    Optional<unsigned> FirstTrailingLabel,
                     LabelRangeType RangeType, bool isCallSite) {
     if (isCallSite)
-      return renameLabelsLenient(LabelRanges, RangeType);
+      return renameLabelsLenient(LabelRanges, FirstTrailingLabel, RangeType);
 
+    assert(!FirstTrailingLabel);
     ArrayRef<StringRef> OldLabels = Old.args();
 
     if (OldLabels.size() != LabelRanges.size())
@@ -131,6 +132,27 @@ public:
   bool isOperator() const { return Lexer::isOperator(Old.base()); }
 
 private:
+
+  /// Returns the range of the  (possibly escaped) identifier at the start of
+  /// \p Range and updates \p IsEscaped to indicate whether it's escaped or not.
+  CharSourceRange getLeadingIdentifierRange(CharSourceRange Range, bool &IsEscaped) {
+    assert(Range.isValid() && Range.getByteLength());
+    IsEscaped = Range.str().front() == '`';
+    SourceLoc Start = Range.getStart();
+    if (IsEscaped)
+      Start = Start.getAdvancedLoc(1);
+    return Lexer::getCharSourceRangeFromSourceRange(SM, Start);
+  }
+
+  CharSourceRange stripBackticks(CharSourceRange Range) {
+    StringRef Content = Range.str();
+    if (Content.size() < 3 || Content.front() != '`' || Content.back() != '`') {
+      return Range;
+    }
+    return CharSourceRange(Range.getStart().getAdvancedLoc(1),
+                           Range.getByteLength() - 2);
+  }
+
   void splitAndRenameLabel(CharSourceRange Range, LabelRangeType RangeType,
                            size_t NameIndex) {
     switch (RangeType) {
@@ -218,13 +240,15 @@ private:
 
   bool labelRangeMatches(CharSourceRange Range, LabelRangeType RangeType, StringRef Expected) {
     if (Range.getByteLength()) {
-      CharSourceRange ExistingLabelRange =
-          Lexer::getCharSourceRangeFromSourceRange(SM, Range.getStart());
+      bool IsEscaped = false;
+      CharSourceRange ExistingLabelRange = getLeadingIdentifierRange(Range, IsEscaped);
       StringRef ExistingLabel = ExistingLabelRange.str();
+      bool IsSingleName = Range == ExistingLabelRange ||
+        (IsEscaped && Range.getByteLength() == ExistingLabel.size() + 2);
 
       switch (RangeType) {
       case LabelRangeType::NoncollapsibleParam:
-        if (ExistingLabelRange == Range && Expected.empty()) // subscript([x]: Int)
+        if (IsSingleName && Expected.empty()) // subscript([x]: Int)
           return true;
         LLVM_FALLTHROUGH;
       case LabelRangeType::CallArg:
@@ -239,10 +263,56 @@ private:
   }
 
   bool renameLabelsLenient(ArrayRef<CharSourceRange> LabelRanges,
+                           Optional<unsigned> FirstTrailingLabel,
                            LabelRangeType RangeType) {
 
     ArrayRef<StringRef> OldNames = Old.args();
 
+    // First, match trailing closure arguments in reverse
+    if (FirstTrailingLabel) {
+      auto TrailingLabels = LabelRanges.drop_front(*FirstTrailingLabel);
+      LabelRanges = LabelRanges.take_front(*FirstTrailingLabel);
+
+      for (auto LabelIndex: llvm::reverse(indices(TrailingLabels))) {
+        CharSourceRange Label = TrailingLabels[LabelIndex];
+
+        if (Label.getByteLength()) {
+          if (OldNames.empty())
+            return true;
+
+          while (!labelRangeMatches(Label, LabelRangeType::Selector,
+                                    OldNames.back())) {
+            if ((OldNames = OldNames.drop_back()).empty())
+              return true;
+          }
+          splitAndRenameLabel(Label, LabelRangeType::Selector,
+                              OldNames.size() - 1);
+          OldNames = OldNames.drop_back();
+          continue;
+        }
+
+        // empty labelled trailing closure label
+        if (LabelIndex) {
+          if (OldNames.empty())
+            return true;
+
+          while (!OldNames.back().empty()) {
+            if ((OldNames = OldNames.drop_back()).empty())
+              return true;
+          }
+          splitAndRenameLabel(Label, LabelRangeType::Selector,
+                              OldNames.size() - 1);
+          OldNames = OldNames.drop_back();
+          continue;
+        }
+
+        // unlabelled trailing closure label
+        OldNames = OldNames.drop_back();
+        continue;
+      }
+    }
+
+    // Next, match the non-trailing arguments.
     size_t NameIndex = 0;
 
     for (CharSourceRange Label : LabelRanges) {
@@ -377,7 +447,8 @@ public:
                         (Config.Usage != NameUsage::Reference || IsSubscript) &&
                         Resolved.LabelType == LabelRangeType::CallArg;
 
-      if (renameLabels(Resolved.LabelRanges, Resolved.LabelType, isCallSite))
+      if (renameLabels(Resolved.LabelRanges, Resolved.FirstTrailingLabel,
+                       Resolved.LabelType, isCallSite))
         return Config.Usage == NameUsage::Unknown ?
             RegionType::Unmatched : RegionType::Mismatch;
     }

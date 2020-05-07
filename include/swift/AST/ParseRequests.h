@@ -102,7 +102,8 @@ public:
   void cacheResult(ArrayRef<Decl *> decls) const;
 
 public:
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 void simple_display(llvm::raw_ostream &out,
@@ -123,7 +124,8 @@ private:
                 CodeCompletionCallbacksFactory *Factory) const;
 
 public:
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 /// The zone number for the parser.

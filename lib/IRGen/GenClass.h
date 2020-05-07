@@ -168,14 +168,6 @@ namespace irgen {
                                     llvm::Value *selfValue,
                                     llvm::Value *metadataValue);
 
-  /// We emit Objective-C class stubs for non-generic classes with resilient
-  /// ancestry. This lets us attach categories to the class even though it
-  /// does not have statically-emitted metadata.
-  bool hasObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D);
-
-  /// Emit a resilient class stub.
-  void emitObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D);
-
   /// Emit the constant fragile offset of the given property inside an instance
   /// of the class.
   llvm::Constant *tryEmitConstantClassFragilePhysicalMemberOffset(

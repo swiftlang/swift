@@ -471,13 +471,11 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   // arguments are dead?
   std::pair<SILFunction *, SILFunction *> GenericSpecialized;
   SILOptFunctionBuilder FuncBuilder(*this);
-  if (auto *NewFunc = getSpecializedWithDeadParams(FuncBuilder,
-          PAI, SubstF, PAI->getNumArguments(), GenericSpecialized)) {
-    // SWIFT_ENABLE_TENSORFLOW
-    // Add a previously unexercised check to prevent AutoDiff crash. Rewrite
-    // `partial_apply` only if the specialized function is `@convention(thin)`.
-    // Revert check when `VJPEmitter::visitApplyInst` no longer produces
-    // argumentless `partial_apply` instructions.
+  if (auto *NewFunc = getSpecializedWithDeadParams(FuncBuilder, PAI, SubstF,
+                                                   PAI->getNumArguments(),
+                                                   GenericSpecialized)) {
+    // `partial_apply` can be rewritten to `thin_to_thick_function` only if the
+    // specialized callee is `@convention(thin)`.
     if (NewFunc->getRepresentation() == SILFunctionTypeRepresentation::Thin) {
       rewritePartialApply(PAI, NewFunc);
       if (GenericSpecialized.first) {
@@ -487,7 +485,6 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
       }
       return true;
     }
-    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   // Second possibility: Are all partially applied arguments constant?

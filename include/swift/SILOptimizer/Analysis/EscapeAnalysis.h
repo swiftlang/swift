@@ -225,26 +225,6 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
     Return
   };
 
-  /// Indicates to what a value escapes. Note: the order of values is important.
-  enum class EscapeState : char {
-
-    /// The node's value does not escape.
-    /// The value points to a locally allocated object who's lifetime ends in
-    /// the same function.
-    None,
-    
-    /// The node's value escapes through the return value.
-    /// The value points to a locally allocated object which escapes via the
-    /// return instruction.
-    Return,
-
-    /// The node's value escapes through a function argument.
-    Arguments,
-
-    /// The node's value escapes to any global or unidentified memory.
-    Global
-  };
-
   // Must be ordered from most precise to least precise. A meet across memory
   // locations (such as aggregate fields) always moves down.
   enum PointerKind { NoPointer, ReferenceOnly, AnyPointer };
@@ -276,6 +256,27 @@ private:
   };
 
 public:
+  
+  /// Indicates to what a value escapes. Note: the order of values is important.
+  enum class EscapeState : char {
+
+    /// The node's value does not escape.
+    /// The value points to a locally allocated object who's lifetime ends in
+    /// the same function.
+    None,
+    
+    /// The node's value escapes through the return value.
+    /// The value points to a locally allocated object which escapes via the
+    /// return instruction.
+    Return,
+
+    /// The node's value escapes through a function argument.
+    Arguments,
+
+    /// The node's value escapes to any global or unidentified memory.
+    Global
+  };
+
 
   /// A node in the connection graph.
   /// A node basically represents a "pointer" or the "memory content" where a

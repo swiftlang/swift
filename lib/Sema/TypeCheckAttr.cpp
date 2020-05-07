@@ -2622,8 +2622,8 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    auto resolution = TypeResolution::forContextual(PD);
-    return resolution.resolveType(typeEraserRepr, /*options=*/None);
+    auto resolution = TypeResolution::forContextual(PD, None);
+    return resolution.resolveType(typeEraserRepr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -2809,8 +2809,8 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-    auto resolution = TypeResolution::forContextual(DC);
-    T = resolution.resolveType(ProtoTypeLoc.getTypeRepr(), options);
+    auto resolution = TypeResolution::forContextual(DC, options);
+    T = resolution.resolveType(ProtoTypeLoc.getTypeRepr());
     ProtoTypeLoc.setType(T);
   }
 
@@ -2829,7 +2829,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     if (!R) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_lacks_member,
-               PD->getBaseName(), attr->getMemberName())
+               PD->getName(), attr->getMemberName())
         .highlight(attr->getMemberNameLoc().getSourceRange());
     }
 
@@ -4469,12 +4469,13 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
         return derivative->getParent() == func->getParent();
       };
 
-  auto resolution = TypeResolution::forContextual(derivative->getDeclContext());
   Type baseType;
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
     TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowModule;
-    baseType = resolution.resolveType(baseTypeRepr, options);
+    auto resolution =
+        TypeResolution::forContextual(derivative->getDeclContext(), options);
+    baseType = resolution.resolveType(baseTypeRepr);
   }
   if (baseType && baseType->hasError())
     return true;
@@ -4540,6 +4541,42 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     }
   }
   attr->setOriginalFunction(originalAFD);
+
+  // Returns true if:
+  // - Original function and derivative function have the same access level.
+  // - Original function is public and derivative function is internal
+  //   `@usableFromInline`. This is the only special case.
+  auto compatibleAccessLevels = [&]() {
+    if (originalAFD->getFormalAccess() == derivative->getFormalAccess())
+      return true;
+    return originalAFD->getFormalAccess() == AccessLevel::Public &&
+           derivative->getEffectiveAccess() == AccessLevel::Public;
+  };
+
+  // Check access level compatibility for original and derivative functions.
+  if (!compatibleAccessLevels()) {
+    auto originalAccess = originalAFD->getFormalAccess();
+    auto derivativeAccess =
+        derivative->getFormalAccessScope().accessLevelForDiagnostics();
+    diags.diagnose(originalName.Loc,
+                   diag::derivative_attr_access_level_mismatch,
+                   originalAFD->getName(), originalAccess,
+                   derivative->getName(), derivativeAccess);
+    auto fixItDiag =
+        derivative->diagnose(diag::derivative_attr_fix_access, originalAccess);
+    // If original access is public, suggest adding `@usableFromInline` to
+    // derivative.
+    if (originalAccess == AccessLevel::Public) {
+      fixItDiag.fixItInsert(
+          derivative->getAttributeInsertionLoc(/*forModifier*/ false),
+          "@usableFromInline ");
+    }
+    // Otherwise, suggest changing derivative access level.
+    else {
+      fixItAccess(fixItDiag, derivative, originalAccess);
+    }
+    return true;
+  }
 
   // Get the resolved differentiability parameter indices.
   auto *resolvedDiffParamIndices = attr->getParameterIndices();
@@ -4982,10 +5019,11 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
       [&](AbstractFunctionDecl *decl) { return true; };
 
-  auto resolution = TypeResolution::forContextual(transpose->getDeclContext());
+  auto resolution =
+      TypeResolution::forContextual(transpose->getDeclContext(), None);
   Type baseType;
   if (attr->getBaseTypeRepr())
-    baseType = resolution.resolveType(attr->getBaseTypeRepr(), None);
+    baseType = resolution.resolveType(attr->getBaseTypeRepr());
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
                                : defaultUnqualifiedLookupOptions) |

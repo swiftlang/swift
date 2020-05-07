@@ -286,6 +286,7 @@ struct SwiftStatistics {
 class SwiftLangSupport : public LangSupport {
   std::shared_ptr<NotificationCenter> NotificationCtr;
   std::string RuntimeResourcePath;
+  std::string DiagnosticDocumentationPath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
   SwiftInterfaceGenMap IFaceGenContexts;
@@ -310,6 +311,9 @@ public:
   }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }
+  StringRef getDiagnosticDocumentationPath() const {
+    return DiagnosticDocumentationPath;
+  }
 
   std::shared_ptr<SwiftASTManager> getASTManager() { return ASTMgr; }
 
@@ -453,6 +457,8 @@ public:
   //==========================================================================//
   // LangSupport Interface
   //==========================================================================//
+
+  void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) override;
 
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
                    ArrayRef<const char *> Args) override;

@@ -10,6 +10,9 @@
 | **macOS**        | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
 | **Ubuntu 16.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
 | **Ubuntu 18.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04)|
+| **Ubuntu 20.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04)|
+| **CentOS 8** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-centos-8/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-8)|
+| **Amazon Linux 2** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2)|[![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2)|
 
 **Swift Community-Hosted CI Platforms**
 
@@ -347,8 +350,36 @@ described above.
 
 ## Testing Swift
 
-See [docs/Testing.md](docs/Testing.md), in particular the section on
-[lit.py](docs/Testing.md#using-litpy).
+See [docs/Testing.md](docs/Testing.md), in particular the section on [lit.py](docs/Testing.md#using-litpy).
+
+## Learning More
+
+Be sure to look through the [docs](https://github.com/apple/swift/tree/master/docs)
+directory for more information about the compiler. In particular, the documents
+titled [Debugging the Swift Compiler](docs/DebuggingTheCompiler.md) and
+[Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
+helpful to understand before submitting your first PR.
+
+### Building Documentation
+
+To read the compiler documentation, start by installing the
+[Sphinx](http://sphinx-doc.org) documentation generator tool by running the
+command:
+
+    easy_install -U "Sphinx < 2.0"
+
+Once complete, you can build the Swift documentation by changing directory into
+[docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This
+compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs)
+directory into HTML in the `docs/_build/html` directory.
+
+Many of the docs are out of date, but you can see some historical design
+documents in the `docs` directory.
+
+Another source of documentation is the standard library itself, located in
+`stdlib`. Much of the language is actually implemented in the library
+(including `Int`), and the standard library gives some examples of what can be
+expressed today.
 
 ## Build Dependencies
 

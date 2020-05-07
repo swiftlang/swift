@@ -153,8 +153,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 
   // Bail if the result type of the converted callee is different from the callee's
   // result type of the apply instruction.
-  if (SubstCalleeTy->getAllResultsSubstType(AI.getModule())
-        != ConvertCalleeTy->getAllResultsSubstType(AI.getModule())) {
+  if (SubstCalleeTy->getAllResultsSubstType(
+          AI.getModule(), AI.getFunction()->getTypeExpansionContext()) !=
+      ConvertCalleeTy->getAllResultsSubstType(
+          AI.getModule(), AI.getFunction()->getTypeExpansionContext())) {
     return nullptr;
   }
 
@@ -164,8 +166,9 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   OperandValueArrayRef Ops = AI.getArgumentsWithoutIndirectResults();
   SILFunctionConventions substConventions(SubstCalleeTy, FRI->getModule());
   SILFunctionConventions convertConventions(ConvertCalleeTy, FRI->getModule());
-  auto oldOpTypes = substConventions.getParameterSILTypes();
-  auto newOpTypes = convertConventions.getParameterSILTypes();
+  auto context = AI.getFunction()->getTypeExpansionContext();
+  auto oldOpTypes = substConventions.getParameterSILTypes(context);
+  auto newOpTypes = convertConventions.getParameterSILTypes(context);
 
   assert(Ops.size() == SubstCalleeTy->getNumParameters()
          && "Ops and op types must have same size.");
@@ -206,10 +209,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
   SILInstruction *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
                                             Args, setNonThrowing);
-  assert(FullApplySite::isa(NAI).getSubstCalleeType()
-                               ->getAllResultsSubstType(AI.getModule())
-           == AI.getSubstCalleeType()
-               ->getAllResultsSubstType(AI.getModule()) &&
+  assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsSubstType(
+             AI.getModule(), AI.getFunction()->getTypeExpansionContext()) ==
+             AI.getSubstCalleeType()->getAllResultsSubstType(
+                 AI.getModule(), AI.getFunction()->getTypeExpansionContext()) &&
          "Function types should be the same");
   return NAI;
 }
@@ -866,12 +869,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   // We need to make sure that we can a) update Apply to use the new args and b)
   // at least one argument has changed. If no arguments have changed, we need
   // to return nullptr. Otherwise, we will have an infinite loop.
-  auto substTy =
-      Apply.getCallee()
-          ->getType()
-          .substGenericArgs(Apply.getModule(), NewCallSubs,
-                            Apply.getFunction()->getTypeExpansionContext())
-          .getAs<SILFunctionType>();
+  auto context = Apply.getFunction()->getTypeExpansionContext();
+  auto substTy = Apply.getCallee()
+                     ->getType()
+                     .substGenericArgs(Apply.getModule(), NewCallSubs, context)
+                     .getAs<SILFunctionType>();
   SILFunctionConventions conv(substTy,
                               SILModuleConventions(Apply.getModule()));
   bool canUpdateArgs = true;
@@ -880,7 +882,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     // Make sure that *all* the arguments in both the new substitution function
     // and our vector of new arguments have the same type.
     canUpdateArgs &=
-        conv.getSILArgumentType(index) == NewArgs[index]->getType();
+        conv.getSILArgumentType(index, context) == NewArgs[index]->getType();
     // Make sure that we have changed at least one argument.
     madeUpdate |=
         NewArgs[index]->getType() != Apply.getArgument(index)->getType();

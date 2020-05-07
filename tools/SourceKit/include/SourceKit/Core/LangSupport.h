@@ -39,6 +39,7 @@ class SourceFileSyntax;
 } // namespace swift
 
 namespace SourceKit {
+class GlobalConfig;
 
 struct EntityInfo {
   UIdent Kind;
@@ -147,7 +148,7 @@ public:
   virtual void failed(StringRef ErrDescription) = 0;
 
   virtual void setCompletionKind(UIdent kind) {};
-  virtual void setReusingASTContext(bool) {};
+  virtual void setReusingASTContext(bool) = 0;
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 
@@ -658,6 +659,9 @@ public:
   /// rather than to the real filesystem.
   virtual void setInMemoryOutputFileSystem(
       llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) = 0;
+  // SWIFT_ENABLE_TENSORFLOW END
+
+  virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
 
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,

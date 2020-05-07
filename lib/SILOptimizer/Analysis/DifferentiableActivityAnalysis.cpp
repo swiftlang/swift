@@ -13,11 +13,12 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
+#include "swift/SILOptimizer/Differentiation/Common.h"
+
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 
 using namespace swift;
 using namespace swift::autodiff;

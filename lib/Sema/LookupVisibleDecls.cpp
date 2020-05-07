@@ -395,7 +395,8 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
   DynamicLookupConsumer ConsumerWrapper(Consumer, LS, CurrDC);
 
   for (auto Import : namelookup::getAllImports(CurrDC)) {
-    Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
+    Import.importedModule->lookupClassMembers(Import.accessPath,
+                                              ConsumerWrapper);
   }
 }
 

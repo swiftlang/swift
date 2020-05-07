@@ -194,7 +194,8 @@ public:
   virtual void verifyAllModules() override;
 
   virtual Optional<ModuleDependencies> getModuleDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache) override;
+      StringRef moduleName, ModuleDependenciesCache &cache,
+      SubASTContextDelegate &delegate) override;
 };
 
 /// Imports serialized Swift modules into an ASTContext.
@@ -306,16 +307,15 @@ class SerializedASTFile final : public LoadedFile {
 
   ModuleFile &File;
 
-  bool IsSIB;
-
-  SerializedASTFile(ModuleDecl &M, ModuleFile &file, bool isSIB = false)
-    : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
+  SerializedASTFile(ModuleDecl &M, ModuleFile &file)
+    : LoadedFile(FileUnitKind::SerializedAST, M), File(file) {}
 
   void
   collectLinkLibrariesFromImports(ModuleDecl::LinkLibraryCallback callback) const;
 
 public:
-  bool isSIB() const { return IsSIB; }
+  /// Whether this represents a '.sib' file.
+  bool isSIB() const;
 
   /// Returns the language version that was used to compile the contents of this
   /// file.

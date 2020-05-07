@@ -845,7 +845,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
 
     SmallVector<Identifier, 4> yieldLabels;
     SmallVector<SourceLoc, 4> yieldLabelLocs;
-    Expr *trailingClosure = nullptr;
+    SmallVector<TrailingClosure, 2> trailingClosures;
 
     status = parseExprList(tok::l_paren, tok::r_paren,
                            /*postfix (allow trailing closure)*/ false,
@@ -853,9 +853,9 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
                            lpLoc,
                            yields, yieldLabels, yieldLabelLocs,
                            rpLoc,
-                           trailingClosure,
+                           trailingClosures,
                            SyntaxKind::ExprList);
-    assert(trailingClosure == nullptr);
+    assert(trailingClosures.empty());
     assert(yieldLabels.empty());
     assert(yieldLabelLocs.empty());
   } else {
@@ -1093,7 +1093,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
     auto varPattern = new (P.Context) VarPattern(loc, /*isLet*/true,
-                                                 namePattern, /*implicit*/true);
+                                                 namePattern);
+    varPattern->setImplicit();
     patternResult = makeParserResult(varPattern);
   }
 
@@ -1107,9 +1108,12 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 
   // If that didn't work, use a bogus pattern so that we can fill out
   // the AST.
-  if (patternResult.isNull())
-    patternResult =
-      makeParserErrorResult(new (P.Context) AnyPattern(P.PreviousLoc));
+  if (patternResult.isNull()) {
+    auto *AP = new (P.Context) AnyPattern(P.PreviousLoc);
+    if (P.PreviousLoc.isInvalid())
+      AP->setImplicit();
+    patternResult = makeParserErrorResult(AP);
+  }
 
   // Fill in the pattern.
   status |= patternResult;
@@ -1483,7 +1487,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     
     if (ThePattern.isNonNull()) {
       auto *P = new (Context) VarPattern(IntroducerLoc, wasLet,
-                                          ThePattern.get(), /*impl*/false);
+                                          ThePattern.get());
       ThePattern = makeParserResult(Status, P);
     }
 
@@ -1505,7 +1509,10 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     
   if (ThePattern.isNull()) {
     // Recover by creating AnyPattern.
-    ThePattern = makeParserResult(new (Context) AnyPattern(PreviousLoc));
+    auto *AP = new (Context) AnyPattern(PreviousLoc);
+    if (PreviousLoc.isInvalid())
+      AP->setImplicit();
+    ThePattern = makeParserResult(AP);
   }
 
   // Conditional bindings must have an initializer.
@@ -2132,7 +2139,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   SourceLoc InLoc;
   if (pattern.isNull()) {
     // Recover by creating a "_" pattern.
-    pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));
+    pattern = makeParserErrorResult(AnyPattern::createImplicit(Context));
     consumeIf(tok::kw_in, InLoc);
   } else if (!IsCStyleFor) {
     parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);
@@ -2421,6 +2428,8 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
 
   // Create an implicit AnyPattern to represent the default match.
   auto Any = new (P.Context) AnyPattern(CaseLoc);
+  if (CaseLoc.isInvalid())
+    Any->setImplicit();
   LabelItems.push_back(
       CaseLabelItem::getDefault(Any, WhereLoc, Guard.getPtrOrNull()));
 

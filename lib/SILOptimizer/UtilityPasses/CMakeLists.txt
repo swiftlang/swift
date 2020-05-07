@@ -31,4 +31,5 @@ silopt_register_sources(
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
   OwnershipDumper.cpp
+  OwnershipVerifierTextualErrorDumper.cpp
 )

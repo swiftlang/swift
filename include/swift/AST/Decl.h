@@ -7180,18 +7180,16 @@ class OperatorDecl : public Decl {
   
   Identifier name;
 
-  ArrayRef<Identifier> Identifiers;
-  ArrayRef<SourceLoc> IdentifierLocs;
+  ArrayRef<Located<Identifier>> Identifiers;
   ArrayRef<NominalTypeDecl *> DesignatedNominalTypes;
   SourceLoc getLocFromSource() const { return NameLoc; }
   friend class Decl;
 public:
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
-               ArrayRef<Identifier> Identifiers,
-               ArrayRef<SourceLoc> IdentifierLocs)
+               ArrayRef<Located<Identifier>> Identifiers)
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        Identifiers(Identifiers), IdentifierLocs(IdentifierLocs) {}
+        Identifiers(Identifiers) {}
 
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
@@ -7226,12 +7224,8 @@ public:
   ///
   /// \todo These two purposes really ought to be in separate properties and the
   /// designated type list should be of TypeReprs instead of Identifiers.
-  ArrayRef<Identifier> getIdentifiers() const {
+  ArrayRef<Located<Identifier>> getIdentifiers() const {
     return Identifiers;
-  }
-
-  ArrayRef<SourceLoc> getIdentifierLocs() const {
-    return IdentifierLocs;
   }
 
   ArrayRef<NominalTypeDecl *> getDesignatedNominalTypes() const {
@@ -7262,18 +7256,17 @@ class InfixOperatorDecl : public OperatorDecl {
 public:
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
                     SourceLoc nameLoc, SourceLoc colonLoc,
-                    ArrayRef<Identifier> identifiers,
-                    ArrayRef<SourceLoc> identifierLocs)
+                    ArrayRef<Located<Identifier>> identifiers)
       : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
-                     identifiers, identifierLocs),
+                     identifiers),
         ColonLoc(colonLoc) {}
 
   SourceLoc getEndLoc() const {
-    auto identifierLocs = getIdentifierLocs();
-    if (identifierLocs.empty())
+    auto identifiers = getIdentifiers();
+    if (identifiers.empty())
       return getNameLoc();
 
-    return identifierLocs.back();
+    return identifiers.back().Loc;
   }
 
   SourceRange getSourceRange() const {
@@ -7304,10 +7297,9 @@ class PrefixOperatorDecl : public OperatorDecl {
 public:
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                      SourceLoc NameLoc,
-                     ArrayRef<Identifier> Identifiers,
-                     ArrayRef<SourceLoc> IdentifierLocs)
+                     ArrayRef<Located<Identifier>> Identifiers)
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     Identifiers, IdentifierLocs) {}
+                     Identifiers) {}
 
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                      SourceLoc NameLoc,
@@ -7339,10 +7331,9 @@ class PostfixOperatorDecl : public OperatorDecl {
 public:
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                       SourceLoc NameLoc,
-                      ArrayRef<Identifier> Identifiers,
-                      ArrayRef<SourceLoc> IdentifierLocs)
+                      ArrayRef<Located<Identifier>> Identifiers)
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     Identifiers, IdentifierLocs) {}
+                     Identifiers) {}
 
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                       SourceLoc NameLoc,

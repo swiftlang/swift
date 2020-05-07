@@ -1563,6 +1563,14 @@ public:
 
   void emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *);
 
+  /// We emit Objective-C class stubs for non-generic classes with resilient
+  /// ancestry. This lets us attach categories to the class even though it
+  /// does not have statically-emitted metadata.
+  bool hasObjCResilientClassStub(ClassDecl *D);
+
+  /// Emit a resilient class stub.
+  void emitObjCResilientClassStub(ClassDecl *D);
+
 private:
   llvm::Constant *
   getAddrOfSharedContextDescriptor(LinkEntity entity,

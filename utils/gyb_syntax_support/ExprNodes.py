@@ -394,6 +394,21 @@ EXPR_NODES = [
              Child('Pattern', kind='Pattern'),
          ]),
 
+    # trailing-closure-element -> identifier ':' closure-expression
+    Node('MultipleTrailingClosureElement', kind='Syntax',
+         children=[
+             Child('Label', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken'
+                   ]),
+             Child('Colon', kind='ColonToken'),
+             Child('Closure', kind='ClosureExpr'),
+         ]),
+
+    Node('MultipleTrailingClosureElementList', kind='SyntaxCollection',
+         element='MultipleTrailingClosureElement'),
+
     # call-expr -> expr '(' call-argument-list ')' closure-expr?
     #            | expr closure-expr
     Node('FunctionCallExpr', kind='Expr',
@@ -407,6 +422,10 @@ EXPR_NODES = [
                    is_optional=True),
              Child('TrailingClosure', kind='ClosureExpr',
                    is_optional=True),
+             Child('AdditionalTrailingClosures',
+                   kind='MultipleTrailingClosureElementList',
+                   collection_element_name='AdditionalTralingClosure',
+                   is_optional=True),
          ]),
 
     # subscript-expr -> expr '[' call-argument-list ']' closure-expr?
@@ -418,6 +437,10 @@ EXPR_NODES = [
                    collection_element_name='Argument'),
              Child('RightBracket', kind='RightSquareBracketToken'),
              Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
+             Child('AdditionalTrailingClosures',
+                   kind='MultipleTrailingClosureElementList',
+                   collection_element_name='AdditionalTralingClosure',
                    is_optional=True),
          ]),
 
@@ -564,30 +587,6 @@ EXPR_NODES = [
              Child('LeftParen', kind='LeftParenToken'),
              Child('Arguments', kind='TupleExprElementList',
                    collection_element_name='Argument'),
-             Child('RightParen', kind='RightParenToken'),
-         ]),
-
-    # quote-expr -> '#quote' '(' expr ')'
-    #             | '#quote' '{' expr '}'
-    Node('QuoteLiteralExpr', kind='Expr',
-         children=[
-             Child('Quote', kind='PoundQuoteToken'),
-             Child('LeftParen', kind='LeftParenToken',
-                   is_optional=True),
-             Child('Expr', kind='Expr',
-                   is_optional=True),
-             Child('RightParen', kind='RightParenToken',
-                   is_optional=True),
-             Child('TrailingClosure', kind='ClosureExpr',
-                   is_optional=True),
-         ]),
-
-    # unquote-expr -> '#unquote' '(' expr ')'
-    Node('UnquoteExpr', kind='Expr',
-         children=[
-             Child('Quote', kind='PoundQuoteToken'),
-             Child('LeftParen', kind='LeftParenToken'),
-             Child('Expr', kind='Expr'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 ]
