@@ -3,7 +3,7 @@
 set -xe
 repository='swiftwasm/swift'
 workflow_name='main.yml'
-branch='swiftwasm'
+branch=$1
 
 gh_api=https://api.github.com
 
@@ -88,15 +88,15 @@ download_artifact macos-installable
 unzip linux-installable.zip
 unzip macos-installable.zip
 
-toolchain_name=$(basename $(tar tfz swift-wasm-DEVELOPMENT-SNAPSHOT-linux.tar.gz | head -n1))
+toolchain_name=$(basename $(tar tfz swift-wasm-$2-SNAPSHOT-linux.tar.gz | head -n1))
 
 if is_released $toolchain_name; then
   echo "Latest toolchain $toolchain_name has been already released"
   exit 0
 fi
 
-cp swift-wasm-DEVELOPMENT-SNAPSHOT-linux.tar.gz "$toolchain_name-linux.tar.gz"
-cp swift-wasm-DEVELOPMENT-SNAPSHOT-osx.tar.gz "$toolchain_name-osx.tar.gz"
+cp swift-wasm-$2-SNAPSHOT-linux.tar.gz "$toolchain_name-linux.tar.gz"
+cp swift-wasm-$2-SNAPSHOT-osx.tar.gz "$toolchain_name-osx.tar.gz"
 
 create_tag $toolchain_name $head_sha
 release_id=$(create_release $toolchain_name $toolchain_name $head_sha)
