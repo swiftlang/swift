@@ -1278,9 +1278,8 @@ static bool performCompile(CompilerInstance &Instance,
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
   if (Action == FrontendOptions::ActionType::REPL) {
-    runREPL(Instance, ProcessCmdLine(Args.begin(), Args.end()),
-            Invocation.getParseStdlib());
-    return Context.hadError();
+    llvm::report_fatal_error("Compiler-internal integrated REPL has been "
+                             "removed; use the LLDB-enhanced REPL instead.");
   }
 
   if (auto r = dumpASTIfNeeded(Instance))
