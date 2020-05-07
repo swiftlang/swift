@@ -8544,4 +8544,5 @@ SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
 
     return *this;
   }
+  llvm_unreachable("invalid target kind");
 }

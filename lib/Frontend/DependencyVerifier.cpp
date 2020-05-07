@@ -239,6 +239,7 @@ public:
     case Expectation::Scope::Cascading:
       return "cascading";
     }
+    llvm_unreachable("invalid expectation scope");
   }
 
   StringRef renderAsFixit(ASTContext &Ctx) const {

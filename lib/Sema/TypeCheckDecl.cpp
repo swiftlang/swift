@@ -2351,6 +2351,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     return resultTy;
   }
   }
+  llvm_unreachable("invalid decl kind");
 }
 
 NamedPattern *

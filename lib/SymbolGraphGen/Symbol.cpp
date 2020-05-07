@@ -371,6 +371,7 @@ Symbol::getDomain(PlatformAgnosticAvailabilityKind AgnosticKind,
     case swift::PlatformKind::none:
       return None;
   }
+  llvm_unreachable("invalid platform kind");
 }
 
 void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
