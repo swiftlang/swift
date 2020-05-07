@@ -196,8 +196,6 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
     return SourceFileKind::Main;
   case InputFileKind::SwiftLibrary:
     return SourceFileKind::Library;
-  case InputFileKind::SwiftREPL:
-    return SourceFileKind::Main;
   case InputFileKind::SwiftModuleInterface:
     return SourceFileKind::Interface;
   case InputFileKind::SIL:

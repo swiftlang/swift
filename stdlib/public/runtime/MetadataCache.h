@@ -1076,7 +1076,7 @@ private:
     case LSK::CompletionQueue:
       // Move the existing completion queue to the cache entry.
       queueEntry->CompletionQueue = LockedStorage.CompletionQueue;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
 
     case LSK::AllocatingThread:
       LockedStorageKind = LSK::QueueEntry;
