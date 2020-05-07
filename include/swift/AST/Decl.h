@@ -7187,6 +7187,7 @@ public:
     case DeclKind::PostfixOperator:
       return OperatorFixity::Postfix;
     }
+    llvm_unreachable("inavlid decl kind");
   }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }

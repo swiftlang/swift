@@ -54,6 +54,7 @@ DeclarationFragmentPrinter::getKindSpelling(FragmentKind Kind) const {
     case FragmentKind::None:
       llvm_unreachable("Fragment kind of 'None' has no spelling");
   }
+  llvm_unreachable("invalid fragment kind");
 }
 
 void DeclarationFragmentPrinter::closeFragment() {
