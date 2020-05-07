@@ -1179,7 +1179,6 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       return;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
-    case SourceFileKind::REPL:
       break;
     }
   }
@@ -1499,7 +1498,6 @@ public:
           case SourceFileKind::SIL:
             return;
           case SourceFileKind::Main:
-          case SourceFileKind::REPL:
           case SourceFileKind::Library:
             break;
           }
@@ -1514,7 +1512,6 @@ public:
         if (DC->isModuleScopeContext()) {
           switch (SF->Kind) {
           case SourceFileKind::Main:
-          case SourceFileKind::REPL:
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
@@ -2121,7 +2118,6 @@ public:
         return false;
       case SourceFileKind::Library:
       case SourceFileKind::Main:
-      case SourceFileKind::REPL:
         break;
       }
     }

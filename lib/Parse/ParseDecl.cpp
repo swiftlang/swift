@@ -7414,7 +7414,6 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       break;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
-    case SourceFileKind::REPL:
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
         consumeToken();

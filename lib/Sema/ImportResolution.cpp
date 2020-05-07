@@ -370,9 +370,8 @@ ImportResolver::getModule(ArrayRef<Located<Identifier>> modulePath) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
 
-  // The Builtin module cannot be explicitly imported unless we're a .sil file
-  // or in the REPL.
-  if ((SF.Kind == SourceFileKind::SIL || SF.Kind == SourceFileKind::REPL) &&
+  // The Builtin module cannot be explicitly imported unless we're a .sil file.
+  if (SF.Kind == SourceFileKind::SIL &&
       moduleID.Item == ctx.TheBuiltinModule->getName())
     return ctx.TheBuiltinModule;
 
@@ -563,7 +562,7 @@ bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {
              [&] { modulePathStr += "."; });
 
   auto diagKind = diag::sema_no_import;
-  if (SF.Kind == SourceFileKind::REPL || ctx.LangOpts.DebuggerSupport)
+  if (ctx.LangOpts.DebuggerSupport)
     diagKind = diag::sema_no_import_repl;
   ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
 
