@@ -51,6 +51,7 @@ namespace swift {
   class Expr;
   class GenericParamList;
   class LazyMemberLoader;
+  class GenericContext;
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
@@ -817,6 +818,9 @@ public:
 
   /// Return 'this' as a \c Decl.
   const Decl *getDecl() const;
+
+  /// Return 'this' as a \c GenericContext.
+  const GenericContext *getAsGenericContext() const;
 
   /// Get the DeclID this Decl was deserialized from.
   serialization::DeclID getDeclID() const {

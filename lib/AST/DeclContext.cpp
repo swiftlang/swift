@@ -766,6 +766,16 @@ IterableDeclContext::getDecl() const {
   llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
 }
 
+const GenericContext *IterableDeclContext::getAsGenericContext() const {
+  switch (getIterableContextKind()) {
+  case IterableDeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(this);
+  case IterableDeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this);
+  }
+  llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
+}
+
 ASTContext &IterableDeclContext::getASTContext() const {
   return getDecl()->getASTContext();
 }
@@ -853,7 +863,7 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   if (AddedParsedMembers)
     return false;
 
-  if (!getDecl()->getDeclContext()->getParentSourceFile()) {
+  if (!getAsGenericContext()->getParentSourceFile()) {
     // There will never be any parsed members to add, so set the flag to say
     // we are done so we can short-circuit next time.
     const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
@@ -873,7 +883,7 @@ void IterableDeclContext::loadAllMembers() const {
   ASTContext &ctx = getASTContext();
 
   // For contexts within a source file, get the list of parsed members.
-  if (getDecl()->getDeclContext()->getParentSourceFile()) {
+  if (getAsGenericContext()->getParentSourceFile()) {
     // Retrieve the parsed members. Even if we've already added the parsed
     // members to this context, this call is important for recording the
     // dependency edge.
@@ -911,7 +921,7 @@ void IterableDeclContext::loadAllMembers() const {
 }
 
 bool IterableDeclContext::wasDeserialized() const {
-  const DeclContext *DC = cast<DeclContext>(getDecl());
+  const DeclContext *DC = getAsGenericContext();
   if (auto F = dyn_cast<FileUnit>(DC->getModuleScopeContext())) {
     return F->getKind() == FileUnitKind::SerializedAST;
   }
@@ -943,7 +953,7 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 
 Optional<std::string> IterableDeclContext::getBodyFingerprint() const {
   // Only makes sense for contexts in a source file
-  if (!getDecl()->getDeclContext()->getParentSourceFile())
+  if (!getAsGenericContext()->getParentSourceFile())
     return None;
   auto mutableThis = const_cast<IterableDeclContext *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
