@@ -231,6 +231,8 @@ public:
 
   /// Return a range of (key, ArrayRef<Value>) pairs. The keys are guaranteed to
   /// be in key sorted order and the ArrayRef<Value> are in insertion order.
+  ///
+  /// The range skips all erased (key, ArrayRef<Value>) entries.
   RangeType getRange() const {
     assert(isFrozen() &&
            "Can not create range until data structure is frozen?!");

@@ -244,16 +244,6 @@ bb5:
 // CHECK: Block: bb2
 // CHECK: Error#: 0. End Error in Function: 'bad_order'
 //
-// TODO: Should we really flag this twice?
-//
-// CHECK-LABEL: Error#: 1. Begin Error in Function: 'bad_order'
-// CHECK: Found use after free due to unvisited non lifetime ending uses?!
-// CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
-// CHECK: Remaining Users:
-// CHECK: User:  end_borrow %5 : $Builtin.NativeObject
-// CHECK: Block: bb2
-// CHECK: Error#: 1. End Error in Function: 'bad_order'
-//
 // CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'bad_order'
 sil [ossa] @bad_order : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -301,6 +291,15 @@ bb5:
 // CHECK:   end_borrow %1 : $Builtin.NativeObject           // id: %19
 // CHECK: Error#: 1. End Error in Function: 'bad_order_add_a_level'
 //
+// This block is reported as leaking block since given our partial-cfg:
+//
+//                /---> BB3
+// BB1 -> BB2 ------> BB5
+//
+// we create the borrow at BB1 and end its lifetime at BB2 and BB5. This causes
+// us to walk up, identify they double consume at BB2 from BB5. Since we skipped
+// BB3 that is identified as a leaking block appropriately.
+//
 // CHECK-LABEL: Error#: 2. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Error! Found a leak due to a consuming post-dominance failure!
 // CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %19, %14, %6, %3
@@ -308,18 +307,7 @@ bb5:
 // CHECK: bb3
 // CHECK: Error#: 2. End Error in Function: 'bad_order_add_a_level'
 //
-// This error is a "use after free" error b/c we are accessing the argument
-// /after/ we end the parent borrow. We /could/ improve the error message here.
-//
 // CHECK-LABEL: Error#: 3. Begin Error in Function: 'bad_order_add_a_level'
-// CHECK: Found use after free due to unvisited non lifetime ending uses?!
-// CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %19, %14, %6, %3
-// CHECK: Remaining Users:
-// CHECK: User:  end_borrow %5 : $Builtin.NativeObject           // id: %7
-// CHECK: Block: bb2
-// CHECK: Error#: 3. End Error in Function: 'bad_order_add_a_level'
-//
-// CHECK-LABEL: Error#: 4. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Found over consume?!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %9, %7
 // CHECK: User:   end_borrow %5 : $Builtin.NativeObject           // id: %13
@@ -327,27 +315,31 @@ bb5:
 // CHECK: Consuming Users:
 // CHECK:   end_borrow %5 : $Builtin.NativeObject           // id: %7
 // CHECK:   end_borrow %5 : $Builtin.NativeObject           // id: %13
-// CHECK: Error#: 4. End Error in Function: 'bad_order_add_a_level'
+// CHECK: Error#: 3. End Error in Function: 'bad_order_add_a_level'
 //
-// CHECK-LABEL: Error#: 5. Begin Error in Function: 'bad_order_add_a_level'
+// CHECK-LABEL: Error#: 4. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Error! Found a leak due to a consuming post-dominance failure!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %9, %7
 // CHECK: Post Dominating Failure Blocks:
 // CHECK: bb3
+// CHECK: Error#: 4. End Error in Function: 'bad_order_add_a_level'
+//
+// We found a use that we didn't visit. For our purposes, we consider this to be
+// an outside lifetime use rather than use after freer to unite it with errors
+// from uses that are not reachable from the definition of the value.
+//
+// CHECK-LABEL: Error#: 5. Begin Error in Function: 'bad_order_add_a_level'
+// CHECK: Found outside of lifetime uses!
+// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %9, %7
+// CHECK: User List:
+// CHECK: User:  %9 = begin_borrow %5 : $Builtin.NativeObject    // user: %10
+// CHECK: Block: bb3
 // CHECK: Error#: 5. End Error in Function: 'bad_order_add_a_level'
 //
 // CHECK-LABEL: Error#: 6. Begin Error in Function: 'bad_order_add_a_level'
-// CHECK: Found use after free due to unvisited non lifetime ending uses?!
-// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %9, %7
-// CHECK: Remaining Users:
-// CHECK: User:  %9 = begin_borrow %5 : $Builtin.NativeObject    // user: %10
-// CHECK: Block: bb3
-// CHECK: Error#: 6. End Error in Function: 'bad_order_add_a_level'
-//
-// CHECK-LABEL: Error#: 7. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
 // CHECK: Value: %11 = argument of bb4 : $Builtin.NativeObject
-// CHECK: Error#: 7. End Error in Function: 'bad_order_add_a_level'
+// CHECK: Error#: 6. End Error in Function: 'bad_order_add_a_level'
 //
 // CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'bad_order_add_a_level'
 sil [ossa] @bad_order_add_a_level : $@convention(thin) (@owned Builtin.NativeObject) -> () {
@@ -442,34 +434,20 @@ bb7:
 // CHECK:   end_borrow %1 : $Builtin.NativeObject           // id: %22
 // CHECK: Error#: 4. End Error in Function: 'bad_order_add_a_level_2'
 //
-// These are handled via other checks.
-//
 // CHECK-LABEL: Error#: 5. Begin Error in Function: 'bad_order_add_a_level_2'
-// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
-// CHECK: Error#: 5. End Error in Function: 'bad_order_add_a_level_2'
-//
-// CHECK-LABEL: Error#: 6. Begin Error in Function: 'bad_order_add_a_level_2'
-// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
-// CHECK: Error#: 6. End Error in Function: 'bad_order_add_a_level_2'
-//
-// CHECK-LABEL: Error#: 7. Begin Error in Function: 'bad_order_add_a_level_2'
-// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
-// CHECK: Error#: 7. End Error in Function: 'bad_order_add_a_level_2'
-//
-// CHECK-LABEL: Error#: 8. Begin Error in Function: 'bad_order_add_a_level_2'
 // CHECK-NEXT: Found use after free?!
 // CHECK-NEXT: Value: %5 = argument of bb2 : $Builtin.NativeObject
 // CHECK-NEXT: Consuming User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Non Consuming User:   end_borrow %11 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb4
-// CHECK: Error#: 8. End Error in Function: 'bad_order_add_a_level_2'
+// CHECK: Error#: 5. End Error in Function: 'bad_order_add_a_level_2'
 //
-// CHECK-LABEL: Error#: 9. Begin Error in Function: 'bad_order_add_a_level_2'
+// CHECK-LABEL: Error#: 6. Begin Error in Function: 'bad_order_add_a_level_2'
 // CHECK-NEXT: Found over consume?!
 // CHECK-NEXT: Value: %5 = argument of bb2 : $Builtin.NativeObject
 // CHECK-NEXT: User:   end_borrow %5 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
-// CHECK: Error#: 9. End Error in Function: 'bad_order_add_a_level_2'
+// CHECK: Error#: 6. End Error in Function: 'bad_order_add_a_level_2'
 //
 // NOTE: There are 2-3 errors here we are not pattern matching. We should add
 // patterns for them so we track if they are changed.
@@ -683,19 +661,29 @@ bb3:
 // CHECK-NEXT:   br bb2(%1 : $Builtin.NativeObject, %1 : $Builtin.NativeObject) // id: %3
 // CHECK: Error#: 0. End Error in Function: 'simple_loop_carry_over_consume'
 //
+// This error is a little non-sensical since we have malformed SIL here. The
+// end_borrow is considered to be a read only use of itself since we borrow %5
+// and then pass %8 (the result of the borrow) around the loop. This then
+// becomes %5 and then our end_borrow is treated as the end of the lfietime of
+// the end_borrow and thus a liveness requiring use of the thing that %8 was
+// borrowed from, %5.
+//
 // CHECK-LABEL: Error#: 1. Begin Error in Function: 'simple_loop_carry_over_consume'
 // CHECK: Found use after free?!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %11, %10, %8
 // CHECK: Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
-// CHECK: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject           // id: %12
+// CHECK: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
 // CHECK: Block: bb5
 // CHECK: Error#: 1. End Error in Function: 'simple_loop_carry_over_consume'
 //
+// %5 is passed around the loop as an incoming value to %4. So we get a certain
+// amount of circularity here. The important thing is we flag it.
+//
 // CHECK-LABEL: Error#: 2. Begin Error in Function: 'simple_loop_carry_over_consume'
-// CHECK: Found use after free due to unvisited non lifetime ending uses?!
+// CHECK: Found use after free?!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %11, %10, %8
-// CHECK: Remaining Users:
-// CHECK: User:  end_borrow %4 : $Builtin.NativeObject           // id: %12
+// CHECK: Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
+// CHECK: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject           // id: %12
 // CHECK: Block: bb5
 // CHECK: Error#: 2. End Error in Function: 'simple_loop_carry_over_consume'
 //
@@ -756,24 +744,26 @@ bb3:
   return %9999 : $()
 }
 
-// This first test fails since the %2a is considered dead at bb2a's
-// terminator. So the end_borrow of %2a in bb3 is considered a liveness use of
-// %2 due to it consuming %3 via the loop carry.
+// This is slightly non-sensical since we are feeding the verifier broken SIL.
 //
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry'
 // CHECK-NEXT: Found use after free?!
 // CHECK-NEXT: Value: %5 = argument of bb1 : $Builtin.NativeObject      // users: %11, %10, %8
 // CHECK-NEXT: Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
-// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject           // id: %12
+// CHECK-NEXT: Non Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
 // CHECK-NEXT: Block: bb4
 // CHECK: Error#: 0. End Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry'
 //
+// This test fails since the %2a is considered dead at bb2a's terminator. So the
+// end_borrow of %2a in bb3 is considered a liveness use of %2 due to it
+// consuming %3 via the loop carry.
+//
 // CHECK-LABEL: Error#: 1. Begin Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry'
-// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
-// CHECK-NEXT: Value: %5 = argument of bb1 : $Builtin.NativeObject      // users: %11, %10, %8
-// CHECK-NEXT:     Remaining Users:
-// CHECK-NEXT: User:  end_borrow %4 : $Builtin.NativeObject           // id: %12
-// CHECK-NEXT: Block: bb4
+// CHECK: Found use after free?!
+// CHECK: Value: %5 = argument of bb1 : $Builtin.NativeObject      // users: %11, %10, %8
+// CHECK: Consuming User:   end_borrow %5 : $Builtin.NativeObject           // id: %11
+// CHECK: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject           // id: %12
+// CHECK: Block: bb4
 // CHECK: Error#: 1. End Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry'
 //
 // CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry'
