@@ -24,6 +24,8 @@
 
 namespace swift {
 
+class KeyPathInst;
+
 /// Projects a statically known key path expression to
 /// a direct property access.
 class KeyPathProjector {
@@ -52,6 +54,10 @@ public:
   /// \param builder The SILBuilder to use.
   static std::unique_ptr<KeyPathProjector>
   create(SILValue keyPath, SILValue root, SILLocation loc, SILBuilder &builder);
+  
+  /// Extract the literal KeyPathInst underlying a value, or return null if there is none.
+  static KeyPathInst *
+  getLiteralKeyPath(SILValue keyPath);
   
   /// Projects the key path to an address. Sets up the projection,
   /// invokes the callback, then tears down the projection.
