@@ -21,6 +21,11 @@ private:
   int varPrivate;
 };
 
+struct StructWithUnimportedMemberFunction {
+  int varPublic;
+  int StructWithUnimportedMemberFunction::* unimportedMemberFunction();
+};
+
 class ClassPrivateOnly {
   int varPrivate;
 };
@@ -39,6 +44,12 @@ class ClassPrivateAndPublic {
   int varPrivate;
 public:
   int varPublic;
+};
+
+struct ClassWithUnimportedMemberFunction {
+public:
+  int varPublic;
+  int ClassWithUnimportedMemberFunction::* unimportedMemberFunction();
 };
 
 #endif
