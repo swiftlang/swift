@@ -22,10 +22,7 @@ export PATH="$HOME/.wasmer/bin:$PATH"
 export SCCACHE_CACHE_SIZE="50G"
 export SCCACHE_DIR="$SOURCE_PATH/build-cache"
 
-CACHE_FLAGS="--cmake-c-launcher $(which sccache) --cmake-cxx-launcher $(which sccache)"
-FLAGS="--release $CACHE_FLAGS --verbose"
-
-$BUILD_SCRIPT $FLAGS
+$BUILD_SCRIPT
 
 if [[ "$(uname)" == "Darwin" ]]; then
   # workaround: host target test directory is necessary to use run-test
@@ -38,5 +35,5 @@ if [[ "$(uname)" == "Linux" ]]; then
   echo "Skip running test suites for Linux"
 else
   # Run test but ignore failure temporarily
-  $BUILD_SCRIPT $FLAGS -t || true
+  $BUILD_SCRIPT -t || true
 fi

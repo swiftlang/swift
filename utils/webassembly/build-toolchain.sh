@@ -43,6 +43,7 @@ $SOURCE_PATH/swift/utils/build-script --preset=$PRESET_NAME \
   DISPLAY_NAME_SHORT="${DISPLAY_NAME_SHORT}" \
   TOOLCHAIN_NAME="${TOOLCHAIN_NAME}" \
   TOOLCHAIN_VERSION="${TOOLCHAIN_VERSION}"
+  C_CXX_LAUNCHER="$(which sccache)"
 
 
 NIGHTLY_TOOLCHAIN=$SOURCE_PATH/swift-nightly-toolchain
