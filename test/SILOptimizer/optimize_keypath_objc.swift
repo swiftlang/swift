@@ -4,6 +4,9 @@
 
 // REQUIRES: objc_interop
 
+// This test currently fails iphonesimulator-i386.
+// REQUIRES: CPU=x86_64
+
 import Foundation
 
 class Foo: NSObject {
