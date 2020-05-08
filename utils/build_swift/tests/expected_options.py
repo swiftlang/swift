@@ -518,6 +518,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--install-skstresstester', dest='install_skstresstester'),
     EnableOption('--install-swiftevolve', dest='install_swiftevolve'),
     EnableOption('--toolchain-benchmarks', dest='build_toolchainbenchmarks'),
+    EnableOption('--swiftdt', dest='build_swiftdt'),
     EnableOption('--tsan-libdispatch-test'),
     EnableOption('--long-test'),
     EnableOption('--show-sdks'),
@@ -581,6 +582,8 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-swiftevolve', dest='test_swiftevolve'),
     DisableOption('--skip-test-toolchain-benchmarks',
                   dest='test_toolchainbenchmarks'),
+    DisableOption('--skip-test-swiftdt',
+                  dest='test_swiftdt'),
     DisableOption('--skip-build-clang-tools-extra',
                   dest='build_clang_tools_extra'),
 

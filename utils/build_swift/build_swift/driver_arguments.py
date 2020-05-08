@@ -593,6 +593,10 @@ def create_argument_parser():
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
                 'toolchain')
+    option(['--swiftdt'],
+           toggle_true('build_swiftdt'),
+           help='build SwiftDT using swiftpm against the just built '
+                'toolchain')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -1012,6 +1016,9 @@ def create_argument_parser():
     option('--skip-test-toolchain-benchmarks',
            toggle_false('test_toolchainbenchmarks'),
            help='skip testing toolchain benchmarks')
+    option('--skip-test-swiftdt',
+           toggle_false('test_swiftdt'),
+           help='skip testing swiftdt')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
