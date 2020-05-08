@@ -8,6 +8,8 @@
             "remote": { "id": "apple/swift-cmark" } },
         "llbuild": {
             "remote": { "id": "apple/swift-llbuild" } },
+        "swift-driver": {
+            "remote": { "id": "apple/swift-driver" } },
         "swift-tools-support-core": {
             "remote": { "id": "apple/swift-tools-support-core" } },
         "swiftpm": {
@@ -31,6 +33,9 @@
         "icu": {
             "remote": { "id": "unicode-org/icu" },
             "platforms": [ "Linux" ]
+        },
+        "yams": {
+            "remote": { "id": "jpsim/Yams" }
         },
         "cmake": {
             "remote": { "id": "KitWare/CMake" },
@@ -62,6 +67,7 @@
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "master",
+                "swift-driver": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
                 "swift-corelibs-xctest": "master",
@@ -71,6 +77,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
+                "yams": "master",
                 "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
@@ -90,6 +97,7 @@
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "master",
+                "swift-driver": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
                 "swift-corelibs-xctest": "master",
@@ -99,6 +107,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-65-1",
+                "yams": "master",
                 "cmake": "v3.16.5",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
