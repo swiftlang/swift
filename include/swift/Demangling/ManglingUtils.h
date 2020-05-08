@@ -191,8 +191,8 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
       // of the identifier - that's why we added the dummy-word).
       // The first thing: we add the encoded sub-string length.
       M.Buffer << (Repl.StringPos - Pos);
-//       assert(!isDigit(ident[Pos]) &&
-//              "first char of sub-string may not be a digit");
+      assert(!isDigit(ident[Pos]) &&
+             "first char of sub-string may not be a digit");
       do {
         // Update the start position of new added words, so that they refer to
         // the begin of the whole mangled Buffer.
