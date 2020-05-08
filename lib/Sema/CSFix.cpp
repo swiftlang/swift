@@ -722,6 +722,19 @@ AllowAnyObjectKeyPathRoot::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) AllowAnyObjectKeyPathRoot(cs, locator);
 }
 
+bool AllowMultiArgFuncKeyPathMismatch::diagnose(const Solution &solution,
+                                                bool asNote) const {
+  MultiArgFuncKeyPathFailure failure(solution, functionType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMultiArgFuncKeyPathMismatch *
+AllowMultiArgFuncKeyPathMismatch::create(ConstraintSystem &cs, Type fnType,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+  AllowMultiArgFuncKeyPathMismatch(cs, fnType, locator);
+}
+
 bool TreatKeyPathSubscriptIndexAsHashable::diagnose(const Solution &solution,
                                                     bool asNote) const {
   KeyPathSubscriptIndexHashableFailure failure(solution, NonConformingType,

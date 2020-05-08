@@ -2044,6 +2044,22 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to use a KeyPath where a multi-argument function is expected
+///
+/// ```swift
+/// [Item].sorted(\Item.name)
+/// ```
+class MultiArgFuncKeyPathFailure final : public FailureDiagnostic {
+  Type functionType;
+public:
+  MultiArgFuncKeyPathFailure(const Solution &solution, Type functionType,
+                             ConstraintLocator *locator)
+  : FailureDiagnostic(solution, locator),
+  functionType(functionType) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

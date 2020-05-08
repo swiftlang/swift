@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSFix.h"
+#include "CSDiagnostics.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -7615,10 +7616,10 @@ ConstraintSystem::simplifyKeyPathConstraint(
   auto subflags = getDefaultDecompositionOptions(flags);
   // The constraint ought to have been anchored on a KeyPathExpr.
   auto keyPath = cast<KeyPathExpr>(locator.getBaseLocator()->getAnchor());
-
   keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
   bool definitelyFunctionType = false;
   bool definitelyKeyPathType = false;
+  bool resolveAsMultiArgFuncFix = false;
 
   auto tryMatchRootAndValueFromType = [&](Type type,
                                           bool allowPartial = true) -> bool {
@@ -7643,10 +7644,18 @@ ConstraintSystem::simplifyKeyPathConstraint(
     }
 
     if (auto fnTy = type->getAs<FunctionType>()) {
-      definitelyFunctionType = true;
+      if (fnTy->getParams().size() != 1) {
+        if (!shouldAttemptFixes())
+          return false;
 
-      if (fnTy->getParams().size() != 1)
-        return false;
+        resolveAsMultiArgFuncFix = true;
+        auto *fix = AllowMultiArgFuncKeyPathMismatch::create(
+            *this, fnTy, locator.getBaseLocator());
+        // Pretend the keypath type got resolved and move on.
+        return !recordFix(fix);
+      }
+
+      definitelyFunctionType = true;
 
       // Match up the root and value types to the function's param and return
       // types. Note that we're using the type of the parameter as referenced
@@ -7680,6 +7689,10 @@ ConstraintSystem::simplifyKeyPathConstraint(
     if (!tryMatchRootAndValueFromType(contextualTy))
       return SolutionKind::Error;
   }
+
+  // If we fix this keypath as `AllowMultiArgFuncKeyPathMismatch`, just proceed
+  if (resolveAsMultiArgFuncFix)
+    return SolutionKind::Solved;
 
   // See if we resolved overloads for all the components involved.
   enum {
@@ -7845,7 +7858,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
   } else if (!anyComponentsUnresolved ||
              (definitelyKeyPathType && capability == ReadOnly)) {
     auto resolvedKPTy =
-        BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
+      BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
     return matchTypes(keyPathTy, resolvedKPTy, ConstraintKind::Bind, subflags,
                       loc);
   } else {
@@ -9562,6 +9575,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::AllowInaccessibleMember:
   case FixKind::AllowAnyObjectKeyPathRoot:
+  case FixKind::AllowMultiArgFuncKeyPathMismatch:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::DefaultGenericArgument:
