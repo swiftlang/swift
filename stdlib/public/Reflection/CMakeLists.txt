@@ -3,7 +3,6 @@ set(swiftReflection_SOURCES
   TypeLowering.cpp
   TypeRef.cpp
   TypeRefBuilder.cpp
-  "${SWIFT_SOURCE_DIR}/stdlib/public/runtime/LLVMSupport.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"

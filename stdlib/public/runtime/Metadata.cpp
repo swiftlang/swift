@@ -1653,7 +1653,7 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
   // If we didn't manage to perform the insertion, free the memory associated
   // with the copy of the labels: nobody else can reference it.
   if (cast<TupleTypeMetadata>(result.Value)->Labels != newLabels) {
-    cache.getAllocator().Deallocate(newLabels, labelsAllocSize);
+    cache.getAllocator().Deallocate(newLabels, labelsAllocSize, alignof(char));
   }
 
   // Done.
@@ -5499,7 +5499,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   }
 }
 
-void MetadataAllocator::Deallocate(const void *allocation, size_t size) {
+void MetadataAllocator::Deallocate(const void *allocation, size_t size,
+                                   size_t Alignment) {
   __asan_poison_memory_region(allocation, size);
 
   if (size > PoolRange::MaxPoolAllocationSize) {
