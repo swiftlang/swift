@@ -63,6 +63,11 @@ public class KlassBar : KlassFoo {
   init()
 }
 
+indirect public enum IndirectEnum : Hashable {
+  case A
+  case B(IndirectEnum)
+}
+
 sil @use_Int : $@convention(thin) (Int) -> ()
 sil @use_Int64 : $@convention(thin) (Int64) -> ()
 sil @use_Generic : $@convention(thin) <T>(@in_guaranteed T) -> ()
@@ -513,6 +518,39 @@ bb0(%0 : $boo):
   release_value %2: $foo
   return %0 : $boo
 }
+
+// CHECK-LABEL: sil @no_fso_recursive_result_is_not_returned :
+// CHECK-NOT:  release_value
+// CHECK:      bb2:
+// CHECK-NEXT:   retain_value %0
+// CHECK: return
+// CHECK-LABEL: } // end sil function 'no_fso_recursive_result_is_not_returned'
+sil @no_fso_recursive_result_is_not_returned : $@convention(method) (@guaranteed IndirectEnum, @guaranteed IndirectEnum) -> @owned IndirectEnum {
+bb0(%0 : $IndirectEnum, %1 : $IndirectEnum):
+  switch_enum %1 : $IndirectEnum, case #IndirectEnum.B!enumelt: bb1, default bb2
+
+bb1(%3 : ${ var IndirectEnum }):
+  %4 = project_box %3 : ${ var IndirectEnum }, 0
+  %5 = load %4 : $*IndirectEnum
+  %6 = function_ref @no_fso_recursive_result_is_not_returned : $@convention(method) (@guaranteed IndirectEnum, @guaranteed IndirectEnum) -> @owned IndirectEnum
+
+  // The result of the self-recursion is not returned (but put in a box).
+  // This prevents guaranteed -> owned return value specialization.
+  %7 = apply %6(%0, %5) : $@convention(method) (@guaranteed IndirectEnum, @guaranteed IndirectEnum) -> @owned IndirectEnum
+  %8 = alloc_box ${ var IndirectEnum }
+  %9 = project_box %8 : ${ var IndirectEnum }, 0
+  store %7 to %9 : $*IndirectEnum
+  %11 = enum $IndirectEnum, #IndirectEnum.B!enumelt, %8 : ${ var IndirectEnum }
+  br bb3(%11 : $IndirectEnum)
+
+bb2:
+  retain_value %0 : $IndirectEnum
+  br bb3(%0 : $IndirectEnum)
+
+bb3(%35 : $IndirectEnum):
+  return %35 : $IndirectEnum
+}
+
 
 // Make sure we do not move the retain_value in the throw block.
 //
