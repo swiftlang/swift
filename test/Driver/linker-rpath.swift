@@ -5,11 +5,11 @@
 // SWIFT_ENABLE_TENSORFLOW
 // All "-no-toolchain-stdlib-rpath" additions are SWIFT_ENABLE_TENSORFLOW.
 
-// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
-// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
-// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.14 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
-// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.14.3 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
-// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.14.4 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.14 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.14.3 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.14.4 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
 // RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.15 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
 
 // RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target arm64-apple-ios12 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
