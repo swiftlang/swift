@@ -100,8 +100,7 @@ running in, and often to perform separate analysis for each mode. The
 significant modes are:
 
   - **Primary-file** vs. **whole-module**: this varies depending on whether the
-    driver is run with the flag `-wmo`, `-whole-module-optimization` or
-    `-force-single-frontend-invocation` (all these options are synonymous).
+    driver is run with the flag `-wmo` (a.k.a. `-whole-module-optimization`).
 
     - **Batch** vs. **single-file** primary-file mode. This distinction refines
     the behaviour of primary-file mode, with the new batch mode added in the
