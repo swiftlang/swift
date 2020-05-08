@@ -5,6 +5,18 @@ include(SwiftWindowsSupport)
 include(SwiftAndroidSupport)
 
 function(_swift_gyb_target_sources target scope)
+  file(GLOB GYB_UNICODE_DATA ${SWIFT_SOURCE_DIR}/utils/UnicodeData/*)
+  file(GLOB GYB_STDLIB_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py)
+  file(GLOB GYB_SYNTAX_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/*)
+  file(GLOB GYB_SOURCEKIT_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/*)
+  set(GYB_SOURCES
+    ${SWIFT_SOURCE_DIR}/utils/GYBUnicodeDataUtils.py
+    ${SWIFT_SOURCE_DIR}/utils/SwiftIntTypes.py
+    ${GYB_UNICODE_DATA}
+    ${GYB_STDLIB_SUPPORT}
+    ${GYB_SYNTAX_SUPPORT}
+    ${GYB_SOURCEKIT_SUPPORT})
+
   foreach(source ${ARGN})
     get_filename_component(generated ${source} NAME_WLE)
     get_filename_component(absolute ${source} REALPATH)
@@ -17,6 +29,7 @@ function(_swift_gyb_target_sources target scope)
       COMMAND
         ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp
       DEPENDS
+        ${GYB_SOURCES}
         ${absolute})
     set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/${generated} PROPERTIES
       GENERATED TRUE)

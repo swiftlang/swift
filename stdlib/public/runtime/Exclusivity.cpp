@@ -276,10 +276,10 @@ static SwiftTLSContext &getTLSContext() {
   return *ctx;
 }
 
-#elif SWIFT_TLS_HAS_THREADLOCAL
+#elif __has_feature(cxx_thread_local)
 // Second choice is direct language support for thread-locals.
 
-static LLVM_THREAD_LOCAL SwiftTLSContext TLSContext;
+static thread_local SwiftTLSContext TLSContext;
 
 static SwiftTLSContext &getTLSContext() {
   return TLSContext;

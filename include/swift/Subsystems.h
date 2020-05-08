@@ -102,9 +102,6 @@ namespace swift {
 
   /// @}
 
-  /// Parse a source file's SIL declarations into a given SIL module.
-  void parseSourceFileSIL(SourceFile &SF, SILParserState *sil);
-
   /// Finish the code completion.
   void performCodeCompletionSecondPass(SourceFile &SF,
                                        CodeCompletionCallbacksFactory &Factory);

@@ -17,6 +17,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SILGenRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
@@ -105,17 +106,30 @@ SILParserState::SILParserState(SILModule *M)
 
 SILParserState::~SILParserState() = default;
 
-void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
-  auto bufferID = SF.getBufferID();
+std::unique_ptr<SILModule>
+ParseSILModuleRequest::evaluate(Evaluator &evaluator,
+                                SILGenDescriptor desc) const {
+  auto *SF = desc.getSourceFileToParse();
+  assert(SF);
+
+  auto bufferID = SF->getBufferID();
   assert(bufferID);
 
-  FrontendStatsTracer tracer(SF.getASTContext().Stats,
-                             "Parsing SIL");
-  Parser parser(*bufferID, SF, sil->Impl.get(),
-                /*persistentParserState*/ nullptr,
-                /*syntaxTreeCreator*/ nullptr);
+  auto *mod = SF->getParentModule();
+  auto silMod = SILModule::createEmptyModule(mod, desc.conv, desc.opts,
+                                             desc.isWholeModule());
+  SILParserState parserState(silMod.get());
+  Parser parser(*bufferID, *SF, parserState.Impl.get());
   PrettyStackTraceParser StackTrace(parser);
-  parser.parseTopLevelSIL();
+
+  auto hadError = parser.parseTopLevelSIL();
+  if (hadError) {
+    // The rest of the SIL pipeline expects well-formed SIL, so if we encounter
+    // a parsing error, just return an empty SIL module.
+    return SILModule::createEmptyModule(mod, desc.conv, desc.opts,
+                                        desc.isWholeModule());
+  }
+  return silMod;
 }
 
 //===----------------------------------------------------------------------===//

@@ -875,6 +875,7 @@ class OutdentChecker: protected RangeWalker {
       return !SM.isBeforeInBuffer(L, CheckRange.Start) &&
         (R.isInvalid() || !SM.isBeforeInBuffer(CheckRange.End, R));
     }
+    llvm_unreachable("invalid range kind");
   }
 
 public:

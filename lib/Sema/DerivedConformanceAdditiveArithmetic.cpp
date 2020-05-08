@@ -51,6 +51,7 @@ static StringRef getMathOperatorName(MathOperator op) {
   case Subtract:
     return "-";
   }
+  llvm_unreachable("invalid math operator kind");
 }
 
 bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,

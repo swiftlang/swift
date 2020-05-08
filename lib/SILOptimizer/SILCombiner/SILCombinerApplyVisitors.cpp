@@ -226,11 +226,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   ...
 ///   load/store %addr
-bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
-  SILFunction *callee = AI->getReferencedFunctionOrNull();
-  if (!callee)
-    return false;
-
+bool SILCombiner::tryOptimizeKeypathApplication(ApplyInst *AI,
+                                          SILFunction *callee) {
   if (AI->getNumArguments() != 3)
     return false;
 
@@ -272,6 +269,99 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
   eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
   return true;
+}
+
+/// Try to optimize a keypath KVC string access on a literal key path.
+///
+/// Replace:
+///   %kp = keypath (objc "blah", ...)
+///   %string = apply %keypath_kvcString_method(%kp)
+/// With:
+///   %string = string_literal "blah"
+bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
+                                              SILDeclRef callee) {
+  if (AI->getNumArguments() != 1) {
+    return false;
+  }
+  if (!callee.hasDecl()) {
+    return false;
+  }
+  auto calleeFn = dyn_cast<FuncDecl>(callee.getDecl());
+  if (!calleeFn)
+    return false;
+  
+  if (!calleeFn->getAttrs()
+        .hasSemanticsAttr(semantics::KEYPATH_KVC_KEY_PATH_STRING))
+    return false;
+  
+  // Method should return `String?`
+  auto &C = calleeFn->getASTContext();
+  auto objTy = AI->getType().getOptionalObjectType();
+  if (!objTy || objTy.getStructOrBoundGenericStruct() != C.getStringDecl())
+    return false;
+  
+  KeyPathInst *kp
+    = KeyPathProjector::getLiteralKeyPath(AI->getArgument(0));
+  if (!kp || !kp->hasPattern())
+    return false;
+  
+  auto objcString = kp->getPattern()->getObjCString();
+  
+  SILValue literalValue;
+  if (objcString.empty()) {
+    // Replace with a nil String value.
+    literalValue = Builder.createEnum(AI->getLoc(), SILValue(),
+                                      C.getOptionalNoneDecl(),
+                                      AI->getType());
+  } else {
+    // Construct a literal String from the ObjC string.
+    auto init = C.getStringBuiltinInitDecl(C.getStringDecl());
+    if (!init)
+      return false;
+    auto initRef = SILDeclRef(init.getDecl(), SILDeclRef::Kind::Allocator);
+    auto initFn = AI->getModule().findFunction(initRef.mangle(),
+                                               SILLinkage::PublicExternal);
+    if (!initFn)
+      return false;
+
+    auto stringValue = Builder.createStringLiteral(AI->getLoc(), objcString,
+                                             StringLiteralInst::Encoding::UTF8);
+    auto stringLen = Builder.createIntegerLiteral(AI->getLoc(),
+                                                SILType::getBuiltinWordType(C),
+                                                objcString.size());
+    auto isAscii = Builder.createIntegerLiteral(AI->getLoc(),
+                                          SILType::getBuiltinIntegerType(1, C),
+                                          C.isASCIIString(objcString));
+    auto metaTy =
+      CanMetatypeType::get(objTy.getASTType(), MetatypeRepresentation::Thin);
+    auto self = Builder.createMetatype(AI->getLoc(),
+                                     SILType::getPrimitiveObjectType(metaTy));
+    
+    auto initFnRef = Builder.createFunctionRef(AI->getLoc(), initFn);
+    auto string = Builder.createApply(AI->getLoc(),
+                                      initFnRef, {},
+                                      {stringValue, stringLen, isAscii, self});
+    
+    literalValue = Builder.createEnum(AI->getLoc(), string,
+                                      C.getOptionalSomeDecl(), AI->getType());
+  }
+
+  AI->replaceAllUsesWith(literalValue);
+  eraseInstFromFunction(*AI);
+  ++NumOptimizedKeypaths;
+  return true;
+}
+
+bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
+  if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
+    return tryOptimizeKeypathApplication(AI, callee);
+  }
+  
+  if (auto method = dyn_cast<ClassMethodInst>(AI->getCallee())) {
+    return tryOptimizeKeypathKVCString(AI, method->getMember());
+  }
+  
+  return false;
 }
 
 /// Try to optimize a keypath application with an apply instruction.

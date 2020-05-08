@@ -1614,13 +1614,7 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
                                            StringRef Str, SGFContext C,
                                         StringLiteralExpr::Encoding encoding) {
   uint64_t Length;
-  bool isASCII = true;
-  for (unsigned char c : Str) {
-    if (c > 127) {
-      isASCII = false;
-      break;
-    }
-  }
+  bool isASCII = SGF.getASTContext().isASCIIString(Str);
   StringLiteralInst::Encoding instEncoding;
   switch (encoding) {
   case StringLiteralExpr::UTF8:

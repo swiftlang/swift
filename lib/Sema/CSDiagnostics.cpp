@@ -5880,6 +5880,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
     case PTK_AutoreleasingUnsafeMutablePointer:
       return None;
     }
+    llvm_unreachable("invalid pointer kind");
   };
 
   // First emit a note about the implicit conversion only lasting for the

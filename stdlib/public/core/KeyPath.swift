@@ -122,9 +122,12 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   // SPI for the Foundation overlay to allow interop with KVC keypath-based
   // APIs.
   public var _kvcKeyPathString: String? {
-    guard let ptr = _kvcKeyPathStringPtr else { return nil }
+    @_semantics("keypath.kvcKeyPathString")
+    get {
+      guard let ptr = _kvcKeyPathStringPtr else { return nil }
 
-    return String(validatingUTF8: ptr)
+      return String(validatingUTF8: ptr)
+    }
   }
   
   // MARK: Implementation details
