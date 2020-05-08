@@ -1418,12 +1418,12 @@ func testTypeCheckNil() {
 func testResolveModules1() {
   Swift#^RESOLVE_MODULES_1^#
 // RESOLVE_MODULES_1: Begin completions
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Int8[#Int8#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Int16[#Int16#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Int32[#Int32#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Int64[#Int64#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]:    .Bool[#Bool#]{{; name=.+$}}
-// RESOLVE_MODULES_1-DAG: Decl[TypeAlias]/OtherModule[Swift]: .Float32[#Float#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: .Int8[#Int8#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: .Int16[#Int16#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: .Int32[#Int32#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: .Int64[#Int64#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: .Bool[#Bool#]{{; name=.+$}}
+// RESOLVE_MODULES_1-DAG: Decl[TypeAlias]/OtherModule[Swift]/IsSystem: .Float32[#Float#]{{; name=.+$}}
 // RESOLVE_MODULES_1: End completions
 }
 
@@ -2045,7 +2045,7 @@ class TestDotExprWithNonNominal {
 // DOT_EXPR_NON_NOMINAL_2-NOT: otherField
 // DOT_EXPR_NON_NOMINAL_2-NOT: firstName
 // DOT_EXPR_NON_NOMINAL_2: Keyword[self]/CurrNominal:          self[#Int#]; name=self
-// DOT_EXPR_NON_NOMINAL_2: Decl[InstanceVar]/CurrNominal:      hashValue[#Int#];
+// DOT_EXPR_NON_NOMINAL_2: Decl[InstanceVar]/CurrNominal/IsSystem: hashValue[#Int#];
 // DOT_EXPR_NON_NOMINAL_2-NOT: otherField
 // DOT_EXPR_NON_NOMINAL_2-NOT: firstName
   }

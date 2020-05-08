@@ -51,9 +51,9 @@ func test(value: SomeValue) {
 // GLOBAL-NOT: internalFunc
 // GLOBAL-NOT: _SecretClass
 // GLOBAL-NOT: InternalClass
-// GLOBAL-DAG: Decl[Struct]/OtherModule[SomeModule]: SomeValue[#SomeValue#];
-// GLOBAL-DAG: Decl[FreeFunction]/OtherModule[SomeModule]: publicFunc()[#Void#];
-// GLOBAL-DAG: Decl[Class]/OtherModule[SomeModule]: PublicClass[#PublicClass#]; name=PublicClass
+// GLOBAL-DAG: Decl[Struct]/OtherModule[SomeModule]/IsSystem: SomeValue[#SomeValue#];
+// GLOBAL-DAG: Decl[FreeFunction]/OtherModule[SomeModule]/IsSystem: publicFunc()[#Void#];
+// GLOBAL-DAG: Decl[Class]/OtherModule[SomeModule]/IsSystem: PublicClass[#PublicClass#]; name=PublicClass
 // GLOBAL: End completions
 
   let _: #^GLOBAL_TYPE^#
@@ -67,12 +67,12 @@ func test(value: SomeValue) {
   let _ = value.#^INSTANCE^#
 // INSTANCE: Begin completions, 3 items
 // INSTANCE-DAG: Keyword[self]/CurrNominal:          self[#SomeValue#];
-// INSTANCE-DAG: Decl[InstanceVar]/CurrNominal:      publicValue[#Int#];
-// INSTANCE-DAG: Decl[InstanceMethod]/CurrNominal:   publicMethod()[#Int#];
+// INSTANCE-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: publicValue[#Int#];
+// INSTANCE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: publicMethod()[#Int#];
 // INSTANCE: End completions
 
   let _ = SomeValue(#^INITIALIZER^#
 // INITIALIZER: Begin completions, 1 items
-// INITIALIZER-DAG: Decl[Constructor]/CurrNominal:      ['(']{#public: Int#}[')'][#SomeValue#];
+// INITIALIZER-DAG: Decl[Constructor]/CurrNominal/IsSystem: ['(']{#public: Int#}[')'][#SomeValue#];
 // INITIALIZER: End completions
 }

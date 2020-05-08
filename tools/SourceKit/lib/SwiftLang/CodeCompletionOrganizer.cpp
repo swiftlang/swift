@@ -1314,10 +1314,11 @@ Completion *CompletionBuilder::finish() {
     if (current.getKind() == SwiftResult::Declaration) {
       base = SwiftResult(
           semanticContext, current.getNumBytesToErase(), completionString,
-          current.getAssociatedDeclKind(), current.getModuleName(),
-          current.isNotRecommended(),  current.getNotRecommendedReason(),
-          current.getBriefDocComment(), current.getAssociatedUSRs(),
-          current.getDeclKeywords(), typeRelation, opKind);
+          current.getAssociatedDeclKind(), current.isSystem(),
+          current.getModuleName(), current.isNotRecommended(),
+          current.getNotRecommendedReason(), current.getBriefDocComment(),
+          current.getAssociatedUSRs(), current.getDeclKeywords(),
+          typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext,
                          current.getNumBytesToErase(), completionString,

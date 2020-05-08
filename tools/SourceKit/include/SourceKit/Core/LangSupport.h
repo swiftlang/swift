@@ -93,6 +93,7 @@ struct CodeCompletionInfo {
   UIdent TypeRelation;
   Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
+  bool IsSystem;
   unsigned NumBytesToErase;
 
   struct IndexRange {

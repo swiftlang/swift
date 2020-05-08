@@ -544,6 +544,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   Info.ModuleName = Result->getModuleName();
   Info.DocBrief = Result->getBriefDocComment();
   Info.NotRecommended = Result->isNotRecommended();
+  Info.IsSystem = Result->isSystem();
 
   Info.NumBytesToErase = Result->getNumBytesToErase();
 

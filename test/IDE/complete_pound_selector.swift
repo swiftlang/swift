@@ -80,14 +80,14 @@ class Subclass : NSObject {
 // CHECK-SELECTOR_BASIC: Keyword/None:                       setter: {#@objc property#}; name=setter: @objc property
 
 // CHECK-IN_SELECTOR-NOT: getter:
-// CHECK-IN_SELECTOR: Decl[Constructor]/CurrNominal:      {{.?}}init; name=init
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}perform(_:with:); name=perform(_:with:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}perform(_:with:); name=perform(_:with:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}myClass; name=myClass
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}description; name=description
-// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal:     {{.?}}isEqual(_:); name=isEqual(_:)
-// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}isEqual(_:); name=isEqual(_:)
+// CHECK-IN_SELECTOR: Decl[Constructor]/CurrNominal/IsSystem:    {{.?}}init; name=init
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal/IsSystem:   {{.?}}perform(_:with:); name=perform(_:with:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}perform(_:with:); name=perform(_:with:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}myClass; name=myClass
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal/IsSystem:   {{.?}}description; name=description
+// CHECK-IN_SELECTOR: Decl[StaticMethod]/CurrNominal/IsSystem:   {{.?}}isEqual(_:); name=isEqual(_:)
+// CHECK-IN_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}isEqual(_:); name=isEqual(_:)
 
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}perform(_:with:); name=perform(_:with:)
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}myClass; name=myClass
-// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal:   {{.?}}isEqual(_:); name=isEqual(_:)
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}perform(_:with:); name=perform(_:with:)
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}myClass; name=myClass
+// CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}isEqual(_:); name=isEqual(_:)

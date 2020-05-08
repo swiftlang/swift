@@ -872,8 +872,8 @@ struct SynthesizedConformance1: Codable {
   let foo: Int
   #^OVERRIDE_SYNTHESIZED_1^#
 // OVERRIDE_SYNTHESIZED_1: Begin completions,  2 items
-// OVERRIDE_SYNTHESIZED_1-DAG: Decl[Constructor]/Super:       init(from decoder: Decoder) throws {|};
-// OVERRIDE_SYNTHESIZED_1-DAG: Decl[InstanceMethod]/Super:    func encode(to encoder: Encoder) throws {|};
+// OVERRIDE_SYNTHESIZED_1-DAG: Decl[Constructor]/Super/IsSystem:       init(from decoder: Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_1-DAG: Decl[InstanceMethod]/Super/IsSystem:    func encode(to encoder: Encoder) throws {|};
 }
 
 open class SynthesizedConformance2: Codable {
@@ -881,7 +881,7 @@ open class SynthesizedConformance2: Codable {
   func encode(to encoder: Encoder) throws {}
   #^OVERRIDE_SYNTHESIZED_2^#
 // OVERRIDE_SYNTHESIZED_2: Begin completions, 1 items
-// OVERRIDE_SYNTHESIZED_2: Decl[Constructor]/Super:           public required init(from decoder: Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_2: Decl[Constructor]/Super/IsSystem:           public required init(from decoder: Decoder) throws {|};
 }
 
 struct SynthesizedConformance3: Hashable {
@@ -889,23 +889,23 @@ struct SynthesizedConformance3: Hashable {
   #^OVERRIDE_SYNTHESIZED_3^#
 // FIXME: Where did Equatable.(==) go?
 // OVERRIDE_SYNTHESIZED_3: Begin completions, 2 items
-// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceVar]/Super:       var hashValue: Int; name=hashValue: Int
-// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceMethod]/Super:    func hash(into hasher: inout Hasher) {|}
+// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceVar]/Super/IsSystem:       var hashValue: Int; name=hashValue: Int
+// OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceMethod]/Super/IsSystem:    func hash(into hasher: inout Hasher) {|}
 }
 
 enum SynthesizedConformance4: CaseIterable {
   case a, b, c, d
   #^OVERRIDE_SYNTHESIZED_4^#
 // OVERRIDE_SYNTHESIZED_4: Begin completions, 4 items
-// OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceVar]/Super:       var hashValue: Int
-// OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceMethod]/Super:    func hash(into hasher: inout Hasher) {|};
-// OVERRIDE_SYNTHESIZED_4-DAG: Decl[StaticVar]/Super:         static var allCases: [SynthesizedConformance4];
-// OVERRIDE_SYNTHESIZED_4-DAG: Decl[AssociatedType]/Super:    typealias AllCases = {#(Type)#};
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceVar]/Super/IsSystem:       var hashValue: Int
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceMethod]/Super/IsSystem:    func hash(into hasher: inout Hasher) {|};
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[StaticVar]/Super/IsSystem:         static var allCases: [SynthesizedConformance4];
+// OVERRIDE_SYNTHESIZED_4-DAG: Decl[AssociatedType]/Super/IsSystem:    typealias AllCases = {#(Type)#};
 }
 
 class SynthesizedConformance5: SynthesizedConformance2 {
   #^OVERRIDE_SYNTHESIZED_5^#
 // OVERRIDE_SYNTHESIZED_5: Begin completions, 2 items
-// OVERRIDE_SYNTHESIZED_5-DAG: Decl[InstanceMethod]/Super:    override func encode(to encoder: Encoder) throws {|};
-// OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super:       required init(from decoder: Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[InstanceMethod]/Super/IsSystem:    override func encode(to encoder: Encoder) throws {|};
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super/IsSystem:       required init(from decoder: Decoder) throws {|};
 }
