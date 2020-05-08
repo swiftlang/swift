@@ -189,7 +189,7 @@ function (add_swift_benchmark_library objfile_out sibfile_out swiftmodule_out)
     DEPENDS ${stdlib_dependencies} ${sources} ${BENCHLIB_DEPENDS}
     COMMAND "${SWIFT_EXEC}"
       ${BENCHLIB_LIBRARY_FLAGS}
-      "-force-single-frontend-invocation"
+      "-whole-module-optimization"
       "-parse-as-library"
       "-module-name" "${module_name}"
       "-emit-module" "-emit-module-path" "${swiftmodule}"
@@ -209,7 +209,7 @@ function (add_swift_benchmark_library objfile_out sibfile_out swiftmodule_out)
       ${stdlib_dependencies} ${sources} ${BENCHLIB_DEPENDS}
       COMMAND "${SWIFT_EXEC}"
         ${BENCHLIB_LIBRARY_FLAGS}
-        "-force-single-frontend-invocation"
+        "-whole-module-optimization"
         "-parse-as-library"
         "-module-name" "${module_name}"
         "-emit-sib"
@@ -574,7 +574,7 @@ function (swift_benchmark_compile_archopts)
         ${SWIFT_BENCH_SIBFILES} "${source}"
       COMMAND "${SWIFT_EXEC}"
       ${common_swift4_options}
-      "-force-single-frontend-invocation"
+      "-whole-module-optimization"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
       "-o" "${objdir}/${module_name}.o"

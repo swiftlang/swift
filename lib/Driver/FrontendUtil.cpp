@@ -32,10 +32,10 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
 
   // When creating a CompilerInvocation, ensure that the driver creates a single
   // frontend command.
-  Args.push_back("-force-single-frontend-invocation");
+  Args.push_back("-whole-module-optimization");
 
   // Explictly disable batch mode to avoid a spurious warning when combining
-  // -enable-batch-mode with -force-single-frontend-invocation.  This is an
+  // -enable-batch-mode with -whole-module-optimization.  This is an
   // implementation detail.
   Args.push_back("-disable-batch-mode");
 
