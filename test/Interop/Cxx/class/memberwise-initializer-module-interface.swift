@@ -17,6 +17,11 @@
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
+// CHECK-NEXT: struct StructWithUnimportedMemberFunction {
+// CHECK-NEXT:   var varPublic: Int32
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT: }
 // CHECK-NEXT: struct ClassPrivateOnly {
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
@@ -31,4 +36,9 @@
 // CHECK-NEXT: struct ClassPrivateAndPublic {
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT:   init()
+// CHECK-NEXT: }
+// CHECK-NEXT: struct ClassWithUnimportedMemberFunction {
+// CHECK-NEXT:   var varPublic: Int32
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   init(varPublic: Int32)
 // CHECK-NEXT: }
