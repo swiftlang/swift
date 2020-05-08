@@ -1,3 +1,4 @@
+add_subdirectory(LLVMSupport)
 
 set(SWIFT_RUNTIME_CXX_FLAGS)
 set(SWIFT_RUNTIME_LINK_FLAGS)
