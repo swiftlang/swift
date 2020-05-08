@@ -552,7 +552,8 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
     SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
     evaluator(Diags,
               langOpts.DebugDumpCycles,
-              langOpts.BuildRequestDependencyGraph),
+              langOpts.BuildRequestDependencyGraph,
+              langOpts.EnableExperientalPrivateIntransitiveDependencies),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
@@ -1462,13 +1463,14 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
-    ModuleDependenciesCache &cache) {
+    ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) {
   for (auto &loader : getImpl().ModuleLoaders) {
     if (isUnderlyingClangModule &&
         loader.get() != getImpl().TheClangModuleLoader)
       continue;
 
-    if (auto dependencies = loader->getModuleDependencies(moduleName, cache))
+    if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                          delegate))
       return dependencies;
   }
 

@@ -18,9 +18,8 @@
 // STRUCT-NEXT   "spelling": " "
 // STRUCT-NEXT }
 // STRUCT-NEXT {
-// STRUCT-NEXT   "kind": "typeIdentifier",
-// STRUCT-NEXT   "spelling": "Struct",
-// STRUCT-NEXT   "preciseIdentifier": "s:35SubheadingDeclarationFragmentsTypes6StructV"
+// STRUCT-NEXT   "kind": "identifier",
+// STRUCT-NEXT   "spelling": "Struct"
 // STRUCT-NEXT }
 public struct Struct<T> where T: Sequence {}
 
@@ -35,9 +34,8 @@ public struct Struct<T> where T: Sequence {}
 // ENUM-NEXT:   "spelling": " "
 // ENUM-NEXT: }
 // ENUM-NEXT: {
-// ENUM-NEXT:   "kind": "typeIdentifier",
-// ENUM-NEXT:   "spelling": "Enum",
-// ENUM-NEXT:   "preciseIdentifier": "s:35SubheadingDeclarationFragmentsTypes4EnumO"
+// ENUM-NEXT:   "kind": "identifier",
+// ENUM-NEXT:   "spelling": "Enum"
 // ENUM-NEXT: }
 public enum Enum<T> where T: Sequence {}
 
@@ -52,9 +50,8 @@ public enum Enum<T> where T: Sequence {}
 // PROTOCOL-NEXT:   "spelling": " "
 // PROTOCOL-NEXT: }
 // PROTOCOL-NEXT: {
-// PROTOCOL-NEXT:   "kind": "typeIdentifier",
-// PROTOCOL-NEXT:   "spelling": "Protocol",
-// PROTOCOL-NEXT:   "preciseIdentifier": "s:35SubheadingDeclarationFragmentsTypes8ProtocolP"
+// PROTOCOL-NEXT:   "kind": "identifier",
+// PROTOCOL-NEXT:   "spelling": "Protocol"
 // PROTOCOL-NEXT: }
 public protocol Protocol where T: Sequence {
   associatedtype T
@@ -71,9 +68,8 @@ public protocol Protocol where T: Sequence {
 // CLASS-NEXT   "spelling": " "
 // CLASS-NEXT },
 // CLASS-NEXT {
-// CLASS-NEXT   "kind": "typeIdentifier",
-// CLASS-NEXT   "spelling": "Class",
-// CLASS-NEXT   "preciseIdentifier": "s:35SubheadingDeclarationFragmentsTypes5ClassC"
+// CLASS-NEXT   "kind": "identifier",
+// CLASS-NEXT   "spelling": "Class"
 // CLASS-NEXT }
 public class Class<T> where T: Sequence {}
 
@@ -88,9 +84,8 @@ public class Class<T> where T: Sequence {}
 // TYPEALIAS-NEXT:   "spelling": " "
 // TYPEALIAS-NEXT: },
 // TYPEALIAS-NEXT: {
-// TYPEALIAS-NEXT:   "kind": "typeIdentifier",
-// TYPEALIAS-NEXT:   "spelling": "TypeAlias",
-// TYPEALIAS-NEXT:   "preciseIdentifier": "s:35SubheadingDeclarationFragmentsTypes9TypeAliasa"
+// TYPEALIAS-NEXT:   "kind": "identifier",
+// TYPEALIAS-NEXT:   "spelling": "TypeAlias"
 // TYPEALIAS-NEXT: }
 public typealias TypeAlias<T> = Struct<T> where T: Collection
 

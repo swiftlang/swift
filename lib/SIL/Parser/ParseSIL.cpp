@@ -5399,7 +5399,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
     for (auto &ArgName : ArgNames) {
-      SILType expectedTy = substConv.getSILArgumentType(ArgNo++);
+      SILType expectedTy =
+          substConv.getSILArgumentType(ArgNo++, B.getTypeExpansionContext());
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
@@ -5413,7 +5414,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
     for (auto &ArgName : ArgNames) {
-      SILType expectedTy = substConv.getSILArgumentType(ArgNo++);
+      SILType expectedTy =
+          substConv.getSILArgumentType(ArgNo++, B.getTypeExpansionContext());
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
@@ -5430,7 +5432,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     SmallVector<SILValue, 4> Args;
     unsigned ArgNo = substConv.getNumSILArguments() - ArgNames.size();
     for (auto &ArgName : ArgNames) {
-      SILType expectedTy = substConv.getSILArgumentType(ArgNo++);
+      SILType expectedTy =
+          substConv.getSILArgumentType(ArgNo++, B.getTypeExpansionContext());
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
@@ -5458,7 +5461,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     unsigned argNo = 0;
     SmallVector<SILValue, 4> args;
     for (auto &argName : ArgNames) {
-      SILType expectedTy = substConv.getSILArgumentType(argNo++);
+      SILType expectedTy =
+          substConv.getSILArgumentType(argNo++, B.getTypeExpansionContext());
       args.push_back(getLocalValue(argName, expectedTy, InstLoc, B));
     }
 

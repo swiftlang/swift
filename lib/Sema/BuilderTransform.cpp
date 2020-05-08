@@ -101,7 +101,7 @@ class BuilderClosureVisitor
     SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
     Expr *result = CallExpr::create(ctx, memberRef, openLoc, args,
                                     argLabels, argLabelLocs, closeLoc,
-                                    /*trailing closure*/ nullptr,
+                                    /*trailing closures*/{},
                                     /*implicit*/true);
 
     return result;
@@ -551,8 +551,7 @@ protected:
       return nullptr;
     }
 
-    // FIXME: Need a locator for the "if" statement.
-    Type resultType = cs->addJoinConstraint(nullptr,
+    Type resultType = cs->addJoinConstraint(cs->getConstraintLocator(ifStmt),
         {
           { cs->getType(thenExpr), cs->getConstraintLocator(thenExpr) },
           { cs->getType(elseExpr), cs->getConstraintLocator(elseExpr) }
@@ -709,8 +708,8 @@ protected:
     }
 
     // Form the type of the switch itself.
-    // FIXME: Need a locator for the "switch" statement.
-    Type resultType = cs->addJoinConstraint(nullptr, injectedCaseTerms);
+    Type resultType = cs->addJoinConstraint(
+        cs->getConstraintLocator(switchStmt), injectedCaseTerms);
     if (!resultType) {
       hadError = true;
       return nullptr;
@@ -810,7 +809,8 @@ protected:
     }
     cs->addConstraint(
         ConstraintKind::Equal, cs->getType(arrayInitExpr), arrayType,
-        cs->getConstraintLocator(arrayInitExpr));
+        cs->getConstraintLocator(
+          arrayInitExpr, LocatorPathElt::ContextualType()));
 
     // Form a call to Array.append(_:) to add the result of executing each
     // iteration of the loop body to the array formed above.
@@ -823,7 +823,7 @@ protected:
     auto bodyVarRef = buildVarRef(bodyVar, endLoc);
     Expr *arrayAppendCall = CallExpr::create(
         ctx, arrayAppendRef, endLoc, { bodyVarRef } , { Identifier() },
-        { endLoc }, endLoc, /*trailingClosure=*/nullptr, /*implicit=*/true);
+        { endLoc }, endLoc, /*trailingClosures=*/{}, /*implicit=*/true);
     arrayAppendCall = cs->generateConstraints(arrayAppendCall, dc);
     if (!arrayAppendCall) {
       hadError = true;
@@ -1477,32 +1477,10 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
-  // Find an expression... any expression... to use for a locator.
-  // FIXME: This is a hack because we don't have the notion of locators that
-  // refer to statements.
-  Expr *fakeAnchor = nullptr;
-  {
-    class FindExprWalker : public ASTWalker {
-      Expr *&fakeAnchor;
-
-    public:
-      explicit FindExprWalker(Expr *&fakeAnchor) : fakeAnchor(fakeAnchor) { }
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) {
-        if (!fakeAnchor)
-          fakeAnchor = E;
-
-        return { false, nullptr };
-      }
-    } walker(fakeAnchor);
-
-    func->getBody()->walk(walker);
-  }
-
   if (auto result = cs.matchFunctionBuilder(
           func, builderType, resultContextType, resultConstraintKind,
-          /*calleeLocator=*/cs.getConstraintLocator(fakeAnchor),
-          /*FIXME:*/cs.getConstraintLocator(fakeAnchor))) {
+          cs.getConstraintLocator(func->getBody()),
+          cs.getConstraintLocator(func->getBody()))) {
     if (result->isFailure())
       return nullptr;
   }

@@ -517,7 +517,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       }
 
       // Otherwise it requires a tuple wrapper.
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     }
 
     // This covers both none and multiple parameters.

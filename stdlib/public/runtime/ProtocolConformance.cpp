@@ -31,9 +31,7 @@
 using namespace swift;
 
 #ifndef NDEBUG
-template <>
-LLVM_ATTRIBUTE_USED
-void ProtocolDescriptor::dump() const {
+template <> SWIFT_USED void ProtocolDescriptor::dump() const {
   printf("TargetProtocolDescriptor.\n"
          "Name: \"%s\".\n",
          Name.get());
@@ -95,9 +93,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
 #endif
 
 #ifndef NDEBUG
-template<>
-LLVM_ATTRIBUTE_USED
-void ProtocolConformanceDescriptor::verify() const {
+template <> SWIFT_USED void ProtocolConformanceDescriptor::verify() const {
   auto typeKind = unsigned(getTypeKind());
   assert(((unsigned(TypeReferenceKind::First_Kind) <= typeKind) &&
           (unsigned(TypeReferenceKind::Last_Kind) >= typeKind)) &&
@@ -302,7 +298,7 @@ struct ConformanceState {
   }
 
 #ifndef NDEBUG
-  void verify() const LLVM_ATTRIBUTE_USED;
+  void verify() const SWIFT_USED;
 #endif
 };
 

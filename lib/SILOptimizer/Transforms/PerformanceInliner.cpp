@@ -284,8 +284,8 @@ bool SILPerformanceInliner::isProfitableToInline(
 
     // Don't inline class methods.
     if (Callee->hasSelfParam()) {
-      auto SelfTy = Callee->getLoweredFunctionType()
-                          ->getSelfInstanceType(FuncBuilder.getModule());
+      auto SelfTy = Callee->getLoweredFunctionType()->getSelfInstanceType(
+          FuncBuilder.getModule(), AI.getFunction()->getTypeExpansionContext());
       if (SelfTy->mayHaveSuperclass() &&
           Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
         isClassMethodAtOsize = true;

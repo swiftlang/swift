@@ -113,8 +113,10 @@ static SourceKit::Context *GlobalCtx = nullptr;
 
 void sourcekitd::initialize() {
   llvm::EnablePrettyStackTrace();
-  GlobalCtx = new SourceKit::Context(sourcekitd::getRuntimeLibPath(),
-                                     SourceKit::createSwiftLangSupport);
+  GlobalCtx =
+      new SourceKit::Context(sourcekitd::getRuntimeLibPath(),
+                             sourcekitd::getDiagnosticDocumentationPath(),
+                             SourceKit::createSwiftLangSupport);
   GlobalCtx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
     onDocumentUpdateNotification);
 }

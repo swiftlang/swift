@@ -1214,11 +1214,13 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   SubstitutionMap calleeSubMap;
 
   auto calleeFnType = callee->getLoweredFunctionType();
-  assert(
-      !calleeFnType->hasSelfParam() ||
-      !calleeFnType->getSelfInstanceType(callee->getModule())
-                   ->getClassOrBoundGenericClass() &&
-      "class methods are not supported");
+  assert(!calleeFnType->hasSelfParam() ||
+         !calleeFnType
+                 ->getSelfInstanceType(
+                     callee->getModule(),
+                     apply->getFunction()->getTypeExpansionContext())
+                 ->getClassOrBoundGenericClass() &&
+             "class methods are not supported");
   if (calleeFnType->getInvocationGenericSignature()) {
     // Get the substitution map of the call.  This maps from the callee's space
     // into the caller's world. Witness methods require additional work to

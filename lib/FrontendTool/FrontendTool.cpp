@@ -791,10 +791,9 @@ static bool compileLLVMIR(CompilerInstance &Instance) {
                                  inputsAndOutputs.getFilenameOfFirstInput());
 
   if (!FileBufOrErr) {
-    Instance.getASTContext().Diags.diagnose(
-        SourceLoc(), diag::error_open_input_file,
-        inputsAndOutputs.getFilenameOfFirstInput(),
-        FileBufOrErr.getError().message());
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
+                                 inputsAndOutputs.getFilenameOfFirstInput(),
+                                 FileBufOrErr.getError().message());
     return true;
   }
   llvm::MemoryBuffer *MainFile = FileBufOrErr.get().get();
@@ -806,9 +805,9 @@ static bool compileLLVMIR(CompilerInstance &Instance) {
   if (!Module) {
     // TODO: Translate from the diagnostic info to the SourceManager location
     // if available.
-    Instance.getASTContext().Diags.diagnose(
-        SourceLoc(), diag::error_parse_input_file,
-        inputsAndOutputs.getFilenameOfFirstInput(), Err.getMessage());
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
+                                 inputsAndOutputs.getFilenameOfFirstInput(),
+                                 Err.getMessage());
     return true;
   }
   return performLLVM(Invocation.getIRGenOptions(), Instance.getASTContext(),
@@ -927,7 +926,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasReferenceDependenciesPath() &&
       Instance.getPrimarySourceFiles().empty()) {
-    Instance.getASTContext().Diags.diagnose(
+    Instance.getDiags().diagnose(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
     return;
   }
@@ -936,40 +935,39 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
-      auto LangOpts = Invocation.getLangOptions();
+      const auto LangOpts = Invocation.getLangOptions();
       (void)fine_grained_dependencies::emitReferenceDependencies(
-          Instance.getASTContext().Diags, SF,
-          *Instance.getDependencyTracker(),
+          Instance.getDiags(), SF, *Instance.getDependencyTracker(),
           referenceDependenciesFilePath,
           LangOpts.EmitFineGrainedDependencySourcefileDotFiles);
     }
   }
 }
 static void
-emitSwiftRangesForAllPrimaryInputsIfNeeded(const CompilerInstance &Instance) {
+emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
       Instance.getPrimarySourceFiles().empty()) {
-    Instance.getASTContext().Diags.diagnose(
-        SourceLoc(), diag::emit_swift_ranges_without_primary_file);
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::emit_swift_ranges_without_primary_file);
     return;
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
     const std::string &swiftRangesFilePath =
         Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
     if (!swiftRangesFilePath.empty()) {
-      (void)Instance.emitSwiftRanges(Instance.getASTContext().Diags, SF,
+      (void)Instance.emitSwiftRanges(Instance.getDiags(), SF,
                                      swiftRangesFilePath);
     }
   }
 }
 static void emitCompiledSourceForAllPrimaryInputsIfNeeded(
-    const CompilerInstance &Instance) {
+    CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasCompiledSourcePath() &&
       Instance.getPrimarySourceFiles().empty()) {
-    Instance.getASTContext().Diags.diagnose(
+    Instance.getDiags().diagnose(
         SourceLoc(), diag::emit_compiled_source_without_primary_file);
     return;
   }
@@ -977,7 +975,7 @@ static void emitCompiledSourceForAllPrimaryInputsIfNeeded(
     const std::string &compiledSourceFilePath =
         Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
     if (!compiledSourceFilePath.empty()) {
-      (void)Instance.emitCompiledSource(Instance.getASTContext().Diags, SF,
+      (void)Instance.emitCompiledSource(Instance.getDiags(), SF,
                                         compiledSourceFilePath);
     }
   }
@@ -1037,9 +1035,8 @@ static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(Path, EC, llvm::sys::fs::F_None);
   if (EC) {
-    module->getASTContext().Diags.diagnose(SourceLoc(),
-                                           diag::error_opening_output,
-                                           Path, EC.message());
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_opening_output, Path,
+                                 EC.message());
     return true;
   }
   OS << "// Automatically generated C source file from the Swift compiler \n"
@@ -1254,7 +1251,7 @@ static bool performCompile(CompilerInstance &Instance,
     scanDependencies(Instance);
   }
 
-  (void)emitMakeDependenciesIfNeeded(Context.Diags,
+  (void)emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                      Instance.getDependencyTracker(), opts);
 
   if (Action == FrontendOptions::ActionType::ResolveImports ||
@@ -1281,9 +1278,8 @@ static bool performCompile(CompilerInstance &Instance,
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
   if (Action == FrontendOptions::ActionType::REPL) {
-    runREPL(Instance, ProcessCmdLine(Args.begin(), Args.end()),
-            Invocation.getParseStdlib());
-    return Context.hadError();
+    llvm::report_fatal_error("Compiler-internal integrated REPL has been "
+                             "removed; use the LLDB-enhanced REPL instead.");
   }
 
   if (auto r = dumpASTIfNeeded(Instance))
@@ -1293,9 +1289,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
   emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
+
+  SWIFT_DEFER {
+    // We might have freed the ASTContext already, but in that case we must have
+    // emitted the dependencies first.
+    if (Instance.hasASTContext())
+      emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+  };
 
   emitIndexData(Instance);
 
@@ -1511,6 +1513,11 @@ static void freeDeallocatableResourcesIfPossible(CompilerInstance &Instance) {
     break;
   case DeallocatableResources::SILModuleAndASTContext:
     Instance.freeSILModule();
+
+    // Make sure we emit dependencies now, because we can't do it after the
+    // context is gone.
+    emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+
     Instance.freeASTContext();
     break;
   }

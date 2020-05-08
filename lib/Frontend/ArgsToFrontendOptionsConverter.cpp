@@ -405,8 +405,6 @@ bool ArgsToFrontendOptionsConverter::setUpInputKindAndImmediateArgs() {
     Opts.InputKind = InputFileKind::SwiftModuleInterface;
   else if (Args.hasArg(OPT_parse_as_library))
     Opts.InputKind = InputFileKind::SwiftLibrary;
-  else if (Opts.RequestedAction == FrontendOptions::ActionType::REPL)
-    Opts.InputKind = InputFileKind::SwiftREPL;
   else
     Opts.InputKind = InputFileKind::Swift;
 
