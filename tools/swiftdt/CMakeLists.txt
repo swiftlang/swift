@@ -8,6 +8,7 @@ add_swift_target_executable(swiftdt
 
   COMPILE_FLAGS
     -I${SWIFT_SOURCE_DIR}/include/swift/SwiftRemoteMirror
+    -I${SWIFT_SOURCE_DIR}/tools/swiftdt
   LINK_LIBRARIES
     swiftRemoteMirror
   )

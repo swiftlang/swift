@@ -1,11 +1,12 @@
-import Foundation
+import Darwin
+import SymbolicationShims
 
 private let symbolicationPath =
   "/System/Library/PrivateFrameworks/Symbolication.framework/Symbolication"
 private let symbolicationHandle = dlopen(symbolicationPath, RTLD_LAZY)!
 
 private let coreSymbolicationPath =
-  "/System/Library/PrivateFrameworks/Symbolication.framework/Symbolication"
+  "/System/Library/PrivateFrameworks/CoreSymbolication.framework/CoreSymbolication"
 private let coreSymbolicationHandle = dlopen(coreSymbolicationPath, RTLD_LAZY)!
 
 private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
@@ -16,7 +17,7 @@ private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
 }
 
 enum Sym {
-  static let pidFromHint: @convention(c) (NSString) -> pid_t =
+  static let pidFromHint: @convention(c) (AnyObject) -> pid_t =
     symbol(symbolicationHandle, "pidFromHint")
   static let CSSymbolicatorCreateWithTask: @convention(c) (task_t) -> CSTypeRef =
     symbol(coreSymbolicationHandle, "CSSymbolicatorCreateWithTask")
@@ -35,7 +36,7 @@ enum Sym {
     symbol(coreSymbolicationHandle, "CSSymbolGetMangledName")
   static let CSSymbolIsFunction: @convention(c) (CSTypeRef) -> CBool =
     symbol(coreSymbolicationHandle, "CSSymbolIsFunction")
-  static let CSSymbolGetRange: @convention(c) (CSTypeRef) -> NSRange =
+  static let CSSymbolGetRange: @convention(c) (CSTypeRef) -> Range =
     symbol(coreSymbolicationHandle, "CSSymbolGetRange")
   static let task_start_peeking: @convention(c) (task_t) -> kern_return_t =
     symbol(symbolicationHandle, "task_start_peeking")
@@ -50,12 +51,25 @@ enum Sym {
     symbol(symbolicationHandle, "task_stop_peeking")
 }
 
-typealias CSTypeRef = NSRange
+private enum CF {
+  static let path = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
+  static let handle = dlopen(path, RTLD_LAZY)!
+  static let stringCreateWithCString:
+    @convention(c) (UnsafeRawPointer?, UnsafePointer<CChar>, UInt32) ->
+      Unmanaged<AnyObject> = symbol(handle, "CFStringCreateWithCString")
+  static let stringEncodingUTF8: UInt32 = 0x08000100
+}
+
 typealias CSMachineTime = UInt64
 let kCSNow = CSMachineTime(Int64.max) + 1
 
+private func withNSString<T>(_ str: String, call: (AnyObject) -> T) -> T {
+  let cfstr = CF.stringCreateWithCString(nil, str, CF.stringEncodingUTF8)
+  return call(cfstr.takeRetainedValue())
+}
+
 func pidFromHint(_ hint: String) -> pid_t? {
-  let result = Sym.pidFromHint(hint as NSString)
+  let result = withNSString(hint, call: Sym.pidFromHint)
   return result == 0 ? nil : result
 }
 
@@ -95,7 +109,7 @@ func CSSymbolIsFunction(_ sym: CSTypeRef) -> Bool {
   return Sym.CSSymbolIsFunction(sym)
 }
 
-func CSSymbolGetRange(_ sym: CSTypeRef) -> NSRange {
+func CSSymbolGetRange(_ sym: CSTypeRef) -> Range {
   return Sym.CSSymbolGetRange(sym)
 }
 

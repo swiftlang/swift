@@ -97,8 +97,10 @@ func printUsage(args: inout ArraySlice<String>) {
   
   let maxWidth = commands.map({ $0.name.count }).max() ?? 0
   for command in commands {
-    let paddedName = command.name.padding(toLength: maxWidth,
-                                          withPad: " ", startingAt: 0)
+    var paddedName = command.name
+    while paddedName.count < maxWidth {
+      paddedName = " " + paddedName
+    }
     print("  \(paddedName) - \(command.help)", to: &Std.err)
   }
 }
