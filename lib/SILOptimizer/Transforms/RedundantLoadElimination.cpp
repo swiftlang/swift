@@ -160,6 +160,9 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::EndAccessInst:
+  case SILInstructionKind::SetDeallocatingInst:
+  case SILInstructionKind::DeallocRefInst:
     return true;
   default:
     return false;
