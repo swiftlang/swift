@@ -1,16 +1,16 @@
-name: Track upstream
-on:
-  schedule:
-    - cron: '0 * * * *'
-jobs:
-  track-upstream:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Push master from upstream
-        run: |
-          git remote add apple https://github.com/apple/swift.git
-          git fetch
-          git checkout -b master --track origin/master
-          git pull apple master
-          git push origin master
+# name: Track upstream
+# on:
+#   schedule:
+#     - cron: '0 * * * *'
+# jobs:
+#   track-upstream:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v2
+#       - name: Push master from upstream
+#         run: |
+#           git remote add apple https://github.com/apple/swift.git
+#           git fetch
+#           git checkout -b master --track origin/master
+#           git pull apple master
+#           git push origin master
