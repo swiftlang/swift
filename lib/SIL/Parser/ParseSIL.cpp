@@ -184,8 +184,7 @@ namespace {
     std::function<void(Type)> ParsedTypeCallback;
 
     bool performTypeLocChecking(TypeLoc &T, bool IsSILType,
-                                GenericEnvironment *GenericEnv = nullptr,
-                                DeclContext *DC = nullptr);
+                                GenericEnvironment *GenericEnv = nullptr);
 
     void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To);
@@ -1105,19 +1104,13 @@ static bool parseDeclSILOptional(bool *isTransparent,
 }
 
 bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
-                                       GenericEnvironment *GenericEnv,
-                                       DeclContext *DC) {
+                                       GenericEnvironment *GenericEnv) {
   if (GenericEnv == nullptr)
     GenericEnv = ContextGenericEnv;
 
-  if (!DC)
-    DC = &P.SF;
-  else if (!GenericEnv)
-    GenericEnv = DC->getGenericEnvironmentOfContext();
-
   return swift::performTypeLocChecking(P.Context, T,
                                        /*isSILMode=*/true, IsSILType,
-                                       GenericEnv, DC);
+                                       GenericEnv, &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -1712,8 +1705,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     TypeLoc Ty = TyR.get();
     if (defaultForProto)
       bindProtocolSelfInTypeRepr(Ty, defaultForProto);
-    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, GenericEnv,
-                               defaultForProto))
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, GenericEnv))
       return true;
     parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
@@ -6268,6 +6260,8 @@ ProtocolConformanceRef SILParser::parseProtocolConformance(
   auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
   if (genericParams) {
     genericEnv = handleSILGenericParams(genericParams, &P.SF);
+  } else if (defaultForProto) {
+    genericEnv = defaultForProto->getGenericEnvironment();
   }
 
   auto retVal = parseProtocolConformanceHelper(proto, genericEnv, context,
@@ -6291,8 +6285,7 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
     bindProtocolSelfInTypeRepr(Ty, defaultForProto);
   }
 
-  if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv,
-                             defaultForProto))
+  if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv))
     return ProtocolConformanceRef();
   auto ConformingTy = Ty.getType();
 
