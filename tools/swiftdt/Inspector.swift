@@ -1,5 +1,6 @@
-import Foundation
+import Darwin
 import SwiftRemoteMirror
+import SymbolicationShims
 
 class Inspector {
   let task: task_t
