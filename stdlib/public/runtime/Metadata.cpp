@@ -5461,13 +5461,17 @@ namespace {
     size_t Remaining;
   };
 
+  /// The trailer placed at the end of each pool allocation, used when
+  /// SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION is on.
   struct PoolTrailer {
     void *PrevTrailer;
     size_t PoolSize;
   };
 
-  static constexpr size_t InitialPoolSize = 64 * 1024 - sizeof(PoolTrailer);
+  static constexpr size_t InitialPoolSize = 64 * 1024;
 
+  /// The header placed before each allocation, used when
+  /// SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION is on.
   struct alignas(void *) AllocationHeader {
     uint16_t Size;
     uint16_t Tag;
@@ -5478,7 +5482,6 @@ namespace {
 // doesn't cost us anything in binary size.
 alignas(void *) static struct {
   char Pool[InitialPoolSize];
-  PoolTrailer Trailer{ nullptr, InitialPoolSize };
 } InitialAllocationPool;
 static std::atomic<PoolRange>
 AllocationPool{PoolRange{InitialAllocationPool.Pool,
@@ -5487,18 +5490,31 @@ AllocationPool{PoolRange{InitialAllocationPool.Pool,
 bool swift::_swift_debug_metadataAllocationIterationEnabled = false;
 const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
 
+static void checkAllocatorDebugEnvironmentVariable(void *context) {
+  const char *value =
+    getenv("SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION");
+  if (value && (value[0] == '1' || value[0] == 'y' || value[0] == 'Y')) {
+    _swift_debug_metadataAllocationIterationEnabled = true;
+    // Write a PoolTrailer to the end of InitialAllocationPool and shrink
+    // the pool accordingly.
+    auto poolCopy = AllocationPool.load(std::memory_order_relaxed);
+    assert(poolCopy.Begin == InitialAllocationPool.Pool);
+    size_t newPoolSize = InitialPoolSize - sizeof(PoolTrailer);
+    PoolTrailer trailer = { nullptr, newPoolSize };
+    memcpy(InitialAllocationPool.Pool + newPoolSize, &trailer,
+           sizeof(trailer));
+    poolCopy.Remaining = newPoolSize;
+    AllocationPool.store(poolCopy, std::memory_order_relaxed);
+  }
+}
+
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   assert(Tag != 0);
   assert(alignment <= alignof(void*));
   assert(size % alignof(void*) == 0);
 
   static OnceToken_t getenvToken;
-  SWIFT_ONCE_F(getenvToken, [](void *) {
-    const char *value =
-      getenv("SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION");
-    if (value && (value[0] == '1' || value[0] == 'y' || value[0] == 'Y'))
-      _swift_debug_metadataAllocationIterationEnabled = true;
-  }, nullptr);
+  SWIFT_ONCE_F(getenvToken, checkAllocatorDebugEnvironmentVariable, nullptr);
 
   // If the size is larger than the maximum, just use malloc.
   if (size > PoolRange::MaxPoolAllocationSize)
