@@ -718,18 +718,23 @@ generic constraints:
   * @weak types
   * Types that can't satisfy the requirements for being loadable because they
     care about the exact location of their value in memory and need to run some
-    user-written code when they are copied or moved. For example:
+    user-written code when they are copied or moved. Most commonly, types "care"
+    about the addresses of values because addresses of values are registered in
+    some global data structure, or because values may contain pointers into
+    themselves.  For example:
 
     * Addresses of values of Swift ``@weak`` types are registered in a global
       table. That table needs to be adjusted when a ``@weak`` value is copied
       or moved to a new address.
 
-    * A non-COW collection type with a heap allocation needs to allocate memory
-      and copy the collection elements when the collection is copied.
+    * A non-COW collection type with a heap allocation (like ``std::vector`` in
+      C++) needs to allocate memory and copy the collection elements when the
+      collection is copied.
 
-    * A non-COW string type with an SSO buffer (like ``std::string`` in C++)
-      can contain a pointer into the value itself. That pointer needs to be
-      recomputed when the string is copied or moved.
+    * A non-COW string type that implements a small string optimization (like
+      many implementations of ``std::string`` in C++) can contain a pointer
+      into the value itself. That pointer needs to be recomputed when the
+      string is copied or moved.
 
   Values of address-only type ("address-only values") must reside in
   memory and can only be referenced in SIL by address. Addresses of
