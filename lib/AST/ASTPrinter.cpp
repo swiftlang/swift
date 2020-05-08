@@ -997,12 +997,11 @@ void PrintAST::printAttributes(const Decl *D) {
 
     // SPI groups
     if (Options.PrintSPIs) {
-      interleave(D->getSPIGroups(),
-             [&](Identifier spiName) {
-               Printer.printAttrName("_spi", true);
-               Printer << "(" << spiName << ") ";
-             },
-             [&] { Printer << ""; });
+      for (Identifier spiName: D->getSPIGroups()) {
+        Printer.printAttrName("_spi", true);
+        if (!spiName.empty())
+          Printer << "(" << spiName << ") ";
+      }
       Options.ExcludeAttrList.push_back(DAK_SPIAccessControl);
     }
 

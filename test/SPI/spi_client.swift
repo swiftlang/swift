@@ -16,7 +16,7 @@
 // RUN: rm %t/SPIHelper.private.swiftinterface
 // RUN: not %target-swift-frontend -typecheck -I %t
 
-@_spi(HelperSPI) import SPIHelper
+@_spi(HelperSPI) @_spi import SPIHelper
 
 // Use as SPI
 publicFunc()

@@ -2098,7 +2098,10 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
     while (!spisStr.empty()) {
       StringRef nextComponent;
       std::tie(nextComponent, spisStr) = spisStr.split('\0');
-      dependency.spiGroups.push_back(ctx.getIdentifier(nextComponent));
+
+      Identifier id = nextComponent.empty() ? Identifier()
+                                            : ctx.getIdentifier(nextComponent);
+      dependency.spiGroups.push_back(id);
     }
 
     if (!module->hasResolvedImports()) {

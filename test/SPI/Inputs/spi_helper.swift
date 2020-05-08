@@ -1,5 +1,8 @@
 /// Library defining SPI decls
 
+import Swift
+@_spi @_spi(ARandomSPI) import Swift
+
 public protocol PublicProto {
   associatedtype Assoc
 }

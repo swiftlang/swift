@@ -131,8 +131,12 @@ static void printImports(raw_ostream &out,
     if (Opts.PrintSPIs) {
       llvm::SmallSetVector<Identifier, 4> spis;
       M->lookupImportedSPIGroups(importedModule, spis);
-      for (auto spiName : spis)
-        out << "@_spi(" << spiName << ") ";
+      for (Identifier spiName : spis) {
+        out << "@_spi";
+        if (!spiName.empty())
+          out << "(" << spiName << ")";
+        out << " ";
+      }
     }
 
     out << "import ";
