@@ -3353,8 +3353,8 @@ namespace {
 
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
-          if (!isa<clang::TypeDecl>(nd)) {
-            // We don't know what this field is.
+          if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
+            // We don't know what this member is.
             // Assume it may be important in C.
             hasUnreferenceableStorage = true;
             hasMemberwiseInitializer = false;
