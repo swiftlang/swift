@@ -773,27 +773,6 @@ public:
     }
   }
 
-  StoredSignedPointer getTypeContextDescriptor(const TargetMetadata<Runtime> *Metadata) const {
-    switch (Metadata->getKind()) {
-    case MetadataKind::Class: {
-      const auto cls = static_cast<const TargetClassMetadata<Runtime> *>(Metadata);
-      if (!cls->isTypeMetadata())
-        return {};
-      return cls->getDescriptionAsSignedPointer();
-    }
-    case MetadataKind::Struct:
-    case MetadataKind::Enum:
-    case MetadataKind::Optional:
-      return static_cast<const TargetValueMetadata<Runtime> *>(Metadata)
-          ->Description;
-    case MetadataKind::ForeignClass:
-      return static_cast<const TargetForeignClassMetadata<Runtime> *>(Metadata)
-          ->Description;
-    default:
-      return {};
-    }
-  }
-
   /// Iterate the protocol conformance cache tree rooted at NodePtr, calling
   /// Call with the type and protocol in each node.
   void iterateConformanceTree(StoredPointer NodePtr,
