@@ -78,6 +78,9 @@ extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
 #define VM_TAG_FOR_SWIFT_METADATA (-1)
 #endif
 
+// Protects concurrent accesses to the metadata cache
+static std::recursive_mutex metadata_mutex;
+
 using namespace swift;
 using namespace metadataimpl;
 
@@ -684,6 +687,7 @@ MetadataResponse
 swift::swift_getGenericMetadata(MetadataRequest request,
                                 const void * const *arguments,
                                 const TypeContextDescriptor *description) {
+  std::lock_guard<std::recursive_mutex> guard(metadata_mutex);
   description = swift_auth_data_non_address(description, SpecialPointerAuthDiscriminators::TypeDescriptor);
   auto &cache = getCache(*description);
   assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
@@ -4789,6 +4793,7 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                       const Metadata *conformingType,
                                       const ProtocolRequirement *reqBase,
                                       const ProtocolRequirement *assocType) {
+  std::lock_guard<std::recursive_mutex> guard(metadata_mutex);
   assert(assocType->Flags.getKind() ==
            ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
 
@@ -4916,6 +4921,7 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
                                   const Metadata *assocType,
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance) {
+  std::lock_guard<std::recursive_mutex> guard(metadata_mutex);
   // We avoid using this function for initializing base protocol conformances
   // so that we can have a better fast-path.
   assert(assocConformance->Flags.getKind() ==
