@@ -1351,6 +1351,7 @@ public:
     case Kind::caseLabelItem:
       return nullptr;
     }
+    llvm_unreachable("invalid expression type");
   }
 
   DeclContext *getDeclContext() const {
@@ -1367,6 +1368,7 @@ public:
     case Kind::caseLabelItem:
       return caseLabelItem.dc;
     }
+    llvm_unreachable("invalid decl context type");
   }
 
   ContextualTypePurpose getExprContextualTypePurpose() const {
@@ -1520,6 +1522,7 @@ public:
     case Kind::function:
       return function.function;
     }
+    llvm_unreachable("invalid function kind");
   }
 
   Optional<StmtCondition> getAsStmtCondition() const {
@@ -1532,6 +1535,7 @@ public:
     case Kind::stmtCondition:
       return stmtCondition.stmtCondition;
     }
+    llvm_unreachable("invalid statement kind");
   }
 
   Optional<CaseLabelItem *> getAsCaseLabelItem() const {
@@ -1544,6 +1548,7 @@ public:
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem;
     }
+    llvm_unreachable("invalid case label type");
   }
 
   BraceStmt *getFunctionBody() const {
@@ -1572,6 +1577,7 @@ public:
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem->getSourceRange();
     }
+    llvm_unreachable("invalid target type");
   }
 
   /// Retrieve the source location for the target.
@@ -1589,6 +1595,7 @@ public:
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem->getStartLoc();
     }
+    llvm_unreachable("invalid target type");
   }
 
   /// Walk the contents of the application target.

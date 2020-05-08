@@ -3,4 +3,5 @@
 // CHECK:      struct MyClass {
 // CHECK-NEXT:   var const_member: Int32 { get }
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   init(const_member: Int32)
 // CHECK-NEXT: }

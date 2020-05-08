@@ -4827,3 +4827,11 @@ llvm::LLVMContext &ASTContext::getIntrinsicScratchContext() const {
 #endif
 }
 
+bool ASTContext::isASCIIString(StringRef s) const {
+  for (unsigned char c : s) {
+    if (c > 127) {
+      return false;
+    }
+  }
+  return true;
+}

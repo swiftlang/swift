@@ -1007,6 +1007,7 @@ private:
       // Execute the expression.
       return rewriteExpr(capturedExpr);
     }
+    llvm_unreachable("invalid function builder target");
   }
 
   /// Declare the given temporary variable, adding the appropriate

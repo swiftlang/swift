@@ -1860,6 +1860,11 @@ public:
 std::unique_ptr<SILModule>
 SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
                                   SILGenDescriptor desc) const {
+  // If we have a .sil file to parse, defer to the parsing request.
+  if (desc.getSourceFileToParse()) {
+    return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
+  }
+
   auto *unit = desc.context.get<FileUnit *>();
   auto *mod = unit->getParentModule();
   auto M = std::unique_ptr<SILModule>(
@@ -1879,6 +1884,11 @@ SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
 std::unique_ptr<SILModule>
 SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
                                    SILGenDescriptor desc) const {
+  // If we have a .sil file to parse, defer to the parsing request.
+  if (desc.getSourceFileToParse()) {
+    return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
+  }
+
   auto *mod = desc.context.get<ModuleDecl *>();
   auto M = std::unique_ptr<SILModule>(
       new SILModule(mod, desc.conv, desc.opts, mod, /*wholeModule*/ true));

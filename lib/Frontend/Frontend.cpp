@@ -186,14 +186,6 @@ Lowering::TypeConverter &CompilerInstance::getSILTypes() {
   return *tc;
 }
 
-void CompilerInstance::createSILModule() {
-  assert(MainModule && "main module not created yet");
-  // Assume WMO if a -primary-file option was not provided.
-  TheSILModule = SILModule::createEmptyModule(
-      getMainModule(), getSILTypes(), Invocation.getSILOptions(),
-      Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
-}
-
 void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
   PrimaryBufferIDs.insert(BufID);
 }
@@ -678,10 +670,6 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   return None;
 }
 
-std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
-  return std::move(TheSILModule);
-}
-
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -759,14 +747,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   ModuleDecl *mainModule = getMainModule();
   Context->LoadedModules[mainModule->getName()] = mainModule;
 
-  if (Invocation.getInputKind() == InputFileKind::SIL) {
-    assert(!InputSourceCodeBufferIDs.empty());
-    assert(InputSourceCodeBufferIDs.size() == 1);
-    assert(MainBufferID != NO_SUCH_BUFFER);
-    assert(isPrimaryInput(MainBufferID) || isWholeModuleCompilation());
-    createSILModule();
-  }
-
   if (Invocation.getImplicitStdlibKind() == ImplicitStdlibKind::Stdlib) {
     if (!loadStdlib())
       return;
@@ -804,13 +784,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF);
-
-    // Parse the SIL decls if needed.
-    // TODO: Requestify SIL parsing.
-    if (TheSILModule) {
-      SILParserState SILContext(TheSILModule.get());
-      parseSourceFileSIL(SF, &SILContext);
-    }
   });
 
   finishTypeChecking();
@@ -985,8 +958,6 @@ void CompilerInstance::freeASTContext() {
   PrimaryBufferIDs.clear();
   PrimarySourceFiles.clear();
 }
-
-void CompilerInstance::freeSILModule() { TheSILModule.reset(); }
 
 /// Perform "stable" optimizations that are invariant across compiler versions.
 static bool performMandatorySILPasses(CompilerInvocation &Invocation,
