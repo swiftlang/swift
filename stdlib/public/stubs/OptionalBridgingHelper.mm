@@ -14,7 +14,6 @@
 
 #if SWIFT_OBJC_INTEROP
 #include "swift/Basic/Lazy.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ObjCBridge.h"

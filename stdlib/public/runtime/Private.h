@@ -20,7 +20,6 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
-#include "llvm/Support/Compiler.h"
 
 #if defined(__APPLE__) && defined(__MACH__)
 #include <TargetConditionals.h>

@@ -20,8 +20,6 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Once.h"
 #include "swift/ABI/System.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MathExtras.h"
 #include "MetadataCache.h"
 #include "Private.h"
 #include "RuntimeInvocationsTracking.h"
