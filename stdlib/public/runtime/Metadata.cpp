@@ -27,8 +27,6 @@
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Strings.h"
-#include "llvm/Support/MathExtras.h"
-#include "llvm/Support/PointerLikeTypeTraits.h"
 #include <algorithm>
 #include <cctype>
 #include <cinttypes>

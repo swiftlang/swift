@@ -28,8 +28,6 @@
 #include "swift/Runtime/HeapObject.h"
 #include "SwiftHashableSupport.h"
 
-#include "llvm/Support/Compiler.h"
-
 #include <atomic>
 #if SWIFT_OBJC_INTEROP
 # include <CoreFoundation/CoreFoundation.h>
