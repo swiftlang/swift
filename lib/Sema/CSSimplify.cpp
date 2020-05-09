@@ -126,7 +126,7 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
 
 static bool areConservativelyCompatibleArgumentLabels(
     OverloadChoice choice, SmallVectorImpl<FunctionType::Param> &args,
-    Optional<unsigned> unlabeledTrailingClosureArgIndex) {
+    Optional<unsigned> firstTrailingClosureArgIndex) {
   ValueDecl *decl = nullptr;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -168,7 +168,7 @@ static bool areConservativelyCompatibleArgumentLabels(
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
   return !matchCallArguments(args, params, paramInfo,
-                             unlabeledTrailingClosureArgIndex,
+                             firstTrailingClosureArgIndex,
                              /*allow fixes*/ false, listener,
                              unusedParamBindings);
 }
@@ -220,13 +220,13 @@ bool constraints::
 matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                    ArrayRef<AnyFunctionType::Param> params,
                    const ParameterListInfo &paramInfo,
-                   Optional<unsigned> unlabeledTrailingClosureArgIndex,
+                   Optional<unsigned> firstTrailingClosureArgIndex,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
   assert(params.size() == paramInfo.size() && "Default map does not match");
-  assert(!unlabeledTrailingClosureArgIndex ||
-         *unlabeledTrailingClosureArgIndex < args.size());
+  assert(!firstTrailingClosureArgIndex ||
+         *firstTrailingClosureArgIndex < args.size());
 
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
@@ -433,16 +433,28 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     haveUnfulfilledParams = true;
   };
 
-  // If we have an unlabeled trailing closure, we match trailing closure
-  // labels from the end, then match the trailing closure arg.
-  if (unlabeledTrailingClosureArgIndex) {
-    unsigned unlabeledArgIdx = *unlabeledTrailingClosureArgIndex;
+  // If we have any trailing closures, we match trailing closure labels from the
+  // end, then match any unlabeled trailing closure arg.
+  if (firstTrailingClosureArgIndex) {
+    unsigned firstArgIdx = *firstTrailingClosureArgIndex;
 
     // One past the next parameter index to look at.
     unsigned prevParamIdx = numParams;
 
+    bool hasUnlabeledFirstTrailingClosure = false;
+
     // Scan backwards to match any labeled trailing closures.
-    for (unsigned argIdx = numArgs - 1; argIdx != unlabeledArgIdx; --argIdx) {
+    unsigned argIdx = numArgs;
+    while (argIdx > firstArgIdx) {
+      argIdx -= 1;
+      auto argLabel = args[argIdx].getLabel();
+
+      // We're done if we're at the first trailing closure and it's unlabeled.
+      if (argIdx == firstArgIdx && argLabel.empty()) {
+        hasUnlabeledFirstTrailingClosure = true;
+        break;
+      }
+
       bool claimed = false;
 
       // We do this scan on a copy of prevParamIdx so that, if it fails,
@@ -454,7 +466,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
         // Check for an exact label match.
         const auto &param = params[paramIdx];
-        if (param.getLabel() == args[argIdx].getLabel()) {
+        if (param.getLabel() == argLabel) {
           parameterBindings[paramIdx].push_back(argIdx);
           claim(param.getLabel(), argIdx);
 
@@ -474,81 +486,83 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     }
 
     // Okay, we've matched all the labeled closures; scan backwards from
-    // there to match the unlabeled trailing closure.
-    Optional<unsigned> unlabeledParamIdx;
-    if (prevParamIdx > 0) {
-      unsigned paramIdx = prevParamIdx - 1;
+    // there to match the unlabeled first trailing closure, if there is one.
+    if (hasUnlabeledFirstTrailingClosure) {
+      Optional<unsigned> unlabeledParamIdx;
+      if (prevParamIdx > 0) {
+        unsigned paramIdx = prevParamIdx - 1;
 
-      bool lastAcceptsTrailingClosure =
-          acceptsTrailingClosure(params[paramIdx]);
+        bool lastAcceptsTrailingClosure =
+            acceptsTrailingClosure(params[paramIdx]);
 
-      // If the last parameter is defaulted, this might be
-      // an attempt to use a trailing closure with previous
-      // parameter that accepts a function type e.g.
-      //
-      // func foo(_: () -> Int, _ x: Int = 0) {}
-      // foo { 42 }
-      //
-      // FIXME: shouldn't this skip multiple arguments and look for
-      // something that acceptsTrailingClosure rather than just something
-      // with a function type?
-      if (!lastAcceptsTrailingClosure && paramIdx > 0 &&
-          paramInfo.hasDefaultArgument(paramIdx)) {
-        auto paramType = params[paramIdx - 1].getPlainType();
-        // If the parameter before defaulted last accepts.
-        if (paramType->is<AnyFunctionType>()) {
-          lastAcceptsTrailingClosure = true;
-          paramIdx -= 1;
+        // If the last parameter is defaulted, this might be
+        // an attempt to use a trailing closure with previous
+        // parameter that accepts a function type e.g.
+        //
+        // func foo(_: () -> Int, _ x: Int = 0) {}
+        // foo { 42 }
+        //
+        // FIXME: shouldn't this skip multiple arguments and look for
+        // something that acceptsTrailingClosure rather than just something
+        // with a function type?
+        if (!lastAcceptsTrailingClosure && paramIdx > 0 &&
+            paramInfo.hasDefaultArgument(paramIdx)) {
+          auto paramType = params[paramIdx - 1].getPlainType();
+          // If the parameter before defaulted last accepts.
+          if (paramType->is<AnyFunctionType>()) {
+            lastAcceptsTrailingClosure = true;
+            paramIdx -= 1;
+          }
         }
+
+        if (lastAcceptsTrailingClosure)
+          unlabeledParamIdx = paramIdx;
       }
 
-      if (lastAcceptsTrailingClosure)
-        unlabeledParamIdx = paramIdx;
-    }
-
-    // If there's no suitable last parameter to accept the trailing closure,
-    // notify the listener and bail if we need to.
-    if (!unlabeledParamIdx) {
-      // Try to use a specialized diagnostic for an extra closure.
-      bool isExtraClosure = false;
-      if (prevParamIdx == 0) {
-        isExtraClosure = true;
-      } else if (unlabeledArgIdx > 0) {
-        // Argument before the trailing closure.
-        unsigned prevArg = unlabeledArgIdx - 1;
-        auto &arg = args[prevArg];
-        // If the argument before trailing closure matches
-        // last parameter, this is just a special case of
-        // an extraneous argument.
-        const auto param = params[prevParamIdx - 1];
-        if (param.hasLabel() && param.getLabel() == arg.getLabel()) {
+      // If there's no suitable last parameter to accept the trailing closure,
+      // notify the listener and bail if we need to.
+      if (!unlabeledParamIdx) {
+        // Try to use a specialized diagnostic for an extra closure.
+        bool isExtraClosure = false;
+        if (prevParamIdx == 0) {
           isExtraClosure = true;
+        } else if (firstArgIdx > 0) {
+          // Argument before the trailing closure.
+          unsigned prevArg = firstArgIdx - 1;
+          auto &arg = args[prevArg];
+          // If the argument before trailing closure matches
+          // last parameter, this is just a special case of
+          // an extraneous argument.
+          const auto param = params[prevParamIdx - 1];
+          if (param.hasLabel() && param.getLabel() == arg.getLabel()) {
+            isExtraClosure = true;
+          }
+        }
+
+        if (isExtraClosure) {
+          if (listener.extraArgument(firstArgIdx))
+            return true;
+        } else {
+          if (listener.trailingClosureMismatch(prevParamIdx - 1,
+                                               firstArgIdx))
+            return true;
+        }
+
+        if (isExtraClosure) {
+          // Claim the unlabeled trailing closure without an associated
+          // parameter to suppress further complaints about it.
+          claim(Identifier(), firstArgIdx, /*ignoreNameClash=*/true);
+        } else {
+          unlabeledParamIdx = prevParamIdx - 1;
         }
       }
 
-      if (isExtraClosure) {
-        if (listener.extraArgument(unlabeledArgIdx))
-          return true;
-      } else {
-        if (listener.trailingClosureMismatch(prevParamIdx - 1,
-                                             unlabeledArgIdx))
-          return true;
+      if (unlabeledParamIdx) {
+        // Claim the parameter/argument pair.
+        claim(params[*unlabeledParamIdx].getLabel(), firstArgIdx,
+              /*ignoreNameClash=*/true);
+        parameterBindings[*unlabeledParamIdx].push_back(firstArgIdx);
       }
-
-      if (isExtraClosure) {
-        // Claim the unlabeled trailing closure without an associated
-        // parameter to suppress further complaints about it.
-        claim(Identifier(), unlabeledArgIdx, /*ignoreNameClash=*/true);
-      } else {
-        unlabeledParamIdx = prevParamIdx - 1;
-      }
-    }
-
-    if (unlabeledParamIdx) {
-      // Claim the parameter/argument pair.
-      claim(params[*unlabeledParamIdx].getLabel(), unlabeledArgIdx,
-            /*ignoreNameClash=*/true);
-      parameterBindings[*unlabeledParamIdx].push_back(unlabeledArgIdx);
     }
   }
 
@@ -1107,7 +1121,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
                                     parameterBindings, locator);
     if (constraints::matchCallArguments(
             argsWithLabels, params, paramInfo,
-            argInfo->UnlabeledTrailingClosureIndex,
+            argInfo->FirstTrailingClosureIndex,
             cs.shouldAttemptFixes(), listener, parameterBindings))
       return cs.getTypeMatchFailure(locator);
 
@@ -8076,7 +8090,7 @@ retry_after_fail:
 
           if (!areConservativelyCompatibleArgumentLabels(
                   choice, argsWithLabels,
-                  argumentInfo->UnlabeledTrailingClosureIndex)) {
+                  argumentInfo->FirstTrailingClosureIndex)) {
             labelMismatch = true;
             return false;
           }

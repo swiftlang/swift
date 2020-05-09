@@ -394,7 +394,7 @@ EXPR_NODES = [
              Child('Pattern', kind='Pattern'),
          ]),
 
-    # trailing-closure-element -> identifier ':' closure-expression
+    # trailing-closure-element -> identifier ':' closure-expr
     Node('MultipleTrailingClosureElement', kind='Syntax',
          children=[
              Child('Label', kind='Token',
@@ -409,8 +409,9 @@ EXPR_NODES = [
     Node('MultipleTrailingClosureElementList', kind='SyntaxCollection',
          element='MultipleTrailingClosureElement'),
 
-    # call-expr -> expr '(' call-argument-list ')' closure-expr?
-    #            | expr closure-expr
+    # call-expr -> expr '(' call-argument-list ')' closure-expr? multiple-trailing-closure-element-list
+    #            | expr closure-expr multiple-trailing-closure-element-list
+    #            | expr trailing-closure-element multiple-trailing-closure-element-list
     Node('FunctionCallExpr', kind='Expr',
          children=[
              Child('CalledExpression', kind='Expr'),
@@ -424,11 +425,11 @@ EXPR_NODES = [
                    is_optional=True),
              Child('AdditionalTrailingClosures',
                    kind='MultipleTrailingClosureElementList',
-                   collection_element_name='AdditionalTralingClosure',
+                   collection_element_name='AdditionalTrailingClosure',
                    is_optional=True),
          ]),
 
-    # subscript-expr -> expr '[' call-argument-list ']' closure-expr?
+    # subscript-expr -> expr '[' call-argument-list ']' closure-expr? multiple-trailing-closure-element-list
     Node('SubscriptExpr', kind='Expr',
          children=[
              Child('CalledExpression', kind='Expr'),
@@ -440,7 +441,7 @@ EXPR_NODES = [
                    is_optional=True),
              Child('AdditionalTrailingClosures',
                    kind='MultipleTrailingClosureElementList',
-                   collection_element_name='AdditionalTralingClosure',
+                   collection_element_name='AdditionalTrailingClosure',
                    is_optional=True),
          ]),
 

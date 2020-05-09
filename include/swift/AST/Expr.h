@@ -544,8 +544,8 @@ public:
 
   /// Given that this is a packed argument expression of the sort that
   /// would be produced from packSingleArgument, return the index of the
-  /// unlabeled trailing closure, if there is one.
-  Optional<unsigned> getUnlabeledTrailingClosureIndexOfPackedArgument() const;
+  /// first trailing closure, if there is one.
+  Optional<unsigned> getFirstTrailingClosureIndexOfPackedArgument() const;
 
   /// Produce a mapping from each subexpression to its parent
   /// expression, with the provided expression serving as the root of
@@ -1234,9 +1234,9 @@ public:
     return Bits.ObjectLiteralExpr.HasTrailingClosure;
   }
 
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return getArg()->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  /// Return the index of the first trailing closure argument.
+  Optional<unsigned> getFirstTrailingClosureIndex() const {
+    return getArg()->getFirstTrailingClosureIndexOfPackedArgument();
   }
 
   SourceLoc getSourceLoc() const { return PoundLoc; }
@@ -1825,9 +1825,9 @@ public:
     return Bits.DynamicSubscriptExpr.HasTrailingClosure;
   }
 
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return Index->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  /// Return the index of the first trailing closure argument.
+  Optional<unsigned> getFirstTrailingClosureIndex() const {
+    return Index->getFirstTrailingClosureIndexOfPackedArgument();
   }
 
   SourceLoc getLoc() const { return Index->getStartLoc(); }
@@ -1899,9 +1899,9 @@ public:
     return Bits.UnresolvedMemberExpr.HasTrailingClosure;
   }
 
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return getArgument()->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  /// Return the index of the first trailing closure argument.
+  Optional<unsigned> getFirstTrailingClosureIndex() const {
+    return getArgument()->getFirstTrailingClosureIndexOfPackedArgument();
   }
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
@@ -2086,7 +2086,7 @@ public:
   bool hasTrailingClosure() const { return Bits.ParenExpr.HasTrailingClosure; }
 
   Optional<unsigned>
-  getUnlabeledTrailingClosureIndexOfPackedArgument() const {
+  getFirstTrailingClosureIndexOfPackedArgument() const {
     return hasTrailingClosure() ? Optional<unsigned>(0) : None;
   }
 
@@ -2185,7 +2185,7 @@ public:
   }
 
   Optional<unsigned>
-  getUnlabeledTrailingClosureIndexOfPackedArgument() const {
+  getFirstTrailingClosureIndexOfPackedArgument() const {
     return FirstTrailingArgumentAt;
   }
 
@@ -2474,9 +2474,9 @@ public:
     return Bits.SubscriptExpr.HasTrailingClosure;
   }
 
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return getIndex()->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  /// Return the index of the first trailing closure argument.
+  Optional<unsigned> getFirstTrailingClosureIndex() const {
+    return getIndex()->getFirstTrailingClosureIndexOfPackedArgument();
   }
 
   /// Determine whether this subscript reference should bypass the
@@ -4324,8 +4324,8 @@ public:
   /// Whether this application was written using a trailing closure.
   bool hasTrailingClosure() const;
 
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const;
+  /// Return the index of the first trailing closure argument.
+  Optional<unsigned> getFirstTrailingClosureIndex() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&
@@ -4413,9 +4413,9 @@ public:
   /// Whether this call with written with a single trailing closure.
   bool hasTrailingClosure() const { return Bits.CallExpr.HasTrailingClosure; }
 
-  /// Return the index of the unlabeled trailing closure argument.
-  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
-    return getArg()->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  /// Return the index of the first trailing closure argument.
+  Optional<unsigned> getFirstTrailingClosureIndex() const {
+    return getArg()->getFirstTrailingClosureIndexOfPackedArgument();
   }
 
   using TrailingCallArguments::getArgumentLabels;

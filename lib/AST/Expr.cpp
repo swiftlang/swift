@@ -1069,24 +1069,24 @@ Expr *swift::packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
     argLabelLocs = argLabelLocsScratch;
   }
 
-  Optional<unsigned> unlabeledTrailingClosureIndex;
-  if (!trailingClosures.empty() && trailingClosures[0].Label.empty())
-    unlabeledTrailingClosureIndex = args.size() - trailingClosures.size();
+  Optional<unsigned> firstTrailingClosureIndex;
+  if (!trailingClosures.empty())
+    firstTrailingClosureIndex = args.size() - trailingClosures.size();
 
   auto arg = TupleExpr::create(ctx, lParenLoc, rParenLoc, args, argLabels,
                                argLabelLocs,
-                               unlabeledTrailingClosureIndex,
+                               firstTrailingClosureIndex,
                                /*Implicit=*/false);
   computeSingleArgumentType(ctx, arg, implicit, getType);
   return arg;
 }
 
 Optional<unsigned>
-Expr::getUnlabeledTrailingClosureIndexOfPackedArgument() const {
+Expr::getFirstTrailingClosureIndexOfPackedArgument() const {
   if (auto PE = dyn_cast<ParenExpr>(this))
-    return PE->getUnlabeledTrailingClosureIndexOfPackedArgument();
+    return PE->getFirstTrailingClosureIndexOfPackedArgument();
   if (auto TE = dyn_cast<TupleExpr>(this))
-    return TE->getUnlabeledTrailingClosureIndexOfPackedArgument();
+    return TE->getFirstTrailingClosureIndexOfPackedArgument();
   return None;
 }
 
@@ -1675,9 +1675,9 @@ bool ApplyExpr::hasTrailingClosure() const {
   return false;
 }
 
-Optional<unsigned> ApplyExpr::getUnlabeledTrailingClosureIndex() const {
+Optional<unsigned> ApplyExpr::getFirstTrailingClosureIndex() const {
   if (auto call = dyn_cast<CallExpr>(this))
-    return call->getUnlabeledTrailingClosureIndex();
+    return call->getFirstTrailingClosureIndex();
 
   return None;
 }
@@ -1731,7 +1731,7 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc,
   SmallVector<Identifier, 4> argLabelsScratch;
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
   Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
-                                 rParenLoc,  trailingClosures, implicit,
+                                 rParenLoc, trailingClosures, implicit,
                                  argLabelsScratch, argLabelLocsScratch,
                                  getType);
 

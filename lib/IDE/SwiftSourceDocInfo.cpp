@@ -887,7 +887,7 @@ std::vector<CallArgInfo> swift::ide::
 getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   std::vector<CallArgInfo> InfoVec;
   if (auto *TE = dyn_cast<TupleExpr>(Arg)) {
-    auto FirstTrailing = TE->getUnlabeledTrailingClosureIndexOfPackedArgument();
+    auto FirstTrailing = TE->getFirstTrailingClosureIndexOfPackedArgument();
     for (size_t ElemIndex: range(TE->getNumElements())) {
       Expr *Elem = TE->getElement(ElemIndex);
       if (isa<DefaultArgumentExpr>(Elem))

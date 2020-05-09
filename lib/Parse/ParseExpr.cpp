@@ -948,7 +948,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
 /// where the parser requires an expr-basic (which does not allow them).  We
 /// handle this by doing some lookahead in common situations. And later, Sema
 /// will emit a diagnostic with a fixit to add wrapping parens.
-static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
+static bool isValidUnlabeledTrailingClosure(bool isExprBasic, Parser &P) {
   assert(P.Tok.is(tok::l_brace) && "Couldn't be a trailing closure");
   
   // If this is the start of a get/set accessor, then it isn't a trailing
@@ -1013,7 +1013,39 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   }
 }
 
+static bool isStartOfLabeledTrailingClosure(Parser &P) {
+  // Fast path: the next two tokens must be a label and a colon.
+  // But 'default:' is ambiguous with switch cases and we disallow it
+  // (unless escaped) even outside of switches.
+  if (!P.Tok.canBeArgumentLabel() ||
+      P.Tok.is(tok::kw_default) ||
+      !P.peekToken().is(tok::colon))
+    return false;
 
+  // Do some tentative parsing to distinguish `label: { ... }` and
+  // `label: switch x { ... }`.
+  Parser::BacktrackingScope backtrack(P);
+  P.consumeToken();
+  if (P.peekToken().is(tok::l_brace))
+    return true;
+  // Parse editor placeholder as trailing closure so SourceKit can expand it to
+  // closure literal.
+  if (P.peekToken().is(tok::identifier) &&
+      Identifier::isEditorPlaceholder(P.peekToken().getText()))
+    return true;
+  // Consider `label: <complete>` that the user is trying to write a closure.
+  if (P.peekToken().is(tok::code_complete) && !P.peekToken().isAtStartOfLine())
+    return true;
+  return false;
+}
+
+static bool isStartOfFirstTrailingClosure(bool isExprBasic, Parser &P) {
+  if (P.Tok.is(tok::l_brace) && isValidUnlabeledTrailingClosure(isExprBasic, P))
+    return true;
+  if (isStartOfLabeledTrailingClosure(P))
+    return true;
+  return false;
+}
 
 /// Map magic literal tokens such as #file to their
 /// MagicIdentifierLiteralExpr kind.
@@ -1202,7 +1234,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     }
 
     // Check for a trailing closure, if allowed.
-    if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
+    if (isStartOfFirstTrailingClosure(isExprBasic, *this)) {
       // FIXME: if Result has a trailing closure, break out.
 
       // Stop after literal expressions, which may never have trailing closures.
@@ -1233,8 +1265,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
                            /*implicit=*/false));
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
 
-      // We only allow a single trailing closure on a call.  This could be
-      // generalized in the future, but needs further design.
+      // We only allow a single unlabeled trailing closure on a call.  This
+      // could be generalized in the future, but needs further design.
       if (Tok.is(tok::l_brace))
         break;
       continue;
@@ -1626,7 +1658,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     }
 
     // Check for a trailing closure, if allowed.
-    if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
+    if (isStartOfFirstTrailingClosure(isExprBasic, *this)) {
       if (SyntaxContext->isEnabled()) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
@@ -3133,8 +3165,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
 
   // If we aren't interested in trailing closures, or there isn't a valid one,
   // we're done.
-  if (!isPostfix || Tok.isNot(tok::l_brace) ||
-      !isValidTrailingClosure(isExprBasic, *this))
+  if (!isPostfix || !isStartOfFirstTrailingClosure(isExprBasic, *this))
     return status;
 
   // Parse the closure.
@@ -3144,72 +3175,48 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
   return status;
 }
 
-static bool isStartOfLabelledTrailingClosure(Parser &P) {
-  // Fast path: the next two tokens must be a label and a colon.
-  // But 'default:' is ambiguous with switch cases and we disallow it
-  // (unless escaped) even outside of switches.
-  if (!P.Tok.canBeArgumentLabel() ||
-      P.Tok.is(tok::kw_default) ||
-      !P.peekToken().is(tok::colon))
-    return false;
-
-  // Do some tentative parsing to distinguish `label: { ... }` and
-  // `label: switch x { ... }`.
-  Parser::BacktrackingScope backtrack(P);
-  P.consumeToken();
-  if (P.peekToken().is(tok::l_brace))
-    return true;
-  // Parse editor placeholder as trailing closure so SourceKit can expand it to
-  // closure literal.
-  if (P.peekToken().is(tok::identifier) &&
-      Identifier::isEditorPlaceholder(P.peekToken().getText()))
-    return true;
-  // Consider `label: <complete>` that the user is trying to write a closure.
-  if (P.peekToken().is(tok::code_complete) && !P.peekToken().isAtStartOfLine())
-    return true;
-  return false;
-}
-
 ParserStatus
 Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
                               SmallVectorImpl<TrailingClosure> &closures) {
-  SourceLoc braceLoc = Tok.getLoc();
-
-  // Record the line numbers for the diagnostics below.
-  // Note that *do not* move this to after 'parseExprClosure()' it slows down
-  // 'getLineNumber()' call because of cache in SourceMgr.
-  auto origLine = SourceMgr.getLineNumber(calleeRange.End);
-  auto braceLine = SourceMgr.getLineNumber(braceLoc);
-
   ParserStatus result;
 
-  // Parse the closure.
-  ParserResult<Expr> closure = parseExprClosure();
-  if (closure.isNull())
-    return makeParserError();
+  // Parse any unlabeled trailing closure.
+  if (Tok.is(tok::l_brace)) {
+    SourceLoc braceLoc = Tok.getLoc();
 
-  result |= closure;
+    // Record the line numbers for the diagnostics below.
+    // Note that *do not* move this to after 'parseExprClosure()' it slows down
+    // 'getLineNumber()' call because of cache in SourceMgr.
+    auto origLine = SourceMgr.getLineNumber(calleeRange.End);
+    auto braceLine = SourceMgr.getLineNumber(braceLoc);
 
-  closures.push_back({closure.get()});
+    // Parse the closure.
+    ParserResult<Expr> closure = parseExprClosure();
+    if (closure.isNull())
+      return makeParserError();
 
-  // Warn if the trailing closure is separated from its callee by more than
-  // one line. A single-line separation is acceptable for a trailing closure
-  // call, and will be diagnosed later only if the call fails to typecheck.
-  if (braceLine > origLine + 1) {
-    diagnose(braceLoc, diag::trailing_closure_after_newlines);
-    diagnose(calleeRange.Start, diag::trailing_closure_callee_here);
+    result |= closure;
+    closures.push_back({closure.get()});
 
-    auto *CE = dyn_cast<ClosureExpr>(closures[0].ClosureExpr);
-    if (CE && CE->hasAnonymousClosureVars() &&
-        CE->getParameters()->size() == 0) {
-      diagnose(braceLoc, diag::brace_stmt_suggest_do)
-        .fixItInsert(braceLoc, "do ");
+    // Warn if the trailing closure is separated from its callee by more than
+    // one line. A single-line separation is acceptable for a trailing closure
+    // call, and will be diagnosed later only if the call fails to typecheck.
+    if (braceLine > origLine + 1) {
+      diagnose(braceLoc, diag::trailing_closure_after_newlines);
+      diagnose(calleeRange.Start, diag::trailing_closure_callee_here);
+
+      auto *CE = dyn_cast<ClosureExpr>(closures[0].ClosureExpr);
+      if (CE && CE->hasAnonymousClosureVars() &&
+          CE->getParameters()->size() == 0) {
+        diagnose(braceLoc, diag::brace_stmt_suggest_do)
+          .fixItInsert(braceLoc, "do ");
+      }
     }
   }
 
   // Parse labeled trailing closures.
   while (true) {
-    if (!isStartOfLabelledTrailingClosure(*this)) {
+    if (!isStartOfLabeledTrailingClosure(*this)) {
       if (!Tok.is(tok::code_complete))
         break;
 
@@ -3241,7 +3248,7 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
       consumeToken(tok::identifier);
     } else if (Tok.is(tok::code_complete)) {
       assert(!Tok.isAtStartOfLine() &&
-             "isStartOfLabelledTrailingClosure() should return false");
+             "isStartOfLabeledTrailingClosure() should return false");
       // Swallow code completion token after the label.
       // FIXME: Closure literal completion.
       consumeToken(tok::code_complete);
@@ -3253,7 +3260,8 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
     result |= closure;
     closures.push_back({label, labelLoc, closure.get()});
 
-    // Don't diagnose whitespace gaps before labelled closures.
+    // Don't diagnose whitespace gaps before labeled closures.
+    // TODO: Recover if multiple closures are separated by a comma.
   }
   SyntaxContext->collectNodesInPlace(
       SyntaxKind::MultipleTrailingClosureElementList);

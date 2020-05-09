@@ -5515,7 +5515,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(args, params,
                                                 paramInfo,
-                       arg->getUnlabeledTrailingClosureIndexOfPackedArgument(),
+                           arg->getFirstTrailingClosureIndexOfPackedArgument(),
                                                 /*allowFixes=*/false, listener,
                                                 parameterBindings);
 

@@ -994,7 +994,7 @@ namespace {
     Type addSubscriptConstraints(
         Expr *anchor, Type baseTy, Expr *index,
         ValueDecl *declOrNull, ArrayRef<Identifier> argLabels,
-        Optional<unsigned> unlabeledTrailingClosure,
+        Optional<unsigned> firstTrailingClosure,
         ConstraintLocator *locator = nullptr,
         SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
       // Locators used in this expression.
@@ -1012,7 +1012,7 @@ namespace {
                                 ConstraintLocator::FunctionResult);
 
       associateArgumentLabels(memberLocator,
-                              {argLabels, unlabeledTrailingClosure});
+                              {argLabels, firstTrailingClosure});
 
       Type outputTy;
 
@@ -1306,7 +1306,7 @@ namespace {
       auto *exprLoc = CS.getConstraintLocator(expr);
       associateArgumentLabels(
           exprLoc, {expr->getArgumentLabels(),
-                    expr->getUnlabeledTrailingClosureIndex()});
+                    expr->getFirstTrailingClosureIndex()});
 
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
@@ -1591,7 +1591,7 @@ namespace {
         associateArgumentLabels(
             CS.getConstraintLocator(expr),
             {expr->getArgumentLabels(),
-             expr->getUnlabeledTrailingClosureIndex()});
+             expr->getFirstTrailingClosureIndex()});
         return baseTy;
       }
 
@@ -1833,7 +1833,7 @@ namespace {
       return addSubscriptConstraints(expr, CS.getType(base),
                                      expr->getIndex(),
                                      decl, expr->getArgumentLabels(),
-                                     expr->getUnlabeledTrailingClosureIndex());
+                                     expr->getFirstTrailingClosureIndex());
     }
     
     Type visitArrayExpr(ArrayExpr *expr) {
@@ -2125,7 +2125,7 @@ namespace {
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
                                      expr->getIndex(), /*decl*/ nullptr,
                                      expr->getArgumentLabels(),
-                                     expr->getUnlabeledTrailingClosureIndex());
+                                     expr->getFirstTrailingClosureIndex());
     }
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
@@ -2909,7 +2909,7 @@ namespace {
       associateArgumentLabels(
           CS.getConstraintLocator(expr),
           {expr->getArgumentLabels(scratch),
-           expr->getUnlabeledTrailingClosureIndex()},
+           expr->getFirstTrailingClosureIndex()},
           /*labelsArePermanent=*/isa<CallExpr>(expr));
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
@@ -3458,12 +3458,12 @@ namespace {
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Subscript: {
           auto index = component.getIndexExpr();
-          auto unlabeledTrailingClosureIndex =
-            index->getUnlabeledTrailingClosureIndexOfPackedArgument();
+          auto firstTrailingClosureIndex =
+            index->getFirstTrailingClosureIndexOfPackedArgument();
           base = addSubscriptConstraints(E, base, index,
                                          /*decl*/ nullptr,
                                          component.getSubscriptLabels(),
-                                         unlabeledTrailingClosureIndex,
+                                         firstTrailingClosureIndex,
                                          memberLocator,
                                          &componentTypeVars);
           break;
