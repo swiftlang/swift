@@ -23,3 +23,37 @@ func crossFileDerivativeAttr<T: Protocol>(
   // expected-note @+1 {{cannot differentiate functions that have not been marked '@differentiable' and that are defined in other files}}
   return input.identityDerivativeAttr()
 }
+
+// TF-1234: Test `@differentiable` propagation from protocol requirement storage
+// declarations to their accessors in other file.
+
+@differentiable
+func protocolRequirementGetters<T: Protocol>(_ x: T) -> Float {
+  x.property + x[]
+}
+
+// TODO(TF-1184): Make `@differentiable` on storage declarations propagate to
+// the setter in addition to the getter.
+@differentiable
+func protocolRequirementSetters<T: Protocol>(_ x: inout T, _ newValue: Float) {
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
+  x.property = newValue
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
+  x[] = newValue
+}
+
+// TF-1234: Test `@differentiable` propagation from class member storage
+// declarations to their accessors in other file.
+
+@differentiable
+func classRequirementGetters(_ x: Class) -> Float {
+  x.property + x[]
+}
+
+@differentiable
+func classRequirementSetters(_ x: inout Class, _ newValue: Float) {
+  x.property = newValue
+  x[] = newValue
+}
