@@ -1632,60 +1632,6 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
   return ty;
 }
 
-/// Returns a valid type or ErrorType in case of an error.
-Type TypeChecker::resolveIdentifierType(TypeResolution resolution,
-                                        IdentTypeRepr *IdType) {
-  const auto options = resolution.getOptions();
-  auto DC = resolution.getDeclContext();
-  ASTContext &ctx = DC->getASTContext();
-  auto &diags = ctx.Diags;
-  auto ComponentRange = IdType->getComponentRange();
-  auto Components = llvm::makeArrayRef(ComponentRange.begin(),
-                                       ComponentRange.end());
-  Type result = resolveIdentTypeComponent(resolution, Components);
-  if (!result) return nullptr;
-
-  if (auto moduleTy = result->getAs<ModuleType>()) {
-    // Allow module types only if flag is specified.
-    if (options.contains(TypeResolutionFlags::AllowModule))
-      return moduleTy;
-    // Otherwise, emit an error.
-    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      auto moduleName = moduleTy->getModule()->getName();
-      diags.diagnose(Components.back()->getNameLoc(),
-                     diag::cannot_find_type_in_scope, DeclNameRef(moduleName));
-      diags.diagnose(Components.back()->getNameLoc(),
-                     diag::note_module_as_type, moduleName);
-    }
-    Components.back()->setInvalid();
-    return ErrorType::get(ctx);
-  }
-
-  // Hack to apply context-specific @escaping to a typealias with an underlying
-  // function type.
-  if (result->is<FunctionType>())
-    result = applyNonEscapingFromContext(DC, result, options);
-
-  // Check the availability of the type.
-
-  // We allow a type to conform to a protocol that is less available than
-  // the type itself. This enables a type to retroactively model or directly
-  // conform to a protocol only available on newer OSes and yet still be used on
-  // older OSes.
-  // To support this, inside inheritance clauses we allow references to
-  // protocols that are unavailable in the current type refinement context.
-
-  if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
-      !options.contains(TypeResolutionFlags::AllowUnavailable) &&
-      diagnoseAvailability(IdType, DC,
-             options.contains(TypeResolutionFlags::AllowUnavailableProtocol))) {
-    Components.back()->setInvalid();
-    return ErrorType::get(ctx);
-  }
-  
-  return result;
-}
-
 /// Validate whether type associated with @autoclosure attribute is correct,
 /// it supposed to be a function type with no parameters.
 /// \returns true if there was an error, false otherwise.
@@ -1831,6 +1777,8 @@ namespace {
                                 SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &results,
                                 Optional<SILResultInfo> &errorResult);
+    Type resolveIdentifierType(IdentTypeRepr *IdType,
+                               TypeResolutionOptions options);
     Type resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
                                   TypeResolutionOptions options);
     Type resolveArrayType(ArrayTypeRepr *repr,
@@ -1949,8 +1897,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
-    return TypeChecker::resolveIdentifierType(resolution.withOptions(options),
-                                              cast<IdentTypeRepr>(repr));
+    return resolveIdentifierType(cast<IdentTypeRepr>(repr), options);
 
   case TypeReprKind::Function: {
     if (!(options & TypeResolutionFlags::SILType)) {
@@ -3255,6 +3202,56 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 
   return resolveSingleSILResult(repr, options,
                                 yields, ordinaryResults, errorResult);
+}
+
+Type TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
+                                         TypeResolutionOptions options) {
+  auto ComponentRange = IdType->getComponentRange();
+  auto Components = llvm::makeArrayRef(ComponentRange.begin(),
+                                       ComponentRange.end());
+  Type result = resolveIdentTypeComponent(resolution.withOptions(options),
+                                          Components);
+  if (!result) return nullptr;
+
+  if (auto moduleTy = result->getAs<ModuleType>()) {
+    // Allow module types only if flag is specified.
+    if (options.contains(TypeResolutionFlags::AllowModule))
+      return moduleTy;
+    // Otherwise, emit an error.
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      auto moduleName = moduleTy->getModule()->getName();
+      diagnose(Components.back()->getNameLoc(),
+               diag::cannot_find_type_in_scope, DeclNameRef(moduleName));
+      diagnose(Components.back()->getNameLoc(),
+               diag::note_module_as_type, moduleName);
+    }
+    Components.back()->setInvalid();
+    return ErrorType::get(Context);
+  }
+
+  // Hack to apply context-specific @escaping to a typealias with an underlying
+  // function type.
+  if (result->is<FunctionType>())
+    result = applyNonEscapingFromContext(DC, result, options);
+
+  // Check the availability of the type.
+
+  // We allow a type to conform to a protocol that is less available than
+  // the type itself. This enables a type to retroactively model or directly
+  // conform to a protocol only available on newer OSes and yet still be used on
+  // older OSes.
+  // To support this, inside inheritance clauses we allow references to
+  // protocols that are unavailable in the current type refinement context.
+
+  if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
+      !options.contains(TypeResolutionFlags::AllowUnavailable) &&
+      diagnoseAvailability(IdType, DC,
+             options.contains(TypeResolutionFlags::AllowUnavailableProtocol))) {
+    Components.back()->setInvalid();
+    return ErrorType::get(Context);
+  }
+
+  return result;
 }
 
 Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
