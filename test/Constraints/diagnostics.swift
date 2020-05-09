@@ -1483,3 +1483,24 @@ func rdar62428353<T>(_ t: inout T) {
   let v = t // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   rdar62428353(v) // expected-error {{cannot pass immutable value as inout argument: 'v' is a 'let' constant}}
 }
+
+func rdar62989214() {
+  struct Flag {
+    var isTrue: Bool
+  }
+
+  @propertyWrapper @dynamicMemberLookup
+  struct Wrapper<Value> {
+    var wrappedValue: Value
+
+    subscript<Subject>(
+      dynamicMember keyPath: WritableKeyPath<Value, Subject>
+    ) -> Wrapper<Subject> {
+      get { fatalError() }
+    }
+  }
+
+  func test(arr: Wrapper<[Flag]>, flag: Flag) {
+    arr[flag].isTrue // expected-error {{cannot convert value of type 'Flag' to expected argument type 'Int'}}
+  }
+}

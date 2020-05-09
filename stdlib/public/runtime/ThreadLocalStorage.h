@@ -26,16 +26,6 @@
 # define SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC 1
 #endif
 
-// If we're using Clang, and Clang claims not to support thread_local,
-// it must be because we're on a platform that doesn't support it.
-#if __clang__ && !__has_feature(cxx_thread_local)
-// No thread_local.
-#else
-// Otherwise, we do have thread_local.
-# define SWIFT_TLS_HAS_THREADLOCAL 1
-static_assert(LLVM_ENABLE_THREADS, "LLVM_THREAD_LOCAL will use a global?");
-#endif
-
 #if SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
 // Use reserved TSD keys.
 # if __has_include(<pthread/tsd_private.h>)
@@ -92,6 +82,9 @@ typedef unsigned long __swift_thread_key_t;
 #  include <io.h>
 #  define WIN32_LEAN_AND_MEAN
 #  include <Windows.h>
+
+#include <type_traits>
+
 static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
               "__swift_thread_key_t is not a DWORD");
 

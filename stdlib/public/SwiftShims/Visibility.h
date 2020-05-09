@@ -30,6 +30,10 @@
 #define __has_builtin(builtin) 0
 #endif
 
+#if !defined(__has_cpp_attribute)
+#define __has_cpp_attribute(attribute) 0
+#endif
+
 #if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
@@ -70,6 +74,18 @@
 #define SWIFT_NOINLINE __attribute__((__noinline__))
 #else
 #define SWIFT_NOINLINE
+#endif
+
+#if __has_attribute(noreturn)
+#define SWIFT_NORETURN __attribute__((__noreturn__))
+#else
+#define SWIFT_NORETURN
+#endif
+
+#if __has_attribute(used)
+#define SWIFT_USED __attribute__((__used__))
+#else
+#define SWIFT_USED
 #endif
 
 #if __has_attribute(unavailable)
@@ -119,6 +135,26 @@
 #define SWIFT_RUNTIME_EXPORT extern "C" SWIFT_EXPORT_ATTRIBUTE
 #else
 #define SWIFT_RUNTIME_EXPORT SWIFT_EXPORT_ATTRIBUTE
+#endif
+
+#if __cplusplus > 201402l && __has_cpp_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH [[fallthrough]]
+#elif __has_cpp_attribute(gnu::fallthrough)
+#define SWIFT_FALLTHROUGH [[gnu::fallthrough]]
+#elif __has_cpp_attribute(clang::fallthrough)
+#define SWIFT_FALLTHROUGH [[clang::fallthrough]]
+#elif __has_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH __attribute__((__fallthrough__))
+#else
+#define SWIFT_FALLTHROUGH
+#endif
+
+#if __cplusplus >= 201402l && __has_cpp_attribute(nodiscard)
+#define SWIFT_NODISCARD [[nodiscard]]
+#elif __has_cpp_attribute(clang::warn_unused_result)
+#define SWIFT_NODISCARD [[clang::warn_unused_result]]
+#else
+#define SWIFT_NODISCARD
 #endif
 
 

@@ -3883,6 +3883,99 @@ class TestData : TestDataSuper {
             }
         }
     }
+
+    // This is a (potentially invalid) sequence that produces a configurable number of 42s and has a freely customizable `underestimatedCount`.
+    struct TestSequence: Sequence {
+        typealias Element = UInt8
+        struct Iterator: IteratorProtocol {
+            var _remaining: Int
+            init(_ count: Int) {
+                _remaining = count
+            }
+            mutating func next() -> UInt8? {
+                guard _remaining > 0 else { return nil }
+                _remaining -= 1
+                return 42
+            }
+        }
+        let underestimatedCount: Int
+        let count: Int
+
+        func makeIterator() -> Iterator {
+            return Iterator(count)
+        }
+    }
+
+    func test_init_TestSequence() {
+        // Underestimated count
+        do {
+            let d = Data(TestSequence(underestimatedCount: 0, count: 10))
+            expectEqual(10, d.count)
+            expectEqual(Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+
+        // Very underestimated count (to exercise realloc path)
+        do {
+            let d = Data(TestSequence(underestimatedCount: 0, count: 1000))
+            expectEqual(1000, d.count)
+            expectEqual(Array(repeating: 42 as UInt8, count: 1000), Array(d))
+        }
+
+        // Exact count
+        do {
+            let d = Data(TestSequence(underestimatedCount: 10, count: 10))
+            expectEqual(10, d.count)
+            expectEqual(Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+
+        // Overestimated count. This is an illegal case, so trapping would be fine.
+        // However, for compatibility with the implementation in Swift 5, Data
+        // handles this case by simply truncating itself to the actual size.
+        do {
+            let d = Data(TestSequence(underestimatedCount: 20, count: 10))
+            expectEqual(10, d.count)
+            expectEqual(Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+    }
+
+    func test_append_TestSequence() {
+        let base = Data(Array(repeating: 23 as UInt8, count: 10))
+
+        // Underestimated count
+        do {
+            var d = base
+            d.append(contentsOf: TestSequence(underestimatedCount: 0, count: 10))
+            expectEqual(20, d.count)
+            expectEqual(Array(base) + Array(repeating: 42 as UInt8, count: 10),
+                           Array(d))
+        }
+
+        // Very underestimated count (to exercise realloc path)
+        do {
+            var d = base
+            d.append(contentsOf: TestSequence(underestimatedCount: 0, count: 1000))
+            expectEqual(1010, d.count)
+            expectEqual(Array(base) + Array(repeating: 42 as UInt8, count: 1000), Array(d))
+        }
+
+        // Exact count
+        do {
+            var d = base
+            d.append(contentsOf: TestSequence(underestimatedCount: 10, count: 10))
+            expectEqual(20, d.count)
+            expectEqual(Array(base) + Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+
+        // Overestimated count. This is an illegal case, so trapping would be fine.
+        // However, for compatibility with the implementation in Swift 5, Data
+        // handles this case by simply truncating itself to the actual size.
+        do {
+            var d = base
+            d.append(contentsOf: TestSequence(underestimatedCount: 20, count: 10))
+            expectEqual(20, d.count)
+            expectEqual(Array(base) + Array(repeating: 42 as UInt8, count: 10), Array(d))
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -3968,8 +4061,7 @@ DataTests.test("test_validateMutation_slice_withUnsafeMutableBytes") { TestData(
 DataTests.test("test_validateMutation_slice_appendBytes") { TestData().test_validateMutation_slice_appendBytes() }
 DataTests.test("test_validateMutation_slice_appendData") { TestData().test_validateMutation_slice_appendData() }
 DataTests.test("test_validateMutation_slice_appendBuffer") { TestData().test_validateMutation_slice_appendBuffer() }
-// rdar://62866069
-//DataTests.test("test_validateMutation_slice_appendSequence") { TestData().test_validateMutation_slice_appendSequence() }
+DataTests.test("test_validateMutation_slice_appendSequence") { TestData().test_validateMutation_slice_appendSequence() }
 DataTests.test("test_validateMutation_slice_appendContentsOf") { TestData().test_validateMutation_slice_appendContentsOf() }
 DataTests.test("test_validateMutation_slice_resetBytes") { TestData().test_validateMutation_slice_resetBytes() }
 DataTests.test("test_validateMutation_slice_replaceSubrange") { TestData().test_validateMutation_slice_replaceSubrange() }
@@ -4017,8 +4109,7 @@ DataTests.test("test_validateMutation_slice_immutableBacking_withUnsafeMutableBy
 DataTests.test("test_validateMutation_slice_immutableBacking_appendBytes") { TestData().test_validateMutation_slice_immutableBacking_appendBytes() }
 DataTests.test("test_validateMutation_slice_immutableBacking_appendData") { TestData().test_validateMutation_slice_immutableBacking_appendData() }
 DataTests.test("test_validateMutation_slice_immutableBacking_appendBuffer") { TestData().test_validateMutation_slice_immutableBacking_appendBuffer() }
-// rdar://62866069
-//DataTests.test("test_validateMutation_slice_immutableBacking_appendSequence") { TestData().test_validateMutation_slice_immutableBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_immutableBacking_appendSequence") { TestData().test_validateMutation_slice_immutableBacking_appendSequence() }
 DataTests.test("test_validateMutation_slice_immutableBacking_appendContentsOf") { TestData().test_validateMutation_slice_immutableBacking_appendContentsOf() }
 DataTests.test("test_validateMutation_slice_immutableBacking_resetBytes") { TestData().test_validateMutation_slice_immutableBacking_resetBytes() }
 DataTests.test("test_validateMutation_slice_immutableBacking_replaceSubrange") { TestData().test_validateMutation_slice_immutableBacking_replaceSubrange() }
@@ -4114,8 +4205,7 @@ DataTests.test("test_validateMutation_slice_customBacking_withUnsafeMutableBytes
 DataTests.test("test_validateMutation_slice_customBacking_appendBytes") { TestData().test_validateMutation_slice_customBacking_appendBytes() }
 DataTests.test("test_validateMutation_slice_customBacking_appendData") { TestData().test_validateMutation_slice_customBacking_appendData() }
 DataTests.test("test_validateMutation_slice_customBacking_appendBuffer") { TestData().test_validateMutation_slice_customBacking_appendBuffer() }
-// rdar://62866069
-//DataTests.test("test_validateMutation_slice_customBacking_appendSequence") { TestData().test_validateMutation_slice_customBacking_appendSequence() }
+DataTests.test("test_validateMutation_slice_customBacking_appendSequence") { TestData().test_validateMutation_slice_customBacking_appendSequence() }
 DataTests.test("test_validateMutation_slice_customBacking_appendContentsOf") { TestData().test_validateMutation_slice_customBacking_appendContentsOf() }
 DataTests.test("test_validateMutation_slice_customBacking_resetBytes") { TestData().test_validateMutation_slice_customBacking_resetBytes() }
 DataTests.test("test_validateMutation_slice_customBacking_replaceSubrange") { TestData().test_validateMutation_slice_customBacking_replaceSubrange() }
@@ -4211,6 +4301,8 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
 }
 DataTests.test("test_increaseCount") { TestData().test_increaseCount() }
 DataTests.test("test_decreaseCount") { TestData().test_decreaseCount() }
+DataTests.test("test_increaseCount") { TestData().test_init_TestSequence() }
+DataTests.test("test_decreaseCount") { TestData().test_append_TestSequence() }
 
 
 // XCTest does not have a crash detection, whereas lit does

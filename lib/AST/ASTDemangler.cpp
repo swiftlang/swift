@@ -452,6 +452,7 @@ getParameterDifferentiability(ImplParameterDifferentiability diffKind) {
   case ImplParameterDifferentiability::NotDifferentiable:
     return SILParameterDifferentiability::NotDifferentiable;
   }
+  llvm_unreachable("unknown differentiability kind");
 }
 
 static ResultConvention getResultConvention(ImplResultConvention conv) {

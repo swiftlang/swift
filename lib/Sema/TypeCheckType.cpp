@@ -694,6 +694,7 @@ static Type checkContextualRequirements(Type type,
   case RequirementCheckResult::Success:
     return type;
   }
+  llvm_unreachable("invalid requirement check type");
 }
 
 static void diagnoseUnboundGenericType(Type ty, SourceLoc loc);

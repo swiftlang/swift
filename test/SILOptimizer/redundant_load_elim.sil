@@ -1225,3 +1225,22 @@ bb0(%0 : $*Int):
   %3 = tuple()
   return %3 : $()
 }
+
+// Check that begin_access, end_access, strong_release, set_deallocating, and dealloc_ref don't prevent optimization.
+// CHECK-LABEL: ignore_read_write
+// CHECK: bb0
+// CHECK-NOT: load
+// CHECK-LABEL: end sil function 'ignore_read_write'
+sil @ignore_read_write : $@convention(thin) () -> Int32 {
+bb0:
+  %1 = alloc_ref [stack] $AX
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = ref_element_addr %1 : $AX, #AX.current
+  store %3 to %4 : $*Int32
+  %5 = load %4 : $*Int32
+  set_deallocating %1 : $AX
+  dealloc_ref %1 : $AX
+  dealloc_ref [stack] %1 : $AX
+  return %5 : $Int32
+}

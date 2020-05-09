@@ -1079,6 +1079,7 @@ namespace driver {
                      forRanges, "file is up-to-date and output exists");
         return false;
       }
+      llvm_unreachable("invalid job condition");
     }
 
     bool isCascadingJobAccordingToCondition(
@@ -1092,6 +1093,7 @@ namespace driver {
       case Job::Condition::CheckDependencies:
         return false;
       }
+      llvm_unreachable("invalid job condition");
     }
 
     void forEachOutOfDateExternalDependency(

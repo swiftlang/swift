@@ -243,7 +243,7 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
   TokReceiver->finalize();
 }
 
-void Parser::parseTopLevelSIL() {
+bool Parser::parseTopLevelSIL() {
   assert(SIL && isInSILMode());
 
   // Prime the lexer.
@@ -255,6 +255,7 @@ void Parser::parseTopLevelSIL() {
       skipSingle();
   };
 
+  auto hadError = false;
   while (!Tok.is(tok::eof)) {
     // If we run into a Swift decl, skip over until we find the next SIL decl.
     if (isStartOfSwiftDecl()) {
@@ -271,6 +272,7 @@ void Parser::parseTopLevelSIL() {
       if (SIL->parse##NAME(*this)) {                                           \
         Lexer::SILBodyRAII sbr(*L);                                            \
         skipToNextSILDecl();                                                   \
+        hadError = true;                                                       \
       }                                                                        \
       break;                                                                   \
     }
@@ -290,9 +292,11 @@ void Parser::parseTopLevelSIL() {
       // or a SIL decl. Emit an error and skip ahead to the next SIL decl.
       diagnose(Tok, diag::expected_sil_keyword);
       skipToNextSILDecl();
+      hadError = true;
       break;
     }
   }
+  return hadError;
 }
 
 ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
@@ -1858,6 +1862,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         return makeParserError();
       }
       }
+      llvm_unreachable("invalid next segment kind");
     }).isError() || SuppressLaterDiags) {
       return false;
     }

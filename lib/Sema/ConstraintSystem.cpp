@@ -3523,6 +3523,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
+    case ConstraintLocator::KeyPathDynamicMember: {
+      // Key path dynamic member lookup should be completely transparent.
+      path = path.slice(1);
+      continue;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -4095,6 +4101,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
     // parameter.
     return ConversionEphemeralness::NonEphemeral;
   }
+  llvm_unreachable("invalid conversion restriction kind");
 }
 
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
@@ -4399,6 +4406,7 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   case CTP_CannotFail:
     return false;
   }
+  llvm_unreachable("invalid contextual type");
 }
 
 /// Given a specific expression and the remnants of the failed constraint

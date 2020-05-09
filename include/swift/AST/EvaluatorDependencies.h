@@ -94,6 +94,7 @@ inline DependencyScope getScopeForAccessLevel(AccessLevel l) {
   case AccessLevel::Open:
     return DependencyScope::Cascading;
   }
+  llvm_unreachable("invalid access level kind");
 }
 
 // A \c DependencySource is currently defined to be a parent source file and
@@ -258,6 +259,7 @@ private:
     case Mode::ExperimentalPrivateDependencies:
       return false;
     }
+    llvm_unreachable("invalid mode");
   }
 };
 } // end namespace evaluator

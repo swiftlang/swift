@@ -90,7 +90,7 @@ function(handle_swift_sources
 
     # FIXME: We shouldn't /have/ to build things in a single process.
     # <rdar://problem/15972329>
-    list(APPEND swift_compile_flags "-force-single-frontend-invocation")
+    list(APPEND swift_compile_flags "-whole-module-optimization")
 
     _compile_swift_files(
         dependency_target

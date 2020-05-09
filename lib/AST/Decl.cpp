@@ -656,6 +656,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   case FileUnitKind::DWARFModule:
     return SourceLoc();
   }
+  llvm_unreachable("invalid file kind");
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
@@ -3551,7 +3552,10 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   case AccessLevel::Public:
   case AccessLevel::Open: {
     if (useDC && VD->isSPI()) {
-      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      auto useModuleScopeContext = useDC->getModuleScopeContext();
+      if (useModuleScopeContext == sourceDC->getModuleScopeContext()) return true;
+
+      auto *useSF = dyn_cast<SourceFile>(useModuleScopeContext);
       return !useSF || useSF->isImportedAsSPI(VD);
     }
     return true;
@@ -6349,6 +6353,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::EmptyDictionary:
     return true;
   }
+  llvm_unreachable("invalid default argument kind");
 }
 
 Expr *ParamDecl::getTypeCheckedDefaultExpr() const {

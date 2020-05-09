@@ -571,8 +571,7 @@ bool UnqualifiedLookupFactory::wouldUseASTScopesForLookupIfItWereEnabled()
     const {
   if (!Loc.isValid())
     return false;
-  const auto *const SF = DC->getParentSourceFile();
-  return SF && SF->isSuitableForASTScopes();
+  return (bool) DC->getParentSourceFile();
 }
 
 #pragma mark context-based lookup definitions
