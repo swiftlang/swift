@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "inst-opt-utils"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SemanticAttrs.h"
@@ -2041,4 +2042,120 @@ swift::cloneFullApplySiteReplacingCallee(FullApplySite applySite,
   }
   }
   llvm_unreachable("Unhandled case?!");
+}
+
+SILFunction *swift::getDestructor(SILValue value) {
+  // We only support classes.
+  ClassDecl *ClsDecl = value->getType().getClassOrBoundGenericClass();
+  if (!ClsDecl)
+    return nullptr;
+
+  // Look up the destructor of ClsDecl.
+  DestructorDecl *Destructor = ClsDecl->getDestructor();
+  assert(Destructor && "getDestructor() should never return a nullptr.");
+
+  // Find the destructor name via SILDeclRef.
+  // FIXME: When destructors get moved into vtables, update this to use the
+  // vtable for the class.
+  SILDeclRef Ref(Destructor);
+  SILFunction *Fn = value->getModule()->lookUpFunction(Ref);
+  if (!Fn || Fn->empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "    Could not find destructor.\n");
+    return nullptr;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "    Found destructor!\n");
+
+  // If the destructor has an objc_method calling convention, we cannot
+  // analyze it since it could be swapped out from under us at runtime.
+  if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
+    LLVM_DEBUG(llvm::dbgs() << "        Found Objective-C destructor. Can't "
+                               "analyze!\n");
+    return nullptr;
+  }
+
+  return Fn;
+}
+
+bool swift::doesDestructorHaveSideEffects(SILValue value) {
+  SILFunction *Fn = getDestructor(value);
+  // If we can't find a constructor then assume it has side effects.
+  if (!Fn)
+    return true;
+
+  // A destructor only has one argument, self.
+  assert(Fn->begin()->getNumArguments() == 1 &&
+         "Destructor should have only one argument, self.");
+  SILArgument *Self = Fn->begin()->getArgument(0);
+
+  LLVM_DEBUG(llvm::dbgs() << "    Analyzing destructor.\n");
+
+  // For each BB in the destructor...
+  for (auto &BB : *Fn)
+    // For each instruction I in BB...
+    for (auto &I : BB) {
+      LLVM_DEBUG(llvm::dbgs() << "        Visiting: " << I);
+
+      // If I has no side effects, we can ignore it.
+      if (!I.mayHaveSideEffects()) {
+        LLVM_DEBUG(llvm::dbgs() << "            SAFE! Instruction has no side "
+                                   "effects.\n");
+        continue;
+      }
+
+      // RefCounting operations on Self are ok since we are already in the
+      // destructor. RefCountingOperations on other instructions could have side
+      // effects though.
+      if (auto *RefInst = dyn_cast<RefCountingInst>(&I)) {
+        if (stripCasts(RefInst->getOperand(0)) == Self) {
+          // For now all ref counting insts have 1 operand. Put in an assert
+          // just in case.
+          assert(RefInst->getNumOperands() == 1 &&
+                 "Make sure RefInst only has one argument.");
+          LLVM_DEBUG(llvm::dbgs() << "            SAFE! Ref count operation on "
+                                     "Self.\n");
+          continue;
+        } else {
+          LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
+                                     "not on self.\n");
+          return true;
+        }
+      }
+
+      // dealloc_stack can be ignored.
+      if (isa<DeallocStackInst>(I)) {
+        LLVM_DEBUG(llvm::dbgs() << "            SAFE! dealloc_stack can be "
+                                   "ignored.\n");
+        continue;
+      }
+
+      // dealloc_ref on self can be ignored, but dealloc_ref on anything else
+      // cannot be eliminated.
+      if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
+        if (stripCasts(DeallocRef->getOperand()) == Self) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "            SAFE! dealloc_ref on self.\n");
+          continue;
+        } else {
+          LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! dealloc_ref on value "
+                                     "besides self.\n");
+          return true;
+        }
+      }
+
+      // Storing into the object can be ignored.
+      if (auto *SI = dyn_cast<StoreInst>(&I))
+        if (stripAddressProjections(SI->getDest()) == Self) {
+          LLVM_DEBUG(llvm::dbgs() << "            SAFE! Instruction is a store "
+                                     "into self.\n");
+          continue;
+        }
+
+      LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Unknown instruction.\n");
+      // Otherwise, we can't remove the deallocation completely.
+      return true;
+    }
+
+  // We didn't find any side effects.
+  return false;
 }

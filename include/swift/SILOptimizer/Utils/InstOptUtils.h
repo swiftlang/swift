@@ -587,6 +587,16 @@ FullApplySite cloneFullApplySiteReplacingCallee(FullApplySite applySite,
                                                 SILValue newCallee,
                                                 SILBuilderContext &builderCtx);
 
+/// Analyze the destructor for the class of \p value to see if any instructions in it could have side effects on
+/// the program outside the destructor. If the destructor is not a class or cannot be analyzed returns true.
+bool doesDestructorHaveSideEffects(SILValue value);
+
+/// Returns the destructor of the class \p value if it is visiable and can be analyzed. If the \p value is not
+/// a class, is not visiable, or cannot be analyzed, returns nullptr.
+///
+/// Note: analyzing the body of this class destructor is valid because the object is dead. This means that the
+/// object is never passed to objc_setAssociatedObject, so its destructor cannot be extended at runtime.
+SILFunction *getDestructor(SILValue value);
 } // end namespace swift
 
 #endif
