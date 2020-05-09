@@ -4,6 +4,14 @@ protocol Protocol: Differentiable {
   // Test cross-file `@differentiable` attribute.
   @differentiable(wrt: self)
   func identityDifferentiableAttr() -> Self
+
+  // Test `@differentiable` propagation from storage declaration to accessors.
+  @differentiable
+  var property: Float { get set }
+
+  // Test `@differentiable` propagation from storage declaration to accessors.
+  @differentiable
+  subscript() -> Float { get set }
 }
 
 extension Protocol {
@@ -15,5 +23,21 @@ extension Protocol {
     value: Self, pullback: (TangentVector) -> TangentVector
   ) {
     fatalError()
+  }
+}
+
+class Class: Differentiable {
+  // Test `@differentiable` propagation from storage declaration to accessors.
+  @differentiable
+  var property: Float {
+    get { 1 }
+    set {}
+  }
+
+  // Test `@differentiable` propagation from storage declaration to accessors.
+  @differentiable
+  subscript() -> Float {
+    get { 1 }
+    set {}
   }
 }
