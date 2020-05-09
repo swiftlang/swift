@@ -1686,12 +1686,6 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
       continue;
 
     if (next->getName() != getParentModule()->getName()) {
-      // Hack: Assume other REPL files already have their libraries linked.
-      if (!next->getFiles().empty())
-        if (auto *nextSource = dyn_cast<SourceFile>(next->getFiles().front()))
-          if (nextSource->Kind == SourceFileKind::REPL)
-            continue;
-
       next->collectLinkLibraries(callback);
     }
 
@@ -2461,7 +2455,6 @@ bool SourceFile::shouldCollectToken() const {
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
     return (bool)AllCorrectedTokens;
-  case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;
   }
@@ -2478,7 +2471,6 @@ bool SourceFile::canBeParsedInFull() const {
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
     return true;
-  case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;
   }
@@ -2490,7 +2482,7 @@ bool SourceFile::hasDelayedBodyParsing() const {
     return false;
 
   // Not supported right now.
-  if (Kind == SourceFileKind::REPL || Kind == SourceFileKind::SIL)
+  if (Kind == SourceFileKind::SIL)
     return false;
   if (hasInterfaceHash())
     return false;

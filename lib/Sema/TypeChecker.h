@@ -574,8 +574,6 @@ Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
 
 void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-void processREPLTopLevel(SourceFile &SF);
-
 void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);

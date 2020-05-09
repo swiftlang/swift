@@ -900,7 +900,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
-  SourceFile &SF = CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL);
+  SourceFile &SF = CI.getMainModule()->getMainSourceFile(SourceFileKind::Main);
 
   REPLCompletions REPLCompl;
   REPLCompl.populate(SF, BufferText);
@@ -1656,7 +1656,7 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
   if (isSourceInputComplete(std::move(FileBuf),
-                            SourceFileKind::REPL).IsComplete) {
+                            SourceFileKind::Main).IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
