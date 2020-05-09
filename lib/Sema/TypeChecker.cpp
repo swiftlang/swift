@@ -320,7 +320,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // scope-based lookups. Only the top-level scopes because extensions have not
   // been bound yet.
   auto &Ctx = SF->getASTContext();
-  if (Ctx.LangOpts.EnableASTScopeLookup && SF->isSuitableForASTScopes())
+  if (Ctx.LangOpts.EnableASTScopeLookup)
     SF->getScope()
         .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 

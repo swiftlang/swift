@@ -3505,6 +3505,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
+    case ConstraintLocator::KeyPathDynamicMember: {
+      // Key path dynamic member lookup should be completely transparent.
+      path = path.slice(1);
+      continue;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
