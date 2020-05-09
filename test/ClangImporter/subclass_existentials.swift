@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -o - -primary-file %s -swift-version 4
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -o - -primary-file %s -I %S/Inputs/custom-modules/
 
 // REQUIRES: objc_interop
 
 import Foundation
+import SubclassExistentialsExtra
 
 class SwiftLaundryService : NSLaundry {
   var g: (Garment & Coat)? = nil
@@ -20,7 +21,7 @@ class SwiftLaundryService : NSLaundry {
 
 // FIXME: Consider better diagnostics here.
 
-class OldSwiftLaundryService : NSLaundry {
+class OldSwiftLaundryService : NSLaundry { 
 // expected-error@-1 {{type 'OldSwiftLaundryService' does not conform to protocol 'NSLaundry'}}
 
   var g: Coat? = nil
@@ -39,3 +40,12 @@ class OldSwiftLaundryService : NSLaundry {
 // Make sure the method lookup is not ambiguous
 
 _ = Coat.fashionStatement.wear()
+
+
+func testInheritanceFromComposition(_ object: CompositionSubObject, _ specific: CompositionSubSpecific) {
+  let _: NSObject = object
+  let _: NSCopying = object
+
+  let _: SomeSpecificSubclass = specific
+  let _: NSCopying = specific
+}

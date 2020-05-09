@@ -24,14 +24,14 @@ namespace llvm {
 
 namespace swift {
 
-class SILPHIArgument;
+class SILPhiArgument;
 class SILBasicBlock;
 class SILType;
 class SILUndef;
 
 /// Independent utility that canonicalizes BB arguments by reusing structurally
 /// equivalent arguments and replacing the original arguments with casts.
-SILInstruction *replaceBBArgWithCast(SILPHIArgument *Arg);
+SILValue replaceBBArgWithCast(SILPhiArgument *Arg);
 
 /// This class updates SSA for a set of SIL instructions defined in multiple
 /// blocks.
@@ -39,8 +39,8 @@ class SILSSAUpdater {
   friend class llvm::SSAUpdaterTraits<SILSSAUpdater>;
 
   // A map of basic block to available phi value.
-  // using AvailableValsTy = llvm::DenseMap<SILBasicBlock *, SILValue>;
-  void *AV;
+  using AvailableValsTy = llvm::DenseMap<SILBasicBlock *, SILValue>;
+  std::unique_ptr<AvailableValsTy> AV;
 
   SILType ValType;
 
@@ -49,7 +49,7 @@ class SILSSAUpdater {
   std::unique_ptr<SILUndef, void(*)(SILUndef *)> PHISentinel;
 
   // If not null updated with inserted 'phi' nodes (SILArgument).
-  SmallVectorImpl<SILPHIArgument *> *InsertedPHIs;
+  SmallVectorImpl<SILPhiArgument *> *InsertedPHIs;
 
   // Not copyable.
   void operator=(const SILSSAUpdater &) = delete;
@@ -57,19 +57,23 @@ class SILSSAUpdater {
 
 public:
   explicit SILSSAUpdater(
-      SmallVectorImpl<SILPHIArgument *> *InsertedPHIs = nullptr);
+      SmallVectorImpl<SILPhiArgument *> *InsertedPHIs = nullptr);
   ~SILSSAUpdater();
 
-  /// \brief Initialize for a use of a value of type.
+  void setInsertedPhis(SmallVectorImpl<SILPhiArgument *> *insertedPhis) {
+    InsertedPHIs = insertedPhis;
+  }
+
+  /// Initialize for a use of a value of type.
   void Initialize(SILType T);
 
   bool HasValueForBlock(SILBasicBlock *BB) const;
   void AddAvailableValue(SILBasicBlock *BB, SILValue V);
 
-  /// \brief Construct SSA for a value that is live at the *end* of a basic block.
+  /// Construct SSA for a value that is live at the *end* of a basic block.
   SILValue GetValueAtEndOfBlock(SILBasicBlock *BB);
 
-  /// \brief Construct SSA for a value that is live in the middle of a block.
+  /// Construct SSA for a value that is live in the middle of a block.
   /// This handles the case where the use is before a definition of the value.
   ///  BB1:
   ///    val_1 = def
@@ -92,7 +96,7 @@ private:
   SILValue GetValueAtEndOfBlockInternal(SILBasicBlock *BB);
 };
 
-/// \brief Utility to wrap 'Operand's to deal with invalidation of
+/// Utility to wrap 'Operand's to deal with invalidation of
 /// ValueUseIterators during SSA construction.
 ///
 /// Uses in branches change under us - we need to identify them by an
@@ -120,7 +124,7 @@ class UseWrapper {
 
 public:
 
-  /// \brief Construct a use wrapper. For branches we store information so that
+  /// Construct a use wrapper. For branches we store information so that
   /// we can reconstruct the use after the branch has been modified.
   ///
   /// When a branch is modified existing pointers to the operand
@@ -129,8 +133,10 @@ public:
   /// reconstruct the use.
   UseWrapper(Operand *Use);
 
+  Operand *getOperand();
+
   /// Return the operand we wrap. Reconstructing branch operands.
-  operator Operand*();
+  operator Operand*() { return getOperand(); }
 };
 
 } // end namespace swift

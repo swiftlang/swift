@@ -1,0 +1,213 @@
+// RUN: %target-sil-opt -access-enforcement-dom %s -enable-sil-verify-all | %FileCheck %s
+//
+// Test AccessEnforcementDom in the presence of calls.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+@_hasInitialValue @_hasStorage var globalInt: Int64 { get set }
+
+// globalInt
+sil_global hidden @globalInt : $Int64
+
+// readGlobal
+sil hidden [noinline] @readGlobal : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = global_addr @globalInt : $*Int64
+  %1 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*Int64
+  %2 = struct_element_addr %1 : $*Int64, #Int64._value
+  %3 = load %2 : $*Builtin.Int64
+  end_access %1 : $*Int64
+  return %3 : $Builtin.Int64
+}
+
+// writeGlobal
+sil hidden [noinline] @writeGlobal : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalInt : $*Int64
+  %1 = begin_access [modify] [dynamic] [no_nested_conflict] %0 : $*Int64
+  %2 = integer_literal $Builtin.Int64, 3
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to %1 : $*Int64
+  end_access %1 : $*Int64
+  %v = tuple ()
+  return %v : $()
+}
+
+// (read, read-call), read
+// Yes, can optimize when the dominating access has a nested call.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingRDRC_RD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingRDRC_RD'
+sil hidden [noinline] @testDominatingRDRC_RD : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalInt : $*Int64
+  %1 = begin_access [read] [dynamic] %0 : $*Int64
+  %4 = function_ref @readGlobal : $@convention(thin) () -> Builtin.Int64
+  %5 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  end_access %1 : $*Int64
+  %13 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*Int64
+  end_access %13 : $*Int64
+  %16 = tuple ()
+  return %16 : $()
+}
+
+// (read, read-call), modify
+// No, cannot promote a read with a nested call.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingRDRC_MD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingRDRC_MD'
+sil hidden [noinline] @testDominatingRDRC_MD : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalInt : $*Int64
+  %1 = begin_access [read] [dynamic] %0 : $*Int64
+  %4 = function_ref @readGlobal : $@convention(thin) () -> Builtin.Int64
+  %5 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  end_access %1 : $*Int64
+  %13 = begin_access [modify] [dynamic] [no_nested_conflict] %0 : $*Int64
+  end_access %13 : $*Int64
+  %16 = tuple ()
+  return %16 : $()
+}
+
+// (modify, read-call), read
+// Yes, can optimize when the dominating access has a nested call.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingMDRC_RD : $@convention(thin) () -> () {
+// CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingMDRC_RD'
+sil hidden [noinline] @testDominatingMDRC_RD : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalInt : $*Int64
+  %1 = begin_access [modify] [dynamic] %0 : $*Int64
+  %4 = function_ref @readGlobal : $@convention(thin) () -> Builtin.Int64
+  %5 = apply %4() : $@convention(thin) () -> Builtin.Int64
+  end_access %1 : $*Int64
+  %13 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*Int64
+  end_access %13 : $*Int64
+  %16 = tuple ()
+  return %16 : $()
+}
+
+// -----------------------------------------------------------------------------
+// Accessors
+
+public class C {
+  @_hasStorage @_hasInitialValue public var field: Int64 { get set }
+}
+
+sil_property #C.field ()
+
+sil hidden [transparent] @CFieldModify : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64 {
+bb0(%0 : $C):
+  debug_value %0 : $C, let, name "self", argno 1  // id: %1
+  %2 = ref_element_addr %0 : $C, #C.field         // user: %3
+  %3 = begin_access [modify] [dynamic] %2 : $*Int64 // users: %5, %8, %4
+  yield %3 : $*Int64, resume bb1, unwind bb2      // id: %4
+
+bb1:                                              // Preds: bb0
+  end_access %3 : $*Int64                         // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+
+bb2:                                              // Preds: bb0
+  end_access %3 : $*Int64                         // id: %8
+  unwind                                          // id: %9
+} // end sil function '$s1t1CC5fields5Int64VvM'
+
+sil_vtable C {
+  #C.field!modify: (C) -> () -> () : @CFieldModify
+}
+
+// No, cannot optimize an access within a coroutine.
+// CHECK-LABEL: sil @testDominatingRD_ARD : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: begin_access [read] [dynamic]
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'testDominatingRD_ARD'
+sil @testDominatingRD_ARD : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %ra = ref_element_addr %0 : $C, #C.field         // user: %3
+  %a1 = begin_access [read] [dynamic] %ra : $*Int64
+  end_access %a1 : $*Int64
+  %m = class_method %0 : $C, #C.field!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
+  (%3, %4) = begin_apply %m(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
+  %a2 = begin_access [read] [dynamic] [no_nested_conflict] %ra : $*Int64
+  end_access %a2 : $*Int64
+  end_apply %4
+  %v = tuple ()
+  return %v : $()
+}
+
+// Yes, can optimize when the dominating access is inside a coroutine.
+// CHECK-LABEL: sil @testDominatingRDA_RD : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: begin_access [read] [dynamic]
+// CHECK: begin_access [read] [static] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'testDominatingRDA_RD'
+sil @testDominatingRDA_RD : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %m = class_method %0 : $C, #C.field!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
+  (%3, %4) = begin_apply %m(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
+  %ra = ref_element_addr %0 : $C, #C.field         // user: %3
+  %a1 = begin_access [read] [dynamic] %ra : $*Int64
+  end_access %a1 : $*Int64
+  end_apply %4
+  %a2 = begin_access [read] [dynamic] [no_nested_conflict] %ra : $*Int64
+  end_access %a2 : $*Int64
+  %v = tuple ()
+  return %v : $()
+}
+
+// No, cannot promote an access within a coroutine.
+// CHECK-LABEL: sil @testDominatingRDA_MD : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: begin_access [read] [dynamic]
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'testDominatingRDA_MD'
+sil @testDominatingRDA_MD : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %m = class_method %0 : $C, #C.field!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
+  (%3, %4) = begin_apply %m(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
+  %ra = ref_element_addr %0 : $C, #C.field         // user: %3
+  %a1 = begin_access [read] [dynamic] %ra : $*Int64
+  end_access %a1 : $*Int64
+  end_apply %4
+  %a2 = begin_access [modify] [dynamic] [no_nested_conflict] %ra : $*Int64
+  end_access %a2 : $*Int64
+  %v = tuple ()
+  return %v : $()
+}
+
+// No, cannot guard an access inside a coroutine with a preheader check.
+// CHECK-LABEL: sil @testDomLoopAMD : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: begin_apply
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict]
+// CHECK: end_apply
+// CHECK-LABEL: } // end sil function 'testDomLoopAMD'
+sil @testDomLoopAMD : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  br bb1
+  
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+  
+bb3:
+  %m = class_method %0 : $C, #C.field!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
+  (%3, %4) = begin_apply %m(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
+  %ra = ref_element_addr %0 : $C, #C.field         // user: %3
+  %a1 = begin_access [modify] [dynamic] [no_nested_conflict] %ra : $*Int64
+  end_access %a1 : $*Int64
+  end_apply %4
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb2, bb4
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}

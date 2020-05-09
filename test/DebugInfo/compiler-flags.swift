@@ -1,23 +1,22 @@
-// Check that the sdk and resource dirs end up in the debug info.
-// RUN: %target-swiftc_driver %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swiftc_driver %s -emit-ir -sdk "/Weird Location/SDK" -g -o - | %FileCheck --check-prefix CHECK-EXPLICIT %s
-// CHECK:          !DICompileUnit({{.*}}producer: "{{(Apple )?Swift version [^"]+}}"
+// Check that the sdk and resource dirs end up in the debug info if we pass the
+// frontend flag. This tests the general functionality; we test the macosx
+// specific toolchain logic in compiler-flags-macosx.swift.
+
+// RUN: %target-swiftc_driver %s -emit-ir -debug-info-store-invocation -g -o - | %FileCheck %s
+// RUN: %target-swiftc_driver %s -emit-ir -debug-info-store-invocation -sdk "/Weird Location/SDK" -g -o - | %FileCheck --check-prefix CHECK-EXPLICIT %s
+// CHECK:          !DICompileUnit({{.*}}producer: "{{[^"]*Swift version [^"]+}}"
 // CHECK-SAME:                    flags: "
 // CHECK-NOT:                     "
 // CHECK-SAME:                    -resource-dir 
-// CHECK-EXPLICIT: !DICompileUnit({{.*}}producer: "{{(Apple )?Swift version [^"]+}}"
+// CHECK-EXPLICIT: !DICompileUnit({{.*}}producer: "{{[^"]*Swift version [^"]+}}"
 // CHECK-EXPLICIT-SAME:           flags: "
 // CHECK-EXPLICIT-NOT:            "
 // CHECK-EXPLICIT-SAME:           -sdk \22/Weird Location/SDK\22
 // CHECK-EXPLICIT-NOT:            "
 // CHECK-EXPLICIT-SAME:           -resource-dir 
 
+// Check that we don't write temporary file names in the debug info
+// RUN: env TMP=abc/def TMPDIR=abc/def %target-swift-frontend %s -I abc/def/xyz -g -emit-ir -debug-info-store-invocation -o - | %FileCheck --check-prefix CHECK-TEMP %s
+// RUN: env TMP=%t TMPDIR=%t %target-swift-frontend %s -I %t/xyz -g -emit-ir -debug-info-store-invocation -o - | %FileCheck --check-prefix CHECK-TEMP %s
+// CHECK-TEMP: !DICompileUnit({{.*}} flags: "{{.*}} -I {{(\\22)?}}<temporary-file>
 
-// Check that we tune the debug output for LLDB.
-// Adapted from llvm/test/DebugInfo/X86/debugger-tune.ll
-// RUN: %target-swiftc_driver -emit-object -g %s -o %t
-// RUN: llvm-readobj -sections %t | %FileCheck --check-prefix=CHECK-LLDB %s
-
-// CHECK-LLDB-NOT: debug_pubnames
-// CHECK-LLDB:     apple_names
-// CHECK-LLDB-NOT: debug_pubnames

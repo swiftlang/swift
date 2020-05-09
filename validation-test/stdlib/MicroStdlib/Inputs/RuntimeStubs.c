@@ -1,12 +1,24 @@
-int _T0Bi32_N;
-int _T0Bi64_N;
-int _T0Bi8_N;
-void _swift_getEnumCaseSinglePayload(void) {}
-void _swift_getGenericMetadata(void) {}
-void _swift_slowAlloc(void) {}
-void _swift_slowDealloc(void) {}
-void _swift_storeEnumTagSinglePayload(void) {}
+int $sBi32_N;
+int $sBi64_N;
+int $sBi8_N;
+int $sBwN;
+int $sBpN;
+int $sBi32_WV;
+int $sBi64_WV;
+int $sBi8_WV;
+void swift_getGenericMetadata(void) {}
+void swift_checkMetadataState(void) {}
+void swift_slowAlloc(void) {}
+void swift_slowDealloc(void) {}
 void swift_allocateGenericValueMetadata(void) {}
-void swift_initEnumValueWitnessTableSinglePayload(void) {}
-void _swift_retain(){}
+void swift_initEnumMetadataSinglePayload(void) {}
+void swift_getEnumTagSinglePayloadGeneric(void) {}
+void swift_storeEnumTagSinglePayloadGeneric(void) {}
+void swift_retain(){}
 void swift_allocBox(){}
+void swift_getWitnessTable(void) {}
+void swift_getObjCClassMetadata(void) {}
+void swift_addNewDSOImage(void) {}
+void swift_once() {}
+void swift_getFunctionReplacement() {}
+void swift_getOrigOfReplaceable() {}

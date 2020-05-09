@@ -10,7 +10,7 @@ public enum Optional<Wrapped> {
 }
 
 public typealias IntegerLiteralType = Int
-public typealias _MaxBuiltinIntegerType = Builtin.Int2048
+public typealias _MaxBuiltinIntegerType = Builtin.IntLiteral
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE80
 
 public protocol _ExpressibleByBuiltinIntegerLiteral {
@@ -37,7 +37,7 @@ public struct Int : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
     self = 0
   }
   public init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType) {
-    let builtinValue = Builtin.truncOrBitCast_Int2048_Word(value)
+    let builtinValue = Builtin.s_to_s_checked_trunc_IntLiteral_Word(value).0
     self.value = builtinValue
   }
   public init(integerLiteral value: IntegerLiteralType) {
@@ -50,7 +50,7 @@ public struct Int32 : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerL
     self.init(integerLiteral: 0)
   }
   public init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType) {
-    let builtinValue = Builtin.truncOrBitCast_Int2048_Int32(value)
+    let builtinValue = Builtin.s_to_s_checked_trunc_IntLiteral_Int32(value).0
     self.value = builtinValue
   }
   public init(integerLiteral value: IntegerLiteralType) {
@@ -64,7 +64,7 @@ public struct Int8 : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLi
     self.init(integerLiteral: 0)
   }
   public init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType) {
-    let builtinValue = Builtin.truncOrBitCast_Int2048_Int8(value)
+    let builtinValue = Builtin.s_to_s_checked_trunc_IntLiteral_Int8(value).0
     self.value = builtinValue
   }
   public init(integerLiteral value: IntegerLiteralType) {

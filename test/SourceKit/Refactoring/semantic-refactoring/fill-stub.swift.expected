@@ -1,0 +1,6 @@
+source.edit.kind.active:
+  5:15-5:15 "
+    func foo() {
+        <#code#>
+    }
+"

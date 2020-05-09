@@ -3,8 +3,8 @@
 var a : Int
 
 func test() {
-  var y : a   // expected-error {{use of undeclared type 'a'}}
-  var z : y   // expected-error {{use of undeclared type 'y'}}
+  var y : a   // expected-error {{cannot find type 'a' in scope}}
+  var z : y   // expected-error {{cannot find type 'y' in scope}}
   var w : Swift.print   // expected-error {{no type named 'print' in module 'Swift'}}
 }
 
@@ -18,14 +18,22 @@ var d3 : () -> Float = { 4 }
 
 var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{26-26=()}}
 
-var e0 : [Int]
-e0[] // expected-error {{cannot subscript a value of type '[Int]' with an index of type '()'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int), (Range<Int>),}}
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  var e0 : [Int]
+  e0[] // expected-error {{no exact matches in call to subscript}}
+  // expected-note@-1 {{candidate has partially matching parameter list (Int)}}
+  // expected-note@-2 {{candidate has partially matching parameter list (Range<Int>)}}
+  // expected-note@-3 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
+  // expected-note@-4 {{candidate has partially matching parameter list (RangeSet<Array<Int>.Index>)}}
+  // expected-note@-5 {{candidate has partially matching parameter list (Range<Array<Int>.Index>)}}
+  // expected-note@-6 {{candidate has partially matching parameter list ((UnboundedRange_) -> ())}}
+  // expected-note@-7 {{candidate has partially matching parameter list (RangeSet<Array<Int>.Index>)}}
+}
 
 var f0 : [Float]
 var f1 : [(Int,Int)]
 
-var g : Swift // expected-error {{use of undeclared type 'Swift'}} expected-note {{cannot use module 'Swift' as a type}}
+var g : Swift // expected-error {{cannot find type 'Swift' in scope}} expected-note {{cannot use module 'Swift' as a type}}
 
 var h0 : Int?
 _ = h0 == nil // no-warning
@@ -51,8 +59,8 @@ func testInvalidUseOfParameterAttr() {
   var bad_is : (Int) -> (__shared Int, Int)  // expected-error {{'__shared' may only be used on parameters}}
   func bad_is2(_ a: (__shared Int, Int)) {}    // expected-error {{'__shared' may only be used on parameters}}
   
-  var bad_iow : (Int) -> (__owned Int, Int)
-  func bad_iow2(_ a: (__owned Int, Int)) {}
+  var bad_iow : (Int) -> (__owned Int, Int)  // expected-error {{'__owned' may only be used on parameters}}
+  func bad_iow2(_ a: (__owned Int, Int)) {}  // expected-error {{'__owned' may only be used on parameters}}
 }
 
 // <rdar://problem/15588967> Array type sugar default construction syntax doesn't work
@@ -152,7 +160,7 @@ let tupleTypeWithNames = (age:Int, count:Int)(4, 5)
 let dictWithTuple = [String: (age:Int, count:Int)]()
 
 // <rdar://problem/21684837> typeexpr not being formed for postfix !
-let bb2 = [Int!](repeating: nil, count: 2)
+let bb2 = [Int!](repeating: nil, count: 2) // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{15-16=?}}
 
 // <rdar://problem/21560309> inout allowed on function return type
 func r21560309<U>(_ body: (_: inout Int) -> inout U) {}  // expected-error {{'inout' may only be used on parameters}}
@@ -165,9 +173,10 @@ class r21949448 {
 
 // SE-0066 - Standardize function type argument syntax to require parentheses
 let _ : Int -> Float // expected-error {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
-let _ : inout Int -> Float // expected-error {{single argument function types require parentheses}} {{9-9=(}} {{18-18=)}}
+let _ : inout Int -> Float // expected-error {{'inout' may only be used on parameters}}
+// expected-error@-1 {{single argument function types require parentheses}} {{15-15=(}} {{18-18=)}}
 func testNoParenFunction(x: Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{29-29=(}} {{32-32=)}}
-func testNoParenFunction(x: inout Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{29-29=(}} {{38-38=)}}
+func testNoParenFunction(x: inout Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{35-35=(}} {{38-38=)}}
 
 func foo1(a : UnsafePointer<Void>) {} // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}{{15-34=UnsafeRawPointer}}
 func foo2(a : UnsafeMutablePointer<()>) {} // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{15-39=UnsafeMutableRawPointer}}
@@ -180,11 +189,15 @@ class C {
   }
 }
 
-let _ : inout @convention(c) Int -> Int // expected-error {{'inout' may only be used on parameters}}
+let _ : inout @convention(c) (Int) -> Int // expected-error {{'inout' may only be used on parameters}}
 func foo3(inout a: Int -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{11-16=}} {{20-20=inout }}
                                    // expected-error @-1 {{single argument function types require parentheses}} {{20-20=(}} {{23-23=)}}
 
 func sr5505(arg: Int) -> String {
   return "hello"
 }
-var _: sr5505 = sr5505 // expected-error {{use of undeclared type 'sr5505'}}
+var _: sr5505 = sr5505 // expected-error {{cannot find type 'sr5505' in scope}}
+
+typealias A = (inout Int ..., Int ... = [42, 12]) -> Void // expected-error {{'inout' must not be used on variadic parameters}}
+                                                          // expected-error@-1 {{only a single element can be variadic}} {{35-39=}}
+                                                          // expected-error@-2 {{default argument not permitted in a tuple type}} {{39-49=}}

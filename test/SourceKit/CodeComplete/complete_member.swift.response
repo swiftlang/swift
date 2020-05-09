@@ -7,6 +7,7 @@
       key.description: "fooInstanceFunc0()",
       key.typename: "Double",
       key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unrelated,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc0SdyF",
       key.modulename: "complete_member"
@@ -18,8 +19,9 @@
       key.description: "fooInstanceFunc1(a: Int)",
       key.typename: "Double",
       key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unrelated,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1SdSiF",
+      key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1ySdSiF",
       key.modulename: "complete_member"
     },
     {
@@ -30,9 +32,20 @@
       key.typename: "Int",
       key.doc.brief: "fooInstanceVar Aaa. Bbb.",
       key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unrelated,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:15complete_member11FooProtocolP14fooInstanceVarSiv",
+      key.associated_usrs: "s:15complete_member11FooProtocolP14fooInstanceVarSivp",
       key.modulename: "complete_member"
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "self",
+      key.sourcetext: "self",
+      key.description: "self",
+      key.typename: "FooProtocol",
+      key.context: source.codecompletion.context.thisclass,
+      key.typerelation: source.codecompletion.typerelation.unknown,
+      key.num_bytes_to_erase: 0
     }
   ]
 }

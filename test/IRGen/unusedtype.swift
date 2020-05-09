@@ -1,11 +1,7 @@
-// RUN: %target-swift-frontend -parse-as-library -O %s -emit-ir > %t.ll
-// RUN: %FileCheck %s < %t.ll
-// RUN: %FileCheck -check-prefix=CHECK-REFLECTION %s < %t.ll
+// RUN: %target-swift-frontend -parse-as-library -O %s -emit-ir | %FileCheck %s
 
-// No global metadata, witness tables, etc. Only reflection metadata should not be optimized away
-// CHECK-NOT: @_T0{{.*[^F] =}}
-// CHECK-REFLECTION: @[[C:[0-9]+]] = private constant {{.*}} c"10unusedtype13MicroSequenceV\00"
-// CHECK-REFLECTION: @_T010unusedtype13MicroSequenceVMF = {{.*}} [[C]]
+// No global metadata, witness tables, or reflection field descriptor, etc.
+// CHECK-NOT: @"$s{{.* =}}"
 
 // No conformance records
 // CHECK-NOT: protocol_conformances

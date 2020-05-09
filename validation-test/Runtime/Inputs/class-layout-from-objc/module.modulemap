@@ -1,0 +1,4 @@
+module OneWordSuperclass {
+  header "OneWordSuperclass.h"
+  export *
+}

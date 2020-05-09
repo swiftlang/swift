@@ -12,6 +12,7 @@
 
 #include "ModuleAPIDiff.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/FrontendUtil.h"
@@ -232,7 +233,7 @@ decl-attributes ::=
       return ScalarTraits<std::string>::input(Scalar, Context,                 \
                                               Val.STRING_MEMBER_NAME);         \
     }                                                                          \
-    static bool mustQuote(StringRef S) {                                       \
+    static QuotingType mustQuote(StringRef S) {                                \
       return ScalarTraits<std::string>::mustQuote(S);                          \
     }                                                                          \
   };                                                                           \
@@ -735,7 +736,7 @@ public:
   }
 
   llvm::Optional<sma::GenericSignature>
-  convertToGenericSignature(GenericSignature *GS) {
+  convertToGenericSignature(GenericSignature GS) {
     if (!GS)
       return None;
     sma::GenericSignature ResultGS;
@@ -768,8 +769,10 @@ public:
   }
 
   std::vector<sma::TypeName> collectProtocolConformances(NominalTypeDecl *NTD) {
+    const auto AllProtocols = NTD->getAllProtocols();
     std::vector<sma::TypeName> Result;
-    for (const auto *PD : NTD->getAllProtocols()) {
+    Result.reserve(AllProtocols.size());
+    for (const auto *PD : AllProtocols) {
       Result.emplace_back(convertToTypeName(PD->getDeclaredType()));
     }
     return Result;
@@ -830,7 +833,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     auto ResultTD = std::make_shared<sma::TypealiasDecl>();
     ResultTD->Name = convertToIdentifier(TAD->getName());
-    ResultTD->Type = convertToTypeName(TAD->getUnderlyingTypeLoc().getType());
+    ResultTD->Type = convertToTypeName(TAD->getUnderlyingType());
     // FIXME
     // ResultTD->Attributes = ?;
     Result.Typealiases.emplace_back(std::move(ResultTD));
@@ -906,27 +909,30 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
-  std::unique_ptr<CompilerInvocation> Invocation =
-      driver::createCompilerInvocation(CStringArgs, Diags);
+  CompilerInvocation Invocation;
+  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
+      CStringArgs, Diags, [&](ArrayRef<const char *> FrontendArgs) {
+    return Invocation.parseArgs(FrontendArgs, Diags);
+  });
 
-  if (!Invocation) {
+  if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
     return 1;
   }
 
-  Invocation->setMainExecutablePath(MainExecutablePath);
+  Invocation.setMainExecutablePath(MainExecutablePath);
 
   CompilerInstance CI;
   CI.addDiagnosticConsumer(&PDC);
-  if (CI.setup(*Invocation))
+  if (CI.setup(Invocation))
     return 1;
   CI.performSema();
 
   PrintOptions Options = PrintOptions::printEverything();
 
   ModuleDecl *M = CI.getMainModule();
-  M->getMainSourceFile(Invocation->getSourceFileKind()).print(llvm::outs(),
-                                                        Options);
+  M->getMainSourceFile(Invocation.getSourceFileKind()).print(llvm::outs(),
+                                                             Options);
 
   auto SMAModel = createSMAModel(M);
   llvm::yaml::Output YOut(llvm::outs());

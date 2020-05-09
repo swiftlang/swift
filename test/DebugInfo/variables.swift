@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend %s -g -S -o - | %FileCheck %s --check-prefix ASM-%target-object-format
 // ASM-macho: .section __DWARF,__debug_info
 // ASM-elf: .section .debug_info,"",{{[@%]}}progbits
+// ASM-coff: .section .debug_info,"dr"
 
 // Test variables-interpreter.swift runs this code with `swift -g -i`.
 // Test variables-repl.swift runs this code with `swift -g < variables.swift`.
@@ -40,7 +41,7 @@ print(", \(glob_b)", terminator: "")
 print(", \(glob_s)", terminator: "")
 var unused: Int32 = -1
 
-// CHECK-DAG: ![[RT:[0-9]+]] ={{.*}}"Swift.swiftmodule"
+// CHECK-DAG: ![[RT:[0-9]+]] ={{.*}}"{{.*}}Swift.swiftmodule{{(/.+[.]swiftmodule)?}}"
 
 
 // Stack variables.
@@ -59,8 +60,8 @@ var g = foo(1.0);
 
 // Tuple types.
 var tuple: (Int, Bool) = (1, true)
-// CHECK-DAG: !DIGlobalVariable(name: "tuple", linkageName: "_T0{{9variables|4main}}5tupleSi_Sbtv",{{.*}} type: ![[TUPTY:[^,)]+]]
-// CHECK-DAG: ![[TUPTY]] = !DICompositeType({{.*}}identifier: "_T0Si_SbtD"
+// CHECK-DAG: !DIGlobalVariable(name: "tuple", linkageName: "$s{{9variables|4main}}5tupleSi_Sbtvp",{{.*}} type: ![[TUPTY:[^,)]+]]
+// CHECK-DAG: ![[TUPTY]] = !DICompositeType({{.*}}identifier: "$sSi_SbtD"
 func myprint(_ p: (i: Int, b: Bool)) {
      print("\(p.i) -> \(p.b)")
 }
@@ -71,7 +72,10 @@ myprint(tuple)
 
 // Arrays are represented as an instantiation of Array.
 // CHECK-DAG: ![[ARRAYTY:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Array",
-// CHECK-DAG: !DIGlobalVariable(name: "array_of_tuples",{{.*}} type: ![[ARRAYTY]]
+// CHECK-DAG: ![[ARRAY_MEMBER:.*]] = !DIDerivedType(tag: DW_TAG_member, {{.*}}baseType: ![[ARRAYTY]]
+// CHECK-DAG: ![[ARRAY_ELTS:.*]] = !{![[ARRAY_MEMBER]]}
+// CHECK-DAG: ![[ARRAY_CONTAINER:.*]] = !DICompositeType({{.*}}elements: ![[ARRAY_ELTS]]
+// CHECK-DAG: !DIGlobalVariable(name: "array_of_tuples",{{.*}} type: ![[ARRAY_CONTAINER]]
 var array_of_tuples : [(a : Int, b : Int)] = [(1,2)]
 var twod : [[Int]] = [[1]]
 
@@ -80,8 +84,8 @@ func bar(_ x: [(a : Int, b : Int)], y: [[Int]]) {
 
 
 // CHECK-DAG: !DIGlobalVariable(name: "P",{{.*}} type: ![[PTY:[0-9]+]]
-// CHECK-DAG: ![[PTUP:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_T0Sd1x_Sd1ySd1ztD",
-// CHECK-DAG: ![[PTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_T0{{9variables|4main}}5PointaD",{{.*}} baseType: ![[PTUP]]
+// CHECK-DAG: ![[PTUP:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sSd1x_Sd1ySd1ztD",
+// CHECK-DAG: ![[PTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s{{9variables|4main}}5PointaD",{{.*}} baseType: ![[PTUP]]
 typealias Point = (x: Double, y: Double, z: Double)
 var P:Point = (1, 2, 3)
 func myprint(_ p: (x: Double, y: Double, z: Double)) {
@@ -90,7 +94,7 @@ func myprint(_ p: (x: Double, y: Double, z: Double)) {
 myprint(P)
 
 // CHECK-DAG: !DIGlobalVariable(name: "P2",{{.*}} type: ![[APTY:[0-9]+]]
-// CHECK-DAG: ![[APTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_T0{{9variables|4main}}13AliasForPointaD",{{.*}} baseType: ![[PTY:[0-9]+]]
+// CHECK-DAG: ![[APTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s{{9variables|4main}}13AliasForPointaD",{{.*}} baseType: ![[PTY:[0-9]+]]
 typealias AliasForPoint = Point
 var P2:AliasForPoint = (4, 5, 6)
 myprint(P2)
@@ -113,4 +117,4 @@ func myprint(_ value: TriValue) {
 }
 myprint(unknown)
 
-// CHECK-DAG: !DIFile(filename: "variables.swift"
+// CHECK-DAG: !DIFile(filename: "{{.*}}variables.swift"

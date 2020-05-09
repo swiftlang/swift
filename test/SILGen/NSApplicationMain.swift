@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s -check-prefix=IR
+// RUN: %target-swift-emit-silgen -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s -check-prefix=IR
 
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -D REFERENCE | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -D REFERENCE | %FileCheck %s -check-prefix=IR
+// RUN: %target-swift-emit-silgen -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -D REFERENCE | %FileCheck %s
+// RUN: %target-swift-emit-ir -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -D REFERENCE | %FileCheck %s -check-prefix=IR
 
 // REQUIRES: OS=macosx
 
@@ -12,7 +12,7 @@ import AppKit
 @NSApplicationMain
 class MyDelegate: NSApplicationDelegate {}
 
-// CHECK-LABEL: sil @main
+// CHECK-LABEL: sil [ossa] @main
 // CHECK:         function_ref @NSApplicationMain
 // IR-LABEL: define{{( protected)?}} i32 @main
 // IR:            call swiftcc i32 @NSApplicationMain

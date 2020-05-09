@@ -6,7 +6,7 @@ class B : A {
   func g() -> (B, B) { return (B(), B()) } // expected-error {{declaration 'g()' cannot override more than one superclass declaration}}
   override func h() -> (A, B) { return (B(), B()) } // expected-note {{'h()' previously overridden here}}
   override func h() -> (B, A) { return (B(), B()) } // expected-error {{'h()' has already been overridden}}
-  func i() {} // expected-error {{declarations from extensions cannot be overridden yet}}
+  func i() {} // expected-error {{overri}}
   override func j() -> Int { return 0 }
   func j() -> Float { return 0.0 }
   func k() -> Float { return 0.0 }
@@ -39,7 +39,7 @@ class A {
   }
 }
 extension A {
-  func i() {} // expected-note{{overridden declaration is here}}
+  func i() {} // expected-note{{overri}}
 }
 func f() {
   let x = B()
@@ -84,4 +84,24 @@ class H {
 class HDerived : H {
   override func f(_ x: Int) { }
   override class func f(_ x: Int) { }
+}
+
+// Subclass existentials in inheritance clause
+protocol P {}
+protocol Q {}
+protocol R {}
+class Base : Q & R {}
+
+class Derived : P & Base {}
+
+func f(_: P) {}
+func g(_: Base) {}
+func h(_: Q) {}
+func i(_: R) {}
+
+func testSubclassExistentialsInInheritanceClause() {
+  f(Derived())
+  g(Derived())
+  h(Derived())
+  i(Derived())
 }

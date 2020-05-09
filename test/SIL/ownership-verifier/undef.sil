@@ -1,0 +1,60 @@
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all=0 -module-name Swift -ownership-dumper -o /dev/null %s | %FileCheck %s
+
+// REQUIRES: asserts
+
+sil_stage raw
+
+import Builtin
+
+class Klass {}
+
+struct MyInt {
+  var i: Builtin.Int32
+}
+
+// Make sure that we handle undef in an appropriate way. Do to special handling
+// in SIL around undef, we test this using the ownership dumper for simplicity.
+
+// CHECK-LABEL: *** Dumping Function: 'undef_addresses_have_any_ownership'
+// CHECK: Visiting: {{.*}}%0 = mark_uninitialized [var] undef : $*Klass
+// CHECK-NEXT: Operand Ownership Map:
+// CHECK-NEXT: Op #: 0
+// CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: unowned:  No.
+// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
+// CHECK-NEXT: guaranteed:  No.
+// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK: Visiting: {{.*}}%1 = mark_uninitialized [var] undef : $Klass
+// CHECK-NEXT: Operand Ownership Map:
+// CHECK-NEXT: Op #: 0
+// CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: unowned:  No.
+// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
+// CHECK-NEXT: guaranteed:  No.
+// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK: Visiting: {{.*}}%3 = mark_uninitialized [var] undef : $*Builtin.Int32
+// CHECK-NEXT: Operand Ownership Map:
+// CHECK-NEXT: Op #: 0
+// CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: unowned:  No.
+// CHECK-NEXT: owned: Yes. Liveness: MustBeInvalidated
+// CHECK-NEXT: guaranteed:  No.
+// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+// CHECK: Visiting: {{.*}}%4 = struct $MyInt (undef : $Builtin.Int32)
+// CHECK-NEXT: Operand Ownership Map:
+// CHECK-NEXT: Op #: 0
+// CHECK-NEXT: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK-NEXT: unowned:  Yes. Liveness: MustBeLive
+// CHECK-NEXT: owned: Yes. Liveness: MustBeLive
+// CHECK-NEXT: guaranteed:  Yes. Liveness: MustBeLive
+// CHECK-NEXT: any: Yes. Liveness: MustBeLive
+sil [ossa] @undef_addresses_have_any_ownership : $@convention(thin) () -> () {
+bb0:
+  %0 = mark_uninitialized [var] undef : $*Klass
+  %1 = mark_uninitialized [var] undef : $Klass
+  destroy_value %1 : $Klass
+  %2 = mark_uninitialized [var] undef : $*Builtin.Int32
+  %3 = struct $MyInt(undef : $Builtin.Int32)
+  %9999 = tuple()
+  return %9999 : $()
+}

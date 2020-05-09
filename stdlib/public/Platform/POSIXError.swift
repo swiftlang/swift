@@ -10,12 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: Only defining POSIXErrorCode for Darwin and Linux at the moment.
-
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 
 /// Enumeration describing POSIX error codes.
-@objc public enum POSIXErrorCode : Int32 {
+@objc
+public enum POSIXErrorCode : Int32 {
   /// Operation not permitted.
   case EPERM           = 1
   /// No such file or directory.
@@ -551,6 +550,136 @@ public enum POSIXErrorCode : Int32 {
   case EOWNERDEAD      = 130
   /// State not recoverable
   case ENOTRECOVERABLE = 131
+  /// Operation not possible due to RF-kill
+  case ERFKILL         = 132
+  /// Memory page has hardware error
+  case EHWPOISON       = 133
+}
+
+#elseif os(Windows)
+
+/// Enumeration describing POSIX error codes.
+public enum POSIXErrorCode : Int32 {
+    
+    /// Operation not permitted
+    case EPERM          = 1
+    
+    /// No such file or directory
+    case ENOENT         = 2
+    
+    /// No such process
+    case ESRCH          = 3
+    
+    /// Interrupted function
+    case EINTR          = 4
+    
+    /// I/O error
+    case EIO            = 5
+    
+    /// No such device or address
+    case ENXIO          = 6
+    
+    /// Argument list too long
+    case E2BIG          = 7
+    
+    /// Exec format error
+    case ENOEXEC        = 8
+    
+    /// Bad file number
+    case EBADF          = 9
+    
+    /// No spawned processes
+    case ECHILD         = 10
+    
+    /// No more processes or not enough memory or maximum nesting level reached
+    case EAGAIN         = 11
+    
+    /// Not enough memory
+    case ENOMEM         = 12
+    
+    /// Permission denied
+    case EACCES         = 13
+    
+    /// Bad address
+    case EFAULT         = 14
+    
+    /// Device or resource busy
+    case EBUSY          = 16
+    
+    /// File exists
+    case EEXIST         = 17
+    
+    /// Cross-device link
+    case EXDEV          = 18
+    
+    /// No such device
+    case ENODEV         = 19
+    
+    /// Not a directory
+    case ENOTDIR        = 20
+    
+    /// Is a directory
+    case EISDIR         = 21
+    
+    /// Invalid argument
+    case EINVAL         = 22
+    
+    /// Too many files open in system
+    case ENFILE         = 23
+    
+    /// Too many open files
+    case EMFILE         = 24
+    
+    /// Inappropriate I/O control operation
+    case ENOTTY         = 25
+    
+    /// File too large
+    case EFBIG          = 27
+    
+    /// No space left on device
+    case ENOSPC         = 28
+    
+    /// Invalid seek
+    case ESPIPE         = 29
+    
+    /// Read-only file system
+    case EROFS          = 30
+    
+    /// Too many links
+    case EMLINK         = 31
+    
+    /// Broken pipe
+    case EPIPE          = 32
+    
+    /// Math argument
+    case EDOM           = 33
+    
+    /// Result too large
+    case ERANGE         = 34
+    
+    /// Resource deadlock would occur
+    case EDEADLK        = 36
+    
+    /// Same as EDEADLK for compatibility with older Microsoft C versions
+    public static var EDEADLOCK: POSIXErrorCode { return .EDEADLK }
+    
+    /// Filename too long
+    case ENAMETOOLONG   = 38
+    
+    /// No locks available
+    case ENOLCK         = 39
+    
+    /// Function not supported
+    case ENOSYS         = 40
+    
+    /// Directory not empty
+    case ENOTEMPTY      = 41
+    
+    /// Illegal byte sequence
+    case EILSEQ         = 42
+    
+    /// String was truncated
+    case STRUNCATE      = 80
 }
 
 #endif

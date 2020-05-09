@@ -99,6 +99,11 @@ public:
 
   unsigned getBindingIndex() const { return SpareBits; }
 
+  /// If this initializes a single @lazy variable, return it.
+  VarDecl *getInitializedLazyVar() const;
+
+  /// If this initializes a single @lazy variable, lazily create a self
+  /// declaration for it to refer to.
   ParamDecl *getImplicitSelfDecl();
 
   static bool classof(const DeclContext *DC) {
@@ -145,34 +150,18 @@ public:
 /// A default argument expression.  The parent context is the function
 /// (possibly a closure) for which this is a default argument.
 class DefaultArgumentInitializer : public Initializer {
-  friend class ASTContext; // calls reset on unused contexts
-  void reset(DeclContext *parent, unsigned index) {
-    setParent(parent);
-    SpareBits = index;
-  }
-
 public:
   explicit DefaultArgumentInitializer(DeclContext *parent, unsigned index)
       : Initializer(InitializerKind::DefaultArgument, parent) {
-    SpareBits = (unsigned(ResilienceExpansion::Maximal) | index << 1);
+    SpareBits = index;
   }
 
-  unsigned getIndex() const { return SpareBits >> 1; }
-
-  ResilienceExpansion getResilienceExpansion() const {
-    return ResilienceExpansion(SpareBits & 1);
-  }
+  unsigned getIndex() const { return SpareBits; }
 
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(AbstractFunctionDecl *parent);
-
-  /// Change the resilience expansion of this context, necessary
-  /// for the same reason as above.
-  void changeResilienceExpansion(ResilienceExpansion expansion) {
-    SpareBits = (SpareBits & ~1) | unsigned(expansion);
-  }
+  void changeFunction(DeclContext *parent, ParameterList *paramLists);
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))

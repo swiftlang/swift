@@ -1,0 +1,2 @@
+module rdar40899824Helper { header "rdar40899824Helper.h" }
+module SuperclassObjC { header "SuperclassObjC.h" }

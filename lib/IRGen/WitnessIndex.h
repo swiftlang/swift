@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_WITNESSINDEX_H
 #define SWIFT_IRGEN_WITNESSINDEX_H
 
+#include "swift/ABI/MetadataValues.h"
 #include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
@@ -25,17 +26,27 @@ namespace irgen {
 
 /// A class which encapsulates an index into a witness table.
 class WitnessIndex {
-  unsigned Value : 31;
+  // Negative values are indexing into the private area of a protocol witness
+  // table.
+  int Value : 31;
   unsigned IsPrefix : 1;
 public:
   WitnessIndex() = default;
-  WitnessIndex(ValueWitness index) : Value(unsigned(index)) {}
-  explicit WitnessIndex(unsigned index, bool isPrefix)
-    : Value(index), IsPrefix(isPrefix) {}
+  explicit WitnessIndex(int index, bool isPrefix)
+      : Value(index), IsPrefix(isPrefix) {}
 
-  unsigned getValue() const { return Value; }
+  int getValue() const { return Value; }
 
   bool isPrefix() const { return IsPrefix; }
+
+  /// Adjust the index to refer into a protocol witness table (rather than
+  /// a value witness table).
+  WitnessIndex forProtocolWitnessTable() const {
+    int NewValue = Value < 0
+                     ? Value
+                     : Value + WitnessTableFirstRequirementOffset;
+    return WitnessIndex(NewValue, IsPrefix);
+  }
 };
 
 } // end namespace irgen

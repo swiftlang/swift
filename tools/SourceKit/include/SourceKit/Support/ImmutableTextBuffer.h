@@ -138,6 +138,8 @@ public:
 
   ImmutableTextBufferRef getBuffer() const;
 
+  size_t getSize() const;
+
   bool isFromSameBuffer(ImmutableTextSnapshotRef Other) const {
     return Other->EditableBuf.get() == EditableBuf.get();
   }
@@ -153,7 +155,7 @@ public:
 };
 
 class EditableTextBuffer : public ThreadSafeRefCountedBase<EditableTextBuffer> {
-  llvm::sys::Mutex EditMtx;
+  mutable llvm::sys::Mutex EditMtx;
   ImmutableTextBufferRef Root;
   ImmutableTextUpdateRef CurrUpd;
   std::string Filename;
@@ -169,6 +171,10 @@ public:
     return getSnapshot()->getBuffer();
   }
 
+  size_t getSize() const {
+    return getSnapshot()->getSize();
+  }
+
   ImmutableTextSnapshotRef insert(unsigned ByteOffset, StringRef Text);
   ImmutableTextSnapshotRef erase(unsigned ByteOffset, unsigned Length);
   ImmutableTextSnapshotRef replace(unsigned ByteOffset, unsigned Length,
@@ -178,6 +184,7 @@ private:
   ImmutableTextSnapshotRef addAtomicUpdate(ImmutableTextUpdateRef NewUpd);
   ImmutableTextBufferRef getBufferForSnapshot(
       const ImmutableTextSnapshot &Snap);
+  size_t getSizeForSnapshot(const ImmutableTextSnapshot &Snap) const;
   void refresh();
   friend class ImmutableTextSnapshot;
 };

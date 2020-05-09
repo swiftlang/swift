@@ -25,13 +25,42 @@ namespace clang {
 class Module;
 }
 
+namespace {
+class AnnotatedTypePrinter;
+}
+
 namespace swift {
 class Decl;
 class ModuleDecl;
 
 namespace ide {
 
+/// The expected contextual type(s) for code-completion.
+struct ExpectedTypeContext {
+  /// Possible types of the code completion expression.
+  llvm::SmallVector<Type, 4> possibleTypes;
+
+  /// Pre typechecked type of the expression at the completion position.
+  Type idealType;
+
+  /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
+  /// `foo({ here })`.
+  ///
+  /// Since the input may be incomplete, we take into account that the types are
+  /// only a hint.
+  bool isSingleExpressionBody = false;
+
+  bool empty() const { return possibleTypes.empty(); }
+
+  ExpectedTypeContext() = default;
+  ExpectedTypeContext(ArrayRef<Type> types, bool isSingleExpressionBody)
+      : possibleTypes(types.begin(), types.end()),
+        isSingleExpressionBody(isSingleExpressionBody) {}
+};
+
 class CodeCompletionResultBuilder {
+  friend AnnotatedTypePrinter;
+  
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
   SemanticContextKind SemanticContext;
@@ -43,14 +72,21 @@ class CodeCompletionResultBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
-  ArrayRef<Type> ExpectedDeclTypes;
+  ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
-      CodeCompletionResult::Unrelated;
+      CodeCompletionResult::Unknown;
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   bool IsNotRecommended = false;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
     CodeCompletionResult::NotRecommendedReason::NoReason;
+
+  /// Annotated results are requested by the client.
+  ///
+  /// This affects the structure of the CodeCompletionString.
+  bool shouldAnnotateResults() {
+    return Sink.annotateResult;
+  }
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -78,9 +114,9 @@ public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
                               CodeCompletionResult::ResultKind Kind,
                               SemanticContextKind SemanticContext,
-                              ArrayRef<Type> ExpectedDeclTypes)
+                              const ExpectedTypeContext &declTypeContext)
       : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
-        ExpectedDeclTypes(ExpectedDeclTypes) {}
+        declTypeContext(declTypeContext) {}
 
   ~CodeCompletionResultBuilder() {
     finishResult();
@@ -103,32 +139,36 @@ public:
     NotRecReason = Reason;
   }
 
+  void setSemanticContext(SemanticContextKind Kind) {
+    SemanticContext = Kind;
+  }
+
   void
   setExpectedTypeRelation(CodeCompletionResult::ExpectedTypeRelation relation) {
     ExpectedTypeRelation = relation;
   }
 
-  void addAccessControlKeyword(Accessibility Access) {
+  void addAccessControlKeyword(AccessLevel Access) {
     switch (Access) {
-    case Accessibility::Private:
+    case AccessLevel::Private:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "private ");
       break;
-    case Accessibility::FilePrivate:
+    case AccessLevel::FilePrivate:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "fileprivate ");
       break;
-    case Accessibility::Internal:
+    case AccessLevel::Internal:
       // 'internal' is the default, don't add it.
       break;
-    case Accessibility::Public:
+    case AccessLevel::Public:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "public ");
       break;
-    case Accessibility::Open:
+    case AccessLevel::Open:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "open ");
@@ -146,8 +186,21 @@ public:
                      Text);
   }
 
+  void addBaseName(StringRef Text) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::BaseName, Text);
+  }
+
+  void addKeyword(StringRef Text) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Keyword, Text);
+  }
+
   void addTextChunk(StringRef Text) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Text, Text);
+  }
+
+  void addAnnotatedTextChunk(StringRef Text) {
+    addTextChunk(Text);
+    getLastChunk().setIsAnnotation();
   }
 
   void addAnnotatedThrows() {
@@ -173,8 +226,7 @@ public:
 
   void addRethrows() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword,
-        " rethrows");
+        CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword, " rethrows");
   }
 
   void addAnnotatedLeftParen() {
@@ -197,9 +249,19 @@ public:
         CodeCompletionString::Chunk::ChunkKind::RightParen, ")");
   }
 
+  void addAnnotatedLeftBracket() {
+    addLeftBracket();
+    getLastChunk().setIsAnnotation();
+  }
+
   void addLeftBracket() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::LeftBracket, "[");
+  }
+
+  void addAnnotatedRightBracket() {
+    addRightBracket();
+    getLastChunk().setIsAnnotation();
   }
 
   void addRightBracket() {
@@ -267,9 +329,9 @@ public:
       addTypeAnnotation(Annotation);
   }
 
-  StringRef escapeArgumentLabel(StringRef Word,
-                                bool escapeAllKeywords,
-                                llvm::SmallString<16> &EscapedKeyword) {
+  StringRef escapeKeyword(StringRef Word, bool escapeAllKeywords,
+                          llvm::SmallString<16> &EscapedKeyword) {
+    EscapedKeyword.clear();
     bool shouldEscape = false;
     if (escapeAllKeywords) {
 #define KEYWORD(kw) .Case(#kw, true)
@@ -315,88 +377,15 @@ public:
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        bool IsVarArg, bool Outermost, bool IsInOut) {
-    CurrentNestingLevel++;
+                        Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
+                        bool isAutoClosure, bool useUnderscoreLabel,
+                        bool isLabeledTrailingClosure);
 
-    addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-
-    if (!Name.empty()) {
-      StringRef NameStr = Name.str();
-
-      // 'self' is a keyword, we cannot allow to insert it into the source
-      // buffer.
-      bool IsAnnotation = (NameStr == "self");
-
-      llvm::SmallString<16> EscapedKeyword;
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterName,
-          // if the name is not annotation, we need to escape keyword
-          IsAnnotation ? NameStr
-                       : escapeArgumentLabel(NameStr, !Outermost,
-                                             EscapedKeyword));
-      if (IsAnnotation)
-        getLastChunk().setIsAnnotation();
-
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
-      if (IsAnnotation)
-        getLastChunk().setIsAnnotation();
-    }
-
-    // 'inout' arguments are printed specially.
-    if (IsInOut) {
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::Ampersand, "&");
-      Ty = Ty->getInOutObjectType();
-    }
-
-    if (Name.empty() && !LocalName.empty()) {
-      llvm::SmallString<16> EscapedKeyword;
-      // Use local (non-API) parameter name if we have nothing else.
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-            escapeArgumentLabel(LocalName.str(), !Outermost, EscapedKeyword));
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
-    }
-
-    // If the parameter is of the type @autoclosure ()->output, then the
-    // code completion should show the parameter of the output type
-    // instead of the function type ()->output.
-    if (auto FuncType = Ty->getAs<AnyFunctionType>()) {
-      if (FuncType->isAutoClosure()) {
-        Ty = FuncType->getResult();
-      }
-    }
-
-    PrintOptions PO;
-    PO.SkipAttributes = true;
-    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
-                     Ty->getString(PO));
-
-    // Look through optional types and type aliases to find out if we have
-    // function/closure parameter type that is not an autoclosure.
-    Ty = Ty->lookThroughAllAnyOptionalTypes();
-    if (auto AFT = Ty->getAs<AnyFunctionType>()) {
-      if (!AFT->isAutoClosure()) {
-        // If this is a closure type, add ChunkKind::CallParameterClosureType.
-        PrintOptions PO;
-        PO.PrintFunctionRepresentationAttrs = false;
-        PO.SkipAttributes = true;
-        addChunkWithText(
-            CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
-            AFT->getString(PO));
-      }
-    }
-
-    if (IsVarArg)
-      addEllipsis();
-    CurrentNestingLevel--;
-  }
-
-  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg,
-                        bool Outermost, bool IsInOut) {
-    addCallParameter(Name, Identifier(), Ty, IsVarArg, Outermost, IsInOut);
+  void addCallParameter(Identifier Name, Type Ty, Type ContextTy = Type()) {
+    addCallParameter(Name, Identifier(), Ty, ContextTy,
+                     /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
+                     /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
+                     /*isLabeledTrailingClosure=*/false);
   }
 
   void addGenericParameter(StringRef Name) {
@@ -417,8 +406,7 @@ public:
 
   void addOptionalMethodCallTail() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail, "!");
-    getLastChunk().setIsAnnotation();
+        CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail, "?");
   }
 
   void addTypeAnnotation(StringRef Type) {
@@ -448,4 +436,3 @@ public:
 } // namespace swift
 
 #endif // SWIFT_LIB_IDE_CODE_COMPLETION_RESULT_BUILDER_H
-

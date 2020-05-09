@@ -61,11 +61,10 @@ static SWIFT_CC(swift) void _destroyErrorObject(SWIFT_CONTEXT HeapObject *obj) {
 /// Heap metadata for Error boxes.
 static const FullMetadata<HeapMetadata> ErrorMetadata{
   HeapMetadataHeader{{_destroyErrorObject}, {&VALUE_WITNESS_SYM(Bo)}},
-  Metadata{MetadataKind::ErrorObject},
+  HeapMetadata(MetadataKind::ErrorObject),
 };
 
-SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
-BoxPair::Return
+BoxPair
 swift::swift_allocError(const swift::Metadata *type,
                         const swift::WitnessTable *errorConformance,
                         OpaqueValue *initialValue,
@@ -95,7 +94,7 @@ swift::swift_allocError(const swift::Metadata *type,
 void
 swift::swift_deallocError(SwiftError *error, const Metadata *type) {
   auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
-  swift_deallocObject(error, sizeAndAlign.first, sizeAndAlign.second);
+  swift_deallocUninitializedObject(error, sizeAndAlign.first, sizeAndAlign.second);
 }
 
 void
@@ -106,7 +105,5 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
   out->type = errorObject->type;
   out->errorConformance = errorObject->errorConformance;
 }
-
-void swift::swift_willThrow(SwiftError *object) { }
 
 #endif

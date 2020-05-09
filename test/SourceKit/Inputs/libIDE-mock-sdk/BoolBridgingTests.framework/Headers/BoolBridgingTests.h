@@ -68,9 +68,10 @@ extern DarwinBooleanBlock globalDarwinBooleanBlock;
 - (BOOL (^)(BOOL))testObjCBoolFnToBlock:(BOOL (*)(BOOL))fp;
 - (Boolean (^)(Boolean))testDarwinBooleanFnToBlock:(Boolean (*)(Boolean))fp;
 
-- (void)produceCBoolBlockTypedef:(CBoolBlock __nullable * __nonnull)outBlock;
-- (void)produceObjCBoolBlockTypedef:(ObjCBoolBlock __nullable * __nonnull)outBlock;
-- (void)produceDarwinBooleanBlockTypedef:(DarwinBooleanBlock __nullable * __nonnull)outBlock;
+- (void)produceCBoolBlockTypedef:(CBoolBlock _Nullable *_Nonnull)outBlock;
+- (void)produceObjCBoolBlockTypedef:(ObjCBoolBlock _Nullable *_Nonnull)outBlock;
+- (void)produceDarwinBooleanBlockTypedef:
+    (DarwinBooleanBlock _Nullable *_Nonnull)outBlock;
 
 - (instancetype)init;
 @end

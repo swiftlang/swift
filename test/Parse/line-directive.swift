@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -c %s 2>&1 | %FileCheck %s
 
 let x = 0 // We need this because of the #sourceLocation-ends-with-a-newline requirement.
 
@@ -23,6 +24,13 @@ x x // expected-error{{consecutive statements}} {{2-2=;}}
 
 // rdar://19582475
 public struct S { // expected-note{{in declaration of 'S'}}
+// expected-error@+8{{expected 'func' keyword in operator function declaration}}
+// expected-error@+7{{operator '/' declared in type 'S' must be 'static'}}
+// expected-error@+6{{expected '(' in argument list of function declaration}}
+// expected-error@+5{{operators must have one or two arguments}}
+// expected-error@+4{{member operator '/()' must have at least one argument of type 'S'}}
+// expected-error@+3{{expected '{' in body of function declaration}}
+// expected-error@+2{{consecutive declarations on a line must be separated by ';}}
 // expected-error@+1{{expected declaration}}
 / ###line 25 "line-directive.swift"
 }
@@ -53,3 +61,9 @@ enum E {
     case C, D
 #sourceLocation()
 }
+
+#sourceLocation(file: "sr8772.swift", line: 400)
+2., 3
+// CHECK: sr8772.swift:400:2: error: expected member name following '.'
+// CHECK: sr8772.swift:400:3: error: consecutive statements on a line must be separated by ';'
+// CHECK: sr8772.swift:400:3: error: expected expression

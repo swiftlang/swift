@@ -13,9 +13,9 @@
 #ifndef SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 #define SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 
+#include "ModuleFormat.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
-#include "swift/Serialization/ModuleFormat.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -37,6 +37,8 @@ class XRefTracePath {
       Accessor,
       Extension,
       GenericParam,
+      PrivateDiscriminator,
+      OpaqueReturnType,
       Unknown
     };
 
@@ -55,11 +57,13 @@ class XRefTracePath {
       : kind(K),
         data(llvm::PointerLikeTypeTraits<T>::getAsVoidPointer(value)) {}
 
-    Identifier getAsIdentifier() const {
+    DeclBaseName getAsBaseName() const {
       switch (kind) {
       case Kind::Value:
       case Kind::Operator:
-        return getDataAs<Identifier>();
+      case Kind::PrivateDiscriminator:
+      case Kind::OpaqueReturnType:
+        return getDataAs<DeclBaseName>();
       case Kind::Type:
       case Kind::OperatorFilter:
       case Kind::Accessor:
@@ -68,12 +72,13 @@ class XRefTracePath {
       case Kind::Unknown:
         return Identifier();
       }
+      llvm_unreachable("unhandled kind");
     }
 
     void print(raw_ostream &os) const {
       switch (kind) {
       case Kind::Value:
-        os << getDataAs<Identifier>();
+        os << getDataAs<DeclBaseName>();
         break;
       case Kind::Type:
         os << "with type " << getDataAs<Type>();
@@ -108,19 +113,16 @@ class XRefTracePath {
         break;
       case Kind::Accessor:
         switch (getDataAs<uintptr_t>()) {
-        case Getter:
+        case Get:
           os << "(getter)";
           break;
-        case Setter:
+        case Set:
           os << "(setter)";
           break;
-        case MaterializeForSet:
-          os << "(materializeForSet)";
-          break;
-        case Addressor:
+        case Address:
           os << "(addressor)";
           break;
-        case MutableAddressor:
+        case MutableAddress:
           os << "(mutableAddressor)";
           break;
         case WillSet:
@@ -129,6 +131,12 @@ class XRefTracePath {
         case DidSet:
           os << "(didSet)";
           break;
+        case Read:
+          os << "(read)";
+          break;
+        case Modify:
+          os << "(modify)";
+          break;
         default:
           os << "(unknown accessor kind)";
           break;
@@ -136,6 +144,12 @@ class XRefTracePath {
         break;
       case Kind::GenericParam:
         os << "generic param #" << getDataAs<uintptr_t>();
+        break;
+      case Kind::PrivateDiscriminator:
+        os << "(in " << getDataAs<Identifier>() << ")";
+        break;
+      case Kind::OpaqueReturnType:
+        os << "opaque return type of " << getDataAs<DeclBaseName>();
         break;
       case Kind::Unknown:
         os << "unknown xref kind " << getDataAs<uintptr_t>();
@@ -180,17 +194,25 @@ public:
     path.push_back({ PathPiece::Kind::GenericParam, index });
   }
 
+  void addPrivateDiscriminator(Identifier name) {
+    path.push_back({ PathPiece::Kind::PrivateDiscriminator, name });
+  }
+
   void addUnknown(uintptr_t kind) {
     path.push_back({ PathPiece::Kind::Unknown, kind });
   }
+  
+  void addOpaqueReturnType(Identifier name) {
+    path.push_back({ PathPiece::Kind::OpaqueReturnType, name });
+  }
 
-  Identifier getLastName() const {
-    for (auto &piece : reversed(path)) {
-      Identifier result = piece.getAsIdentifier();
+  DeclBaseName getLastName() const {
+    for (auto &piece : llvm::reverse(path)) {
+      DeclBaseName result = piece.getAsBaseName();
       if (!result.empty())
         return result;
     }
-    return Identifier();
+    return DeclBaseName();
   }
 
   void removeLast() {
@@ -214,14 +236,14 @@ class DeclDeserializationError : public llvm::ErrorInfoBase {
 public:
   enum Flag : unsigned {
     DesignatedInitializer = 1 << 0,
-    NeedsVTableEntry = 1 << 1,
-    NeedsAllocatingVTableEntry = 1 << 2,
+    NeedsFieldOffsetVectorEntry = 1 << 1,
   };
   using Flags = OptionSet<Flag>;
 
 protected:
   DeclName name;
   Flags flags;
+  uint8_t numVTableEntries = 0;
 
 public:
   DeclName getName() const {
@@ -231,11 +253,11 @@ public:
   bool isDesignatedInitializer() const {
     return flags.contains(Flag::DesignatedInitializer);
   }
-  bool needsVTableEntry() const {
-    return flags.contains(Flag::NeedsVTableEntry);
+  unsigned getNumberOfVTableEntries() const {
+    return numVTableEntries;
   }
-  bool needsAllocatingVTableEntry() const {
-    return flags.contains(Flag::NeedsAllocatingVTableEntry);
+  bool needsFieldOffsetVectorEntry() const {
+    return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
   }
 
   bool isA(const void *const ClassID) const override {
@@ -269,6 +291,26 @@ public:
   }
 };
 
+class XRefNonLoadedModuleError :
+    public llvm::ErrorInfo<XRefNonLoadedModuleError, DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  explicit XRefNonLoadedModuleError(Identifier name) {
+    this->name = name;
+  }
+
+  void log(raw_ostream &OS) const override {
+    OS << "module '" << name << "' was not loaded";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 class OverrideError : public llvm::ErrorInfo<OverrideError,
                                              DeclDeserializationError> {
 private:
@@ -277,9 +319,11 @@ private:
   void anchor() override;
 
 public:
-  explicit OverrideError(DeclName name, Flags flags = {}) {
+  explicit OverrideError(DeclName name,
+                         Flags flags={}, unsigned numVTableEntries=0) {
     this->name = name;
     this->flags = flags;
+    this->numVTableEntries = numVTableEntries;
   }
 
   void log(raw_ostream &OS) const override {
@@ -299,10 +343,11 @@ class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError> {
   std::unique_ptr<ErrorInfoBase> underlyingReason;
 public:
   explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
-                     Flags flags = {})
+                     Flags flags={}, unsigned numVTableEntries=0)
       : underlyingReason(std::move(reason)) {
     this->name = name;
     this->flags = flags;
+    this->numVTableEntries = numVTableEntries;
   }
 
   void log(raw_ostream &OS) const override {
@@ -341,6 +386,61 @@ public:
     return llvm::inconvertibleErrorCode();
   }
 };
+
+class SILEntityError : public llvm::ErrorInfo<SILEntityError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  std::unique_ptr<ErrorInfoBase> underlyingReason;
+  StringRef name;
+public:
+  SILEntityError(StringRef name, std::unique_ptr<ErrorInfoBase> reason)
+      : underlyingReason(std::move(reason)), name(name) {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "could not deserialize SIL entity '" << name << "'";
+    if (underlyingReason) {
+      OS << ": ";
+      underlyingReason->log(OS);
+    }
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+// Decl was not deserialized because its attributes did not match the filter.
+//
+// \sa getDeclChecked
+class DeclAttributesDidNotMatch : public llvm::ErrorInfo<DeclAttributesDidNotMatch> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  DeclAttributesDidNotMatch() {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "Decl attributes did not match filter";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+LLVM_NODISCARD
+static inline std::unique_ptr<llvm::ErrorInfoBase>
+takeErrorInfo(llvm::Error error) {
+  std::unique_ptr<llvm::ErrorInfoBase> result;
+  llvm::handleAllErrors(std::move(error),
+                        [&](std::unique_ptr<llvm::ErrorInfoBase> info) {
+    result = std::move(info);
+  });
+  return result;
+}
 
 class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
   const char *Action;

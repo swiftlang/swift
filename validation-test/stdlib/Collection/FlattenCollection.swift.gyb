@@ -1,0 +1,90 @@
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+// FIXME: the test is too slow when the standard library is not optimized.
+// rdar://problem/46878013
+// REQUIRES: optimized_stdlib
+// REQUIRES: long_test
+
+import SwiftPrivate
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+var tests = TestSuite("FlattenCollection")
+
+%{
+variations = [('', 'Sequence'), ('', 'Collection'), ('Bidirectional', 'Collection')]
+}%
+
+// Test collections using value types as elements.
+% for (traversal, kind) in variations:
+tests.add${traversal}${kind}Tests(
+  make${kind}: { (elements: [OpaqueValue<Int>]) -> Flatten${kind}<Minimal${traversal}${kind}<Minimal${traversal}${kind}<OpaqueValue<Int>>>> in
+    Minimal${traversal}${kind}(elements: elements.map { Minimal${traversal}${kind}(elements: [$0]) }).joined()
+  },
+  wrapValue: identity,
+  extractValue: identity,
+  make${kind}OfEquatable: { (elements: [MinimalEquatableValue]) -> Flatten${kind}<Minimal${traversal}${kind}<Minimal${traversal}${kind}<MinimalEquatableValue>>> in
+    Minimal${traversal}${kind}(elements: elements.map { Minimal${traversal}${kind}(elements: [$0]) }).joined()
+  },
+  wrapValueIntoEquatable: identityEq,
+  extractValueFromEquatable: identityEq
+)
+% end
+
+// Test collections using reference types as elements.
+% for (traversal, kind) in variations:
+tests.add${traversal}${kind}Tests(
+  make${kind}: { (elements: [LifetimeTracked]) -> Flatten${kind}<Minimal${traversal}${kind}<Minimal${traversal}${kind}<LifetimeTracked>>> in
+    Minimal${traversal}${kind}(elements: elements.map { Minimal${traversal}${kind}(elements: [$0]) }).joined()
+  },
+  wrapValue: { (element: OpaqueValue<Int>) in
+    LifetimeTracked(element.value, identity: element.identity)
+  },
+  extractValue: { (element: LifetimeTracked) in
+    OpaqueValue(element.value, identity: element.identity)
+  },
+  make${kind}OfEquatable: { (elements: [LifetimeTracked]) -> Flatten${kind}<Minimal${traversal}${kind}<Minimal${traversal}${kind}<LifetimeTracked>>> in
+    Minimal${traversal}${kind}(elements: elements.map { Minimal${traversal}${kind}(elements: [$0]) }).joined()
+  },
+  wrapValueIntoEquatable: { (element: MinimalEquatableValue) in
+    LifetimeTracked(element.value, identity: element.identity)
+  },
+  extractValueFromEquatable: { (element: LifetimeTracked) in
+    MinimalEquatableValue(element.value, identity: element.identity)
+  }
+)
+% end
+
+var rdar45956357: Bool
+// Test collection instances and iterators.
+% for (traversal, kind) in variations:
+if #available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *) {
+  tests.test("FlattenCollection instances (${traversal}${kind})") {
+    do {
+      let expected : [String] = []
+      let base: [[String]] = [[], [], []]
+      check${traversal}${kind}(
+        expected,
+        Minimal${traversal}${kind}(elements: base).joined(),
+        sameValue: { $0 == $1 })
+    }
+    do {
+      let expected = ["apple", "orange", "banana", "grapefruit", "lychee"]
+      let base = [["apple", "orange"], ["banana", "grapefruit"], ["lychee"]]
+      let flattened = Minimal${traversal}${kind}(elements: base).joined()
+      check${traversal}${kind}(
+        expected,
+        Minimal${traversal}${kind}(elements: base).joined(),
+        sameValue: { $0 == $1 })
+      checkSequence(
+        expected,
+        flattened.makeIterator(),
+        sameValue: { $0 == $1 })
+    }
+  }
+}
+% end
+
+runAllTests()

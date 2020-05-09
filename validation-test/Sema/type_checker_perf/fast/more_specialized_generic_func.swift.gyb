@@ -1,0 +1,26 @@
+// RUN: %scale-test --begin 8 --end 40 --step 2 --select NumLeafScopes %s --expected-exit-code 0
+// REQUIRES: asserts,no_asan
+
+protocol P { }
+
+extension Int : P { }
+
+struct Wrapper<T: P>: P { }
+
+func foo<T>(_ value: T) -> T { return value }
+func foo<T: P>(_ value: T) -> Wrapper<T> { return Wrapper<T>() }
+
+func acceptValues(_: Any...) { }
+func acceptValue(_: Any) { }
+
+func test() {
+  acceptValue(
+% for i in range(N):
+    foo(
+% end
+      0
+% for i in range(N):
+    )
+% end
+  )
+}

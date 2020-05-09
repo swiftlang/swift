@@ -1,14 +1,14 @@
 // REQUIRES: OS=macosx
 
-// RUN: %target-swift-frontend -DVALUE -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=VALUE
-// RUN: %target-swift-frontend -DEMPTYCATCH -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=EMPTYCATCH
-// RUN: %target-swift-frontend -DASQEXPR -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASQEXPR
-// RUN: %target-swift-frontend -DASBANGEXPR -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASBANGEXPR
-// RUN: %target-swift-frontend -DCATCHIS -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHIS
-// RUN: %target-swift-frontend -DCATCHAS -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHAS
-// RUN: %target-swift-frontend -DGENERICONLY -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=GENERICONLY
+// RUN: %target-swift-frontend -DVALUE -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=VALUE
+// RUN: %target-swift-frontend -DEMPTYCATCH -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=EMPTYCATCH
+// RUN: %target-swift-frontend -DASQEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASQEXPR
+// RUN: %target-swift-frontend -DASBANGEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASBANGEXPR
+// RUN: %target-swift-frontend -DCATCHIS -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHIS
+// RUN: %target-swift-frontend -DCATCHAS -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHAS
+// RUN: %target-swift-frontend -DGENERICONLY -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=GENERICONLY
 
-// RUN: not %target-swift-frontend -DEXHAUSTIVE -emit-sil -sil-serialize-witness-tables %s -import-objc-header %S/Inputs/enum-error.h 2>&1 | %FileCheck %s -check-prefix=EXHAUSTIVE
+// RUN: not %target-swift-frontend -DEXHAUSTIVE -emit-sil %s -import-objc-header %S/Inputs/enum-error.h  -enable-nonfrozen-enum-exhaustivity-diagnostics 2>&1 | %FileCheck %s -check-prefix=EXHAUSTIVE
 // RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-error.h -DERRORS -verify
 
 // RUN: echo '#include "enum-error.h"' > %t.m
@@ -19,6 +19,11 @@ import Foundation
 
 func testDropCode(other: OtherError) -> OtherError.Code {
   return other.code
+}
+
+func testImportsCorrectly() {
+  _ = TypedefOnlyError.badness
+  _ = TypedefOnlyError.Code.badness
 }
 
 func testError() {
@@ -79,18 +84,31 @@ func testError() {
 
 #elseif EXHAUSTIVE
 // CHECK: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
+// CHECK: sil_witness_table shared [serialized] ExhaustiveError: _BridgedStoredNSError module __ObjC
   let terr = getErr()
-  switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
+  switch (terr) { case .TENone, .TEOne, .TETwo: break }
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch covers known cases, but 'TestError.Code' may have additional unknown values
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: handle unknown values using "@unknown default"
 
   switch (terr) { case .TENone, .TEOne: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
   // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.TETwo'
+
   let _ = TestError.Code(rawValue: 2)!
 
   do {
     throw TestError(.TEOne)
   } catch is TestError {
   } catch {}
+
+  // Allow exhaustive error codes as well.
+  let eerr = getExhaustiveErr()
+  switch eerr { case .EENone, .EEOne, .EETwo: break }
+  // EXHAUSTIVE-NOT: [[@LINE-1]]:{{.+}}: {{error|warning|note}}
+
+  switch eerr { case .EENone, .EEOne: break }
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.EETwo'
 
 #endif
 

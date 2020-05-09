@@ -10,19 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGenFunction.h"
 #include "ArgumentSource.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "SILGenFunction.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -31,21 +33,29 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
                                            ValueDecl *ctor) {
   // In addition to the declared arguments, the constructor implicitly takes
   // the metatype as its first argument, like a static function.
-  Type metatype = ctor->getInterfaceType()->castTo<AnyFunctionType>()->getInput();
+  auto ctorFnType = ctor->getInterfaceType()->castTo<AnyFunctionType>();
+  assert(ctorFnType->getParams().size() == 1 &&
+         "more than one self parameter?");
+  auto param = ctorFnType->getParams()[0];
+  assert(!param.isVariadic() && !param.isInOut());
+  Type metatype = param.getPlainType();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                               AC.getIdentifier("$metatype"), SourceLoc(),
-                               AC.getIdentifier("$metatype"), Type(),
-                               DC);
+  auto VD =
+      new (AC) ParamDecl(SourceLoc(), SourceLoc(),
+                         AC.getIdentifier("$metatype"), SourceLoc(),
+                         AC.getIdentifier("$metatype"), DC);
+  VD->setSpecifier(ParamSpecifier::Default);
   VD->setInterfaceType(metatype);
 
   SGF.AllocatorMetatype = SGF.F.begin()->createFunctionArgument(
-      SGF.getLoweredType(DC->mapTypeIntoContext(metatype)), VD);
+      SGF.getLoweredTypeForFunctionArgument(DC->mapTypeIntoContext(metatype)),
+      VD);
 
   return SGF.AllocatorMetatype;
 }
 
+// FIXME: Consolidate this with SILGenProlog
 static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
                                               SILLocation loc,
                                               CanType interfaceType,
@@ -57,20 +67,85 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
     RValue tuple(type);
     for (auto fieldType : tupleTy.getElementTypes())
       tuple.addElement(emitImplicitValueConstructorArg(SGF, loc, fieldType, DC));
-
     return tuple;
-  } else {
-    auto &AC = SGF.getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                 AC.getIdentifier("$implicit_value"),
-                                 SourceLoc(),
-                                 AC.getIdentifier("$implicit_value"), Type(),
-                                 DC);
-    VD->setInterfaceType(interfaceType);
-    SILValue arg =
-        SGF.F.begin()->createFunctionArgument(SGF.getLoweredType(type), VD);
-    return RValue(SGF, loc, type, SGF.emitManagedRValueWithCleanup(arg));
   }
+
+  auto &AC = SGF.getASTContext();
+  auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
+                               AC.getIdentifier("$implicit_value"),
+                               SourceLoc(),
+                               AC.getIdentifier("$implicit_value"),
+                               DC);
+  VD->setSpecifier(ParamSpecifier::Default);
+  VD->setInterfaceType(interfaceType);
+
+  auto argType = SGF.getLoweredTypeForFunctionArgument(type);
+  auto *arg = SGF.F.begin()->createFunctionArgument(argType, VD);
+  ManagedValue mvArg;
+  if (arg->getArgumentConvention().isOwnedConvention()) {
+    mvArg = SGF.emitManagedRValueWithCleanup(arg);
+  } else {
+    mvArg = ManagedValue::forUnmanaged(arg);
+  }
+
+  // This can happen if the value is resilient in the calling convention
+  // but not resilient locally.
+  if (argType.isLoadable(SGF.F) && argType.isAddress()) {
+    if (mvArg.isPlusOne(SGF))
+      mvArg = SGF.B.createLoadTake(loc, mvArg);
+    else
+      mvArg = SGF.B.createLoadBorrow(loc, mvArg);
+  }
+
+  return RValue(SGF, loc, type, mvArg);
+}
+
+/// If the field has a property wrapper for which we will need to call the
+/// wrapper type's init(wrappedValue:, ...), call the function that performs
+/// that initialization and return the result. Otherwise, return \c arg.
+static RValue maybeEmitPropertyWrapperInitFromValue(
+    SILGenFunction &SGF,
+    SILLocation loc,
+    VarDecl *field,
+    SubstitutionMap subs,
+    RValue &&arg) {
+  auto originalProperty = field->getOriginalWrappedProperty();
+  if (!originalProperty ||
+      !originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
+    return std::move(arg);
+
+  auto wrapperInfo = originalProperty->getPropertyWrapperBackingPropertyInfo();
+  if (!wrapperInfo || !wrapperInfo.initializeFromOriginal)
+    return std::move(arg);
+
+  return SGF.emitApplyOfPropertyWrapperBackingInitializer(loc, originalProperty,
+                                                          subs, std::move(arg));
+}
+
+static SubstitutionMap getSubstitutionsForPropertyInitializer(
+    DeclContext *dc,
+    NominalTypeDecl *nominal) {
+  // We want a substitution list written in terms of the generic
+  // signature of the type, with replacement archetypes from the
+  // constructor's context (which might be in an extension of
+  // the type, which adds additional generic requirements).
+  if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
+    // Generate a set of substitutions for the initialization function,
+    // whose generic signature is that of the type context, and whose
+    // replacement types are the archetypes of the initializer itself.
+    return SubstitutionMap::get(
+      nominal->getGenericSignatureOfContext(),
+      [&](SubstitutableType *type) {
+        if (auto gp = type->getAs<GenericTypeParamType>()) {
+          return genericEnv->mapTypeIntoContext(gp);
+        }
+
+        return Type(type);
+      },
+      LookUpConformanceInModule(dc->getParentModule()));
+  }
+
+  return SubstitutionMap();
 }
 
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
@@ -78,24 +153,24 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   RegularLocation Loc(ctor);
   Loc.markAutoGenerated();
   // FIXME: Handle 'self' along with the other arguments.
-  auto *paramList = ctor->getParameterList(1);
+  auto *paramList = ctor->getParameters();
   auto *selfDecl = ctor->getImplicitSelfDecl();
-  auto selfTyCan = selfDecl->getType()->getInOutObjectType();
-  auto selfIfaceTyCan = selfDecl->getInterfaceType()->getInOutObjectType();
-  SILType selfTy = SGF.getLoweredType(selfTyCan);
+  auto selfIfaceTy = selfDecl->getInterfaceType();
+  SILType selfTy = SGF.getLoweredTypeForFunctionArgument(selfDecl->getType());
 
   // Emit the indirect return argument, if any.
   SILValue resultSlot;
-  if (selfTy.isAddressOnly(SGF.SGM.M) && SGF.silConv.useLoweredAddresses()) {
+  if (SILModuleConventions::isReturnedIndirectlyInSIL(selfTy, SGF.SGM.M)) {
     auto &AC = SGF.getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
-                                 SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
-                                 AC.getIdentifier("$return_value"), Type(),
+                                 AC.getIdentifier("$return_value"),
                                  ctor);
-    VD->setInterfaceType(selfIfaceTyCan);
-    resultSlot = SGF.F.begin()->createFunctionArgument(selfTy, VD);
+    VD->setSpecifier(ParamSpecifier::InOut);
+    VD->setInterfaceType(selfIfaceTy);
+    resultSlot =
+        SGF.F.begin()->createFunctionArgument(selfTy.getAddressType(), VD);
   }
 
   // Emit the elementwise arguments.
@@ -113,38 +188,55 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   auto *decl = selfTy.getStructOrBoundGenericStruct();
   assert(decl && "not a struct?!");
 
+  auto subs = getSubstitutionsForPropertyInitializer(decl, decl);
+
   // If we have an indirect return slot, initialize it in-place.
   if (resultSlot) {
-
     auto elti = elements.begin(), eltEnd = elements.end();
     for (VarDecl *field : decl->getStoredProperties()) {
-      auto fieldTy = selfTy.getFieldType(field, SGF.SGM.M);
-      auto &fieldTL = SGF.getTypeLowering(fieldTy);
-      SILValue slot = SGF.B.createStructElementAddr(Loc, resultSlot, field,
-                                                    fieldTL.getLoweredType().getAddressType());
+      auto fieldTy =
+          selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
+      SILValue slot =
+        SGF.B.createStructElementAddr(Loc, resultSlot, field,
+                                      fieldTy.getAddressType());
       InitializationPtr init(new KnownAddressInitialization(slot));
 
-      // An initialized 'let' property has a single value specified by the
-      // initializer - it doesn't come from an argument.
-      if (!field->isStatic() && field->isLet() &&
-          field->getParentInitializer()) {
+      // If it's memberwise initialized, do so now.
+      if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/false)) {
+        assert(elti != eltEnd &&
+               "number of args does not match number of fields");
+        (void)eltEnd;
+        FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+        maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
+                                              std::move(*elti))
+          .forwardInto(SGF, Loc, init.get());
+        ++elti;
+      } else {
 #ifndef NDEBUG
-        auto fieldTy = decl->getDeclContext()->mapTypeIntoContext(
-            field->getInterfaceType());
-        assert(fieldTy->isEqual(field->getParentInitializer()->getType())
-               && "Checked by sema");
+        assert(
+            field->getType()->isEqual(field->getParentInitializer()->getType())
+              && "Checked by sema");
 #endif
 
         // Cleanup after this initialization.
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-        SGF.emitExprInto(field->getParentInitializer(), init.get());
-        continue;
-      }
 
-      assert(elti != eltEnd && "number of args does not match number of fields");
-      (void)eltEnd;
-      std::move(*elti).forwardInto(SGF, Loc, init.get());
-      ++elti;
+        // If this is a property wrapper backing storage var that isn't
+        // memberwise initialized and has an original wrapped value, apply
+        // the property wrapper backing initializer.
+        if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
+          auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
+          if (wrappedInfo.originalInitialValue) {
+            auto arg = SGF.emitRValue(wrappedInfo.originalInitialValue);
+            maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
+                                                  std::move(arg))
+              .forwardInto(SGF, Loc, init.get());
+            continue;
+          }
+        }
+
+        SGF.emitExprInto(field->getParentInitializer(), init.get());
+      }
     }
     SGF.B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
                        SGF.emitEmptyTuple(Loc));
@@ -156,22 +248,38 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   auto elti = elements.begin(), eltEnd = elements.end();
   for (VarDecl *field : decl->getStoredProperties()) {
-    auto fieldTy = selfTy.getFieldType(field, SGF.SGM.M);
-    SILValue v;
+    auto fieldTy =
+        selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
+    RValue value;
 
-    // An initialized 'let' property has a single value specified by the
-    // initializer - it doesn't come from an argument.
-    if (!field->isStatic() && field->isLet() && field->getParentInitializer()) {
-      // Cleanup after this initialization.
-      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-      v = SGF.emitRValue(field->getParentInitializer())
-             .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
-    } else {
+    // If it's memberwise initialized, do so now.
+    if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/false)) {
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      v = std::move(*elti).forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+      value = std::move(*elti);
       ++elti;
+    } else {
+      // Otherwise, use its initializer.
+      assert(field->isParentInitialized());
+      Expr *init = field->getParentInitializer();
+
+      // If this is a property wrapper backing storage var that isn't
+      // memberwise initialized, use the original wrapped value if it exists.
+      if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
+        auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
+        if (wrappedInfo.originalInitialValue) {
+          init = wrappedInfo.originalInitialValue;
+        }
+      }
+
+      value = SGF.emitRValue(init);
     }
+
+    // Cleanup after this initialization.
+    FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+    SILValue v = maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
+                                                       std::move(value))
+        .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
 
     eltValues.push_back(v);
   }
@@ -194,28 +302,41 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Get the 'self' decl and type.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  auto &lowering = getTypeLowering(selfDecl->getType()->getInOutObjectType());
-  SILType selfTy = lowering.getLoweredType();
-  (void)selfTy;
-  assert(!selfTy.getClassOrBoundGenericClass()
-         && "can't emit a class ctor here");
+  auto &lowering = getTypeLowering(selfDecl->getType());
+
+  // Decide if we need to do extra work to warn on unsafe behavior in pre-Swift-5
+  // modes.
+  MarkUninitializedInst::Kind MUIKind;
+  if (isDelegating) {
+    MUIKind = MarkUninitializedInst::DelegatingSelf;
+  } else if (getASTContext().isSwiftVersionAtLeast(5)) {
+    MUIKind = MarkUninitializedInst::RootSelf;
+  } else {
+    auto *dc = ctor->getParent();
+    if (isa<ExtensionDecl>(dc) &&
+        dc->getSelfStructDecl()->getParentModule() != dc->getParentModule()) {
+      MUIKind = MarkUninitializedInst::CrossModuleRootSelf;
+    } else {
+      MUIKind = MarkUninitializedInst::RootSelf;
+    }
+  }
 
   // Allocate the local variable for 'self'.
-  auto MUIKind = isDelegating ? MarkUninitializedInst::DelegatingSelf
-                              : MarkUninitializedInst::RootSelf;
   emitLocalVariableWithCleanup(selfDecl, MUIKind)->finishInitialization(*this);
   SILValue selfLV = VarLocs[selfDecl].value;
 
   // Emit the prolog.
-  emitProlog(ctor->getParameterList(1),
+  emitProlog(ctor->getParameters(),
+             /*selfParam=*/nullptr,
              ctor->getResultInterfaceType(), ctor,
-             ctor->hasThrows());
+             ctor->hasThrows(),
+             ctor->getThrowsLoc());
   emitConstructorMetatypeArg(*this, ctor);
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  prepareEpilog(Type(), ctor->hasThrows(), CleanupLocation(ctor));
+  prepareEpilog(false, ctor->hasThrows(), CleanupLocation(ctor));
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -224,14 +345,15 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
   auto &resultLowering = getTypeLowering(resultType);
 
-  if (ctor->getFailability() != OTK_None) {
+  if (ctor->isFailable()) {
     SILBasicBlock *failureBB = createBasicBlock(FunctionSection::Postmatter);
 
     // On failure, we'll clean up everything (except self, which should have
     // been cleaned up before jumping here) and return nil instead.
-    SavedInsertionPoint savedIP(*this, failureBB, FunctionSection::Postmatter);
+    SILGenSavedInsertionPoint savedIP(*this, failureBB,
+                                      FunctionSection::Postmatter);
     failureExitBB = createBasicBlock();
-    Cleanups.emitCleanupsForReturn(ctor);
+    Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);
     // Return nil.
     if (F.getConventions().hasIndirectSILResults()) {
       // Inject 'nil' into the indirect return.
@@ -244,7 +366,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       B.createReturn(ctor, emitEmptyTuple(ctor));
     } else {
       // Pass 'nil' as the return value to the exit BB.
-      failureExitArg = failureExitBB->createPHIArgument(
+      failureExitArg = failureExitBB->createPhiArgument(
           resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
       SILValue nilResult =
           B.createEnum(ctor, SILValue(), getASTContext().getOptionalNoneDecl(),
@@ -261,7 +383,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // If this is not a delegating constructor, emit member initializers.
   if (!isDelegating) {
     auto *typeDC = ctor->getDeclContext();
-    auto *nominal = typeDC->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *nominal = typeDC->getSelfNominalTypeDecl();
     emitMemberInitializers(ctor, selfDecl, nominal);
   }
 
@@ -275,7 +397,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // SIL representation.
   SILValue selfValue;
   {
-    SavedInsertionPoint savedIP(*this, ReturnDest.getBlock());
+    SILGenSavedInsertionPoint savedIP(*this, ReturnDest.getBlock());
     assert(B.getInsertionBB()->empty() && "Epilog already set up?");
     
     auto cleanupLoc = CleanupLocation::get(ctor);
@@ -286,7 +408,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                                     LoadOwnershipQualifier::Copy);
 
       // Inject the self value into an optional if the constructor is failable.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         selfValue = B.createEnum(cleanupLoc, selfValue,
                                  getASTContext().getOptionalSomeDecl(),
                                  getLoweredLoadableType(resultType));
@@ -299,19 +421,15 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       // Get the address to which to store the result.
       SILValue completeReturnAddress = F.getIndirectResults()[0];
       SILValue returnAddress;
-      switch (ctor->getFailability()) {
-      // For non-failable initializers, store to the return address directly.
-      case OTK_None:
+      if  (!ctor->isFailable()) {
+        // For non-failable initializers, store to the return address directly.
         returnAddress = completeReturnAddress;
-        break;
-      // If this is a failable initializer, project out the payload.
-      case OTK_Optional:
-      case OTK_ImplicitlyUnwrappedOptional:
+      } else {
+        // If this is a failable initializer, project out the payload.
         returnAddress = B.createInitEnumDataAddr(cleanupLoc,
                                                  completeReturnAddress,
-                                       getASTContext().getOptionalSomeDecl(),
+                                         getASTContext().getOptionalSomeDecl(),
                                                  selfLV->getType());
-        break;
       }
       
       // We have to do a non-take copy because someone else may be using the
@@ -320,7 +438,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                        IsNotTake, IsInitialization);
       
       // Inject the enum tag if the result is optional because of failability.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         // Inject the 'Some' tag.
         B.createInjectEnumAddr(cleanupLoc, completeReturnAddress,
                                getASTContext().getOptionalSomeDecl());
@@ -354,13 +472,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 }
 
 void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
-  CanType enumTy = element->getParentEnum()
-                      ->getDeclaredTypeInContext()
-                      ->getCanonicalType();
-  CanType enumIfaceTy = element->getParentEnum()
-                      ->getDeclaredInterfaceType()
-                      ->getCanonicalType();
-  auto &enumTI = getTypeLowering(enumTy);
+  Type enumIfaceTy = element->getParentEnum()->getDeclaredInterfaceType();
+  Type enumTy = F.mapTypeIntoContext(enumIfaceTy);
+  auto &enumTI =
+      SGM.Types.getTypeLowering(enumTy, TypeExpansionContext::minimal());
 
   RegularLocation Loc(element);
   CleanupLocation CleanupLoc(element);
@@ -370,12 +485,12 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   std::unique_ptr<Initialization> dest;
   if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
-                                 SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
-                                 AC.getIdentifier("$return_value"), Type(),
-                                 element->getDeclContext());
+                                 AC.getIdentifier("$return_value"),
+                                 element->getDeclContext());  
+    VD->setSpecifier(ParamSpecifier::InOut);
     VD->setInterfaceType(enumIfaceTy);
     auto resultSlot =
         F.begin()->createFunctionArgument(enumTI.getLoweredType(), VD);
@@ -388,10 +503,9 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   // Emit the exploded constructor argument.
   ArgumentSource payload;
   if (element->hasAssociatedValues()) {
-    RValue arg = emitImplicitValueConstructorArg
-      (*this, Loc, element->getArgumentInterfaceType()->getCanonicalType(),
-       element->getDeclContext());
-   payload = ArgumentSource(Loc, std::move(arg));
+    auto eltArgTy = element->getArgumentInterfaceType()->getCanonicalType();
+    RValue arg = emitImplicitValueConstructorArg(*this, Loc, eltArgTy, element);
+    payload = ArgumentSource(Loc, std::move(arg));
   }
 
   // Emit the metatype argument.
@@ -412,21 +526,16 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
     B.createReturn(ReturnLoc, emitEmptyTuple(Loc));
   } else {
     assert(enumTI.isLoadable() || !silConv.useLoweredAddresses());
-    SILValue result = mv.forward(*this);
+    SILValue result = mv.ensurePlusOne(*this, ReturnLoc).forward(*this);
     scope.pop();
     B.createReturn(ReturnLoc, result);
   }
 }
 
 bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
-  while (true) {
-    // If the root class was implemented in Objective-C, use Objective-C's
-    // allocation methods because they may have been overridden.
-    if (!theClass->hasSuperclass())
-      return theClass->hasClangNode();
-
-    theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
-  }
+  // If the root class was implemented in Objective-C, use Objective-C's
+  // allocation methods because they may have been overridden.
+  return theClass->checkAncestry(AncestryFlags::ClangImported);
 }
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
@@ -440,7 +549,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Forward the constructor arguments.
   // FIXME: Handle 'self' along with the other body patterns.
   SmallVector<SILValue, 8> args;
-  bindParametersForForwarding(ctor->getParameterList(1), args);
+  bindParametersForForwarding(ctor->getParameters(), args);
 
   SILValue selfMetaValue = emitConstructorMetatypeArg(*this, ctor);
 
@@ -453,16 +562,19 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Use alloc_ref to allocate the object.
   // TODO: allow custom allocation?
   // FIXME: should have a cleanup in case of exception
-  auto selfClassDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto selfClassDecl = ctor->getDeclContext()->getSelfClassDecl();
 
   SILValue selfValue;
 
   // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
 
-  if (ctor->isConvenienceInit() || ctor->hasClangNode()) {
-    // For a convenience initializer or an initializer synthesized
-    // for an Objective-C class, allocate using the metatype.
+  if (ctor->hasClangNode() ||
+      ctor->isObjCDynamic() ||
+      ctor->isConvenienceInit()) {
+    assert(ctor->hasClangNode() || ctor->isObjC());
+    // For an allocator thunk synthesized for an @objc convenience initializer
+    // or imported Objective-C init method, allocate using the metatype.
     SILValue allocArg = selfMetaValue;
 
     // When using Objective-C allocation, convert the metatype
@@ -478,9 +590,11 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy,
                                         useObjCAllocation, {}, {});
   } else {
+    assert(ctor->isDesignatedInit());
     // For a designated initializer, we know that the static type being
     // allocated is the type of the class that defines the designated
     // initializer.
+    F.setIsExactSelfClass(IsExactSelfClass);
     selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false,
                                  ArrayRef<SILType>(), ArrayRef<SILValue>());
   }
@@ -494,24 +608,15 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILType initTy;
 
   // Call the initializer.
-  SubstitutionMap subMap;
-  SmallVector<Substitution, 4> subs;
-  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
-    auto *genericSig = genericEnv->getGenericSignature();
-    subMap = genericSig->getSubstitutionMap(
-      [&](SubstitutableType *t) -> Type {
-        return genericEnv->mapTypeIntoContext(
-          t->castTo<GenericTypeParamType>());
-      },
-      MakeAbstractConformanceForGenericType());
-    genericSig->getSubstitutions(subMap, subs);
-  }
+  auto subMap = F.getForwardingSubstitutionMap();
 
   std::tie(initVal, initTy)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, subMap);
 
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
-                                                  initTy, subs, args);
+                                                  initTy, subMap, args);
+
+  emitProfilerIncrement(ctor->getBody());
 
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
@@ -540,7 +645,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // this behavior, we could avoid runtime overhead here.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
   auto *dc = ctor->getDeclContext();
-  auto selfClassDecl = dc->getAsClassOrClassExtensionContext();
+  auto selfClassDecl = dc->getSelfClassDecl();
   bool NeedsBoxForSelf = isDelegating ||
     (selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation());
   bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
@@ -549,10 +654,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // enforce its DI properties on stored properties.
   MarkUninitializedInst::Kind MUKind;
 
-  if (isDelegating)
-    MUKind = MarkUninitializedInst::DelegatingSelf;
-  else if (selfClassDecl->requiresStoredPropertyInits() &&
-           usesObjCAllocator) {
+  if (isDelegating) {
+    if (ctor->isObjC())
+      MUKind = MarkUninitializedInst::DelegatingSelfAllocated;
+    else
+      MUKind = MarkUninitializedInst::DelegatingSelf;
+  } else if (selfClassDecl->requiresStoredPropertyInits() &&
+             usesObjCAllocator) {
     // Stored properties will be initialized in a separate
     // .cxx_construct method called by the Objective-C runtime.
     assert(selfClassDecl->hasSuperclass() &&
@@ -570,16 +678,18 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Emit the prolog for the non-self arguments.
   // FIXME: Handle self along with the other body patterns.
-  emitProlog(ctor->getParameterList(1),
-             TupleType::getEmpty(F.getASTContext()), ctor, ctor->hasThrows());
+  uint16_t ArgNo = emitProlog(ctor->getParameters(), /*selfParam=*/nullptr,
+                              TupleType::getEmpty(F.getASTContext()), ctor,
+                              ctor->hasThrows(), ctor->getThrowsLoc());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  ManagedValue selfArg = B.createFunctionArgument(selfTy, selfDecl);
+  ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);
 
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();
-    B.createDebugValue(PrologueLoc, selfArg.getValue());
+    SILDebugVariable DbgVar(selfDecl->isLet(), ++ArgNo);
+    B.createDebugValue(PrologueLoc, selfArg.getValue(), DbgVar);
   }
 
   if (!ctor->hasStubImplementation()) {
@@ -588,7 +698,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     if (NeedsBoxForSelf) {
       SILLocation prologueLoc = RegularLocation(ctor);
       prologueLoc.markAsPrologue();
-      // SEMANTIC ARC TODO: When the verifier is complete, review this.
       B.emitStoreValueOperation(prologueLoc, selfArg.forward(*this),
                                 VarLocs[selfDecl].value,
                                 StoreOwnershipQualifier::Init);
@@ -604,7 +713,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(Type(), ctor->hasThrows(),
+  prepareEpilog(false, ctor->hasThrows(),
                 CleanupLocation::get(endOfInitLoc));
 
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
@@ -615,20 +724,21 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILArgument *failureExitArg = nullptr;
   auto &resultLowering = getTypeLowering(resultType);
 
-  if (ctor->getFailability() != OTK_None) {
+  if (ctor->isFailable()) {
     SILBasicBlock *failureBB = createBasicBlock(FunctionSection::Postmatter);
 
     RegularLocation loc(ctor);
     loc.markAutoGenerated();
 
     // On failure, we'll clean up everything and return nil instead.
-    SavedInsertionPoint savedIP(*this, failureBB, FunctionSection::Postmatter);
+    SILGenSavedInsertionPoint savedIP(*this, failureBB,
+                                      FunctionSection::Postmatter);
 
     failureExitBB = createBasicBlock();
-    failureExitArg = failureExitBB->createPHIArgument(
+    failureExitArg = failureExitBB->createPhiArgument(
         resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
 
-    Cleanups.emitCleanupsForReturn(ctor);
+    Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);
     SILValue nilResult =
         B.createEnum(loc, SILValue(), getASTContext().getOptionalNoneDecl(),
                      resultLowering.getLoweredType());
@@ -663,6 +773,22 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the constructor body.
   emitStmt(ctor->getBody());
 
+  // Emit the call to super.init() right before exiting from the initializer.
+  if (NeedsBoxForSelf) {
+    if (auto *SI = ctor->getSuperInitCall()) {
+      B.setInsertionPoint(ReturnDest.getBlock());
+
+      emitRValue(SI);
+
+      B.emitBlock(B.splitBlockForFallthrough(), ctor);
+
+      ReturnDest = JumpDest(B.getInsertionBB(),
+                            ReturnDest.getDepth(),
+                            ReturnDest.getCleanupLocation());
+      B.clearInsertionPoint();
+    }
+  }
+
   CleanupStateRestorationScope SelfCleanupSave(Cleanups);
 
   // Build a custom epilog block, since the AST representation of the
@@ -675,17 +801,12 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                                           ReturnDest.getDepth()) &&
            "emitting epilog in wrong scope");
 
-    SavedInsertionPoint savedIP(*this, ReturnDest.getBlock());
-    assert(B.getInsertionBB()->empty() && "Epilog already set up?");
+    SILGenSavedInsertionPoint savedIP(*this, ReturnDest.getBlock());
     auto cleanupLoc = CleanupLocation(ctor);
 
     // If we're using a box for self, reload the value at the end of the init
     // method.
     if (NeedsBoxForSelf) {
-      // Emit the call to super.init() right before exiting from the initializer.
-      if (Expr *SI = ctor->getSuperInitCall())
-        emitRValue(SI);
-
       ManagedValue storedSelf =
           ManagedValue::forUnmanaged(VarLocs[selfDecl].value);
       selfArg = B.createLoadCopy(cleanupLoc, storedSelf);
@@ -702,7 +823,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     }
 
     // Inject the self value into an optional if the constructor is failable.
-    if (ctor->getFailability() != OTK_None) {
+    if (ctor->isFailable()) {
       RegularLocation loc(ctor);
       loc.markAutoGenerated();
       selfArg = B.createEnum(loc, selfArg,
@@ -746,28 +867,24 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
 static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                           VarDecl *selfDecl) {
-  CanType selfFormalType = selfDecl->getType()
-      ->getInOutObjectType()->getCanonicalType();
+  CanType selfFormalType = selfDecl->getType()->getCanonicalType();
   if (selfFormalType->hasReferenceSemantics())
-    return SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType(),
+    return SGF.emitRValueForDecl(loc, selfDecl, selfFormalType,
                                  AccessSemantics::DirectToStorage,
                                  SGFContext::AllowImmediatePlusZero)
       .getAsSingleValue(SGF, loc);
   else
-    return SGF.emitLValueForDecl(loc, selfDecl,
-                                 selfDecl->getType()->getCanonicalType(),
-                                 AccessKind::Write,
-                                 AccessSemantics::DirectToStorage);
+    return SGF.emitAddressOfLocalVarDecl(loc, selfDecl, selfFormalType,
+                                         SGFAccessKind::Write);
 }
 
 static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                       VarDecl *selfDecl,
                                       VarDecl *property) {
-  CanType selfFormalType = selfDecl->getType()
-    ->getInOutObjectType()->getCanonicalType();
+  CanType selfFormalType = selfDecl->getType()->getCanonicalType();
   auto self = emitSelfForMemberInit(SGF, loc, selfDecl);
   return SGF.emitPropertyLValue(loc, self, selfFormalType, property,
-                                LValueOptions(), AccessKind::Write,
+                                LValueOptions(), SGFAccessKind::Write,
                                 AccessSemantics::DirectToStorage);
 }
 
@@ -826,70 +943,21 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
   }
 }
 
-static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
-                                         VarDecl *behaviorVar) {
-  Mangle::ASTMangler NewMangler;
-  std::string behaviorInitName = NewMangler.mangleBehaviorInitThunk(behaviorVar);
-  
-  SILFunction *thunkFn;
-  // Skip out early if we already emitted this thunk.
-  if (auto existing = SGF.SGM.M.lookUpFunction(behaviorInitName)) {
-    thunkFn = existing;
-  } else {
-    auto init = behaviorVar->getBehavior()->InitStorageDecl.getDecl();
-    auto initFn = SGF.SGM.getFunction(SILDeclRef(init), NotForDefinition);
-    
-    // Emit a thunk to inject the `self` metatype and implode tuples.
-    auto storageVar = behaviorVar->getBehavior()->StorageDecl;
-    auto selfTy = behaviorVar->getDeclContext()->getDeclaredInterfaceType();
-    auto initTy = SGF.getLoweredType(selfTy).getFieldType(behaviorVar,
-                                                          SGF.SGM.M);
-    auto storageTy = SGF.getLoweredType(selfTy).getFieldType(storageVar,
-                                                             SGF.SGM.M);
-    
-    auto initConstantTy = initFn->getLoweredType().castTo<SILFunctionType>();
-    
-    auto param = SILParameterInfo(initTy.getSwiftRValueType(),
-                        initTy.isAddress() ? ParameterConvention::Indirect_In
-                                           : ParameterConvention::Direct_Owned);
-    auto result = SILResultInfo(storageTy.getSwiftRValueType(),
-                              storageTy.isAddress() ? ResultConvention::Indirect
-                                                    : ResultConvention::Owned);
-    
-    initConstantTy = SILFunctionType::get(initConstantTy->getGenericSignature(),
-                                          initConstantTy->getExtInfo(),
-                                          ParameterConvention::Direct_Unowned,
-                                          param,
-                                          result,
-                                          // TODO: throwing initializer?
-                                          None,
-                                          SGF.getASTContext());
-    
-    // TODO: Generate the body of the thunk.
-    thunkFn = SGF.SGM.M.getOrCreateFunction(SILLocation(behaviorVar),
-                                            behaviorInitName,
-                                            SILLinkage::PrivateExternal,
-                                            initConstantTy,
-                                            IsBare, IsTransparent, IsSerialized);
-    
-    
-  }
-  return SGF.B.createFunctionRef(behaviorVar, thunkFn);
-}
-
-static SILValue getBehaviorSetterFn(SILGenFunction &SGF, VarDecl *behaviorVar) {
-  auto set = behaviorVar->getSetter();
-  auto setFn = SGF.SGM.getFunction(SILDeclRef(set), NotForDefinition);
-
-  // TODO: The setter may need to be a thunk, to implode tuples or perform
-  // reabstractions.
-  return SGF.B.createFunctionRef(behaviorVar, setFn);
-}
-
 static Type getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
     Pattern *pattern) {
-  auto interfaceType = fromDC->mapTypeOutOfContext(pattern->getType());
+  auto interfaceType = pattern->getType()->mapTypeOutOfContext();
+
+  // If this pattern is initializing the backing storage for a property
+  // with an attached wrapper that is initialized with `=`, the
+  // initialization type is the original property type.
+  if (auto singleVar = pattern->getSingleVar()) {
+    if (auto originalProperty = singleVar->getOriginalWrappedProperty()) {
+      if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
+        interfaceType = originalProperty->getPropertyWrapperInitValueInterfaceType();
+    }
+  }
+
   auto resultType = toDC->mapTypeIntoContext(interfaceType);
 
   return resultType;
@@ -898,96 +966,48 @@ static Type getInitializationTypeInContext(
 void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             VarDecl *selfDecl,
                                             NominalTypeDecl *nominal) {
+  auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
+
   for (auto member : nominal->getMembers()) {
     // Find instance pattern binding declarations that have initializers.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;
 
-      for (auto entry : pbd->getPatternList()) {
-        auto init = entry.getInit();
+      for (auto i : range(pbd->getNumPatternEntries())) {
+        auto init = pbd->getExecutableInit(i);
         if (!init) continue;
 
+        auto *varPattern = pbd->getPattern(i);
         // Cleanup after this initialization.
-        FullExpr scope(Cleanups, entry.getPattern());
-
-        // We want a substitution list written in terms of the generic
-        // signature of the type, with replacement archetypes from the
-        // constructor's context (which might be in an extension of
-        // the type, which adds additional generic requirements).
-        SubstitutionList subs;
-        auto *genericEnv = dc->getGenericEnvironmentOfContext();
-        auto typeGenericSig = nominal->getGenericSignatureOfContext();
-
-        if (genericEnv && typeGenericSig) {
-          // Generate a set of substitutions for the initialization function,
-          // whose generic signature is that of the type context, and whose
-          // replacement types are the archetypes of the initializer itself.
-          auto subMap = typeGenericSig->getSubstitutionMap(
-                       [&](SubstitutableType *type) {
-                         if (auto gp = type->getAs<GenericTypeParamType>()) {
-                           return genericEnv->mapTypeIntoContext(gp);
-                         }
-
-                         return Type(type);
-                       },
-                       [](CanType dependentType,
-                           Type conformingReplacementType,
-                           ProtocolType *conformedProtocol) {
-                         return ProtocolConformanceRef(
-                                  conformedProtocol->getDecl());
-                       });
-          SmallVector<Substitution, 4> subsVec;
-          typeGenericSig->getSubstitutions(subMap, subsVec);
-          subs = SGM.getASTContext().AllocateCopy(subsVec);
-        }
+        FullExpr scope(Cleanups, varPattern);
 
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.
         CanType resultType = getInitializationTypeInContext(
-            pbd->getDeclContext(), dc, entry.getPattern())->getCanonicalType();
+            pbd->getDeclContext(), dc, varPattern)->getCanonicalType();
         AbstractionPattern origResultType(resultType);
 
         // FIXME: Can emitMemberInit() share code with
         // InitializationForPattern in SILGenDecl.cpp?
         RValue result = emitApplyOfStoredPropertyInitializer(
-                                  init, entry, subs,
+                                  init, pbd->getAnchoringVarDecl(i), subs,
                                   resultType, origResultType,
                                   SGFContext());
 
-        emitMemberInit(*this, selfDecl, entry.getPattern(), std::move(result));
+        // If we have the backing storage for a property with an attached
+        // property wrapper initialized with `=`, inject the value into an
+        // instance of the wrapper.
+        if (auto singleVar = pbd->getSingleVar()) {
+          auto originalVar = singleVar->getOriginalWrappedProperty();
+          if (originalVar &&
+              originalVar->isPropertyMemberwiseInitializedWithWrappedType()) {
+            result = maybeEmitPropertyWrapperInitFromValue(
+                *this, init, singleVar, subs, std::move(result));
+          }
+        }
+
+        emitMemberInit(*this, selfDecl, varPattern, std::move(result));
       }
-    }
-    
-    // Introduce behavior initialization markers for properties that need them.
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->isStatic()) continue;
-      if (!var->hasBehaviorNeedingInitialization()) continue;
-      
-      // Get the initializer method for behavior.
-      auto init = var->getBehavior()->InitStorageDecl;
-      SILValue initFn = getBehaviorInitStorageFn(*this, var);
-      
-      // Get the behavior's storage we need to initialize.
-      auto storage = var->getBehavior()->StorageDecl;
-      LValue storageRef = emitLValueForMemberInit(*this, var, selfDecl,storage);
-      // Shed any reabstraction over the member.
-      while (storageRef.isLastComponentTranslation())
-        storageRef.dropLastTranslationComponent();
-      
-      auto storageAddr = emitAddressOfLValue(var, std::move(storageRef),
-                                             AccessKind::ReadWrite);
-      
-      // Get the setter.
-      auto setterFn = getBehaviorSetterFn(*this, var);
-      auto self = emitSelfForMemberInit(*this, var, selfDecl);
-      
-      auto mark = B.createMarkUninitializedBehavior(var,
-               initFn, init.getSubstitutions(), storageAddr.getValue(),
-               setterFn, getForwardingSubstitutions(), self.getValue(),
-               getLoweredType(var->getType()).getAddressType());
-      
-      // The mark instruction stands in for the behavior property.
-      VarLocs[var].value = mark;
     }
   }
 }
@@ -1003,14 +1023,16 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   SILValue selfArg = F.begin()->createFunctionArgument(selfTy, selfDecl);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
-  B.createDebugValue(PrologueLoc, selfArg);
+  // Hard-code self as argument number 1.
+  SILDebugVariable DbgVar(selfDecl->isLet(), 1);
+  B.createDebugValue(PrologueLoc, selfArg, DbgVar);
   selfArg = B.createMarkUninitialized(selfDecl, selfArg,
                                       MarkUninitializedInst::RootSelf);
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
   VarLocs[selfDecl] = VarLoc::get(selfArg);
 
   auto cleanupLoc = CleanupLocation::get(loc);
-  prepareEpilog(TupleType::getEmpty(getASTContext()), false, cleanupLoc);
+  prepareEpilog(false, false, cleanupLoc);
 
   // Emit the initializers.
   emitMemberInitializers(cd, selfDecl, cd);

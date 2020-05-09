@@ -10,7 +10,7 @@
 // REQUIRES: PTRSIZE=64
 
 // Clear the temporary directory
-// RUN: rm -rfv %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // We use a driver file to ensure that we are not dependent on how main/start
 // are setup on our platform. The c function interface that we use is very
@@ -44,7 +44,7 @@ import Builtin
 
 sil @putchar : $@convention(c) (Builtin.Int64) -> ()
 
-sil @target_func : $@convention(thin) () -> () {
+sil [serialized] @target_func : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @putchar : $@convention(c) (Builtin.Int64) -> ()
   // "swift\n" in ASCII
@@ -64,7 +64,7 @@ bb0:
   return %9999 : $()
 }
 
-sil @function_2 : $@convention(thin) () -> () {
+sil [serialized] @function_2 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @target_func : $@convention(thin) () -> ()
   apply %0() : $@convention(thin) () -> ()
@@ -76,7 +76,7 @@ bb0:
   return %9999 : $()
 }
 
-sil @function_3 : $@convention(thin) () -> () {
+sil [serialized] @function_3 : $@convention(thin) () -> () {
 bb0:
   // Make sure we only eliminate one.
   %0 = function_ref @target_func : $@convention(thin) () -> ()

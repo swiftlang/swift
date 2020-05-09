@@ -1,0 +1,14 @@
+{
+  "kind": "Root",
+  "name": "TopLevel",
+  "printedName": "TopLevel",
+  "badKey": ["foo", "bar", "baz"],
+  "children": [
+    {
+      "kind": "Zyzyx",
+      "typeAttributes": ["autoclosure", "fnord", "inout", "Available"],
+      "declAttributes": ["Available", "Fnord", "ObjC", "inout"],
+      "declKind": "Subroutine"
+    }
+  ]
+}

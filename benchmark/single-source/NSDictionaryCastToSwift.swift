@@ -18,12 +18,18 @@
 import Foundation
 import TestsUtils
 
+public let NSDictionaryCastToSwift = BenchmarkInfo(
+  name: "NSDictionaryCastToSwift",
+  runFunction: run_NSDictionaryCastToSwift,
+  tags: [.validation, .api, .Dictionary, .bridging],
+  legacyFactor: 10)
+
 @inline(never)
 public func run_NSDictionaryCastToSwift(_ N: Int) {
 #if _runtime(_ObjC)
     let NSDict = NSDictionary()
     var swiftDict = [String: NSObject]()
-    for _ in 1...10000*N {
+    for _ in 1...1_000*N {
         swiftDict = NSDict as! [String: NSObject]
         if !swiftDict.isEmpty {
             break

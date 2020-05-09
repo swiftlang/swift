@@ -1,0 +1,141 @@
+// RUN: %target-sil-opt -let-properties-opt -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Test initialization of a constant aggregate "let".
+// <rdar://problem/45691574> [SR-9146] IBAnimatable - SILCloner crash in LetPropertiesOpt.
+
+struct Point {
+  var x: Int64
+  var y: Int64
+}
+
+class HasCenter {
+  let centerPoint: Point = Point(x: 0, y: 0)
+  public func getCenter() -> Int64
+}
+
+sil hidden [ossa] @$s19let_properties_opts5PointV1x1yACSi_SitcfC : $@convention(method) (Int64, Int64, @thin Point.Type) -> Point {
+bb0(%0 : $Int64, %1 : $Int64, %2 : $@thin Point.Type):
+  %3 = struct $Point (%0 : $Int64, %1 : $Int64)
+  return %3 : $Point
+}
+
+// variable initialization expression of HasCenter.centerPoint
+sil hidden [transparent] [ossa] @$s19let_properties_opts9HasCenterC11centerPointAA0E0Vvpfi : $@convention(thin) () -> Point {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = struct $Point (%1 : $Int64, %1 : $Int64)
+  return %2 : $Point
+}
+
+// HasCenter.centerPoint.getter
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s19let_properties_opts9HasCenterC11centerPointAA0E0Vvg : $@convention(method) (@guaranteed HasCenter) -> Point {
+// CHECK: bb0(%0 : @guaranteed $HasCenter):
+// CHECK: [[LIT:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK: [[INT:%.*]] = struct $Int64 ([[LIT]] : $Builtin.Int64)
+// CHECK: [[PNT:%.*]] = struct $Point ([[INT]] : $Int64, [[INT]] : $Int64)
+// CHECK: return [[PNT]] : $Point
+// CHECK-LABEL: } // end sil function '$s19let_properties_opts9HasCenterC11centerPointAA0E0Vvg'
+sil hidden [transparent] [ossa] @$s19let_properties_opts9HasCenterC11centerPointAA0E0Vvg : $@convention(method) (@guaranteed HasCenter) -> Point {
+bb0(%0 : @guaranteed $HasCenter):
+  %1 = ref_element_addr %0 : $HasCenter, #HasCenter.centerPoint
+  %2 = load [trivial] %1 : $*Point
+  return %2 : $Point
+}
+
+// HasCenter.getCenter()
+// CHECK-LABEL: sil hidden [ossa] @$s19let_properties_opts9HasCenterC9getCenterSiyF : $@convention(method) (@guaranteed HasCenter) -> Int64 {
+// CHECK: [[LIT:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK: [[INT:%.*]] = struct $Int64 ([[LIT]] : $Builtin.Int64)
+// CHECK: [[PNT:%.*]] = struct $Point ([[INT]] : $Int64, [[INT]] : $Int64)
+// CHECK: [[X:%.*]] = struct_extract [[PNT]] : $Point, #Point.x
+// CHECK: return [[X]] : $Int64
+// CHECK-LABEL: } // end sil function '$s19let_properties_opts9HasCenterC9getCenterSiyF'
+sil hidden [ossa] @$s19let_properties_opts9HasCenterC9getCenterSiyF : $@convention(method) (@guaranteed HasCenter) -> Int64 {
+bb0(%0 : @guaranteed $HasCenter):
+  %1 = ref_element_addr %0 : $HasCenter, #HasCenter.centerPoint
+  %2 = struct_element_addr %1 : $*Point, #Point.x
+  %3 = load [trivial] %2 : $*Int64
+  return %3 : $Int64
+}
+
+// HasCenter.init()
+sil hidden [ossa] @$s19let_properties_opts9HasCenterCACycfc : $@convention(method) (@owned HasCenter) -> @owned HasCenter {
+bb0(%0 : @owned $HasCenter):
+  %1 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%1 : $Builtin.Int64)
+  %4 = struct $Point (%3 : $Int64, %3 : $Int64)
+  %5 = begin_borrow %0 : $HasCenter
+  %6 = ref_element_addr %5 : $HasCenter, #HasCenter.centerPoint
+  store %4 to [trivial] %6 : $*Point
+  end_borrow %5 : $HasCenter
+  %9 = copy_value %0 : $HasCenter
+  destroy_value %0 : $HasCenter
+  return %9 : $HasCenter
+}
+
+// -----------------------------------------------------------------------------
+// Test that struct 'let's are not replaced with constants. A struct
+// 'let' is part of a larger mutable value.
+
+private struct Inner {
+  @_hasStorage let val: Int32 { get }
+  init(val: Int32)
+}
+
+private struct Outer {
+  @_hasStorage @_hasInitialValue var inner: Inner { get set }
+  init(inner: Inner)
+}
+
+sil [transparent] @initInnerLet : $@convention(thin) () -> Inner {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = struct $Inner (%1 : $Int32)
+  return %2 : $Inner
+}
+
+// Check that the returned value is reloaded from inner.val after the memcpy.
+//
+// CHECK-LABEL: sil hidden @testStructLet : $@convention(thin) (@inout Outer) -> Int32 {
+// CHECK: bb0(%0 : $*Outer):
+// CHECK: [[OUTADR:%.*]] = address_to_pointer %0 : $*Outer to $Builtin.RawPointer
+// CHECK: builtin "int_memcpy_RawPointer_RawPointer_Int64"([[OUTADR]] : $Builtin.RawPointer, %{{.*}} : $Builtin.RawPointer, %{{.*}} : $Builtin.Int64, %{{.*}} : $Builtin.Int1) : $()
+// CHECK: [[INADR:%.*]] = struct_element_addr %0 : $*Outer, #Outer.inner
+// CHECK: [[VALADR:%.*]] = struct_element_addr [[INADR]] : $*Inner, #Inner.val
+// CHECK: [[VAL:%.*]] = load %22 : $*Int32
+// CHECK: return [[VAL]] : $Int32
+// CHECK-LABEL: } // end sil function 'testStructLet'
+sil hidden @testStructLet : $@convention(thin) (@inout Outer) -> Int32 {
+bb0(%0 : $*Outer):
+  %1 = address_to_pointer %0 : $*Outer to $Builtin.RawPointer
+  %2 = metatype $@thick Outer.Type
+  %3 = builtin "sizeof"<Outer>(%2 : $@thick Outer.Type) : $Builtin.Word
+  %4 = builtin "sextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64
+  %5 = integer_literal $Builtin.Int64, 0
+  %6 = builtin "cmp_slt_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %6 : $Builtin.Int1, "UnsafeMutableRawBufferPointer with negative count"
+  %8 = integer_literal $Builtin.Int32, 0
+  %9 = struct $Int32 (%8 : $Builtin.Int32)
+  %10 = integer_literal $Builtin.Int1, 0
+  %11 = alloc_stack $Int32
+  store %9 to %11 : $*Int32
+  %13 = address_to_pointer %11 : $*Int32 to $Builtin.RawPointer
+  %14 = metatype $@thick Int32.Type
+  %15 = builtin "sizeof"<Int32>(%14 : $@thick Int32.Type) : $Builtin.Word
+  %16 = builtin "sextOrBitCast_Word_Int64"(%15 : $Builtin.Word) : $Builtin.Int64
+  %17 = builtin "cmp_slt_Int64"(%16 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %17 : $Builtin.Int1, "Negative value is not representable"
+  %19 = builtin "int_memcpy_RawPointer_RawPointer_Int64"(%1 : $Builtin.RawPointer, %13 : $Builtin.RawPointer, %16 : $Builtin.Int64, %10 : $Builtin.Int1) : $()
+  dealloc_stack %11 : $*Int32
+  %21 = struct_element_addr %0 : $*Outer, #Outer.inner
+  %22 = struct_element_addr %21 : $*Inner, #Inner.val
+  %23 = load %22 : $*Int32
+  return %23 : $Int32
+}

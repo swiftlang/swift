@@ -85,3 +85,7 @@ class Something {
 func testP3(_ p: P3, something: Something) {
   p.withP3(Something.takeP3(something))
 }
+
+func testIUOToAny(_ t: AnyObject.Type!) {
+  let _: Any = t
+}

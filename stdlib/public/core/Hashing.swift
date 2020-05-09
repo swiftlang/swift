@@ -11,167 +11,153 @@
 //===----------------------------------------------------------------------===//
 
 //
-// This file implements helpers for constructing non-cryptographic hash
-// functions.
-//
-// This code was ported from LLVM's ADT/Hashing.h.
-//
-// Currently the algorithm is based on CityHash, but this is an implementation
-// detail.  Even more, there are facilities to mix in a per-execution seed to
-// ensure that hash values differ between executions.
+// This file implements helpers for hashing collections.
 //
 
 import SwiftShims
 
-public // @testable
-struct _Hashing {
-  // FIXME(ABI)#41 : make this an actual public API.
-  public // SPI
-  static var secretKey: (UInt64, UInt64) {
-    get {
-      // The variable itself is defined in C++ code so that it is initialized
-      // during static construction.  Almost every Swift program uses hash
-      // tables, so initializing the secret key during the startup seems to be
-      // the right trade-off.
-      return (
-        _swift_stdlib_Hashing_secretKey.key0,
-        _swift_stdlib_Hashing_secretKey.key1)
-    }
-    set {
-      (_swift_stdlib_Hashing_secretKey.key0,
-       _swift_stdlib_Hashing_secretKey.key1) = newValue
-    }
-  }
+/// The inverse of the default hash table load factor.  Factored out so that it
+/// can be used in multiple places in the implementation and stay consistent.
+/// Should not be used outside `Dictionary` implementation.
+@usableFromInline @_transparent
+internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
+  return 1.0 / 0.75
 }
 
-public // @testable
-struct _HashingDetail {
-
-  public // @testable
-  static var fixedSeedOverride: UInt64 {
-    get {
-      // HACK: the variable itself is defined in C++ code so that it is
-      // guaranteed to be statically initialized.  This is a temporary
-      // workaround until the compiler can do the same for Swift.
-      return _swift_stdlib_HashingDetail_fixedSeedOverride
-    }
-    set {
-      _swift_stdlib_HashingDetail_fixedSeedOverride = newValue
-    }
-  }
-
-  @_versioned
-  @_transparent
-  static func getExecutionSeed() -> UInt64 {
-    // FIXME: This needs to be a per-execution seed. This is just a placeholder
-    // implementation.
-    let seed: UInt64 = 0xff51afd7ed558ccd
-    return _HashingDetail.fixedSeedOverride == 0 ? seed : fixedSeedOverride
-  }
-
-  @_versioned
-  @_transparent
-  static func hash16Bytes(_ low: UInt64, _ high: UInt64) -> UInt64 {
-    // Murmur-inspired hashing.
-    let mul: UInt64 = 0x9ddfea08eb382d69
-    var a: UInt64 = (low ^ high) &* mul
-    a ^= (a >> 47)
-    var b: UInt64 = (high ^ a) &* mul
-    b ^= (b >> 47)
-    b = b &* mul
-    return b
-  }
-}
-
-//
-// API functions.
-//
-
-//
-// _mix*() functions all have type (T) -> T.  These functions don't compress
-// their inputs and just exhibit avalanche effect.
-//
-
-@_transparent
-public // @testable
-func _mixUInt32(_ value: UInt32) -> UInt32 {
-  // Zero-extend to 64 bits, hash, select 32 bits from the hash.
-  //
-  // NOTE: this differs from LLVM's implementation, which selects the lower
-  // 32 bits.  According to the statistical tests, the 3 lowest bits have
-  // weaker avalanche properties.
-  let extendedValue = UInt64(value)
-  let extendedResult = _mixUInt64(extendedValue)
-  return UInt32((extendedResult >> 3) & 0xffff_ffff)
-}
-
-@_transparent
-public // @testable
-func _mixInt32(_ value: Int32) -> Int32 {
-  return Int32(bitPattern: _mixUInt32(UInt32(bitPattern: value)))
-}
-
-@_transparent
-public // @testable
-func _mixUInt64(_ value: UInt64) -> UInt64 {
-  // Similar to hash_4to8_bytes but using a seed instead of length.
-  let seed: UInt64 = _HashingDetail.getExecutionSeed()
-  let low: UInt64 = value & 0xffff_ffff
-  let high: UInt64 = value >> 32
-  return _HashingDetail.hash16Bytes(seed &+ (low << 3), high)
-}
-
-@_transparent
-public // @testable
-func _mixInt64(_ value: Int64) -> Int64 {
-  return Int64(bitPattern: _mixUInt64(UInt64(bitPattern: value)))
-}
-
-@_transparent
-public // @testable
-func _mixUInt(_ value: UInt) -> UInt {
-#if arch(i386) || arch(arm)
-  return UInt(_mixUInt32(UInt32(value)))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  return UInt(_mixUInt64(UInt64(value)))
+#if _runtime(_ObjC)
+/// Call `[lhs isEqual: rhs]`.
+///
+/// This function is part of the runtime because `Bool` type is bridged to
+/// `ObjCBool`, which is in Foundation overlay.
+@_silgen_name("swift_stdlib_NSObject_isEqual")
+internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bool
 #endif
+
+
+/// A temporary view of an array of AnyObject as an array of Unmanaged<AnyObject>
+/// for fast iteration and transformation of the elements.
+///
+/// Accesses the underlying raw memory as Unmanaged<AnyObject> using untyped
+/// memory accesses. The memory remains bound to managed AnyObjects.
+internal struct _UnmanagedAnyObjectArray {
+  /// Underlying pointer.
+  internal var value: UnsafeMutableRawPointer
+
+  internal init(_ up: UnsafeMutablePointer<AnyObject>) {
+    self.value = UnsafeMutableRawPointer(up)
+  }
+
+  internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
+    guard let unwrapped = up else { return nil }
+    self.init(unwrapped)
+  }
+
+  internal subscript(i: Int) -> AnyObject {
+    get {
+      let unmanaged = value.load(
+        fromByteOffset: i * MemoryLayout<AnyObject>.stride,
+        as: Unmanaged<AnyObject>.self)
+      return unmanaged.takeUnretainedValue()
+    }
+    nonmutating set(newValue) {
+      let unmanaged = Unmanaged.passUnretained(newValue)
+      value.storeBytes(of: unmanaged,
+        toByteOffset: i * MemoryLayout<AnyObject>.stride,
+        as: Unmanaged<AnyObject>.self)
+    }
+  }
 }
 
-@_transparent
-public // @testable
-func _mixInt(_ value: Int) -> Int {
-#if arch(i386) || arch(arm)
-  return Int(_mixInt32(Int32(value)))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  return Int(_mixInt64(Int64(value)))
+#if _runtime(_ObjC)
+/// An NSEnumerator implementation returning zero elements. This is useful when
+/// a concrete element type is not recoverable from the empty singleton.
+// NOTE: older runtimes called this class _SwiftEmptyNSEnumerator. The two
+// must coexist without conflicting ObjC class names, so it was
+// renamed. The old name must not be used in the new runtime.
+final internal class __SwiftEmptyNSEnumerator
+  : __SwiftNativeNSEnumerator, _NSEnumerator {
+  internal override required init() {
+    super.init()
+    _internalInvariant(_orphanedFoundationSubclassesReparented)
+  }
+
+  @objc
+  internal func nextObject() -> AnyObject? {
+    return nil
+  }
+
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int
+  ) -> Int {
+    // Even though we never do anything in here, we need to update the
+    // state so that callers know we actually ran.
+    var theState = state.pointee
+    if theState.state == 0 {
+      theState.state = 1 // Arbitrary non-zero value.
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+    }
+    state.pointee = theState
+    return 0
+  }
+}
 #endif
+
+#if _runtime(_ObjC)
+/// This is a minimal class holding a single tail-allocated flat buffer,
+/// representing hash table storage for AnyObject elements. This is used to
+/// store bridged elements in deferred bridging scenarios.
+///
+/// Using a dedicated class for this rather than a _BridgingBuffer makes it easy
+/// to recognize these in heap dumps etc.
+// NOTE: older runtimes called this class _BridgingHashBuffer.
+// The two must coexist without a conflicting ObjC class name, so it
+// was renamed. The old name must not be used in the new runtime.
+internal final class __BridgingHashBuffer
+  : ManagedBuffer<__BridgingHashBuffer.Header, AnyObject> {
+  struct Header {
+    internal var owner: AnyObject
+    internal var hashTable: _HashTable
+
+    init(owner: AnyObject, hashTable: _HashTable) {
+      self.owner = owner
+      self.hashTable = hashTable
+    }
+  }
+
+  internal static func allocate(
+    owner: AnyObject,
+    hashTable: _HashTable
+  ) -> __BridgingHashBuffer {
+    let buffer = self.create(minimumCapacity: hashTable.bucketCount) { _ in
+      Header(owner: owner, hashTable: hashTable)
+    }
+    return unsafeDowncast(buffer, to: __BridgingHashBuffer.self)
+  }
+
+  deinit {
+    for bucket in header.hashTable {
+      (firstElementAddress + bucket.offset).deinitialize(count: 1)
+    }
+    _fixLifetime(self)
+  }
+
+  internal subscript(bucket: _HashTable.Bucket) -> AnyObject {
+    @inline(__always) get {
+      _internalInvariant(header.hashTable.isOccupied(bucket))
+      defer { _fixLifetime(self) }
+      return firstElementAddress[bucket.offset]
+    }
+  }
+
+  @inline(__always)
+  internal func initialize(at bucket: _HashTable.Bucket, to object: AnyObject) {
+    _internalInvariant(header.hashTable.isOccupied(bucket))
+    (firstElementAddress + bucket.offset).initialize(to: object)
+    _fixLifetime(self)
+  }
 }
-
-/// Given a hash value, returns an integer value in the range of
-/// 0..<`upperBound` that corresponds to a hash value.
-///
-/// The `upperBound` must be positive and a power of 2.
-///
-/// This function is superior to computing the remainder of `hashValue` by
-/// the range length.  Some types have bad hash functions; sometimes simple
-/// patterns in data sets create patterns in hash values and applying the
-/// remainder operation just throws away even more information and invites
-/// even more hash collisions.  This effect is especially bad because the
-/// range is a power of two, which means to throws away high bits of the hash
-/// (which would not be a problem if the hash was known to be good). This
-/// function mixes the bits in the hash value to compensate for such cases.
-///
-/// Of course, this function is a compressing function, and applying it to a
-/// hash value does not change anything fundamentally: collisions are still
-/// possible, and it does not prevent malicious users from constructing data
-/// sets that will exhibit pathological collisions.
-public // @testable
-func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
-  _sanityCheck(_isPowerOf2(upperBound))
-  let mixedHashValue = _mixInt(hashValue)
-
-  // As `upperBound` is a power of two we can do a bitwise-and to calculate
-  // mixedHashValue % upperBound.
-  return mixedHashValue & (upperBound &- 1)
-}
-
+#endif

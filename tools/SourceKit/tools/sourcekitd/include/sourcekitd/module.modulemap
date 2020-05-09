@@ -1,0 +1,4 @@
+module sourcekitd {
+  umbrella header "sourcekitd.h"
+  export *
+}

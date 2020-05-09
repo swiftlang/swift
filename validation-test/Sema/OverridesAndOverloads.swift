@@ -103,10 +103,8 @@ Overrides.test("covariant argument override, struct to protocol") {
   }
 
   // FIXME: https://bugs.swift.org/browse/SR-731
-  expectFailure {
-    Derived().foo(P1ImplS1())
-    expectEqual("Derived.foo(P1)", which)
-  }
+  Derived().foo(P1ImplS1())
+  expectEqual("Base.foo(P1ImplS1)", which)
 
   Derived().foo(P1xImplS1())
   expectEqual("Derived.foo(P1)", which)
@@ -321,14 +319,13 @@ Overloads.test("generic methods are worse than non-generic") {
     func foo(_: C1) { which = "foo(C1)" }
     func foo(_: Any) { which = "foo(Any)" }
     func foo<T>(_: T) { which = "foo(T)" }
-    // It is not possible to call foo<T>(T).  foo(Any) always wins.
 
     func bar(_: C1) { which = "bar(C1)" }
     func bar<T>(_: T) { which = "bar(T)" }
   }
 
   Base().foo(C1());     expectEqual("foo(C1)", which)
-  Base().foo(Token1()); expectEqual("foo(Any)", which)
+  Base().foo(Token1()); expectEqual("foo(T)", which)
 
   Base().bar(C1());     expectEqual("bar(C1)", which)
   Base().bar(Token1()); expectEqual("bar(T)", which)

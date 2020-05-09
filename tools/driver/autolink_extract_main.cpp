@@ -31,7 +31,6 @@
 #include "llvm/Option/Option.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ObjectFile.h"
-#include "llvm/Object/COFF.h"
 #include "llvm/Object/ELFObjectFile.h"
 
 using namespace swift;
@@ -81,10 +80,11 @@ public:
     }
 
     if (ParsedArgs.getLastArg(OPT_help)) {
-      std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
+      std::string ExecutableName =
+          llvm::sys::path::stem(MainExecutablePath).str();
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Autolink Extract", options::AutolinkExtractOption,
-                       0);
+                       0, /*ShowAllAliases*/false);
       return 1;
     }
 
@@ -107,26 +107,42 @@ public:
 
 /// Look inside the object file 'ObjectFile' and append any linker flags found in
 /// its ".swift1_autolink_entries" section to 'LinkerFlags'.
-static void
+/// Return 'true' if there was an error, and 'false' otherwise.
+static bool
 extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
-                                 std::vector<std::string> &LinkerFlags) {
+                                 std::vector<std::string> &LinkerFlags,
+                                 CompilerInstance &Instance) {
   // Search for the section we hold autolink entries in
   for (auto &Section : ObjectFile->sections()) {
-    llvm::StringRef SectionName;
-    Section.getName(SectionName);
+    llvm::Expected<llvm::StringRef> SectionNameOrErr = Section.getName();
+    if (!SectionNameOrErr) {
+      llvm::consumeError(SectionNameOrErr.takeError());
+      continue;
+    }
+    llvm::StringRef SectionName = *SectionNameOrErr;
     if (SectionName == ".swift1_autolink_entries") {
-      llvm::StringRef SectionData;
-      Section.getContents(SectionData);
+      llvm::Expected<llvm::StringRef> SectionData = Section.getContents();
+      if (!SectionData) {
+        std::string message;
+        {
+          llvm::raw_string_ostream os(message);
+          logAllUnhandledErrors(SectionData.takeError(), os, "");
+        }
+        Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
+                                  ObjectFile->getFileName() , message);
+        return true;
+      }
 
       // entries are null-terminated, so extract them and push them into
       // the set.
       llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
-      SectionData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
-                        /*KeepEmpty=*/false);
+      SectionData->split(SplitFlags, llvm::StringRef("\0", 1), -1,
+                         /*KeepEmpty=*/false);
       for (const auto &Flag : SplitFlags)
-        LinkerFlags.push_back(Flag);
+        LinkerFlags.push_back(Flag.str());
     }
   }
+  return false;
 }
 
 /// Look inside the binary 'Bin' and append any linker flags found in its
@@ -138,12 +154,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
                                StringRef BinaryFileName,
                                std::vector<std::string> &LinkerFlags) {
   if (auto *ObjectFile = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Bin)) {
-    extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags);
-    return false;
-  } else if (auto *ObjectFile =
-                 llvm::dyn_cast<llvm::object::COFFObjectFile>(Bin)) {
-    extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags);
-    return false;
+    return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
     llvm::Error Error = llvm::Error::success();
     for (const auto &Child : Archive->children(Error)) {

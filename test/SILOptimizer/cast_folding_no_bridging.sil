@@ -1,8 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-sil %s | %FileCheck %s
-// REQUIRES: objc_interop
 
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// REQUIRES: objc_interop
 
 // We want to check that casts between two types which are both Swift types or
 // both are ObjC types are not optimized by the cast optimizer into casts
@@ -51,7 +49,7 @@ bb3:
 // CHECK: return
 sil @testObjCToObjC : $@convention(thin) (NSSet, NSSet) -> @owned NSSet {
 bb0(%0 : $NSSet, %1 : $NSSet):
-  checked_cast_br %0 : $NSSet to $NSSet, bb1, bb3
+  checked_cast_br %0 : $NSSet to NSSet, bb1, bb3
 
 bb1(%2 : $NSSet):
   br bb2(%2 : $NSSet)
@@ -88,7 +86,7 @@ bb2:
 // CHECK: bb0(
 // CHECK-NEXT: [[T0:%.*]] = load %1 : $*CFString
 // CHECK-NEXT: [[T1:%.*]] = unchecked_ref_cast [[T0]] : $CFString to $NSString
-// CHECK:      [[FN:%.*]] = function_ref @_T0SS10FoundationE34_conditionallyBridgeFromObjectiveCSbSo8NSStringC_SSSgz6resulttFZ : $@convention(method) (@owned NSString, @inout Optional<String>, @thin String.Type) -> Bool
+// CHECK:      [[FN:%.*]] = function_ref @$sSS10FoundationE34_conditionallyBridgeFromObjectiveC_6resultSbSo8NSStringC_SSSgztFZ : $@convention(method) (@guaranteed NSString, @inout Optional<String>, @thin String.Type) -> Bool
 // CHECK: apply [[FN]]([[T1]], {{.*}}, {{.*}})
 sil @testCFToSwift : $@convention(thin) (@in CFString) -> @out String {
 bb0(%0 : $*String, %1 : $*CFString):

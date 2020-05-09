@@ -1,4 +1,4 @@
-_TtBf80_ ---> Builtin.Float80
+_TtBf80_ ---> Builtin.FPIEEE80
 _TtBi32_ ---> Builtin.Int32
 _TtBw ---> Builtin.Word
 _TtBO ---> Builtin.UnknownObject
@@ -135,9 +135,9 @@ _TtGSqGSaC5sugar7MyClass__ ---> [MyClass]?
 _TtGSaGSqC5sugar7MyClass__ ---> [MyClass?]
 _TtaC9typealias5DWARF9DIEOffset ---> DWARF.DIEOffset
 _Ttas3Int ---> Int
-_TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> thunk for @callee_owned (@unowned UnicodeScalar) -> (@unowned Bool)
-_TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> thunk for @callee_owned (@unowned Int) -> (@unowned Int?)
-_TTRGrXFo_iV18switch_abstraction1A_ix_XFo_dS0__ix_ ---> thunk for @callee_owned (@in A) -> (@out A)
+_TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> thunk for @callee_owned (@in UnicodeScalar) -> (@out Bool)
+_TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> thunk for @callee_owned (@in Int) -> (@out Int?)
+_TTRGrXFo_iV18switch_abstraction1A_ix_XFo_dS0__ix_ ---> thunk for @callee_owned (@unowned A) -> (@out A)
 _TFCF5types1gFT1bSb_T_L0_10Collection3zimfT_T_ ---> zim() in Collection #2 in g(b:)
 _TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> closure #1 in test_capture_promotion()
 _TFIVs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> _arguments in variable initialization expression of _Process
@@ -159,7 +159,7 @@ _TTSgSiS_ ---> _TTSgSiS_
 _TTSgSi__xyz ---> _TTSgSi__xyz
 _TTSg5Si___TTSg5Si___TFSqcfT_GSqx_ ---> specialized Optional.init()
 _TTSg5Vs5UInt8___TFV10specialize3XXXcfT1tx_GS0_x_ ---> specialized XXX.init(t:)
-_TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_31 ---> partial apply for thunk for @callee_owned (@owned String, @owned String) -> (@unowned Bool)
+_TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_31 ---> partial apply for thunk for @callee_owned (@in String, @in String) -> (@unowned Bool)
 _TiC4Meow5MyCls9subscriptFT1iSi_Sf ---> MyCls.subscript(i:)
 _TF8manglingX22egbpdajGbuEbxfgehfvwxnFT_T_ ---> ليهمابتكلموشعربي؟()
 _TF8manglingX24ihqwcrbEcvIaIdqgAFGpqjyeFT_T_ ---> 他们为什么不说中文()
@@ -179,15 +179,15 @@ _TPA__TFFVs11GeneratorOfcuRd__s13GeneratorTyperFqd__GS_x_U_FT_GSqx_ ---> partial
 _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized take_closure(_:)
 _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized take_closure(_:)
 _TTSg5Si___TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized take_closure(_:)
-_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ ---> specialized thunk for @callee_owned (@unowned Int) -> (@unowned ())
-_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_DT__XFo_iSi_DT__ ---> specialized thunk for @callee_owned (@unowned Int) -> (@unowned_inner_pointer ())
+_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ ---> specialized thunk for @callee_owned (@in Int) -> (@unowned ())
+_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_DT__XFo_iSi_DT__ ---> specialized thunk for @callee_owned (@in Int) -> (@unowned_inner_pointer ())
 _TTSf1cpi0_cpfl0_cpse0v4u123_cpg53globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8_cpfr36_TFtest_capture_propagation2_closure___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized take_closure(_:)
-_TTSf0gs___TFVs11_StringCore15_invariantCheckfT_T_ ---> specialized _StringCore._invariantCheck()
-_TTSf2g___TTSf2s_d___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
-_TTSf2dg___TTSf2s_d___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
-_TTSf2dgs___TTSf2s_d___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
-_TTSf3d_i_d_i_d_i___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
-_TTSf3d_i_n_i_d_i___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
+_TTSf0gs___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> specialized _LegacyStringCore._invariantCheck()
+_TTSf2g___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf2dg___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf2dgs___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf3d_i_d_i_d_i___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf3d_i_n_i_d_i___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
 _TFIZvV8mangling10HasVarInit5stateSbiu_KT_Sb ---> implicit closure #1 in variable initialization expression of static HasVarInit.state
 _TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContexturFqd__T_L_3fooFTqd__x_T_ ---> foo #1 (_:_:) in GenericTypeContext.closureInGenericContext<A>(_:)
 _TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextxL_3fooFT_x ---> foo #1 () in GenericTypeContext.closureInGenericPropertyContext.getter
@@ -197,11 +197,17 @@ _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_F
 _TFC3red11BaseClassEHcfzT1aSi_S0_ ---> BaseClassEH.init(a:)
 _TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1aSi ---> Foo<A>.a.getter
 _TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1bx ---> Foo<A>.b.getter
-_TTRXFo_iT__iT_zoPs5Error__XFo__dT_zoPS___ ---> thunk for @callee_owned (@in ()) -> (@out (), @error @owned Error)
+_TTRXFo_iT__iT_zoPs5Error__XFo__dT_zoPS___ ---> thunk for @callee_owned () -> (@unowned (), @error @owned Error)
 _TFE1a ---> _TFE1a
 _TFC4testP33_83378C430F65473055F1BD53F3ADCDB71C5doFoofT_T_ ---> C.doFoo()
-_TTRXFo_oCSo13SKPhysicsBodydVSC7CGPointdVSC8CGVectordGSpV10ObjectiveC8ObjCBool___XFdCb_dS_dS0_dS1_dGSpS3____ ---> thunk for @callee_owned (@owned SKPhysicsBody, @unowned CGPoint, @unowned CGVector, @unowned UnsafeMutablePointer<ObjCBool>) -> ()
+_TTRXFo_oCSo13SKPhysicsBodydVSC7CGPointdVSC8CGVectordGSpV10ObjectiveC8ObjCBool___XFdCb_dS_dS0_dS1_dGSpS3____ ---> thunk for @callee_unowned @convention(block) (@unowned SKPhysicsBody, @unowned CGPoint, @unowned CGVector, @unowned UnsafeMutablePointer<ObjCBool>) -> ()
 _T0So13SKPhysicsBodyCSC7CGPointVSC8CGVectorVSpy10ObjectiveC8ObjCBoolVGIxxyyy_AbdFSpyAIGIyByyyy_TR ---> thunk for @callee_owned (@owned SKPhysicsBody, @unowned CGPoint, @unowned CGVector, @unowned UnsafeMutablePointer<ObjCBool>) -> ()
 _T04main1_yyF ---> _()
 _T03abc6testitySiFTm ---> testit(_:)
 _T04main4TestCACSi1x_tc6_PRIV_Llfc ---> Test.init(x:)
+_$S3abc6testityySiFTm ---> testit(_:)
+_$S4main4TestC1xACSi_tc6_PRIV_Llfc ---> Test.init(x:)
+_TTSf0os___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> specialized _LegacyStringCore._invariantCheck()
+_TTSf2o___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf2do___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf2dos___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)

@@ -18,128 +18,75 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#if defined(__ELF__) || defined(__ANDROID__)
+#if defined(__ELF__)
 
 #include "ImageInspection.h"
-#include "swift/Runtime/Debug.h"
+#include "ImageInspectionELF.h"
 #include <dlfcn.h>
-#include <elf.h>
-#include <link.h>
-#include <string.h>
 
 using namespace swift;
 
-/// The symbol name in the image that identifies the beginning of the
-/// protocol conformances table.
-static const char ProtocolConformancesSymbol[] =
-  ".swift2_protocol_conformances_start";
-/// The symbol name in the image that identifies the beginning of the
-/// type metadata record table.
-static const char TypeMetadataRecordsSymbol[] =
-  ".swift2_type_metadata_start";
+namespace {
+static const swift::MetadataSections *registered = nullptr;
 
-/// Context arguments passed down from dl_iterate_phdr to its callback.
-struct InspectArgs {
-  /// Symbol name to look up.
-  const char *symbolName;
-  /// Callback function to invoke with the metadata block.
-  void (*addBlock)(const void *start, uintptr_t size);
-  /// Set to true when initialize*Lookup() is called.
-  bool didInitializeLookup;
-};
-
-static InspectArgs ProtocolConformanceArgs = {
-  ProtocolConformancesSymbol,
-  addImageProtocolConformanceBlockCallback,
-  false
-};
-
-static InspectArgs TypeMetadataRecordArgs = {
-  TypeMetadataRecordsSymbol,
-  addImageTypeMetadataRecordBlockCallback,
-  false
-};
-
-
-// Extract the section information for a named section in an image. imageName
-// can be nullptr to specify the main executable.
-static SectionInfo getSectionInfo(const char *imageName,
-                                  const char *sectionName) {
-  SectionInfo sectionInfo = { 0, nullptr };
-  void *handle = dlopen(imageName, RTLD_LAZY | RTLD_NOLOAD);
-  if (!handle) {
-    fatalError(/* flags = */ 0, "dlopen() failed on `%s': %s", imageName,
-               dlerror());
-  }
-  void *symbol = dlsym(handle, sectionName);
-  if (symbol) {
-    // Extract the size of the section data from the head of the section.
-    const char *section = reinterpret_cast<const char *>(symbol);
-    memcpy(&sectionInfo.size, section, sizeof(uint64_t));
-    sectionInfo.data = section + sizeof(uint64_t);
-  }
-  dlclose(handle);
-  return sectionInfo;
-}
-
-static int iteratePHDRCallback(struct dl_phdr_info *info,
-                               size_t size, void *data) {
-  InspectArgs *inspectArgs = reinterpret_cast<InspectArgs *>(data);
-  const char *fname = info->dlpi_name;
-
-  // While dl_iterate_phdr() is in progress it holds a lock to prevent other
-  // images being loaded. The initialize flag is set here inside the callback so
-  // that addNewDSOImage() sees a consistent state. If it was set outside the
-  // dl_iterate_phdr() call then it could result in images being missed or
-  // added twice.
-  inspectArgs->didInitializeLookup = true;
-
-  if (fname == nullptr || fname[0] == '\0') {
-    // The filename may be null for both the dynamic loader and main executable.
-    // So ignore null image name here and explicitly add the main executable
-    // in initialize*Lookup() to avoid adding the data twice.
-    return 0;
-  }
-
-  SectionInfo block = getSectionInfo(fname, inspectArgs->symbolName);
-  if (block.size > 0) {
-    inspectArgs->addBlock(block.data, block.size);
-  }
-  return 0;
-}
-
-// Add the section information in an image specified by an address in that
-// image.
-static void addBlockInImage(const InspectArgs *inspectArgs, const void *addr) {
-  const char *fname = nullptr;
-  if (addr) {
-    Dl_info info;
-    if (dladdr(addr, &info) == 0 || info.dli_fname == nullptr) {
-      return;
-    }
-    fname = info.dli_fname;
-  }
-  SectionInfo block = getSectionInfo(fname, inspectArgs->symbolName);
-  if (block.size > 0) {
-    inspectArgs->addBlock(block.data, block.size);
+void record(const swift::MetadataSections *sections) {
+  if (registered == nullptr) {
+    registered = sections;
+    sections->next = sections->prev = sections;
+  } else {
+    registered->prev->next = sections;
+    sections->next = registered;
+    sections->prev = registered->prev;
+    registered->prev = sections;
   }
 }
-
-static void initializeSectionLookup(InspectArgs *inspectArgs) {
-  // Add section data in the main executable.
-  addBlockInImage(inspectArgs, nullptr);
-  // Search the loaded dls. This only searches the already
-  // loaded ones. Any images loaded after this are processed by
-  // addNewDSOImage() below.
-  dl_iterate_phdr(iteratePHDRCallback, reinterpret_cast<void *>(inspectArgs));
 }
 
+void swift::initializeProtocolLookup() {
+  const swift::MetadataSections *sections = registered;
+  while (true) {
+    const swift::MetadataSections::Range &protocols =
+        sections->swift5_protocols;
+    if (protocols.length)
+      addImageProtocolsBlockCallbackUnsafe(
+          reinterpret_cast<void *>(protocols.start), protocols.length);
+
+    if (sections->next == registered)
+      break;
+    sections = sections->next;
+  }
+}
 void swift::initializeProtocolConformanceLookup() {
-  initializeSectionLookup(&ProtocolConformanceArgs);
+  const swift::MetadataSections *sections = registered;
+  while (true) {
+    const swift::MetadataSections::Range &conformances =
+        sections->swift5_protocol_conformances;
+    if (conformances.length)
+      addImageProtocolConformanceBlockCallbackUnsafe(
+          reinterpret_cast<void *>(conformances.start), conformances.length);
+
+    if (sections->next == registered)
+      break;
+    sections = sections->next;
+  }
 }
 
 void swift::initializeTypeMetadataRecordLookup() {
-  initializeSectionLookup(&TypeMetadataRecordArgs);
+  const swift::MetadataSections *sections = registered;
+  while (true) {
+    const swift::MetadataSections::Range &type_metadata =
+        sections->swift5_type_metadata;
+    if (type_metadata.length)
+      addImageTypeMetadataRecordBlockCallbackUnsafe(
+          reinterpret_cast<void *>(type_metadata.start), type_metadata.length);
+
+    if (sections->next == registered)
+      break;
+    sections = sections->next;
+  }
+}
+
+void swift::initializeDynamicReplacementLookup() {
 }
 
 // As ELF images are loaded, ImageInspectionInit:sectionDataInit() will call
@@ -148,12 +95,39 @@ void swift::initializeTypeMetadataRecordLookup() {
 // function has been called.
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr) {
-  if (ProtocolConformanceArgs.didInitializeLookup) {
-    addBlockInImage(&ProtocolConformanceArgs, addr);
-  }
+  const swift::MetadataSections *sections =
+      static_cast<const swift::MetadataSections *>(addr);
 
-  if (TypeMetadataRecordArgs.didInitializeLookup) {
-    addBlockInImage(&TypeMetadataRecordArgs, addr);
+  record(sections);
+
+  const auto &protocols_section = sections->swift5_protocols;
+  const void *protocols =
+      reinterpret_cast<void *>(protocols_section.start);
+  if (protocols_section.length)
+    addImageProtocolsBlockCallback(protocols, protocols_section.length);
+
+  const auto &protocol_conformances = sections->swift5_protocol_conformances;
+  const void *conformances =
+      reinterpret_cast<void *>(protocol_conformances.start);
+  if (protocol_conformances.length)
+    addImageProtocolConformanceBlockCallback(conformances,
+                                             protocol_conformances.length);
+
+  const auto &type_metadata = sections->swift5_type_metadata;
+  const void *metadata = reinterpret_cast<void *>(type_metadata.start);
+  if (type_metadata.length)
+    addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
+
+  const auto &dynamic_replacements = sections->swift5_replace;
+  const auto *replacements =
+      reinterpret_cast<void *>(dynamic_replacements.start);
+  if (dynamic_replacements.length) {
+    const auto &dynamic_replacements_some = sections->swift5_replac2;
+    const auto *replacements_some =
+      reinterpret_cast<void *>(dynamic_replacements_some.start);
+    addImageDynamicReplacementBlockCallback(
+        replacements, dynamic_replacements.length, replacements_some,
+        dynamic_replacements_some.length);
   }
 }
 
@@ -165,9 +139,15 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 
   info->fileName = dlinfo.dli_fname;
   info->baseAddress = dlinfo.dli_fbase;
-  info->symbolName = dlinfo.dli_sname;
+  info->symbolName.reset(dlinfo.dli_sname);
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
 }
 
-#endif // defined(__ELF__) || defined(__ANDROID__)
+// This is only used for backward deployment hooks, which we currently only support for
+// MachO. Add a stub here to make sure it still compiles.
+void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
+  return nullptr;
+}
+
+#endif // defined(__ELF__)

@@ -18,7 +18,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -86,7 +89,7 @@ void ConformanceLookupTable::ConformanceEntry::dump(raw_ostream &os,
 
   if (Loc.isValid()) {
     os << " loc=";
-    Loc.dump(getProtocol()->getASTContext().SourceMgr);
+    Loc.print(os, getProtocol()->getASTContext().SourceMgr);
   }
 
   switch (getKind()) {
@@ -124,9 +127,7 @@ void *ConformanceLookupTable::operator new(size_t Bytes,
   return C.Allocate(Bytes, Alignment);
 }
 
-ConformanceLookupTable::ConformanceLookupTable(ASTContext &ctx, 
-                                               NominalTypeDecl *nominal,
-                                               LazyResolver *resolver) {
+ConformanceLookupTable::ConformanceLookupTable(ASTContext &ctx) {
   // Register a cleanup with the ASTContext to call the conformance
   // table destructor.
   ctx.addCleanup([this]() {
@@ -138,10 +139,13 @@ void ConformanceLookupTable::destroy() {
   this->~ConformanceLookupTable();
 }
 
+namespace {
+  using ConformanceConstructionInfo = Located<ProtocolDecl *>;
+}
+
 template<typename NominalFunc, typename ExtensionFunc>
 void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
                                             NominalTypeDecl *nominal,
-                                            LazyResolver *resolver,
                                             NominalFunc nominalFunc,
                                             ExtensionFunc extensionFunc) {
   assert(static_cast<unsigned>(stage) < NumConformanceStages &&
@@ -160,9 +164,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
       loader.first->loadAllConformances(nominal, loader.second, conformances);
-      loadAllConformances(nominal, nominal, conformances);
-    } else if (nominal->getParentSourceFile() && resolver) {
-      resolver->resolveDeclSignature(nominal);
+      loadAllConformances(nominal, conformances);
     }
 
     nominalFunc(nominal);
@@ -176,13 +178,13 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     return;
 
   // Handle the extensions that we have not yet visited.
-  llvm::SetVector<ExtensionDecl *> &delayedExtensionDecls
-    = DelayedExtensionDecls[static_cast<unsigned>(stage)];
   nominal->prepareExtensions();
   while (auto next = lastProcessed.getPointer()
                        ? lastProcessed.getPointer()->NextExtension.getPointer()
                        : nominal->FirstExtension) {
     lastProcessed.setPointer(next);
+
+    SmallVector<ConformanceConstructionInfo, 2> protocols;
 
     // If we have conformances we can load, do so.
     // FIXME: This could be lazier.
@@ -190,42 +192,26 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     if (loader.first) {
       SmallVector<ProtocolConformance *, 2> conformances;
       loader.first->loadAllConformances(next, loader.second, conformances);
-      loadAllConformances(nominal, next, conformances);
-    } else if (next->getParentSourceFile()) {
-      if (!resolver) {
-        // We have a parsed extension that we can't resolve well enough to
-        // get any information from. Queue it for later.
-        // FIXME: Per the comment on DelayedExtensionDecls, this is insane.
-        delayedExtensionDecls.insert(next);
-        continue;
+      loadAllConformances(next, conformances);
+      for (auto conf : conformances) {
+        protocols.push_back({conf->getProtocol(), SourceLoc()});
       }
-
-      // Resolve this extension.
-      delayedExtensionDecls.remove(next);
-      resolver->resolveExtension(next);
+    } else if (next->getParentSourceFile()) {
+      bool anyObject = false;
+      for (const auto &found :
+               getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
+        if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+          protocols.push_back({proto, found.Loc});
+      }
     }
 
-    extensionFunc(next);
-  }
-
-  // If we delayed any extension declarations because we didn't have a resolver
-  // then, but we have a resolver now, process them.
-  if (resolver) {
-    while (!delayedExtensionDecls.empty()) {
-      // Remove the last extension declaration.
-      auto ext = delayedExtensionDecls.back();
-      delayedExtensionDecls.remove(ext);
-
-      resolver->resolveExtension(ext);
-      extensionFunc(ext);
-    }
+    extensionFunc(next, protocols);
   }
 }
 
 void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl, 
                                                  ClassDecl *superclassDecl,
-                                                 ExtensionDecl *superclassExt,
-                                                 LazyResolver *resolver) {
+                                                 ExtensionDecl *superclassExt) {
   // Local function to return the location of the superclass. This
   // takes a little digging, so compute on first use and cache it.
   SourceLoc superclassLoc;
@@ -238,6 +224,13 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
         if (inheritedType->getClassOrBoundGenericClass()) {
           superclassLoc = inherited.getSourceRange().Start;
           return superclassLoc;
+        }
+        if (inheritedType->isExistentialType()) {
+          auto layout = inheritedType->getExistentialLayout();
+          if (layout.explicitSuperclass) {
+            superclassLoc = inherited.getSourceRange().Start;
+            return superclassLoc;
+          }
         }
       }
     }
@@ -257,7 +250,7 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
       return;
     
     // Add the inherited entry.
-    (void)addProtocol(classDecl, protocol, getSuperclassLoc(), 
+    (void)addProtocol(protocol, getSuperclassLoc(), 
                       ConformanceSource::forInherited(classDecl));
   };
 
@@ -272,40 +265,33 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
 }
 
 void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
-                                               ConformanceStage stage,
-                                               LazyResolver *resolver) {
+                                               ConformanceStage stage) {
   switch (stage) {
   case ConformanceStage::RecordedExplicit:
     // Record all of the explicit conformances.
-    forEachInStage(stage, nominal, resolver,
-                   [&](NominalTypeDecl *nominal) {
-                     if (resolver)
-                       resolver->resolveInheritanceClause(nominal);
-
-                     addProtocols(nominal, nominal->getInherited(), 
-                                  ConformanceSource::forExplicit(nominal),
-                                  resolver);
-                   },
-                   [&](ExtensionDecl *ext) {
-                     if (resolver)
-                       resolver->resolveInheritanceClause(ext);
-
-                     addProtocols(nominal, ext->getInherited(),
-                                  ConformanceSource::forExplicit(ext),
-                                  resolver);
-                   });
+    forEachInStage(
+        stage, nominal,
+        [&](NominalTypeDecl *nominal) {
+          addInheritedProtocols(nominal,
+                                ConformanceSource::forExplicit(nominal));
+        },
+        [&](ExtensionDecl *ext,
+            ArrayRef<ConformanceConstructionInfo> protos) {
+          // The extension decl may not be validated, so we can't use
+          // its inherited protocols directly.
+          auto source = ConformanceSource::forExplicit(ext);
+          for (auto locAndProto : protos)
+            addProtocol(locAndProto.Item, locAndProto.Loc, source);
+        });
     break;
 
   case ConformanceStage::Inherited:
-    updateLookupTable(nominal, ConformanceStage::RecordedExplicit, resolver);
+    updateLookupTable(nominal, ConformanceStage::RecordedExplicit);
 
     // For classes, expand implied conformances of the superclass,
     // because an implied conformance in the superclass is considered
     // "fixed" in the subclass.
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-      if (resolver)
-        resolver->resolveSuperclass(classDecl);
-
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         // Break infinite recursion when visiting ill-formed classes
         // with circular inheritance.
@@ -313,12 +299,15 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           return;
         llvm::SaveAndRestore<bool> visiting(VisitingSuperclass, true);
 
+        // Don't update our own lookup table if we inherit from ourselves.
+        if (classDecl == superclassDecl)
+          break;
+
         // Resolve the conformances of the superclass.
         superclassDecl->prepareConformanceTable();
         superclassDecl->ConformanceTable->updateLookupTable(
           superclassDecl,
-          ConformanceStage::Resolved,
-          resolver);
+          ConformanceStage::Resolved);
         
         // Expand inherited conformances from all superclasses.
         // We may have circular inheritance in ill-formed classes, so keep an
@@ -326,15 +315,16 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
         auto circularSuperclass = superclassDecl->getSuperclassDecl();
         
         do {
-          forEachInStage(stage, superclassDecl, resolver,
-                         [&](NominalTypeDecl *superclass) {
-                           inheritConformances(classDecl, superclassDecl,
-                                               nullptr, resolver);
-                         },
-                         [&](ExtensionDecl *ext) {
-                           inheritConformances(classDecl, superclassDecl, ext,
-                                               resolver);
-                         });
+          forEachInStage(
+              stage, superclassDecl,
+              [&](NominalTypeDecl *superclass) {
+                inheritConformances(classDecl, superclassDecl, nullptr);
+              },
+              [&](ExtensionDecl *ext,
+                  ArrayRef<ConformanceConstructionInfo> protos) {
+                (void)protos;
+                inheritConformances(classDecl, superclassDecl, ext);
+              });
           superclassDecl = superclassDecl->getSuperclassDecl();
           if (circularSuperclass)
             circularSuperclass = circularSuperclass->getSuperclassDecl();
@@ -348,39 +338,41 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
   case ConformanceStage::ExpandedImplied:
     // Record explicit conformances and import inherited conformances
     // before expanding.
-    updateLookupTable(nominal, ConformanceStage::Inherited, resolver);
+    updateLookupTable(nominal, ConformanceStage::Inherited);
 
     // Expand inherited conformances.
-    forEachInStage(stage, nominal, resolver,
-                   [&](NominalTypeDecl *nominal) {
-                     expandImpliedConformances(nominal, nominal, resolver);
-                   },
-                   [&](ExtensionDecl *ext) {
-                     expandImpliedConformances(nominal, ext, resolver);
-                   });
+    forEachInStage(
+        stage, nominal,
+        [&](NominalTypeDecl *nominal) {
+          expandImpliedConformances(nominal, nominal);
+        },
+        [&](ExtensionDecl *ext,
+            ArrayRef<ConformanceConstructionInfo> protos) {
+          (void)protos;
+          expandImpliedConformances(nominal, ext);
+        });
     break;
 
   case ConformanceStage::Resolved:
     // Expand inherited conformances so we have the complete set of
     // conformances.
-    updateLookupTable(nominal, ConformanceStage::ExpandedImplied, resolver);
+    updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
     
     /// Determine whether any extensions were added that might require
     /// us to compute conformances again.
     bool anyChanged = false;
-    forEachInStage(stage, nominal, resolver,
-                   [&](NominalTypeDecl *nominal) {
-                     anyChanged = true;
-                   },
-                   [&](ExtensionDecl *ext) {
+    forEachInStage(stage, nominal,
+                   [&](NominalTypeDecl *nominal) { anyChanged = true; },
+                   [&](ExtensionDecl *ext,
+                       ArrayRef<ConformanceConstructionInfo>) {
                      anyChanged = true;
                    });
-                   
+
     if (anyChanged) {
       // Compute the conformances for each protocol.
       bool anySuperseded = false;
       for (const auto &entry : Conformances) {
-        if (resolveConformances(nominal, entry.first, resolver))
+        if (resolveConformances(entry.first))
           anySuperseded = true;
       }
 
@@ -403,7 +395,6 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
 }
 
 void ConformanceLookupTable::loadAllConformances(
-       NominalTypeDecl *nominal,
        DeclContext *dc,
        ArrayRef<ProtocolConformance*> conformances) {
   // If this declaration context came from source, there's nothing to
@@ -417,8 +408,7 @@ void ConformanceLookupTable::loadAllConformances(
   }
 }
 
-bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
-                                         ProtocolDecl *protocol, SourceLoc loc,
+bool ConformanceLookupTable::addProtocol(ProtocolDecl *protocol, SourceLoc loc,
                                          ConformanceSource source) {
   DeclContext *dc = source.getDeclContext();
   ASTContext &ctx = dc->getASTContext();
@@ -440,14 +430,23 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
         return false;
 
       case ConformanceEntryKind::Implied:
-        // An implied conformance is better than a synthesized one.
         // Ignore implied circular protocol inheritance
-        if (kind == ConformanceEntryKind::Synthesized ||
-            existingEntry->getProtocol() == protocol)
+        if (existingEntry->getDeclContext() == dc)
           return false;
+
+        // An implied conformance is better than a synthesized one, unless
+        // the implied conformance was deserialized.
+        if (kind == ConformanceEntryKind::Synthesized &&
+            existingEntry->getDeclContext()->getParentSourceFile() == nullptr)
+          return false;
+
         break;
 
       case ConformanceEntryKind::Synthesized:
+        // An implied conformance is better unless it was deserialized.
+        if (dc->getParentSourceFile() == nullptr)
+          return false;
+
         break;
       }
     }
@@ -464,24 +463,20 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
   return true;
 }
 
-void ConformanceLookupTable::addProtocols(NominalTypeDecl *nominal,
-                                          ArrayRef<TypeLoc> inherited,
-                                          ConformanceSource source,
-                                          LazyResolver *resolver) {
-  // Visit each of the types in the inheritance list to find
-  // protocols.
-  for (const auto &entry : inherited) {
-    if (!entry.getType() || !entry.getType()->isExistentialType())
-      continue;
-    auto layout = entry.getType()->getExistentialLayout();
-    for (auto *proto : layout.getProtocols())
-      addProtocol(nominal, proto->getDecl(), entry.getLoc(), source);
+void ConformanceLookupTable::addInheritedProtocols(
+                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                          ConformanceSource source) {
+  // Find all of the protocols in the inheritance list.
+  bool anyObject = false;
+  for (const auto &found :
+          getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+      addProtocol(proto, found.Loc, source);
   }
 }
 
 void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
-                                                       DeclContext *dc, 
-                                                       LazyResolver *resolver) {
+                                                       DeclContext *dc) {
   // Note: recursive type-checking implies that AllConformances
   // may be reallocated during this traversal, so pay the lookup cost
   // during each iteration.
@@ -492,15 +487,6 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
            "Infinite loop due to circular protocol inheritance?");
     ConformanceEntry *conformanceEntry = AllConformances[dc][i];
     ProtocolDecl *conformingProtocol = conformanceEntry->getProtocol();
-
-    // Visit the protocols inherited by this protocol, adding them as
-    // implied conformances.
-    if (resolver) {
-      if (nominal == dc)
-        resolver->resolveInheritanceClause(nominal);
-      else
-        resolver->resolveInheritanceClause(cast<ExtensionDecl>(dc));
-    }
 
     // An @objc enum that explicitly conforms to the Error protocol
     // also implicitly conforms to _ObjectiveCBridgeableError, via the
@@ -513,15 +499,13 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
       ASTContext &ctx = nominal->getASTContext();
       if (auto bridgedNSError
             = ctx.getProtocol(KnownProtocolKind::BridgedNSError)) {
-        addProtocol(nominal, bridgedNSError, SourceLoc(),
+        addProtocol(bridgedNSError, SourceLoc(),
                     ConformanceSource::forImplied(conformanceEntry));
       }
     }
 
-    // Add inherited protocols.
-    addProtocols(nominal, conformingProtocol->getInherited(),
-                 ConformanceSource::forImplied(conformanceEntry),
-                 resolver);
+    addInheritedProtocols(conformingProtocol,
+                          ConformanceSource::forImplied(conformanceEntry));
   }
 }
 
@@ -618,6 +602,24 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     }
   }
 
+  // Prefer the least conditional implier, which we approximate by seeing if one
+  // of the contexts syntactically has no generic requirements. This misses
+  // redundant cases like `struct Foo<T: P> {} extension Foo: P where T: P {}`
+  // (Foo : P is unconditional), but isConstrainedExtension doesn't fly as it
+  // requires the generic signature of the extension to exist, which requires
+  // conformances to exist, which is what we're doing here.
+  auto hasAdditionalRequirements = [&](ConformanceEntry *entry) {
+    if (auto ED = dyn_cast<ExtensionDecl>(entry->getDeclContext()))
+      if (auto TWC = ED->getTrailingWhereClause())
+        return !TWC->getRequirements().empty();
+
+    return false;
+  };
+  bool lhsHasReqs = hasAdditionalRequirements(lhs);
+  bool rhsHasReqs = hasAdditionalRequirements(rhs);
+  if (lhsHasReqs != rhsHasReqs)
+    return lhsHasReqs ? Ordering::After : Ordering::Before;
+
   // If the two conformances come from the same file, pick the first context
   // in the file.
   auto lhsSF = lhs->getDeclContext()->getParentSourceFile();
@@ -628,6 +630,18 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
                                           rhs->getDeclaredLoc())
              ? Ordering::Before
              : Ordering::After;
+  }
+
+  // If one of the conformances comes from the same file as the type
+  // declaration, pick that one; this is so that conformance synthesis works if
+  // there's any implied conformance in the same file as the type.
+  auto NTD = lhs->getDeclContext()->getSelfNominalTypeDecl();
+  auto typeSF = NTD->getParentSourceFile();
+  if (typeSF) {
+    if (typeSF == lhsSF)
+      return Ordering::Before;
+    if (typeSF == rhsSF)
+      return Ordering::After;
   }
 
   // Otherwise, pick the earlier file unit.
@@ -660,9 +674,7 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
   llvm_unreachable("files weren't in the parent module?");
 }
 
-bool ConformanceLookupTable::resolveConformances(NominalTypeDecl *nominal,
-                                                 ProtocolDecl *protocol,
-                                                 LazyResolver *resolver) {
+bool ConformanceLookupTable::resolveConformances(ProtocolDecl *protocol) {
   // Find any entries that are superseded by other entries.
   ConformanceEntries &entries = Conformances[protocol];
   llvm::SmallPtrSet<DeclContext *, 4> knownConformances;
@@ -726,7 +738,6 @@ bool ConformanceLookupTable::resolveConformances(NominalTypeDecl *nominal,
 
 DeclContext *ConformanceLookupTable::getConformingContext(
                NominalTypeDecl *nominal,
-               LazyResolver *resolver,
                ConformanceEntry *entry) {
   ProtocolDecl *protocol = entry->getProtocol();
 
@@ -754,9 +765,7 @@ DeclContext *ConformanceLookupTable::getConformingContext(
                                    true);
 
       superclassDecl->prepareConformanceTable();
-      superclassDecl->ConformanceTable->resolveConformances(superclassDecl,
-                                                            protocol,
-                                                            resolver);
+      superclassDecl->ConformanceTable->resolveConformances(protocol);
     }
 
     // Grab the superclass entry and continue searching for a
@@ -769,10 +778,9 @@ DeclContext *ConformanceLookupTable::getConformingContext(
   return entry->getDeclContext();
 }
 
-ProtocolConformance *ConformanceLookupTable::getConformance(
-                       NominalTypeDecl *nominal,
-                       LazyResolver *resolver,
-                       ConformanceEntry *entry) {
+ProtocolConformance *
+ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
+                                       ConformanceEntry *entry) {
   // If we already have a conformance, we're done.
   if (auto conformance = entry->getConformance())
     return conformance;
@@ -783,17 +791,15 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
   // FIXME: This is a hack to ensure that inherited conformances are
   // always "single step", which is bad for resilience but is assumed
   // elsewhere in the compiler.
-  DeclContext *conformingDC = getConformingContext(nominal, resolver, entry);
+  DeclContext *conformingDC = getConformingContext(nominal, entry);
   if (!conformingDC)
     return nullptr;
 
-  auto *conformingNominal =
-    conformingDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *conformingNominal = conformingDC->getSelfNominalTypeDecl();
 
   // Form the conformance.
-  Type type = entry->getDeclContext()->getDeclaredTypeInContext();
-  ProtocolConformance *conformance;
-    ASTContext &ctx = nominal->getASTContext();
+  Type type = entry->getDeclContext()->getDeclaredInterfaceType();
+  ASTContext &ctx = nominal->getASTContext();
   if (entry->getKind() == ConformanceEntryKind::Inherited) {
     // For an inherited conformance, the conforming nominal type will
     // be different from the nominal type.
@@ -801,41 +807,77 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
 
     // Find the superclass type that matches where the conformance was
     // declared.
-    Type superclassTy = type->getSuperclass();
-    while (superclassTy->getAnyNominal() != conformingNominal)
-      superclassTy = superclassTy->getSuperclass();
+    auto *conformingClass = cast<ClassDecl>(conformingNominal);
+    Type superclassTy = type->getSuperclassForDecl(conformingClass);
+    if (superclassTy->is<ErrorType>())
+      return nullptr;
 
     // Look up the inherited conformance.
     ModuleDecl *module = entry->getDeclContext()->getParentModule();
     auto inheritedConformance = module->lookupConformance(superclassTy,
-                                                          protocol,
-                                                          resolver);
+                                                          protocol);
 
     // Form the inherited conformance.
-    conformance = ctx.getInheritedConformance(
-                    type,
-                    inheritedConformance->getConcrete());
+    entry->Conformance =
+        ctx.getInheritedConformance(type, inheritedConformance.getConcrete());
   } else {
     // Create or find the normal conformance.
-    Type conformingType = conformingDC->getDeclaredTypeInContext();
+    Type conformingType = conformingDC->getDeclaredInterfaceType();
     SourceLoc conformanceLoc
       = conformingNominal == conformingDC
           ? conformingNominal->getLoc()
           : cast<ExtensionDecl>(conformingDC)->getLoc();
 
-    conformance = ctx.getConformance(conformingType, protocol, conformanceLoc,
-                                     conformingDC,
-                                     ProtocolConformanceState::Incomplete);
+    auto normalConf =
+        ctx.getConformance(conformingType, protocol, conformanceLoc,
+                           conformingDC, ProtocolConformanceState::Incomplete);
+    // Invalid code may cause the getConformance call below to loop, so break
+    // the infinite recursion by setting this eagerly to shortcircuit with the
+    // early return at the start of this function.
+    entry->Conformance = normalConf;
+
+    NormalProtocolConformance *implyingConf = nullptr;
+    if (entry->Source.getKind() == ConformanceEntryKind::Implied) {
+      auto implyingEntry = entry->Source.getImpliedSource();
+      implyingConf = getConformance(conformingNominal, implyingEntry)
+                         ->getRootNormalConformance();
+    }
+    normalConf->setSourceKindAndImplyingConformance(entry->Source.getKind(),
+                                                    implyingConf);
+
+    // If the conformance was synthesized by the ClangImporter, give it a
+    // lazy loader that will be used to populate the conformance.
+
+    // First, if this is a conformance to a base protocol of a derived
+    // protocol, find the most derived protocol.
+    auto *impliedEntry = entry;
+    while (impliedEntry->getKind() == ConformanceEntryKind::Implied)
+      impliedEntry = impliedEntry->Source.getImpliedSource();
+
+    // Check if this was a synthesized conformance.
+    if (impliedEntry->getKind() == ConformanceEntryKind::Synthesized) {
+      auto *impliedProto = impliedEntry->getProtocol();
+
+      // Find a SynthesizedProtocolAttr corresponding to the protocol.
+      for (auto attr : conformingNominal->getAttrs()
+             .getAttributes<SynthesizedProtocolAttr>()) {
+        auto otherProto = ctx.getProtocol(attr->getProtocolKind());
+        if (otherProto == impliedProto) {
+          // Set the conformance loader to the loader stashed inside
+          // the attribute.
+          normalConf->setLazyLoader(attr->getLazyLoader(), /*context=*/0);
+          break;
+        }
+      }
+    }
   }
 
-  // Record the conformance.
-  entry->Conformance = conformance;
-  return conformance;
+  return entry->Conformance.get<ProtocolConformance *>();
 }
 
 void ConformanceLookupTable::addSynthesizedConformance(NominalTypeDecl *nominal,
                                                        ProtocolDecl *protocol) {
-  addProtocol(nominal, protocol, nominal->getLoc(),
+  addProtocol(protocol, nominal->getLoc(),
               ConformanceSource::forSynthesized(nominal));
 }
 
@@ -844,7 +886,7 @@ void ConformanceLookupTable::registerProtocolConformance(
        bool synthesized) {
   auto protocol = conformance->getProtocol();
   auto dc = conformance->getDeclContext();
-  auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = dc->getSelfNominalTypeDecl();
 
   // If there is an entry to update, do so.
   auto &dcConformances = AllConformances[dc];
@@ -883,16 +925,15 @@ bool ConformanceLookupTable::lookupConformance(
        ModuleDecl *module, 
        NominalTypeDecl *nominal,
        ProtocolDecl *protocol, 
-       LazyResolver *resolver,
        SmallVectorImpl<ProtocolConformance *> &conformances) {
   // Update to record all explicit and inherited conformances.
-  updateLookupTable(nominal, ConformanceStage::Inherited, resolver);
+  updateLookupTable(nominal, ConformanceStage::Inherited);
 
   // Look for conformances to this protocol.
   auto known = Conformances.find(protocol);
   if (known == Conformances.end()) {
     // If we didn't find anything, expand implied conformances.
-    updateLookupTable(nominal, ConformanceStage::ExpandedImplied, resolver);
+    updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
     known = Conformances.find(protocol);
 
     // We didn't find anything.
@@ -901,9 +942,9 @@ bool ConformanceLookupTable::lookupConformance(
   }
 
   // Resolve the conformances for this protocol.
-  resolveConformances(nominal, protocol, resolver);
+  resolveConformances(protocol);
   for (auto entry : Conformances[protocol]) {
-    if (auto conformance = getConformance(nominal, resolver, entry)) {
+    if (auto conformance = getConformance(nominal, entry)) {
       conformances.push_back(conformance);
     }
   }
@@ -913,14 +954,13 @@ bool ConformanceLookupTable::lookupConformance(
 void ConformanceLookupTable::lookupConformances(
        NominalTypeDecl *nominal,
        DeclContext *dc,
-       LazyResolver *resolver,
        ConformanceLookupKind lookupKind,
        SmallVectorImpl<ProtocolDecl *> *protocols,
        SmallVectorImpl<ProtocolConformance *> *conformances,
        SmallVectorImpl<ConformanceDiagnostic> *diagnostics) {
   // We need to expand all implied conformances before we can find
   // those conformances that pertain to this declaration context.
-  updateLookupTable(nominal, ConformanceStage::ExpandedImplied, resolver);
+  updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
 
   /// Resolve conformances for each of the protocols to which this
   /// declaration may provide a conformance. Only some of these will
@@ -928,7 +968,7 @@ void ConformanceLookupTable::lookupConformances(
   /// context.
   auto &potentialConformances = AllConformances[dc]; 
   for (const auto &potential : potentialConformances) {
-    resolveConformances(nominal, potential->getProtocol(), resolver);
+    resolveConformances(potential->getProtocol());
   }
 
   // Remove any superseded conformances from AllConformances.
@@ -940,10 +980,30 @@ void ConformanceLookupTable::lookupConformances(
                        return true;
 
                      // If we are to filter out this result, do so now.
-                     if (lookupKind == ConformanceLookupKind::OnlyExplicit &&
-                         entry->getKind() != ConformanceEntryKind::Explicit &&
-                         entry->getKind() != ConformanceEntryKind::Synthesized)
-                       return false;
+                     switch (lookupKind) {
+                     case ConformanceLookupKind::OnlyExplicit:
+                       switch (entry->getKind()) {
+                       case ConformanceEntryKind::Explicit:
+                       case ConformanceEntryKind::Synthesized:
+                         break;
+                       case ConformanceEntryKind::Implied:
+                       case ConformanceEntryKind::Inherited:
+                         return false;
+                       }
+                       break;
+                     case ConformanceLookupKind::NonInherited:
+                       switch (entry->getKind()) {
+                       case ConformanceEntryKind::Explicit:
+                       case ConformanceEntryKind::Synthesized:
+                       case ConformanceEntryKind::Implied:
+                         break;
+                       case ConformanceEntryKind::Inherited:
+                         return false;
+                       }
+                       break;
+                     case ConformanceLookupKind::All:
+                       break;
+                     }
 
                      // Record the protocol.
                      if (protocols)
@@ -951,8 +1011,7 @@ void ConformanceLookupTable::lookupConformances(
 
                      // Record the conformance.
                      if (conformances) {
-                       if (auto conformance = getConformance(nominal, resolver,
-                                                             entry))
+                       if (auto conformance = getConformance(nominal, entry))
                          conformances->push_back(conformance);
                      }
                      return false;
@@ -984,11 +1043,10 @@ void ConformanceLookupTable::lookupConformances(
 
 void ConformanceLookupTable::getAllProtocols(
        NominalTypeDecl *nominal,
-       LazyResolver *resolver,
        SmallVectorImpl<ProtocolDecl *> &scratch) {
   // We need to expand all implied conformances to find the complete
   // set of protocols to which this nominal type conforms.
-  updateLookupTable(nominal, ConformanceStage::ExpandedImplied, resolver);
+  updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
 
   // Gather all of the protocols.
   for (const auto &conformance : Conformances) {
@@ -1034,21 +1092,20 @@ int ConformanceLookupTable::compareProtocolConformances(
   // Otherwise, sort by protocol.
   ProtocolDecl *lhsProto = lhs->getProtocol();
   ProtocolDecl *rhsProto = rhs->getProtocol();
-  return ProtocolType::compareProtocols(&lhsProto, &rhsProto);
+  return TypeDecl::compare(lhsProto, rhsProto);
 }
 
 void ConformanceLookupTable::getAllConformances(
        NominalTypeDecl *nominal,
-       LazyResolver *resolver,
        bool sorted,
        SmallVectorImpl<ProtocolConformance *> &scratch) {
   // We need to expand and resolve all conformances to enumerate them.
-  updateLookupTable(nominal, ConformanceStage::Resolved, resolver);
+  updateLookupTable(nominal, ConformanceStage::Resolved);
 
   // Gather all of the protocols.
   for (const auto &conformance : AllConformances) {
     for (auto entry : conformance.second) {
-      if (auto conformance = getConformance(nominal, resolver, entry))
+      if (auto conformance = getConformance(nominal, entry))
         scratch.push_back(conformance);
     }
   }
@@ -1074,14 +1131,13 @@ ArrayRef<ValueDecl *>
 ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
                                                 const ValueDecl *member,
                                                 NominalTypeDecl *nominal,
-                                                LazyResolver *resolver,
                                                 bool sorted) {
   auto It = ConformingDeclMap.find(member);
   if (It != ConformingDeclMap.end())
     return It->second;
 
   SmallVector<ProtocolConformance *, 4> result;
-  getAllConformances(nominal, resolver, sorted, result);
+  getAllConformances(nominal, sorted, result);
 
   auto &reqs = ConformingDeclMap[member];
   if (isa<TypeDecl>(member)) {
@@ -1089,9 +1145,9 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
       if (conf->isInvalid())
         continue;
 
-      conf->forEachTypeWitness(resolver, [&](const AssociatedTypeDecl *assoc,
-                                             Type type,
-                                             TypeDecl *typeDecl) -> bool {
+      conf->forEachTypeWitness([&](const AssociatedTypeDecl *assoc,
+                                   Type type,
+                                   TypeDecl *typeDecl) -> bool {
         if (typeDecl == member)
           reqs.push_back(const_cast<AssociatedTypeDecl*>(assoc));
         return false;
@@ -1102,9 +1158,8 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
       if (conf->isInvalid())
         continue;
 
-      auto normal = conf->getRootNormalConformance();
-      normal->forEachValueWitness(resolver, [&](ValueDecl *req,
-                                              ConcreteDeclRef witness) {
+      auto root = conf->getRootConformance();
+      root->forEachValueWitness([&](ValueDecl *req, Witness witness) {
         if (witness.getDecl() == member)
           reqs.push_back(req);
       });

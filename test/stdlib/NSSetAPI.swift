@@ -67,6 +67,12 @@ NSSetAPI.test("AnyHashable containing NSSet that contains an NSSet") {
   }
 }
 
+NSSetAPI.test("Incorrectly constructed Set for backwards compatibility") {
+  let array:NSArray = [NSObject()] as NSArray
+  let wrongSet = Set<NSObject>(_immutableCocoaSet: array)
+  print(wrongSet.startIndex)
+}
+
 var NSOrderedSetAPI = TestSuite("NSOrderedSetAPI")
 
 NSOrderedSetAPI.test("Sequence") {
@@ -108,7 +114,7 @@ NSIndexSetAPI.test("Sequence") {
   // FIXME: Compiler doesn't accept these terms.
   // expectEqual(Optional<Int>.some(1), iter.next())
   // expectEqual(Optional<Int>.none, iter.next())
-  expectOptionalEqual(1, iter.next())
+  expectEqual(1, iter.next())
   expectNil(iter.next())
   let empty = NSIndexSet(indexesIn: NSMakeRange(1, 0))
   var emptyGen = empty.makeIterator()

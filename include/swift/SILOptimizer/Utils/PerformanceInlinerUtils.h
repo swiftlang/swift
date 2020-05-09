@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CommandLine.h"
 
 
 using namespace swift;
@@ -34,10 +35,11 @@ class SideEffectAnalysis;
 enum class InlineSelection {
   Everything,
   NoGlobalInit, // and no availability semantics calls
-  NoSemanticsAndGlobalInit
+  NoSemanticsAndGlobalInit,
+  OnlyInlineAlways,
 };
 
-// Returns the callee of an apply_inst if it is basically inlineable.
+// Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *getEligibleFunction(FullApplySite AI,
                                  InlineSelection WhatToInline);
 
@@ -312,6 +314,7 @@ private:
   SILLoopInfo *LI;
   llvm::DenseMap<const SILBasicBlock *, BlockInfo *> BlockInfos;
   std::vector<BlockInfo> BlockInfoStorage;
+  bool valid = false;
 
   BlockInfo *getBlockInfo(const SILBasicBlock *BB) {
     BlockInfo *BI = BlockInfos[BB];
@@ -381,15 +384,22 @@ private:
 public:
   ShortestPathAnalysis(SILFunction *F, SILLoopInfo *LI) : F(F), LI(LI) { }
 
-  bool isValid() const { return !BlockInfos.empty(); }
+  bool isValid() const { return valid; }
 
   /// Compute the distances. The function \p getApplyLength returns the length
   /// of a function call.
   template <typename Func>
   void analyze(ColdBlockInfo &CBI, Func getApplyLength) {
     assert(!isValid());
+    valid = true;
+    unsigned numBlocks = F->size();
 
-    BlockInfoStorage.resize(F->size());
+    // As the complexity of the analysis is more than linear with the number of blocks,
+    // disable it for huge functions. In this case inlining will be less aggressive.
+    if (numBlocks > 2000)
+      return;
+
+    BlockInfoStorage.resize(numBlocks);
 
     // First step: compute the length of the blocks.
     unsigned BlockIdx = 0;
@@ -433,6 +443,11 @@ public:
   /// shortest path in the function.
   int getScopeLength(SILBasicBlock *BB, int LoopDepth) {
     assert(BB->getParent() == F);
+
+    // Return a conservative default if the analysis was not done due to a high number of blocks.
+    if (BlockInfos.empty())
+      return ColdBlockLength;
+
     if (LoopDepth >= MaxNumLoopLevels)
       LoopDepth = MaxNumLoopLevels - 1;
     return getBlockInfo(BB)->getScopeLength(LoopDepth);

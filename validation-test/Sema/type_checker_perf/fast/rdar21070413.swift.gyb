@@ -1,0 +1,14 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s
+// REQUIRES: asserts,no_asan
+
+enum E: UInt {
+%for i in range(0, N):
+case C${i}
+%end
+}
+
+_ = [
+%for i in range(0, N):
+  E.C${i}:   [${i}],
+%end
+]

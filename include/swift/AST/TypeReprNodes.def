@@ -31,13 +31,17 @@
 #define ABSTRACT_TYPEREPR(Id, Parent)
 #endif
 
+#ifndef LAST_TYPEREPR
+#define LAST_TYPEREPR(Id)
+#endif
+
 TYPEREPR(Error, TypeRepr)
 TYPEREPR(Attributed, TypeRepr)
 
 ABSTRACT_TYPEREPR(Ident, TypeRepr)
   ABSTRACT_TYPEREPR(ComponentIdent, IdentTypeRepr)
-  TYPEREPR(SimpleIdent, ComponentIdentTypeRepr)
-  TYPEREPR(GenericIdent, ComponentIdentTypeRepr)
+    TYPEREPR(SimpleIdent, ComponentIdentTypeRepr)
+    TYPEREPR(GenericIdent, ComponentIdentTypeRepr)
   TYPEREPR(CompoundIdent, IdentTypeRepr)
 
 TYPEREPR(Function, TypeRepr)
@@ -49,11 +53,15 @@ TYPEREPR(Tuple, TypeRepr)
 TYPEREPR(Composition, TypeRepr)
 TYPEREPR(Metatype, TypeRepr)
 TYPEREPR(Protocol, TypeRepr)
+TYPEREPR(OpaqueReturn, TypeRepr)
 ABSTRACT_TYPEREPR(Specifier, TypeRepr)
   TYPEREPR(InOut, SpecifierTypeRepr)
   TYPEREPR(Shared, SpecifierTypeRepr)
+  TYPEREPR(Owned, SpecifierTypeRepr)
 TYPEREPR(Fixed, TypeRepr)
 TYPEREPR(SILBox, TypeRepr)
+LAST_TYPEREPR(SILBox)
 
 #undef ABSTRACT_TYPEREPR
 #undef TYPEREPR
+#undef LAST_TYPEREPR

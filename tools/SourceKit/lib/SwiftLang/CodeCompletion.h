@@ -17,6 +17,7 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringMap.h"
 
 namespace SourceKit {
 namespace CodeCompletion {
@@ -123,8 +124,7 @@ class CompletionBuilder {
   CompletionSink &sink;
   SwiftResult &current;
   bool modified = false;
-  bool isNotRecommended;
-  Completion::NotRecommendedReason notRecommendedReason;
+  Completion::ExpectedTypeRelation typeRelation;
   SemanticContextKind semanticContext;
   CodeCompletionString *completionString;
   llvm::SmallVector<char, 64> originalName;
@@ -135,7 +135,8 @@ class CompletionBuilder {
 public:
   static void getFilterName(CodeCompletionString *str, raw_ostream &OS);
   static void getDescription(SwiftResult *result, raw_ostream &OS,
-                             bool leadingPunctuation);
+                             bool leadingPunctuation,
+                             bool annotatedDecription = false);
 
 public:
   CompletionBuilder(CompletionSink &sink, SwiftResult &base);
@@ -147,11 +148,9 @@ public:
     moduleImportDepth = value;
   }
 
-  void setNotRecommended(Completion::NotRecommendedReason Reason) {
+  void setExpectedTypeRelation(Completion::ExpectedTypeRelation Relation) {
     modified = true;
-    notRecommendedReason = Reason;
-    if (Reason != Completion::NoReason)
-      isNotRecommended = true;
+    typeRelation = Relation;
   }
 
   void setSemanticContext(SemanticContextKind kind) {

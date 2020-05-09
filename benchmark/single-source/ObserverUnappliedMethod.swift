@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+import TestsUtils
+
+public let ObserverUnappliedMethod = BenchmarkInfo(
+  name: "ObserverUnappliedMethod",
+  runFunction: run_ObserverUnappliedMethod,
+  tags: [.validation],
+  legacyFactor: 10)
+
 class Observer {
   @inline(never)
   func receive(_ value: Int) {
@@ -46,7 +54,7 @@ class Signal {
 public func run_ObserverUnappliedMethod(_ iterations: Int) {
   let signal = Signal()
   let observer = Observer()
-  for _ in 0 ..< 10_000 * iterations {
+  for _ in 0 ..< 1_000 * iterations {
     let forwarder = Forwarder(object: observer, method: Observer.receive)
     signal.subscribe(forwarder)
   }

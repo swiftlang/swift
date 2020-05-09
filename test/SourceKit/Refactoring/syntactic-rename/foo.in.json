@@ -1,0 +1,65 @@
+[
+  {
+    "key.name": "foo(a:)",
+    "key.newname": "bar(first:)",
+    "key.is_function_like": 1,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 7,
+        "key.column": 6,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 17,
+        "key.column": 17,
+        "key.nametype": source.syntacticrename.call
+      },
+      {
+        "key.line": 18,
+        "key.column": 17,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 22,
+        "key.column": 12,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 23,
+        "key.column": 19,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 24,
+        "key.column": 19,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 25,
+        "key.column": 19,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 26,
+        "key.column": 17,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 26,
+        "key.column": 23,
+        "key.nametype": source.syntacticrename.call
+      },
+      {
+        "key.line": 26,
+        "key.column": 33,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 26,
+        "key.column": 43,
+        "key.nametype": source.syntacticrename.unknown
+      }
+    ]
+  }
+]

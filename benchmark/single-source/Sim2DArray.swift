@@ -9,6 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+import TestsUtils
+
+public let Sim2DArray = BenchmarkInfo(
+  name: "Sim2DArray",
+  runFunction: run_Sim2DArray,
+  tags: [.validation, .api, .Array])
 
 struct Array2D {
   var storage : [Int]

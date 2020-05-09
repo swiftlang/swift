@@ -1,0 +1,10 @@
+func throwingFunc() throws -> [Int] {
+    return []
+}
+do {
+for num in try throwingFunc() {
+    let _ = num
+}
+} catch {
+<#code#>
+}

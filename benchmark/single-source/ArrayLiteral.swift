@@ -15,6 +15,14 @@
 // It is reported to be slow: <rdar://problem/17297449>
 import TestsUtils
 
+public let ArrayLiteral = [
+  BenchmarkInfo(name: "ArrayLiteral2", runFunction: run_ArrayLiteral, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayValueProp", runFunction: run_ArrayValueProp, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayValueProp2", runFunction: run_ArrayValueProp2, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayValueProp3", runFunction: run_ArrayValueProp3, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayValueProp4", runFunction: run_ArrayValueProp4, tags: [.validation, .api, .Array]),
+]
+
 @inline(never)
 func makeArray() -> [Int] {
   return [1,2,3]
@@ -23,7 +31,7 @@ func makeArray() -> [Int] {
 @inline(never)
 public func run_ArrayLiteral(_ N: Int) {
   for _ in 1...10000*N {
-    _ = makeArray()
+    blackHole(makeArray())
   }
 }
 

@@ -1,5 +1,8 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -licm | %FileCheck %s
+// RUN: %target-sil-opt -enforce-exclusivity=none -enable-sil-verify-all %s -licm | %FileCheck %s
 
+// Declare this SIL to be canonical because some tests break raw SIL
+// conventions. e.g. address-type block args. -enforce-exclusivity=none is also
+// required to allow address-type block args in canonical SIL.
 sil_stage canonical
 
 import Builtin
@@ -181,12 +184,14 @@ bb2:
   return %r1 : $()
 }
 
+sil @use_addr : $@convention(thin) (@inout Int32) -> ()
+
 // CHECK-LABEL:   sil @dont_hoist_aliased_stack_location
 // CHECK:         {{^}}bb0
 // CHECK-NOT:       load
 // CHECK:         {{^}}bb1:
 // CHECK:           store
-// CHECK:           load
+// CHECK:           apply
 // CHECK:         {{^}}bb2:
 // CHECK:           return
 sil @dont_hoist_aliased_stack_location : $@convention(thin) (Int32) -> () {
@@ -196,7 +201,8 @@ bb0(%0 : $Int32):
 
 bb1:
   store %0 to %313 : $*Int32
-  %l1 = load %313 : $*Int32
+  %f = function_ref @use_addr : $@convention(thin) (@inout Int32) -> ()
+  %a = apply %f(%313) : $@convention(thin) (@inout Int32) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
@@ -231,8 +237,8 @@ bb0(%0 : $*Builtin.Int1, %1 : $P):
 bb1(%existential : $P):
   %2 = open_existential_ref %existential : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P
   %3 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P).Type
-  %4 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P, #P.foo!1, %2 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
-  %5 = apply %4<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %4 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P, #P.foo, %2 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %5 = apply %4<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
   %6 = load %0 : $*Builtin.Int1
   cond_br %6, bb3, bb1(%existential : $P)
 
@@ -267,4 +273,521 @@ bb2:
   destroy_addr %0 : $*P
   %52 = tuple ()
   return %52 : $()
+}
+
+
+sil @get_unknown_value : $@convention(thin) () -> Builtin.Int32
+sil @get_unknown_value2 : $@convention(thin) () -> Builtin.Int32
+
+sil @callee : $@convention(thin) (@inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = function_ref @get_unknown_value : $@convention(thin) () -> Builtin.Int32
+  %2 = apply %1() : $@convention(thin) () -> Builtin.Int32
+  store %2 to %0 : $*Builtin.Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @use_value : $@convention(thin) (Builtin.Int32) -> ()
+
+// Check if escape analysis figures out that the alloc_stack escapes to callee.
+//
+// CHECK-LABEL: sil @dont_hoist_aliased_load
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   load
+// CHECK-NEXT:   apply
+sil @dont_hoist_aliased_load : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  %1 = integer_literal $Builtin.Int32, 0
+  %3 = function_ref @callee : $@convention(thin) (@inout Builtin.Int32) -> ()
+  %5 = function_ref @use_value : $@convention(thin) (Builtin.Int32) -> ()
+  %unknown_value_fn = function_ref @get_unknown_value2 : $@convention(thin) () -> Builtin.Int32
+  store %1 to %0 : $*Builtin.Int32
+  br bb1(%0 : $*Builtin.Int32)
+
+bb1(%phi1 : $*Builtin.Int32):
+  br bb2
+
+bb2:
+  apply %3(%0) : $@convention(thin) (@inout Builtin.Int32) -> ()
+  %4 = load %phi1 : $*Builtin.Int32
+  %6 = apply %unknown_value_fn() : $@convention(thin) () -> Builtin.Int32
+  %33 = builtin "cmp_eq_Int32"(%4 : $Builtin.Int32, %6 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %33, bb2, bb3
+
+bb3:
+  %9999 = tuple()
+  dealloc_stack %0 : $*Builtin.Int32
+  return %9999 : $()
+}
+
+class RefElemClass {
+  var x : Int32
+
+  init()
+}
+
+// Check hoisting of ref_element_addr in conditional control flow (for exclusivity)
+//
+// CHECK-LABEL: sil @hoist_ref_elem
+// CHECK: bb0(%0 : $RefElemClass):
+// CHECK-NEXT:   ref_element_addr %0 : $RefElemClass, #RefElemClass.x
+// CHECK-NEXT:   br bb1
+sil @hoist_ref_elem : $@convention(thin) (RefElemClass) -> () {
+bb0(%0 : $RefElemClass):
+  br bb1
+
+// loop.
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  cond_br undef, bb4, bb1
+
+bb3:
+  %x = ref_element_addr %0 : $RefElemClass, #RefElemClass.x
+  br bb1
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @hoist_load_and_store
+// CHECK:   [[V1:%[0-9]+]] = load %0
+// CHECK:   br bb1([[V1]] : $Int32)
+// CHECK: bb1([[V2:%[0-9]+]] : $Int32):
+// CHECK-NOT:   load
+// CHECK:   [[E:%[0-9]+]] = struct_extract [[V2]]
+// CHECK:   "sadd_with_overflow_Int64"([[E]]
+// CHECK:   [[V3:%[0-9]+]] = struct $Int32
+// CHECK-NOT:   store
+// CHECK: bb2:
+// CHECK:   br bb1([[V3]] : $Int32)
+// CHECK: bb3:
+// CHECK:   store [[V3]] to %0
+// CHECK: } // end sil function 'hoist_load_and_store'
+sil @hoist_load_and_store : $@convention(thin) (@inout Int32, Int32) -> () {
+bb0(%0 : $*Int32, %1 : $Int32):
+  %8 = struct_element_addr %0 : $*Int32, #Int32._value
+  %9 = struct_extract %1 : $Int32, #Int32._value
+  %10 = integer_literal $Builtin.Int1, 0
+  br bb1
+
+bb1:
+  %17 = load %8 : $*Builtin.Int32
+  %18 = builtin "sadd_with_overflow_Int64"(%17 : $Builtin.Int32, %9 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %19 = tuple_extract %18 : $(Builtin.Int32, Builtin.Int1), 0
+  %20 = struct $Int32 (%19 : $Builtin.Int32)
+  store %20 to %0 : $*Int32
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// Just make sure the optimizer does not crash in case the operand of the
+// store is the load itself.
+sil @hoist_load_and_redundant_store : $@convention(thin) (@inout Int32) -> () {
+bb0(%0 : $*Int32):
+  br bb1
+
+bb1:
+  %1 = load %0 : $*Int32
+  store %1 to %0 : $*Int32
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil @hoist_load_and_two_stores
+// CHECK:   [[V1:%[0-9]+]] = load %0
+// CHECK:   br bb1([[V1]] : $Int32)
+// CHECK: bb1([[V2:%[0-9]+]] : $Int32):
+// CHECK-NOT:   load
+// CHECK:   [[E:%[0-9]+]] = struct_extract [[V2]]
+// CHECK:   "sadd_with_overflow_Int64"([[E]]
+// CHECK:   [[V3:%[0-9]+]] = struct $Int32
+// CHECK: bb2:
+// CHECK-NOT:   store
+// CHECK:   br bb4([[V3]] : $Int32)
+// CHECK: bb3:
+// CHECK-NOT:   store
+// CHECK:   br bb4([[V3]] : $Int32)
+// CHECK: bb4([[V4:%[0-9]+]] : $Int32):
+// CHECK:   cond_br
+// CHECK: bb5:
+// CHECK:   br bb1([[V4]] : $Int32)
+// CHECK: bb6:
+// CHECK:   store [[V4]] to %0
+// CHECK: } // end sil function 'hoist_load_and_two_stores'
+sil @hoist_load_and_two_stores : $@convention(thin) (@inout Int32, Int32) -> () {
+bb0(%0 : $*Int32, %1 : $Int32):
+  %8 = struct_element_addr %0 : $*Int32, #Int32._value
+  %9 = struct_extract %1 : $Int32, #Int32._value
+  %10 = integer_literal $Builtin.Int1, 0
+  br bb1
+
+bb1:
+  %17 = load %8 : $*Builtin.Int32
+  %18 = builtin "sadd_with_overflow_Int64"(%17 : $Builtin.Int32, %9 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %19 = tuple_extract %18 : $(Builtin.Int32, Builtin.Int1), 0
+  %20 = struct $Int32 (%19 : $Builtin.Int32)
+  cond_br undef, bb2, bb3
+bb2:
+  store %20 to %0 : $*Int32
+  br bb4
+bb3:
+  store %20 to %0 : $*Int32
+  br bb4
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil @dont_hoist_stores_not_dominating_exit
+// CHECK: bb0(%0 : $*Int32, %1 : $Int32):
+// CHECK-NOT: load
+// CHECK: bb1:
+// CHECK:   load
+// CHECK: bb3:
+// CHECK:   store
+// CHECK: bb4:
+// CHECK: bb6:
+// CHECK-NOT: store
+// CHECK: } // end sil function 'dont_hoist_stores_not_dominating_exit'
+sil @dont_hoist_stores_not_dominating_exit : $@convention(thin) (@inout Int32, Int32) -> () {
+bb0(%0 : $*Int32, %1 : $Int32):
+  %8 = struct_element_addr %0 : $*Int32, #Int32._value
+  %9 = struct_extract %1 : $Int32, #Int32._value
+  %10 = integer_literal $Builtin.Int1, 0
+  br bb1
+
+bb1:
+  %17 = load %8 : $*Builtin.Int32
+  %18 = builtin "sadd_with_overflow_Int64"(%17 : $Builtin.Int32, %9 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %19 = tuple_extract %18 : $(Builtin.Int32, Builtin.Int1), 0
+  %20 = struct $Int32 (%19 : $Builtin.Int32)
+  cond_br undef, bb2, bb3
+bb2:
+  br bb4
+bb3:
+  store %20 to %0 : $*Int32
+  br bb4
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil @hoist_loads_and_stores_multiple_exits
+// CHECK:   [[V1:%[0-9]+]] = load %0
+// CHECK:   br bb1([[V1]] : $Int32)
+// CHECK: bb1([[V2:%[0-9]+]] : $Int32):
+// CHECK-NOT:   load
+// CHECK:   [[E:%[0-9]+]] = struct_extract [[V2]]
+// CHECK:   "sadd_with_overflow_Int64"([[E]]
+// CHECK:   [[V3:%[0-9]+]] = struct $Int32
+// CHECK: bb2:
+// CHECK-NOT:   store
+// CHECK:   cond_br undef, bb1([[V3]] : $Int32), bb3
+// CHECK: bb3:
+// CHECK:   store [[V3]] to %0
+// CHECK:   br bb6
+// CHECK: bb4:
+// CHECK-NOT:   store
+// CHECK:   cond_br undef, bb1([[V3]] : $Int32), bb5
+// CHECK: bb5:
+// CHECK:   store [[V3]] to %0
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK: } // end sil function 'hoist_loads_and_stores_multiple_exits'
+sil @hoist_loads_and_stores_multiple_exits : $@convention(thin) (@inout Int32, Int32) -> () {
+// %0                                             // users: %14, %17, %5, %2
+// %1                                             // user: %3
+bb0(%0 : $*Int32, %1 : $Int32):
+  %2 = struct_element_addr %0 : $*Int32, #Int32._value
+  %3 = struct_extract %1 : $Int32, #Int32._value  // user: %9
+  %4 = integer_literal $Builtin.Int1, 0           // user: %9
+  %5 = load %0 : $*Int32                          // user: %6
+  br bb1(%5 : $Int32)                             // id: %6
+
+// %7                                             // user: %8
+bb1(%7 : $Int32):                                 // Preds: bb0 bb2 bb4
+  %8 = struct_extract %7 : $Int32, #Int32._value  // user: %9
+  %9 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int32, %3 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %10
+  %10 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 0 // user: %11
+  %11 = struct $Int32 (%10 : $Builtin.Int32)      // users: %14, %17, %13, %16
+  cond_br undef, bb2, bb4                         // id: %12
+
+bb2:                                              // Preds: bb1
+  cond_br undef, bb1(%11 : $Int32), bb3           // id: %13
+
+bb3:                                              // Preds: bb2
+  store %11 to %0 : $*Int32                       // id: %14
+  br bb6                                          // id: %15
+
+bb4:                                              // Preds: bb1
+  cond_br undef, bb1(%11 : $Int32), bb5           // id: %16
+
+bb5:                                              // Preds: bb4
+  store %11 to %0 : $*Int32                       // id: %17
+  br bb6                                          // id: %18
+
+bb6:                                              // Preds: bb3 bb5
+  %19 = tuple ()                                  // user: %20
+  return %19 : $()                                // id: %20
+} // end sil function 'hoist_loads_and_stores'
+
+// ==================================================================
+// Test combined load/store hoisting/sinking with aliases
+
+struct Index {
+  @_hasStorage var value: Int64 { get set }
+}
+
+// -----------------------------------------------------------------------------
+// Test combined load/store hoisting/sinking with obvious aliasing loads
+
+// CHECK-LABEL: sil shared @testCombinedLdStAliasingLoad : $@convention(method) (Int64) -> Int64 {
+// CHECK: bb0(%0 : $Int64):
+// CHECK: store
+// CHECK-NOT: {{(load|store)}}
+// CHECK: bb1:
+// CHECK-NEXT: load %{{.*}} : $*Builtin.Int64
+// CHECK-NEXT: store %{{.*}} to %{{.*}} : $*Int64
+// CHECK-NEXT: load %{{.*}} : $*Builtin.Int64
+// CHECK-NEXT: cond_br
+// CHECK-NOT: {{(load|store)}}
+// CHECK-LABEL: } // end sil function 'testCombinedLdStAliasingLoad'
+sil shared @testCombinedLdStAliasingLoad : $@convention(method) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %zero = integer_literal $Builtin.Int64, 0
+  %intz = struct $Int64(%zero : $Builtin.Int64)
+  %stackAddr = alloc_stack $Index
+  %outerAddr1 = struct_element_addr %stackAddr : $*Index, #Index.value
+  store %intz to %outerAddr1 : $*Int64
+  %innerAddr1 = struct_element_addr %outerAddr1 : $*Int64, #Int64._value
+  %outerAddr2 = struct_element_addr %stackAddr : $*Index, #Index.value
+  %innerAddr2 = struct_element_addr %outerAddr2 : $*Int64, #Int64._value
+  br bb1
+
+bb1:
+  %val = load %innerAddr2 : $*Builtin.Int64
+  %intv = struct $Int64(%zero : $Builtin.Int64)
+  store %intv to %outerAddr2 : $*Int64
+  %val2 = load %innerAddr1 : $*Builtin.Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %stackAddr : $*Index
+  %result = struct $Int64(%val2 : $Builtin.Int64)
+  return %result : $Int64
+}
+
+// -----------------------------------------------------------------------------
+// Test combined load/store hoisting/sinking with obvious aliasing stores
+
+// CHECK-LABEL: sil shared @testCombinedLdStAliasingStore : $@convention(method) (Int64) -> Int64 {
+// CHECK: bb0(%0 : $Int64):
+// CHECK: store
+// CHECK-NOT: {{(load|store)}}
+// CHECK: bb1:
+// CHECK-NEXT: load %{{.*}} : $*Builtin.Int64
+// CHECK-NEXT: store %{{.*}} to %{{.*}} : $*Int64
+// CHECK-NEXT: store %{{.*}} to %{{.*}} : $*Builtin.Int64
+// CHECK-NEXT: cond_br
+// CHECK-NOT: {{(load|store)}}
+// CHECK: load
+// CHECK-NOT: {{(load|store)}}
+// CHECK-LABEL: } // end sil function 'testCombinedLdStAliasingStore'
+sil shared @testCombinedLdStAliasingStore : $@convention(method) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %zero = integer_literal $Builtin.Int64, 0
+  %intz = struct $Int64(%zero : $Builtin.Int64)
+  %stackAddr = alloc_stack $Index
+  %outerAddr1 = struct_element_addr %stackAddr : $*Index, #Index.value
+  store %intz to %outerAddr1 : $*Int64
+  %innerAddr1 = struct_element_addr %outerAddr1 : $*Int64, #Int64._value
+  %outerAddr2 = struct_element_addr %stackAddr : $*Index, #Index.value
+  %innerAddr2 = struct_element_addr %outerAddr2 : $*Int64, #Int64._value
+  br bb1
+
+bb1:
+  %val = load %innerAddr2 : $*Builtin.Int64
+  %intv = struct $Int64(%zero : $Builtin.Int64)
+  store %intv to %outerAddr2 : $*Int64
+  store %val to %innerAddr1 : $*Builtin.Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %stackAddr : $*Index
+  %final = load %innerAddr2 : $*Builtin.Int64
+  %result = struct $Int64(%final : $Builtin.Int64)
+  return %result : $Int64
+}
+
+// -----------------------------------------------------------------------------
+// Test combined load/store hoisting/sinking with unknown aliasing loads
+
+// CHECK-LABEL: sil shared @testCombinedLdStUnknownLoad : $@convention(method) (Int64, Builtin.RawPointer, Builtin.RawPointer) -> Int64 {
+// CHECK: bb0(%0 : $Int64, %1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer):
+// CHECK-NOT: {{(load|store)}}
+// CHECK: bb1:
+// CHECK-NEXT:  load %{{.*}} : $*Builtin.Int64
+// CHECK-NEXT:  store %{{.*}} to %{{.*}} : $*Int64
+// CHECK-NEXT:  load %{{.*}} : $*Builtin.Int64
+// CHECK-NEXT:  cond_br
+// CHECK-NOT: {{(load|store)}}
+// CHECK-LABEL: } // end sil function 'testCombinedLdStUnknownLoad'
+sil shared @testCombinedLdStUnknownLoad : $@convention(method) (Int64, Builtin.RawPointer, Builtin.RawPointer) -> Int64 {
+bb0(%0 : $Int64, %1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer):
+  %addr1 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
+  %addr2 = pointer_to_address %2 : $Builtin.RawPointer to $*Index
+  %outerAddr1 = struct_element_addr %addr1 : $*Index, #Index.value
+  %outerAddr2 = struct_element_addr %addr2 : $*Index, #Index.value
+  %innerAddr1 = struct_element_addr %outerAddr1 : $*Int64, #Int64._value
+  %innerAddr2 = struct_element_addr %outerAddr2 : $*Int64, #Int64._value
+  br bb1
+
+bb1:
+  %val = load %innerAddr2 : $*Builtin.Int64
+  store %0 to %outerAddr2 : $*Int64
+  %val2 = load %innerAddr1 : $*Builtin.Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %result = struct $Int64(%val2 : $Builtin.Int64)
+  return %result : $Int64
+}
+
+// -----------------------------------------------------------------------------
+// Reduced test case from rdar !!!
+//
+// Test miscompilation of BidirectionalCollection<IndexSet>._distance with
+// combined load/store hoisting/sinking with mutiple loads from
+// aliasing addresses.
+
+// getRange
+sil @getRange : $@convention(thin) () -> Range<Int64>
+
+// CHECK-LABEL: sil shared @testLICMReducedCombinedLdStExtraProjection : $@convention(method) (Int64) -> Int64 {
+// CHECK: bb0(%0 : $Int64):
+// CHECK:   store %0 to %{{.*}} : $*Int64
+// CHECK-NOT: {{(load|store)}}
+// CHECK: bb1(%{{.*}} : $Builtin.Int64):
+// CHECK:   builtin "sadd_with_overflow_Int64"
+// CHECK:   load %{{.*}} : $*Builtin.Int64
+// CHECK:   builtin "sadd_with_overflow_Int64"
+// CHECK:   builtin "cmp_eq_Int64"
+// CHECK-NEXT: cond_br
+// CHECK: bb3:
+// CHECK:   store %{{.*}} to %{{.*}} : $*Int64
+// CHECK: bb4:
+// CHECK:   store %{{.*}} to %{{.*}} : $*Int64
+// CHECK: bb5:
+// CHECK:   function_ref @getRange : $@convention(thin) () -> Range<Int64>
+// CHECK:   apply %{{.*}}() : $@convention(thin) () -> Range<Int64>
+// CHECK:   store %{{.*}} to %{{.*}} : $*Int64
+// CHECK: bb6:
+// CHECK:   load %{{.*}} : $*Builtin.Int64
+// CHECK:   builtin "cmp_eq_Int64"
+// CHECK:   cond_br
+// CHECK-NOT: {{(load|store)}}
+// CHECK-LABEL: } // end sil function 'testLICMReducedCombinedLdStExtraProjection'
+sil shared @testLICMReducedCombinedLdStExtraProjection : $@convention(method) (Int64) -> Int64 {
+// %0                                             // users: %5, %1
+bb0(%0 : $Int64):
+  %1 = struct_extract %0 : $Int64, #Int64._value      // users: %35, %20
+  %2 = integer_literal $Builtin.Int64, 0          // user: %9
+  %3 = alloc_stack $Index              // users: %41, %13, %4
+  %4 = struct_element_addr %3 : $*Index, #Index.value // users: %8, %5
+  store %0 to %4 : $*Int64                          // id: %5
+  %6 = integer_literal $Builtin.Int64, 1          // user: %11
+  %7 = integer_literal $Builtin.Int1, -1          // user: %11
+  %8 = struct_element_addr %4 : $*Int64, #Int64._value // user: %34
+  br bb1(%2 : $Builtin.Int64)                     // id: %9
+
+// %10                                            // user: %11
+bb1(%10 : $Builtin.Int64):                        // Preds: bb8 bb0
+  %11 = builtin "sadd_with_overflow_Int64"(%10 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %12
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0 // users: %38, %37
+  %13 = struct_element_addr %3 : $*Index, #Index.value // users: %32, %27, %24, %14
+  %14 = struct_element_addr %13 : $*Int64, #Int64._value // user: %15
+  %15 = load %14 : $*Builtin.Int64                // user: %18
+  %16 = integer_literal $Builtin.Int64, 1         // user: %18
+  %17 = integer_literal $Builtin.Int1, -1         // user: %18
+  %18 = builtin "sadd_with_overflow_Int64"(%15 : $Builtin.Int64, %16 : $Builtin.Int64, %17 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %19
+  %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0 // users: %26, %23, %20
+  %20 = builtin "cmp_eq_Int64"(%19 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %21
+  cond_br %20, bb2, bb3                           // id: %21
+
+bb2:                                              // Preds: bb1
+  cond_br undef, bb4, bb5                         // id: %22
+
+bb3:                                              // Preds: bb1
+  %23 = struct $Int64 (%19 : $Builtin.Int64)        // user: %24
+  store %23 to %13 : $*Int64                        // id: %24
+  br bb6                                          // id: %25
+
+bb4:                                              // Preds: bb2
+  %26 = struct $Int64 (%19 : $Builtin.Int64)        // user: %27
+  store %26 to %13 : $*Int64                        // id: %27
+  br bb6                                          // id: %28
+
+bb5:                                              // Preds: bb2
+  // function_ref getRange
+  %29 = function_ref @getRange : $@convention(thin) () -> Range<Int64> // user: %30
+  %30 = apply %29() : $@convention(thin) () -> Range<Int64> // user: %31
+  %31 = struct_extract %30 : $Range<Int64>, #Range.lowerBound // user: %32
+  store %31 to %13 : $*Int64                        // id: %32
+  br bb6                                          // id: %33
+
+bb6:                                              // Preds: bb5 bb4 bb3
+  %34 = load %8 : $*Builtin.Int64                 // user: %35
+  %35 = builtin "cmp_eq_Int64"(%34 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %36
+  cond_br %35, bb7, bb8                           // id: %36
+
+bb7:                                              // Preds: bb6
+  br bb9(%12 : $Builtin.Int64)                    // id: %37
+
+bb8:                                              // Preds: bb6
+  br bb1(%12 : $Builtin.Int64)                    // id: %38
+
+// %39                                            // user: %40
+bb9(%39 : $Builtin.Int64):                        // Preds: bb7
+  %40 = struct $Int64 (%39 : $Builtin.Int64)        // user: %42
+  dealloc_stack %3 : $*Index           // id: %41
+  return %40 : $Int64                               // id: %42
 }

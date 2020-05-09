@@ -23,6 +23,7 @@ from __future__ import print_function
 import os
 import subprocess
 import sys
+import time
 
 
 VERBOSE = False
@@ -37,11 +38,11 @@ def compile_and_stat(compile_args, output_file):
     subprocess.check_call(compile_args)
 
     md5 = subprocess.check_output(["md5", "-q", output_file])
-    mtime = os.path.getmtime(output_file)
+    mtime = time.ctime(os.path.getmtime(output_file))
 
     if VERBOSE:
-        print("  time = {}".format(md5))
-        print("  md5 = " + mtime)
+        print(" time = " + str(mtime))
+        print("  md5 = " + md5)
 
     return (md5, mtime)
 
@@ -64,13 +65,19 @@ def main():
         elif arg == '-o':
             next_arg_is_output = True
 
-    if not write_obj_file or output_file is None:
-        return
-
     new_args = sys.argv[1:]
+
+    if not write_obj_file or output_file is None:
+        subprocess.check_call(new_args)
+        return
 
     if VERBOSE:
         print("Reference compilation of " + output_file + ":")
+
+    # As a workaround for rdar://problem/43442957 and rdar://problem/43439465
+    # we have to "warm-up" the clang module cache. Without that in some cases
+    # we end up with small differences in the debug info.
+    compile_and_stat(new_args, output_file)
 
     reference_md5, reference_time = compile_and_stat(new_args, output_file)
 
@@ -86,7 +93,8 @@ def main():
         # This is the most important check: is the output file exactly the
         # same.
         if reference_md5 != second_md5:
-            sys.exit("non-determinism when generating: " + output_file)
+            sys.exit("non-determinism when generating: " + output_file +
+                     "\ncommand line:\n" + " ".join(new_args))
 
         # This is the bonus check: does the compiler not re-write the output
         # file. (For compilations < 1sec this check may succeed even if the

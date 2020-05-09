@@ -10,19 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/ConstExpr.h"
 
 using namespace swift;
 
@@ -40,19 +43,39 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
   SILLocation FLoc = F->getLocation();
 
   Type ResTy;
+  BraceStmt *BS;
 
   if (auto *FD = FLoc.getAsASTNode<FuncDecl>()) {
     ResTy = FD->getResultInterfaceType();
+    BS = FD->getBody(/*canSynthesize=*/false);
+  } else if (auto *CD = FLoc.getAsASTNode<ConstructorDecl>()) {
+    ResTy = CD->getResultInterfaceType();
+    BS = FD->getBody();
   } else if (auto *CE = FLoc.getAsASTNode<ClosureExpr>()) {
     ResTy = CE->getResultType();
+    BS = CE->getBody();
   } else {
     llvm_unreachable("unhandled case in MissingReturn");
   }
 
   SILLocation L = UI->getLoc();
   assert(L && ResTy);
-  auto diagID = F->isNoReturnFunction() ? diag::missing_never_call
-                                        : diag::missing_return;
+  if (!BS->empty()) {
+    auto element = BS->getLastElement();
+    if (auto expr = element.dyn_cast<Expr *>()) {
+      if (expr->getType()->isEqual(ResTy)) {
+        Context.Diags.diagnose(
+          expr->getStartLoc(),
+          diag::missing_return_last_expr, ResTy,
+          FLoc.isASTNode<ClosureExpr>() ? 1 : 0)
+        .fixItInsert(expr->getStartLoc(), "return ");
+        return;
+      }
+    }
+  }
+  auto diagID = F->isNoReturnFunction(F->getTypeExpansionContext())
+                    ? diag::missing_never_call
+                    : diag::missing_return;
   diagnose(Context,
            L.getEndSourceLoc(),
            diagID, ResTy,
@@ -91,7 +114,7 @@ static void diagnoseUnreachable(const SILInstruction *I,
   }
 }
 
-/// \brief Issue diagnostics whenever we see Builtin.static_report(1, ...).
+/// Issue diagnostics whenever we see Builtin.static_report(1, ...).
 static void diagnoseStaticReports(const SILInstruction *I,
                                   SILModule &M) {
 
@@ -112,20 +135,138 @@ static void diagnoseStaticReports(const SILInstruction *I,
   }
 }
 
+/// Emit a diagnostic for `poundAssert` builtins whose condition is
+/// false or whose condition cannot be evaluated.
+static void diagnosePoundAssert(const SILInstruction *I,
+                                SILModule &M,
+                                ConstExprEvaluator &constantEvaluator) {
+  auto *builtinInst = dyn_cast<BuiltinInst>(I);
+  if (!builtinInst ||
+      builtinInst->getBuiltinKind() != BuiltinValueKind::PoundAssert)
+    return;
+
+  SmallVector<SymbolicValue, 1> values;
+  constantEvaluator.computeConstantValues({builtinInst->getArguments()[0]},
+                                          values);
+  SymbolicValue value = values[0];
+  if (!value.isConstant()) {
+    diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+             diag::pound_assert_condition_not_constant);
+
+    // If we have more specific information about what went wrong, emit
+    // notes.
+    if (value.getKind() == SymbolicValue::Unknown)
+      value.emitUnknownDiagnosticNotes(builtinInst->getLoc());
+    return;
+  }
+  assert(value.getKind() == SymbolicValue::Integer &&
+         "sema prevents non-integer #assert condition");
+
+  APInt intValue = value.getIntegerValue();
+  assert(intValue.getBitWidth() == 1 &&
+         "sema prevents non-int1 #assert condition");
+  if (intValue.isNullValue()) {
+    auto *message = cast<StringLiteralInst>(builtinInst->getArguments()[1]);
+    StringRef messageValue = message->getValue();
+    if (messageValue.empty())
+      messageValue = "assertion failed";
+    diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+             diag::pound_assert_failure, messageValue);
+    return;
+  }
+}
+
+static void diagnoseUnspecializedPolymorphicBuiltins(SILInstruction *inst) {
+  // We only validate if we are in a non-transparent function.
+  if (inst->getFunction()->isTransparent())
+    return;
+
+  auto *bi = dyn_cast<BuiltinInst>(inst);
+  if (!bi)
+    return;
+
+  auto kind = bi->getBuiltinKind();
+  if (!kind)
+    return;
+
+  if (!isPolymorphicBuiltin(*kind))
+    return;
+
+  const auto &builtinInfo = bi->getBuiltinInfo();
+
+  // First that the parameters were acceptable so we can emit a nice error to
+  // guide the user.
+  for (SILValue value : bi->getOperandValues()) {
+    SILType type = value->getType();
+    SourceLoc loc;
+    if (auto *inst = value->getDefiningInstruction()) {
+      loc = inst->getLoc().getSourceLoc();
+    } else {
+      loc = bi->getLoc().getSourceLoc();
+    }
+
+    if (!type.is<BuiltinType>() || !type.isTrivial(*bi->getFunction())) {
+      diagnose(bi->getModule().getASTContext(), loc,
+               diag::polymorphic_builtin_passed_non_trivial_non_builtin_type,
+               type.getASTType());
+      return;
+    }
+  }
+
+  // Ok, we have a valid type for a polymorphic builtin. Make sure we actually
+  // have a static overload for this type.
+  PolymorphicBuiltinSpecializedOverloadInfo overloadInfo;
+  bool ableToMapToStaticOverload = overloadInfo.init(bi);
+  (void)ableToMapToStaticOverload;
+  assert(ableToMapToStaticOverload);
+  if (!overloadInfo.doesOverloadExist()) {
+    diagnose(bi->getModule().getASTContext(), bi->getLoc().getSourceLoc(),
+             diag::polymorphic_builtin_passed_type_without_static_overload,
+             overloadInfo.staticOverloadIdentifier,
+             getBuiltinName(builtinInfo.ID),
+             overloadInfo.argTypes.front().getASTType());
+    return;
+  }
+
+  // Otherwise, something happen that we did not understand. This can only
+  // happen if we specialize the generic type in the builtin /after/ constant
+  // propagation runs at -Onone but before dataflow diagnostics. This is an
+  // error in implementation, so we assert.
+  llvm_unreachable("Found generic builtin with known static overload that it "
+                   "could be transformed to. Did this builtin get its generic "
+                   "type specialized /after/ constant propagation?");
+}
+
 namespace {
 class EmitDFDiagnostics : public SILFunctionTransform {
   ~EmitDFDiagnostics() override {}
 
   /// The entry point to the transformation.
   void run() override {
+    // Don't rerun diagnostics on deserialized functions.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
+
     SILModule &M = getFunction()->getModule();
-    for (auto &BB : *getFunction())
+    for (auto &BB : *getFunction()) {
       for (auto &I : BB) {
         diagnoseUnreachable(&I, M.getASTContext());
         diagnoseStaticReports(&I, M);
+        diagnoseUnspecializedPolymorphicBuiltins(&I);
       }
+    }
+
+    if (M.getASTContext().LangOpts.EnableExperimentalStaticAssert) {
+      SymbolicValueBumpAllocator allocator;
+      ConstExprEvaluator constantEvaluator(allocator,
+                                           getOptions().AssertConfig);
+      for (auto &BB : *getFunction())
+        for (auto &I : BB)
+          diagnosePoundAssert(&I, M, constantEvaluator);
+    }
   }
 };
+
 } // end anonymous namespace
 
 

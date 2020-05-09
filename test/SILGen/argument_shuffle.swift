@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s
+// RUN: %target-swift-emit-silgen %s
 
 struct Horse<T> {
   func walk(_: (String, Int), reverse: Bool) {}

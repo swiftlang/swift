@@ -40,21 +40,32 @@ function(add_swift_unittest test_dirname)
   endif()
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
-      LINK_FLAGS " -Xlinker -rpath -Xlinker ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx")
+    set_target_properties(${test_dirname} PROPERTIES
+      BUILD_RPATH ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx)
+  elseif("${SWIFT_HOST_VARIANT}" STREQUAL "android")
+    swift_android_lib_for_arch(${SWIFT_HOST_VARIANT_ARCH} android_system_libs)
+    set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_DIRECTORIES
+      "${android_system_libs}")
+    set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_LIBRARIES "log")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
-      LINK_FLAGS " -latomic")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+      target_compile_options(${test_dirname} PRIVATE
+        -march=core2)
+    endif()
+  elseif("${SWIFT_HOST_VARIANT}" STREQUAL "windows")
+    target_compile_definitions("${test_dirname}" PRIVATE
+      _ENABLE_EXTENDED_ALIGNED_STORAGE)
   endif()
 
-  if(SWIFT_ENABLE_GOLD_LINKER AND
+  find_program(LDLLD_PATH "ld.lld")
+  # Strangely, macOS finds lld and then can't find it when using -fuse-ld=
+  if(SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
+      LINK_FLAGS " -fuse-ld=lld")
+  elseif(SWIFT_ENABLE_GOLD_LINKER AND
      "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -fuse-ld=gold")
-  endif()
-  if(SWIFT_ENABLE_LLD_LINKER)
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
-      LINK_FLAGS " -fuse-ld=lld")
   endif()
 
   if(SWIFT_ANALYZE_CODE_COVERAGE)

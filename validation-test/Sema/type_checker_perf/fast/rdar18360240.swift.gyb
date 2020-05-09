@@ -1,0 +1,9 @@
+// RUN: %scale-test --begin 2 --end 10 --step 2 --select NumConstraintScopes --polynomial-threshold 1.5 %s
+// REQUIRES: asserts,no_asan
+
+let empty: [Int] = []
+let _ = empty +
+%for i in range(0, N):
+    empty +
+%end
+    empty

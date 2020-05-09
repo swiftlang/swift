@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -dump-parse %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -dump-parse %s | %FileCheck %s
 
 // CR
 _ = """"""

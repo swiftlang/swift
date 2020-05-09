@@ -9,8 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-build-swift %s -swift-version 3 -g -Onone -o %T/UnicodeDecoders
-// RUN: %target-run %T/UnicodeDecoders
+// RUN: %target-build-swift %s -g -Onone -o %t
+// RUN: %target-codesign %t
+// RUN: %target-run %t
 // REQUIRES: executable_test
 
 // Benchmarking: use the following script with your swift-4-enabled swiftc.
@@ -29,11 +30,84 @@
 //===----------------------------------------------------------------------===//
 extension Unicode.Scalar {
   // Hack providing an efficient API that is available to the standard library
-  @_versioned
+  @usableFromInline
   @inline(__always)
   init(_unchecked x: UInt32) { self = unsafeBitCast(x, to: Unicode.Scalar.self) }
 }
 //===----------------------------------------------------------------------===//
+
+extension Unicode {
+  @frozen
+  public // @testable
+  struct _ParsingIterator<
+    CodeUnitIterator : IteratorProtocol, 
+    Parser: Unicode.Parser
+  > where Parser.Encoding.CodeUnit == CodeUnitIterator.Element {
+    @inline(__always)
+    @inlinable
+    public init(codeUnits: CodeUnitIterator, parser: Parser) {
+      self.codeUnits = codeUnits
+      self.parser = parser
+    }
+    public var codeUnits: CodeUnitIterator
+    public var parser: Parser
+  }
+}
+
+extension Unicode._ParsingIterator : IteratorProtocol, Sequence {
+  @inline(__always)
+  @inlinable
+  public mutating func next() -> Parser.Encoding.EncodedScalar? {
+    switch parser.parseScalar(from: &codeUnits) {
+    case let .valid(scalarContent): return scalarContent
+    case .error: return Parser.Encoding.encodedReplacementCharacter
+    case .emptyInput: return nil
+    }
+  }
+}
+
+extension _UnicodeParser {
+  @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  @discardableResult
+  internal static func _parse<I: IteratorProtocol>(
+    _ input: inout I,
+    repairingIllFormedSequences makeRepairs: Bool = true,
+    into output: (Encoding.EncodedScalar)->Void
+  ) -> Int
+  where I.Element == Encoding.CodeUnit
+  {
+    var errorCount = 0
+    var d = Self()
+    while true {
+      switch d.parseScalar(from: &input) {
+      case let .valid(scalarContent):
+        output(scalarContent)
+      case .error:
+        if _slowPath(!makeRepairs) { return 1 }
+        errorCount += 1
+        output(Encoding.encodedReplacementCharacter)
+      case .emptyInput:
+        return errorCount
+      }
+    }
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  @discardableResult
+  public static func _decode<I: IteratorProtocol>(
+    _ input: inout I,
+    repairingIllFormedSequences makeRepairs: Bool,
+    into output: (Unicode.Scalar)->Void
+  ) -> Int
+  where I.Element == Encoding.CodeUnit
+  {
+    return _parse(&input, repairingIllFormedSequences: makeRepairs) {
+      output(Encoding.decode($0))
+    }
+  }
+}
 
 extension Unicode {
   struct DefaultScalarView<
@@ -153,18 +227,17 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
   public func index(before i: Index) -> Index {
     var parser = Encoding.ReverseParser()
     
-    var more = _ReverseIndexingIterator(
-      _elements: codeUnits, _position: i.codeUnitIndex)
+    var more = codeUnits[..<i.codeUnitIndex].reversed().makeIterator()
     
     switch parser.parseScalar(from: &more) {
     case .valid(let scalarContent):
-      let d: CodeUnits.IndexDistance = -numericCast(scalarContent.count)
+      let d: Int = -scalarContent.count
       return Index(
         codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d),
         scalar: Encoding.decode(scalarContent),
         stride: numericCast(scalarContent.count))
     case .error(let stride):
-      let d: CodeUnits.IndexDistance = -numericCast(stride)
+      let d: Int = -stride
       return Index(
         codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d) ,
         scalar: Unicode.Scalar(_unchecked: 0xfffd),

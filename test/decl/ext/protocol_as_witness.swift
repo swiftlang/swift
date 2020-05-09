@@ -8,8 +8,7 @@ protocol P1 {
 protocol Q1 {}
 
 extension P1 where Self : Q1 {
-  // FIXME: Poor QoI
-  func f() {} // expected-note{{candidate has non-matching type '<Self> () -> ()'}}
+  func f() {} // expected-note{{candidate would match if 'X1' conformed to 'Q1'}}
 }
 
 struct X1 : P1 {} // expected-error{{type 'X1' does not conform to protocol 'P1'}}
@@ -33,7 +32,7 @@ protocol P3 {
 }
 
 extension P3 where Self : Equatable {
-  func f() {} // expected-note{{candidate has non-matching type '<Self> () -> ()'}}
+  func f() {} // expected-note{{candidate would match if 'X3' conformed to 'Equatable'}}
 }
 
 struct X3 : P3 {} // expected-error{{type 'X3' does not conform to protocol 'P3'}}

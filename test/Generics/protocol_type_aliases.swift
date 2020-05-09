@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 
@@ -14,10 +14,6 @@ protocol Q {
 }
 
 // CHECK-LABEL: .requirementOnNestedTypeAlias@
-// CHECK-NEXT: Requirements:
-// CHECK-NEXT:   τ_0_0 : Q [τ_0_0: Explicit @ 22:51]
-// CHECK-NEXT:   τ_0_0[.Q].B : P [τ_0_0: Explicit @ 22:51 -> Protocol requirement (via Self.B in Q)
-// CHECK-NEXT:   τ_0_0[.Q].B[.P].A == Int [τ_0_0[.Q].B[.P].X: Explicit @ 22:62]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q, τ_0_0.B.A == Int>
 func requirementOnNestedTypeAlias<T>(_: T) where T: Q, T.B.X == Int {}
 
@@ -33,22 +29,13 @@ protocol Q2 {
 }
 
 // CHECK-LABEL: .requirementOnConcreteNestedTypeAlias@
-// CHECK-NEXT: Requirements:
-// CHECK-NEXT:   τ_0_0 : Q2 [τ_0_0: Explicit @ 42:59]
-// CHECK-NEXT:   τ_0_0[.Q2].B : P2 [τ_0_0: Explicit @ 42:59 -> Protocol requirement (via Self.B in Q2)
-// CHECK-NEXT:   τ_0_0[.Q2].C == S<T.B.A> [τ_0_0[.Q2].C: Explicit]
-// CHECK-NEXT:   τ_0_0[.Q2].B[.P2].X == S<T.B.A> [τ_0_0[.Q2].B[.P2].X: Concrete type binding]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == S<τ_0_0.B.A>>
 func requirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, T.C == T.B.X {}
 
 // CHECK-LABEL: .concreteRequirementOnConcreteNestedTypeAlias@
-// CHECK-NEXT: Requirements:
-// CHECK-NEXT:   τ_0_0 : Q2 [τ_0_0: Explicit @ 51:67]
-// CHECK-NEXT:   τ_0_0[.Q2].B : P2 [τ_0_0: Explicit @ 51:67 -> Protocol requirement (via Self.B in Q2)
-// CHECK-NEXT:   τ_0_0[.Q2].C == τ_0_0[.Q2].B[.P2].A [τ_0_0[.Q2].C: Explicit]
-// CHECK-NEXT:   τ_0_0[.Q2].B[.P2].X == S<T.B.A> [τ_0_0[.Q2].B[.P2].X: Concrete type binding]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == τ_0_0.B.A>
 func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> == T.B.X {}
+// expected-warning@-1 {{neither type in same-type constraint ('S<T.C>' or 'T.B.X') refers to a generic parameter or associated type}}
 
 
 // Incompatible concrete typealias types are flagged as such

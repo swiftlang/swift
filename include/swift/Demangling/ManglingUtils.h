@@ -160,13 +160,13 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
       if (WordIdx >= 0) {
         // We found a word substitution!
         assert(WordIdx < 26);
-        M.SubstWordsInIdent.push_back({wordStartPos, WordIdx});
+        M.addSubstWordsInIdent({wordStartPos, WordIdx});
       } else if (wordLen >= 2 && M.Words.size() < M.MaxNumWords) {
         // It's a new word: remember it.
         // Note: at this time the word's start position is relative to the
         // begin of the identifier. We must update it afterwards so that it is
         // relative to the begin of the whole mangled Buffer.
-        M.Words.push_back({wordStartPos, wordLen});
+        M.addWord({wordStartPos, wordLen});
       }
       wordStartPos = NotInsideWord;
     }
@@ -181,7 +181,7 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
 
   size_t Pos = 0;
   // Add a dummy-word at the end of the list.
-  M.SubstWordsInIdent.push_back({ident.size(), -1});
+  M.addSubstWordsInIdent({ident.size(), -1});
 
   // Mangle a sequence of word substitutions and sub-strings.
   for (size_t Idx = 0, End = M.SubstWordsInIdent.size(); Idx < End; ++Idx) {

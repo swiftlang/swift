@@ -35,5 +35,7 @@ VALUE_WITNESS(xg, GetExtraInhabitantIndex)
 VALUE_WITNESS(ug, GetEnumTag)
 VALUE_WITNESS(up, DestructiveProjectEnumData)
 VALUE_WITNESS(ui, DestructiveInjectEnumTag)
+VALUE_WITNESS(et, GetEnumTagSinglePayload)
+VALUE_WITNESS(st, StoreEnumTagSinglePayload)
 
 #undef VALUE_WITNESS

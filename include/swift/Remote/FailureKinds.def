@@ -27,4 +27,7 @@ FAILURE(TypeHasNoSuchMember,
 FAILURE(CouldNotResolveTypeDecl,
         "could not resolve a type with mangled name '%0'", (String))
 
+FAILURE(NotFixedLayout,
+        "query cannot be determined for a type with no fixed layout", ())
+
 #undef FAILURE

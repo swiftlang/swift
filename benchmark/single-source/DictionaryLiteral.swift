@@ -14,6 +14,12 @@
 // rdar://problem/19804127
 import TestsUtils
 
+public let DictionaryLiteral = BenchmarkInfo(
+  name: "DictionaryLiteral",
+  runFunction: run_DictionaryLiteral,
+  tags: [.validation, .api, .Dictionary],
+  legacyFactor: 10)
+
 @inline(never)
 func makeDictionary() -> [Int: Int] {
   return [1: 3, 2: 2, 3: 1]
@@ -21,7 +27,7 @@ func makeDictionary() -> [Int: Int] {
 
 @inline(never)
 public func run_DictionaryLiteral(_ N: Int) {
-  for _ in 1...10000*N {
+  for _ in 1...1000*N {
     _ = makeDictionary()
   }
 }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -array-specialize
+// RUN: %target-sil-opt -enable-sil-verify-all %s -array-property-opt
 
 sil_stage canonical
 
@@ -108,4 +108,71 @@ bb4:
 
 bb5(%9 : $Error):
   throw %9 : $Error
+}
+
+sil @dominator_update_outside_non_exit_block : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
+  %3 = load %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %4 = load %1 : $*Builtin.Int1
+  retain_value %3 : $MyArray<MyClass>
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  cond_br %4, bb2, bb4
+
+bb2:
+ cond_br undef, bb3, bb5
+
+bb3:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb1, bb7
+
+bb4: // Exit block; b1 dom b4
+ cond_br undef, bb5, bb6
+
+bb5: // Exit Block; b1 dom b4
+ br bb6
+
+bb6: // Non-exit Dominated by bb1
+ br bb7
+
+bb7:
+  return %4 : $Builtin.Int1
+}
+
+sil @dominator_update_outside_non_exit_block_2 : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
+  %3 = load %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %4 = load %1 : $*Builtin.Int1
+  retain_value %3 : $MyArray<MyClass>
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  cond_br %4, bb2, bb4
+
+bb2:
+ cond_br undef, bb3, bb5
+
+bb3:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb1, bb7
+
+bb4: // Exit block; b1 dom b4
+ cond_br undef, bb5, bb6
+
+bb5: // Exit Block; b1 dom b4
+ br bb6
+
+bb6: // Non-exit Dominated by bb1
+ br bb8
+
+bb7: // Exit dominated by bb3
+ br bb8
+
+bb8: // Non-exit dominated by bb1
+  return %4 : $Builtin.Int1
 }

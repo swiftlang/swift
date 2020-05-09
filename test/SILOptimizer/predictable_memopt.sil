@@ -1,12 +1,13 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -predictable-memopt  | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -predictable-memaccess-opts -predictable-deadalloc-elim  | %FileCheck %s
 
 import Builtin
 import Swift
 
-
 // CHECK-LABEL: sil @simple_reg_promotion
+// CHECK: bb0(%0 : $Int):
+// CHECK-NEXT: return %0 : $Int
 sil @simple_reg_promotion : $@convention(thin) (Int) -> Int {
-bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
+bb0(%0 : $Int):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %0 to %1a : $*Int
@@ -18,41 +19,89 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
   strong_release %3 : $<τ_0_0> { var τ_0_0 } <Int>
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int>
   return %6 : $Int
-
-  // CHECK-NEXT: return %0 : $Int
 }
 
-
+// Verify that promotion has promoted the tuple load away, and we know that
+// %0 is being returned through scalar instructions in SSA form.
+//
 // CHECK-LABEL: sil @tuple_reg_promotion
+// CHECK: bb0(%0 : $Int):
+// CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ({{.*}} : $Int, {{.*}} : $Int)
+// CHECK-NEXT: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int, Int), 0
+// CHECK-NEXT: return [[TUPLE_ELT]] : $Int
 sil @tuple_reg_promotion : $@convention(thin) (Int) -> Int {
-bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
+bb0(%0 : $Int):                         
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>, 0
-
   %a = tuple_element_addr %1a : $*(Int, Int), 0
   %b = tuple_element_addr %1a : $*(Int, Int), 1
   store %0 to %a : $*Int
   store %0 to %b : $*Int
-
   %c = load %1a : $*(Int, Int)
   %d = tuple_extract %c : $(Int, Int), 0
-
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>
-
   return %d : $Int
+}
 
-  // Verify that promotion has promoted the tuple load away, and we know that
-  // %0 is being returned through scalar instructions in SSA form.
-  // CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ({{.*}} : $Int, {{.*}} : $Int)
-  // CHECK-NEXT: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int, Int), 0
+// In this example we create two boxes. The first box is initialized and then
+// taken from to initialize the second box. This means that the first box must
+// be dealloc_boxed (since its underlying memory is considered invalid). In
+// contrast, the 2nd box must be released so that we destroy the underlying
+// input object.
+//
+// CHECK-LABEL: sil @simple_reg_promotion_nontrivial_memory : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: strong_release
+// CHECK-NOT: dealloc_box
+// CHECK: } // end sil function 'simple_reg_promotion_nontrivial_memory'
+sil @simple_reg_promotion_nontrivial_memory : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
+  store %0 to %1a : $*Builtin.NativeObject
 
-  // CHECK-NEXT: return [[TUPLE_ELT]] : $Int
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
+  %4 = load %1a : $*Builtin.NativeObject
+  store %4 to %3a : $*Builtin.NativeObject
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  dealloc_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Same as the last test but with release_value to be defensive in the cast that
+// someone passes us such SIL.
+//
+// CHECK-LABEL: sil @simple_reg_promotion_nontrivial_memory_release_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// The retain value is on the dealloc_box.
+// CHECK-NOT: retain_value
+// CHECK: release_value
+// CHECK-NOT: dealloc_box
+// CHECK: } // end sil function 'simple_reg_promotion_nontrivial_memory_release_value'
+sil @simple_reg_promotion_nontrivial_memory_release_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
+  store %0 to %1a : $*Builtin.NativeObject
+
+  // Also verify that we skip a retain_value on the dealloc_box.
+  retain_value %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
+  %4 = load %1a : $*Builtin.NativeObject
+  store %4 to %3a : $*Builtin.NativeObject
+  release_value %3 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  dealloc_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+
+  %9999 = tuple()
+  return %9999 : $()
 }
 
 
 sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
-
-
+sil @takes_NativeObject_inout : $@convention(thin) (@inout Builtin.NativeObject) -> ()
 
 // Verify that load promotion works properly with inout arguments.
 //
@@ -61,29 +110,35 @@ sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 //  takes_Int_inout(&a)
 //  return (t, a)
 //}
-// CHECK-LABEL: sil @used_by_inout
+//
+// CHECK-LABEL: sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
+// CHECK: bb0([[ARG:%.*]] : $Int):
 sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
   // This alloc_stack can't be removed since it is used by an inout call.
-  // CHECK: %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[PB_BOX:%.*]] = project_box [[BOX]]
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  %2 = store %0 to %1a : $*Int
+  store %0 to %1a : $*Int
 
   // This load should be eliminated.
+  // CHECK-NOT: load
+  // CHECK: [[FUNC:%.*]] = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
+  // CHECK: apply [[FUNC]]([[PB_BOX]])
   %3 = load %1a : $*Int
   %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
   %6 = apply %5(%1a) : $@convention(thin) (@inout Int) -> ()
 
   // This load is needed in case the callee modifies the allocation.
-  // CHECK: [[RES:%[0-9]+]] = load
+  // CHECK: [[RES:%[0-9]+]] = load [[PB_BOX]]
   %7 = load %1a : $*Int
 
   // This should use the incoming argument to the function.
-  // CHECK: tuple ({{.*}} : $Int, {{.*}} : $Int)
+  // CHECK: tuple ([[ARG]] : $Int, [[RES]] : $Int)
   %8 = tuple (%3 : $Int, %7 : $Int)
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int>
-  %11 = return %8 : $(Int, Int)
+  return %8 : $(Int, Int)
 }
 
 
@@ -148,12 +203,74 @@ bb0(%0 : $Int):
 
 
 struct ContainsNativeObject {
-  var x : Int
-  var y : Builtin.NativeObject
+  var x : Builtin.NativeObject
+  var y : Int32
+  var z : Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil @multiple_level_extract_1 : $@convention(thin) (@owned ContainsNativeObject) -> Builtin.Int32 {
+// CHECK: bb0([[ARG:%.*]] : $ContainsNativeObject):
+// CHECK:   [[FIELD1:%.*]] = struct_extract [[ARG]] : $ContainsNativeObject, #ContainsNativeObject.y
+// CHECK:   [[FIELD2:%.*]] = struct_extract [[FIELD1]] : $Int32, #Int32._value
+// CHECK:   release_value [[ARG]]
+// CHECK:   return [[FIELD2]]
+// CHECK: } // end sil function 'multiple_level_extract_1'
+sil @multiple_level_extract_1 : $@convention(thin) (@owned ContainsNativeObject) -> Builtin.Int32 {
+bb0(%0 : $ContainsNativeObject):
+  %1 = alloc_stack $ContainsNativeObject
+  store %0 to %1 : $*ContainsNativeObject
+
+  %2 = struct_element_addr %1 : $*ContainsNativeObject, #ContainsNativeObject.y
+  %3 = struct_element_addr %2 : $*Int32, #Int32._value
+  %4 = load %3 : $*Builtin.Int32
+
+  destroy_addr %1 : $*ContainsNativeObject
+  dealloc_stack %1 : $*ContainsNativeObject
+  return %4 : $Builtin.Int32
+}
+
+struct ComplexStruct {
+  var f1 : Builtin.NativeObject
+  var f2 : ContainsNativeObject
+  var f3 : Builtin.Int32
+}
+
+// CHECK-LABEL: sil @multiple_level_extract_2 : $@convention(thin) (@owned ComplexStruct) -> (@owned Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32) {
+// CHECK: bb0([[ARG:%.*]] : $ComplexStruct):
+// CHECK: [[f1:%.*]] = struct_extract [[ARG]] : $ComplexStruct, #ComplexStruct.f3
+// CHECK: [[f2:%.*]] = struct_extract [[ARG]] : $ComplexStruct, #ComplexStruct.f2
+// CHECK: [[f2_x:%.*]] = struct_extract [[f2]] : $ContainsNativeObject, #ContainsNativeObject.x
+// CHECK: [[f3:%.*]] = struct_extract [[ARG]] : $ComplexStruct, #ComplexStruct.f1
+// CHECK-NEXT: strong_retain [[f3]]
+// CHECK-NEXT: strong_retain [[f2_x]]
+// CHECK-NEXT: release_value [[ARG]]
+// CHECK: [[RESULT:%.*]] = tuple ([[f3]] : $Builtin.NativeObject, [[f2_x]] : $Builtin.NativeObject, [[f1]] : $Builtin.Int32)
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'multiple_level_extract_2'
+sil @multiple_level_extract_2 : $@convention(thin) (@owned ComplexStruct) -> (@owned Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32) {
+bb0(%0 : $ComplexStruct):
+  %1 = alloc_stack $ComplexStruct
+  store %0 to %1 : $*ComplexStruct
+
+  %2 = struct_element_addr %1 : $*ComplexStruct, #ComplexStruct.f1
+  %3 = struct_element_addr %1 : $*ComplexStruct, #ComplexStruct.f2
+  %4 = struct_element_addr %3 : $*ContainsNativeObject, #ContainsNativeObject.x
+  %5 = struct_element_addr %1 : $*ComplexStruct, #ComplexStruct.f3
+
+  %6 = load %2 : $*Builtin.NativeObject
+  strong_retain %6 : $Builtin.NativeObject
+  %7 = load %4 : $*Builtin.NativeObject
+  strong_retain %7 : $Builtin.NativeObject
+  %8 = load %5 : $*Builtin.Int32
+
+  destroy_addr %1 : $*ComplexStruct
+  dealloc_stack %1 : $*ComplexStruct
+
+  %9 = tuple(%6 : $Builtin.NativeObject, %7 : $Builtin.NativeObject, %8 : $Builtin.Int32)
+  return %9 : $(Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32)
 }
 
 var int_global : Int
-
 
 // CHECK-LABEL: sil @promote_alloc_stack
 sil @promote_alloc_stack : $@convention(thin) (Int32) -> Builtin.Int32 {
@@ -296,8 +413,8 @@ bb5:                                              // Preds: bb4
 }
 
 
-// CHECK-LABEL: sil @destroy_addr
-sil @destroy_addr : $@convention(method) (@owned SomeClass) -> @owned SomeClass {
+// CHECK-LABEL: sil @destroy_addr_test
+sil @destroy_addr_test : $@convention(method) (@owned SomeClass) -> @owned SomeClass {
 bb0(%0 : $SomeClass):
   %1 = alloc_stack $SomeClass
   %2 = tuple ()
@@ -327,7 +444,7 @@ bb0:
   %9 = apply %f() : $@convention(thin) () -> @owned SomeClass
   // CHECK: [[CVAL:%[0-9]+]] = apply
 
-  assign %9 to %3 : $*SomeClass
+  store %9 to %3 : $*SomeClass
   destroy_addr %3 : $*SomeClass
   dealloc_stack %3 : $*SomeClass
   %15 = tuple ()
@@ -375,14 +492,14 @@ enum IndirectCase {
 sil @indirect_enum_box : $@convention(thin) (Int) -> IndirectCase {
 // CHECK: bb0([[X:%.*]] : $Int):
 entry(%x : $Int):
-  // CHECK: [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }
+  %b = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[BOX]]
-  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %ba = project_box %b : ${ var Int }, 0
   // CHECK: store [[X]] to [[PB]]
   store %x to %ba : $*Int
-  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt.1, [[BOX]] : $<τ_0_0> { var τ_0_0 } <Int>
-  %e = enum $IndirectCase, #IndirectCase.X!enumelt.1, %b : $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt, [[BOX]] : ${ var Int }
+  %e = enum $IndirectCase, #IndirectCase.X!enumelt, %b : ${ var Int }
   // CHECK: return [[E]]
   return %e : $IndirectCase
 }
@@ -416,3 +533,428 @@ bb0:
   return %r : $Bool
 }
 
+///////////////////
+// Diamond Tests //
+///////////////////
+
+struct NativeObjectPair {
+  var f1: Builtin.NativeObject
+  var f2: Builtin.NativeObject
+}
+
+// These tests ensure that we insert all gep operations, before the stores and
+// any new load operations at the location where the old load was. It also
+// ensures that we are able to handle values that are provided with multilple
+// available values from different stores. Today the tests use the exact same
+// value since pred mem opts is so conservative (it will not support having
+// different available values from different blocks due to the predicate it uses
+// while merging).
+
+// We should just remove the stores here.
+// CHECK-LABEL: sil @diamond_test_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK-NOT: load
+// CHECK: } // end sil function 'diamond_test_1'
+sil @diamond_test_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0 to %1 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  store %0 to %1 : $*Builtin.NativeObject
+  br bb3
+
+bb3:
+  %2 = load %1 : $*Builtin.NativeObject
+  strong_retain %2 : $Builtin.NativeObject
+  strong_release %2 : $Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This test makes sure that we insert the tuple_extracts that we need before
+// the store in bb0, not at the load block.
+// CHECK-LABEL: sil @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : $NativeObjectPair):
+// CHECK:   [[LHS1:%.*]] = struct_extract [[ARG]] : $NativeObjectPair, #NativeObjectPair.f1
+// CHECK:   [[LHS2:%.*]] = struct_extract [[ARG]] : $NativeObjectPair, #NativeObjectPair.f1
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   strong_retain [[LHS2]]
+// CHECK:   br bb3([[LHS2]] :
+//
+// CHECK: bb2:
+// CHECK:   strong_retain [[LHS1]] : $Builtin.NativeObject
+// CHECK:   br bb3([[LHS1]] :
+//
+// CHECK: bb3([[PHI:%.*]] :
+// CHECK:   release_value [[ARG]]
+// CHECK:   return [[PHI]]
+// CHECK: } // end sil function 'diamond_test_2'
+sil @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Builtin.NativeObject {
+bb0(%0 : $NativeObjectPair):
+  %1 = alloc_stack $NativeObjectPair
+  store %0 to %1 : $*NativeObjectPair
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.f1
+  %3 = load %2 : $*Builtin.NativeObject
+  strong_retain %3 : $Builtin.NativeObject
+  br bb3(%3 : $Builtin.NativeObject)
+
+bb2:
+  %4 = struct_element_addr %1 : $*NativeObjectPair, #NativeObjectPair.f1
+  %5 = load %4 : $*Builtin.NativeObject
+  strong_retain %5 : $Builtin.NativeObject
+  br bb3(%5 : $Builtin.NativeObject)
+
+bb3(%6 : $Builtin.NativeObject):
+  destroy_addr %1 : $*NativeObjectPair
+  dealloc_stack %1 : $*NativeObjectPair
+  return %6 : $Builtin.NativeObject
+}
+
+// We should be able to promote all memory operations here.
+//
+// CHECK-LABEL: sil @diamond_test_3 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: load
+// CHECK-NOT: store
+// CHECK: } // end sil function 'diamond_test_3'
+sil @diamond_test_3 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = alloc_stack $NativeObjectPair
+  %3 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.f1
+  %4 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.f2
+  store %0 to %3 : $*Builtin.NativeObject
+  store %1 to %4 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %tup_addr_1 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.f1
+  %tup_val_1 = load %tup_addr_1 : $*Builtin.NativeObject
+  strong_retain %tup_val_1 : $Builtin.NativeObject
+  br bb3(%tup_val_1 : $Builtin.NativeObject)
+
+bb2:
+  %tup_addr_2 = struct_element_addr %2 : $*NativeObjectPair, #NativeObjectPair.f1
+  %tup_val_2 = load %tup_addr_2 : $*Builtin.NativeObject
+  strong_retain %tup_val_2 : $Builtin.NativeObject
+  br bb3(%tup_val_2 : $Builtin.NativeObject)
+
+bb3(%result : $Builtin.NativeObject):
+  destroy_addr %2 : $*NativeObjectPair
+  dealloc_stack %2 : $*NativeObjectPair
+  return %result : $Builtin.NativeObject
+}
+
+struct NativeObjectTriple {
+  var f1: Builtin.NativeObject
+  var f2: NativeObjectPair
+}
+
+// Make sure we insert the struct_extracts in bb1, bb2.
+//
+// CHECK-LABEL: sil @diamond_test_4 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $NativeObjectPair):
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK-NEXT: [[PAIR_LHS:%.*]] = struct_extract [[ARG1]]
+// CHECK-NEXT: br bb3([[PAIR_LHS]] :
+//
+// CHECK: bb2:
+// CHECK-NEXT: [[PAIR_LHS:%.*]] = struct_extract [[ARG1]]
+// CHECK-NEXT: br bb3([[PAIR_LHS]] :
+//
+// CHECK: bb3([[PHI:%.*]] : $Builtin.NativeObject):
+// CHECK-NOT: struct_extract
+// CHECK: strong_retain [[PHI]]
+// CHECK-NOT: struct_extract
+// CHECK: [[REFORMED:%.*]] = struct $NativeObjectTriple ([[ARG0]] : {{.*}}, [[ARG1]] : {{.*}})
+// CHECK-NOT: struct_extract
+// CHECK: release_value [[REFORMED]]
+// CHECK-NOT: struct_extract
+// CHECK: return [[PHI]]
+// CHECK: } // end sil function 'diamond_test_4'
+sil @diamond_test_4 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject, %1 : $NativeObjectPair):
+  %2 = alloc_stack $NativeObjectTriple
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f1
+  %4 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f2
+  store %0 to %3 : $*Builtin.NativeObject
+  store %1 to %4 : $*NativeObjectPair
+  br bb3
+
+bb2:
+  %5 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f1
+  %6 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f2
+  store %0 to %5 : $*Builtin.NativeObject
+  store %1 to %6 : $*NativeObjectPair
+  br bb3
+
+bb3:
+  %11 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f2
+  %12 = struct_element_addr %11 : $*NativeObjectPair, #NativeObjectPair.f1
+  %13 = load %12 : $*Builtin.NativeObject
+  strong_retain %13 : $Builtin.NativeObject
+  destroy_addr %2 : $*NativeObjectTriple
+  dealloc_stack %2 : $*NativeObjectTriple
+  return %13 : $Builtin.NativeObject
+}
+
+// Make sure that we do the right thing if our definite init value is partially
+// overridden along one path
+//
+// CHECK-LABEL: sil @diamond_test_5 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $NativeObjectPair, [[ARG2:%.*]] : $Builtin.NativeObject):
+// CHECK:   [[BOX:%.*]] = alloc_stack $NativeObjectTriple
+// CHECK:   br bb1
+//
+// CHECK: bb1:
+// CHECK:   [[TRIPLE_LHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f1
+// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
+// CHECK:   store [[ARG0]] to [[TRIPLE_LHS]]
+// CHECK:   [[TRIPLE_RHS_RHS_VAL:%.*]] = struct_extract [[ARG1]] : $NativeObjectPair, #NativeObjectPair.f2
+// CHECK:   store [[ARG1]] to [[TRIPLE_RHS]]
+// CHECK:   cond_br undef, bb2, bb3
+//
+// CHECK: bb2:
+// CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]]
+// CHECK:   store [[ARG2]] to [[TRIPLE_RHS_LHS]]
+// CHECK:   br bb4
+//
+// CHECK: bb3:
+// CHECK:   br bb4
+//
+// CHECK: bb4:
+// CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]] : $*NativeObjectPair, #NativeObjectPair.f1
+// CHECK:   [[TRIPLE_RHS_LHS_VAL:%.*]] = load [[TRIPLE_RHS_LHS]] : $*Builtin.NativeObject
+// CHECK:   [[STRUCT:%.*]] = struct $NativeObjectPair ([[TRIPLE_RHS_LHS_VAL]] : {{.*}}, [[TRIPLE_RHS_RHS_VAL]] : {{.*}})
+// CHECK:   retain_value [[STRUCT]]
+// CHECK:   destroy_addr [[BOX]]
+// CHECK:   return [[STRUCT]]
+// CHECK: } // end sil function 'diamond_test_5'
+sil @diamond_test_5 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
+bb0(%0 : $Builtin.NativeObject, %1 : $NativeObjectPair, %arg2 : $Builtin.NativeObject):
+  %2 = alloc_stack $NativeObjectTriple
+  br bb1
+
+bb1:
+  %5 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f1
+  %6 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f2
+  store %0 to %5 : $*Builtin.NativeObject
+  store %1 to %6 : $*NativeObjectPair
+  cond_br undef, bb2, bb3
+
+bb2:
+  %11 = struct_element_addr %6 : $*NativeObjectPair, #NativeObjectPair.f1
+  store %arg2 to %11 : $*Builtin.NativeObject
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %13 = load %6 : $*NativeObjectPair
+  retain_value %13 : $NativeObjectPair
+  destroy_addr %2 : $*NativeObjectTriple
+  dealloc_stack %2 : $*NativeObjectTriple
+  return %13 : $NativeObjectPair
+}
+
+// CHECK-LABEL: sil @diamond_test_6 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $NativeObjectPair, [[ARG2:%.*]] : $Builtin.NativeObject):
+// CHECK:   [[BOX:%.*]] = alloc_stack $NativeObjectTriple
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   [[TRIPLE_LHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f1
+// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
+// CHECK:   store [[ARG0]] to [[TRIPLE_LHS]]
+// CHECK:   [[TRIPLE_RHS_RHS_VAL:%.*]] = struct_extract [[ARG1]] : $NativeObjectPair, #NativeObjectPair.f2
+// CHECK:   store [[ARG1]] to [[TRIPLE_RHS]]
+// CHECK:   cond_br undef, bb3([[TRIPLE_RHS_RHS_VAL]] : {{.*}}), bb4([[TRIPLE_RHS_RHS_VAL]] : {{.*}})
+//
+// CHECK: bb2:
+// CHECK:   [[TRIPLE_LHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f1
+// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
+// CHECK:   store [[ARG0]] to [[TRIPLE_LHS]]
+// CHECK:   [[TRIPLE_RHS_RHS_VAL:%.*]] = struct_extract [[ARG1]] : $NativeObjectPair, #NativeObjectPair.f2
+// CHECK:   store [[ARG1]] to [[TRIPLE_RHS]]
+// CHECK:   cond_br undef, bb3([[TRIPLE_RHS_RHS_VAL]] : {{.*}}), bb4([[TRIPLE_RHS_RHS_VAL]] : {{.*}})
+//
+// CHECK: bb3([[PHI1:%.*]] : $Builtin.NativeObject):
+// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
+// CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]]
+// CHECK:   store [[ARG2]] to [[TRIPLE_RHS_LHS]]
+// CHECK:   br bb5([[PHI1:%.*]] : $Builtin.NativeObject)
+//
+// CHECK: bb4([[PHI:%.*]] : $Builtin.NativeObject):
+// CHECK:   br bb5([[PHI]] : {{.*}})
+//
+// CHECK: bb5([[PHI:%.*]] : $Builtin.NativeObject
+// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
+// CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]] : $*NativeObjectPair, #NativeObjectPair.f1
+// CHECK:   [[TRIPLE_RHS_LHS_VAL:%.*]] = load [[TRIPLE_RHS_LHS]] : $*Builtin.NativeObject
+// CHECK:   [[STRUCT:%.*]] = struct $NativeObjectPair ([[TRIPLE_RHS_LHS_VAL]] : {{.*}}, [[PHI]] : {{.*}})
+// CHECK:   retain_value [[STRUCT]]
+// CHECK:   destroy_addr [[BOX]]
+// CHECK:   return [[STRUCT]]
+// CHECK: } // end sil function 'diamond_test_6'
+sil @diamond_test_6 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
+bb0(%0 : $Builtin.NativeObject, %1 : $NativeObjectPair, %arg2 : $Builtin.NativeObject):
+  %2 = alloc_stack $NativeObjectTriple
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f1
+  %6 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f2
+  store %0 to %5 : $*Builtin.NativeObject
+  store %1 to %6 : $*NativeObjectPair
+  cond_br undef, bb3, bb4
+
+bb2:
+  %7 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f1
+  %8 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f2
+  store %0 to %7 : $*Builtin.NativeObject
+  store %1 to %8 : $*NativeObjectPair
+  cond_br undef, bb3, bb4
+
+bb3:
+  %11 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f2
+  %12 = struct_element_addr %11 : $*NativeObjectPair, #NativeObjectPair.f1
+  store %arg2 to %12 : $*Builtin.NativeObject
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  %13 = struct_element_addr %2 : $*NativeObjectTriple, #NativeObjectTriple.f2
+  %14 = load %13 : $*NativeObjectPair
+  retain_value %14 : $NativeObjectPair
+  destroy_addr %2 : $*NativeObjectTriple
+  dealloc_stack %2 : $*NativeObjectTriple
+  return %14 : $NativeObjectPair
+}
+
+///////////////////////
+// Unreachable Tests //
+///////////////////////
+
+// Make sure that we can handle a dead allocation with a destroy_addr in an
+// unreachable block.
+//
+// TODO: We can support this with trivial changes to canPromoteDestroyAddr. We
+// just need to distinguish a promotion failure around lack of availability vs
+// promotion failure for other reasons.
+//
+//
+// CHECK-LABEL: sil @dead_allocation_with_unreachable_destroy_addr : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: store
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb1:
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+//
+// CHECK: bb2:
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: unreachable
+// CHECK: } // end sil function 'dead_allocation_with_unreachable_destroy_addr'
+sil @dead_allocation_with_unreachable_destroy_addr : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to %1 : $*Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+
+bb2:
+  destroy_addr %1 : $*Builtin.NativeObject
+  unreachable
+}
+
+
+class K {
+  init()
+}
+
+sil @init_k : $@convention(thin) () -> @out K
+
+struct S {
+  var k: K
+}
+
+// CHECK-LABEL: sil @recursive_struct_destroy_with_apply : $@convention(thin) () -> S {
+// CHECK: alloc_stack
+// CHECK: } // end sil function 'recursive_struct_destroy_with_apply'
+sil @recursive_struct_destroy_with_apply : $@convention(thin) () -> S {
+bb0:
+  %0 = alloc_stack $S
+  %1 = struct_element_addr %0 : $*S, #S.k
+  %2 = function_ref @init_k : $@convention(thin) () -> @out K
+  %3 = apply %2(%1) : $@convention(thin) () -> @out K
+  %4 = load %0 : $*S
+  dealloc_stack %0 : $*S
+  return %4 : $S
+}
+
+struct SWithOpt {
+  var k: Optional<K>
+}
+
+// CHECK-LABEL: sil @recursive_struct_destroy_with_enum_init : $@convention(thin) (@owned K) -> @owned SWithOpt {
+// CHECK: alloc_stack
+// CHECK: } // end sil function 'recursive_struct_destroy_with_enum_init'
+sil @recursive_struct_destroy_with_enum_init : $@convention(thin) (@owned K) -> @owned SWithOpt {
+bb0(%arg : $K):
+  %0 = alloc_stack $SWithOpt
+  %1 = struct_element_addr %0 : $*SWithOpt, #SWithOpt.k
+  %2 = init_enum_data_addr %1 : $*Optional<K>, #Optional.some!enumelt
+  store %arg to %2 : $*K
+  inject_enum_addr %1 : $*Optional<K>, #Optional.some!enumelt
+  %4 = load %0 : $*SWithOpt
+  dealloc_stack %0 : $*SWithOpt
+  return %4 : $SWithOpt
+}
+
+// We do not support this now, so make sure we do not do anything.
+//
+// CHECK-LABEL: sil @promote_init_enum_data_addr : $@convention(thin)
+// CHECK: alloc_stack
+// CHECK: load
+// CHECK: [[RESULT:%.*]] = load
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'promote_init_enum_data_addr'
+sil @promote_init_enum_data_addr : $@convention(thin) (@in Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = alloc_stack $Optional<Int>
+  %2 = load %0 : $*Int
+  %3 = init_enum_data_addr %1 : $*Optional<Int>, #Optional.some!enumelt
+  store %2 to %3 : $*Int
+  inject_enum_addr %1 : $*Optional<Int>, #Optional.some!enumelt
+  %4 = load %3 : $*Int
+  dealloc_stack %1 : $*Optional<Int>
+  return %4 : $Int
+}

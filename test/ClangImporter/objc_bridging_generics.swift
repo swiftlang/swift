@@ -11,7 +11,9 @@ func testNSArrayBridging(_ hive: Hive) {
 }
 
 func testNSDictionaryBridging(_ hive: Hive) {
-  _ = hive.beesByName as [String : Bee] // expected-error{{'[String : Bee]?' is not convertible to '[String : Bee]'; did you mean to use 'as!' to force downcast?}}
+  _ = hive.beesByName as [String : Bee] // expected-error{{value of optional type '[String : Bee]?' must be unwrapped to a value of type '[String : Bee]'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
 
   var dict1 = hive.anythingToBees
   let dict2: [AnyHashable : Bee] = dict1
@@ -123,7 +125,7 @@ extension GenericClass {
     _ = T.self // expected-note{{used here}}
   }
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
-@objc   func usesGenericParamE(_ x: Int) {
+  @objc func usesGenericParamE(_ x: Int) {
     _ = x as? T // expected-note{{used here}}
   }
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
@@ -249,18 +251,22 @@ extension AnimalContainer {
   }
 
 
+  // expected-note@+2{{add '@objc' to allow uses of 'self' within the function body}}{{3-3=@objc }}
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamA(_ x: T) {
     _ = T(noise: x) // expected-note{{used here}}
   }
+  // expected-note@+2{{add '@objc' to allow uses of 'self' within the function body}}{{3-3=@objc }}
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamB() {
     _ = T.create() // expected-note{{used here}}
   }
+  // expected-note@+2{{add '@objc' to allow uses of 'self' within the function body}}{{3-3=@objc }}
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamC() {
     _ = T.apexPredator // expected-note{{used here}}
   }
+  // expected-note@+2{{add '@objc' to allow uses of 'self' within the function body}}{{3-3=@objc }}
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamD(_ x: T) {
     T.apexPredator = x // expected-note{{used here}}
@@ -269,6 +275,7 @@ extension AnimalContainer {
   // rdar://problem/27796375 -- allocating init entry points for ObjC
   // initializers are generated as true Swift generics, so reify type
   // parameters.
+  // expected-note@+2{{add '@objc' to allow uses of 'self' within the function body}}{{3-3=@objc }}
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamE(_ x: T) {
     _ = GenericClass(thing: x) // expected-note{{used here}}
@@ -403,9 +410,15 @@ func testHashableGenerics(
     any: ObjCBridgeGeneric<ElementConcrete>,
     constrained: ObjCBridgeGenericConstrained<ElementConcrete>,
     insufficient: ObjCBridgeGenericInsufficientlyConstrained<ElementConcrete>,
-    extra: ObjCBridgeGenericConstrainedExtra<ElementConcrete>) {
+    extra: ObjCBridgeGenericConstrainedExtra<ElementConcrete>,
+    existential: ObjCBridgeExistential) {
   let _: Int = any.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
   let _: Int = constrained.foo // expected-error{{cannot convert value of type 'Set<ElementConcrete>' to specified type 'Int'}}
   let _: Int = insufficient.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
-  let _: Int = extra.foo // expected-error{{cannot convert value of type 'Set<ElementConcrete>' to specified type 'Int'}}
+  let _: Int = extra.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
+  let _: Int = existential.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
+}
+
+func testGenericsWithTypedefBlocks(hba: HasBlockArray) {
+  let _: Int = hba.blockArray() // expected-error{{type '[@convention(block) () -> Void]'}}
 }

@@ -1,7 +1,15 @@
+" This source file is part of the Swift.org open source project
+"
+" Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+" Licensed under Apache License v2.0 with Runtime Library Exception
+"
+" See https://swift.org/LICENSE.txt for license information
+" See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+"
 " Vim syntax file
 " Language: swift
 " Maintainer: Joe Groff <jgroff@apple.com>
-" Last Change: 2013 Feb 2
+" Last Change: 2018 Jan 21
 
 if exists("b:current_syntax")
     finish
@@ -10,10 +18,8 @@ endif
 syn keyword swiftKeyword
       \ associatedtype
       \ break
-      \ case
       \ catch
       \ continue
-      \ default
       \ defer
       \ do
       \ else
@@ -32,7 +38,7 @@ syn keyword swiftKeyword
 syn match swiftMultiwordKeyword
       \ "indirect case"
 
-syn keyword swiftImport skipwhite nextgroup=swiftImportModule
+syn keyword swiftImport skipwhite skipempty nextgroup=swiftImportModule
       \ import
 
 syn keyword swiftDefinitionModifier
@@ -41,8 +47,11 @@ syn keyword swiftDefinitionModifier
       \ fileprivate
       \ final
       \ internal
+      \ lazy
       \ nonmutating
+      \ open
       \ override
+      \ prefix
       \ private
       \ public
       \ required
@@ -51,7 +60,7 @@ syn keyword swiftDefinitionModifier
       \ throws
       \ weak
 
-syn keyword swiftInOutKeyword skipwhite nextgroup=swiftTypeName
+syn keyword swiftInOutKeyword skipwhite skipempty nextgroup=swiftTypeName
       \ inout
 
 syn keyword swiftIdentifierKeyword
@@ -60,7 +69,7 @@ syn keyword swiftIdentifierKeyword
       \ self
       \ super
 
-syn keyword swiftFuncKeywordGeneral skipwhite nextgroup=swiftTypeParameters
+syn keyword swiftFuncKeywordGeneral skipwhite skipempty nextgroup=swiftTypeParameters
       \ init
 
 syn keyword swiftFuncKeyword
@@ -70,22 +79,25 @@ syn keyword swiftFuncKeyword
 syn keyword swiftScope
       \ autoreleasepool
 
-syn keyword swiftMutating skipwhite nextgroup=swiftFuncDefinition
+syn keyword swiftMutating skipwhite skipempty nextgroup=swiftFuncDefinition
       \ mutating
-syn keyword swiftFuncDefinition skipwhite nextgroup=swiftTypeName,swiftOperator
+syn keyword swiftFuncDefinition skipwhite skipempty nextgroup=swiftTypeName,swiftOperator
       \ func
 
-syn keyword swiftTypeDefinition skipwhite nextgroup=swiftTypeName
+syn keyword swiftTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
       \ class
       \ enum
       \ extension
       \ protocol
       \ struct
+
+syn keyword swiftTypeAliasDefinition skipwhite skipempty nextgroup=swiftTypeAliasName
       \ typealias
-syn match swiftMultiwordTypeDefinition nextgroup=swiftTypeName
+
+syn match swiftMultiwordTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
       \ "indirect enum"
 
-syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
+syn keyword swiftVarDefinition skipwhite skipempty nextgroup=swiftVarName
       \ let
       \ var
 
@@ -107,25 +119,27 @@ syn match swiftImportModule contained nextgroup=swiftImportComponent
 syn match swiftImportComponent contained nextgroup=swiftImportComponent
       \ /\.\<[A-Za-z_][A-Za-z_0-9]*\>/
 
-syn match swiftTypeName contained nextgroup=swiftTypeParameters
+syn match swiftTypeAliasName contained skipwhite skipempty nextgroup=swiftTypeAliasValue
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
+syn match swiftTypeName contained skipwhite skipempty nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
-syn match swiftVarName contained skipwhite nextgroup=swiftTypeDeclaration
+syn match swiftVarName contained skipwhite skipempty nextgroup=swiftTypeDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
 syn match swiftImplicitVarName
       \ /\$\<[A-Za-z_0-9]\+\>/
 
 " TypeName[Optionality]?
-syn match swiftType contained nextgroup=swiftTypeParameters
+syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
 syn region swiftType contained contains=swiftTypePair,swiftType
       \ matchgroup=Delimiter start=/\[/ end=/\]/
-syn match swiftTypePair contained nextgroup=swiftTypeParameters,swiftTypeDeclaration
+syn match swiftTypePair contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftTypeDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " (Type[, Type]) (tuple)
 " FIXME: we should be able to use skip="," and drop swiftParamDelim
 syn region swiftType contained contains=swiftType,swiftParamDelim
-      \ matchgroup=Delimiter start="[^@](" end=")" matchgroup=NONE skip=","
+      \ matchgroup=Delimiter start="[^@]\?(" end=")" matchgroup=NONE skip=","
 syn match swiftParamDelim contained
       \ /,/
 " <Generic Clause> (generics)
@@ -134,38 +148,73 @@ syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint
 syn keyword swiftConstraint contained
       \ where
 
-syn match swiftTypeDeclaration skipwhite nextgroup=swiftType,swiftInOutKeyword
+syn match swiftTypeAliasValue skipwhite skipempty nextgroup=swiftType
+      \ /=/
+syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType,swiftInOutKeyword
       \ /:/
-syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
+syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType
       \ /->/
 
-syn region swiftString start=/"/ skip=/\\\\\|\\"/ end=/"/ contains=swiftInterpolationRegion
-syn region swiftInterpolationRegion matchgroup=swiftInterpolation start=/\\(/ end=/)/ contained contains=TOP
-syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
-syn region swiftLineComment start="//" end="$" contains=swiftComment,swiftTodo
+syn match swiftKeyword
+      \ /\<case\>/
+syn region swiftCaseLabelRegion
+      \ matchgroup=swiftKeyword start=/\<case\>/ matchgroup=Delimiter end=/:/ oneline contains=TOP
+syn region swiftDefaultLabelRegion
+      \ matchgroup=swiftKeyword start=/\<default\>/ matchgroup=Delimiter end=/:/ oneline
 
-syn match swiftDecimal /[+\-]\?\<\([0-9][0-9_]*\)\([.][0-9_]*\)\?\([eE][+\-]\?[0-9][0-9_]*\)\?\>/
-syn match swiftHex /[+\-]\?\<0x[0-9A-Fa-f][0-9A-Fa-f_]*\(\([.][0-9A-Fa-f_]*\)\?[pP][+\-]\?[0-9][0-9_]*\)\?\>/
-syn match swiftOct /[+\-]\?\<0o[0-7][0-7_]*\>/
-syn match swiftBin /[+\-]\?\<0b[01][01_]*\>/
+syn region swiftParenthesisRegion contains=TOP
+      \ matchgroup=NONE start=/(/ end=/)/
 
-syn match swiftOperator +\.\@<!\.\.\.\@!\|[/=\-+*%<>!&|^~]\@<!\(/[/*]\@![/=\-+*%<>!&|^~]*\|*/\@![/=\-+*%<>!&|^~]*\|->\@![/=\-+*%<>!&|^~]*\|[=+%<>!&|^~][/=\-+*%<>!&|^~]*\)+ skipwhite nextgroup=swiftTypeParameters
-syn match swiftOperator "\.\.[<.]" skipwhite nextgroup=swiftTypeParameters
+syn region swiftString contains=swiftInterpolationRegion
+      \ start=/"/ skip=/\\\\\|\\"/ end=/"/
+syn region swiftInterpolationRegion contained contains=TOP
+      \ matchgroup=swiftInterpolation start=/\\(/ end=/)/
+syn region swiftComment contains=swiftComment,swiftLineComment,swiftTodo
+      \ start="/\*" end="\*/"
+syn region swiftLineComment contains=swiftComment,swiftTodo
+      \ start="//" end="$"
 
-syn match swiftChar /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
+syn match swiftDecimal
+      \ /[+\-]\?\<\([0-9][0-9_]*\)\([.][0-9_]*\)\?\([eE][+\-]\?[0-9][0-9_]*\)\?\>/
+syn match swiftHex
+      \ /[+\-]\?\<0x[0-9A-Fa-f][0-9A-Fa-f_]*\(\([.][0-9A-Fa-f_]*\)\?[pP][+\-]\?[0-9][0-9_]*\)\?\>/
+syn match swiftOct
+      \ /[+\-]\?\<0o[0-7][0-7_]*\>/
+syn match swiftBin
+      \ /[+\-]\?\<0b[01][01_]*\>/
 
-syn match swiftPreproc /#\(\<file\>\|\<line\>\|\<function\>\)/
-syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\)/
-syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
+syn match swiftOperator skipwhite skipempty nextgroup=swiftTypeParameters
+      \ "\.\@<!\.\.\.\@!\|[/=\-+*%<>!&|^~]\@<!\(/[/*]\@![/=\-+*%<>!&|^~]*\|*/\@![/=\-+*%<>!&|^~]*\|->\@![/=\-+*%<>!&|^~]*\|[=+%<>!&|^~][/=\-+*%<>!&|^~]*\)"
+syn match swiftOperator skipwhite skipempty nextgroup=swiftTypeParameters
+      \ "\.\.[<.]"
 
-syn match swiftAttribute /@\<\w\+\>/ skipwhite nextgroup=swiftType
+syn match swiftChar
+      \ /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
+
+syn match swiftTupleIndexNumber contains=swiftDecimal
+      \ /\.[0-9]\+/
+syn match swiftDecimal contained
+      \ /[0-9]\+/
+
+syn match swiftPreproc
+      \ /#\(\<file\>\|\<line\>\|\<function\>\)/
+syn match swiftPreproc
+      \ /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\|\<error\>\|\<warning\>\)/
+syn region swiftPreprocFalse
+      \ start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
+
+syn match swiftAttribute
+      \ /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftType,swiftTypeDefinition
 
 syn keyword swiftTodo MARK TODO FIXME contained
 
-syn match swiftCastOp "\<is\>" skipwhite nextgroup=swiftType
-syn match swiftCastOp "\<as\>[!?]\?" skipwhite nextgroup=swiftType
+syn match swiftCastOp skipwhite skipempty nextgroup=swiftType
+      \ "\<is\>"
+syn match swiftCastOp skipwhite skipempty nextgroup=swiftType
+      \ "\<as\>[!?]\?"
 
-syn match swiftNilOps "??"
+syn match swiftNilOps
+      \ "??"
 
 syn region swiftReservedIdentifier oneline
       \ start=/`/ end=/`/
@@ -179,17 +228,20 @@ hi def link swiftTypeDefinition Define
 hi def link swiftMultiwordTypeDefinition Define
 hi def link swiftType Type
 hi def link swiftTypePair Type
+hi def link swiftTypeAliasName Identifier
 hi def link swiftTypeName Function
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
-hi def link swiftDefinitionModifier Define
+hi def link swiftDefinitionModifier Operator
 hi def link swiftInOutKeyword Define
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncKeywordGeneral Function
+hi def link swiftTypeAliasDefinition Define
 hi def link swiftVarDefinition Define
 hi def link swiftVarName Identifier
 hi def link swiftImplicitVarName Identifier
 hi def link swiftIdentifierKeyword Identifier
+hi def link swiftTypeAliasValue Delimiter
 hi def link swiftTypeDeclaration Delimiter
 hi def link swiftTypeParameters Delimiter
 hi def link swiftBoolean Boolean

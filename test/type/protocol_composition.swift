@@ -28,7 +28,6 @@ typealias Any2 = protocol< > // expected-error {{'protocol<>' syntax has been re
 // Okay to inherit a typealias for Any type.
 protocol P5 : Any { }
 protocol P6 : protocol<> { } // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}}
-                             // expected-error@-1 {{protocol-constrained type is neither allowed nor needed here}}
 typealias P7 = Any & Any1
 
 extension Int : P5 { }
@@ -112,7 +111,7 @@ func testConversion() {
 
   // Conversions among existential types.
   var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{12-53=SuperREPLPrintable & FooProtocol}}
-  x2 = x // expected-error{{value of type 'FooProtocol & REPLPrintable' does not conform to 'FooProtocol & SuperREPLPrintable' in assignment}}
+  x2 = x // expected-error{{value of type 'FooProtocol & REPLPrintable' does not conform to 'SuperREPLPrintable' in assignment}}
   x = x2
 
   // Subtyping
@@ -140,24 +139,26 @@ typealias E = protocol<Any> // expected-error {{'protocol<...>' composition synt
 typealias F = protocol<Any, Any> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-33=Any}}
 typealias G = protocol<P1>.Type // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-27=P1}}
 typealias H = protocol<P1>! // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=P1!}}
+// expected-warning@-1 {{using '!' is not allowed here; treating this as '?' instead}}
 typealias J = protocol<P1, P2>.Protocol // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-31=(P1 & P2)}}
 typealias K = protocol<P1, P2>? // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-32=(P1 & P2)?}}
 
 typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol, non-class type 'P1.Protocol' cannot be used within a protocol-constrained type}}
 typealias T02 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'P1.Type' cannot be used within a protocol-constrained type}}
 typealias T03 = P1? & P2 // expected-error {{non-protocol, non-class type 'P1?' cannot be used within a protocol-constrained type}}
-typealias T04 = P1 & P2! // expected-error {{non-protocol, non-class type 'P2!' cannot be used within a protocol-constrained type}} expected-error {{implicitly unwrapped optionals}} {{24-25=?}}
+typealias T04 = P1 & P2! // expected-error {{non-protocol, non-class type 'P2?' cannot be used within a protocol-constrained type}}
+// expected-warning@-1 {{using '!' is not allowed here; treating this as '?' instead}}
 typealias T05 = P1 & P2 -> P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{24-24=)}}
 typealias T06 = P1 -> P2 & P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{19-19=)}}
 typealias T07 = P1 & protocol<P2, P3> // expected-error {{protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{22-38=P2 & P3}}
 func fT07(x: T07) -> P1 & P2 & P3 { return x } // OK, 'P1 & protocol<P2, P3>' is parsed as 'P1 & P2 & P3'.
 let _: P1 & P2 & P3 -> P1 & P2 & P3 = fT07 // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{20-20=)}}
 
-struct S01: P5 & P6 {} // expected-error {{protocol-constrained type is neither allowed nor needed here}} {{none}}
-struct S02: P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
-struct S03: Optional<P5> & P6 {} // expected-error {{inheritance from non-protocol type 'Optional<P5>'}} expected-error {{protocol-constrained type is neither allowed nor needed here}}
-struct S04<T : P5 & (P6)> {} // expected-error {{inheritance from non-named type '(P6)'}}
-struct S05<T> where T : P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
+struct S01: P5 & P6 {}
+struct S02: P5? & P6 {} // expected-error {{non-protocol, non-class type 'P5?' cannot be used within a protocol-constrained type}}
+struct S03: Optional<P5> & P6 {} // expected-error {{non-protocol, non-class type 'Optional<P5>' cannot be used within a protocol-constrained type}}
+struct S04<T : P5 & (P6)> {}
+struct S05<T> where T : P5? & P6 {} // expected-error 2{{non-protocol, non-class type 'P5?' cannot be used within a protocol-constrained type}}
 
 // SR-3124 - Protocol Composition Often Migrated Incorrectly
 struct S3124<T: protocol<P1, P3>> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{17-34=P1 & P3>}}
@@ -171,5 +172,9 @@ takesP1AndP2([AnyObject & P1 & P2]())
 takesP1AndP2([Swift.AnyObject & P1 & P2]())
 takesP1AndP2([AnyObject & protocol_composition.P1 & P2]())
 takesP1AndP2([AnyObject & P1 & protocol_composition.P2]())
-takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-error {{use of unresolved identifier 'DoesNotExist'}}
+takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-error {{cannot find 'DoesNotExist' in scope}}
 takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-error {{module 'Swift' has no member named 'DoesNotExist'}}
+
+typealias T08 = P1 & inout P2 // expected-error {{'inout' may only be used on parameters}}
+typealias T09 = P1 & __shared P2 // expected-error {{'__shared' may only be used on parameters}}
+typealias T10 = P1 & __owned P2 // expected-error {{'__owned' may only be used on parameters}}

@@ -68,7 +68,7 @@ let continuingScalars: [UnicodeScalar] = [
   "\u{200D}",
 ]
 
-let testCharacters = [
+var testCharacters = [
   // U+000D CARRIAGE RETURN (CR)
   // U+000A LINE FEED (LF)
   "\u{000d}\u{000a}",
@@ -82,7 +82,20 @@ let testCharacters = [
   "\u{0061}\u{0300}\u{0300}", // UTF-8: 5 bytes
   "\u{0061}\u{0300}\u{0300}\u{0300}", // UTF-8: 7 bytes
   "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 9 bytes
+]
 
+// Only run it on ObjC platforms. Supported Linux versions do not have a
+// recent enough ICU
+#if _runtime(_ObjC)
+testCharacters += [
+  "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 11 bytes
+  "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 13 bytes
+  "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 15 bytes
+  "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 17 bytes
+]
+#endif
+
+testCharacters += [
   // U+00A9 COPYRIGHT SIGN
   // U+0300 COMBINING GRAVE ACCENT
   "\u{00a9}", // UTF-8: 2 bytes
@@ -92,11 +105,25 @@ let testCharacters = [
   "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 10 bytes
 ]
 
+// Only run it on recent enough versions of ICU
+#if _runtime(_ObjC)
+if #available(iOS 11.0, macOS 10.13, tvOS 11.0, watchOS 4.0, *) {
+  testCharacters += [
+    "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 12 bytes
+    "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 14 bytes
+    "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 16 bytes
+
+    "👩🏽‍💼", // UTF-8: 15 bytes
+    "👩‍👩‍👦‍👦", // UTF-8: 25 bytes
+  ]
+}
+#endif
+
 func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
-  let n = pickRandom((minSize + 1)..<maxSize)
-  var result = String(pickRandom(baseScalars))
+  let n = Int.random(in: (minSize + 1) ..< maxSize)
+  var result = String(baseScalars.randomElement()!)
   for _ in 0..<n {
-    result += String(pickRandom(continuingScalars))
+    result += String(continuingScalars.randomElement()!)
   }
   return result
 }
@@ -139,12 +166,10 @@ CharacterTests.test("sizeof") {
   // <rdar://problem/16754935> MemoryLayout<Character>.size is 9, should be 8
 
   let size1 = MemoryLayout<Character>.size
-  expectTrue(size1 == 8 || size1 == 9)
+  expectTrue(size1 == MemoryLayout<String>.size)
 
   let a: Character = "a"
   let size2 = MemoryLayout.size(ofValue: a)
-  expectTrue(size2 == 8 || size2 == 9)
-
   expectEqual(size1, size2)
 }
 
@@ -161,47 +186,50 @@ CharacterTests.test("Hashable") {
 CharacterTests.test("CR-LF") {
   let asciiString = "qwerty\r\n"
   let asciiString_rev = "\r\nytrewq"
-  expectEqual(asciiString.characters.count, asciiString_rev.characters.count)
-  expectEqualSequence(asciiString.characters.reversed(), asciiString_rev.characters)
+  expectEqual(asciiString.count, asciiString_rev.count)
+  expectEqualSequence(asciiString.reversed(), asciiString_rev)
 
   // Mixed form
   let utf16String = "a\u{03B2}c\r\nd\u{03B5}f"
   let utf16String_rev = "f\u{03B5}d\r\nc\u{03B2}a"
-  expectEqual(utf16String.characters.count, utf16String_rev.characters.count)
-  expectEqualSequence(utf16String.characters.reversed(), utf16String_rev.characters)
+  expectEqual(utf16String.count, utf16String_rev.count)
+  expectEqualSequence(utf16String.reversed(), utf16String_rev)
 
   // Substrings
   let asciiString_sub = asciiString[asciiString.index(after: asciiString.startIndex)..<asciiString.endIndex]
   let asciiString_rev_sub = asciiString_rev[asciiString_rev.startIndex..<asciiString_rev.index(before:asciiString_rev.endIndex)]
-  expectEqual(asciiString_sub.characters.count, asciiString_rev_sub.characters.count)
-  expectEqual(asciiString_sub.characters.count, asciiString.characters.count-1)
-  expectEqualSequence(asciiString_sub.characters.reversed(), asciiString_rev_sub.characters)
+  expectEqual(asciiString_sub.count, asciiString_rev_sub.count)
+  expectEqual(asciiString_sub.count, asciiString.count-1)
+  expectEqualSequence(asciiString_sub.reversed(), asciiString_rev_sub)
 
   let utf16String_sub = utf16String[utf16String.index(after: utf16String.startIndex)..<utf16String.endIndex]
   let utf16String_rev_sub = utf16String_rev[utf16String_rev.startIndex..<utf16String_rev.index(before: utf16String_rev.endIndex)]
-  expectEqual(utf16String_sub.characters.count, utf16String_rev_sub.characters.count)
-  expectEqual(utf16String_sub.characters.count, utf16String.characters.count-1)
-  expectEqualSequence(utf16String_sub.characters.reversed(), utf16String_rev_sub.characters)
+  expectEqual(utf16String_sub.count, utf16String_rev_sub.count)
+  expectEqual(utf16String_sub.count, utf16String.count-1)
+  expectEqualSequence(utf16String_sub.reversed(), utf16String_rev_sub)
 
   // Character view slices where the indices are invalid as subsequence-relative offsets
   let asciiString_final = "ty\r\n"
   let asciiString_final_rev = "\r\nyt"
-  let finalASCIICharacters = asciiString.characters[asciiString.characters.index(asciiString.characters.endIndex, offsetBy: -3)..<asciiString.characters.endIndex]
-  expectEqualSequence(finalASCIICharacters, asciiString_final.characters)
-  expectEqualSequence(finalASCIICharacters.reversed(), asciiString_final_rev.characters)
+  let finalASCIICharacters = asciiString[asciiString.index(asciiString.endIndex, offsetBy: -3)..<asciiString.endIndex]
+  expectEqualSequence(finalASCIICharacters, asciiString_final)
+  expectEqualSequence(finalASCIICharacters.reversed(), asciiString_final_rev)
 
   let unicodeAlphabetString = "abcdefgあいうえおαβγ\r\n"
   let unicodeAlphabetString_final = "βγ\r\n"
   let unicodeAlphabetString_final_rev = "\r\nγβ"
-  let finalAlphaCharacters = unicodeAlphabetString.characters[unicodeAlphabetString.characters.index(unicodeAlphabetString.characters.endIndex, offsetBy: -3)..<unicodeAlphabetString.characters.endIndex]
-  expectEqualSequence(finalAlphaCharacters, unicodeAlphabetString_final.characters)
-  expectEqualSequence(finalAlphaCharacters.reversed(), unicodeAlphabetString_final_rev.characters)
+  let finalAlphaCharacters = unicodeAlphabetString[unicodeAlphabetString.index(unicodeAlphabetString.endIndex, offsetBy: -3)..<unicodeAlphabetString.endIndex]
+  expectEqualSequence(finalAlphaCharacters, unicodeAlphabetString_final)
+  expectEqualSequence(finalAlphaCharacters.reversed(), unicodeAlphabetString_final_rev)
 }
 
 CharacterTests.test("Unicode 9 grapheme breaking") {
   // Only run it on ObjC platforms. Supported Linux versions do not have a
   // recent enough ICU for Unicode 9 support.
 #if _runtime(_ObjC)
+  // Check for Unicode 9 or later
+  guard #available(iOS 10.0, macOS 10.12, *) else { return }
+
   let flags = "🇺🇸🇨🇦🇩🇰🏳️‍🌈"
   expectEqual(4, flags.count)
   expectEqual(flags.reversed().count, flags.count)
@@ -228,24 +256,19 @@ func checkRoundTripThroughCharacter(_ s: String) {
 }
 
 func isSmallRepresentation(_ s: String) -> Bool {
-  switch Character(s)._representation {
-    case .smallUTF16:
-      return true
-    default:
-      return false
-  }
+  return Character(s)._isSmall
 }
 
 func checkUnicodeScalars(_ s: String) {
   let c = s.first!
   expectEqualSequence(s.unicodeScalars, c.unicodeScalars)
-  
+
   expectEqualSequence(
     s.unicodeScalars, c.unicodeScalars.indices.map { c.unicodeScalars[$0] })
-  
+
   expectEqualSequence(
     s.unicodeScalars.reversed(), c.unicodeScalars.reversed())
-  
+
   expectEqualSequence(
     s.unicodeScalars.reversed(), c.unicodeScalars.indices.reversed().map {
       c.unicodeScalars[$0]
@@ -253,8 +276,7 @@ func checkUnicodeScalars(_ s: String) {
 }
 
 func checkRepresentation(_ s: String) {
-  let expectSmall
-    = s.utf16.count < 4 || s.utf16.count == 4 && s._core[3] < 0x8000
+  let expectSmall = s.utf8.count <= _SmallString.capacity
   let isSmall = isSmallRepresentation(s)
 
   let expectedSize = expectSmall ? "small" : "large"
@@ -307,12 +329,11 @@ CharacterTests.test(
   let asciiDomain = Array(0..<127)
   let ascii0to126 = asciiDomain.map({ UnicodeScalar(Int($0))! })
   let ascii1to127 = asciiDomain.map({ UnicodeScalar(Int($0 + 1))! })
-  typealias PredicateFn = (UnicodeScalar) -> (UnicodeScalar) -> Bool
   expectEqualMethodsForDomain(
     ascii0to126,
     ascii1to127,
-    { x in { String(x) < String($0) } } as PredicateFn,
-    { x in { String(Character(x)) < String(Character($0)) } } as PredicateFn)
+    { x in { String(x) < String($0) } },
+    { x in { String(Character(x)) < String(Character($0)) } })
 }
 
 CharacterTests.test("String.append(_: Character)") {
@@ -323,6 +344,19 @@ CharacterTests.test("String.append(_: Character)") {
     expectEqualSequence(
       test.unicodeScalars,
       result.unicodeScalars)
+  }
+}
+
+CharacterTests.test("utf6/16/unicodescalar views") {
+  for c in testCharacters {
+    expectEqualSequence(String(c).unicodeScalars, c.unicodeScalars)
+    expectEqualSequence(String(c).utf8, c.utf8)
+    expectEqualSequence(String(c).utf16, c.utf16)
+
+    expectEqualSequence(
+      String(c).unicodeScalars.reversed(), c.unicodeScalars.reversed())
+    expectEqualSequence(String(c).utf8.reversed(), c.utf8.reversed())
+    expectEqualSequence(String(c).utf16.reversed(), c.utf16.reversed())
   }
 }
 
@@ -381,6 +415,21 @@ UnicodeScalarTests.test("LosslessStringConvertible") {
 
   checkLosslessStringConvertible((0xE000...0xF000).map { UnicodeScalar(Int($0))! })
   checkLosslessStringConvertible((0...127).map { UnicodeScalar(Int($0))! })
+}
+
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  UnicodeScalarTests.test("Views") {
+    let scalars = baseScalars + continuingScalars
+    for scalar in scalars {
+      expectEqual(scalar, String(scalar).unicodeScalars.first!)
+      expectEqualSequence(String(scalar).utf8, scalar.utf8)
+      expectEqualSequence(String(scalar).utf16, scalar.utf16)
+
+      expectEqualSequence(String(scalar).utf8.reversed(), scalar.utf8.reversed())
+      expectEqualSequence(
+        String(scalar).utf16.reversed(), scalar.utf16.reversed())
+    }
+  }
 }
 
 runAllTests()

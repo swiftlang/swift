@@ -26,54 +26,38 @@ namespace swift {
 namespace irgen {
   
 /// A description of how to represent an enum payload as a value.
-/// A payload can either use a generic word-chunked representation, or attempt
-/// to follow the explosion schema of one of its payload types.
+/// A payload can either use a generic word-chunked representation,
+/// or attempt to follow the explosion schema of one of its payload
+/// types.
+/// TODO: the current code only ever uses the generic word-chunked
+/// representation, it might be better if it used an appropriate
+/// explosion schema instead.
 class EnumPayloadSchema {
-  using BitSizeTy = llvm::PointerEmbeddedInt<unsigned, 31>;
-
-  const llvm::PointerUnion<ExplosionSchema *, BitSizeTy> Value;
-
+  // A size in bits less than 0 indicates that the payload size is
+  // dynamic.
+  const int64_t BitSize;
 public:
-  EnumPayloadSchema() : Value((ExplosionSchema *)nullptr) {}
+  /// Create a new schema with a dynamic size.
+  EnumPayloadSchema() : BitSize(-1) {}
 
-  explicit operator bool() {
-    return Value.getOpaqueValue() != nullptr;
-  }
-
+  /// Create a new schema with the given fixed size in bits.
   explicit EnumPayloadSchema(unsigned bits)
-    : Value(BitSizeTy(bits)) {}
+    : BitSize(static_cast<int64_t>(bits)) {}
 
-  EnumPayloadSchema(ExplosionSchema &s)
-    : Value(&s) {}
+  /// Report whether the schema has a fixed size.
+  explicit operator bool() const {
+    return BitSize >= 0;
+  }
 
-  static EnumPayloadSchema withBitSize(unsigned bits) {
-    return EnumPayloadSchema(bits);
-  }
-  
-  ExplosionSchema *getSchema() const {
-    return Value.dyn_cast<ExplosionSchema*>();
-  }
-  
   /// Invoke a functor for each element type in the schema.
   template<typename TypeFn /* void(llvm::Type *schemaType) */>
   void forEachType(IRGenModule &IGM, TypeFn &&fn) const {
-    // Follow an explosion schema if we have one.
-    if (auto *explosion = Value.dyn_cast<ExplosionSchema *>()) {
-      for (auto &element : *explosion) {
-        auto type = element.getScalarType();
-        assert(IGM.DataLayout.getTypeSizeInBits(type)
-                 == IGM.DataLayout.getTypeAllocSizeInBits(type)
-               && "enum payload schema elements should use full alloc size");
-        (void) type;
-        fn(element.getScalarType());
-      }
-      return;
-    }
-    
-    // Otherwise, chunk into pointer-sized integer values by default.
-    unsigned bitSize = Value.get<BitSizeTy>();
-    unsigned pointerSize = IGM.getPointerSize().getValueInBits();
-    
+    assert(BitSize >= 0 && "payload size must not be dynamic");
+
+    // Chunk into pointer-sized integer values.
+    int64_t bitSize = BitSize;
+    int64_t pointerSize = IGM.getPointerSize().getValueInBits();
+
     while (bitSize >= pointerSize) {
       fn(IGM.SizeTy);
       bitSize -= pointerSize;
@@ -111,9 +95,9 @@ public:
 
   /// Generate an enum payload containing the given bit pattern.
   static EnumPayload fromBitPattern(IRGenModule &IGM,
-                                    APInt bitPattern,
+                                    const APInt &bitPattern,
                                     EnumPayloadSchema schema);
-  
+
   /// Insert a value into the enum payload.
   ///
   /// The current payload value at the given offset is assumed to be zero.
@@ -121,8 +105,7 @@ public:
   /// that need storing in \p value otherwise the full bit-width of \p value
   /// will be stored.
   void insertValue(IRGenFunction &IGF,
-                   llvm::Value *value, unsigned bitOffset,
-                   int numBitsUsedInValue = -1);
+                   llvm::Value *value, unsigned bitOffset);
   
   /// Extract a value from the enum payload.
   llvm::Value *extractValue(IRGenFunction &IGF,
@@ -157,29 +140,40 @@ public:
   /// Emit a switch over specific bit patterns for the payload.
   /// The value will be tested as if AND-ed against the given mask.
   void emitSwitch(IRGenFunction &IGF,
-                  APInt mask,
+                  const APInt &mask,
                   ArrayRef<std::pair<APInt, llvm::BasicBlock*>> cases,
                   SwitchDefaultDest dflt) const;
   
   /// Emit an equality comparison operation that payload & mask == value.
   llvm::Value *emitCompare(IRGenFunction &IGF,
-                           APInt mask,
-                           APInt value) const;
+                           const APInt &mask,
+                           const APInt &value) const;
   
   /// Apply an AND mask to the payload.
-  void emitApplyAndMask(IRGenFunction &IGF, APInt mask);
+  void emitApplyAndMask(IRGenFunction &IGF, const APInt &mask);
   
   /// Apply an OR mask to the payload.
-  void emitApplyOrMask(IRGenFunction &IGF, APInt mask);
+  void emitApplyOrMask(IRGenFunction &IGF, const APInt &mask);
   
   /// Apply an OR mask to the payload.
   void emitApplyOrMask(IRGenFunction &IGF, EnumPayload mask);
-  
+
+  /// Scatter the bits in value to the bit positions indicated by the
+  /// mask. The new bits are added using OR, so an emitApplyAndMask
+  /// call should be used first if existing bits need to be cleared.
+  void emitScatterBits(IRGenFunction &IGF,
+                       const APInt &mask,
+                       llvm::Value *value);
+
   /// Gather bits from an enum payload based on a spare bit mask.
   llvm::Value *emitGatherSpareBits(IRGenFunction &IGF,
                                    const SpareBitVector &spareBits,
                                    unsigned firstBitOffset,
                                    unsigned bitWidth) const;
+private:
+  /// Calculate the total number of bits this payload requires.
+  /// This will always be a multiple of 8.
+  unsigned getAllocSizeInBits(const llvm::DataLayout &DL) const;
 };
   
 }

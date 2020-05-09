@@ -14,7 +14,7 @@ func test0(_ fridge: CCRefrigerator) {
 
 func test1(_ power: Unmanaged<CCPowerSupply>) {
   assertUnmanaged(power)
-  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot convert value of type 'Unmanaged<CCPowerSupply>' to expected argument type 'CCPowerSupply!'}}
+  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot convert value of type 'Unmanaged<CCPowerSupply>' to expected argument type 'CCPowerSupply?'}}
   assertUnmanaged(fridge)
 }
 
@@ -61,8 +61,10 @@ func test9() {
   let constFridge: CCRefrigerator = fridge
   CCRefrigeratorOpen(fridge)
   let item = CCRefrigeratorGet(fridge, 0).takeUnretainedValue()
-  CCRefrigeratorInsert(item, fridge) // expected-error {{cannot convert value of type 'CCItem' to expected argument type 'CCMutableRefrigerator!'}}
-  CCRefrigeratorInsert(constFridge, item) // expected-error {{cannot convert value of type 'CCRefrigerator' to expected argument type 'CCMutableRefrigerator!'}}
+  // TODO(diagnostics): In this case we should probably suggest to flip `item` and `fridge`
+  CCRefrigeratorInsert(item, fridge) // expected-error {{cannot convert value of type 'CCItem' to expected argument type 'CCMutableRefrigerator?'}}
+  // expected-error@-1 {{cannot convert value of type 'CCMutableRefrigerator' to expected argument type 'CCItem?'}}
+  CCRefrigeratorInsert(constFridge, item) // expected-error {{cannot convert value of type 'CCRefrigerator' to expected argument type 'CCMutableRefrigerator?'}}
   CCRefrigeratorInsert(fridge, item)
   CCRefrigeratorClose(fridge)
 }
@@ -97,6 +99,7 @@ func testChainedAliases(_ fridge: CCRefrigerator) {
 func testBannedImported(_ object: CCOpaqueTypeRef) {
   CCRetain(object) // expected-error {{'CCRetain' is unavailable: Core Foundation objects are automatically memory managed}} expected-warning {{result of call to 'CCRetain' is unused}}
   CCRelease(object) // expected-error {{'CCRelease' is unavailable: Core Foundation objects are automatically memory managed}}
+  CCMungeAndRetain(object) // okay, has a custom swift_name
 }
 
 func testOutParametersGood() {
@@ -115,10 +118,14 @@ func testOutParametersBad() {
   CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot convert value of type 'CCRefrigerator?' to expected argument type 'UnsafeMutablePointer<CCRefrigerator?>?'}}
 
   let power: CCPowerSupply?
-  CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator!'}}
+  CCRefrigeratorGetPowerSupplyIndirect(0, power)
+  // expected-error@-1:40 {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator?'}}
+  // expected-error@-2:43 {{cannot convert value of type 'CCPowerSupply?' to expected argument type 'AutoreleasingUnsafeMutablePointer<CCPowerSupply?>'}}
 
   let item: CCItem?
-  CCRefrigeratorGetItemUnaudited(0, 0, item) // expected-error {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator!'}}
+  CCRefrigeratorGetItemUnaudited(0, 0, item)
+  // expected-error@-1:34 {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator?'}}
+  // expected-error@-2:40 {{cannot convert value of type 'CCItem?' to expected argument type 'UnsafeMutablePointer<Unmanaged<CCItem>?>?'}}
 }
 
 func nameCollisions() {

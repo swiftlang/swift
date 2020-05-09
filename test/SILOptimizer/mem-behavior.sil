@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -aa-kind=basic-aa -mem-behavior-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -aa-kind=basic-aa -mem-behavior-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -6,8 +6,8 @@ import Builtin
 import Swift
 
 class X {
-  @sil_stored var a: Int32
-  @sil_stored var x: X
+  @_hasStorage var a: Int32
+  @_hasStorage var x: X
 
   init()
 }

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/Inputs/nontransparent.swift -O -sil-serialize-all -parse-stdlib -parse-as-library -emit-module -o %t/Swift.swiftmodule -module-name=Swift -module-link-name swiftCore
+// RUN: %target-swift-frontend -emit-module %S/Inputs/nontransparent.swift -O -parse-stdlib -parse-as-library -emit-module -o %t/Swift.swiftmodule -module-name=Swift -module-link-name swiftCore
 // RUN: %target-swift-frontend %s -O -I %t -emit-sil -o - | %FileCheck %s
 
 import Swift
@@ -16,5 +16,5 @@ import Swift
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: return
 
-var a = doSomething()
+public var a = doSomething()
 a.isBConfused()

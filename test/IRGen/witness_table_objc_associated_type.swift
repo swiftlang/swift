@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize
 
 protocol A {}
 
@@ -19,10 +19,9 @@ struct SB: B {
   typealias AA = SA
   func foo() {}
 }
-// CHECK-LABEL: @_T034witness_table_objc_associated_type2SBVAA1BAAWP = hidden constant [3 x i8*] [
-// CHECK:         i8* bitcast (%swift.type* ()* @_T034witness_table_objc_associated_type2SAVMa to i8*)
-// CHECK:         i8* bitcast (i8** ()* @_T034witness_table_objc_associated_type2SAVAA1AAAWa to i8*)
-// CHECK:         i8* bitcast {{.*}} @_T034witness_table_objc_associated_type2SBVAA1BA2aDP3fooyyFTW
+// CHECK-LABEL: @"$s34witness_table_objc_associated_type2SBVAA1BAAWP" = hidden global [4 x i8*] [
+// CHECK:         {{(associated conformance 34witness_table_objc_associated_type2SBVAA1BAA2AAAaDP_AA1A|.ptrauth)}}
+// CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SBVAA1BA2aDP3fooyyFTW{{(\.ptrauth)?}}"
 // CHECK:       ]
 
 class CO: O {}
@@ -30,23 +29,22 @@ struct SO: C {
   typealias OO = CO
   func foo() {}
 }
-// CHECK-LABEL: @_T034witness_table_objc_associated_type2SOVAA1CAAWP = hidden constant [2 x i8*] [
-// CHECK:         i8* bitcast (%swift.type* ()* @_T034witness_table_objc_associated_type2COCMa to i8*)
-// CHECK:         i8* bitcast {{.*}} @_T034witness_table_objc_associated_type2SOVAA1CA2aDP3fooyyFTW
+// CHECK-LABEL: @"$s34witness_table_objc_associated_type2SOVAA1CAAWP" = hidden global [3 x i8*] [
+// CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SOVAA1CA2aDP3fooyyFTW{{(\.ptrauth)?}}"
 // CHECK:       ]
 
-// CHECK-LABEL: define hidden swiftcc void @_T034witness_table_objc_associated_type0A25OffsetAfterAssociatedTypeyxAA1BRzlF(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.B)
+// CHECK-LABEL: define hidden swiftcc void @"$s34witness_table_objc_associated_type0A25OffsetAfterAssociatedTypeyyxAA1BRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.B)
 func witnessOffsetAfterAssociatedType<T: B>(_ x: T) {
-  // CHECK:         [[FOO_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.B, i32 2
+  // CHECK:         [[FOO_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.B, i32 3
   // CHECK:         [[FOO_OPAQUE:%.*]] = load {{.*}} [[FOO_ADDR]]
   // CHECK:         [[FOO:%.*]] = bitcast {{.*}} [[FOO_OPAQUE]]
   // CHECK:         call swiftcc void [[FOO]]
   x.foo()
 }
 
-// CHECK-LABEL: define hidden swiftcc void @_T034witness_table_objc_associated_type0A29OffsetAfterAssociatedTypeObjCyxAA1CRzlF(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.C) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s34witness_table_objc_associated_type0A29OffsetAfterAssociatedTypeObjCyyxAA1CRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.C) {{.*}} {
 func witnessOffsetAfterAssociatedTypeObjC<T: C>(_ x: T) {
-  // CHECK:         [[FOO_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.C, i32 1
+  // CHECK:         [[FOO_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.C, i32 2
   // CHECK:         [[FOO_OPAQUE:%.*]] = load {{.*}} [[FOO_ADDR]]
   // CHECK:         [[FOO:%.*]] = bitcast {{.*}} [[FOO_OPAQUE]]
   // CHECK:         call swiftcc void [[FOO]]

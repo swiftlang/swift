@@ -17,9 +17,8 @@ namespace swift {
 
 // Enabling bitwise masking.
 enum class SanitizerKind : unsigned {
-  Address = 1 << 1,
-  Thread = 1 << 2,
-  Fuzzer = 1 << 3
+  #define SANITIZER(enum_bit, kind, name, file) kind = (1 << enum_bit),
+  #include "Sanitizers.def"
 };
 
 } // end namespace swift

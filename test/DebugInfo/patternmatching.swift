@@ -24,7 +24,7 @@ switch p {
       markUsed(x)
       // SIL-CHECK:  dealloc_stack{{.*}}line:[[@LINE-1]]:17:cleanup
       // Verify that the branch has a location >= the cleanup.
-      // SIL-CHECK-NEXT:  br{{.*}}line:[[@LINE-3]]:17:cleanup
+      // SIL-CHECK-NEXT:  br{{.*}}auto_gen
       // CHECK-SCOPES: call void @llvm.dbg
       // CHECK-SCOPES: call void @llvm.dbg
       // CHECK-SCOPES: call void @llvm.dbg
@@ -57,5 +57,16 @@ switch p {
       // CHECK-SCOPES-SAME:                     scope: ![[SCOPE3]])
       markUsed(x)
     }
+
+switch p {
+    case (let x, let y) where x == 0:
+      if y == 0 { markUsed(x) }
+      else      { markUsed(y) } // SIL-CHECK-NOT: br{{.*}}line:[[@LINE]]:31:cleanup
+    case (let x, let y): do {
+      if y == 0 { markUsed(x) }
+      else      { markUsed(y) }
+    } // SIL-CHECK: br{{.*}}line:[[@LINE]]:5:cleanup
+}
+
 // CHECK: !DILocation(line: [[@LINE+1]],
 }

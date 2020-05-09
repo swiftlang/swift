@@ -16,13 +16,13 @@
 #define DEBUG_TYPE "remove-redundant-overflow-checks"
 
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -58,7 +58,7 @@ public:
   struct Constraint {
     Constraint(SILBasicBlock *BB, SILValue L, SILValue R, ValueRelation Rel) :
       DominatingBlock(BB), Left(L), Right(R), Relationship(Rel) {
-      DEBUG(dump());
+      LLVM_DEBUG(dump());
     }
 
     /// The constraint is valid in blocks dominated by this block.
@@ -108,8 +108,9 @@ public:
   /// and return True if and instructions were removed.
   bool removeCollectedRedundantInstructions() {
     if (ToRemove.size()) {
-      DEBUG(llvm::dbgs()<<"Removing "<<ToRemove.size()<<" condfails in "
-                  <<getFunction()->getName()<<"\n");
+      LLVM_DEBUG(llvm::dbgs() << "Removing " << ToRemove.size()
+                              << " condfails in "
+                              << getFunction()->getName() << "\n");
 
       for (auto *CF : ToRemove) {
         CF->eraseFromParent();

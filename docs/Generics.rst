@@ -747,7 +747,7 @@ The exact syntax of the @_specialize function attribute is defined as: ::
   @_specialize(exported: false, kind: partial, where K: _Trivial64)
   func dictFunction<K, V>(dict: Dictionary<K, V>) {
   }
-    
+
 If 'exported' is set, the corresponding specialization would have a public
 visibility and can be used by clients. If 'exported' is omitted, it's value
 is assumed to be 'false'.
@@ -757,7 +757,7 @@ produce an error if you forget to specify the type for some of the generic
 parameters in the 'where' clause. If 'kind' is 'partial' it means a partial
 specialization. If 'kind' is omitted, its value is assumed to be 'full.
 
-The requirements in the where clause may be same-type constaints like 'T == Int',
+The requirements in the where clause may be same-type constraints like 'T == Int',
 but they may also specify so-called layout constraints like 'T: _Trivial'.
 
 The following layout constraints are currently supported:
@@ -773,7 +773,7 @@ The following layout constraints are currently supported:
     exactly 'SizeInBits' bits.
   * _TrivialAtMost(SizeInBits) - like _Trivial, but the size of the type should
     be at most 'SizeInBits' bits.
-  
+
 
 Existential Types and Generics
 ------------------------------
@@ -783,7 +783,7 @@ protocols. A value of an existential type (say, Comparable) is a pair (value,
 vtable). 'value' stores the current value either directly (if it fits in the 3
 words allocated to the value) or as a pointer to the boxed representation (if
 the actual representation is larger than 3 words). By itself, this value cannot
-be interpreted, because it's type is not known statically, and may change due to
+be interpreted, because its type is not known statically, and may change due to
 assignment. The vtable provides the means to manipulate the value, because it
 provides a mapping between the protocols to which the existential type conforms
 (which is known statically) to the functions that implements that

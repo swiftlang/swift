@@ -59,6 +59,8 @@ enum class CustomBufferKind {
   InheritedTypesArray,
   DocStructureElementArray,
   AttributesArray,
+  ExpressionTypeArray,
+  RawData
 };
 
 class ResponseBuilder {
@@ -77,12 +79,14 @@ public:
     void set(SourceKit::UIdent Key, sourcekitd_uid_t UID);
     void set(SourceKit::UIdent Key, const char *Str);
     void set(SourceKit::UIdent Key, llvm::StringRef Str);
+    void set(SourceKit::UIdent Key, const std::string &Str);
     void set(SourceKit::UIdent Key, int64_t val);
     void set(SourceKit::UIdent Key, llvm::ArrayRef<llvm::StringRef> Strs);
+    void set(SourceKit::UIdent Key, llvm::ArrayRef<std::string> Strs);
     void setBool(SourceKit::UIdent Key, bool val);
     Array setArray(SourceKit::UIdent Key);
     Dictionary setDictionary(SourceKit::UIdent Key);
-    void setCustomBuffer(SourceKit::UIdent Key, CustomBufferKind Kind,
+    void setCustomBuffer(SourceKit::UIdent Key,
                          std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 
   private:
@@ -126,7 +130,7 @@ public:
   Optional<llvm::StringRef> getString(SourceKit::UIdent Key);
   Optional<RequestDict> getDictionary(SourceKit::UIdent Key);
 
-  /// \brief Populate the vector with an array of C strings.
+  /// Populate the vector with an array of C strings.
   /// \param isOptional true if the key is optional. If false and the key is
   /// missing, the function will return true to indicate an error.
   /// \returns true if there is an error, like the key is not of an array type or
@@ -156,9 +160,9 @@ void handleRequest(sourcekitd_object_t Request, ResponseReceiver Receiver);
 void printRequestObject(sourcekitd_object_t Obj, llvm::raw_ostream &OS);
 void printResponse(sourcekitd_response_t Resp, llvm::raw_ostream &OS);
 
-sourcekitd_response_t createErrorRequestInvalid(const char *Description);
-sourcekitd_response_t createErrorRequestFailed(const char *Description);
-sourcekitd_response_t createErrorRequestInterrupted(const char *Description);
+sourcekitd_response_t createErrorRequestInvalid(llvm::StringRef Description);
+sourcekitd_response_t createErrorRequestFailed(llvm::StringRef Description);
+sourcekitd_response_t createErrorRequestInterrupted(llvm::StringRef Descr);
 sourcekitd_response_t createErrorRequestCancelled();
 
 /// Send notification object.
@@ -170,6 +174,7 @@ sourcekitd_uid_t SKDUIDFromUIdent(SourceKit::UIdent UID);
 SourceKit::UIdent UIdentFromSKDUID(sourcekitd_uid_t uid);
 
 std::string getRuntimeLibPath();
+std::string getDiagnosticDocumentationPath();
 
 void writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS);
 
@@ -217,6 +222,8 @@ struct VariantFunctions {
   const char *(*string_get_ptr)(sourcekitd_variant_t obj);
   int64_t (*int64_get_value)(sourcekitd_variant_t obj);
   sourcekitd_uid_t (*uid_get_value)(sourcekitd_variant_t obj);
+  size_t (*data_get_size)(sourcekitd_variant_t obj);
+  const void *(*data_get_ptr)(sourcekitd_variant_t obj);
 };
 
 }

@@ -1,21 +1,11 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/main.swift
-// RUN: if [ %target-runtime == "objc" ]; then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control; \
-// RUN: else \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Dictionary -Xfrontend -disable-access-control; \
-// RUN: fi
+// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
 //
-// RUN: %line-directive %t/main.swift -- %target-run %t/Dictionary
+// RUN: %target-codesign %t/Dictionary && %line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
-
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
-import Darwin
-#else
-import Glibc
-#endif
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -34,6 +24,8 @@ extension Dictionary {
 
 // Check that the generic parameters are called 'Key' and 'Value'.
 protocol TestProtocol1 {}
+
+struct TestError: Error {}
 
 extension Dictionary where Key : TestProtocol1, Value : TestProtocol1 {
   var _keyValueAreTestProtocol1: Bool {
@@ -64,7 +56,6 @@ DictionaryTestSuite.test("AssociatedTypes") {
     iteratorType: DictionaryIterator<MinimalHashableValue, OpaqueValue<Int>>.self,
     subSequenceType: Slice<Collection>.self,
     indexType: DictionaryIndex<MinimalHashableValue, OpaqueValue<Int>>.self,
-    indexDistanceType: Int.self,
     indicesType: DefaultIndices<Collection>.self)
 }
 
@@ -75,6 +66,13 @@ DictionaryTestSuite.test("sizeof") {
 #else
   expectEqual(8, MemoryLayout.size(ofValue: dict))
 #endif
+}
+
+DictionaryTestSuite.test("Index.Hashable") {
+  let d = [1: "meow", 2: "meow", 3: "meow"]
+  let e = Dictionary(uniqueKeysWithValues: zip(d.indices, d))
+  expectEqual(d.count, e.count)
+  expectNotNil(e[d.startIndex])
 }
 
 DictionaryTestSuite.test("valueDestruction") {
@@ -91,7 +89,7 @@ DictionaryTestSuite.test("valueDestruction") {
 
 DictionaryTestSuite.test("COW.Smoke") {
   var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
-  var identity1 = d1._rawIdentifier()
+  let identity1 = d1._rawIdentifier()
 
   d1[TestKeyTy(10)] = TestValueTy(1010)
   d1[TestKeyTy(20)] = TestValueTy(1020)
@@ -120,6 +118,14 @@ func getCOWFastDictionary() -> Dictionary<Int, Int> {
   return d
 }
 
+func getCOWFastDictionaryWithCOWValues() -> Dictionary<Int, TestValueCOWTy> {
+  var d = Dictionary<Int, TestValueCOWTy>(minimumCapacity: 10)
+  d[10] = TestValueCOWTy(1010)
+  d[20] = TestValueCOWTy(1020)
+  d[30] = TestValueCOWTy(1030)
+  return d
+}
+
 func getCOWSlowDictionary() -> Dictionary<TestKeyTy, TestValueTy> {
   var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
   d[TestKeyTy(10)] = TestValueTy(1010)
@@ -137,13 +143,21 @@ func getCOWSlowEquatableDictionary()
   return d
 }
 
+func expectUnique<T: AnyObject>(_ v: inout T) {
+  expectTrue(isKnownUniquelyReferenced(&v))
+}
+
+func expectUnique<T: AnyObject>(_ v: inout T?) {
+  guard v != nil else { return }
+  expectTrue(isKnownUniquelyReferenced(&v))
+}
 
 DictionaryTestSuite.test("COW.Fast.IndexesDontAffectUniquenessCheck") {
   var d = getCOWFastDictionary()
-  var identity1 = d._rawIdentifier()
+  let identity1 = d._rawIdentifier()
 
-  var startIndex = d.startIndex
-  var endIndex = d.endIndex
+  let startIndex = d.startIndex
+  let endIndex = d.endIndex
   assert(startIndex != endIndex)
   assert(startIndex < endIndex)
   assert(startIndex <= endIndex)
@@ -162,10 +176,10 @@ DictionaryTestSuite.test("COW.Fast.IndexesDontAffectUniquenessCheck") {
 
 DictionaryTestSuite.test("COW.Slow.IndexesDontAffectUniquenessCheck") {
   var d = getCOWSlowDictionary()
-  var identity1 = d._rawIdentifier()
+  let identity1 = d._rawIdentifier()
 
-  var startIndex = d.startIndex
-  var endIndex = d.endIndex
+  let startIndex = d.startIndex
+  let endIndex = d.endIndex
   assert(startIndex != endIndex)
   assert(startIndex < endIndex)
   assert(startIndex <= endIndex)
@@ -183,10 +197,10 @@ DictionaryTestSuite.test("COW.Slow.IndexesDontAffectUniquenessCheck") {
 
 
 DictionaryTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
-  var d = getCOWFastDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getCOWFastDictionary()
+  let identity1 = d._rawIdentifier()
 
-  var startIndex = d.startIndex
+  let startIndex = d.startIndex
   let empty = startIndex == d.endIndex
   assert((d.startIndex < d.endIndex) == !empty)
   assert(d.startIndex <= d.endIndex)
@@ -199,10 +213,10 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
 }
 
 DictionaryTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
-  var d = getCOWSlowDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getCOWSlowDictionary()
+  let identity1 = d._rawIdentifier()
 
-  var startIndex = d.startIndex
+  let startIndex = d.startIndex
   let empty = startIndex == d.endIndex
   assert((d.startIndex < d.endIndex) == !empty)
   assert(d.startIndex <= d.endIndex)
@@ -216,11 +230,9 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   var d = getCOWFastDictionary()
-  var identity1 = d._rawIdentifier()
+  let identity1 = d._rawIdentifier()
 
   assert(d[10]! == 1010)
   assert(identity1 == d._rawIdentifier())
@@ -262,23 +274,21 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate")
   do {
     var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectNil(d2[MinimalHashableValue(42)])
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
 DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
 
   var d = getCOWSlowDictionary()
-  var identity1 = d._rawIdentifier()
+  let identity1 = d._rawIdentifier()
 
   assert(d[TestKeyTy(10)]!.value == 1010)
   assert(identity1 == d._rawIdentifier())
@@ -320,22 +330,26 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate")
   do {
     var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
 
     expectNil(d2[MinimalHashableClass(42)])
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKey.Uniqueness") {
+  var d = getCOWSlowEquatableDictionary()
+  expectUnique(&d[TestKeyTy(20)])
+}
 
 DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     // Insert a new key-value pair.
     assert(d1.updateValue(2040, forKey: 40) == .none)
@@ -350,7 +364,7 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -380,7 +394,7 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -407,10 +421,10 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.UpdateValueForKeyDoesNotReallocate") {
   do {
     var d1 = getCOWSlowDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     // Insert a new key-value pair.
     assert(d1.updateValue(TestValueTy(2040), forKey: TestKeyTy(40)) == nil)
@@ -427,7 +441,7 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
 
   do {
     var d1 = getCOWSlowDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -457,7 +471,7 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
 
   do {
     var d1 = getCOWSlowDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -485,13 +499,11 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
 }
 
 DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     // Merge some new values.
     d1.merge([(40, 2040), (50, 2050)]) { _, y in y }
@@ -523,7 +535,7 @@ DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate")
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -554,7 +566,7 @@ DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate")
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -582,7 +594,7 @@ DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate")
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -610,13 +622,11 @@ DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate")
 }
 
 DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     // Merge some new values.
     d1.merge([40: 2040, 50: 2050]) { _, y in y }
@@ -648,7 +658,7 @@ DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -679,7 +689,7 @@ DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -707,7 +717,7 @@ DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -734,10 +744,34 @@ DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
   }
 }
 
+
+DictionaryTestSuite.test("Merge.ThrowingIsSafe") {
+  var d: [TestKeyTy: TestValueTy] = [
+    TestKeyTy(10): TestValueTy(1),
+    TestKeyTy(20): TestValueTy(2),
+    TestKeyTy(30): TestValueTy(3),
+  ]
+
+  let d2: [TestKeyTy: TestValueTy] = [
+    TestKeyTy(40): TestValueTy(4),
+    TestKeyTy(50): TestValueTy(5),
+    TestKeyTy(10): TestValueTy(1),
+  ]
+
+  struct TE: Error {}
+  do {
+    // Throwing must not leave the dictionary in an inconsistent state.
+    try d.merge(d2) { v1, v2 in throw TE() }
+    expectTrue(false, "merge did not throw")
+  } catch {
+    expectTrue(error is TE)
+  }
+}
+
 DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotReallocate") {
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     // No mutation on access.
     assert(d1[10, default: 0] + 1 == 1011)
@@ -758,7 +792,7 @@ DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotReallocate") {
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -785,7 +819,7 @@ DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotReallocate") {
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
@@ -805,16 +839,107 @@ DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotReallocate") {
   }
 }
 
+DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotCopyValue") {
+  do {
+    var d = getCOWFastDictionaryWithCOWValues()
+    let identityValue30 = d[30]!.baseAddress
+
+    // Increment the value without having to reallocate the underlying Base
+    // instance, as uniquely referenced.
+    d[30, default: TestValueCOWTy()].value += 1
+    assert(identityValue30 == d[30]!.baseAddress)
+    assert(d[30]!.value == 1031)
+
+    let value40 = TestValueCOWTy()
+    let identityValue40 = value40.baseAddress
+
+    // Increment the value, reallocating the underlying Base, as not uniquely
+    // referenced.
+    d[40, default: value40].value += 1
+    assert(identityValue40 != d[40]!.baseAddress)
+    assert(d[40]!.value == 1)
+
+    // Keep variables alive.
+    _fixLifetime(d)
+    _fixLifetime(value40)
+  }
+}
+
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Uniqueness") {
+  var d = getCOWSlowEquatableDictionary()
+
+  expectUnique(&d[TestKeyTy(20), default: TestEquatableValueTy(0)])
+  expectUnique(&d[TestKeyTy(40), default: TestEquatableValueTy(0)])
+}
+
+func bumpValue(_ value: inout TestEquatableValueTy) {
+  value = TestEquatableValueTy(value.value + 1)
+}
+
+func bumpValueAndThrow(_ value: inout TestEquatableValueTy) throws {
+  value = TestEquatableValueTy(value.value + 1)
+  throw TestError()
+}
+
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Insertion.modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  bumpValue(&d[TestKeyTy(40), default: TestEquatableValueTy(1040)])
+  expectEqual(TestEquatableValueTy(1041), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Mutation.modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  bumpValue(&d[TestKeyTy(10), default: TestEquatableValueTy(2000)])
+  expectEqual(TestEquatableValueTy(1011), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Insertion.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try bumpValueAndThrow(
+      &d[TestKeyTy(40), default: TestEquatableValueTy(1040)])
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+  expectEqual(TestEquatableValueTy(1041), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Mutation.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try bumpValueAndThrow(
+      &d[TestKeyTy(10), default: TestEquatableValueTy(2000)])
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+  expectEqual(TestEquatableValueTy(1011), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+
 DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
-  var d = getCOWFastDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getCOWFastDictionary()
+  let identity1 = d._rawIdentifier()
 
   // Find an existing key.
   do {
-    var foundIndex1 = d.index(forKey: 10)!
+    let foundIndex1 = d.index(forKey: 10)!
     assert(identity1 == d._rawIdentifier())
 
-    var foundIndex2 = d.index(forKey: 10)!
+    let foundIndex2 = d.index(forKey: 10)!
     assert(foundIndex1 == foundIndex2)
 
     assert(d[foundIndex1].0 == 10)
@@ -824,34 +949,34 @@ DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
 
   // Try to find a key that is not present.
   do {
-    var foundIndex1 = d.index(forKey: 1111)
+    let foundIndex1 = d.index(forKey: 1111)
     assert(foundIndex1 == nil)
     assert(identity1 == d._rawIdentifier())
   }
 
   do {
-    var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
+    let d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectNil(d2.index(forKey: MinimalHashableValue(42)))
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
 DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
-  var d = getCOWSlowDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getCOWSlowDictionary()
+  let identity1 = d._rawIdentifier()
 
   // Find an existing key.
   do {
-    var foundIndex1 = d.index(forKey: TestKeyTy(10))!
+    let foundIndex1 = d.index(forKey: TestKeyTy(10))!
     assert(identity1 == d._rawIdentifier())
 
-    var foundIndex2 = d.index(forKey: TestKeyTy(10))!
+    let foundIndex2 = d.index(forKey: TestKeyTy(10))!
     assert(foundIndex1 == foundIndex2)
 
     assert(d[foundIndex1].0 == TestKeyTy(10))
@@ -861,32 +986,30 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
 
   // Try to find a key that is not present.
   do {
-    var foundIndex1 = d.index(forKey: TestKeyTy(1111))
+    let foundIndex1 = d.index(forKey: TestKeyTy(1111))
     assert(foundIndex1 == nil)
     assert(identity1 == d._rawIdentifier())
   }
 
   do {
-    var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
+    let d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
     expectNil(d2.index(forKey: MinimalHashableClass(42)))
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
 
 DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d = getCOWFastDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
 
     let foundIndex1 = d.index(forKey: 10)!
     assert(identity1 == d._rawIdentifier())
@@ -903,14 +1026,14 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
   }
 
   do {
-    var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let d1 = getCOWFastDictionary()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
     assert(identity1 == d2._rawIdentifier())
 
-    var foundIndex1 = d2.index(forKey: 10)!
+    let foundIndex1 = d2.index(forKey: 10)!
     assert(d2[foundIndex1].0 == 10)
     assert(d2[foundIndex1].1 == 1010)
     assert(identity1 == d1._rawIdentifier())
@@ -927,14 +1050,12 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
 }
 
 DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d = getCOWSlowDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
 
-    var foundIndex1 = d.index(forKey: TestKeyTy(10))!
+    let foundIndex1 = d.index(forKey: TestKeyTy(10))!
     assert(identity1 == d._rawIdentifier())
 
     assert(d[foundIndex1].0 == TestKeyTy(10))
@@ -949,14 +1070,14 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
   }
 
   do {
-    var d1 = getCOWSlowDictionary()
-    var identity1 = d1._rawIdentifier()
+    let d1 = getCOWSlowDictionary()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(identity1 == d1._rawIdentifier())
     assert(identity1 == d2._rawIdentifier())
 
-    var foundIndex1 = d2.index(forKey: TestKeyTy(10))!
+    let foundIndex1 = d2.index(forKey: TestKeyTy(10))!
     assert(d2[foundIndex1].0 == TestKeyTy(10))
     assert(d2[foundIndex1].1.value == 1010)
 
@@ -972,12 +1093,10 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
 
 
 DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var deleted = d1.removeValue(forKey: 0)
     assert(deleted == nil)
@@ -992,8 +1111,8 @@ DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate")
   }
 
   do {
-    var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let d1 = getCOWFastDictionary()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     var deleted = d2.removeValue(forKey: 0)
@@ -1013,12 +1132,10 @@ DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate")
 }
 
 DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d1 = getCOWSlowDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var deleted = d1.removeValue(forKey: TestKeyTy(0))
     assert(deleted == nil)
@@ -1033,8 +1150,8 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate")
   }
 
   do {
-    var d1 = getCOWSlowDictionary()
-    var identity1 = d1._rawIdentifier()
+    let d1 = getCOWSlowDictionary()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     var deleted = d2.removeValue(forKey: TestKeyTy(0))
@@ -1057,15 +1174,15 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate")
 DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWFastDictionary()
-    let originalCapacity = d._variantBuffer.asNative.capacity
+    let originalCapacity = d.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
     d.removeAll()
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
-    var identity1 = d._rawIdentifier()
-    assert(d._variantBuffer.asNative.capacity < originalCapacity)
+    let identity1 = d._rawIdentifier()
+    assert(d.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
@@ -1077,33 +1194,33 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 
   do {
     var d = getCOWFastDictionary()
-    var identity1 = d._rawIdentifier()
-    let originalCapacity = d._variantBuffer.asNative.capacity
+    let identity1 = d._rawIdentifier()
+    let originalCapacity = d.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
   }
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
 
     var d2 = d1
     d2.removeAll()
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
     assert(d1.count == 3)
@@ -1118,19 +1235,19 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 
   do {
     var d1 = getCOWFastDictionary()
-    var identity1 = d1._rawIdentifier()
-    let originalCapacity = d1._variantBuffer.asNative.capacity
+    let identity1 = d1._rawIdentifier()
+    let originalCapacity = d1.capacity
     assert(d1.count == 3)
     assert(d1[10] == 1010)
 
     var d2 = d1
     d2.removeAll(keepingCapacity: true)
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
-    assert(d2._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d2.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[10] == nil)
 
@@ -1143,15 +1260,15 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWSlowDictionary()
-    let originalCapacity = d._variantBuffer.asNative.capacity
+    let originalCapacity = d.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
     d.removeAll()
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
-    var identity1 = d._rawIdentifier()
-    assert(d._variantBuffer.asNative.capacity < originalCapacity)
+    let identity1 = d._rawIdentifier()
+    assert(d.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
@@ -1163,33 +1280,33 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
 
   do {
     var d = getCOWSlowDictionary()
-    var identity1 = d._rawIdentifier()
-    let originalCapacity = d._variantBuffer.asNative.capacity
+    let identity1 = d._rawIdentifier()
+    let originalCapacity = d.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
   }
 
   do {
     var d1 = getCOWSlowDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
     var d2 = d1
     d2.removeAll()
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
     assert(d1.count == 3)
@@ -1204,19 +1321,19 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
 
   do {
     var d1 = getCOWSlowDictionary()
-    var identity1 = d1._rawIdentifier()
-    let originalCapacity = d1._variantBuffer.asNative.capacity
+    let identity1 = d1._rawIdentifier()
+    let originalCapacity = d1.capacity
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
     var d2 = d1
     d2.removeAll(keepingCapacity: true)
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
-    assert(d2._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d2.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestKeyTy(10)] == nil)
 
@@ -1228,16 +1345,16 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.CountDoesNotReallocate") {
-  var d = getCOWFastDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getCOWFastDictionary()
+  let identity1 = d._rawIdentifier()
 
   assert(d.count == 3)
   assert(identity1 == d._rawIdentifier())
 }
 
 DictionaryTestSuite.test("COW.Slow.CountDoesNotReallocate") {
-  var d = getCOWSlowDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getCOWSlowDictionary()
+  let identity1 = d._rawIdentifier()
 
   assert(d.count == 3)
   assert(identity1 == d._rawIdentifier())
@@ -1245,8 +1362,8 @@ DictionaryTestSuite.test("COW.Slow.CountDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
-  var d = getCOWFastDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getCOWFastDictionary()
+  let identity1 = d._rawIdentifier()
 
   var iter = d.makeIterator()
   var pairs = Array<(Int, Int)>()
@@ -1258,24 +1375,13 @@ DictionaryTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
 }
 
 DictionaryTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
-  var d = getCOWSlowDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getCOWSlowDictionary()
+  let identity1 = d._rawIdentifier()
 
   var iter = d.makeIterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = iter.next() {
-    // FIXME: This doesn't work (<rdar://problem/17751308> Can't +=
-    // with array literal of pairs)
-    // pairs += [(key.value, value.value)]
-
-    // FIXME: This doesn't work (<rdar://problem/17750582> generics over tuples)
-    // pairs.append((key.value, value.value))
-
-    // FIXME: This doesn't work (<rdar://problem/17751359>)
-    // pairs.append(key.value, value.value)
-
-    let kv = (key.value, value.value)
-    pairs += [kv]
+    pairs += [(key.value, value.value)]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   assert(identity1 == d._rawIdentifier())
@@ -1283,11 +1389,11 @@ DictionaryTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.EqualityTestDoesNotReallocate") {
-  var d1 = getCOWFastDictionary()
-  var identity1 = d1._rawIdentifier()
+  let d1 = getCOWFastDictionary()
+  let identity1 = d1._rawIdentifier()
 
   var d2 = getCOWFastDictionary()
-  var identity2 = d2._rawIdentifier()
+  let identity2 = d2._rawIdentifier()
 
   assert(d1 == d2)
   assert(identity1 == d1._rawIdentifier())
@@ -1300,11 +1406,11 @@ DictionaryTestSuite.test("COW.Fast.EqualityTestDoesNotReallocate") {
 }
 
 DictionaryTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
-  var d1 = getCOWSlowEquatableDictionary()
-  var identity1 = d1._rawIdentifier()
+  let d1 = getCOWSlowEquatableDictionary()
+  let identity1 = d1._rawIdentifier()
 
   var d2 = getCOWSlowEquatableDictionary()
-  var identity2 = d2._rawIdentifier()
+  let identity2 = d2._rawIdentifier()
 
   assert(d1 == d2)
   assert(identity1 == d1._rawIdentifier())
@@ -1320,9 +1426,9 @@ DictionaryTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
 // Keys and Values collection tests.
 //===---
 
-DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.Values.AccessDoesNotReallocate") {
   var d1 = getCOWFastDictionary()
-  var identity1 = d1._rawIdentifier()
+  let identity1 = d1._rawIdentifier()
   
   assert([1010, 1020, 1030] == d1.values.sorted())
   assert(identity1 == d1._rawIdentifier())
@@ -1334,12 +1440,10 @@ DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
   assert(d1.values[i] == 1010)
   assert(d1[i] == (10, 1010))
   
-#if swift(>=4.0)
   d2.values[i] += 1
   assert(d2.values[i] == 1011)
   assert(d2[10]! == 1011)
   assert(identity1 != d2._rawIdentifier())
-#endif
   
   assert(d1[10]! == 1010)
   assert(identity1 == d1._rawIdentifier())
@@ -1351,9 +1455,63 @@ DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
   { $0 == $1 }
 }
 
-DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
-  var d1 = getCOWFastDictionary()
-  var identity1 = d1._rawIdentifier()
+DictionaryTestSuite.test("COW.Slow.Values.Modify") {
+  var d1 = getCOWSlowEquatableDictionary()
+  var d2: [TestKeyTy: TestEquatableValueTy] = [
+    TestKeyTy(40): TestEquatableValueTy(1040),
+    TestKeyTy(50): TestEquatableValueTy(1050),
+    TestKeyTy(60): TestEquatableValueTy(1060),
+  ]
+  d1.values = d2.values
+  expectEqual(d1, d2)
+  expectNil(d1[TestKeyTy(10)])
+  expectNil(d1[TestKeyTy(20)])
+  expectNil(d1[TestKeyTy(30)])
+  expectEqual(TestEquatableValueTy(1040), d1[TestKeyTy(40)])
+  expectEqual(TestEquatableValueTy(1050), d1[TestKeyTy(50)])
+  expectEqual(TestEquatableValueTy(1060), d1[TestKeyTy(60)])
+}
+
+@inline(never)
+func replaceValuesThenThrow<K: Hashable, V>(
+  _ v: inout Dictionary<K, V>.Values,
+  with v2: Dictionary<K, V>.Values
+) throws {
+  v = v2
+  throw TestError()
+}
+
+DictionaryTestSuite.test("COW.Slow.Values.ModifyThrow") {
+  var d1 = getCOWSlowEquatableDictionary()
+  var d2: [TestKeyTy: TestEquatableValueTy] = [
+    TestKeyTy(40): TestEquatableValueTy(1040),
+    TestKeyTy(50): TestEquatableValueTy(1050),
+    TestKeyTy(60): TestEquatableValueTy(1060),
+  ]
+  do {
+    try replaceValuesThenThrow(&d1.values, with: d2.values)
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+  expectEqual(d1, d2)
+  expectNil(d1[TestKeyTy(10)])
+  expectNil(d1[TestKeyTy(20)])
+  expectNil(d1[TestKeyTy(30)])
+  expectEqual(TestEquatableValueTy(1040), d1[TestKeyTy(40)])
+  expectEqual(TestEquatableValueTy(1050), d1[TestKeyTy(50)])
+  expectEqual(TestEquatableValueTy(1060), d1[TestKeyTy(60)])
+}
+
+DictionaryTestSuite.test("COW.Slow.Values.Uniqueness") {
+  var d = getCOWSlowEquatableDictionary()
+  let i = d.index(forKey: TestKeyTy(20))!
+  expectUnique(&d.values[i])
+}
+
+DictionaryTestSuite.test("COW.Fast.Keys.AccessDoesNotReallocate") {
+  let d1 = getCOWFastDictionary()
+  let identity1 = d1._rawIdentifier()
   
   assert([10, 20, 30] == d1.keys.sorted())
 
@@ -1380,14 +1538,16 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
       MinimalHashableValue(80): 1080,
       MinimalHashableValue(90): 1090,
     ]
+    // Make collisions less likely
+    d2.reserveCapacity(1000)
     
     // Find the last key in the dictionary
     var lastKey: MinimalHashableValue = d2.first!.key
     for i in d2.indices { lastKey = d2[i].key }
 
-    // index(where:) - linear search
+    // firstIndex(where:) - linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    let j = d2.index(where: { (k, _) in k == lastKey })!
+    let j = d2.firstIndex(where: { (k, _) in k == lastKey })!
     expectGE(MinimalHashableValue.timesEqualEqualWasCalled, 8)
 
     // index(forKey:) - O(1) bucket + linear search
@@ -1395,69 +1555,234 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
     let k = d2.index(forKey: lastKey)!
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
     
-    // keys.index(of:) - O(1) bucket + linear search
+    // keys.firstIndex(of:) - O(1) bucket + linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    let l = d2.keys.index(of: lastKey)!
-#if swift(>=4.0)
+    let l = d2.keys.firstIndex(of: lastKey)!
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
-#endif
 
     expectEqual(j, k)
     expectEqual(k, l)
   }
 }
 
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Insertion") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(40)] = TestEquatableValueTy(1040)
+  expectEqual(TestEquatableValueTy(1040), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Mutation") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(10)] = TestEquatableValueTy(2010)
+  expectEqual(TestEquatableValueTy(2010), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Removal") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(10)] = nil
+  expectNil(d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Noop") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(40)] = nil
+  expectNil(d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+extension Optional {
+  @inline(never)
+  mutating func setWrapped(to value: Wrapped) {
+    self = .some(value)
+  }
+
+  @inline(never)
+  mutating func setWrappedThenThrow(to value: Wrapped) throws {
+    self = .some(value)
+    throw TestError()
+  }
+
+  @inline(never)
+  mutating func clear() {
+    self = .none
+  }
+
+  @inline(never)
+  mutating func clearThenThrow() throws {
+    self = .none
+    throw TestError()
+  }
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Insertion.modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(40)].setWrapped(to: TestEquatableValueTy(1040))
+  expectEqual(TestEquatableValueTy(1040), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Mutation.modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(10)].setWrapped(to: TestEquatableValueTy(2010))
+  expectEqual(TestEquatableValueTy(2010), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Removal.modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(10)].clear()
+  expectNil(d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Noop.modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(40)].clear()
+  expectNil(d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Insertion.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try d[TestKeyTy(40)].setWrappedThenThrow(to: TestEquatableValueTy(1040))
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+
+  expectEqual(TestEquatableValueTy(1040), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Mutation.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try d[TestKeyTy(10)].setWrappedThenThrow(to: TestEquatableValueTy(2010))
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+
+  expectEqual(TestEquatableValueTy(2010), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Removal.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try d[TestKeyTy(10)].clearThenThrow()
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+
+  expectNil(d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Noop.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try d[TestKeyTy(40)].clearThenThrow()
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+
+  expectNil(d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+
 //===---
 // Native dictionary tests.
 //===---
 
-func helperDeleteThree(_ k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
-  var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
+func helperDeleteThree(
+  _ k1: RawTestKeyTy,
+  _ k2: RawTestKeyTy,
+  _ k3: RawTestKeyTy
+) {
+  var d1 = Dictionary<RawTestKeyTy, TestValueTy>(minimumCapacity: 10)
 
   d1[k1] = TestValueTy(1010)
   d1[k2] = TestValueTy(1020)
   d1[k3] = TestValueTy(1030)
 
-  assert(d1[k1]!.value == 1010)
-  assert(d1[k2]!.value == 1020)
-  assert(d1[k3]!.value == 1030)
+  assert(d1[k1]?.value == 1010)
+  assert(d1[k2]?.value == 1020)
+  assert(d1[k3]?.value == 1030)
 
   d1[k1] = nil
-  assert(d1[k2]!.value == 1020)
-  assert(d1[k3]!.value == 1030)
+  assert(d1[k1]?.value == nil)
+  assert(d1[k2]?.value == 1020)
+  assert(d1[k3]?.value == 1030)
 
   d1[k2] = nil
-  assert(d1[k3]!.value == 1030)
+  assert(d1[k1]?.value == nil)
+  assert(d1[k2]?.value == nil)
+  assert(d1[k3]?.value == 1030)
 
   d1[k3] = nil
+  assert(d1[k1]?.value == nil)
+  assert(d1[k2]?.value == nil)
+  assert(d1[k3]?.value == nil)
   assert(d1.count == 0)
 }
 
 DictionaryTestSuite.test("deleteChainCollision") {
-  var k1 = TestKeyTy(value: 10, hashValue: 0)
-  var k2 = TestKeyTy(value: 20, hashValue: 0)
-  var k3 = TestKeyTy(value: 30, hashValue: 0)
+  let k1 = RawTestKeyTy(value: 10, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 20, hashValue: 0)
+  let k3 = RawTestKeyTy(value: 30, hashValue: 0)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 DictionaryTestSuite.test("deleteChainNoCollision") {
-  var k1 = TestKeyTy(value: 10, hashValue: 0)
-  var k2 = TestKeyTy(value: 20, hashValue: 1)
-  var k3 = TestKeyTy(value: 30, hashValue: 2)
+  let k1 = RawTestKeyTy(value: 10, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 20, hashValue: 1)
+  let k3 = RawTestKeyTy(value: 30, hashValue: 2)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 DictionaryTestSuite.test("deleteChainCollision2") {
-  var k1_0 = TestKeyTy(value: 10, hashValue: 0)
-  var k2_0 = TestKeyTy(value: 20, hashValue: 0)
-  var k3_2 = TestKeyTy(value: 30, hashValue: 2)
-  var k4_0 = TestKeyTy(value: 40, hashValue: 0)
-  var k5_2 = TestKeyTy(value: 50, hashValue: 2)
-  var k6_0 = TestKeyTy(value: 60, hashValue: 0)
+  let k1_0 = RawTestKeyTy(value: 10, hashValue: 0)
+  let k2_0 = RawTestKeyTy(value: 20, hashValue: 0)
+  let k3_2 = RawTestKeyTy(value: 30, hashValue: 2)
+  let k4_0 = RawTestKeyTy(value: 40, hashValue: 0)
+  let k5_2 = RawTestKeyTy(value: 50, hashValue: 2)
+  let k6_0 = RawTestKeyTy(value: 60, hashValue: 0)
 
-  var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
+  var d = Dictionary<RawTestKeyTy, TestValueTy>(minimumCapacity: 10)
 
   d[k1_0] = TestValueTy(1010) // in bucket 0
   d[k2_0] = TestValueTy(1020) // in bucket 1
@@ -1476,67 +1801,45 @@ DictionaryTestSuite.test("deleteChainCollision2") {
   assert(d[k6_0]!.value == 1060)
 }
 
-func uniformRandom(_ max: Int) -> Int {
-#if os(Linux)
-  // SR-685: Can't use arc4random on Linux
-  return Int(random() % (max + 1))
-#else
-  return Int(arc4random_uniform(UInt32(max)))
-#endif
-}
+DictionaryTestSuite.test("deleteChainCollisionRandomized") {
+  let seed = UInt64.random(in: .min ... .max)
+  var generator = LinearCongruentialGenerator(seed: seed)
+  print("using LinearCongruentialGenerator(seed: \(seed))")
 
-func pickRandom<T>(_ a: [T]) -> T {
-  return a[uniformRandom(a.count)]
-}
-
-func product<C1 : Collection, C2 : Collection>(
-  _ c1: C1, _ c2: C2
-) -> [(C1.Iterator.Element, C2.Iterator.Element)] {
-  var result: [(C1.Iterator.Element, C2.Iterator.Element)] = []
-  for e1 in c1 {
-    for e2 in c2 {
-      result.append((e1, e2))
-    }
-  }
-  return result
-}
-
-DictionaryTestSuite.test("deleteChainCollisionRandomized")
-  .forEach(in: product(1...8, 0...5)) {
-  (collisionChains, chainOverlap) in
-
-  func check(_ d: Dictionary<TestKeyTy, TestValueTy>) {
-    var keys = Array(d.keys)
+  func check(_ d: Dictionary<RawTestKeyTy, TestValueTy>) {
+    let keys = Array(d.keys)
     for i in 0..<keys.count {
       for j in 0..<i {
-        assert(keys[i] != keys[j])
+        expectNotEqual(keys[i], keys[j])
       }
     }
 
     for k in keys {
-      assert(d[k] != nil)
+      expectNotNil(d[k])
     }
   }
 
+  let collisionChains = Int.random(in: 1...8, using: &generator)
+  let chainOverlap = Int.random(in: 0...5, using: &generator)
   let chainLength = 7
 
-  var knownKeys: [TestKeyTy] = []
-  func getKey(_ value: Int) -> TestKeyTy {
+  var knownKeys: [RawTestKeyTy] = []
+  func getKey(_ value: Int) -> RawTestKeyTy {
     for k in knownKeys {
       if k.value == value {
         return k
       }
     }
-    let hashValue = uniformRandom(chainLength - chainOverlap) * collisionChains
-    let k = TestKeyTy(value: value, hashValue: hashValue)
+    let hashValue = Int.random(in: 0 ..< (chainLength - chainOverlap), using: &generator) * collisionChains
+    let k = RawTestKeyTy(value: value, hashValue: hashValue)
     knownKeys += [k]
     return k
   }
 
-  var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 30)
-  for i in 1..<300 {
-    let key = getKey(uniformRandom(collisionChains * chainLength))
-    if uniformRandom(chainLength * 2) == 0 {
+  var d = Dictionary<RawTestKeyTy, TestValueTy>(minimumCapacity: 30)
+  for _ in 1..<300 {
+    let key = getKey(Int.random(in: 0 ..< (collisionChains * chainLength), using: &generator))
+    if Int.random(in: 0 ..< (chainLength * 2), using: &generator) == 0 {
       d[key] = nil
     } else {
       d[key] = TestValueTy(key.value * 10)
@@ -1609,13 +1912,13 @@ DictionaryTestSuite.test("init(uniqueKeysWithValues:)") {
   }
   do {
     expectCrashLater()
-    var d = Dictionary(uniqueKeysWithValues: [(10, 1010), (20, 1020), (10, 2010)])
+    _ = Dictionary(uniqueKeysWithValues: [(10, 1010), (20, 1020), (10, 2010)])
   }
 }
 
 DictionaryTestSuite.test("init(_:uniquingKeysWith:)") {
   do {
-    var d = Dictionary(
+    let d = Dictionary(
       [(10, 1010), (20, 1020), (30, 1030), (10, 2010)], uniquingKeysWith: min)
     expectEqual(d.count, 3)
     expectEqual(d[10]!, 1010)
@@ -1624,7 +1927,7 @@ DictionaryTestSuite.test("init(_:uniquingKeysWith:)") {
     expectNil(d[1111])
   }
   do {
-    var d = Dictionary(
+    let d = Dictionary(
       [(10, 1010), (20, 1020), (30, 1030), (10, 2010)] as [(Int, Int)],
       uniquingKeysWith: +)
     expectEqual(d.count, 3)
@@ -1634,7 +1937,7 @@ DictionaryTestSuite.test("init(_:uniquingKeysWith:)") {
     expectNil(d[1111])
   }
   do {
-    var d = Dictionary([(10, 1010), (20, 1020), (30, 1030), (10, 2010)]) {
+    let d = Dictionary([(10, 1010), (20, 1020), (30, 1030), (10, 2010)]) {
       (a, b) in Int("\(a)\(b)")!
     }
     expectEqual(d.count, 3)
@@ -1644,13 +1947,13 @@ DictionaryTestSuite.test("init(_:uniquingKeysWith:)") {
     expectNil(d[1111])
   }
   do {
-    var d = Dictionary([(10, 1010), (10, 2010), (10, 3010), (10, 4010)]) { $1 }
+    let d = Dictionary([(10, 1010), (10, 2010), (10, 3010), (10, 4010)]) { $1 }
     expectEqual(d.count, 1)
     expectEqual(d[10]!, 4010)
     expectNil(d[1111])
   }
   do {
-    var d = Dictionary(EmptyCollection<(Int, Int)>(), uniquingKeysWith: min)
+    let d = Dictionary(EmptyCollection<(Int, Int)>(), uniquingKeysWith: min)
     expectEqual(d.count, 0)
     expectNil(d[1111])
   }
@@ -1658,11 +1961,11 @@ DictionaryTestSuite.test("init(_:uniquingKeysWith:)") {
   struct TE: Error {}
   do {
     // No duplicate keys, so no error thrown.
-    var d1 = try Dictionary([(10, 1), (20, 2), (30, 3)]) { _ in throw TE() }
+    let d1 = try Dictionary([(10, 1), (20, 2), (30, 3)]) { (_,_) in throw TE() }
     expectEqual(d1.count, 3)
     // Duplicate keys, should throw error.
-    var d2 = try Dictionary([(10, 1), (10, 2)]) { _ in throw TE() }
-    assertionFailure()
+    _ = try Dictionary([(10, 1), (10, 2)]) { (_,_) in throw TE() }
+    _ = assertionFailure()
   } catch {
     assert(error is TE)
   }
@@ -1691,23 +1994,46 @@ DictionaryTestSuite.test("mapValues(_:)") {
   expectEqual(d1.count, d2.count)
   expectEqual(d1.keys.first, d2.keys.first)
 
-  for (key, value) in d1 {
+  for (key, _) in d1 {
     expectEqual(String(d1[key]!), d2[key]!)
   }
 
   do {
-    var d3: [MinimalHashableValue : Int] = Dictionary(
+    let d3: [MinimalHashableValue : Int] = Dictionary(
       uniqueKeysWithValues: d1.lazy.map { (MinimalHashableValue($0), $1) })
     expectEqual(d3.count, 3)
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
 
     // Calling mapValues shouldn't ever recalculate any hashes.
     let d4 = d3.mapValues(String.init)
     expectEqual(d4.count, d3.count)
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
+}
+
+DictionaryTestSuite.test("capacity/init(minimumCapacity:)") {
+  let d0 = Dictionary<String, Int>(minimumCapacity: 0)
+  expectGE(d0.capacity, 0)
+
+  let d1 = Dictionary<String, Int>(minimumCapacity: 1)
+  expectGE(d1.capacity, 1)
+
+  let d3 = Dictionary<String, Int>(minimumCapacity: 3)
+  expectGE(d3.capacity, 3)
+
+  let d4 = Dictionary<String, Int>(minimumCapacity: 4)
+  expectGE(d4.capacity, 4)
+
+  let d10 = Dictionary<String, Int>(minimumCapacity: 10)
+  expectGE(d10.capacity, 10)
+
+  let d100 = Dictionary<String, Int>(minimumCapacity: 100)
+  expectGE(d100.capacity, 100)
+
+  let d1024 = Dictionary<String, Int>(minimumCapacity: 1024)
+  expectGE(d1024.capacity, 1024)
 }
 
 DictionaryTestSuite.test("capacity/reserveCapacity(_:)") {
@@ -1726,7 +2052,7 @@ DictionaryTestSuite.test("capacity/reserveCapacity(_:)") {
 
   // Fill up to the limit, no reallocation.
   d1.merge(stride(from: 50, through: 240, by: 10).lazy.map { ($0, 1000 + $0) },
-    uniquingKeysWith: { _ in fatalError() })
+    uniquingKeysWith: { (_,_) in fatalError() })
   expectEqual(24, d1.count)
   expectEqual(24, d1.capacity)
   d1[250] = 1250
@@ -1943,13 +2269,12 @@ class CustomImmutableNSDictionary : NSDictionary {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
-  var (d, nsd) = getBridgedVerbatimDictionaryAndNSMutableDictionary()
-  var identity1 = d._rawIdentifier()
+  let (d, nsd) = getBridgedVerbatimDictionaryAndNSMutableDictionary()
   assert(isCocoaDictionary(d))
 
   // Find an existing key.
   do {
-    var kv = d[d.index(forKey: TestObjCKeyTy(10))!]
+    let kv = d[d.index(forKey: TestObjCKeyTy(10))!]
     assert(kv.0 == TestObjCKeyTy(10))
     assert((kv.1 as! TestObjCValueTy).value == 1010)
   }
@@ -1961,20 +2286,19 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
 
   // Find an existing key, again.
   do {
-    var kv = d[d.index(forKey: TestObjCKeyTy(10))!]
+    let kv = d[d.index(forKey: TestObjCKeyTy(10))!]
     assert(kv.0 == TestObjCKeyTy(10))
     assert((kv.1 as! TestObjCValueTy).value == 1010)
   }
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
-  var (d, nsd) = getBridgedNonverbatimDictionaryAndNSMutableDictionary()
-  var identity1 = d._rawIdentifier()
+  let (d, nsd) = getBridgedNonverbatimDictionaryAndNSMutableDictionary()
   assert(isNativeDictionary(d))
 
   // Find an existing key.
   do {
-    var kv = d[d.index(forKey: TestBridgedKeyTy(10))!]
+    let kv = d[d.index(forKey: TestBridgedKeyTy(10))!]
     assert(kv.0 == TestBridgedKeyTy(10))
     assert(kv.1.value == 1010)
   }
@@ -1986,7 +2310,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
 
   // Find an existing key, again.
   do {
-    var kv = d[d.index(forKey: TestBridgedKeyTy(10))!]
+    let kv = d[d.index(forKey: TestBridgedKeyTy(10))!]
     assert(kv.0 == TestBridgedKeyTy(10))
     assert(kv.1.value == 1010)
   }
@@ -1994,14 +2318,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
-  var nsd: NSDictionary = autoreleasepool {
+  let nsd: NSDictionary =
     NSDictionary(dictionary:
       getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
-  }
 
-  var d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
+  let d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
 
-  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
+  let bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
 
   expectEqual(
     unsafeBitCast(nsd, to: Int.self),
@@ -2013,15 +2336,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
-  var nsd: NSDictionary = autoreleasepool {
+  let nsd: NSDictionary =
     NSDictionary(dictionary:
       getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
-  }
 
-  var d: [TestBridgedKeyTy : TestBridgedValueTy] =
+  let d: [TestBridgedKeyTy : TestBridgedValueTy] =
     convertNSDictionaryToDictionary(nsd)
 
-  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
+  let bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
 
   expectNotEqual(
     unsafeBitCast(nsd, to: Int.self),
@@ -2034,19 +2356,19 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained") {
-  var nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
+  let nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
 
   CustomImmutableNSDictionary.timesCopyWithZoneWasCalled = 0
   CustomImmutableNSDictionary.timesObjectForKeyWasCalled = 0
   CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled = 0
   CustomImmutableNSDictionary.timesCountWasCalled = 0
-  var d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
+  let d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
   expectEqual(1, CustomImmutableNSDictionary.timesCopyWithZoneWasCalled)
   expectEqual(0, CustomImmutableNSDictionary.timesObjectForKeyWasCalled)
   expectEqual(0, CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled)
   expectEqual(0, CustomImmutableNSDictionary.timesCountWasCalled)
 
-  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
+  let bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
   expectEqual(
     unsafeBitCast(nsd, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
@@ -2057,14 +2379,17 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopied") {
-  var nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
+  //some bridged NSDictionary operations on non-standard NSDictionary subclasses
+  //autorelease keys and values. Make sure the leak checker isn't confused
+  autoreleasepool {
+  let nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
 
   CustomImmutableNSDictionary.timesCopyWithZoneWasCalled = 0
   CustomImmutableNSDictionary.timesObjectForKeyWasCalled = 0
   CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled = 0
   CustomImmutableNSDictionary.timesCountWasCalled = 0
   TestBridgedValueTy.bridgeOperations = 0
-  var d: [TestBridgedKeyTy : TestBridgedValueTy] =
+  let d: [TestBridgedKeyTy : TestBridgedValueTy] =
     convertNSDictionaryToDictionary(nsd)
   expectEqual(0, CustomImmutableNSDictionary.timesCopyWithZoneWasCalled)
   expectEqual(3, CustomImmutableNSDictionary.timesObjectForKeyWasCalled)
@@ -2072,7 +2397,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopie
   expectNotEqual(0, CustomImmutableNSDictionary.timesCountWasCalled)
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
 
-  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
+  let bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
   expectNotEqual(
     unsafeBitCast(nsd, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
@@ -2080,12 +2405,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopie
   _fixLifetime(nsd)
   _fixLifetime(d)
   _fixLifetime(bridgedBack)
+  }
 }
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.IndexForKey") {
-  var d = getBridgedVerbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedVerbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
   // Find an existing key.
@@ -2109,8 +2435,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.IndexForKey") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForKey") {
-  var d = getBridgedNonverbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedNonverbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
   // Find an existing key.
@@ -2134,12 +2460,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForKey") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
-  var d = getBridgedVerbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedVerbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
-  var startIndex = d.startIndex
-  var endIndex = d.endIndex
+  let startIndex = d.startIndex
+  let endIndex = d.endIndex
   assert(startIndex != endIndex)
   assert(startIndex < endIndex)
   assert(startIndex <= endIndex)
@@ -2149,7 +2475,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
 
   var pairs = Array<(Int, Int)>()
   for i in d.indices {
-    var (key, value) = d[i]
+    let (key, value) = d[i]
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs += [kv]
   }
@@ -2162,12 +2488,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
-  var d = getBridgedNonverbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedNonverbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
-  var startIndex = d.startIndex
-  var endIndex = d.endIndex
+  let startIndex = d.startIndex
+  let endIndex = d.endIndex
   assert(startIndex != endIndex)
   assert(startIndex < endIndex)
   assert(startIndex <= endIndex)
@@ -2177,7 +2503,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
 
   var pairs = Array<(Int, Int)>()
   for i in d.indices {
-    var (key, value) = d[i]
+    let (key, value) = d[i]
     let kv = (key.value, value.value)
     pairs += [kv]
   }
@@ -2190,12 +2516,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
-  var d = getBridgedVerbatimDictionary([:])
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedVerbatimDictionary([:])
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
-  var startIndex = d.startIndex
-  var endIndex = d.endIndex
+  let startIndex = d.startIndex
+  let endIndex = d.endIndex
   assert(startIndex == endIndex)
   assert(!(startIndex < endIndex))
   assert(startIndex <= endIndex)
@@ -2209,12 +2535,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") {
-  var d = getBridgedNonverbatimDictionary([:])
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedNonverbatimDictionary([:])
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
-  var startIndex = d.startIndex
-  var endIndex = d.endIndex
+  let startIndex = d.startIndex
+  let endIndex = d.endIndex
   assert(startIndex == endIndex)
   assert(!(startIndex < endIndex))
   assert(startIndex <= endIndex)
@@ -2229,7 +2555,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty")
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
   var d = getBridgedVerbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
   // Read existing key-value pairs.
@@ -2246,7 +2572,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
 
   // Insert a new key-value pair.
   d[TestObjCKeyTy(40)] = TestObjCValueTy(2040)
-  var identity2 = d._rawIdentifier()
+  let identity2 = d._rawIdentifier()
   assert(identity1 != identity2)
   assert(isNativeDictionary(d))
   assert(d.count == 4)
@@ -2284,7 +2610,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
   var d = getBridgedNonverbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
   // Read existing key-value pairs.
@@ -2301,8 +2627,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
 
   // Insert a new key-value pair.
   d[TestBridgedKeyTy(40)] = TestBridgedValueTy(2040)
-  var identity2 = d._rawIdentifier()
-  assert(identity1 != identity2)
+
+  let identity2 = d._rawIdentifier()
+  // Storage identity may or may not change depending on allocation behavior.
+  // (d is eagerly bridged to a regular uniquely referenced native Dictionary.)
+  //assert(identity1 != identity2)
+
   assert(isNativeDictionary(d))
   assert(d.count == 4)
 
@@ -2341,13 +2671,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
   // Insert a new key-value pair.
   do {
     var d = getBridgedVerbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
 
-    var oldValue: AnyObject? =
+    let oldValue: AnyObject? =
         d.updateValue(TestObjCValueTy(2040), forKey: TestObjCKeyTy(40))
     assert(oldValue == nil)
-    var identity2 = d._rawIdentifier()
+    let identity2 = d._rawIdentifier()
     assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 4)
@@ -2361,14 +2691,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
   // Overwrite a value in existing binding.
   do {
     var d = getBridgedVerbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
 
-    var oldValue: AnyObject? =
+    let oldValue: AnyObject? =
         d.updateValue(TestObjCValueTy(2010), forKey: TestObjCKeyTy(10))
     assert((oldValue as! TestObjCValueTy).value == 1010)
 
-    var identity2 = d._rawIdentifier()
+    let identity2 = d._rawIdentifier()
     assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 3)
@@ -2383,14 +2713,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
   // Insert a new key-value pair.
   do {
     var d = getBridgedNonverbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    // let identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
 
-    var oldValue =
+    let oldValue =
         d.updateValue(TestBridgedValueTy(2040), forKey: TestBridgedKeyTy(40))
     assert(oldValue == nil)
-    var identity2 = d._rawIdentifier()
-    assert(identity1 != identity2)
+    // let identity2 = d._rawIdentifier()
+    // Storage identity may or may not change depending on allocation behavior.
+    // (d is eagerly bridged to a regular uniquely referenced native Dictionary.)
+    //assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 4)
 
@@ -2403,14 +2735,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
   // Overwrite a value in existing binding.
   do {
     var d = getBridgedNonverbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
 
-    var oldValue =
+    let oldValue =
         d.updateValue(TestBridgedValueTy(2010), forKey: TestBridgedKeyTy(10))!
     assert(oldValue.value == 1010)
 
-    var identity2 = d._rawIdentifier()
+    let identity2 = d._rawIdentifier()
     assert(identity1 == identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 3)
@@ -2424,7 +2756,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   var d = getBridgedVerbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
   let foundIndex1 = d.index(forKey: TestObjCKeyTy(10))!
@@ -2442,11 +2774,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   var d = getBridgedNonverbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
   let foundIndex1 = d.index(forKey: TestBridgedKeyTy(10))!
@@ -2467,7 +2797,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
   do {
     var d = getBridgedVerbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
 
     var deleted: AnyObject? = d.removeValue(forKey: TestObjCKeyTy(0))
@@ -2477,7 +2807,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
 
     deleted = d.removeValue(forKey: TestObjCKeyTy(10))
     assert((deleted as! TestObjCValueTy).value == 1010)
-    var identity2 = d._rawIdentifier()
+    let identity2 = d._rawIdentifier()
     assert(identity1 != identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 2)
@@ -2490,7 +2820,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
 
   do {
     var d1 = getBridgedVerbatimDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(isCocoaDictionary(d1))
@@ -2505,7 +2835,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
 
     deleted = d2.removeValue(forKey: TestObjCKeyTy(10))
     assert((deleted as! TestObjCValueTy).value == 1010)
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 != identity2)
     assert(isCocoaDictionary(d1))
     assert(isNativeDictionary(d2))
@@ -2524,12 +2854,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d = getBridgedNonverbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
 
     var deleted = d.removeValue(forKey: TestBridgedKeyTy(0))
@@ -2539,7 +2867,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
 
     deleted = d.removeValue(forKey: TestBridgedKeyTy(10))
     assert(deleted!.value == 1010)
-    var identity2 = d._rawIdentifier()
+    let identity2 = d._rawIdentifier()
     assert(identity1 == identity2)
     assert(isNativeDictionary(d))
     assert(d.count == 2)
@@ -2552,7 +2880,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
 
   do {
     var d1 = getBridgedNonverbatimDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
 
     var d2 = d1
     assert(isNativeDictionary(d1))
@@ -2567,7 +2895,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
 
     deleted = d2.removeValue(forKey: TestBridgedKeyTy(10))
     assert(deleted!.value == 1010)
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 != identity2)
     assert(isNativeDictionary(d1))
     assert(isNativeDictionary(d2))
@@ -2589,18 +2917,20 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d = getBridgedVerbatimDictionary([:])
-    var identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
   do {
     var d = getBridgedVerbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
@@ -2608,14 +2938,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     d.removeAll()
     assert(identity1 != d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
 
   do {
     var d = getBridgedVerbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
@@ -2623,14 +2953,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 != d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity >= originalCapacity)
+    assert(d.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
 
   do {
     var d1 = getBridgedVerbatimDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
     assert(isCocoaDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
@@ -2638,19 +2968,19 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     var d2 = d1
     d2.removeAll()
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
-    assert(d2._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d2.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
 
   do {
     var d1 = getBridgedVerbatimDictionary()
-    var identity1 = d1._rawIdentifier()
+    let identity1 = d1._rawIdentifier()
     assert(isCocoaDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
@@ -2658,32 +2988,36 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 
     var d2 = d1
     d2.removeAll(keepingCapacity: true)
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
-    assert(d2._variantBuffer.asNative.capacity >= originalCapacity)
+    assert(d2.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  do {
+  if #available(macOS 15.0, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
+    // Identity of empty dictionaries changed in
+    // https://github.com/apple/swift/pull/22527
     var d = getBridgedNonverbatimDictionary([:])
-    var identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
   do {
     var d = getBridgedNonverbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
@@ -2691,14 +3025,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     d.removeAll()
     assert(identity1 != d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
 
   do {
     var d = getBridgedNonverbatimDictionary()
-    var identity1 = d._rawIdentifier()
+    let identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
@@ -2706,14 +3040,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity >= originalCapacity)
+    assert(d.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
 
   do {
-    var d1 = getBridgedNonverbatimDictionary()
-    var identity1 = d1._rawIdentifier()
+    let d1 = getBridgedNonverbatimDictionary()
+    let identity1 = d1._rawIdentifier()
     assert(isNativeDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
@@ -2721,19 +3055,19 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     var d2 = d1
     d2.removeAll()
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d2.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
 
   do {
-    var d1 = getBridgedNonverbatimDictionary()
-    var identity1 = d1._rawIdentifier()
+    let d1 = getBridgedNonverbatimDictionary()
+    let identity1 = d1._rawIdentifier()
     assert(isNativeDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
@@ -2741,21 +3075,20 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 
     var d2 = d1
     d2.removeAll(keepingCapacity: true)
-    var identity2 = d2._rawIdentifier()
+    let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2._variantBuffer.asNative.capacity >= originalCapacity)
+    assert(d2.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
 }
 
-
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Count") {
-  var d = getBridgedVerbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedVerbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
   assert(d.count == 3)
@@ -2763,8 +3096,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Count") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
-  var d = getBridgedNonverbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedNonverbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
   assert(d.count == 3)
@@ -2773,8 +3106,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
-  var d = getBridgedVerbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedVerbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
   var iter = d.makeIterator()
@@ -2784,8 +3117,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   assert(iter.next() == nil)
   assert(iter.next() == nil)
   assert(iter.next() == nil)
@@ -2793,8 +3124,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
-  var d = getBridgedNonverbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedNonverbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
   var iter = d.makeIterator()
@@ -2804,8 +3135,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   assert(iter.next() == nil)
   assert(iter.next() == nil)
   assert(iter.next() == nil)
@@ -2813,8 +3142,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
-  var d = getBridgedVerbatimDictionary([:])
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedVerbatimDictionary([:])
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
   var iter = d.makeIterator()
@@ -2822,8 +3151,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(iter.next() == .none)
   assert(iter.next() == nil)
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   assert(iter.next() == nil)
   assert(iter.next() == nil)
   assert(iter.next() == nil)
@@ -2831,8 +3158,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
-  var d = getBridgedNonverbatimDictionary([:])
-  var identity1 = d._rawIdentifier()
+  let d = getBridgedNonverbatimDictionary([:])
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
   var iter = d.makeIterator()
@@ -2840,8 +3167,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(iter.next() == .none)
   assert(iter.next() == nil)
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   assert(iter.next() == nil)
   assert(iter.next() == nil)
   assert(iter.next() == nil)
@@ -2850,8 +3175,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
-  var d = getHugeBridgedVerbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getHugeBridgedVerbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
   var iter = d.makeIterator()
@@ -2865,8 +3190,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
     expectedPairs += [(i, 1000 + i)]
   }
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   assert(iter.next() == nil)
   assert(iter.next() == nil)
   assert(iter.next() == nil)
@@ -2874,8 +3197,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
-  var d = getHugeBridgedNonverbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getHugeBridgedNonverbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
   var iter = d.makeIterator()
@@ -2889,8 +3212,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
     expectedPairs += [(i, 1000 + i)]
   }
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   assert(iter.next() == nil)
   assert(iter.next() == nil)
   assert(iter.next() == nil)
@@ -2903,8 +3224,8 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
   // Add an autorelease pool because ParallelArrayDictionary autoreleases
   // values in objectForKey.
 
-  var d = getParallelArrayBridgedVerbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getParallelArrayBridgedVerbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isCocoaDictionary(d))
 
   var iter = d.makeIterator()
@@ -2913,10 +3234,8 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
-  var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
+  let expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   assert(iter.next() == nil)
   assert(iter.next() == nil)
   assert(iter.next() == nil)
@@ -2925,12 +3244,12 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_ParallelArray") {
-autoreleasepoolIfUnoptimizedReturnAutoreleased {
-  // Add an autorelease pool because ParallelArrayDictionary autoreleases
-  // values in objectForKey.
+  //some bridged NSDictionary operations on non-standard NSDictionary subclasses
+  //autorelease keys and values. Make sure the leak checker isn't confused
+autoreleasepool {
 
-  var d = getParallelArrayBridgedNonverbatimDictionary()
-  var identity1 = d._rawIdentifier()
+  let d = getParallelArrayBridgedNonverbatimDictionary()
+  let identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
 
   var iter = d.makeIterator()
@@ -2939,10 +3258,8 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
     let kv = (key.value, value.value)
     pairs.append(kv)
   }
-  var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
+  let expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the IteratorProtocol protocol, but
-  // it is a nice QoI.
   assert(iter.next() == nil)
   assert(iter.next() == nil)
   assert(iter.next() == nil)
@@ -2952,8 +3269,8 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
-  var d1 = getBridgedVerbatimEquatableDictionary([:])
-  var identity1 = d1._rawIdentifier()
+  let d1 = getBridgedVerbatimEquatableDictionary([:])
+  let identity1 = d1._rawIdentifier()
   assert(isCocoaDictionary(d1))
 
   var d2 = getBridgedVerbatimEquatableDictionary([:])
@@ -2978,14 +3295,20 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
-  var d1 = getBridgedNonverbatimEquatableDictionary([:])
-  var identity1 = d1._rawIdentifier()
+  guard #available(macOS 15.0, iOS 13.0, watchOS 6.0, tvOS 13.0, *) else {
+    // Identity of empty dictionaries changed in
+    // https://github.com/apple/swift/pull/22527
+    return
+  }
+
+  let d1 = getBridgedNonverbatimEquatableDictionary([:])
+  let identity1 = d1._rawIdentifier()
   assert(isNativeDictionary(d1))
 
   var d2 = getBridgedNonverbatimEquatableDictionary([:])
-  var identity2 = d2._rawIdentifier()
+  let identity2 = d2._rawIdentifier()
   assert(isNativeDictionary(d2))
-  assert(identity1 != identity2)
+  assert(identity1 == identity2)
 
   assert(d1 == d2)
   assert(identity1 == d1._rawIdentifier())
@@ -2993,13 +3316,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 
   d2[TestBridgedKeyTy(10)] = TestBridgedEquatableValueTy(2010)
   assert(isNativeDictionary(d2))
-  assert(identity2 == d2._rawIdentifier())
+  assert(identity2 != d2._rawIdentifier())
 
   assert(d1 != d2)
   assert(identity1 == d1._rawIdentifier())
-  assert(identity2 == d2._rawIdentifier())
+  assert(identity2 != d2._rawIdentifier())
 }
-
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   func helper(_ nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {
@@ -3091,7 +3413,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
-  var nsa = NSMutableArray()
+  let nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
         getAsNSDictionary([10: 1010 + i, 20: 1020 + i, 30: 1030 + i]))
@@ -3099,20 +3421,20 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
 
   var a = nsa as [AnyObject] as! [Dictionary<NSObject, AnyObject>]
   for i in 0..<3 {
-    var d = a[i]
+    let d = a[i]
     var iter = d.makeIterator()
     var pairs = Array<(Int, Int)>()
     while let (key, value) = iter.next() {
       let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
       pairs.append(kv)
     }
-    var expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
+    let expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
     assert(equalsUnordered(pairs, expectedPairs))
   }
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
-  var nsa = NSMutableArray()
+  let nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
         getAsNSDictionary([10: 1010 + i, 20: 1020 + i, 30: 1030 + i]))
@@ -3120,18 +3442,197 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
 
   var a = nsa as [AnyObject] as! [Dictionary<TestBridgedKeyTy, TestBridgedValueTy>]
   for i in 0..<3 {
-    var d = a[i]
+    let d = a[i]
     var iter = d.makeIterator()
     var pairs = Array<(Int, Int)>()
     while let (key, value) = iter.next() {
       let kv = (key.value, value.value)
       pairs.append(kv)
     }
-    var expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
+    let expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
     assert(equalsUnordered(pairs, expectedPairs))
   }
 }
 
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.StringEqualityMismatch") {
+  // NSString's isEqual(_:) implementation is stricter than Swift's String, so
+  // Dictionary values bridged over from Objective-C may have duplicate keys.
+  // rdar://problem/35995647
+  let cafe1 = "Cafe\u{301}" as NSString
+  let cafe2 = "Café" as NSString
+
+  let nsd = NSMutableDictionary()
+  nsd.setObject(42, forKey: cafe1)
+  nsd.setObject(23, forKey: cafe2)
+  expectEqual(2, nsd.count)
+  expectTrue((42 as NSNumber).isEqual(nsd.object(forKey: cafe1)))
+  expectTrue((23 as NSNumber).isEqual(nsd.object(forKey: cafe2)))
+
+  let d = convertNSDictionaryToDictionary(nsd) as [String: Int]
+  expectEqual(1, d.count)
+  expectEqual(d["Cafe\u{301}"], d["Café"])
+  let v = d["Café"]
+  expectTrue(v == 42 || v == 23)
+}
+
+DictionaryTestSuite.test("Upcast.StringEqualityMismatch") {
+  // Upcasting from NSString to String keys changes their concept of equality,
+  // resulting in two equal keys, one of which should be discarded by the
+  // downcast. (Along with its associated value.)
+  // rdar://problem/35995647
+  let d: Dictionary<NSString, NSObject> = [
+    "cafe\u{301}": 1 as NSNumber,
+    "café": 2 as NSNumber,
+  ]
+  expectEqual(d.count, 2)
+  let d2 = d as Dictionary<String, NSObject>
+  expectEqual(d2.count, 1)
+}
+
+
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.OptionalDowncastFailure") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectNotNil(nsd as? [NSString: NSNumber])
+  expectNotNil(nsd as? [NSString: NSObject])
+  expectNotNil(nsd as? [NSObject: NSNumber])
+  expectNil(nsd as? [NSNumber: NSObject])
+  expectNil(nsd as? [NSObject: NSString])
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Verbatim.ForcedDowncastFailure.Keys") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  let bridged = nsd as! [NSNumber: NSObject]
+  expectCrashLater()
+  // The forced downcast succeeds unconditionally; the cast is instead verified
+  // when we access individual elements.
+  _ = bridged.first
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Verbatim.ForcedDowncastFailure.Values") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+
+  let bridged = nsd as! [NSObject: NSString]
+  expectCrashLater()
+  // The forced downcast succeeds unconditionally; the cast is instead verified
+  // when we access individual elements.
+  _ = bridged.first
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Verbatim.ForcedDowncastFailure.Both") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  let bridged = nsd as! [NSNumber: NSString]
+  expectCrashLater()
+  // The forced downcast succeeds unconditionally; the cast is instead verified
+  // when we access individual elements.
+  _ = bridged.first
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Verbatim.ForcedDowncastFailure.Partial")
+  .code {
+  let nsd = NSMutableDictionary(
+    objects: (0..<10).map { "\($0)" as NSString },
+    forKeys: (0..<10).map { $0 as NSNumber })
+  nsd.setObject("cuckoo" as NSString, forKey: "cuckoo" as NSString)
+  let bridged = nsd as! [NSNumber: NSString]
+  // The forced downcast succeeds unconditionally; the cast is instead verified
+  // when we access individual elements.
+  for i in 0 ..< 10 {
+    expectEqual("\(i)" as NSString, bridged[i as NSNumber])
+  }
+  // The item with the unexpected key is only accessible when we iterate over
+  // the elements. There should be a trap when we get to it.
+  expectCrashLater()
+  for (key, value) in bridged {
+    _ = key
+    _ = value
+  }
+}
+
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DowncastFailure.LeakTest") {
+  let nsd = NSMutableDictionary(
+    objects: (0..<100).map { TestObjCEquatableValueTy($0) },
+    forKeys: (0..<100).map { TestObjCKeyTy($0) })
+  expectNotNil(nsd as? [TestObjCKeyTy: TestObjCEquatableValueTy])
+  expectNotNil(nsd as? [TestObjCKeyTy: NSObject])
+  expectNotNil(nsd as? [NSObject: TestObjCEquatableValueTy])
+
+  // Inserting a single key-value pair of a different type should make all these
+  // downcasts fail.
+  nsd.setObject("cuckoo" as NSString, forKey: "cuckoo" as NSString)
+  expectNil(nsd as? [TestObjCKeyTy: TestObjCEquatableValueTy])
+  expectNil(nsd as? [TestObjCKeyTy: NSObject])
+  expectNil(nsd as? [NSObject: TestObjCEquatableValueTy])
+  // No crash test here -- we're relying on the leak tests in tearDown.
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.OptionalDowncastFailure") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectNotNil(nsd as? [String: Int])
+  expectNotNil(nsd as? [String: NSObject])
+  expectNotNil(nsd as? [NSObject: Int])
+  expectNil(nsd as? [Int: NSObject])
+  expectNil(nsd as? [NSObject: String])
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.ForcedDowncastFailure.Keys") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectCrashLater()
+  _ = nsd as! [Int: NSObject]
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.ForcedDowncastFailure.Values") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectCrashLater()
+  _ = nsd as! [NSObject: String]
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.ForcedDowncastFailure.Both") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectCrashLater()
+  _ = nsd as! [Int: String]
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.DowncastFailure.LeakTest") {
+  let nsd = NSMutableDictionary(
+    objects: (0..<100).map { TestObjCEquatableValueTy($0) },
+    forKeys: (0..<100).map { TestObjCKeyTy($0) })
+  expectNotNil(nsd as? [TestBridgedKeyTy: TestBridgedEquatableValueTy])
+  expectNotNil(nsd as? [TestBridgedKeyTy: NSObject])
+  expectNotNil(nsd as? [NSObject: TestBridgedEquatableValueTy])
+
+  // Inserting a single key-value pair of a different type should make all these
+  // downcasts fail.
+  nsd.setObject("cuckoo" as NSString, forKey: "cuckoo" as NSString)
+  expectNil(nsd as? [TestBridgedKeyTy: TestBridgedEquatableValueTy])
+  expectNil(nsd as? [TestBridgedKeyTy: NSObject])
+  expectNil(nsd as? [NSObject: TestBridgedEquatableValueTy])
+  // No crash test here -- we're relying on the leak tests in tearDown.
+}
 
 //===---
 // Dictionary -> NSDictionary bridging tests.
@@ -3167,7 +3668,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   // for mismatched key types.
   expectNil(d.object(forKey: TestObjCInvalidKeyTy()))
 
-  for i in 0..<3 {
+  for _ in 0..<3 {
     expectEqual(idValue10, unsafeBitCast(
       d.object(forKey: TestObjCKeyTy(10)).map { $0 as AnyObject }, to: UInt.self))
 
@@ -3186,7 +3687,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
 
   var capturedIdentityPairs = Array<(UInt, UInt)>()
 
-  for i in 0..<3 {
+  for _ in 0..<3 {
     let enumerator = d.keyEnumerator()
 
     var dataPairs = Array<(Int, Int)>()
@@ -3306,6 +3807,101 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
     { ($0 as! TestObjCValueTy).value })
 }
 
+/// Check for buffer overruns/underruns in Swift's
+/// `-[NSDictionary getObjects:andKeys:count:]` implementations.
+func checkGetObjectsAndKeys(
+  _ dictionary: NSDictionary,
+  count: Int,
+  file: String = #file,
+  line: UInt = #line) {
+  let canary = NSObject()
+  let storageSize = 2 * max(count, dictionary.count) + 2
+
+  // Create buffers for storing keys and values at +0 refcounts,
+  // then call getObjects:andKeys:count: via a shim in
+  // StdlibUnittestFoundationExtras.
+  typealias UnmanagedPointer = UnsafeMutablePointer<Unmanaged<AnyObject>>
+  let keys = UnmanagedPointer.allocate(capacity: storageSize)
+  keys.initialize(repeating: Unmanaged.passUnretained(canary), count: storageSize)
+  let values = UnmanagedPointer.allocate(capacity: storageSize)
+  values.initialize(repeating: Unmanaged.passUnretained(canary), count: storageSize)
+  keys.withMemoryRebound(to: AnyObject.self, capacity: storageSize) { k in
+    values.withMemoryRebound(to: AnyObject.self, capacity: storageSize) { v in
+      dictionary.available_getObjects(
+        AutoreleasingUnsafeMutablePointer(v),
+        andKeys: AutoreleasingUnsafeMutablePointer(k),
+        count: count)
+    }
+  }
+  // Check results.
+  for i in 0 ..< storageSize {
+    let key = keys[i].takeUnretainedValue()
+    let value = values[i].takeUnretainedValue()
+    if i < min(count, dictionary.count) {
+      expectTrue(
+        key !== canary,
+        """
+        Buffer underrun at offset \(i) with count \(count):
+        keys[\(i)] was left unchanged
+        """,
+        file: file, line: line)
+      expectTrue(
+        value !== canary,
+        """
+        Buffer underrun at offset \(i) with count \(count):
+        values[\(i)] was left unchanged
+        """,
+        file: file, line: line)
+      if key !== canary, value !== canary {
+        autoreleasepoolIfUnoptimizedReturnAutoreleased {
+          // We need an autorelease pool because objectForKey returns
+          // autoreleased values.
+          expectTrue(
+            value === dictionary.object(forKey: key) as AnyObject,
+            """
+            Inconsistency at offset \(i) with count \(count):
+            values[\(i)] does not match value for keys[\(i)]
+            """,
+            file: file, line: line)
+        }
+      }
+    } else {
+      expectTrue(
+        key === canary,
+        """
+        Buffer overrun at offset \(i) with count \(count):
+        keys[\(i)] was overwritten with value \(key)
+        """,
+        file: file, line: line)
+      expectTrue(
+        value === canary,
+        """
+        Buffer overrun at offset \(i) with count \(count):
+        values[\(i)] was overwritten with value \(key)
+        """,
+        file: file, line: line)
+    }
+  }
+  keys.deinitialize(count: storageSize) // noop
+  keys.deallocate()
+  values.deinitialize(count: storageSize) // noop
+  values.deallocate()
+  withExtendedLifetime(canary) {}
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:") {
+  let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  for count in 0 ..< d.count + 2 {
+    checkGetObjectsAndKeys(d, count: count)
+  }
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:/InvalidCount") {
+  expectCrashLater()
+  let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  checkGetObjectsAndKeys(d, count: -1)
+}
+
 //===---
 // Dictionary -> NSDictionary bridging tests.
 //
@@ -3404,6 +4000,19 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
     { ($0 as! TestObjCValueTy).value })
 }
 
+DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:") {
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
+  for count in 0 ..< d.count + 2 {
+    checkGetObjectsAndKeys(d, count: count)
+  }
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:/InvalidCount") {
+  expectCrashLater()
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
+  checkGetObjectsAndKeys(d, count: -1)
+}
+
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
   assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
@@ -3464,7 +4073,6 @@ DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
-
 //===---
 // NSDictionary -> Dictionary -> NSDictionary bridging tests.
 //===---
@@ -3523,7 +4131,6 @@ DictionaryTestSuite.test("DictionaryToNSDictionaryConversion") {
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
-  let nsd: NSDictionary = d as NSDictionary
 
   checkDictionaryFastEnumerationFromSwift(
     [ (10, 1010), (20, 1020), (30, 1030) ],
@@ -3583,7 +4190,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
   d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
   do {
-    var dOO: Dictionary<NSObject, AnyObject> = _dictionaryBridgeToObjectiveC(d)
+    var dOO = d as Dictionary<NSObject, AnyObject>
 
     assert(dOO.count == 3)
     var v: AnyObject? = dOO[TestObjCKeyTy(10)]
@@ -3597,8 +4204,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
   }
 
   do {
-    var dOV: Dictionary<NSObject, TestBridgedValueTy>
-      = _dictionaryBridgeToObjectiveC(d)
+    var dOV = d as Dictionary<NSObject, TestBridgedValueTy>
 
     assert(dOV.count == 3)
     var v = dOV[TestObjCKeyTy(10)]
@@ -3612,8 +4218,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridgedEntryPoint") {
   }
 
   do {
-    var dVO: Dictionary<TestBridgedKeyTy, AnyObject>
-      = _dictionaryBridgeToObjectiveC(d)
+    var dVO = d as Dictionary<TestBridgedKeyTy, AnyObject>
 
     assert(dVO.count == 3)
     var v: AnyObject? = dVO[TestBridgedKeyTy(10)]
@@ -3634,7 +4239,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
   d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
   do {
-    var dOO = d as! Dictionary<NSObject, AnyObject>
+    var dOO = d as Dictionary<NSObject, AnyObject>
 
     assert(dOO.count == 3)
     var v: AnyObject? = dOO[TestObjCKeyTy(10)]
@@ -3648,7 +4253,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
   }
 
   do {
-    var dOV = d as! Dictionary<NSObject, TestBridgedValueTy>
+    var dOV = d as Dictionary<NSObject, TestBridgedValueTy>
 
     assert(dOV.count == 3)
     var v = dOV[TestObjCKeyTy(10)]
@@ -3746,7 +4351,7 @@ DictionaryTestSuite.test("DictionaryDowncastConditionalEntryPoint") {
 
   // Unsuccessful downcast
   d["hello" as NSString] = 17 as NSNumber
-  if let dCC
+  if let _
        = _dictionaryDownCastConditional(d) as Dictionary<TestObjCKeyTy, TestObjCValueTy>? {
     assert(false)
   }
@@ -3775,7 +4380,7 @@ DictionaryTestSuite.test("DictionaryDowncastConditional") {
 
   // Unsuccessful downcast
   d["hello" as NSString] = 17 as NSNumber
-  if let dCC = d as? Dictionary<TestObjCKeyTy, TestObjCValueTy> {
+  if d is Dictionary<TestObjCKeyTy, TestObjCValueTy> {
     assert(false)
   }
 }
@@ -3787,8 +4392,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCEntryPoint") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  let dCV: Dictionary<TestObjCKeyTy, TestBridgedValueTy>
-    = _dictionaryBridgeFromObjectiveC(d)
+  let dCV = d as! Dictionary<TestObjCKeyTy, TestBridgedValueTy>
   do {
     assert(dCV.count == 3)
     var v = dCV[TestObjCKeyTy(10)]
@@ -3802,8 +4406,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCEntryPoint") {
   }
 
   // Successful downcast.
-  let dVC: Dictionary<TestBridgedKeyTy, TestObjCValueTy>
-    = _dictionaryBridgeFromObjectiveC(d)
+  let dVC = d as! Dictionary<TestBridgedKeyTy, TestObjCValueTy>
   do {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
@@ -3817,8 +4420,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCEntryPoint") {
   }
 
   // Successful downcast.
-  let dVV: Dictionary<TestBridgedKeyTy, TestBridgedValueTy>
-        = _dictionaryBridgeFromObjectiveC(d)
+  let dVV = d as! Dictionary<TestBridgedKeyTy, TestBridgedValueTy>
   do {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]
@@ -3888,9 +4490,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  if let dCV
-       = _dictionaryBridgeFromObjectiveCConditional(d) as
-         Dictionary<TestObjCKeyTy, TestBridgedValueTy>? {
+  if let dCV = d as? Dictionary<TestObjCKeyTy, TestBridgedValueTy> {
     assert(dCV.count == 3)
     var v = dCV[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -3905,8 +4505,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   }
 
   // Successful downcast.
-  if let dVC
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestObjCValueTy>? {
+  if let dVC = d as? Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3921,8 +4520,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   }
 
   // Successful downcast.
-  if let dVV
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>? {
+  if let dVV = d as? Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3938,16 +4536,15 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
 
   // Unsuccessful downcasts
   d["hello" as NSString] = 17 as NSNumber
-  if let dCV
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestObjCKeyTy, TestBridgedValueTy>?{
+  if let _ = d as? Dictionary<TestObjCKeyTy, TestBridgedValueTy> {
     assert(false)
   }
-  if let dVC
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestObjCValueTy>?{
+  if let _
+       = d as? Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
     assert(false)
   }
-  if let dVV
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>?{
+  if let _
+       = d as? Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
     assert(false)
   }
 }
@@ -4005,13 +4602,13 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditional") {
 
   // Unsuccessful downcasts
   d["hello" as NSString] = 17 as NSNumber
-  if let dCV = d as? Dictionary<TestObjCKeyTy, TestBridgedValueTy> {
+  if d is Dictionary<TestObjCKeyTy, TestBridgedValueTy> {
     assert(false)
   }
-  if let dVC = d as? Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
+  if d is Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
     assert(false)
   }
-  if let dVV = d as? Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  if d is Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
     assert(false)
   }
 }
@@ -4034,11 +4631,11 @@ var DictionaryDerivedAPIs = TestSuite("DictionaryDerivedAPIs")
 
 DictionaryDerivedAPIs.test("isEmpty") {
   do {
-    var empty = Dictionary<Int, Int>()
+    let empty = Dictionary<Int, Int>()
     expectTrue(empty.isEmpty)
   }
   do {
-    var d = getDerivedAPIsDictionary()
+    let d = getDerivedAPIsDictionary()
     expectFalse(d.isEmpty)
   }
 }
@@ -4102,26 +4699,26 @@ func callGenericIsEmpty<C : Collection>(_ collection: C) -> Bool {
 
 DictionaryDerivedAPIs.test("isEmpty/ImplementationIsCustomized") {
   do {
-    var d = getMockDictionaryWithCustomCount(count: 0)
+    let d = getMockDictionaryWithCustomCount(count: 0)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
     expectTrue(d.isEmpty)
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
   do {
-    var d = getMockDictionaryWithCustomCount(count: 0)
+    let d = getMockDictionaryWithCustomCount(count: 0)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
     expectTrue(callGenericIsEmpty(d))
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
 
   do {
-    var d = getMockDictionaryWithCustomCount(count: 4)
+    let d = getMockDictionaryWithCustomCount(count: 4)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
     expectFalse(d.isEmpty)
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
   do {
-    var d = getMockDictionaryWithCustomCount(count: 4)
+    let d = getMockDictionaryWithCustomCount(count: 4)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
     expectFalse(callGenericIsEmpty(d))
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
@@ -4131,21 +4728,21 @@ DictionaryDerivedAPIs.test("isEmpty/ImplementationIsCustomized") {
 
 DictionaryDerivedAPIs.test("keys") {
   do {
-    var empty = Dictionary<Int, Int>()
-    var keys = Array(empty.keys)
+    let empty = Dictionary<Int, Int>()
+    let keys = Array(empty.keys)
     expectTrue(equalsUnordered(keys, []))
   }
   do {
-    var d = getDerivedAPIsDictionary()
-    var keys = Array(d.keys)
+    let d = getDerivedAPIsDictionary()
+    let keys = Array(d.keys)
     expectTrue(equalsUnordered(keys, [ 10, 20, 30 ]))
   }
 }
 
 DictionaryDerivedAPIs.test("values") {
   do {
-    var empty = Dictionary<Int, Int>()
-    var values = Array(empty.values)
+    let empty = Dictionary<Int, Int>()
+    let values = Array(empty.values)
     expectTrue(equalsUnordered(values, []))
   }
   do {
@@ -4164,28 +4761,28 @@ DictionaryDerivedAPIs.test("values") {
 var ObjCThunks = TestSuite("ObjCThunks")
 
 class ObjCThunksHelper : NSObject {
-  dynamic func acceptArrayBridgedVerbatim(_ array: [TestObjCValueTy]) {
+  @objc dynamic func acceptArrayBridgedVerbatim(_ array: [TestObjCValueTy]) {
     expectEqual(10, array[0].value)
     expectEqual(20, array[1].value)
     expectEqual(30, array[2].value)
   }
 
-  dynamic func acceptArrayBridgedNonverbatim(_ array: [TestBridgedValueTy]) {
+  @objc dynamic func acceptArrayBridgedNonverbatim(_ array: [TestBridgedValueTy]) {
     // Cannot check elements because doing so would bridge them.
     expectEqual(3, array.count)
   }
 
-  dynamic func returnArrayBridgedVerbatim() -> [TestObjCValueTy] {
+  @objc dynamic func returnArrayBridgedVerbatim() -> [TestObjCValueTy] {
     return [ TestObjCValueTy(10), TestObjCValueTy(20),
         TestObjCValueTy(30) ]
   }
 
-  dynamic func returnArrayBridgedNonverbatim() -> [TestBridgedValueTy] {
+  @objc dynamic func returnArrayBridgedNonverbatim() -> [TestBridgedValueTy] {
     return [ TestBridgedValueTy(10), TestBridgedValueTy(20),
         TestBridgedValueTy(30) ]
   }
 
-  dynamic func acceptDictionaryBridgedVerbatim(
+  @objc dynamic func acceptDictionaryBridgedVerbatim(
       _ d: [TestObjCKeyTy : TestObjCValueTy]) {
     expectEqual(3, d.count)
     expectEqual(1010, d[TestObjCKeyTy(10)]!.value)
@@ -4193,13 +4790,13 @@ class ObjCThunksHelper : NSObject {
     expectEqual(1030, d[TestObjCKeyTy(30)]!.value)
   }
 
-  dynamic func acceptDictionaryBridgedNonverbatim(
+  @objc dynamic func acceptDictionaryBridgedNonverbatim(
       _ d: [TestBridgedKeyTy : TestBridgedValueTy]) {
     expectEqual(3, d.count)
     // Cannot check elements because doing so would bridge them.
   }
 
-  dynamic func returnDictionaryBridgedVerbatim() ->
+  @objc dynamic func returnDictionaryBridgedVerbatim() ->
       [TestObjCKeyTy : TestObjCValueTy] {
     return [
         TestObjCKeyTy(10): TestObjCValueTy(1010),
@@ -4208,7 +4805,7 @@ class ObjCThunksHelper : NSObject {
     ]
   }
 
-  dynamic func returnDictionaryBridgedNonverbatim() ->
+  @objc dynamic func returnDictionaryBridgedNonverbatim() ->
       [TestBridgedKeyTy : TestBridgedValueTy] {
     return [
         TestBridgedKeyTy(10): TestBridgedValueTy(1010),
@@ -4219,7 +4816,7 @@ class ObjCThunksHelper : NSObject {
 }
 
 ObjCThunks.test("Array/Accept") {
-  var helper = ObjCThunksHelper()
+  let helper = ObjCThunksHelper()
 
   do {
     helper.acceptArrayBridgedVerbatim(
@@ -4235,7 +4832,7 @@ ObjCThunks.test("Array/Accept") {
 }
 
 ObjCThunks.test("Array/Return") {
-  var helper = ObjCThunksHelper()
+  let helper = ObjCThunksHelper()
 
   do {
     let a = helper.returnArrayBridgedVerbatim()
@@ -4257,7 +4854,7 @@ ObjCThunks.test("Array/Return") {
 }
 
 ObjCThunks.test("Dictionary/Accept") {
-  var helper = ObjCThunksHelper()
+  let helper = ObjCThunksHelper()
 
   do {
     helper.acceptDictionaryBridgedVerbatim(
@@ -4278,7 +4875,7 @@ ObjCThunks.test("Dictionary/Accept") {
 }
 
 ObjCThunks.test("Dictionary/Return") {
-  var helper = ObjCThunksHelper()
+  let helper = ObjCThunksHelper()
 
   do {
     let d = helper.returnDictionaryBridgedVerbatim()
@@ -4312,7 +4909,7 @@ ObjCThunks.test("Dictionary/Return") {
 
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/subscript/store") {
   var dict = getDerivedAPIsDictionary()
-  var iter = dict.makeIterator()
+  let iter = dict.makeIterator()
   dict[10] = 1011
 
   expectEqualsUnordered(
@@ -4322,8 +4919,8 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/subscript/store") {
 
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,1") {
   var dict = getDerivedAPIsDictionary()
-  var iter = dict.makeIterator()
-  expectOptionalEqual(1010, dict.removeValue(forKey: 10))
+  let iter = dict.makeIterator()
+  expectEqual(1010, dict.removeValue(forKey: 10))
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
@@ -4332,10 +4929,10 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,1") {
 
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,all") {
   var dict = getDerivedAPIsDictionary()
-  var iter = dict.makeIterator()
-  expectOptionalEqual(1010, dict.removeValue(forKey: 10))
-  expectOptionalEqual(1020, dict.removeValue(forKey: 20))
-  expectOptionalEqual(1030, dict.removeValue(forKey: 30))
+  let iter = dict.makeIterator()
+  expectEqual(1010, dict.removeValue(forKey: 10))
+  expectEqual(1020, dict.removeValue(forKey: 20))
+  expectEqual(1030, dict.removeValue(forKey: 30))
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
@@ -4345,7 +4942,7 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,all") 
 DictionaryTestSuite.test(
   "mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
   var dict = getDerivedAPIsDictionary()
-  var iter = dict.makeIterator()
+  let iter = dict.makeIterator()
   dict.removeAll(keepingCapacity: false)
 
   expectEqualsUnordered(
@@ -4356,7 +4953,7 @@ DictionaryTestSuite.test(
 DictionaryTestSuite.test(
   "mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
   var dict = getDerivedAPIsDictionary()
-  var iter = dict.makeIterator()
+  let iter = dict.makeIterator()
   dict.removeAll(keepingCapacity: true)
 
   expectEqualsUnordered(
@@ -4377,16 +4974,16 @@ DictionaryTestSuite.test("misc") {
     dict["Swift"] = 3
 
     // Access
-    expectOptionalEqual(1, dict["Hello"])
-    expectOptionalEqual(2, dict["World"])
-    expectOptionalEqual(3, dict["Swift"])
+    expectEqual(1, dict["Hello"])
+    expectEqual(2, dict["World"])
+    expectEqual(3, dict["Swift"])
     expectNil(dict["Universe"])
 
     // Overwriting existing value
     dict["Hello"] = 0
-    expectOptionalEqual(0, dict["Hello"])
-    expectOptionalEqual(2, dict["World"])
-    expectOptionalEqual(3, dict["Swift"])
+    expectEqual(0, dict["Hello"])
+    expectEqual(2, dict["World"])
+    expectEqual(3, dict["Swift"])
     expectNil(dict["Universe"])
   }
 
@@ -4394,9 +4991,9 @@ DictionaryTestSuite.test("misc") {
     // Dictionaries with other types
     var d = [ 1.2: 1, 2.6: 2 ]
     d[3.3] = 3
-    expectOptionalEqual(1, d[1.2])
-    expectOptionalEqual(2, d[2.6])
-    expectOptionalEqual(3, d[3.3])
+    expectEqual(1, d[1.2])
+    expectEqual(2, d[2.6])
+    expectEqual(3, d[3.3])
   }
 
   do {
@@ -4406,11 +5003,11 @@ DictionaryTestSuite.test("misc") {
     d["three"] = 3
     d["four"] = 4
     d["five"] = 5
-    expectOptionalEqual(1, d["one"])
-    expectOptionalEqual(2, d["two"])
-    expectOptionalEqual(3, d["three"])
-    expectOptionalEqual(4, d["four"])
-    expectOptionalEqual(5, d["five"])
+    expectEqual(1, d["one"])
+    expectEqual(2, d["two"])
+    expectEqual(3, d["three"])
+    expectEqual(4, d["four"])
+    expectEqual(5, d["five"])
 
     // Iterate over (key, value) tuples as a silly copy
     var d3 = Dictionary<String,Int>(minimumCapacity: 13)
@@ -4418,17 +5015,17 @@ DictionaryTestSuite.test("misc") {
     for (k, v) in d {
       d3[k] = v
     }
-    expectOptionalEqual(1, d3["one"])
-    expectOptionalEqual(2, d3["two"])
-    expectOptionalEqual(3, d3["three"])
-    expectOptionalEqual(4, d3["four"])
-    expectOptionalEqual(5, d3["five"])
+    expectEqual(1, d3["one"])
+    expectEqual(2, d3["two"])
+    expectEqual(3, d3["three"])
+    expectEqual(4, d3["four"])
+    expectEqual(5, d3["five"])
 
-    expectEqual(3, d.values[d.keys.index(of: "three")!])
-    expectEqual(4, d.values[d.keys.index(of: "four")!])
+    expectEqual(3, d.values[d.keys.firstIndex(of: "three")!])
+    expectEqual(4, d.values[d.keys.firstIndex(of: "four")!])
 
-    expectEqual(3, d3.values[d3.keys.index(of: "three")!])
-    expectEqual(4, d3.values[d3.keys.index(of: "four")!])
+    expectEqual(3, d3.values[d3.keys.firstIndex(of: "three")!])
+    expectEqual(4, d3.values[d3.keys.firstIndex(of: "four")!])
   }
 }
 
@@ -4440,38 +5037,49 @@ DictionaryTestSuite.test("dropsBridgedCache") {
   // This test will only fail in address sanitizer.
   var dict = [0:10]
   do {
-    var bridged: NSDictionary = dict as NSDictionary
+    let bridged: NSDictionary = dict as NSDictionary
     expectEqual(10, bridged[0 as NSNumber] as! Int)
   }
 
   dict[0] = 11
   do {
-    var bridged: NSDictionary = dict as NSDictionary
+    let bridged: NSDictionary = dict as NSDictionary
     expectEqual(11, bridged[0 as NSNumber] as! Int)
   }
 }
 
-DictionaryTestSuite.test("getObjects:andKeys:") {
-  let d = ([1: "one", 2: "two"] as Dictionary<Int, String>) as NSDictionary
-  var keys = UnsafeMutableBufferPointer(
+DictionaryTestSuite.test("getObjects:andKeys:count:") {
+  let native = [1: "one", 2: "two"] as Dictionary<Int, String>
+  let d = native as NSDictionary
+  let keys = UnsafeMutableBufferPointer(
     start: UnsafeMutablePointer<NSNumber>.allocate(capacity: 2), count: 2)
-  var values = UnsafeMutableBufferPointer(
+  let values = UnsafeMutableBufferPointer(
     start: UnsafeMutablePointer<NSString>.allocate(capacity: 2), count: 2)
-  var kp = AutoreleasingUnsafeMutablePointer<AnyObject?>(keys.baseAddress!)
-  var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress!)
-  var null: AutoreleasingUnsafeMutablePointer<AnyObject?>?
+  let kp = AutoreleasingUnsafeMutablePointer<AnyObject?>(keys.baseAddress!)
+  let vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress!)
+  let null: AutoreleasingUnsafeMutablePointer<AnyObject?>? = nil
 
-  d.available_getObjects(null, andKeys: null) // don't segfault
+  let expectedKeys: [NSNumber]
+  let expectedValues: [NSString]
+  if native.first?.key == 1 {
+    expectedKeys = [1, 2]
+    expectedValues = ["one", "two"]
+  } else {
+    expectedKeys = [2, 1]
+    expectedValues = ["two", "one"]
+  }
 
-  d.available_getObjects(null, andKeys: kp)
-  expectEqual([2, 1] as [NSNumber], Array(keys))
+  d.available_getObjects(null, andKeys: null, count: 2) // don't segfault
 
-  d.available_getObjects(vp, andKeys: null)
-  expectEqual(["two", "one"] as [NSString], Array(values))
+  d.available_getObjects(null, andKeys: kp, count: 2)
+  expectEqual(expectedKeys, Array(keys))
 
-  d.available_getObjects(vp, andKeys: kp)
-  expectEqual([2, 1] as [NSNumber], Array(keys))
-  expectEqual(["two", "one"] as [NSString], Array(values))
+  d.available_getObjects(vp, andKeys: null, count: 2)
+  expectEqual(expectedValues, Array(values))
+
+  d.available_getObjects(vp, andKeys: kp, count: 2)
+  expectEqual(expectedKeys, Array(keys))
+  expectEqual(expectedValues, Array(values))
 }
 #endif
 
@@ -4490,11 +5098,14 @@ DictionaryTestSuite.test("popFirst") {
       2020: 2020,
       3030: 3030,
     ]
-    let expected = Array(d.map{($0.0, $0.1)})
+    let expected = [(1010, 1010), (2020, 2020), (3030, 3030)]
     while let element = d.popFirst() {
       popped.append(element)
     }
-    expectEqualSequence(expected, Array(popped)) {
+    // Note that removing an element may reorder remaining items, so we
+    // can't compare ordering here.
+    popped.sort(by: { $0.0 < $1.0 })
+    expectEqualSequence(expected, popped) {
       (lhs: (Int, Int), rhs: (Int, Int)) -> Bool in
       lhs.0 == rhs.0 && lhs.1 == rhs.1
     }
@@ -4520,7 +5131,660 @@ DictionaryTestSuite.test("removeAt") {
   }
 }
 
+DictionaryTestSuite.test("updateValue") {
+  let key1 = TestKeyTy(42)
+  let key2 = TestKeyTy(42)
+  let value1 = TestValueTy(1)
+  let value2 = TestValueTy(2)
+
+  var d: [TestKeyTy: TestValueTy] = [:]
+
+  expectNil(d.updateValue(value1, forKey: key1))
+
+  expectEqual(d.count, 1)
+  let index1 = d.index(forKey: key2)
+  expectNotNil(index1)
+  expectTrue(d[index1!].key === key1)
+  expectTrue(d[index1!].value === value1)
+
+  expectTrue(d.updateValue(value2, forKey: key2) === value1)
+
+  expectEqual(d.count, 1)
+  let index2 = d.index(forKey: key2)
+  expectEqual(index1, index2)
+  // We expect updateValue to keep the original key in place.
+  expectTrue(d[index2!].key === key1) // Not key2
+  expectTrue(d[index2!].value === value2)
+}
+
+DictionaryTestSuite.test("localHashSeeds") {
+  // With global hashing, copying elements in hash order between hash tables
+  // can become quadratic. (See https://bugs.swift.org/browse/SR-3268)
+  //
+  // We defeat this by mixing the local storage capacity into the global hash
+  // seed, thereby breaking the correlation between bucket indices across
+  // hash tables with different sizes.
+  //
+  // Verify this works by copying a small sampling of elements near the
+  // beginning of a large Dictionary into a smaller one. If the elements end up
+  // in the same order in the smaller Dictionary, then that indicates we do not
+  // use size-dependent seeding.
+
+  let count = 100_000
+  // Set a large table size to reduce frequency/length of collision chains.
+  var large = [Int: Int](minimumCapacity: 4 * count)
+  for i in 1 ..< count {
+    large[i] = 2 * i
+  }
+
+  let bunch = count / 100 // 1 percent's worth of elements
+
+  // Copy two bunches of elements into another dictionary that's half the size
+  // of the first. We start after the initial bunch because the hash table may
+  // begin with collided elements wrapped over from the end, and these would be
+  // sorted into irregular slots in the smaller table.
+  let slice = large.prefix(3 * bunch).dropFirst(bunch)
+  var small = [Int: Int](minimumCapacity: large.capacity / 2)
+  expectLT(small.capacity, large.capacity)
+  for (key, value) in slice {
+    small[key] = value
+  }
+
+  // Compare the second halves of the new dictionary and the slice.  Ignore the
+  // first halves; the first few elements may not be in the correct order if we
+  // happened to start copying from the middle of a collision chain.
+  let smallKeys = small.dropFirst(bunch).map { $0.key }
+  let sliceKeys = slice.dropFirst(bunch).map { $0.key }
+  // If this test fails, there is a problem with local hash seeding.
+  expectFalse(smallKeys.elementsEqual(sliceKeys))
+}
+
+DictionaryTestSuite.test("Hashable") {
+  let d1: [Dictionary<Int, String>] = [
+    [1: "meow", 2: "meow", 3: "meow"],
+    [1: "meow", 2: "meow", 3: "mooo"],
+    [1: "meow", 2: "meow", 4: "meow"],
+    [1: "meow", 2: "meow", 4: "mooo"]]
+  checkHashable(d1, equalityOracle: { $0 == $1 })
+
+  let d2: [Dictionary<Int, Dictionary<Int, String>>] = [
+    [1: [2: "meow"]],
+    [2: [1: "meow"]],
+    [2: [2: "meow"]],
+    [1: [1: "meow"]],
+    [2: [2: "mooo"]],
+    [2: [:]],
+    [:]]
+  checkHashable(d2, equalityOracle: { $0 == $1 })
+
+  // Dictionary should hash itself in a way that ensures instances get correctly
+  // delineated even when they are nested in other commutative collections.
+  // These are different Sets, so they should produce different hashes:
+  let remix: [Set<Dictionary<String, Int>>] = [
+    [["Blanche": 1, "Rose": 2], ["Dorothy": 3, "Sophia": 4]],
+    [["Blanche": 1, "Dorothy": 3], ["Rose": 2, "Sophia": 4]],
+    [["Blanche": 1, "Sophia": 4], ["Rose": 2, "Dorothy": 3]]
+  ]
+  checkHashable(remix, equalityOracle: { $0 == $1 })
+
+  // Dictionary ordering is not guaranteed to be consistent across equal
+  // instances. In particular, ordering is highly sensitive to the size of the
+  // allocated storage buffer. Generate a few copies of the same dictionary with
+  // different capacities, and verify that they compare and hash the same.
+  var variants: [Dictionary<String, Int>] = []
+  for i in 4 ..< 12 {
+    var set: Dictionary<String, Int> = [
+      "one": 1,   "two": 2,
+      "three": 3, "four": 4,
+      "five": 5,  "six": 6]
+    set.reserveCapacity(1 << i)
+    variants.append(set)
+  }
+  checkHashable(variants, equalityOracle: { _, _ in true })
+}
+
+DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Native") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+  var expected = 1020
+  for _ in 0 ..< 100 {
+    expected += 1
+    d.values[i] += 1
+    expectEqual(d[i], (key: 20, value: expected))
+  }
+}
+
+#if _runtime(_ObjC)
+DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Bridged") {
+  let objects: [NSNumber] = [1, 2, 3, 4]
+  let keys: [NSString] = ["Blanche", "Rose", "Dorothy", "Sophia"]
+  let ns = NSDictionary(objects: objects, forKeys: keys)
+  var d = ns as! Dictionary<NSString, NSNumber>
+
+  let i = d.index(forKey: "Rose")!
+  expectEqual(d[i].key, "Rose")
+  expectEqual(d[i].value, 2 as NSNumber)
+
+  // Mutating a value through the Values view will convert the bridged
+  // NSDictionary instance to native Dictionary storage. However, Values is a
+  // MutableCollection, so doing so must not invalidate existing indices.
+  d.values[i] = 20 as NSNumber
+
+  // The old Cocoa-based index must still work with the new dictionary.
+  expectEqual(d.values[i], 20 as NSNumber)
+
+  let i2 = d.index(forKey: "Rose")
+
+  // You should also be able to advance Cocoa indices.
+  let j = d.index(after: i)
+  expectLT(i, j)
+
+  // Unfortunately, Cocoa and Native indices aren't comparable, so the
+  // Collection conformance is not quite perfect.
+  expectCrash() {
+    print(i == i2)
+  }
+}
+#endif
+
+DictionaryTestSuite.test("Values.Subscript.Uniqueness") {
+  var d = getCOWSlowEquatableDictionary()
+  let i = d.index(forKey: TestKeyTy(20))!
+  expectUnique(&d.values[i])
+}
+
+DictionaryTestSuite.test("Values.Subscript.Modify") {
+  var d = getCOWSlowEquatableDictionary()
+  let i = d.index(forKey: TestKeyTy(20))!
+  bumpValue(&d.values[i])
+  expectEqual(TestEquatableValueTy(1021), d[TestKeyTy(20)])
+}
+
+DictionaryTestSuite.test("Values.Subscript.ModifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+  let i = d.index(forKey: TestKeyTy(20))!
+  do {
+    try bumpValueAndThrow(&d.values[i])
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+  expectEqual(TestEquatableValueTy(1021), d[TestKeyTy(20)])
+}
+
+DictionaryTestSuite.test("RemoveAt.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(forKey: 10)!
+
+  d.remove(at: j)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("RemoveValueForKey.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+
+  d.removeValue(forKey: 10)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("ResizeOnInsertion.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d[0] = 0
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("ResizeOnUpdate.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d.updateValue(100 + i, forKey: 100 + i)
+  }
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.updateValue(0, forKey: 0)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("RemoveAll.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeAll(keepingCapacity: true)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("ReserveCapacity.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.reserveCapacity(0)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.reserveCapacity(d.capacity)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.reserveCapacity(d.capacity * 10)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.Subscript.Getter.AcrossInstances") {
+  // The mutation count may happen to be the same across any two dictionaries.
+  // The probability of this is low, but it could happen -- so check a bunch of
+  // these cases at once; a trap will definitely occur at least once.
+  let dicts = (0 ..< 10).map { _ in getCOWFastDictionary() }
+  let indices = dicts.map { $0.index(forKey: 20)! }
+  let d = getCOWFastDictionary()
+
+  expectCrashLater()
+  for i in indices {
+    _ = d[i]
+  }
+  _fixLifetime(dicts)
+}
+
+DictionaryTestSuite.test("IndexValidation.Subscript.Getter.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.Subscript.Getter.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d[i], (key: 20, value: 1020))
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.KeysSubscript.Getter.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.keys.firstIndex(of: 20)!
+  expectEqual(d.keys[i], 20)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  _ = d.keys[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.KeysSubscript.Getter.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.keys.firstIndex(of: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d.keys[i], 20)
+  expectEqual(d[i], (key: 20, value: 1020))
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectEqual(d.keys[i], 20)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  _ = d.keys[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Getter.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  _ = d.values[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Getter.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  _ = d.values[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Setter.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.values[i] = 1021
+  expectEqual(d.values[i], 1021)
+  expectEqual(d[i], (key: 20, value: 1021))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  d.values[i] = 1022
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Setter.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  d.values[i] = 1021
+  expectEqual(d.values[i], 1021)
+  expectEqual(d[i], (key: 20, value: 1021))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  d.values[i] = 1022
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Modify.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.values[i] += 1
+  expectEqual(d.values[i], 1021)
+  expectEqual(d[i], (key: 20, value: 1021))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  d.values[i] += 1
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Modify.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  d.values[i] += 1
+  expectEqual(d.values[i], 1021)
+  expectEqual(d[i], (key: 20, value: 1021))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  d.values[i] += 1
+}
+
+DictionaryTestSuite.test("IndexValidation.RangeSubscript.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(after: i)
+  expectTrue(i < j)
+  d.removeValue(forKey: 10)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.RangeSubscript.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(after: i)
+  expectTrue(i < j)
+  let identifier = d._rawIdentifier()
+  expectEqual(d[i], (key: 20, value: 1020))
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectTrue(i < j)
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.KeysRangeSubscript.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.keys.firstIndex(of: 20)!
+  let j = d.index(after: i)
+  expectTrue(i < j)
+
+  d.removeValue(forKey: 10)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d.keys[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.KeysRangeSubscript.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.keys.firstIndex(of: 20)!
+  let j = d.index(after: i)
+  let identifier = d._rawIdentifier()
+  expectTrue(i < j)
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectTrue(i < j)
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d.keys[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesRangeSubscript.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(after: i)
+  expectTrue(i < j)
+
+  d.removeValue(forKey: 10)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d.values[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesRangeSubscript.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(after: i)
+  let identifier = d._rawIdentifier()
+  expectTrue(i < j)
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectTrue(i < j)
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d.values[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.RemoveAt.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  d.remove(at: i)
+}
+
+DictionaryTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  d.remove(at: i)
+}
+
+DictionaryTestSuite.test("BulkLoadingInitializer.Unique") {
+  for c in [0, 1, 2, 3, 5, 10, 25, 150] {
+    let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
+      _unsafeUninitializedCapacity: c,
+      allowingDuplicates: false
+    ) { keys, values in
+      let k = keys.baseAddress!
+      let v = values.baseAddress!
+      for i in 0 ..< c {
+        (k + i).initialize(to: TestKeyTy(i))
+        (v + i).initialize(to: TestEquatableValueTy(i))
+      }
+      return c
+    }
+
+    let d2 = Dictionary(
+      uniqueKeysWithValues: (0..<c).map {
+        (TestKeyTy($0), TestEquatableValueTy($0))
+      })
+
+    for i in 0 ..< c {
+      expectEqual(TestEquatableValueTy(i), d1[TestKeyTy(i)])
+    }
+    expectEqual(d2, d1)
+  }
+}
+
+DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
+  for c in [0, 1, 2, 3, 5, 10, 25, 150] {
+    let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
+      _unsafeUninitializedCapacity: c,
+      allowingDuplicates: true
+    ) { keys, values in
+      let k = keys.baseAddress!
+      let v = values.baseAddress!
+      for i in 0 ..< c {
+        (k + i).initialize(to: TestKeyTy(i / 2))
+        (v + i).initialize(to: TestEquatableValueTy(i / 2))
+      }
+      return c
+    }
+
+    let d2 = Dictionary(
+      (0 ..< c).map {
+        (TestKeyTy($0 / 2), TestEquatableValueTy($0 / 2))
+      },
+      uniquingKeysWith: { a, b in a })
+
+    expectEqual(d1.count, d2.count)
+    for i in 0 ..< c / 2 {
+      expectEqual(TestEquatableValueTy(i), d1[TestKeyTy(i)])
+    }
+    expectEqual(d2, d1)
+  }
+}
+
 DictionaryTestSuite.setUp {
+#if _runtime(_ObjC)
+  // Exercise ARC's autoreleased return value optimization in Foundation.
+  //
+  // On some platforms, when a new process is started, the optimization is
+  // expected to fail the first time it is used in each linked
+  // dylib. StdlibUnittest takes care of warming up ARC for the stdlib
+  // (libswiftCore.dylib), but for this particular test we also need to do it
+  // for Foundation, or there will be spurious leaks reported for tests
+  // immediately following a crash test.
+  //
+  // <rdar://problem/42069800> stdlib tests: expectCrashLater() interferes with
+  // counting autoreleased live objects
+  let d = NSDictionary(objects: [1 as NSNumber], forKeys: [1 as NSNumber])
+  _ = d.object(forKey: 1 as NSNumber)
+#endif
+
   resetLeaksOfDictionaryKeysValues()
 #if _runtime(_ObjC)
   resetLeaksOfObjCDictionaryKeysValues()

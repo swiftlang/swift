@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-inline-generics -emit-sorted-sil -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-inline-generics -emit-sorted-sil -emit-sil -enable-spec-devirt -O %s | %FileCheck %s
 
 // We used to crash on this when trying to devirtualize t.boo(a, 1),
 // because it is an "apply" with replacement types that contain
@@ -44,7 +44,7 @@ class Derived<T> : Base<T> {
 
 // Check that testDevirt is specialized and uses speculative devirtualization.
 // CHECK-LABEL: sil shared [noinline] @{{.*}}testDevirt
-// CHECK: checked_cast_br [exact] %{{.*}} : $CC<Int32> to $CC<Int32>
+// CHECK: checked_cast_br [exact] %{{.*}} : $CC<Int32> to CC<Int32>
 // CHECK: class_method
 // CHECK: }
 @inline(never)
@@ -55,12 +55,12 @@ public func testDevirt<T>(_ c: CC<T>) -> T? {
 
 // Check that the instance method Derived<T>.foo can be devirtualized, because Derived.foo is an internal function,
 // Derived has no subclasses and it is a WMO compilation.
-// CHECK-LABEL: sil shared [noinline] @_T022devirt_unbound_generic5test2yAA7DerivedCyxGlF{{.*}}
+// CHECK-LABEL: sil shared [noinline] @$s22devirt_unbound_generic5test2yyAA7DerivedCyxGlFTf4d_n
 // CHECK-NOT: class_method
 // CHECK-NOT: witness_method
 // CHECK-NOT: apply
 // CHECK: return
-// CHECK: end sil function '_T022devirt_unbound_generic5test2yAA7DerivedCyxGlF{{.*}}'
+// CHECK: end sil function '$s22devirt_unbound_generic5test2yyAA7DerivedCyxGlFTf4d_n'
 @inline(never)
 func test2<T>(_ d: Derived<T>) {
    d.foo()
@@ -72,12 +72,12 @@ public func doTest2<T>(_ t:T) {
 
 // Check that the class method Derived<T>.boo can be devirtualized, because Derived.boo is an internal function,
 // Derived has no subclasses and it is a WMO compilation.
-// CHECK: sil shared [noinline] @_T022devirt_unbound_generic5test3yAA7DerivedCyxGlF{{.*}}
+// CHECK: sil shared [noinline] @$s22devirt_unbound_generic5test3yyAA7DerivedCyxGlFTf4d_n
 // CHECK-NOT: class_method
 // CHECK-NOT: witness_method
 // CHECK-NOT: apply
 // CHECK: return
-// CHECK: end sil function '_T022devirt_unbound_generic5test3yAA7DerivedCyxGlF{{.*}}'
+// CHECK: end sil function '$s22devirt_unbound_generic5test3yyAA7DerivedCyxGlFTf4d_n'
 @inline(never)
 func test3<T>(_ d: Derived<T>) {
    type(of: d).boo()

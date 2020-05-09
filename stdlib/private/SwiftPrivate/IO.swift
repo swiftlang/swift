@@ -10,8 +10,76 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
 import SwiftShims
 
+#if os(Windows)
+import MSVCRT
+import WinSDK
+#endif
+
+#if os(Windows)
+public struct _FDInputStream {
+  public var handle: HANDLE = INVALID_HANDLE_VALUE
+  public var isEOF: Bool = false
+  public var isClosed: Bool { return handle == INVALID_HANDLE_VALUE }
+
+  internal var _buffer: ContiguousArray<UInt8> =
+      ContiguousArray<UInt8>(repeating: 0, count: 256)
+  internal var _offset: Int = 0
+
+  public init(handle: HANDLE) {
+    self.handle = handle
+  }
+
+  public mutating func getline() -> String? {
+    // FIXME(compnerd) Windows uses \r\n for the line delimiter, we should split
+    // on that and remove the workaround in the test harness
+    if let index =
+        _buffer[0..<_offset].firstIndex(of: UInt8(Unicode.Scalar("\n").value)) {
+      let result = String(decoding: _buffer[0..<index], as: UTF8.self)
+      _buffer.removeSubrange(0...index)
+      _offset -= index + 1
+      return result
+    }
+    if isEOF && _offset > 0 {
+      let result = String(decoding: _buffer[0..<_offset], as: UTF8.self)
+      _buffer.removeAll()
+      _offset = 0
+      return result
+    }
+    return nil
+  }
+
+  public mutating func read() {
+    var space = _buffer.count - _offset
+    if space < 128 {
+      let capacity = _buffer.count + (128 - space)
+      _buffer.reserveCapacity(capacity)
+      for _ in _buffer.count..<capacity {
+        _buffer.append(0)
+      }
+      space = 128
+    }
+    let read: Int = _buffer.withUnsafeMutableBufferPointer { buffer in
+      var read: DWORD = 0
+      ReadFile(handle, buffer.baseAddress! + _offset, DWORD(space), &read, nil)
+      return Int(read)
+    }
+    if read == 0 {
+      isEOF = true
+    } else {
+      _offset += read
+    }
+  }
+
+  public mutating func close() {
+    if isClosed { return }
+    CloseHandle(handle)
+    handle = INVALID_HANDLE_VALUE
+  }
+}
+#else
 public struct _FDInputStream {
   public let fd: CInt
   public var isClosed: Bool = false
@@ -25,16 +93,14 @@ public struct _FDInputStream {
 
   public mutating func getline() -> String? {
     if let newlineIndex =
-      _buffer[0..<_bufferUsed].index(of: UInt8(Unicode.Scalar("\n").value)) {
-      let result = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: _buffer[0..<newlineIndex])
+      _buffer[0..<_bufferUsed].firstIndex(of: UInt8(Unicode.Scalar("\n").value)) {
+      let result = String(decoding: _buffer[0..<newlineIndex], as: UTF8.self)
       _buffer.removeSubrange(0...newlineIndex)
       _bufferUsed -= newlineIndex + 1
       return result
     }
     if isEOF && _bufferUsed > 0 {
-      let result = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: _buffer[0..<_bufferUsed])
+      let result = String(decoding: _buffer[0..<_bufferUsed], as: UTF8.self)
       _buffer.removeAll()
       _bufferUsed = 0
       return result
@@ -52,9 +118,9 @@ public struct _FDInputStream {
         bufferFree += 1
       }
     }
+    let fd = self.fd
     let readResult: __swift_ssize_t = _buffer.withUnsafeMutableBufferPointer {
       (_buffer) in
-      let fd = self.fd
       let addr = _buffer.baseAddress! + self._bufferUsed
       let size = bufferFree
       return _swift_stdlib_read(fd, addr, size)
@@ -80,6 +146,7 @@ public struct _FDInputStream {
     isClosed = true
   }
 }
+#endif
 
 public struct _Stderr : TextOutputStream {
   public init() {}
@@ -91,6 +158,40 @@ public struct _Stderr : TextOutputStream {
   }
 }
 
+#if os(Windows)
+public struct _FDOutputStream : TextOutputStream {
+  public var handle: HANDLE
+  public var isClosed: Bool {
+    return handle == INVALID_HANDLE_VALUE
+  }
+
+  public init(handle: HANDLE) {
+    self.handle = handle
+  }
+
+  public mutating func write(_ string: String) {
+    string.utf8CString.withUnsafeBufferPointer { buffer in
+      let dwLength: DWORD = DWORD(buffer.count - 1)
+      var dwOffset: DWORD = 0
+      while dwOffset < dwLength {
+        var dwBytesWritten: DWORD = 0
+        if !WriteFile(handle,
+                      UnsafeRawPointer(buffer.baseAddress! + Int(dwOffset)),
+                      dwLength - dwOffset, &dwBytesWritten, nil) {
+          fatalError("WriteFile() failed")
+        }
+        dwOffset += dwBytesWritten
+      }
+    }
+  }
+
+  public mutating func close() {
+    if handle == INVALID_HANDLE_VALUE { return }
+    CloseHandle(handle)
+    handle = INVALID_HANDLE_VALUE
+  }
+}
+#else
 public struct _FDOutputStream : TextOutputStream {
   public let fd: CInt
   public var isClosed: Bool = false
@@ -128,3 +229,4 @@ public struct _FDOutputStream : TextOutputStream {
     isClosed = true
   }
 }
+#endif

@@ -21,13 +21,25 @@
 #include "llvm/Support/FileSystem.h"
 #include <fstream>
 #include <regex>
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
 #include <sys/param.h>
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
 
 // FIXME: Platform compatibility.
 #include <dispatch/dispatch.h>
 
 using namespace llvm;
+
+#if defined(_WIN32)
+namespace {
+int STDOUT_FILENO = _fileno(stdout);
+}
+#endif
 
 namespace {
 struct TestOptions {
@@ -53,6 +65,7 @@ struct TestOptions {
   Optional<unsigned> fuzzyWeight;
   Optional<unsigned> popularityBonus;
   StringRef filterRulesJSON;
+  std::string moduleCachePath;
   bool rawOutput = false;
   bool structureOutput = false;
   ArrayRef<const char *> compilerArgs;
@@ -64,7 +77,6 @@ static sourcekitd_uid_t KeyRequest;
 static sourcekitd_uid_t KeyCompilerArgs;
 static sourcekitd_uid_t KeyOffset;
 static sourcekitd_uid_t KeyLength;
-static sourcekitd_uid_t KeyActionable;
 static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyName;
@@ -240,6 +252,8 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
         return false;
       }
       options.showTopNonLiteral = uval;
+    } else if (opt == "module-cache-path") {
+      options.moduleCachePath = value.str();
     }
   }
 
@@ -286,7 +300,6 @@ static int skt_main(int argc, const char **argv) {
   KeyCompilerArgs = sourcekitd_uid_get_from_cstr("key.compilerargs");
   KeyOffset = sourcekitd_uid_get_from_cstr("key.offset");
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
-  KeyActionable = sourcekitd_uid_get_from_cstr("key.actionable");
   KeyKind = sourcekitd_uid_get_from_cstr("key.kind");
   KeyCodeCompleteOptions =
       sourcekitd_uid_get_from_cstr("key.codecomplete.options");
@@ -382,7 +395,6 @@ removeCodeCompletionTokens(StringRef Input, StringRef TokenName,
     if (match[1].str() != TokenName)
       continue;
     *CompletionOffset = CleanFile.size();
-    CleanFile.push_back('\0');
     if (match.size() == 2 || !match[2].matched)
       continue;
 
@@ -391,7 +403,7 @@ removeCodeCompletionTokens(StringRef Input, StringRef TokenName,
     StringRef next = StringRef(fullMatch).split(',').second;
     while (next != "") {
       auto split = next.split(',');
-      prefixes.push_back(split.first);
+      prefixes.push_back(split.first.str());
       next = split.second;
     }
   }
@@ -664,6 +676,10 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND,"-sdk");
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, sdk);
     }
+    if (!options.moduleCachePath.empty()) {
+      sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, "-module-cache-path");
+      sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, options.moduleCachePath.c_str());
+    }
     // Add -- options.
     for (const char *arg : options.compilerArgs)
       sourcekitd_request_array_set_string(args, SOURCEKITD_ARRAY_APPEND, arg);
@@ -679,7 +695,7 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
 
 static bool readPopularAPIList(StringRef filename,
                                std::vector<std::string> &result) {
-  std::ifstream in(filename);
+  std::ifstream in(filename.str());
   if (!in.is_open()) {
     llvm::errs() << "error opening '" << filename << "'\n";
     return true;

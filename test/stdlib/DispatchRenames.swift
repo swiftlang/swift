@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// REQUIRES: objc_interop
+// RUN: %target-typecheck-verify-swift %import-libdispatch
+// REQUIRES: libdispatch
 
 import Dispatch
 
@@ -11,5 +11,9 @@ _ = dispatch_get_global_queue(0, 0) // expected-error {{'dispatch_get_global_que
 
 _ = dispatch_source_create(OpaquePointer(bitPattern: ~0)!, 0, 0, nil) // expected-error {{'dispatch_source_create' is unavailable: Use DispatchSource class methods}}
 
-_ = dispatch_get_main_queue() // expected-error {{'dispatch_get_main_queue()' has been replaced by property 'DispatchQueue.main'}}
+// Next test is disabled pending what to do about libdispatch change to the signature of dispatch_get_main_queue(): rdar://problem/36528231.
+// To re-enable, remove the #if/#endif and remove "FIXME-" from 'expected-FIXME-error'
+#if false
+_ = dispatch_get_main_queue() // expected-FIXME-error {{'dispatch_get_main_queue()' has been replaced by property 'DispatchQueue.main'}}
+#endif
 _ = DispatchQueue.main

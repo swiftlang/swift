@@ -7,7 +7,7 @@ public class C {
   var (InternalTuple1, InternalTuple2) = (10, 20)
 }
 
-// RUN: %target-swift-ide-test -print-ast-typechecked -accessibility-filter-internal -source-filename %s | %FileCheck %s -check-prefix=CHECK1
+// RUN: %target-swift-ide-test -print-ast-typechecked -access-filter-internal -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // CHECK1: {{^}}public class C {{{$}}
 // CHECK1-NOT: private
 // CHECK1: {{^}}  public var PublicVar: Int{{$}}
@@ -15,3 +15,6 @@ public class C {
 // CHECK1: {{^}}  var InternalVar1: Int, InternalVar2: Int{{$}}
 // CHECK1-NOT: private
 // CHECK1: {{^}}  var (InternalTuple1, InternalTuple2): (Int, Int){{$}}
+
+// RUN: %target-swift-ide-test -fully-qualified-types -print-ast-typechecked -access-filter-internal -source-filename %s | %FileCheck %s -check-prefix=FULLY_QUAL
+// FULLY_QUAL: public var PublicVar: Swift.Int

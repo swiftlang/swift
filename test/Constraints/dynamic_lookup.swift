@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/PrivateObjC.swift -o %t
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -swift-version 4 -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -swift-version 5 -I %t -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 import Foundation
@@ -117,7 +118,7 @@ obj.foo!(5)
 obj.foo!("hello")
 obj.wibble!()
 obj.wobble!() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'wobble'}}
-obj.ext1!()  // expected-warning {{result of call is unused}}
+obj.ext1!()  // expected-warning {{result of call to function returning 'A' is unused}}
 obj.wonka!()
 
 // Same as above but without the '!'
@@ -126,7 +127,7 @@ obj.foo(5)
 obj.foo("hello")
 obj.wibble()
 obj.wobble() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'wobble'}}
-obj.ext1()  // expected-warning {{result of call is unused}}
+obj.ext1()  // expected-warning {{result of call to function returning 'A' is unused}}
 obj.wonka()
 
 // Find class methods via dynamic method lookup.
@@ -144,7 +145,7 @@ var ovl1Result = obj.ovl1!()
 ovl1Result = A() // verify that we got an A, not a B
 
 // Same as above but without the '!'
-obj.ovl1()  // expected-warning {{result of call is unused}}
+obj.ovl1()  // expected-warning {{result of call to function returning 'A' is unused}}
 
 // Don't allow overload resolution between declarations from different
 // classes.
@@ -163,7 +164,7 @@ var ovl4Result = obj.ovl4!()
 var ovl5Result = obj.ovl5!() // expected-error{{ambiguous use of 'ovl5()'}}
 
 // Same as above but without the '!'
-obj.ovl4()  // expected-warning {{result of call is unused}}
+obj.ovl4()  // expected-warning {{result of call to function returning 'B' is unused}}
 
 // Generics
 
@@ -209,7 +210,6 @@ type(of: obj).foo!(obj)(5) // expected-error{{instance member 'foo' cannot be us
 
 // Checked casts to AnyObject
 var p: P = Y()
-// expected-warning @+1 {{forced cast from 'P' to 'AnyObject' always succeeds; did you mean to use 'as'?}}
 var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{cannot force unwrap value of non-optional type 'AnyObject'}} {{41-42=}}
 
 // Implicit force of an implicitly unwrapped optional
@@ -224,7 +224,7 @@ let anyValue: Any = X()
 _ = anyValue.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
 // expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-5=(}}{{13-13= as AnyObject)}}
 _ = (anyValue as AnyObject).bar()
-_ = (anyValue as! X).bar()
+(anyValue as! X).bar()
 
 var anyDict: [String : Any] = Dictionary<String, Any>()
 anyDict["test"] = anyValue
@@ -251,3 +251,160 @@ func rdar29960565(_ o: AnyObject) {
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'privateFoo' declared here
 // <unknown>:0: error: unexpected note produced: 'internalFoo' declared here
+
+@objc protocol Q {}
+
+@objc class Dynamic : NSObject, Q {
+  @objc var s: String = ""
+  @objc func foo() -> String {}
+  @objc subscript(_: String) -> String {
+    get {
+      return "hi"
+    }
+    set {}
+  }
+}
+
+@objc class DynamicIUO : NSObject, Q {
+  @objc var t: String! = ""
+  @objc func baz() -> String! {}
+  @objc subscript(_: DynamicIUO) -> DynamicIUO! {
+    get {
+      return self
+    }
+    set {}
+  }
+}
+
+var dyn = Dynamic()
+var dyn_iuo = DynamicIUO()
+let s = "hi"
+var o: AnyObject = dyn
+let _: String = o.s
+let _: String = o.s!
+let _: String? = o.s
+let _: String = o.foo()
+let _: String = o.foo!()
+let _: String? = o.foo()
+let _: String = o[s]
+let _: String = o[s]!
+let _: String? = o[s]
+// FIXME: These should all produce lvalues that we can write through
+o.s = s // expected-error {{cannot assign to property: 'o' is immutable}}
+o.s! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
+o[s] = s // expected-error {{cannot assign through subscript: 'o' is immutable}}
+o[s]! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
+
+let _: String = o.t
+let _: String = o.t!
+let _: String = o.t!!
+let _: String? = o.t
+let _: String = o.baz()
+let _: String = o.baz!()
+let _: String = o.baz()!
+let _: String = o.baz!()!
+let _: String? = o.baz()
+let _: DynamicIUO = o[dyn_iuo]
+let _: DynamicIUO = o[dyn_iuo]!
+let _: DynamicIUO = o[dyn_iuo]!!
+let _: DynamicIUO? = o[dyn_iuo]
+// FIXME: These should all produce lvalues that we can write through
+o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign through subscript: 'o' is immutable}}
+o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
+o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
+
+
+// Check that we avoid picking an unavailable overload if there's an
+// alternative.
+class OverloadedWithUnavailable1 {
+  @objc func overloadedWithUnavailableA() { }
+
+  @objc
+  @available(swift, obsoleted: 3)
+  func overloadedWithUnavailableB() { }
+}
+
+class OverloadedWithUnavailable2 {
+  @available(swift, obsoleted: 3)
+  @objc func overloadedWithUnavailableA() { }
+
+  @objc func overloadedWithUnavailableB() { }
+}
+
+func testOverloadedWithUnavailable(ao: AnyObject) {
+  ao.overloadedWithUnavailableA()
+  ao.overloadedWithUnavailableB()
+}
+
+func dynamicInitCrash(ao: AnyObject.Type) {
+  let sdk = ao.init(blahblah: ())
+  // expected-error@-1 {{incorrect argument label in call (have 'blahblah:', expected 'toMemory:')}}
+}
+
+// Test that we correctly diagnose ambiguity for different typed members available
+// through dynamic lookup.
+@objc protocol P3 {
+  var ambiguousProperty: String { get } // expected-note {{found this candidate}}
+  var unambiguousProperty: Int { get }
+
+  func ambiguousMethod() -> String // expected-note 2{{found this candidate}}
+  func unambiguousMethod() -> Int
+
+  func ambiguousMethodParam(_ x: String) // expected-note {{found this candidate}}
+  func unambiguousMethodParam(_ x: Int)
+
+  subscript(ambiguousSubscript _: Int) -> String { get } // expected-note {{found this candidate}}
+  subscript(unambiguousSubscript _: String) -> Int { get } // expected-note {{found this candidate}}
+}
+
+class C1 {
+  @objc var ambiguousProperty: Int { return 0 } // expected-note {{found this candidate}}
+  @objc var unambiguousProperty: Int { return 0 }
+
+  @objc func ambiguousMethod() -> Int { return 0 } // expected-note 2{{found this candidate}}
+  @objc func unambiguousMethod() -> Int { return 0 }
+
+  @objc func ambiguousMethodParam(_ x: Int) {} // expected-note {{found this candidate}}
+  @objc func unambiguousMethodParam(_ x: Int) {}
+
+  @objc subscript(ambiguousSubscript _: Int) -> Int { return 0 } // expected-note {{found this candidate}}
+  @objc subscript(unambiguousSubscript _: String) -> Int { return 0 } // expected-note {{found this candidate}}
+}
+
+func testAnyObjectAmbiguity(_ x: AnyObject) {
+  _ = x.ambiguousProperty // expected-error {{ambiguous use of 'ambiguousProperty'}}
+  _ = x.unambiguousProperty
+
+  _ = x.ambiguousMethod() // expected-error {{ambiguous use of 'ambiguousMethod()'}}
+  _ = x.unambiguousMethod()
+
+  _ = x.ambiguousMethod // expected-error {{ambiguous use of 'ambiguousMethod()'}}
+  _ = x.unambiguousMethod
+
+  _ = x.ambiguousMethodParam // expected-error {{ambiguous use of 'ambiguousMethodParam'}}
+  _ = x.unambiguousMethodParam
+
+  _ = x[ambiguousSubscript: 0] // expected-error {{ambiguous use of 'subscript(ambiguousSubscript:)'}}
+
+  // FIX-ME(SR-8611): This is currently ambiguous but shouldn't be.
+  _ = x[unambiguousSubscript: ""] // expected-error {{ambiguous use of 'subscript(unambiguousSubscript:)'}}
+}
+
+// SR-11648
+class HasMethodWithDefault {
+  @objc func hasDefaultParam(_ x: Int = 0) {}
+}
+
+func testAnyObjectWithDefault(_ x: AnyObject) {
+  x.hasDefaultParam()
+}
+
+// SR-11829: Don't perform dynamic lookup for callAsFunction.
+class ClassWithObjcCallAsFunction {
+  @objc func callAsFunction() {}
+}
+
+func testCallAsFunctionAnyObject(_ x: AnyObject) {
+  x() // expected-error {{cannot call value of non-function type 'AnyObject'}}
+  x.callAsFunction() // Okay.
+}

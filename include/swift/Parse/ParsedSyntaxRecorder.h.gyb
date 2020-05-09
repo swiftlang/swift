@@ -1,0 +1,95 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From ParsedSyntaxRecorder.h.gyb.
+//// Do Not Edit Directly!
+//===--- ParsedSyntaxRecorder.h - Parsed Syntax Recorder ------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_PARSE_PARSEDSYNTAXRECORDER_H
+#define SWIFT_PARSE_PARSEDSYNTAXRECORDER_H
+
+#include "swift/Basic/LLVM.h"
+#include "swift/Parse/ParsedSyntaxNodes.h"
+#include "swift/Syntax/SyntaxKind.h"
+
+namespace swift {
+
+class ParsedRawSyntaxRecorder;
+class SyntaxParsingContext;
+
+struct ParsedSyntaxRecorder {
+
+% for node in SYNTAX_NODES:
+%   if node.children:
+%     child_params = []
+%     for child in node.children:
+%         param_type = "Parsed%s" % child.type_name
+%         if child.is_optional:
+%            param_type = "Optional<%s>" % param_type
+%         end
+%         child_params.append("%s %s" % (param_type, child.name))
+%     end
+%     child_params = ', '.join(child_params)
+private:
+  static Parsed${node.name} record${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout,
+                                              ParsedRawSyntaxRecorder &rec);
+  static Parsed${node.name} defer${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout,
+                                              SyntaxParsingContext &SPCtx);
+public:
+  static Parsed${node.name} make${node.syntax_kind}(${child_params},
+                                              SyntaxParsingContext &SPCtx);
+%   elif node.is_syntax_collection():
+private:
+  static Parsed${node.name} record${node.syntax_kind}(
+      MutableArrayRef<ParsedRawSyntaxNode> layout,
+      ParsedRawSyntaxRecorder &rec);
+  static Parsed${node.name} defer${node.syntax_kind}(
+      MutableArrayRef<ParsedRawSyntaxNode> layout,
+      SyntaxParsingContext &SPCtx);
+public:
+  static Parsed${node.name} make${node.syntax_kind}(
+      MutableArrayRef<Parsed${node.collection_element_type}> elts,
+      SyntaxParsingContext &SPCtx);
+
+  static Parsed${node.name} makeBlank${node.syntax_kind}(SourceLoc loc,
+      SyntaxParsingContext &SPCtx);
+%   end
+% end
+
+#pragma mark - Convenience APIs
+
+  /// Records an unlabelled TupleTypeElementSyntax with the provided type and
+  /// optional trailing comma.
+  static ParsedTupleTypeElementSyntax
+  makeTupleTypeElement(ParsedTypeSyntax Type,
+                       Optional<ParsedTokenSyntax> TrailingComma,
+                       SyntaxParsingContext &SPCtx);
+
+  /// The provided \c elements are in the appropriate order for the syntax
+  /// \c kind's layout but optional elements are not be included.
+  /// This function will form the exact layout based on the provided elements,
+  /// substituting missing parts with a null ParsedRawSyntaxNode object.
+  ///
+  /// \returns true if the layout could be formed, false otherwise.
+  static bool
+  formExactLayoutFor(syntax::SyntaxKind kind,
+                     MutableArrayRef<ParsedRawSyntaxNode> elements,
+                     function_ref<void(syntax::SyntaxKind,
+                                       MutableArrayRef<ParsedRawSyntaxNode>)>
+                         receiver);
+};
+}
+
+#endif // SWIFT_PARSE_PARSEDSYNTAXRECORDER_H

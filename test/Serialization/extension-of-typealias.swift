@@ -10,6 +10,9 @@
 
 public typealias Zahl = Int
 
+// CHECK: typealias List
+// CHECK: typealias Zahl
+
 // CHECK-LABEL: extension Int {
 extension Zahl {
   // CHECK-NEXT: addedMember()
@@ -18,20 +21,17 @@ extension Zahl {
 
 public typealias List<T> = Array<T>
 
-// CHECK-LABEL: extension Array {
+// CHECK-LABEL: extension List {
 extension List {
   // CHECK-NEXT: addedMember()
   public func addedMember() {}
 } // CHECK-NEXT: {{^}$}}
 
-// CHECK-LABEL: extension Array where Element == Int {
+// CHECK-LABEL: extension List where Element == Int {
 extension List where Element == Int {
   // CHECK-NEXT: addedMemberInt()
   public func addedMemberInt() {}
 } // CHECK-NEXT: {{^}$}}
-
-// CHECK: typealias List
-// CHECK: typealias Zahl
 
 #else
 
@@ -41,7 +41,7 @@ func test(x: Int) {
   x.addedMember()
   [x].addedMember()
   [x].addedMemberInt()
-  ([] as [Bool]).addedMemberInt() // expected-error {{'[Bool]' is not convertible to 'Array<Int>'}}
+  ([] as [Bool]).addedMemberInt() // expected-error {{referencing instance method 'addedMemberInt()' on 'Array' requires the types 'Bool' and 'Int' be equivalent}}
 }
 
 #endif

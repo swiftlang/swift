@@ -62,8 +62,8 @@ protocol XReqt {}
 protocol YReqt {}
 
 protocol SameTypedDefaultWithReqts {
-    associatedtype X: XReqt
-    associatedtype Y: YReqt
+    associatedtype X: XReqt // expected-note{{protocol requires nested type 'X'; do you want to add it?}}
+    associatedtype Y: YReqt // expected-note{{protocol requires nested type 'Y'; do you want to add it?}}
     static var x: X { get }
     static var y: Y { get }
 }
@@ -86,7 +86,7 @@ struct UsesSameTypedDefaultWithoutSatisfyingReqts: SameTypedDefaultWithReqts {
 }
 
 protocol SameTypedDefaultBaseWithReqts {
-    associatedtype X: XReqt
+    associatedtype X: XReqt // expected-note{{protocol requires nested type 'X'; do you want to add it?}}
     static var x: X { get }
 }
 protocol SameTypedDefaultDerivedWithReqts: SameTypedDefaultBaseWithReqts {
@@ -109,3 +109,14 @@ struct UsesSameTypedDefaultDerivedWithoutSatisfyingReqts: SameTypedDefaultDerive
     static var y: YType { return YType() }
 }
 
+// SR-12199
+
+protocol SR_12199_P1 {
+  associatedtype Assoc
+}
+
+enum SR_12199_E {}
+
+protocol SR_12199_P2: SR_12199_P1 where Assoc == SR_12199_E {
+  associatedtype Assoc: SR_12199_E // expected-error {{type 'Self.Assoc' constrained to non-protocol, non-class type 'SR_12199_E'}}
+}

@@ -1,0 +1,55 @@
+//===--- RuntimeInvocationsTracking.def - Functions to track ----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines x-macros used for metaprogramming with the set of
+// runtime functions, whose invocations should be tracked.
+//
+//===----------------------------------------------------------------------===//
+
+/// FUNCTION_TO_TRACK(Id)
+/// Id is the name of the runtime function to be tracked.
+
+#ifndef FUNCTION_TO_TRACK
+#error "Must define FUNCTION_TO_TRACK to include RuntimeInvocationsTracking.def"
+#endif
+
+/// Set of runtime functions that whose invocations need to be tracked.
+/// Edit this list to add new runtime functions or remove the old ones.
+FUNCTION_TO_TRACK(swift_retain)
+FUNCTION_TO_TRACK(swift_release)
+FUNCTION_TO_TRACK(swift_retain_n)
+FUNCTION_TO_TRACK(swift_release_n)
+FUNCTION_TO_TRACK(swift_nonatomic_retain)
+FUNCTION_TO_TRACK(swift_nonatomic_release)
+FUNCTION_TO_TRACK(swift_nonatomic_retain_n)
+FUNCTION_TO_TRACK(swift_nonatomic_release_n)
+FUNCTION_TO_TRACK(swift_setDeallocating)
+FUNCTION_TO_TRACK(swift_unownedRetain)
+FUNCTION_TO_TRACK(swift_unownedRelease)
+FUNCTION_TO_TRACK(swift_nonatomic_unownedRetain)
+FUNCTION_TO_TRACK(swift_nonatomic_unownedRelease)
+FUNCTION_TO_TRACK(swift_unownedRetain_n)
+FUNCTION_TO_TRACK(swift_unownedRelease_n)
+FUNCTION_TO_TRACK(swift_nonatomic_unownedRetain_n)
+FUNCTION_TO_TRACK(swift_nonatomic_unownedRelease_n)
+FUNCTION_TO_TRACK(swift_allocObject)
+FUNCTION_TO_TRACK(swift_deallocObject)
+FUNCTION_TO_TRACK(swift_initStackObject)
+FUNCTION_TO_TRACK(swift_initStaticObject)
+FUNCTION_TO_TRACK(swift_tryRetain)
+FUNCTION_TO_TRACK(swift_tryRelease)
+FUNCTION_TO_TRACK(swift_unownedRetainStrong)
+FUNCTION_TO_TRACK(swift_nonatomic_unownedRetainStrong)
+FUNCTION_TO_TRACK(swift_unownedRetainStrongAndRelease)
+FUNCTION_TO_TRACK(swift_nonatomic_unownedRetainStrongAndRelease)
+
+#undef FUNCTION_TO_TRACK

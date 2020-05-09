@@ -7,7 +7,7 @@ import Foundation
 
 class Person : NSObject {
   @objc(firstNameString) var firstName: String
-  var lastName: String
+  @objc var lastName: String
 
   init(firstName: String, lastName: String) {
     self.firstName = firstName
@@ -20,11 +20,11 @@ class Person : NSObject {
 }
 
 class Band : NSObject {
-  var members: [Person] = []
+  @objc var members: [Person] = []
 }
 
 class RecordLabel : NSObject {
-  var bands: [String : Band] = [:]
+  @objc var bands: [String : Band] = [:]
 }
 
 let band = Band()
@@ -41,7 +41,7 @@ band.members = [Person(firstName: "John", lastName: "Lennon"),
 // CHECK-NEXT:    Star, Ringo
 // CHECK-NEXT: )
 print("===Members===")
-print((band.value(forKeyPath: #keyPath(Band.members))! as AnyObject).description)
+print(band.value(forKeyPath: #keyPath(Band.members))!)
 
 // CHECK: ===First Names===
 // CHECK-NEXT: (
@@ -51,7 +51,7 @@ print((band.value(forKeyPath: #keyPath(Band.members))! as AnyObject).description
 // CHECK-NEXT:    Ringo
 // CHECK-NEXT:)
 print("===First Names===")
-print((band.value(forKeyPath: #keyPath(Band.members.firstName))! as AnyObject).description)
+print(band.value(forKeyPath: #keyPath(Band.members.firstName))!)
 
 let recordLabel = RecordLabel()
 recordLabel.bands["Beatles"] = band
@@ -64,7 +64,7 @@ recordLabel.bands["Beatles"] = band
 // CHECK-NEXT:     Star
 // CHECK-NEXT: )
 print("===Last Names===")
-print((recordLabel.value(forKeyPath: #keyPath(RecordLabel.bands.Beatles.members.lastName))! as AnyObject).description)
+print(recordLabel.value(forKeyPath: #keyPath(RecordLabel.bands.Beatles.members.lastName))!)
 
 // CHECK: DONE
 print("DONE")

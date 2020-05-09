@@ -1,12 +1,14 @@
+@usableFromInline
+internal var gg = nonTrivialInit()
 
-
-private var gg = nonTrivialInit()
-
+@inlinable
 public func get_gg_b() -> Int {
   return gg
 }
 
+@usableFromInline
+@inlinable
 @inline(never)
-private func nonTrivialInit() -> Int {
+internal func nonTrivialInit() -> Int {
   return 28
 }

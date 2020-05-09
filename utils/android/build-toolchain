@@ -12,29 +12,37 @@
 
 set -e
 
-cd "$(dirname $0)/../.." || exit
-SRC_DIR=$PWD
+SWIFT_PATH="$( cd "$(dirname $0)/../../.." && pwd )" 
 
-ANDROID_NDK_DIR="${ANDROID_NDK_DIR:?Please set the Android NDK directory in the ANDROID_NDK_DIR environment variable}"
-ANDROID_ICU_DIR="${ANDROID_ICU_DIR:?Please set the libiconv-libicu-android directory in the ANDROID_ICU_DIR environment variable}"
+ANDROID_NDK_PATH="${ANDROID_NDK_PATH:?Please set the Android NDK path in the ANDROID_NDK_PATH environment variable}"
+ANDROID_ICU_PATH=${SWIFT_PATH}/libiconv-libicu-android
 
-SWIFT_TOOLCHAIN_DIR="${SRC_DIR}/../swift-android-toolchain"
-SWIFT_LINUX_DIR="${SRC_DIR}/../build/Ninja-ReleaseAssert/swift-linux-x86_64"
+[ -e ${ANDROID_ICU_PATH} ] || exit 1
 
-./utils/build-script \
+SWIFT_ANDROID_TOOLCHAIN_PATH="${SWIFT_PATH}/swift-android-toolchain"
+
+rm -rf ${SWIFT_ANDROID_TOOLCHAIN_PATH}
+
+${SWIFT_PATH}/swift/utils/build-script \
     -R \
     --android \
-    --android-ndk "${ANDROID_NDK_DIR}" \
+    --android-ndk ${ANDROID_NDK_PATH} \
     --android-api-level 21 \
-    --android-icu-uc "${ANDROID_ICU_DIR}/armeabi-v7a" \
-    --android-icu-uc-include "${ANDROID_ICU_DIR}/armeabi-v7a/icu/source/common" \
-    --android-icu-i18n "${ANDROID_ICU_DIR}/armeabi-v7a" \
-    --android-icu-i18n-include "${ANDROID_ICU_DIR}/armeabi-v7a/icu/source/i18n" || exit
+    --android-icu-uc "${ANDROID_ICU_PATH}/armeabi-v7a" \
+    --android-icu-uc-include "${ANDROID_ICU_PATH}/armeabi-v7a/icu/source/common" \
+    --android-icu-i18n "${ANDROID_ICU_PATH}/armeabi-v7a" \
+    --android-icu-i18n-include "${ANDROID_ICU_PATH}/armeabi-v7a/icu/source/i18n" \
+    --libdispatch --install-libdispatch \
+    --foundation --install-foundation \
+    --llbuild --install-llbuild \
+    --lldb --install-lldb \
+    --swiftpm --install-swiftpm \
+    --xctest --install-xctest \
+    --install-swift \
+    '--swift-install-components=autolink-driver;compiler;clang-builtin-headers;stdlib;swift-remote-mirror;sdk-overlay;dev' \
+    --install-prefix=/usr \
+    --install-destdir=${SWIFT_ANDROID_TOOLCHAIN_PATH}
 
-test -e ${SWIFT_LINUX_DIR} || exit
-rm -rf ${SWIFT_TOOLCHAIN_DIR}
-mkdir -p ${SWIFT_TOOLCHAIN_DIR}/usr
-
-cp -r ${SWIFT_LINUX_DIR}/{bin,lib,include} ${SWIFT_TOOLCHAIN_DIR}/usr
-cp ${ANDROID_ICU_DIR}/armeabi-v7a/*.so ${SWIFT_TOOLCHAIN_DIR}/usr/lib/swift/android
+${SWIFT_PATH}/swift-corelibs-libdispatch/build-android
+${SWIFT_PATH}/swift-corelibs-foundation/build-android
 

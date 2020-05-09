@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
 
 sil_stage canonical
 
@@ -50,7 +50,7 @@ class C {
 sil @cls_use : $@convention(thin) (@owned Cls) -> ()
 
 class Container {
-  @sil_stored var c : Cls
+  @_hasStorage var c : Cls
   init()
 }
 
@@ -571,10 +571,16 @@ bb0(%0 : $Cls):
   return %r : $()
 }
 
-// CHECK-LABEL: sil @dont_remove_as_local_object_indirectly_escapes_to_callee
-// CHECK: retain_value
-// CHECK: release_value
-sil @dont_remove_as_local_object_indirectly_escapes_to_callee : $@convention(thin) (Cls) -> () {
+// Remove a retain release "pair" for the local reference if a child object.
+//
+// The local 'Cls' reference is now effectively "moved" into the parent
+// 'Container' object, so the child will be destroyed with the parent.
+// The original SIL already has an over-release of the parent.
+//
+// CHECK-LABEL: sil @remove_as_local_object_indirectly_escapes_to_callee
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @remove_as_local_object_indirectly_escapes_to_callee : $@convention(thin) (Cls) -> () {
 bb0(%0 : $Cls):
   %1 = alloc_ref $Cls
   %2 = alloc_ref $Container
@@ -589,9 +595,41 @@ bb0(%0 : $Cls):
   return %r : $()
 }
 
+// Remove a retain release "pair" for the local reference if a child object.
+//
+// The local 'Cls' reference is now effectively "moved" into the parent
+// 'Container' object, so the child will be destroyed with the parent.
+//
+// CHECK-LABEL: sil @local_object_indirectly_escapes_to_use_and_owned_arg
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @local_object_indirectly_escapes_to_use_and_owned_arg : $@convention(thin) (Cls) -> () {
+bb0(%0 : $Cls):
+  %1 = alloc_ref $Cls
+  %2 = alloc_ref $Container
+  %3 = ref_element_addr %2 : $Container, #Container.c
+  store %1 to %3 : $*Cls
+  retain_value %1 : $Cls
+  %f1 = function_ref @use_container : $@convention(thin) (@guaranteed Container) -> ()
+  apply %f1 (%2) : $@convention(thin) (@guaranteed Container) -> ()
+  %f2 = function_ref @release_container : $@convention(thin) (Container) -> ()
+  apply %f2 (%2) : $@convention(thin) (Container) -> ()
+  release_value %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
 sil @release_arg1 : $@convention(thin) (Cls, Cls) -> () {
 bb0(%0 : $Cls, %1 : $Cls):
   strong_release %1 : $Cls
+  %r = tuple()
+  return %r : $()
+}
+
+sil @use_container : $@convention(thin) (@guaranteed Container) -> () {
+bb0(%0 : $Container):
+  %1 = ref_element_addr %0 : $Container, #Container.c
+  %2 = load %1 : $*Cls
   %r = tuple()
   return %r : $()
 }
@@ -1424,7 +1462,7 @@ bb0(%0 : $S, %1 : $FakeOptional<Builtin.NativeObject>):
   %2 = struct_extract %0 : $S, #S.x
   strong_retain %2 : $Builtin.NativeObject
   release_value %0 : $S
-  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1
+  %3 = unchecked_enum_data %1 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
   strong_retain %3 : $Builtin.NativeObject
   release_value %1 : $FakeOptional<Builtin.NativeObject>
   %5 = tuple()
@@ -1436,7 +1474,7 @@ bb0(%0 : $S, %1 : $FakeOptional<Builtin.NativeObject>):
 // CHECK-NOT: strong_release
 sil @strip_off_single_pred_args : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
-  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  switch_enum %0 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%1 : $Builtin.NativeObject):
   retain_value %0 : $FakeOptional<Builtin.NativeObject>
@@ -1497,7 +1535,7 @@ bb2:
 sil @strip_off_multi_payload_unchecked_enum_data : $@convention(thin) (Either<C, S>) -> () {
 bb0(%0 : $Either<C, S>):
   retain_value %0 : $Either<C, S>
-  %1 = unchecked_enum_data %0 : $Either<C, S>, #Either.Right!enumelt.1
+  %1 = unchecked_enum_data %0 : $Either<C, S>, #Either.Right!enumelt
   release_value %1 : $S
   %2 = tuple()
   return %2 : $()
@@ -1531,7 +1569,7 @@ bb0(%0 : $S2, %1 : $S3):
 // CHECK-NOT: strong_release
 sil @strip_off_enum_from_payload : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1, %0 : $Builtin.NativeObject
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject
   strong_retain %0 : $Builtin.NativeObject
   release_value %1 : $FakeOptional<Builtin.NativeObject>
   %2 = tuple()
@@ -1553,7 +1591,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
   return %2 : $()
 }
 
-sil [_semantics "arc.programtermination_point"] @fatalError : $@convention(thin) (StaticString, StaticString, StaticString) -> Never
+sil [_semantics "programtermination_point"] @fatalError : $@convention(thin) (StaticString, StaticString, StaticString) -> Never
 
 // CHECK-LABEL: sil @ignore_fatalErrorMsgBB : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK-NOT: strong_retain
@@ -1580,7 +1618,7 @@ bb4:
 
 bb5:
   %39 = function_ref @fatalError : $@convention(thin) (StaticString, StaticString, StaticString) -> Never
-  %40 = string_literal utf8 "fatal error"
+  %40 = string_literal utf8 "Fatal error"
   %41 = integer_literal $Builtin.Word, 11
   %42 = integer_literal $Builtin.Int8, 11
   %43 = struct $StaticString (%40 : $Builtin.RawPointer, %41 : $Builtin.Word, %42 : $Builtin.Int8)
@@ -2145,4 +2183,115 @@ bb0(%0 : $*Builtin.NativeObject):
   apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
   strong_release %1 : $Builtin.NativeObject
   return undef : $()
+}
+
+// Make sure that we treat applications of callee_guaranteed functions as a
+// guaranteed use of the function object.
+//
+// CHECK-LABEL: sil @test_callee_guaranteed_is_treated_as_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK: strong_retain
+// CHECK: apply
+// CHECK: strong_release
+// CHECK: } // end sil function 'test_callee_guaranteed_is_treated_as_guaranteed'
+sil @test_callee_guaranteed_is_treated_as_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  strong_retain %0 : $@callee_guaranteed () -> ()
+  apply %0() : $@callee_guaranteed () -> ()
+  strong_release %0 : $@callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we can move a release across a releasenone functions.
+//
+// CHECK-LABEL: sil @testReleaseNoneAttribute
+// CHECK-NOT: strong_retain
+// CHECK: [[RELEASENONE:%.*]] = function_ref @releaseNone
+// CHECK-NOT: strong_retain
+// CHECK: apply [[RELEASENONE]]
+// CHECK-NOT: strong_retain
+// CHECK: [[MAYRELEASE:%.*]] = function_ref @mayRelease
+// CHECK-NOT: strong_retain
+// CHECK: apply [[MAYRELEASE]]
+// CHECK-NOT: strong_retain
+// CHECK: return
+// CHECK: } // end sil function 'testReleaseNoneAttribute'
+sil [releasenone] @releaseNone : $@convention(thin) () -> ()
+sil @mayRelease : $@convention(thin) () -> ()
+
+sil @testReleaseNoneAttribute : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @releaseNone : $@convention(thin) () -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = apply %1() : $@convention(thin) () -> ()
+  %3 = function_ref @mayRelease : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %10 = tuple()
+  return %10 : $()
+}
+
+// Make sure that we elimiante the inner retain/release pair on the
+// partial_apply by treating it as an entrance.
+// CHECK-LABEL: sil @test_strong_entrance_partial_apply : $@convention(thin) () -> () {
+// CHECK: partial_apply
+// CHECK-NOT: strong_retain
+// CHECK: apply
+// CHECK: strong_release
+// CHECK-NOT: strong_release
+// CHECK: } // end sil function 'test_strong_entrance_partial_apply'
+sil @test_strong_entrance_partial_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @mayRelease : $@convention(thin) () -> ()
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> ()
+  strong_retain %1 : $@callee_guaranteed () -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Test invoking EscapeAnalysis:mayReleaseContent on a builtin that takes
+// an address. This should simply not assert.
+//
+// <rdar://problem/60190962> Escape analysis crashes with
+// "an address is never a reference" error with -O -thread=sanitize
+//===----------------------------------------------------------------------===//
+
+// bufferMemory
+sil_global hidden @$s4test12bufferMemorySpys5UInt8VGvp : $UnsafeMutablePointer<UInt8>
+
+// x
+sil_global hidden @$s4test1xypvp : $Any
+
+sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+// CHECK-LABEL: sil @testTsanInoutAccess : $@convention(thin) () -> () {
+// CHECK:   alloc_global @$s4test12bufferMemorySpys5UInt8VGvp
+// CHECK:   [[GLOBAL:%.*]] = global_addr @$s4test12bufferMemorySpys5UInt8VGvp : $*UnsafeMutablePointer<UInt8>
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*UnsafeMutablePointer<UInt8>
+// CHECK:   builtin "tsanInoutAccess"([[ACCESS]] : $*UnsafeMutablePointer<UInt8>) : $()
+// CHECK-LABEL: } // end sil function 'testTsanInoutAccess'
+sil @testTsanInoutAccess : $@convention(thin) () -> () {
+bb0:
+  alloc_global @$s4test12bufferMemorySpys5UInt8VGvp
+  %1 = global_addr @$s4test12bufferMemorySpys5UInt8VGvp : $*UnsafeMutablePointer<UInt8>
+  %2 = integer_literal $Builtin.Int1, -1
+  alloc_global @$s4test1xypvp
+  %4 = global_addr @$s4test1xypvp : $*Any
+  %5 = string_literal utf8 ""
+  %6 = integer_literal $Builtin.Word, 0
+  %7 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %8 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %9 = apply %8(%5, %6, %2, %7) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %10 = init_existential_addr %4 : $*Any, $String
+  store %9 to %10 : $*String
+  %12 = begin_access [modify] [dynamic] %1 : $*UnsafeMutablePointer<UInt8>
+  %13 = builtin "tsanInoutAccess"(%12 : $*UnsafeMutablePointer<UInt8>) : $()
+  end_access %12 : $*UnsafeMutablePointer<UInt8>
+  %15 = tuple ()
+  return %15 : $()
 }

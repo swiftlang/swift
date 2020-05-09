@@ -1,0 +1,16 @@
+// RUN: %target-swift-frontend -Osize -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-ir %s | %FileCheck %s --check-prefix=O
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: define{{.*}} swiftcc void @optimize_for_size_attribute({{.*}}) #0 {
+// O-LABEL: define{{.*}} swiftcc void @optimize_for_size_attribute({{.*}}) #0 {
+sil @optimize_for_size_attribute : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// O-NOT: attributes #0 = {{{.*}}optsize
+// CHECK: attributes #0 = {{{.*}}minsize

@@ -1,0 +1,8 @@
+// RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select InterfaceTypeRequest %s
+// REQUIRES: asserts
+
+struct Outer${N} {
+  struct Inner {}
+}
+
+extension Outer${N}.Inner {}

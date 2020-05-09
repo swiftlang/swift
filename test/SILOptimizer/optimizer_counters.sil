@@ -1,0 +1,101 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-modules 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-MODULES %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-FUNCTIONS %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-dump-all 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ALL %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-modules -sil-stats-only-instructions=integer_literal,builtin 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-INSTRUCTIONS %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-function=test_simple 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTION %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-functions=test 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTIONS %s
+
+
+// Test different modes of optimizer counters statistics collection.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @fatalError : $@convention(thin) () -> Never
+
+// Check that module level statistics are produced.
+//
+// CHECK-SIL-STATS-MODULES: module, inst, HighLevel,Function+EarlyLoopOpt, PerformanceConstantPropagation, {{.*}}, 15, 12
+// CHECK-SIL-STATS-MODULES: module, block, HighLevel,Function+EarlyLoopOpt, SimplifyCFG, {{.*}}, 6, 3
+// CHECK-SIL-STATS-MODULES: module, inst, HighLevel,Function+EarlyLoopOpt, SimplifyCFG, {{.*}}, 12, 6
+
+// Check that module level statistics are produced.
+//
+// CHECK-SIL-STATS-FUNCTIONS: function_history, block,{{.*}}, test_multiply
+// CHECK-SIL-STATS-FUNCTIONS: function_history, inst,{{.*}}, test_multiply
+// CHECK-SIL-STATS-FUNCTIONS: function_history, block,{{.*}}, test_simple
+// CHECK-SIL-STATS-FUNCTIONS: function_history, inst,{{.*}}, test_simple
+// CHECK-SIL-STATS-FUNCTIONS: function_history, block,{{.*}}, another_simple_func
+// CHECK-SIL-STATS-FUNCTIONS: function_history, inst,{{.*}}, another_simple_func
+
+
+
+// Check that -sil-stats-all produces module and function level statistics.
+//
+// CHECK-SIL-STATS-ALL: module, block,
+// CHECK-SIL-STATS-ALL: function, inst
+
+// Check that -sil-stats-only-instructions=integer_literal,builtin produces stats about these instruction.
+//
+// CHECK-SIL-STATS-ONLY-INSTRUCTIONS: module, inst_integer_literal
+// CHECK-SIL-STATS-ONLY-INSTRUCTIONS: module, inst_builtin
+
+sil @test_multiply : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "umul_with_overflow_Int64"(%1 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_br %4, bb1, bb2
+
+bb1:
+  %f = function_ref @fatalError : $@convention(thin) () -> Never
+  apply %f() : $@convention(thin) () -> Never
+  unreachable
+
+bb2:
+  %v = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3 (%v : $Builtin.Int64)
+
+bb3(%r : $Builtin.Int64):
+  return %r: $Builtin.Int64
+}
+
+// Check that -sil-stats-only-function=test_simple produces stats only about test_simple
+//
+// CHECK-SIL-STATS-ONLY-FUNCTION-NOT: function_history, block,{{.*}}, test_multiply
+// CHECK-SIL-STATS-ONLY-FUNCTION-NOT: function_history, inst,{{.*}}, test_multiply
+// CHECK-SIL-STATS-ONLY-FUNCTION-NOT: function_history, block,{{.*}}, another_simple_func
+// CHECK-SIL-STATS-ONLY-FUNCTION-NOT: function_history, inst,{{.*}}, another_simple_func
+// CHECK-SIL-STATS-ONLY-FUNCTION: function_history, block,{{.*}}, test_simple
+// CHECK-SIL-STATS-ONLY-FUNCTION: function_history, inst,{{.*}}, test_simple
+// CHECK-SIL-STATS-ONLY-FUNCTION-NOT: function_history, block,{{.*}}, test_multiply
+// CHECK-SIL-STATS-ONLY-FUNCTION-NOT: function_history, inst,{{.*}}, test_multiply
+// CHECK-SIL-STATS-ONLY-FUNCTION-NOT: function_history, block,{{.*}}, another_simple_func
+// CHECK-SIL-STATS-ONLY-FUNCTION-NOT: function_history, inst,{{.*}}, another_simple_func
+
+sil @test_simple : $@convention(thin) () -> Builtin.Int64 {
+  %0 = integer_literal $Builtin.Int64, 10
+  return %0 : $Builtin.Int64
+}
+
+sil @another_simple_func : $@convention(thin) () -> Builtin.Int64 {
+  %0 = integer_literal $Builtin.Int64, 10
+  return %0 : $Builtin.Int64
+}
+
+// Check that -sil-stats-only-functions=test produces stats only about functions,
+// whose name contains "test"
+//
+// CHECK-SIL-STATS-ONLY-FUNCTIONS-NOT: function_history, block,{{.*}}, another_simple_func
+// CHECK-SIL-STATS-ONLY-FUNCTIONS-NOT: function_history, inst,{{.*}}, another_simple_func
+// CHECK-SIL-STATS-ONLY-FUNCTIONS: function_history, block,{{.*}}, test_multiply
+// CHECK-SIL-STATS-ONLY-FUNCTIONS: function_history, inst,{{.*}}, test_multiply
+// CHECK-SIL-STATS-ONLY-FUNCTIONS: function_history, block,{{.*}}, test_simple
+// CHECK-SIL-STATS-ONLY-FUNCTIONS: function_history, inst,{{.*}}, test_simple
+// CHECK-SIL-STATS-ONLY-FUNCTIONS-NOT: function_history, block,{{.*}}, another_simple_func
+// CHECK-SIL-STATS-ONLY-FUNCTIONS-NOT: function_history, inst,{{.*}}, another_simple_func
+
+

@@ -72,7 +72,7 @@ B<Fast.> Swift is intended as a replacement for C-based languages (C, C++, and
 Objective-C). As such, Swift must be comparable to those languages in
 performance for most tasks. Performance must also be predictable and consistent,
 not just fast in short bursts that require clean-up later. There are lots of
-languages with novel features — being fast is rare.
+languages with novel features - being fast is rare.
 
 B<Expressive.> Swift benefits from decades of advancement in computer science to
 offer syntax that is a joy to use, with modern features developers expect. But
@@ -81,13 +81,12 @@ works, continually evolving to make Swift even better.
 
 =head1 BUGS
 
-Reporting bugs is a great way for anyone to help improve Swift.
-The bug tracker for Swift, an open-source project, is located at
-L<https://bugs.swift.org>.
+Reporting bugs is a great way for anyone to help improve Swift. The bug tracker
+for Swift, an open-source project, is located at L<https://bugs.swift.org>.
 
 If a bug can be reproduced only within an Xcode project or a playground, or if
-the bug is associated with an Apple NDA, please file a report to Apple’s
-bug reporter at L<https://bugreport.apple.com> instead.
+the bug is associated with an Apple NDA, please file a report to Apple's
+Feedback Assistant at L<https://feedbackassistant.apple.com> instead.
 
 =head1 SEE ALSO
 

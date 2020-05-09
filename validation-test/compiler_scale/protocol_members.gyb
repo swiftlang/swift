@@ -1,0 +1,16 @@
+// RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select InterfaceTypeRequest %s
+// REQUIRES: asserts
+
+protocol Protocol${N} {
+% if int(N) > 1:
+    func method(_: Protocol${int(N)-1})
+    var prop: Protocol${int(N)-1} { get set }
+    static var prop: Protocol${int(N)-1} { get set }
+    subscript(n: Int) -> Protocol${int(N)-1} { get set }
+% else:
+    func method()
+    var prop: Int { get set }
+    static var prop: Int { get set }
+    subscript(n: Int) -> Int { get set }
+% end
+}

@@ -26,6 +26,7 @@
 
 namespace llvm {
   class AttributeList;
+  class Constant;
   class Twine;
   class Type;
   class Value;
@@ -85,10 +86,9 @@ namespace irgen {
 
   void emitForeignParameter(IRGenFunction &IGF, Explosion &params,
                             ForeignFunctionInfo foreignInfo,
-                            unsigned foreignParamIndex,
-                            SILType paramTy, const LoadableTypeInfo &paramTI,
-                            Explosion &paramExplosion);
-
+                            unsigned foreignParamIndex, SILType paramTy,
+                            const LoadableTypeInfo &paramTI,
+                            Explosion &paramExplosion, bool isOutlined);
 
   void emitClangExpandedParameter(IRGenFunction &IGF,
                                   Explosion &in, Explosion &out,
@@ -96,9 +96,12 @@ namespace irgen {
                                   SILType swiftType,
                                   const LoadableTypeInfo &swiftTI);
 
-  bool addNativeArgument(IRGenFunction &IGF, Explosion &in,
-                         SILParameterInfo origParamInfo, Explosion &args);
-  
+  bool addNativeArgument(IRGenFunction &IGF,
+                         Explosion &in,
+                         CanSILFunctionType fnTy,
+                         SILParameterInfo origParamInfo, Explosion &args,
+                         bool isOutlined);
+
   /// Allocate a stack buffer of the appropriate size to bitwise-coerce a value
   /// between two LLVM types.
   std::pair<Address, Size>
@@ -119,7 +122,29 @@ namespace irgen {
   Callee getSwiftFunctionPointerCallee(IRGenFunction &IGF,
                                        llvm::Value *fnPtr,
                                        llvm::Value *contextPtr,
-                                       CalleeInfo &&info);
+                                       CalleeInfo &&info,
+                                       bool castOpaqueToRefcountedContext);
+
+  Address emitAllocYieldOnceCoroutineBuffer(IRGenFunction &IGF);
+  void emitDeallocYieldOnceCoroutineBuffer(IRGenFunction &IGF, Address buffer);
+  void emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
+                                   CanSILFunctionType coroutineType,
+                                   Explosion &allParams);
+
+  Address emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF);
+  void emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF, Address buffer);
+  void emitYieldManyCoroutineEntry(IRGenFunction &IGF,
+                                   CanSILFunctionType coroutineType,
+                                   Explosion &allParams);
+
+  /// Yield the given values from the current continuation.
+  ///
+  /// \return an i1 indicating whether the caller wants to unwind this
+  ///   coroutine instead of resuming it normally
+  llvm::Value *emitYield(IRGenFunction &IGF,
+                         CanSILFunctionType coroutineType,
+                         Explosion &yieldedValues);
+
 } // end namespace irgen
 } // end namespace swift
 

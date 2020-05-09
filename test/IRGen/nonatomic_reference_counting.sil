@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-sil-perf-optzns -O -Xllvm -swiftmergefunc-threshold=0 -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-sil-perf-optzns -O -Xllvm -swiftmergefunc-threshold=0 -emit-ir %s | %FileCheck %s
 
 // Check that IRGen lowers non-atomic reference counting instructions to
 // proper runtime calls.
@@ -33,8 +33,8 @@ bb0(%0 : $C):
 sil @doSomething : $@convention(thin) () -> ()
 
 // CHECK-LABEL: define {{.*}}@test_strong_nonatomic_rr
-// CHECK: call {{.*}}@swift_rt_swift_nonatomic_retain
-// CHECK: call {{.*}}@swift_rt_swift_nonatomic_release
+// CHECK: call {{.*}}@swift_nonatomic_retain
+// CHECK: call {{.*}}@swift_nonatomic_release
 // CHECK: ret
 sil @test_strong_nonatomic_rr: $@convention(thin) () -> @owned C {
 bb0:
@@ -47,8 +47,8 @@ bb0:
 }
 
 // CHECK-LABEL: define {{.*}}@test_unknown_nonatomic_rr
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRetain|swift_rt_swift_nonatomic_retain)}}
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRelease|swift_rt_swift_nonatomic_release)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRetain|swift_nonatomic_retain)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRelease|swift_nonatomic_release)}}
 // CHECK: ret
 sil @test_unknown_nonatomic_rr: $@convention(thin) <T where T : P> (@owned T) -> () {
 bb0(%0 : $T):
@@ -61,8 +61,8 @@ bb0(%0 : $T):
 }
 
 // CHECK-LABEL: define {{.*}}@test_strong_nonatomic_rr_n
-// CHECK: call {{.*}}@swift_rt_swift_nonatomic_retain_n
-// CHECK: call {{.*}}@swift_rt_swift_nonatomic_release_n
+// CHECK: call {{.*}}@swift_nonatomic_retain_n
+// CHECK: call {{.*}}@swift_nonatomic_release_n
 // CHECK: ret
 sil @test_strong_nonatomic_rr_n: $@convention(thin) () -> @owned C {
 bb0:
@@ -77,8 +77,8 @@ bb0:
 }
 
 // CHECK-LABEL: define {{.*}}@test_strong_mixed_rr_n
-// CHECK: call {{.*}}@swift_rt_swift_retain_n
-// CHECK: call {{.*}}@swift_rt_swift_release_n
+// CHECK: call {{.*}}@swift_retain_n
+// CHECK: call {{.*}}@swift_release_n
 // CHECK: ret
 sil @test_strong_mixed_rr_n: $@convention(thin) () -> @owned C {
 bb0:
@@ -93,8 +93,8 @@ bb0:
 }
 
 // CHECK-LABEL: define {{.*}}@test_unknown_nonatomic_rr_n
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRetain_n|swift_rt_swift_nonatomic_retain_n)}}
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRelease_n|swift_rt_swift_nonatomic_release_n)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRetain_n|swift_nonatomic_retain_n)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRelease_n|swift_nonatomic_release_n)}}
 // CHECK: ret
 sil @test_unknown_nonatomic_rr_n: $@convention(thin) <T where T : P> (@owned T) -> () {
 bb0(%0 : $T):
@@ -109,8 +109,8 @@ bb0(%0 : $T):
 }
 
 // CHECK-LABEL: define {{.*}}@test_unknown_mixed_rr_n
-// CHECK: call {{.*}}@{{(swift_unknownRetain_n|swift_rt_swift_retain_n)}}
-// CHECK: call {{.*}}@{{(swift_unknownRelease_n|swift_rt_swift_release_n)}}
+// CHECK: call {{.*}}@{{(swift_unknownObjectRetain_n|swift_retain_n)}}
+// CHECK: call {{.*}}@{{(swift_unknownObjectRelease_n|swift_release_n)}}
 // CHECK: ret
 sil @test_unknown_mixed_rr_n: $@convention(thin) <T where T : P> (@owned T) -> () {
 bb0(%0 : $T):
@@ -133,7 +133,7 @@ bb0:
   %r = apply %f () : $@convention(thin) () -> ()
   unowned_release [nonatomic] %1 : $@sil_unowned C
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // CHECK-LABEL: define {{.*}}@test_bridged_nonatomic_rr
@@ -150,7 +150,7 @@ bb0:
   %r = apply %f () : $@convention(thin) () -> ()
   strong_release [nonatomic] %2 : $Builtin.BridgeObject
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // CHECK-LABEL: define {{.*}}@test_bridged_nonatomic_rr_n
@@ -171,7 +171,7 @@ bb0:
   strong_release [nonatomic] %2 : $Builtin.BridgeObject
   strong_release [nonatomic] %2 : $Builtin.BridgeObject
   %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // CHECK-LABEL: define {{.*}}@test_bridged_mixed_rr_n
@@ -192,23 +192,7 @@ bb0:
   strong_release %2 : $Builtin.BridgeObject
   strong_release [nonatomic] %2 : $Builtin.BridgeObject
   %3 = tuple ()
-  %4 = return %3 : $()
-}
-
-// CHECK-LABEL: define {{.*}}@test_nonatomic_pin_unpin
-// CHECK: call {{.*}}@swift_rt_swift_nonatomic_tryPin
-// CHECK: call {{.*}}@swift_rt_swift_nonatomic_unpin
-// CHECK: ret
-sil @test_nonatomic_pin_unpin: $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_ref $C
-  %1 = unchecked_ref_cast %0 : $C to  $Builtin.NativeObject
-  %2 = strong_pin [nonatomic] %1 : $Builtin.NativeObject
-  %f = function_ref @doSomething : $@convention(thin) () -> ()
-  %r = apply %f () : $@convention(thin) () -> ()
-  strong_unpin [nonatomic] %2 : $Optional<Builtin.NativeObject>
-  %3 = tuple ()
-  %4 = return %3 : $()
+  return %3 : $()
 }
 
 // C.__deallocating_deinit
@@ -220,6 +204,6 @@ bb0(%0 : $C):
 }
 
 sil_vtable C {
-  #C.deinit!deallocator: _TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
+  #C.deinit!deallocator: @_TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
 }
 

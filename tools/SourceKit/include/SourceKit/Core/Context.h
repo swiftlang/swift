@@ -16,6 +16,7 @@
 #include "SourceKit/Core/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Mutex.h"
 #include <memory>
 #include <string>
 
@@ -27,23 +28,54 @@ namespace SourceKit {
   class LangSupport;
   class NotificationCenter;
 
-class Context {
-  std::string RuntimeLibPath;
-  std::unique_ptr<LangSupport> SwiftLang;
-  std::unique_ptr<NotificationCenter> NotificationCtr;
+class GlobalConfig {
+public:
+  struct Settings {
+    /// When true, the default compiler options and other configuration flags will be chosen to optimize for
+    /// usage from an IDE.
+    ///
+    /// At the time of writing this just means ignoring .swiftsourceinfo files.
+    bool OptimizeForIDE = false;
+
+    /// Interval second for checking dependencies in fast code completion.
+    unsigned CompletionCheckDependencyInterval = 5;
+  };
+
+private:
+  Settings State;
+  mutable llvm::sys::Mutex Mtx;
 
 public:
-  Context(StringRef RuntimeLibPath,
-          llvm::function_ref<
-              std::unique_ptr<LangSupport>(Context &)> LangSupportFactoryFn,
+  Settings update(Optional<bool> OptimizeForIDE,
+                  Optional<unsigned> CompletionCheckDependencyInterval);
+  bool shouldOptimizeForIDE() const;
+  unsigned getCompletionCheckDependencyInterval() const;
+};
+
+class Context {
+  std::string RuntimeLibPath;
+  std::string DiagnosticDocumentationPath;
+  std::unique_ptr<LangSupport> SwiftLang;
+  std::shared_ptr<NotificationCenter> NotificationCtr;
+  std::shared_ptr<GlobalConfig> Config;
+
+public:
+  Context(StringRef RuntimeLibPath, StringRef DiagnosticDocumentationPath,
+          llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
+              LangSupportFactoryFn,
           bool shouldDispatchNotificationsOnMain = true);
   ~Context();
 
   StringRef getRuntimeLibPath() const { return RuntimeLibPath; }
+  StringRef getDiagnosticDocumentationPath() const {
+    return DiagnosticDocumentationPath;
+  }
 
   LangSupport &getSwiftLangSupport() { return *SwiftLang; }
 
-  NotificationCenter &getNotificationCenter() { return *NotificationCtr; }
+  std::shared_ptr<NotificationCenter> getNotificationCenter() { return NotificationCtr; }
+
+  std::shared_ptr<GlobalConfig> getGlobalConfiguration() { return Config; }
 };
 
 } // namespace SourceKit

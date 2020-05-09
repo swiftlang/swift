@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out_Debug
+// RUN: %target-build-swift %s -o %t/a.out_Debug -Onone
 // RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
+// RUN: %target-codesign %t/a.out_Debug
+// RUN: %target-codesign %t/a.out_Release
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
-// CountablePartialRangeFrom fails in resilient mode. <rdar://problem/31909976>
-// XFAIL: resilient_stdlib
 
 
 import StdlibUnittest

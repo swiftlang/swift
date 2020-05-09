@@ -19,12 +19,12 @@ f3({ print($0) })
 func f4(_ a: Int..., b: Int) { }
 
 // rdar://16008564
-func inoutVariadic(_ i: inout Int...) {  // expected-error {{'inout' may not be used on variadic parameters}}
+func inoutVariadic(_ i: inout Int...) {  // expected-error {{'inout' must not be used on variadic parameters}}
 }
 
 // rdar://19722429
-func invalidVariadic(_ e: NonExistentType) { // expected-error {{use of undeclared type 'NonExistentType'}}
-  { (e: ExtraCrispy...) in }() // expected-error {{use of undeclared type 'ExtraCrispy'}}
+func invalidVariadic(_ e: NonExistentType) { // expected-error {{cannot find type 'NonExistentType' in scope}}
+  { (e: ExtraCrispy...) in }() // expected-error {{cannot find type 'ExtraCrispy' in scope}}
 }
 
 func twoVariadics(_ a: Int..., b: Int...) { } // expected-error{{only a single variadic parameter '...' is permitted}} {{38-41=}}

@@ -1,0 +1,43 @@
+// RUN: %target-sil-opt %s -module-name=witness_tables | %target-sil-opt -module-name=witness_tables | %FileCheck %s
+
+protocol AssocReqt {
+  func requiredMethod()
+}
+
+struct ConformingAssoc : AssocReqt {
+  func requiredMethod()
+}
+
+// CHECK-LABEL: sil @witness_method : $@convention(witness_method: AssocReqt) (@inout ConformingAssoc) -> () {
+sil @witness_method : $@convention(witness_method: AssocReqt) (@inout ConformingAssoc) -> () {
+bb0(%0 : $*ConformingAssoc):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil hidden @existential
+sil hidden @existential : $@convention(thin) (@in AssocReqt) -> () {
+bb0(%0 : $*AssocReqt):
+  // CHECK: open_existential_addr
+  %2 = open_existential_addr immutable_access %0 : $*AssocReqt to $*@opened("B2FFFC12-C4BD-11E7-A4BB-38C98616C0EA") AssocReqt
+  // CHECK: witness_method $@opened({{.*}}) AssocReqt, #AssocReqt.requiredMethod {{.*}} $@convention(witness_method: AssocReqt)
+  %3 = witness_method $@opened("B2FFFC12-C4BD-11E7-A4BB-38C98616C0EA") AssocReqt, #AssocReqt.requiredMethod : <Self where Self : AssocReqt> (Self) -> () -> (), %2 : $*@opened("B2FFFC12-C4BD-11E7-A4BB-38C98616C0EA") AssocReqt : $@convention(witness_method: AssocReqt) <τ_0_0 where τ_0_0 : AssocReqt> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply {{.*}} $@convention(witness_method: AssocReqt)
+  %4 = apply %3<@opened("B2FFFC12-C4BD-11E7-A4BB-38C98616C0EA") AssocReqt>(%2) : $@convention(witness_method: AssocReqt) <τ_0_0 where τ_0_0 : AssocReqt> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0 : $*AssocReqt
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil hidden @generic
+sil hidden @generic : $@convention(thin) <T where T : AssocReqt> (@in T) -> () {
+bb0(%0 : $*T):
+  // CHECK: witness_method $T, #AssocReqt.requiredMethod {{.*}} $@convention(witness_method: AssocReqt)
+  %2 = witness_method $T, #AssocReqt.requiredMethod : <Self where Self : AssocReqt> (Self) -> () -> () : $@convention(witness_method: AssocReqt) <τ_0_0 where τ_0_0 : AssocReqt> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: apply {{.*}} $@convention(witness_method: AssocReqt)
+  %3 = apply %2<T>(%0) : $@convention(witness_method: AssocReqt) <τ_0_0 where τ_0_0 : AssocReqt> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0 : $*T
+  %5 = tuple ()
+  return %5 : $()
+}
+

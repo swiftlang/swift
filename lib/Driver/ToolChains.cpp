@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,12 +16,13 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/TaskQueue.h"
+#include "swift/Config.h"
+#include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
-#include "swift/Config.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -37,51 +38,99 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-/// The limit for passing a list of files on the command line.
-static const size_t TOO_MANY_FILES = 128;
+bool ToolChain::JobContext::shouldUseInputFileList() const {
+  return getTopLevelInputFiles().size() > C.getFilelistThreshold();
+}
 
-static void addInputsOfType(ArgStringList &Arguments,
-                            ArrayRef<const Action *> Inputs,
-                            types::ID InputType) {
+bool ToolChain::JobContext::shouldUsePrimaryInputFileListInFrontendInvocation()
+    const {
+  return InputActions.size() > C.getFilelistThreshold();
+}
+
+bool ToolChain::JobContext::shouldUseMainOutputFileListInFrontendInvocation()
+    const {
+  return Output.getPrimaryOutputFilenames().size() > C.getFilelistThreshold();
+}
+
+bool ToolChain::JobContext::
+    shouldUseSupplementaryOutputFileMapInFrontendInvocation() const {
+  static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
+      file_types::TY_INVALID;
+  return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
+         C.getFilelistThreshold();
+}
+
+bool ToolChain::JobContext::shouldFilterFrontendInputsByType() const {
+  // FIXME: SingleCompile has not filtered its inputs in the past and now people
+  // rely upon that. But we would like the compilation modes to be consistent.
+  return OI.CompilerMode != OutputInfo::Mode::SingleCompile;
+}
+
+void ToolChain::addInputsOfType(ArgStringList &Arguments,
+                                ArrayRef<const Action *> Inputs,
+                                file_types::ID InputType,
+                                const char *PrefixArgument) const {
   for (auto &Input : Inputs) {
     if (Input->getType() != InputType)
       continue;
+    if (PrefixArgument)
+      Arguments.push_back(PrefixArgument);
     Arguments.push_back(cast<InputAction>(Input)->getInputArg().getValue());
   }
 }
 
-static void addInputsOfType(ArgStringList &Arguments,
-                            ArrayRef<const Job *> Jobs,
-                            types::ID InputType) {
+void ToolChain::addInputsOfType(ArgStringList &Arguments,
+                                ArrayRef<const Job *> Jobs,
+                                const llvm::opt::ArgList &Args,
+                                file_types::ID InputType,
+                                const char *PrefixArgument) const {
   for (const Job *Cmd : Jobs) {
-    auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
-    if (!output.empty())
-      Arguments.push_back(output.c_str());
+    auto output = Cmd->getOutput().getAnyOutputForType(InputType);
+    if (!output.empty()) {
+      if (PrefixArgument)
+        Arguments.push_back(PrefixArgument);
+      Arguments.push_back(Args.MakeArgString(output));
+    }
   }
 }
 
-static void addPrimaryInputsOfType(ArgStringList &Arguments,
-                                   ArrayRef<const Job *> Jobs,
-                                   types::ID InputType) {
+void ToolChain::addPrimaryInputsOfType(ArgStringList &Arguments,
+                                       ArrayRef<const Job *> Jobs,
+                                       const llvm::opt::ArgList &Args,
+                                       file_types::ID InputType,
+                                       const char *PrefixArgument) const {
   for (const Job *Cmd : Jobs) {
     auto &outputInfo = Cmd->getOutput();
     if (outputInfo.getPrimaryOutputType() == InputType) {
-      for (const std::string &Output : outputInfo.getPrimaryOutputFilenames()) {
-        Arguments.push_back(Output.c_str());
+      for (auto Output : outputInfo.getPrimaryOutputFilenames()) {
+        if (PrefixArgument)
+          Arguments.push_back(PrefixArgument);
+        Arguments.push_back(Args.MakeArgString(Output));
       }
     }
   }
 }
 
-/// Handle arguments common to all invocations of the frontend (compilation,
-/// module-merging, LLDB's REPL, etc).
-static void addCommonFrontendArgs(const ToolChain &TC,
-                                  const OutputInfo &OI,
-                                  const CommandOutput &output,
-                                  const ArgList &inputArgs,
-                                  ArgStringList &arguments) {
-  const llvm::Triple &Triple = TC.getTriple();
+static bool addOutputsOfType(ArgStringList &Arguments,
+                             CommandOutput const &Output,
+                             const llvm::opt::ArgList &Args,
+                             file_types::ID OutputType,
+                             const char *PrefixArgument = nullptr) {
+  bool Added = false;
+  for (auto Output : Output.getAdditionalOutputsForType(OutputType)) {
+    assert(!Output.empty());
+    if (PrefixArgument)
+      Arguments.push_back(PrefixArgument);
+    Arguments.push_back(Args.MakeArgString(Output));
+    Added = true;
+  }
+  return Added;
+}
 
+void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
+                                      const CommandOutput &output,
+                                      const ArgList &inputArgs,
+                                      ArgStringList &arguments) const {
   // Only pass -target to the REPL or immediate modes if it was explicitly
   // specified on the command line.
   switch (OI.CompilerMode) {
@@ -92,9 +141,16 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     LLVM_FALLTHROUGH;
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::BatchModeCompile:
     arguments.push_back("-target");
     arguments.push_back(inputArgs.MakeArgString(Triple.str()));
     break;
+  }
+
+  if (const Arg *variant = inputArgs.getLastArg(options::OPT_target_variant)) {
+    arguments.push_back("-target-variant");
+    std::string normalized = llvm::Triple::normalize(variant->getValue());
+    arguments.push_back(inputArgs.MakeArgString(normalized));
   }
 
   // Enable address top-byte ignored in the ARM64 backend.
@@ -111,12 +167,15 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   }
 
   // Handle the CPU and its preferences.
-  if (auto arg = inputArgs.getLastArg(options::OPT_target_cpu))
-    arg->render(inputArgs, arguments);
+  inputArgs.AddLastArg(arguments, options::OPT_target_cpu);
 
   if (!OI.SDKPath.empty()) {
     arguments.push_back("-sdk");
     arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
+  }
+
+  if (llvm::sys::Process::StandardErrHasColors()) {
+    arguments.push_back("-color-diagnostics");
   }
 
   inputArgs.AddAllArgs(arguments, options::OPT_I);
@@ -124,15 +183,24 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
-  inputArgs.AddLastArg(arguments, options::OPT_color_diagnostics);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_color_diagnostics,
+                       options::OPT_no_color_diagnostics);
   inputArgs.AddLastArg(arguments, options::OPT_fixit_all);
   inputArgs.AddLastArg(arguments,
                        options::OPT_warn_swift3_objc_inference_minimal,
                        options::OPT_warn_swift3_objc_inference_complete);
+  inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_cxx_interop);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
+  inputArgs.AddLastArg(arguments, options::OPT_debug_info_format);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
@@ -142,212 +210,168 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_solver_memory_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_value_recursion_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_warn_swift3_objc_inference);
+  inputArgs.AddLastArg(arguments, options::OPT_Rpass_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_Rpass_missed_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_warnings);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
-  inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
+  inputArgs.AddAllArgs(arguments, options::OPT_warnings_as_errors,
+                       options::OPT_no_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
+  inputArgs.AddLastArg(arguments, options::OPT_trace_stats_events);
+  inputArgs.AddLastArg(arguments, options::OPT_profile_stats_events);
+  inputArgs.AddLastArg(arguments, options::OPT_profile_stats_entities);
   inputArgs.AddLastArg(arguments,
                        options::OPT_solver_shrink_unsolved_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
+  inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
+  inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_type_fingerprints);
+  inputArgs.AddLastArg(arguments, options::OPT_disable_type_fingerprints);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_fine_grained_dependency_include_intrafile);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_emit_fine_grained_dependency_sourcefile_dot_files);
+  inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
+  inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
+  inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
+  inputArgs.AddLastArg(arguments, options::OPT_print_educational_notes);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);
+  inputArgs.AddLastArg(arguments, options::OPT_disable_astscope_lookup);
+  inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_experimental_concise_pound_file);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_verify_incremental_dependencies);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_experimental_private_intransitive_dependencies);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
+  // Pass on file paths that should be remapped in debug info.
+  inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map);
+
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
+
+  // Pass on module names whose symbols should be embeded in tbd.
+  inputArgs.AddAllArgs(arguments, options::OPT_embed_tbd_for_module);
+
+  if (auto *A = inputArgs.getLastArg(options::OPT_working_directory)) {
+    // Add -Xcc -working-directory before any other -Xcc options to ensure it is
+    // overridden by an explicit -Xcc -working-directory, although having a
+    // different working directory is probably incorrect.
+    SmallString<128> workingDirectory(A->getValue());
+    llvm::sys::fs::make_absolute(workingDirectory);
+    arguments.push_back("-Xcc");
+    arguments.push_back("-working-directory");
+    arguments.push_back("-Xcc");
+    arguments.push_back(inputArgs.MakeArgString(workingDirectory));
+  }
+
+  // -g implies -enable-anonymous-context-mangled-names, because the extra
+  // metadata aids debugging.
+  if (inputArgs.hasArg(options::OPT_g)) {
+    // But don't add the option in optimized builds: it would prevent dead code
+    // stripping of unused metadata.
+    auto OptArg = inputArgs.getLastArgNoClaim(options::OPT_O_Group);
+    if (!OptArg || OptArg->getOption().matches(options::OPT_Onone))
+      arguments.push_back("-enable-anonymous-context-mangled-names");
+  }
 
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
-
-  const std::string &moduleDocOutputPath =
-      output.getAdditionalOutputForType(types::TY_SwiftModuleDocFile);
-  if (!moduleDocOutputPath.empty()) {
-    arguments.push_back("-emit-module-doc-path");
-    arguments.push_back(moduleDocOutputPath.c_str());
-  }
-
-  if (llvm::sys::Process::StandardErrHasColors())
-    arguments.push_back("-color-diagnostics");
-
-  const std::string &SerializedDiagnosticsPath =
-    output.getAdditionalOutputForType(types::TY_SerializedDiagnostics);
-  if (!SerializedDiagnosticsPath.empty()) {
-    arguments.push_back("-serialize-diagnostics-path");
-    arguments.push_back(SerializedDiagnosticsPath.c_str());
-  }
 }
 
+static void addRuntimeLibraryFlags(const OutputInfo &OI,
+                                   ArgStringList &Arguments) {
+  if (!OI.RuntimeVariant)
+    return;
+
+  const OutputInfo::MSVCRuntime RT = OI.RuntimeVariant.getValue();
+
+  Arguments.push_back("-autolink-library");
+  Arguments.push_back("oldnames");
+
+  Arguments.push_back("-autolink-library");
+  switch (RT) {
+  case OutputInfo::MSVCRuntime::MultiThreaded:
+    Arguments.push_back("libcmt");
+    break;
+
+  case OutputInfo::MSVCRuntime::MultiThreadedDebug:
+    Arguments.push_back("libcmtd");
+    break;
+
+  case OutputInfo::MSVCRuntime::MultiThreadedDLL:
+    Arguments.push_back("msvcrt");
+    break;
+
+  case OutputInfo::MSVCRuntime::MultiThreadedDebugDLL:
+    Arguments.push_back("msvcrtd");
+    break;
+  }
+
+  // NOTE(compnerd) we do not support /ML and /MLd
+  Arguments.push_back("-Xcc");
+  Arguments.push_back("-D_MT");
+
+  if (RT == OutputInfo::MSVCRuntime::MultiThreadedDLL ||
+      RT == OutputInfo::MSVCRuntime::MultiThreadedDebugDLL) {
+    Arguments.push_back("-Xcc");
+    Arguments.push_back("-D_DLL");
+  }
+}
 
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const CompileJobAction &job,
                                const JobContext &context) const {
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
-  // Determine the frontend mode option.
-  const char *FrontendModeOption = nullptr;
-  switch (context.OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::SingleCompile: {
-    switch (context.Output.getPrimaryOutputType()) {
-    case types::TY_Object:
-      FrontendModeOption = "-c";
-      break;
-    case types::TY_PCH:
-      FrontendModeOption = "-emit-pch";
-      break;
-    case types::TY_RawSIL:
-      FrontendModeOption = "-emit-silgen";
-      break;
-    case types::TY_SIL:
-      FrontendModeOption = "-emit-sil";
-      break;
-    case types::TY_RawSIB:
-      FrontendModeOption = "-emit-sibgen";
-      break;
-    case types::TY_SIB:
-      FrontendModeOption = "-emit-sib";
-      break;
-    case types::TY_LLVM_IR:
-      FrontendModeOption = "-emit-ir";
-      break;
-    case types::TY_LLVM_BC:
-      FrontendModeOption = "-emit-bc";
-      break;
-    case types::TY_Assembly:
-      FrontendModeOption = "-S";
-      break;
-    case types::TY_SwiftModuleFile:
-      // Since this is our primary output, we need to specify the option here.
-      FrontendModeOption = "-emit-module";
-      break;
-    case types::TY_ImportedModules:
-      FrontendModeOption = "-emit-imported-modules";
-      break;
-
-    // BEGIN APPLE-ONLY OUTPUT TYPES
-    case types::TY_IndexData:
-      FrontendModeOption = "-typecheck";
-      break;
-    // END APPLE-ONLY OUTPUT TYPES
-
-    case types::TY_Remapping:
-      FrontendModeOption = "-update-code";
-      break;
-    case types::TY_Nothing:
-      // We were told to output nothing, so get the last mode option and use that.
-      if (const Arg *A = context.Args.getLastArg(options::OPT_modes_Group))
-        FrontendModeOption = A->getSpelling().data();
-      else
-        llvm_unreachable("We were told to perform a standard compile, "
-                         "but no mode option was passed to the driver.");
-      break;
-    case types::TY_Swift:
-    case types::TY_dSYM:
-    case types::TY_AutolinkFile:
-    case types::TY_Dependencies:
-    case types::TY_SwiftModuleDocFile:
-    case types::TY_ClangModuleFile:
-    case types::TY_SerializedDiagnostics:
-    case types::TY_ObjCHeader:
-    case types::TY_Image:
-    case types::TY_SwiftDeps:
-    case types::TY_ModuleTrace:
-    case types::TY_TBD:
-      llvm_unreachable("Output type can never be primary output.");
-    case types::TY_INVALID:
-      llvm_unreachable("Invalid type ID");
-    }
-    break;
-  }
-  case OutputInfo::Mode::Immediate:
-  case OutputInfo::Mode::REPL:
-    llvm_unreachable("REPL and immediate modes handled elsewhere");
+  {
+    // Determine the frontend mode option.
+    const char *FrontendModeOption = context.computeFrontendModeForCompile();
+    assert(FrontendModeOption != nullptr &&
+           "No frontend mode option specified!");
+    Arguments.push_back(FrontendModeOption);
   }
 
-  assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
-  
-  Arguments.push_back(FrontendModeOption);
+  context.addFrontendInputAndOutputArguments(Arguments, II.FilelistInfos);
 
-  // Add input arguments.
-  switch (context.OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile: {
-    assert(context.InputActions.size() == 1 &&
-           "The Swift frontend expects exactly one input (the primary file)!");
-
-    auto *IA = cast<InputAction>(context.InputActions[0]);
-    const Arg &PrimaryInputArg = IA->getInputArg();
-
-    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-        context.getTopLevelInputFiles().size() > TOO_MANY_FILES) {
-      Arguments.push_back("-filelist");
-      Arguments.push_back(context.getAllSourcesPath());
-      Arguments.push_back("-primary-file");
-      PrimaryInputArg.render(context.Args, Arguments);
-    } else {
-      bool FoundPrimaryInput = false;
-      for (auto inputPair : context.getTopLevelInputFiles()) {
-        if (!types::isPartOfSwiftCompilation(inputPair.first))
-          continue;
-
-        // See if this input should be passed with -primary-file.
-        if (!FoundPrimaryInput &&
-            PrimaryInputArg.getIndex() == inputPair.second->getIndex()) {
-          Arguments.push_back("-primary-file");
-          FoundPrimaryInput = true;
-        }
-        Arguments.push_back(inputPair.second->getValue());
-
-        // Forward migrator flags.
-        if (auto DataPath = context.Args.getLastArg(options::
-                                                    OPT_api_diff_data_file)) {
-          Arguments.push_back("-api-diff-data-file");
-          Arguments.push_back(DataPath->getValue());
-        }
-        if (context.Args.hasArg(options::OPT_dump_usr)) {
-          Arguments.push_back("-dump-usr");
-        }
-      }
-    }
-    break;
+  // Forward migrator flags.
+  if (auto DataPath =
+          context.Args.getLastArg(options::OPT_api_diff_data_file)) {
+    Arguments.push_back("-api-diff-data-file");
+    Arguments.push_back(DataPath->getValue());
   }
-  case OutputInfo::Mode::SingleCompile: {
-    if (context.Output.getPrimaryOutputType() == types::TY_IndexData) {
-      if (Arg *A = context.Args.getLastArg(options::OPT_index_file_path)) {
-        Arguments.push_back("-primary-file");
-        Arguments.push_back(A->getValue());
-      }
-    }
-    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-        context.InputActions.size() > TOO_MANY_FILES) {
-      Arguments.push_back("-filelist");
-      Arguments.push_back(context.getAllSourcesPath());
-    } else {
-      for (const Action *A : context.InputActions) {
-        cast<InputAction>(A)->getInputArg().render(context.Args, Arguments);
-      }
-    }
-    break;
+  if (auto DataDir = context.Args.getLastArg(options::OPT_api_diff_data_dir)) {
+    Arguments.push_back("-api-diff-data-dir");
+    Arguments.push_back(DataDir->getValue());
   }
-
-  case OutputInfo::Mode::Immediate:
-  case OutputInfo::Mode::REPL:
-    llvm_unreachable("REPL and immediate modes handled elsewhere");
+  if (context.Args.hasArg(options::OPT_dump_usr)) {
+    Arguments.push_back("-dump-usr");
   }
 
   if (context.Args.hasArg(options::OPT_parse_stdlib))
     Arguments.push_back("-disable-objc-attr-requires-foundation-module");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
+  addRuntimeLibraryFlags(context.OI, Arguments);
 
   // Pass along an -import-objc-header arg, replacing the argument with the name
   // of any input PCH to the current action if one is present.
@@ -355,15 +379,15 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     bool ForwardAsIs = true;
     bool bridgingPCHIsEnabled =
         context.Args.hasFlag(options::OPT_enable_bridging_pch,
-                             options::OPT_disable_bridging_pch,
-                             true);
+                             options::OPT_disable_bridging_pch, true);
     bool usePersistentPCH = bridgingPCHIsEnabled &&
-        context.Args.hasArg(options::OPT_pch_output_dir);
+                            context.Args.hasArg(options::OPT_pch_output_dir);
     if (!usePersistentPCH) {
       for (auto *IJ : context.Inputs) {
-        if (!IJ->getOutput().getAnyOutputForType(types::TY_PCH).empty()) {
+        if (!IJ->getOutput().getAnyOutputForType(file_types::TY_PCH).empty()) {
           Arguments.push_back("-import-objc-header");
-          addInputsOfType(Arguments, context.Inputs, types::TY_PCH);
+          addInputsOfType(Arguments, context.Inputs, context.Args,
+                          file_types::TY_PCH);
           ForwardAsIs = false;
           break;
         }
@@ -374,11 +398,19 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     }
     if (usePersistentPCH) {
       context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
-      if (context.OI.CompilerMode == OutputInfo::Mode::StandardCompile) {
+      switch (context.OI.CompilerMode) {
+      case OutputInfo::Mode::StandardCompile:
+      case OutputInfo::Mode::BatchModeCompile:
         // In the 'multiple invocations for each file' mode we don't need to
         // validate the PCH every time, it has been validated with the initial
         // -emit-pch invocation.
         Arguments.push_back("-pch-disable-validation");
+        break;
+
+      case OutputInfo::Mode::Immediate:
+      case OutputInfo::Mode::REPL:
+      case OutputInfo::Mode::SingleCompile:
+        break;
       }
     }
   }
@@ -392,62 +424,40 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
-  const std::string &ModuleOutputPath =
-    context.Output.getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
-  if (!ModuleOutputPath.empty()) {
-    Arguments.push_back("-emit-module-path");
-    Arguments.push_back(ModuleOutputPath.c_str());
+  if (context.Args.hasArg(options::OPT_CrossModuleOptimization)) {
+    Arguments.push_back("-cross-module-optimization");
   }
+                                 
 
-  const std::string &ObjCHeaderOutputPath =
-    context.Output.getAdditionalOutputForType(types::ID::TY_ObjCHeader);
-  if (!ObjCHeaderOutputPath.empty()) {
-    assert(context.OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
-           "The Swift tool should only emit an Obj-C header in single compile"
-           "mode!");
-
-    Arguments.push_back("-emit-objc-header-path");
-    Arguments.push_back(ObjCHeaderOutputPath.c_str());
+  file_types::ID remarksFileType = file_types::TY_YAMLOptRecord;
+  // If a specific format is specified for the remarks, forward that as is.
+  if (auto remarksFormat =
+          context.Args.getLastArg(options::OPT_save_optimization_record_EQ)) {
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-save-optimization-record=") + remarksFormat->getValue()));
+    // If that's the case, add the proper output file for the type.
+    if (llvm::Expected<file_types::ID> fileType =
+            remarkFileTypeFromArgs(context.Args))
+      remarksFileType = *fileType;
+    else
+      consumeError(fileType.takeError()); // Don't report errors here. This will
+                                          // be reported later anyway.
   }
+  addOutputsOfType(Arguments, context.Output, context.Args, remarksFileType,
+                   "-save-optimization-record-path");
 
-  const std::string &DependenciesPath =
-    context.Output.getAdditionalOutputForType(types::TY_Dependencies);
-  if (!DependenciesPath.empty()) {
-    Arguments.push_back("-emit-dependencies-path");
-    Arguments.push_back(DependenciesPath.c_str());
-  }
-
-  const std::string &ReferenceDependenciesPath =
-    context.Output.getAdditionalOutputForType(types::TY_SwiftDeps);
-  if (!ReferenceDependenciesPath.empty()) {
-    Arguments.push_back("-emit-reference-dependencies-path");
-    Arguments.push_back(ReferenceDependenciesPath.c_str());
-  }
-
-  const std::string &LoadedModuleTracePath =
-      context.Output.getAdditionalOutputForType(types::TY_ModuleTrace);
-  if (!LoadedModuleTracePath.empty()) {
-    Arguments.push_back("-emit-loaded-module-trace-path");
-    Arguments.push_back(LoadedModuleTracePath.c_str());
-  }
-
-  const std::string &TBDPath =
-      context.Output.getAdditionalOutputForType(types::TY_TBD);
-  if (!TBDPath.empty()) {
-    Arguments.push_back("-emit-tbd-path");
-    Arguments.push_back(TBDPath.c_str());
+  if (auto remarksFilter = context.Args.getLastArg(
+          options::OPT_save_optimization_record_passes)) {
+    Arguments.push_back("-save-optimization-record-passes");
+    Arguments.push_back(remarksFilter->getValue());
   }
 
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
     Arguments.push_back("-migrate-keep-objc-visibility");
   }
 
-  const std::string &FixitsPath =
-    context.Output.getAdditionalOutputForType(types::TY_Remapping);
-  if (!FixitsPath.empty()) {
-    Arguments.push_back("-emit-remap-file-path");
-    Arguments.push_back(FixitsPath.c_str());
-  }
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_Remapping, "-emit-remap-file-path");
 
   if (context.OI.numThreads > 0) {
     Arguments.push_back("-num-threads");
@@ -456,18 +466,17 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   }
 
   // Add the output file argument if necessary.
-  if (context.Output.getPrimaryOutputType() != types::TY_Nothing) {
-    if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-        context.Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES) {
+  if (context.Output.getPrimaryOutputType() != file_types::TY_Nothing) {
+    if (context.shouldUseMainOutputFileListInFrontendInvocation()) {
       Arguments.push_back("-output-filelist");
       Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
-      II.FilelistInfo = {Arguments.back(),
-                         context.Output.getPrimaryOutputType(),
-                         FilelistInfo::Output};
+      II.FilelistInfos.push_back({Arguments.back(),
+                                  context.Output.getPrimaryOutputType(),
+                                  FilelistInfo::WhichFiles::Output});
     } else {
-      for (auto &FileName : context.Output.getPrimaryOutputFilenames()) {
+      for (auto FileName : context.Output.getPrimaryOutputFilenames()) {
         Arguments.push_back("-o");
-        Arguments.push_back(FileName.c_str());
+        Arguments.push_back(context.Args.MakeArgString(FileName));
       }
     }
   }
@@ -475,20 +484,271 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasArg(options::OPT_embed_bitcode_marker))
     Arguments.push_back("-embed-bitcode-marker");
 
-  if (context.Args.hasArg(options::OPT_index_store_path)) {
-    context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
-    Arguments.push_back("-index-system-modules");
+  // For `-index-file` mode add `-disable-typo-correction`, since the errors
+  // will be ignored and it can be expensive to do typo-correction.
+  if (job.getType() == file_types::TY_IndexData) {
+    Arguments.push_back("-disable-typo-correction");
   }
 
+  if (context.Args.hasArg(options::OPT_index_store_path)) {
+    context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
+    if (!context.Args.hasArg(options::OPT_index_ignore_system_modules))
+      Arguments.push_back("-index-system-modules");
+  }
+
+  if (context.Args.hasArg(options::OPT_debug_info_store_invocation) ||
+      shouldStoreInvocationInDebugInfo()) {
+    Arguments.push_back("-debug-info-store-invocation");
+  }
+
+  if (context.Args.hasArg(
+                      options::OPT_disable_autolinking_runtime_compatibility)) {
+    Arguments.push_back("-disable-autolinking-runtime-compatibility");
+  }
+                                 
+  if (auto arg = context.Args.getLastArg(
+                                  options::OPT_runtime_compatibility_version)) {
+    Arguments.push_back("-runtime-compatibility-version");
+    Arguments.push_back(arg->getValue());
+  }
+  if (context.Args.hasArg(options::OPT_track_system_dependencies)) {
+    Arguments.push_back("-track-system-dependencies");
+  }
+
+  context.Args.AddLastArg(
+      Arguments,
+      options::
+          OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
+
   return II;
+}
+
+const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
+  switch (OI.CompilerMode) {
+  case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::BatchModeCompile:
+    break;
+  case OutputInfo::Mode::Immediate:
+  case OutputInfo::Mode::REPL:
+    llvm_unreachable("REPL and immediate modes handled elsewhere");
+  }
+  switch (Output.getPrimaryOutputType()) {
+  case file_types::TY_Object:
+    return "-c";
+  case file_types::TY_PCH:
+    return "-emit-pch";
+  case file_types::TY_ASTDump:
+    return "-dump-ast";
+  case file_types::TY_RawSIL:
+    return "-emit-silgen";
+  case file_types::TY_SIL:
+    return "-emit-sil";
+  case file_types::TY_RawSIB:
+    return "-emit-sibgen";
+  case file_types::TY_SIB:
+    return "-emit-sib";
+  case file_types::TY_LLVM_IR:
+    return "-emit-ir";
+  case file_types::TY_LLVM_BC:
+    return "-emit-bc";
+  case file_types::TY_ClangModuleFile:
+    return "-emit-pcm";
+  case file_types::TY_Assembly:
+    return "-S";
+  case file_types::TY_SwiftModuleFile:
+    // Since this is our primary output, we need to specify the option here.
+    return "-emit-module";
+  case file_types::TY_ImportedModules:
+    return "-emit-imported-modules";
+  case file_types::TY_JSONDependencies:
+    return "-scan-dependencies";
+  case file_types::TY_IndexData:
+    return "-typecheck";
+  case file_types::TY_Remapping:
+    return "-update-code";
+  case file_types::TY_Nothing:
+    // We were told to output nothing, so get the last mode option and use that.
+    if (const Arg *A = Args.getLastArg(options::OPT_modes_Group))
+      return A->getSpelling().data();
+    else
+      llvm_unreachable("We were told to perform a standard compile, "
+                       "but no mode option was passed to the driver.");
+  case file_types::TY_Swift:
+  case file_types::TY_dSYM:
+  case file_types::TY_AutolinkFile:
+  case file_types::TY_Dependencies:
+  case file_types::TY_SwiftModuleDocFile:
+  case file_types::TY_SerializedDiagnostics:
+  case file_types::TY_ObjCHeader:
+  case file_types::TY_Image:
+  case file_types::TY_SwiftDeps:
+  case file_types::TY_SwiftRanges:
+  case file_types::TY_CompiledSource:
+  case file_types::TY_ModuleTrace:
+  case file_types::TY_TBD:
+  case file_types::TY_YAMLOptRecord:
+  case file_types::TY_BitstreamOptRecord:
+  case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_PrivateSwiftModuleInterfaceFile:
+  case file_types::TY_SwiftSourceInfoFile:
+  case file_types::TY_SwiftCrossImportDir:
+  case file_types::TY_SwiftOverlayFile:
+    llvm_unreachable("Output type can never be primary output.");
+  case file_types::TY_INVALID:
+    llvm_unreachable("Invalid type ID");
+  }
+  llvm_unreachable("unhandled output type");
+}
+
+void ToolChain::JobContext::addFrontendInputAndOutputArguments(
+    ArgStringList &Arguments, std::vector<FilelistInfo> &FilelistInfos) const {
+
+  switch (OI.CompilerMode) {
+  case OutputInfo::Mode::StandardCompile:
+    assert(InputActions.size() == 1 &&
+           "Standard-compile mode takes exactly one input (the primary file)");
+    break;
+  case OutputInfo::Mode::BatchModeCompile:
+  case OutputInfo::Mode::SingleCompile:
+    break;
+  case OutputInfo::Mode::Immediate:
+  case OutputInfo::Mode::REPL:
+    llvm_unreachable("REPL and immediate modes handled elsewhere");
+  }
+
+  const bool UseFileList = shouldUseInputFileList();
+  const bool MayHavePrimaryInputs = OI.mightHaveExplicitPrimaryInputs(Output);
+  const bool UsePrimaryFileList =
+      MayHavePrimaryInputs &&
+      shouldUsePrimaryInputFileListInFrontendInvocation();
+  const bool FilterInputsByType = shouldFilterFrontendInputsByType();
+  const bool UseSupplementaryOutputFileList =
+      shouldUseSupplementaryOutputFileMapInFrontendInvocation();
+
+  assert((C.getFilelistThreshold() != Compilation::NEVER_USE_FILELIST ||
+          !UseFileList && !UsePrimaryFileList &&
+              !UseSupplementaryOutputFileList) &&
+         "No filelists are used if FilelistThreshold=NEVER_USE_FILELIST");
+
+  if (UseFileList) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(getAllSourcesPath());
+  }
+  if (UsePrimaryFileList) {
+    Arguments.push_back("-primary-filelist");
+    Arguments.push_back(getTemporaryFilePath("primaryInputs", ""));
+    FilelistInfos.push_back({Arguments.back(), file_types::TY_Swift,
+                             FilelistInfo::WhichFiles::SourceInputActions});
+  }
+  if (!UseFileList || !UsePrimaryFileList) {
+    addFrontendCommandLineInputArguments(MayHavePrimaryInputs, UseFileList,
+                                         UsePrimaryFileList, FilterInputsByType,
+                                         Arguments);
+  }
+
+  if (UseSupplementaryOutputFileList) {
+    Arguments.push_back("-supplementary-output-file-map");
+    Arguments.push_back(getTemporaryFilePath("supplementaryOutputs", ""));
+    FilelistInfos.push_back({Arguments.back(), file_types::TY_INVALID,
+                             FilelistInfo::WhichFiles::SupplementaryOutput});
+  } else {
+    addFrontendSupplementaryOutputArguments(Arguments);
+  }
+}
+
+void ToolChain::JobContext::addFrontendCommandLineInputArguments(
+    const bool mayHavePrimaryInputs, const bool useFileList,
+    const bool usePrimaryFileList, const bool filterByType,
+    ArgStringList &arguments) const {
+  llvm::DenseSet<StringRef> primaries;
+
+  if (mayHavePrimaryInputs) {
+    for (const Action *A : InputActions) {
+      const auto *IA = cast<InputAction>(A);
+      const llvm::opt::Arg &InArg = IA->getInputArg();
+      primaries.insert(InArg.getValue());
+    }
+  }
+  // -index-file compilations are weird. They are processed as SingleCompiles
+  // (WMO), but must indicate that there is one primary file, designated by
+  // -index-file-path.
+  if (Arg *A = Args.getLastArg(options::OPT_index_file_path)) {
+    assert(primaries.empty() &&
+           "index file jobs should be treated as single (WMO) compiles");
+    primaries.insert(A->getValue());
+  }
+  for (auto inputPair : getTopLevelInputFiles()) {
+    if (filterByType && !file_types::isPartOfSwiftCompilation(inputPair.first))
+      continue;
+    const char *inputName = inputPair.second->getValue();
+    const bool isPrimary = primaries.count(inputName);
+    if (isPrimary && !usePrimaryFileList) {
+      arguments.push_back("-primary-file");
+      arguments.push_back(inputName);
+    }
+    if ((!isPrimary || usePrimaryFileList) && !useFileList)
+      arguments.push_back(inputName);
+  }
+}
+
+void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
+    ArgStringList &arguments) const {
+  // FIXME: Get these and other argument strings from the same place for both
+  // driver and frontend.
+  addOutputsOfType(arguments, Output, Args, file_types::ID::TY_SwiftModuleFile,
+                   "-emit-module-path");
+
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftModuleDocFile,
+                   "-emit-module-doc-path");
+
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftSourceInfoFile,
+                   "-emit-module-source-info-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_SwiftModuleInterfaceFile,
+                   "-emit-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
+
+  if (addOutputsOfType(arguments, Output, Args, file_types::ID::TY_ObjCHeader,
+                       "-emit-objc-header-path")) {
+    assert(OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
+           "The Swift tool should only emit an Obj-C header in single compile"
+           "mode!");
+  }
+
+  addOutputsOfType(arguments, Output, Args, file_types::TY_Dependencies,
+                   "-emit-dependencies-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftDeps,
+                   "-emit-reference-dependencies-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftRanges,
+                   "-emit-swift-ranges-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_CompiledSource,
+                   "-emit-compiled-source-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_ModuleTrace,
+                   "-emit-loaded-module-trace-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_TBD,
+                   "-emit-tbd-path");
 }
 
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const InterpretJobAction &job,
                                const JobContext &context) const {
   assert(context.OI.CompilerMode == OutputInfo::Mode::Immediate);
-  ArgStringList Arguments;
 
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
+
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
   Arguments.push_back("-interpret");
 
@@ -502,8 +762,9 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   if (context.Args.hasArg(options::OPT_parse_stdlib))
     Arguments.push_back("-disable-objc-attr-requires-foundation-module");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
+  addRuntimeLibraryFlags(context.OI, Arguments);
+
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_sil);
@@ -516,7 +777,7 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   // The immediate arguments must be last.
   context.Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
 
-  return {SWIFT_EXECUTABLE_NAME, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo
@@ -525,6 +786,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   assert(context.Args.hasArg(options::OPT_embed_bitcode));
   ArgStringList Arguments;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   // Determine the frontend mode option.
@@ -533,20 +796,21 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile: {
     switch (context.Output.getPrimaryOutputType()) {
-    case types::TY_Object:
+    case file_types::TY_Object:
       FrontendModeOption = "-c";
       break;
-    case types::TY_LLVM_IR:
+    case file_types::TY_LLVM_IR:
       FrontendModeOption = "-emit-ir";
       break;
-    case types::TY_LLVM_BC:
+    case file_types::TY_LLVM_BC:
       FrontendModeOption = "-emit-bc";
       break;
-    case types::TY_Assembly:
+    case file_types::TY_Assembly:
       FrontendModeOption = "-S";
       break;
-    case types::TY_Nothing:
-      // We were told to output nothing, so get the last mode option and use that.
+    case file_types::TY_Nothing:
+      // We were told to output nothing, so get the last mode option and use
+      // that.
       if (const Arg *A = context.Args.getLastArg(options::OPT_modes_Group))
         FrontendModeOption = A->getSpelling().data();
       else
@@ -554,41 +818,53 @@ ToolChain::constructInvocation(const BackendJobAction &job,
                          "but no mode option was passed to the driver.");
       break;
 
-    case types::TY_ImportedModules:
-    case types::TY_TBD:
-    case types::TY_SwiftModuleFile:
-    case types::TY_RawSIL:
-    case types::TY_RawSIB:
-    case types::TY_SIL:
-    case types::TY_SIB:
-    case types::TY_PCH:
-    case types::TY_IndexData:
+    case file_types::TY_ImportedModules:
+    case file_types::TY_TBD:
+    case file_types::TY_SwiftModuleFile:
+    case file_types::TY_ASTDump:
+    case file_types::TY_RawSIL:
+    case file_types::TY_RawSIB:
+    case file_types::TY_SIL:
+    case file_types::TY_SIB:
+    case file_types::TY_PCH:
+    case file_types::TY_ClangModuleFile:
+    case file_types::TY_IndexData:
+    case file_types::TY_JSONDependencies:
       llvm_unreachable("Cannot be output from backend job");
-    case types::TY_Swift:
-    case types::TY_dSYM:
-    case types::TY_AutolinkFile:
-    case types::TY_Dependencies:
-    case types::TY_SwiftModuleDocFile:
-    case types::TY_ClangModuleFile:
-    case types::TY_SerializedDiagnostics:
-    case types::TY_ObjCHeader:
-    case types::TY_Image:
-    case types::TY_SwiftDeps:
-    case types::TY_Remapping:
-    case types::TY_ModuleTrace:
+    case file_types::TY_Swift:
+    case file_types::TY_dSYM:
+    case file_types::TY_AutolinkFile:
+    case file_types::TY_Dependencies:
+    case file_types::TY_SwiftModuleDocFile:
+    case file_types::TY_SerializedDiagnostics:
+    case file_types::TY_ObjCHeader:
+    case file_types::TY_Image:
+    case file_types::TY_SwiftDeps:
+    case file_types::TY_SwiftRanges:
+    case file_types::TY_CompiledSource:
+    case file_types::TY_Remapping:
+    case file_types::TY_ModuleTrace:
+    case file_types::TY_YAMLOptRecord:
+    case file_types::TY_BitstreamOptRecord:
+    case file_types::TY_SwiftModuleInterfaceFile:
+    case file_types::TY_PrivateSwiftModuleInterfaceFile:
+    case file_types::TY_SwiftSourceInfoFile:
+    case file_types::TY_SwiftCrossImportDir:
+    case file_types::TY_SwiftOverlayFile:
       llvm_unreachable("Output type can never be primary output.");
-    case types::TY_INVALID:
+    case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
     }
     break;
   }
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("invalid mode for backend job");
   }
 
   assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
-  
+
   Arguments.push_back(FrontendModeOption);
 
   // Add input arguments.
@@ -597,27 +873,32 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     assert(context.Inputs.size() == 1 && "The backend expects one input!");
     Arguments.push_back("-primary-file");
     const Job *Cmd = context.Inputs.front();
-    Arguments.push_back(
-      Cmd->getOutput().getPrimaryOutputFilename().c_str());
+    Arguments.push_back(context.Args.MakeArgString(
+        Cmd->getOutput().getPrimaryOutputFilename()));
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
     assert(context.Inputs.size() == 1 && "The backend expects one input!");
     Arguments.push_back("-primary-file");
     const Job *Cmd = context.Inputs.front();
-    
+
     // In multi-threaded compilation, the backend job must select the correct
     // output file of the compilation job.
     auto OutNames = Cmd->getOutput().getPrimaryOutputFilenames();
-    Arguments.push_back(OutNames[job.getInputIndex()].c_str());
+    Arguments.push_back(
+        context.Args.MakeArgString(OutNames[job.getInputIndex()]));
     break;
   }
+  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("invalid mode for backend job");
   }
 
-  // Only white-listed flags below are allowed to be embedded.
+  // Add flags implied by -embed-bitcode.
+  Arguments.push_back("-embed-bitcode");
+
+  // -embed-bitcode only supports a restricted set of flags.
   Arguments.push_back("-target");
   Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
 
@@ -628,8 +909,11 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
 
   // Handle the CPU and its preferences.
-  if (auto arg = context.Args.getLastArg(options::OPT_target_cpu))
-    arg->render(context.Args, Arguments);
+  context.Args.AddLastArg(Arguments, options::OPT_target_cpu);
+
+  // Enable optimizations, but disable all LLVM-IR-level transformations.
+  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
+  Arguments.push_back("-disable-llvm-optzns");
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
 
@@ -637,17 +921,12 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
   // Add the output file argument if necessary.
-  if (context.Output.getPrimaryOutputType() != types::TY_Nothing) {
-    for (auto &FileName : context.Output.getPrimaryOutputFilenames()) {
+  if (context.Output.getPrimaryOutputType() != file_types::TY_Nothing) {
+    for (auto FileName : context.Output.getPrimaryOutputFilenames()) {
       Arguments.push_back("-o");
-      Arguments.push_back(FileName.c_str());
+      Arguments.push_back(context.Args.MakeArgString(FileName));
     }
   }
-
-  // Add flags implied by -embed-bitcode.
-  Arguments.push_back("-embed-bitcode");
-  // Disable all llvm IR level optimizations.
-  Arguments.push_back("-disable-llvm-optzns");
 
   return {SWIFT_EXECUTABLE_NAME, Arguments};
 }
@@ -657,28 +936,36 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                                const JobContext &context) const {
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   Arguments.push_back("-merge-modules");
   Arguments.push_back("-emit-module");
 
-  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-      context.Inputs.size() > TOO_MANY_FILES) {
+  if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", ""));
-    II.FilelistInfo = {Arguments.back(), types::TY_SwiftModuleFile,
-                       FilelistInfo::Input};
+    II.FilelistInfos.push_back({Arguments.back(),
+                                file_types::TY_SwiftModuleFile,
+                                FilelistInfo::WhichFiles::InputJobs});
 
-    addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
+    addInputsOfType(Arguments, context.InputActions,
+                    file_types::TY_SwiftModuleFile);
   } else {
     size_t origLen = Arguments.size();
     (void)origLen;
-    addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
-    addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
+    addInputsOfType(Arguments, context.Inputs, context.Args,
+                    file_types::TY_SwiftModuleFile);
+    addInputsOfType(Arguments, context.InputActions,
+                    file_types::TY_SwiftModuleFile);
     assert(Arguments.size() - origLen >=
-           context.Inputs.size() + context.InputActions.size());
+               context.Inputs.size() + context.InputActions.size() ||
+           context.OI.CompilerOutputType == file_types::TY_Nothing);
     assert((Arguments.size() - origLen == context.Inputs.size() ||
+            context.OI.CompilerOutputType == file_types::TY_Nothing ||
             !context.InputActions.empty()) &&
            "every input to MergeModule must generate a swiftmodule");
   }
@@ -687,22 +974,44 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   // serialized ASTs.
   Arguments.push_back("-parse-as-library");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  // Merge serialized SIL from partial modules.
+  Arguments.push_back("-sil-merge-partial-modules");
+
+  // Disable SIL optimization passes; we've already optimized the code in each
+  // partial mode.
+  Arguments.push_back("-disable-diagnostic-passes");
+  Arguments.push_back("-disable-sil-perf-optzns");
+
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
+  addRuntimeLibraryFlags(context.OI, Arguments);
+
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_SwiftModuleDocFile, "-emit-module-doc-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_SwiftSourceInfoFile,
+                   "-emit-module-source-info-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_SwiftModuleInterfaceFile,
+                   "-emit-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
+                   "-emit-private-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_ObjCHeader, "-emit-objc-header-path");
+  addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
+                   "-emit-tbd-path");
+
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
-  assert(context.Output.getPrimaryOutputType() == types::TY_SwiftModuleFile &&
+  assert(context.Output.getPrimaryOutputType() ==
+             file_types::TY_SwiftModuleFile &&
          "The MergeModule tool only produces swiftmodule files!");
-
-  const std::string &ObjCHeaderOutputPath =
-    context.Output.getAdditionalOutputForType(types::TY_ObjCHeader);
-  if (!ObjCHeaderOutputPath.empty()) {
-    Arguments.push_back("-emit-objc-header-path");
-    Arguments.push_back(ObjCHeaderOutputPath.c_str());
-  }
 
   Arguments.push_back("-o");
   Arguments.push_back(
@@ -714,26 +1023,32 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const ModuleWrapJobAction &job,
                                const JobContext &context) const {
-  ArgStringList Arguments;
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-modulewrap");
 
-  addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
-  addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
+  addInputsOfType(Arguments, context.Inputs, context.Args,
+                  file_types::TY_SwiftModuleFile);
+  addInputsOfType(Arguments, context.InputActions,
+                  file_types::TY_SwiftModuleFile);
   assert(Arguments.size() == 2 &&
          "ModuleWrap expects exactly one merged swiftmodule as input");
 
-  assert(context.Output.getPrimaryOutputType() == types::TY_Object &&
+  assert(context.Output.getPrimaryOutputType() == file_types::TY_Object &&
          "The -modulewrap mode only produces object files");
 
   Arguments.push_back("-target");
   Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
-    
+
   Arguments.push_back("-o");
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {SWIFT_EXECUTABLE_NAME, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo
@@ -757,8 +1072,12 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   }
 
   ArgStringList FrontendArgs;
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        FrontendArgs);
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    FrontendArgs.push_back(s.c_str());
+
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, FrontendArgs);
+  addRuntimeLibraryFlags(context.OI, FrontendArgs);
+
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
   context.Args.AddAllArgs(FrontendArgs, options::OPT_l, options::OPT_framework,
                           options::OPT_L);
@@ -783,17 +1102,16 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   return {"lldb", Arguments};
 }
 
-
 ToolChain::InvocationInfo
 ToolChain::constructInvocation(const GenerateDSYMJobAction &job,
                                const JobContext &context) const {
   assert(context.Inputs.size() == 1);
   assert(context.InputActions.empty());
-  assert(context.Output.getPrimaryOutputType() == types::TY_dSYM);
+  assert(context.Output.getPrimaryOutputType() == file_types::TY_dSYM);
 
   ArgStringList Arguments;
 
-  StringRef inputPath =
+  auto inputPath =
       context.Inputs.front()->getOutput().getPrimaryOutputFilename();
   Arguments.push_back(context.Args.MakeArgString(inputPath));
 
@@ -817,7 +1135,7 @@ ToolChain::constructInvocation(const VerifyDebugInfoJobAction &job,
   Arguments.push_back("--eh-frame");
   Arguments.push_back("--quiet");
 
-  StringRef inputPath =
+  auto inputPath =
       context.Inputs.front()->getOutput().getPrimaryOutputFilename();
   Arguments.push_back(context.Args.MakeArgString(inputPath));
 
@@ -830,33 +1148,40 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
   assert(context.Inputs.empty());
   assert(context.InputActions.size() == 1);
   assert((!job.isPersistentPCH() &&
-            context.Output.getPrimaryOutputType() == types::TY_PCH) ||
+          context.Output.getPrimaryOutputType() == file_types::TY_PCH) ||
          (job.isPersistentPCH() &&
-            context.Output.getPrimaryOutputType() == types::TY_Nothing));
+          context.Output.getPrimaryOutputType() == file_types::TY_Nothing));
 
-  ArgStringList Arguments;
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
-  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
-                        Arguments);
+  addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
+  addRuntimeLibraryFlags(context.OI, Arguments);
 
-  addInputsOfType(Arguments, context.InputActions, types::TY_ObjCHeader);
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_SerializedDiagnostics,
+                   "-serialize-diagnostics-path");
+
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_ObjCHeader);
   context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
 
   if (job.isPersistentPCH()) {
     Arguments.push_back("-emit-pch");
     Arguments.push_back("-pch-output-dir");
-    Arguments.push_back(
-      context.Args.MakeArgString(job.getPersistentPCHDir()));
+    Arguments.push_back(context.Args.MakeArgString(job.getPersistentPCHDir()));
   } else {
     Arguments.push_back("-emit-pch");
     Arguments.push_back("-o");
     Arguments.push_back(
-      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+        context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
   }
 
-  return {SWIFT_EXECUTABLE_NAME, Arguments};
+  return II;
 }
 
 ToolChain::InvocationInfo
@@ -866,91 +1191,30 @@ ToolChain::constructInvocation(const AutolinkExtractJobAction &job,
 }
 
 ToolChain::InvocationInfo
-ToolChain::constructInvocation(const LinkJobAction &job,
+ToolChain::constructInvocation(const DynamicLinkJobAction &job,
                                const JobContext &context) const {
   llvm_unreachable("linking not implemented for this toolchain");
 }
 
-std::string
-toolchains::Darwin::findProgramRelativeToSwiftImpl(StringRef name) const {
-  StringRef swiftPath = getDriver().getSwiftProgramPath();
-  StringRef swiftBinDir = llvm::sys::path::parent_path(swiftPath);
-
-  // See if we're in an Xcode toolchain.
-  bool hasToolchain = false;
-  llvm::SmallString<128> path{swiftBinDir};
-  llvm::sys::path::remove_filename(path); // bin
-  llvm::sys::path::remove_filename(path); // usr
-  if (llvm::sys::path::extension(path) == ".xctoolchain") {
-    hasToolchain = true;
-    llvm::sys::path::remove_filename(path); // *.xctoolchain
-    llvm::sys::path::remove_filename(path); // Toolchains
-    llvm::sys::path::append(path, "usr", "bin");
-  }
-
-  StringRef paths[] = { swiftBinDir, path };
-  auto pathsRef = llvm::makeArrayRef(paths);
-  if (!hasToolchain)
-    pathsRef = pathsRef.drop_back();
-
-  auto result = llvm::sys::findProgramByName(name, pathsRef);
-  if (result)
-    return result.get();
-  return {};
+ToolChain::InvocationInfo
+ToolChain::constructInvocation(const StaticLinkJobAction &job,
+                               const JobContext &context) const {
+   llvm_unreachable("archiving not implemented for this toolchain");
 }
 
-static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
-                             unsigned major, unsigned minor, unsigned micro) {
-  llvm::SmallString<8> buf;
-  llvm::raw_svector_ostream os{buf};
-  os << major << '.' << minor << '.' << micro;
-  arguments.push_back(inputArgs.MakeArgString(os.str()));
-}
-
-/// Runs <code>xcrun -f clang</code> in order to find the location of Clang for
-/// the currently active Xcode.
-///
-/// We get the "currently active" part by passing through the DEVELOPER_DIR
-/// environment variable (along with the rest of the environment).
-static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
-  assert(path.empty());
-
-  auto xcrunPath = llvm::sys::findProgramByName("xcrun");
-  if (!xcrunPath.getError()) {
-    const char *args[] = {"-f", "clang", nullptr};
-    sys::TaskQueue queue;
-    queue.addTask(xcrunPath->c_str(), args, /*Env=*/llvm::None,
-                  /*Context=*/nullptr,
-                  /*SeparateErrors=*/true);
-    queue.execute(nullptr, [&path](sys::ProcessId PID, int returnCode,
-                                   StringRef output, StringRef errors,
-                                   void *unused) -> sys::TaskFinishedResponse {
-      if (returnCode == 0) {
-        output = output.rtrim();
-        path.append(output.begin(), output.end());
-      }
-      return sys::TaskFinishedResponse::ContinueExecution;
-    });
-  }
-
-  return !path.empty();
-}
-
-static void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
-                                               const char *name,
-                                               const char *separator,
-                                               options::ID optionID,
-                                               const ArgList &args,
-                                               StringRef extraEntry = "") {
+void ToolChain::addPathEnvironmentVariableIfNeeded(
+    Job::EnvironmentVector &env, const char *name, const char *separator,
+    options::ID optionID, const ArgList &args,
+    ArrayRef<std::string> extraEntries) const {
   auto linkPathOptions = args.filtered(optionID);
-  if (linkPathOptions.begin() == linkPathOptions.end() && extraEntry.empty())
+  if (linkPathOptions.begin() == linkPathOptions.end() && extraEntries.empty())
     return;
 
   std::string newPaths;
   interleave(linkPathOptions,
              [&](const Arg *arg) { newPaths.append(arg->getValue()); },
              [&] { newPaths.append(separator); });
-  if (!extraEntry.empty()) {
+  for (auto extraEntry : extraEntries) {
     if (!newPaths.empty())
       newPaths.append(separator);
     newPaths.append(extraEntry.data(), extraEntry.size());
@@ -962,836 +1226,109 @@ static void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
   env.emplace_back(name, args.MakeArgString(newPaths));
 }
 
+void ToolChain::addLinkRuntimeLib(const ArgList &Args, ArgStringList &Arguments,
+                                  StringRef LibName) const {
+  SmallString<128> P;
+  getClangLibraryPath(Args, P);
+  llvm::sys::path::append(P, LibName);
+  Arguments.push_back(Args.MakeArgString(P));
+}
+
+void ToolChain::getClangLibraryPath(const ArgList &Args,
+                                    SmallString<128> &LibPath) const {
+  const llvm::Triple &T = getTriple();
+
+  getResourceDirPath(LibPath, Args, /*Shared=*/true);
+  // Remove platform name.
+  llvm::sys::path::remove_filename(LibPath);
+  llvm::sys::path::append(LibPath, "clang", "lib",
+                          T.isOSDarwin() ? "darwin"
+                                         : getPlatformNameForTriple(T));
+}
+
 /// Get the runtime library link path, which is platform-specific and found
 /// relative to the compiler.
-static void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
-                                  const llvm::opt::ArgList &args,
-                                  const ToolChain &TC) {
+void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
+                                   const llvm::opt::ArgList &args,
+                                   bool shared) const {
   // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
   // library link path and the standard library module import path don't
   // need to be the same.
   if (const Arg *A = args.getLastArg(options::OPT_resource_dir)) {
     StringRef value = A->getValue();
-    runtimeLibPath.append(value.begin(), value.end());
+    resourceDirPath.append(value.begin(), value.end());
+  } else if (!getTriple().isOSDarwin() && args.hasArg(options::OPT_sdk)) {
+    StringRef value = args.getLastArg(options::OPT_sdk)->getValue();
+    resourceDirPath.append(value.begin(), value.end());
+    llvm::sys::path::append(resourceDirPath, "usr", "lib",
+                            shared ? "swift" : "swift_static");
   } else {
-    auto programPath = TC.getDriver().getSwiftProgramPath();
-    runtimeLibPath.append(programPath.begin(), programPath.end());
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
-    llvm::sys::path::append(runtimeLibPath, "lib", "swift");
+    auto programPath = getDriver().getSwiftProgramPath();
+    resourceDirPath.append(programPath.begin(), programPath.end());
+    llvm::sys::path::remove_filename(resourceDirPath); // remove /swift
+    llvm::sys::path::remove_filename(resourceDirPath); // remove /bin
+    llvm::sys::path::append(resourceDirPath, "lib",
+                            shared ? "swift" : "swift_static");
   }
-  llvm::sys::path::append(runtimeLibPath,
-                          getPlatformNameForTriple(TC.getTriple()));
+
+  StringRef libSubDir = getPlatformNameForTriple(getTriple());
+  if (tripleIsMacCatalystEnvironment(getTriple()))
+    libSubDir = "maccatalyst";
+  llvm::sys::path::append(resourceDirPath, libSubDir);
 }
 
-static void getClangLibraryPathOnDarwin(SmallVectorImpl<char> &libPath,
-                                        const ArgList &args,
-                                        const ToolChain &TC) {
-  getRuntimeLibraryPath(libPath, args, TC);
-  // Remove platform name.
-  llvm::sys::path::remove_filename(libPath);
-  llvm::sys::path::append(libPath, "clang", "lib", "darwin");
+// Get the secondary runtime library link path given the primary path.
+// The compiler will look for runtime libraries in the secondary path if they
+// can't be found in the primary path.
+void ToolChain::getSecondaryResourceDirPath(
+    SmallVectorImpl<char> &secondaryResourceDirPath,
+    StringRef primaryPath) const {
+  if (!tripleIsMacCatalystEnvironment(getTriple()))
+    return;
+
+  // For macCatalyst, the secondary runtime library path is the macOS library
+  // path. The compiler will find zippered libraries here.
+  secondaryResourceDirPath.append(primaryPath.begin(), primaryPath.end());
+  // Remove '/maccatalyst' and replace with 'macosx'.
+  llvm::sys::path::remove_filename(secondaryResourceDirPath);
+  llvm::sys::path::append(secondaryResourceDirPath, "macosx");
 }
 
-static void getClangLibraryPathOnLinux(SmallVectorImpl<char> &libPath,
-                                        const ArgList &args,
-                                        const ToolChain &TC) {
-  getRuntimeLibraryPath(libPath, args, TC);
-  // Remove platform name.
-  llvm::sys::path::remove_filename(libPath);
-  llvm::sys::path::append(libPath, "clang", "lib", "linux");
-}
+void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibPaths,
+                                       const llvm::opt::ArgList &args,
+                                       StringRef SDKPath, bool shared) const {
+  SmallString<128> scratchPath;
+  getResourceDirPath(scratchPath, args, shared);
+  runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
-/// Get the runtime library link path for static linking,
-/// which is platform-specific and found relative to the compiler.
-static void getRuntimeStaticLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
-                                  const llvm::opt::ArgList &args,
-                                  const ToolChain &TC) {
-  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
-  // library link path and the standard library module import path don't
-  // need to be the same.
-  if (const Arg *A = args.getLastArg(options::OPT_resource_dir)) {
-    StringRef value = A->getValue();
-    runtimeLibPath.append(value.begin(), value.end());
-  } else {
-    auto programPath = TC.getDriver().getSwiftProgramPath();
-    runtimeLibPath.append(programPath.begin(), programPath.end());
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
-    llvm::sys::path::append(runtimeLibPath, "lib", "swift_static");
+  // If there's a secondary resource dir, add it too.
+  scratchPath.clear();
+  getSecondaryResourceDirPath(scratchPath, runtimeLibPaths[0]);
+  if (!scratchPath.empty())
+    runtimeLibPaths.push_back(std::string(scratchPath.str()));
+
+  if (!SDKPath.empty()) {
+    if (!scratchPath.empty()) {
+      // If we added the secondary resource dir, we also need the iOSSupport
+      // directory.
+      scratchPath = SDKPath;
+      llvm::sys::path::append(scratchPath, "System", "iOSSupport");
+      llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
+      runtimeLibPaths.push_back(std::string(scratchPath.str()));
+    }
+
+    scratchPath = SDKPath;
+    llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
+    runtimeLibPaths.push_back(std::string(scratchPath.str()));
   }
-  llvm::sys::path::append(runtimeLibPath,
-                          getPlatformNameForTriple(TC.getTriple()));
 }
 
-ToolChain::InvocationInfo
-toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
-                                        const JobContext &context) const {
-  InvocationInfo II = ToolChain::constructInvocation(job, context);
-
-  SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this);
-
-  addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_LIBRARY_PATH",
-                                     ":", options::OPT_L, context.Args,
-                                     runtimeLibraryPath);
-  addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
-                                     ":", options::OPT_F, context.Args);
-  // FIXME: Add options::OPT_Fsystem paths to DYLD_FRAMEWORK_PATH as well.
-  return II;
-}
-
-static StringRef
-getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
-  switch (getDarwinPlatformKind(triple)) {
-  case DarwinPlatformKind::MacOS:
-    return "osx";
-  case DarwinPlatformKind::IPhoneOS:
-    return "ios";
-  case DarwinPlatformKind::IPhoneOSSimulator:
-    return "iossim";
-  case DarwinPlatformKind::TvOS:
-    return "tvos";
-  case DarwinPlatformKind::TvOSSimulator:
-    return "tvossim";
-  case DarwinPlatformKind::WatchOS:
-    return "watchos";
-  case DarwinPlatformKind::WatchOSSimulator:
-    return "watchossim";
-  }
-  llvm_unreachable("Unsupported Darwin platform");
-}
-
-static std::string
-getSanitizerRuntimeLibNameForDarwin(StringRef Sanitizer, const llvm::Triple &Triple) {
-  return (Twine("libclang_rt.")
-      + Sanitizer + "_"
-      + getDarwinLibraryNameSuffixForTriple(Triple) + "_dynamic.dylib").str();
-}
-
-static std::string
-getSanitizerRuntimeLibNameForLinux(StringRef Sanitizer, const llvm::Triple &Triple) {
-  return (Twine("libclang_rt.") + Sanitizer + "-" +
-                       Triple.getArchName() + ".a").str();
-}
-
-bool toolchains::Darwin::sanitizerRuntimeLibExists(
-    const ArgList &args, StringRef sanitizer) const {
+bool ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
+                                          StringRef sanitizerName,
+                                          bool shared) const {
   SmallString<128> sanitizerLibPath;
-  getClangLibraryPathOnDarwin(sanitizerLibPath, args, *this);
+  getClangLibraryPath(args, sanitizerLibPath);
   llvm::sys::path::append(sanitizerLibPath,
-      getSanitizerRuntimeLibNameForDarwin(sanitizer, this->getTriple()));
+                          sanitizerRuntimeLibName(sanitizerName, shared));
   return llvm::sys::fs::exists(sanitizerLibPath.str());
-}
-
-bool toolchains::GenericUnix::sanitizerRuntimeLibExists(
-    const ArgList &args, StringRef sanitizer) const {
-  SmallString<128> sanitizerLibPath;
-  getClangLibraryPathOnLinux(sanitizerLibPath, args, *this);
-  llvm::sys::path::append(sanitizerLibPath,
-      getSanitizerRuntimeLibNameForLinux(sanitizer, this->getTriple()));
-  return llvm::sys::fs::exists(sanitizerLibPath.str());
-}
-
-
-static void
-addLinkRuntimeLibForDarwin(const ArgList &Args, ArgStringList &Arguments,
-                           StringRef DarwinLibName, bool AddRPath,
-                           const ToolChain &TC) {
-  SmallString<128> ClangLibraryPath;
-  getClangLibraryPathOnDarwin(ClangLibraryPath, Args, TC);
-
-  SmallString<128> P(ClangLibraryPath);
-  llvm::sys::path::append(P, DarwinLibName);
-  Arguments.push_back(Args.MakeArgString(P));
-
-  // Adding the rpaths might negatively interact when other rpaths are involved,
-  // so we should make sure we add the rpaths last, after all user-specified
-  // rpaths. This is currently true from this place, but we need to be
-  // careful if this function is ever called before user's rpaths are emitted.
-  if (AddRPath) {
-    assert(DarwinLibName.endswith(".dylib") && "must be a dynamic library");
-
-    // Add @executable_path to rpath to support having the dylib copied with
-    // the executable.
-    Arguments.push_back("-rpath");
-    Arguments.push_back("@executable_path");
-
-    // Add the path to the resource dir to rpath to support using the dylib
-    // from the default location without copying.
-    Arguments.push_back("-rpath");
-    Arguments.push_back(Args.MakeArgString(ClangLibraryPath));
-  }
-}
-
-static void
-addLinkRuntimeLibForLinux(const ArgList &Args, ArgStringList &Arguments,
-                           StringRef LinuxLibName,
-                           const ToolChain &TC) {
-  SmallString<128> Dir;
-  getRuntimeLibraryPath(Dir, Args, TC);
-  // Remove platform name.
-  llvm::sys::path::remove_filename(Dir);
-  llvm::sys::path::append(Dir, "clang", "lib", "linux");
-  SmallString<128> P(Dir);
-  llvm::sys::path::append(P, LinuxLibName);
-  Arguments.push_back(Args.MakeArgString(P));
-}
-
-static void
-addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
-                                 ArgStringList &Arguments,
-                                 StringRef Sanitizer, const ToolChain &TC) {
-  // Sanitizer runtime libraries requires C++.
-  Arguments.push_back("-lc++");
-  // Add explicit dependency on -lc++abi, as -lc++ doesn't re-export
-  // all RTTI-related symbols that are used.
-  Arguments.push_back("-lc++abi");
-
-  addLinkRuntimeLibForDarwin(Args, Arguments,
-      getSanitizerRuntimeLibNameForDarwin(Sanitizer, TC.getTriple()),
-      /*AddRPath=*/ true, TC);
-}
-
-static void
-addLinkSanitizerLibArgsForLinux(const ArgList &Args,
-                                 ArgStringList &Arguments,
-                                 StringRef Sanitizer, const ToolChain &TC) {
-  addLinkRuntimeLibForLinux(Args, Arguments,
-      getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
-
-  // Code taken from
-  // https://github.com/apple/swift-clang/blob/ab3cbe7/lib/Driver/Tools.cpp#L3264-L3276
-  // There's no libpthread or librt on RTEMS.
-  if (TC.getTriple().getOS() != llvm::Triple::RTEMS) {
-    Arguments.push_back("-lpthread");
-    Arguments.push_back("-lrt");
-  }
-  Arguments.push_back("-lm");
-
-  // There's no libdl on FreeBSD or RTEMS.
-  if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
-      TC.getTriple().getOS() != llvm::Triple::RTEMS)
-    Arguments.push_back("-ldl");
-}
-
-static void
-addLinkFuzzerLibArgsForDarwin(const ArgList &Args,
-                       ArgStringList &Arguments,
-                       const ToolChain &TC) {
-
-  // libFuzzer requires C++.
-  Arguments.push_back("-lc++");
-
-  // Link libfuzzer.
-  SmallString<128> Dir;
-  getRuntimeLibraryPath(Dir, Args, TC);
-  llvm::sys::path::remove_filename(Dir);
-  llvm::sys::path::append(Dir, "llvm", "libLLVMFuzzer.a");
-  SmallString<128> P(Dir);
-
-  Arguments.push_back(Args.MakeArgString(P));
-}
-
-static void
-addLinkFuzzerLibArgsForLinux(const ArgList &Args,
-                             ArgStringList &Arguments,
-                             const ToolChain &TC) {
-  Arguments.push_back("-lstdc++");
-
-  // Link libfuzzer.
-  SmallString<128> Dir;
-  getRuntimeLibraryPath(Dir, Args, TC);
-  llvm::sys::path::remove_filename(Dir);
-  llvm::sys::path::append(Dir, "llvm", "libLLVMFuzzer.a");
-  SmallString<128> P(Dir);
-
-  Arguments.push_back(Args.MakeArgString(P));
-}
-
-ToolChain::InvocationInfo
-toolchains::Darwin::constructInvocation(const LinkJobAction &job,
-                                        const JobContext &context) const {
-  assert(context.Output.getPrimaryOutputType() == types::TY_Image &&
-         "Invalid linker output type.");
-
-  if (context.Args.hasFlag(options::OPT_static_executable,
-                           options::OPT_no_static_executable,
-                           false)) {
-    llvm::report_fatal_error("-static-executable is not supported on Darwin");
-  }
-
-  const Driver &D = getDriver();
-  const llvm::Triple &Triple = getTriple();
-
-  // Configure the toolchain.
-  // By default, use the system `ld` to link.
-  const char *LD = "ld";
-  if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
-    StringRef toolchainPath(A->getValue());
-
-    // If there is a 'ld' in the toolchain folder, use that instead.
-    if (auto toolchainLD = llvm::sys::findProgramByName("ld", {toolchainPath})) {
-      LD = context.Args.MakeArgString(toolchainLD.get());
-    }
-  }
-
-  InvocationInfo II = {LD};
-  ArgStringList &Arguments = II.Arguments;
-
-  if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
-      context.Inputs.size() > TOO_MANY_FILES) {
-    Arguments.push_back("-filelist");
-    Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
-    II.FilelistInfo = {Arguments.back(), types::TY_Object, FilelistInfo::Input};
-  } else {
-    addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
-  }
-
-  addInputsOfType(Arguments, context.InputActions, types::TY_Object);
-
-  if (context.OI.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
-    size_t argCount = Arguments.size();
-    if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
-      addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
-    else
-      addPrimaryInputsOfType(Arguments, context.Inputs,
-                             types::TY_SwiftModuleFile);
-
-    if (Arguments.size() > argCount) {
-      assert(argCount + 1 == Arguments.size() &&
-             "multiple swiftmodules found for -g");
-      Arguments.insert(Arguments.end() - 1, "-add_ast_path");
-    }
-  }
-
-  switch (job.getKind()) {
-  case LinkKind::None:
-    llvm_unreachable("invalid link kind");
-  case LinkKind::Executable:
-    // The default for ld; no extra flags necessary.
-    break;
-  case LinkKind::DynamicLibrary:
-    Arguments.push_back("-dylib");
-    break;
-  }
-
-  assert(Triple.isOSDarwin());
-
-  // FIXME: If we used Clang as a linker instead of going straight to ld,
-  // we wouldn't have to replicate Clang's logic here.
-  bool wantsObjCRuntime = false;
-  if (Triple.isiOS())
-    wantsObjCRuntime = Triple.isOSVersionLT(9);
-  else if (Triple.isMacOSX())
-    wantsObjCRuntime = Triple.isMacOSXVersionLT(10, 11);
-
-  if (context.Args.hasFlag(options::OPT_link_objc_runtime,
-                           options::OPT_no_link_objc_runtime,
-                           /*Default=*/wantsObjCRuntime)) {
-    llvm::SmallString<128> ARCLiteLib(D.getSwiftProgramPath());
-    llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
-    llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
-    llvm::sys::path::append(ARCLiteLib, "lib", "arc");
-
-    if (!llvm::sys::fs::is_directory(ARCLiteLib)) {
-      // If we don't have a 'lib/arc/' directory, find the "arclite" library
-      // relative to the Clang in the active Xcode.
-      ARCLiteLib.clear();
-      if (findXcodeClangPath(ARCLiteLib)) {
-        llvm::sys::path::remove_filename(ARCLiteLib); // 'clang'
-        llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
-        llvm::sys::path::append(ARCLiteLib, "lib", "arc");
-      }
-    }
-
-    if (!ARCLiteLib.empty()) {
-      llvm::sys::path::append(ARCLiteLib, "libarclite_");
-      ARCLiteLib += getPlatformNameForTriple(Triple);
-      ARCLiteLib += ".a";
-
-      Arguments.push_back("-force_load");
-      Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
-
-      // Arclite depends on CoreFoundation.
-      Arguments.push_back("-framework");
-      Arguments.push_back("CoreFoundation");
-    } else {
-      // FIXME: We should probably diagnose this, but this is not a place where
-      // we can emit diagnostics. Silently ignore it for now.
-    }
-  }
-
-  context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
-  for (const Arg *arg : context.Args.filtered(options::OPT_F,
-                                              options::OPT_Fsystem)) {
-    Arguments.push_back("-F");
-    Arguments.push_back(arg->getValue());
-  }
-
-  if (context.Args.hasArg(options::OPT_enable_app_extension)) {
-    // Keep this string fixed in case the option used by the
-    // compiler itself changes.
-    Arguments.push_back("-application_extension");
-  }
-
-  // Linking sanitizers will add rpaths, which might negatively interact when
-  // other rpaths are involved, so we should make sure we add the rpaths after
-  // all user-specified rpaths.
-  if (context.OI.SelectedSanitizers & SanitizerKind::Address)
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
-
-  if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
-
-  // Only link in libFuzzer for executables.
-  if (job.getKind() == LinkKind::Executable &&
-      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
-    addLinkFuzzerLibArgsForDarwin(context.Args, Arguments, *this);
-
-  if (context.Args.hasArg(options::OPT_embed_bitcode,
-                          options::OPT_embed_bitcode_marker)) {
-    Arguments.push_back("-bitcode_bundle");
-  }
-
-  if (!context.OI.SDKPath.empty()) {
-    Arguments.push_back("-syslibroot");
-    Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
-  }
-
-  Arguments.push_back("-lobjc");
-  Arguments.push_back("-lSystem");
-
-  Arguments.push_back("-arch");
-  Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
-
-  // Add the runtime library link path, which is platform-specific and found
-  // relative to the compiler.
-  SmallString<128> RuntimeLibPath;
-  getRuntimeLibraryPath(RuntimeLibPath, context.Args, *this);
-
-  // Link the standard library.
-  Arguments.push_back("-L");
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                            options::OPT_no_static_stdlib,
-                            false)) {
-    SmallString<128> StaticRuntimeLibPath;
-    getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
-    Arguments.push_back("-lc++");
-    Arguments.push_back("-framework");
-    Arguments.push_back("Foundation");
-    Arguments.push_back("-force_load_swift_libs");
-  } else {
-    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
-    // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
-    // of time the standard library won't be copied. SR-1967
-    Arguments.push_back("-rpath");
-    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
-  }
-
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(RuntimeLibPath);
-    llvm::sys::path::remove_filename(LibProfile); // remove platform name
-    llvm::sys::path::append(LibProfile, "clang", "lib", "darwin");
-
-    StringRef RT;
-    if (Triple.isiOS()) {
-      if (Triple.isTvOS())
-        RT = "tvos";
-      else
-        RT = "ios";
-    } else if (Triple.isWatchOS()) {
-      RT = "watchos";
-    } else {
-      assert(Triple.isMacOSX());
-      RT = "osx";
-    }
-
-    StringRef Sim;
-    if (tripleIsAnySimulator(Triple)) {
-      Sim = "sim";
-    }
-
-    llvm::sys::path::append(LibProfile,
-                            "libclang_rt.profile_" + RT + Sim + ".a");
-
-    // FIXME: Continue accepting the old path for simulator libraries for now.
-    if (!Sim.empty() && !llvm::sys::fs::exists(LibProfile)) {
-      llvm::sys::path::remove_filename(LibProfile);
-      llvm::sys::path::append(LibProfile,
-                              "libclang_rt.profile_" + RT + ".a");
-    }
-
-    Arguments.push_back(context.Args.MakeArgString(LibProfile));
-  }
-
-  // FIXME: Properly handle deployment targets.
-  assert(Triple.isiOS() || Triple.isWatchOS() || Triple.isMacOSX());
-  if (Triple.isiOS()) {
-    bool isiOSSimulator = tripleIsiOSSimulator(Triple);
-    if (Triple.isTvOS()) {
-      if (isiOSSimulator)
-        Arguments.push_back("-tvos_simulator_version_min");
-      else
-        Arguments.push_back("-tvos_version_min");
-    } else {
-      if (isiOSSimulator)
-        Arguments.push_back("-ios_simulator_version_min");
-      else
-        Arguments.push_back("-iphoneos_version_min");
-    }
-    unsigned major, minor, micro;
-    Triple.getiOSVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
-  } else if (Triple.isWatchOS()) {
-    if (tripleIsWatchSimulator(Triple))
-      Arguments.push_back("-watchos_simulator_version_min");
-    else
-      Arguments.push_back("-watchos_version_min");
-    unsigned major, minor, micro;
-    Triple.getOSVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
-  } else {
-    Arguments.push_back("-macosx_version_min");
-    unsigned major, minor, micro;
-    Triple.getMacOSXVersion(major, minor, micro);
-    addVersionString(context.Args, Arguments, major, minor, micro);
-  }
-
-  Arguments.push_back("-no_objc_category_merging");
-
-  // This should be the last option, for convenience in checking output.
-  Arguments.push_back("-o");
-  Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
-
-  return II;
-}
-
-ToolChain::InvocationInfo
-toolchains::GenericUnix::constructInvocation(const InterpretJobAction &job,
-                                             const JobContext &context) const {
-  InvocationInfo II = ToolChain::constructInvocation(job, context);
-
-  SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this);
-
-  addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
-                                     ":", options::OPT_L, context.Args,
-                                     runtimeLibraryPath);
-  return II;
-}
-
-
-ToolChain::InvocationInfo
-toolchains::GenericUnix::constructInvocation(const AutolinkExtractJobAction &job,
-                                             const JobContext &context) const {
-  assert(context.Output.getPrimaryOutputType() == types::TY_AutolinkFile);
-
-  ArgStringList Arguments;
-  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
-  addInputsOfType(Arguments, context.InputActions, types::TY_Object);
-
-  Arguments.push_back("-o");
-  Arguments.push_back(
-      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
-
-  return {"swift-autolink-extract", Arguments};
-}
-
-std::string toolchains::GenericUnix::getDefaultLinker() const {
-  switch(getTriple().getArch()) {
-  case llvm::Triple::arm:
-  case llvm::Triple::armeb:
-  case llvm::Triple::thumb:
-  case llvm::Triple::thumbeb:
-    // BFD linker has issues wrt relocation of the protocol conformance
-    // section on these targets, it also generates COPY relocations for
-    // final executables, as such, unless specified, we default to gold
-    // linker.
-    return "gold";
-  case llvm::Triple::x86_64:
-  case llvm::Triple::ppc64:
-  case llvm::Triple::ppc64le:
-  case llvm::Triple::systemz:
-    // BFD linker has issues wrt relocations against protected symbols.
-    return "gold";
-  default:
-    // Otherwise, use the default BFD linker.
-    return "";
-  }
-}
-
-std::string toolchains::GenericUnix::getTargetForLinker() const {
-  return getTriple().str();
-}
-
-bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
-  return true;
-}
-
-std::string toolchains::GenericUnix::getPreInputObjectPath(
-    StringRef RuntimeLibraryPath) const {
-  // On Linux and FreeBSD (really, ELF binaries) we need to add objects
-  // to provide markers and size for the metadata sections.
-  SmallString<128> PreInputObjectPath = RuntimeLibraryPath;
-  llvm::sys::path::append(PreInputObjectPath,
-      swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(PreInputObjectPath, "swift_begin.o");
-  return PreInputObjectPath.str();
-}
-
-std::string toolchains::GenericUnix::getPostInputObjectPath(
-    StringRef RuntimeLibraryPath) const {
-  SmallString<128> PostInputObjectPath = RuntimeLibraryPath;
-  llvm::sys::path::append(PostInputObjectPath,
-      swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(PostInputObjectPath, "swift_end.o");
-  return PostInputObjectPath.str();
-}
-
-ToolChain::InvocationInfo
-toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
-                                             const JobContext &context) const {
-  assert(context.Output.getPrimaryOutputType() == types::TY_Image &&
-         "Invalid linker output type.");
-
-  ArgStringList Arguments;
-
-  switch (job.getKind()) {
-  case LinkKind::None:
-    llvm_unreachable("invalid link kind");
-  case LinkKind::Executable:
-    // Default case, nothing extra needed.
-    break;
-  case LinkKind::DynamicLibrary:
-    Arguments.push_back("-shared");
-    break;
-  }
-
-  // Select the linker to use.
-  std::string Linker;
-  if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
-    Linker = A->getValue();
-  } else {
-    Linker = getDefaultLinker();
-  }
-  if (!Linker.empty()) {
-    Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
-  }
-
-  // Configure the toolchain.
-  // By default, use the system clang++ to link.
-  const char * Clang = "clang++";
-  if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
-    StringRef toolchainPath(A->getValue());
-
-    // If there is a clang in the toolchain folder, use that instead.
-    if (auto toolchainClang = llvm::sys::findProgramByName("clang++", {toolchainPath})) {
-      Clang = context.Args.MakeArgString(toolchainClang.get());
-    }
-
-    // Look for binutils in the toolchain folder.
-    Arguments.push_back("-B");
-    Arguments.push_back(context.Args.MakeArgString(A->getValue()));
-  }
-
-  if (getTriple().getOS() == llvm::Triple::Linux) {
-    Arguments.push_back("-pie");
-  }
-
-  std::string Target = getTargetForLinker();
-  if (!Target.empty()) {
-    Arguments.push_back("-target");
-    Arguments.push_back(context.Args.MakeArgString(Target));
-  }
-
-  bool staticExecutable = false;
-  bool staticStdlib = false;
-
-  if (context.Args.hasFlag(options::OPT_static_executable,
-                           options::OPT_no_static_executable,
-                           false)) {
-    staticExecutable = true;
-  } else if (context.Args.hasFlag(options::OPT_static_stdlib,
-                                options::OPT_no_static_stdlib,
-                                false)) {
-    staticStdlib = true;
-  }
-
-  SmallString<128> SharedRuntimeLibPath;
-  SmallString<128> StaticRuntimeLibPath;
-  // Path to swift_begin.o and swift_end.o.
-  SmallString<128> ObjectLibPath;
-  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args, *this);
-
-  // -static-stdlib uses the static lib path for libswiftCore but
-  // the shared lib path for swift_begin.o and swift_end.o.
-  if (staticExecutable || staticStdlib) {
-    getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
-  }
-
-  if (staticExecutable) {
-    ObjectLibPath = StaticRuntimeLibPath;
-  } else {
-    ObjectLibPath = SharedRuntimeLibPath;
-  }
-
-  // Add the runtime library link path, which is platform-specific and found
-  // relative to the compiler.
-  if (!(staticExecutable || staticStdlib) && shouldProvideRPathToLinker()) {
-    // FIXME: We probably shouldn't be adding an rpath here unless we know
-    //        ahead of time the standard library won't be copied.
-    Arguments.push_back("-Xlinker");
-    Arguments.push_back("-rpath");
-    Arguments.push_back("-Xlinker");
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
-  }
-
-  auto PreInputObjectPath = getPreInputObjectPath(ObjectLibPath);
-  if (!PreInputObjectPath.empty()) {
-    Arguments.push_back(context.Args.MakeArgString(PreInputObjectPath));
-  }
-  addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
-  addInputsOfType(Arguments, context.InputActions, types::TY_Object);
-
-  for (const Arg *arg : context.Args.filtered(options::OPT_F,
-                                              options::OPT_Fsystem)) {
-    if (arg->getOption().matches(options::OPT_Fsystem))
-      Arguments.push_back("-iframework");
-    else
-      Arguments.push_back(context.Args.MakeArgString(arg->getSpelling()));
-    Arguments.push_back(arg->getValue());
-  }
-
-  if (!context.OI.SDKPath.empty()) {
-    Arguments.push_back("--sysroot");
-    Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
-  }
-
-  // Add any autolinking scripts to the arguments
-  for (const Job *Cmd : context.Inputs) {
-    auto &OutputInfo = Cmd->getOutput();
-    if (OutputInfo.getPrimaryOutputType() == types::TY_AutolinkFile)
-      Arguments.push_back(context.Args.MakeArgString(
-        Twine("@") + OutputInfo.getPrimaryOutputFilename()));
-  }
-
-  // Link the standard library.
-  Arguments.push_back("-L");
-
-  if (staticExecutable) {
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
-
-    SmallString<128> linkFilePath = StaticRuntimeLibPath;
-    llvm::sys::path::append(linkFilePath, "static-executable-args.lnk");
-    auto linkFile = linkFilePath.str();
-
-    if (llvm::sys::fs::is_regular_file(linkFile)) {
-      Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
-    } else {
-      llvm::report_fatal_error("-static-executable not supported on this platform");
-    }
-  }
-  else if (staticStdlib) {
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
-
-    SmallString<128> linkFilePath = StaticRuntimeLibPath;
-    llvm::sys::path::append(linkFilePath, "static-stdlib-args.lnk");
-    auto linkFile = linkFilePath.str();
-    if (llvm::sys::fs::is_regular_file(linkFile)) {
-      Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
-    } else {
-      llvm::report_fatal_error(linkFile + " not found");
-    }
-  }
-  else {
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
-    Arguments.push_back("-lswiftCore");
-  }
-  
-  // Explicitly pass the target to the linker
-  Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
-
-  if (getTriple().getOS() == llvm::Triple::Linux) {
-    //Make sure we only add SanitizerLibs for executables
-    if (job.getKind() == LinkKind::Executable) {
-      if (context.OI.SelectedSanitizers & SanitizerKind::Address)
-        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "asan", *this);
-
-      if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
-        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
-
-      if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
-        addLinkFuzzerLibArgsForLinux(context.Args, Arguments, *this);
-    }
-  }
-
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(SharedRuntimeLibPath);
-    llvm::sys::path::remove_filename(LibProfile); // remove platform name
-    llvm::sys::path::append(LibProfile, "clang", "lib");
-
-    llvm::sys::path::append(LibProfile, getTriple().getOSName(),
-                            Twine("libclang_rt.profile-") +
-                              getTriple().getArchName() +
-                              ".a");
-    Arguments.push_back(context.Args.MakeArgString(LibProfile));
-    Arguments.push_back(context.Args.MakeArgString(
-        Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
-  }
-
-  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
-
-  // Just before the output option, allow GenericUnix toolchains to add
-  // additional inputs.
-  auto PostInputObjectPath = getPostInputObjectPath(ObjectLibPath);
-  if (!PostInputObjectPath.empty()) {
-    Arguments.push_back(context.Args.MakeArgString(PostInputObjectPath));
-  }
-
-  // This should be the last option, for convenience in checking output.
-  Arguments.push_back("-o");
-  Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
-
-  return {Clang, Arguments};
-}
-
-std::string
-toolchains::Android::getTargetForLinker() const {
-  // Explicitly set the linker target to "androideabi", as opposed to the
-  // llvm::Triple representation of "armv7-none-linux-android".
-  // This is the only ABI we currently support for Android.
-  assert(
-    getTriple().getArch() == llvm::Triple::arm &&
-    getTriple().getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7 &&
-    "Only armv7 targets are supported for Android");
-  return "armv7-none-linux-androideabi";
-}
-
-bool toolchains::Android::shouldProvideRPathToLinker() const {
-  return false;
-}
-
-std::string toolchains::Cygwin::getDefaultLinker() const {
-  // Cygwin uses the default BFD linker, even on ARM.
-  return "";
-}
-
-std::string toolchains::Cygwin::getTargetForLinker() const {
-  return "";
-}
-
-std::string toolchains::Cygwin::getPreInputObjectPath(
-    StringRef RuntimeLibraryPath) const {
-  // Cygwin does not add "begin" and "end" objects.
-  return "";
-}
-
-std::string toolchains::Cygwin::getPostInputObjectPath(
-    StringRef RuntimeLibraryPath) const {
-  // Cygwin does not add "begin" and "end" objects.
-  return "";
 }

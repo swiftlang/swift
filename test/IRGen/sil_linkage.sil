@@ -1,23 +1,26 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -Xllvm -sil-disable-pass="External Definition To Declaration" -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
 sil_stage canonical
 
-// CHECK: define{{( protected)?}} swiftcc void @public_fragile_function_test() {{.*}} {
-// CHECK: define{{( protected)?}} internal swiftcc void @public_transparent_fragile_function_test() {{.*}} {
-// CHECK: define{{( protected)?}} swiftcc void @public_transparent_function_test() {{.*}} {
-// CHECK: define{{( protected)?}} swiftcc void @hidden_fragile_function_test() {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @public_fragile_function_test() {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @public_transparent_fragile_function_test() {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @public_transparent_function_test() {{.*}} {
+// CHECK: define weak_odr hidden swiftcc void @public_non_abi_function_test() {{.*}} {
+// CHECK: define hidden swiftcc void @hidden_fragile_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_fragile_function_test() {{.*}} {
-// CHECK: define{{( protected)?}} swiftcc void @private_fragile_function_test() {{.*}} {
-// CHECK: define available_externally swiftcc void @public_external_fragile_function_def_test() {{.*}} {
-// CHECK: define{{( protected)?}} available_externally swiftcc void @hidden_external_fragile_function_def_test() {{.*}} {
+// CHECK: define{{( internal)?}} swiftcc void @private_fragile_function_test() {{.*}} {
+// Public external functions are not emitted into clients.
+// CHECK: declare{{( dllimport)?}} swiftcc void @public_external_fragile_function_def_test()
+// CHECK: define{{( protected)?}} available_externally{{ (hidden)?}}{{( dllimport)?}} swiftcc void @hidden_external_fragile_function_def_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_external_fragile_function_def_test() {{.*}} {
-// CHECK: define{{( protected)?}} available_externally swiftcc void @private_external_fragile_function_def_test() {{.*}} {
-// CHECK: define{{( protected)?}} swiftcc void @public_resilient_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} available_externally{{ (hidden)?}}{{( dllimport)?}} swiftcc void @private_external_fragile_function_def_test() {{.*}} {
+// CHECK: define{{( protected)?}}{{( dllexport)?}} swiftcc void @public_resilient_function_test() {{.*}} {
 // CHECK: define hidden swiftcc void @hidden_resilient_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_resilient_function_test() {{.*}} {
 // CHECK: define internal swiftcc void @private_resilient_function_test() {{.*}}{
-// CHECK: define available_externally swiftcc void @public_external_resilient_function_def_test() {{.*}} {
-// CHECK: define{{( protected)?}} available_externally hidden swiftcc void @hidden_external_resilient_function_def_test() {{.*}} {
+// Public external functions are not emitted into clients.
+// CHECK: declare{{( dllimport)?}} swiftcc void @public_external_resilient_function_def_test()
+// CHECK: define{{( protected)?}} available_externally hidden{{( dllimport)?}} swiftcc void @hidden_external_resilient_function_def_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_external_resilient_function_def_test() {{.*}} {
 
 sil public [serialized] @public_fragile_function_test : $@convention(thin) () -> () {
@@ -31,6 +34,11 @@ sil public [transparent] [serialized] @public_transparent_fragile_function_test 
 }
 
 sil public [transparent] @public_transparent_function_test : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil non_abi [serialized] @public_non_abi_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
@@ -136,6 +144,7 @@ sil public @use_all_symbols : $@convention(thin) () -> () {
   %0 = function_ref @public_fragile_function_test : $@convention(thin) () -> ()
   %t0 = function_ref @public_transparent_fragile_function_test : $@convention(thin) () -> ()
   %t1 = function_ref @public_transparent_function_test : $@convention(thin) () -> ()
+  %t2 = function_ref @public_non_abi_function_test : $@convention(thin) () -> ()
   %1 = function_ref @hidden_fragile_function_test : $@convention(thin) () -> ()
   %2 = function_ref @shared_fragile_function_test : $@convention(thin) () -> ()
   %3 = function_ref @private_fragile_function_test : $@convention(thin) () -> ()

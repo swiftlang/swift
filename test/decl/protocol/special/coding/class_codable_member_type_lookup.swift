@@ -11,11 +11,14 @@ public enum CodingKeys : String, CodingKey {
 // CodingKey enums during member type lookup.
 struct SynthesizedClass : Codable {
   let value: String = "foo"
+  // expected-warning@-1 {{immutable property will not be decoded because it is declared with an initial value which cannot be overwritten}}
+  // expected-note@-2 {{set the initial value via the initializer or explicitly define a CodingKeys enum including a 'value' case to silence this warning}}
+  // expected-note@-3 {{make the property mutable instead}}{{3-6=var}}
 
   // Qualified type lookup should always be unambiguous.
   public func qualifiedFoo(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
   internal func qualifiedBar(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared internal because its parameter uses a private type}}
-  fileprivate func qualfiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+  fileprivate func qualfiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
   private func qualifiedQux(_ key: SynthesizedClass.CodingKeys) {}
 
   // Unqualified lookups should find the synthesized CodingKeys type instead
@@ -28,7 +31,7 @@ struct SynthesizedClass : Codable {
     print(CodingKeys.value) // Not found on top-level.
   }
 
-  fileprivate func unqualifiedBaz(_ key: CodingKeys) { // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+  fileprivate func unqualifiedBaz(_ key: CodingKeys) { // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
     print(CodingKeys.value) // Not found on top-level.
   }
 
@@ -63,7 +66,7 @@ struct SynthesizedClass : Codable {
     bar(CodingKeys.nested)
   }
 
-  fileprivate func nestedUnqualifiedBaz(_ key: CodingKeys) { // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+  fileprivate func nestedUnqualifiedBaz(_ key: CodingKeys) { // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
     enum CodingKeys : String, CodingKey {
       case nested
     }
@@ -94,7 +97,7 @@ struct SynthesizedClass : Codable {
     // Qualified lookup should remain as-is.
     public func qualifiedFoo(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
     internal func qualifiedBar(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared internal because its parameter uses a private type}}
-    fileprivate func qualfiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+    fileprivate func qualfiedBaz(_ key: SynthesizedClass.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
     private func qualifiedQux(_ key: SynthesizedClass.CodingKeys) {}
 
     // Unqualified lookups should find the SynthesizedClass's synthesized
@@ -107,7 +110,7 @@ struct SynthesizedClass : Codable {
       print(CodingKeys.value) // Not found on top-level.
     }
 
-    fileprivate func unqualifiedBaz(_ key: CodingKeys) { // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+    fileprivate func unqualifiedBaz(_ key: CodingKeys) { // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
       print(CodingKeys.value) // Not found on top-level.
     }
 
@@ -142,7 +145,7 @@ struct SynthesizedClass : Codable {
       bar(CodingKeys.nested)
     }
 
-    fileprivate func nestedUnqualifiedBaz(_ key: CodingKeys) { // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+    fileprivate func nestedUnqualifiedBaz(_ key: CodingKeys) { // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
       enum CodingKeys : String, CodingKey {
         case nested
       }
@@ -174,7 +177,7 @@ struct SynthesizedClass : Codable {
 
 // Classes which don't get synthesized Codable implementations should expose the
 // appropriate CodingKeys type.
-struct NonSynthesizedClass : Codable {
+struct NonSynthesizedClass : Codable { // expected-note 4 {{'NonSynthesizedClass' declared here}}
   // No synthesized type since we implemented both methods.
   init(from decoder: Decoder) throws {}
   func encode(to encoder: Encoder) throws {}

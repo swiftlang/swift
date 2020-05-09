@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
-
-// XFAIL: linux
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -verify %s
 
 @_exported import macros
 
@@ -53,11 +51,11 @@ func testTrueFalse() {
   _ = true // should not result in ambiguous use error
   _ = false
 
-  _ = TRUE // expected-error {{use of unresolved identifier 'TRUE'}}
-  _ = FALSE // expected-error {{use of unresolved identifier 'FALSE'}}
+  _ = TRUE // expected-error {{cannot find 'TRUE' in scope}}
+  _ = FALSE // expected-error {{cannot find 'FALSE' in scope}}
 
-  _ = `true` // expected-error {{use of unresolved identifier 'true'}}
-  _ = `false` // expected-error {{use of unresolved identifier 'false'}}
+  _ = `true` // expected-error {{cannot find 'true' in scope}}
+  _ = `false` // expected-error {{cannot find 'false' in scope}}
 }
 
 func testCStrings() -> Bool {
@@ -77,21 +75,21 @@ func testCFString() -> String {
 }
 
 func testInvalidIntegerLiterals() {
-  var l1 = INVALID_INTEGER_LITERAL_1 // expected-error {{use of unresolved identifier 'INVALID_INTEGER_LITERAL_1'}}
+  var l1 = INVALID_INTEGER_LITERAL_1 // expected-error {{cannot find 'INVALID_INTEGER_LITERAL_1' in scope}}
   // FIXME: <rdar://problem/16445608> Swift should set up a DiagnosticConsumer for Clang
-  // var l2 = INVALID_INTEGER_LITERAL_2 // FIXME {{use of unresolved identifier 'INVALID_INTEGER_LITERAL_2'}}
+  // var l2 = INVALID_INTEGER_LITERAL_2 // FIXME {{cannot find 'INVALID_INTEGER_LITERAL_2' in scope}}
 }
 
 func testUsesMacroFromOtherModule() {
   let m1 = USES_MACRO_FROM_OTHER_MODULE_1
   let m2 = macros.USES_MACRO_FROM_OTHER_MODULE_1
-  let m3 = USES_MACRO_FROM_OTHER_MODULE_2 // expected-error {{use of unresolved identifier 'USES_MACRO_FROM_OTHER_MODULE_2'}}
+  let m3 = USES_MACRO_FROM_OTHER_MODULE_2 // expected-error {{cannot find 'USES_MACRO_FROM_OTHER_MODULE_2' in scope}}
   let m4 = macros.USES_MACRO_FROM_OTHER_MODULE_2 // expected-error {{module 'macros' has no member named 'USES_MACRO_FROM_OTHER_MODULE_2'}}
 }
 
 func testSuppressed() {
-  let m1 = NS_BLOCKS_AVAILABLE // expected-error {{use of unresolved identifier 'NS_BLOCKS_AVAILABLE'}}
-  let m2 = CF_USE_OSBYTEORDER_H // expected-error {{use of unresolved identifier 'CF_USE_OSBYTEORDER_H'}}
+  let m1 = NS_BLOCKS_AVAILABLE // expected-error {{cannot find 'NS_BLOCKS_AVAILABLE' in scope}}
+  let m2 = CF_USE_OSBYTEORDER_H // expected-error {{cannot find 'CF_USE_OSBYTEORDER_H' in scope}}
 }
 
 func testNil() {
@@ -101,7 +99,7 @@ func testNil() {
   localNil = NULL_AS_NIL       // expected-error {{'NULL_AS_NIL' is unavailable: use 'nil' instead of this imported macro}}
   localNil = NULL_AS_CLASS_NIL // expected-error {{'NULL_AS_CLASS_NIL' is unavailable: use 'nil' instead of this imported macro}}
 
-  localNil = Nil // expected-error {{use of unresolved identifier 'Nil'}}
+  localNil = Nil // expected-error {{cannot find 'Nil' in scope}}
 }
 
 func testBitwiseOps() {
@@ -111,7 +109,7 @@ func testBitwiseOps() {
   _ = BIT_SHIFT_4 as CUnsignedInt
 
   _ = RSHIFT_ONE as CUnsignedInt
-  _ = RSHIFT_INVALID // expected-error {{use of unresolved identifier 'RSHIFT_INVALID'}}
+  _ = RSHIFT_INVALID // expected-error {{cannot find 'RSHIFT_INVALID' in scope}}
 
   _ = XOR_HIGH as CUnsignedLongLong
 
@@ -119,7 +117,7 @@ func testBitwiseOps() {
   attributes |= ATTR_BOLD
   attributes |= ATTR_ITALIC
   attributes |= ATTR_UNDERLINE
-  attributes |= ATTR_INVALID // expected-error {{use of unresolved identifier 'ATTR_INVALID'}}
+  attributes |= ATTR_INVALID // expected-error {{cannot find 'ATTR_INVALID' in scope}}
 }
 
 func testIntegerArithmetic() {
@@ -147,7 +145,7 @@ func testIntegerArithmetic() {
   _ = DIVIDE_INTEGRAL as CInt
   _ = DIVIDE_NONINTEGRAL as CInt
   _ = DIVIDE_MIXED_TYPES as CLongLong
-  _ = DIVIDE_INVALID // expected-error {{use of unresolved identifier 'DIVIDE_INVALID'}}
+  _ = DIVIDE_INVALID // expected-error {{cannot find 'DIVIDE_INVALID' in scope}}
 }
 
 func testIntegerComparisons() {
@@ -166,6 +164,20 @@ func testLogicalComparisons() {
 }
 
 func testRecursion() {
-  _ = RECURSION // expected-error {{use of unresolved identifier 'RECURSION'}}
-  _ = REF_TO_RECURSION // expected-error {{use of unresolved identifier 'REF_TO_RECURSION'}}
+  _ = RECURSION // expected-error {{cannot find 'RECURSION' in scope}}
+  _ = REF_TO_RECURSION // expected-error {{cannot find 'REF_TO_RECURSION' in scope}}
+  _ = RECURSION_IN_EXPR // expected-error {{cannot find 'RECURSION_IN_EXPR' in scope}}
+  _ = RECURSION_IN_EXPR2 // expected-error {{cannot find 'RECURSION_IN_EXPR2' in scope}}
+  _ = RECURSION_IN_EXPR3 // expected-error {{cannot find 'RECURSION_IN_EXPR3' in scope}}
+}
+
+func testNulls() {
+  let _: Int = UNAVAILABLE_ONE // expected-error {{cannot find 'UNAVAILABLE_ONE' in scope}}
+  let _: Int = DEPRECATED_ONE // expected-error {{cannot find 'DEPRECATED_ONE' in scope}}
+  let _: Int = OKAY_TYPED_ONE // expected-error {{cannot convert value of type 'okay_t' (aka 'UInt32') to specified type 'Int'}}
+}
+
+func testHeaderGuard() {
+  _ = IS_HEADER_GUARD // expected-error {{cannot find 'IS_HEADER_GUARD' in scope}}
+  _ = LOOKS_LIKE_HEADER_GUARD_BUT_IS_USEFUL_CONSTANT
 }

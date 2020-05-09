@@ -12,8 +12,11 @@
 #ifndef SWIFT_IRGEN_TBDGEN_H
 #define SWIFT_IRGEN_TBDGEN_H
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "swift/Basic/Version.h"
+#include <vector>
 
 namespace llvm {
 class raw_ostream;
@@ -23,16 +26,76 @@ namespace swift {
 class FileUnit;
 class ModuleDecl;
 
+/// Options for controlling the exact set of symbols included in the TBD
+/// output.
+struct TBDGenOptions {
+  /// Whether this compilation has multiple IRGen instances.
+  bool HasMultipleIGMs;
+
+  /// Whether this compilation is producing a TBD for InstallAPI.
+  bool IsInstallAPI;
+
+  /// Only collect linker directive symbols.
+  bool LinkerDirectivesOnly = false;
+
+  /// The install_name to use in the TBD file.
+  std::string InstallName;
+
+  /// The module link name (for force loading).
+  std::string ModuleLinkName;
+
+  /// The current project version to use in the generated TBD file. Defaults
+  /// to empty string if not provided.
+  std::string CurrentVersion;
+
+  /// The dylib compatibility-version to use in the generated TBD file. Defaults
+  /// to empty string if not provided.
+  std::string CompatibilityVersion;
+
+  /// The path to a Json file indicating the module name to install-name map
+  /// used by @_originallyDefinedIn
+  std::string ModuleInstallNameMapPath;
+
+  /// For these modules, TBD gen should embed their symbols in the emitted tbd
+  /// file.
+  /// Typically, these modules are static linked libraries. Thus their symbols
+  /// are embeded in the current dylib.
+  std::vector<std::string> embedSymbolsFromModules;
+
+  friend bool operator==(const TBDGenOptions &lhs, const TBDGenOptions &rhs) {
+    return lhs.HasMultipleIGMs == rhs.HasMultipleIGMs &&
+           lhs.IsInstallAPI == rhs.IsInstallAPI &&
+           lhs.LinkerDirectivesOnly == rhs.LinkerDirectivesOnly &&
+           lhs.InstallName == rhs.InstallName &&
+           lhs.ModuleLinkName == rhs.ModuleLinkName &&
+           lhs.CurrentVersion == rhs.CurrentVersion &&
+           lhs.CompatibilityVersion == rhs.CompatibilityVersion &&
+           lhs.ModuleInstallNameMapPath == rhs.ModuleInstallNameMapPath &&
+           lhs.embedSymbolsFromModules == rhs.embedSymbolsFromModules;
+  }
+
+  friend bool operator!=(const TBDGenOptions &lhs, const TBDGenOptions &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend llvm::hash_code hash_value(const TBDGenOptions &opts) {
+    using namespace llvm;
+    return hash_combine(
+        opts.HasMultipleIGMs, opts.IsInstallAPI, opts.LinkerDirectivesOnly,
+        opts.InstallName, opts.ModuleLinkName, opts.CurrentVersion,
+        opts.CompatibilityVersion, opts.ModuleInstallNameMapPath,
+        hash_combine_range(opts.embedSymbolsFromModules.begin(),
+                           opts.embedSymbolsFromModules.end()));
+  }
+};
+
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIRGenThreads,
-                            bool silSerializeWitnessTables);
+                            const TBDGenOptions &opts);
 void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
-                            bool hasMultipleIRGenThreads,
-                            bool silSerializeWitnessTables);
+                            const TBDGenOptions &opts);
 
 void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                  bool hasMultipleIRGenThreads, bool silSerializeWitnessTables,
-                  llvm::StringRef installName);
+                  const TBDGenOptions &opts);
 
 } // end namespace swift
 

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Scope.h"
+#include "swift/Basic/Range.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -20,8 +21,8 @@ ManagedValue Scope::popPreservingValue(ManagedValue mv) {
   // that we want to make sure that we are not forwarding a cleanup for a
   // stack location that will be destroyed by this scope.
   assert(mv && mv.getType().isObject() &&
-         (mv.getType().isTrivial(cleanups.SGF.getModule()) ||
-          mv.getOwnershipKind() == ValueOwnershipKind::Trivial ||
+         (mv.getType().isTrivial(cleanups.SGF.F) ||
+          mv.getOwnershipKind() == ValueOwnershipKind::None ||
           mv.hasCleanup()));
   CleanupCloner cloner(cleanups.SGF, mv);
   SILValue value = mv.forward(cleanups.SGF);
@@ -52,10 +53,10 @@ static void lifetimeExtendAddressOnlyRValueSubValues(
     }
 
     // Otherwise, create the box and move the address only value into the box.
-    assert(v->getType().isAddressOnly(SGF.getModule()) &&
+    assert(v->getType().isAddressOnly(SGF.F) &&
            "RValue invariants imply that all RValue subtypes that are "
            "addresses must be address only.");
-    auto boxTy = SILBoxType::get(v->getType().getSwiftRValueType());
+    auto boxTy = SILBoxType::get(v->getType().getASTType());
     SILValue box = SGF.B.createAllocBox(loc, boxTy);
     SILValue addr = SGF.B.createProjectBox(loc, box, 0);
     SGF.B.createCopyAddr(loc, v, addr, IsTake, IsInitialization);
@@ -71,16 +72,28 @@ RValue Scope::popPreservingValue(RValue &&rv) {
   auto &SGF = cleanups.SGF;
   assert(rv.isPlusOne(SGF) && "Can only push plus one rvalues through a scope");
 
-  // First gather all of the data that we need to recreate the RValue in the
-  // outer scope.
+  // Perform a quick check if we have an incontext value. If so, just pop and
+  // return rv.
+  if (rv.isInContext()) {
+    pop();
+    return std::move(rv);
+  }
+
+  // After this point, we should have /no/ special states.
+  assert(!rv.isInSpecialState());
+
+  // Ok, we have a normal RValue. Gather all of the data that we need to
+  // recreate the RValue in the outer scope.
   CanType type = rv.type;
   unsigned numEltsRemaining = rv.elementsToBeAdded;
-  CleanupCloner cloner(SGF, rv);
-  llvm::SmallVector<SILValue, 4> values;
+  SmallVector<CleanupCloner, 4> cloners;
+  CleanupCloner::getClonersForRValue(SGF, rv, cloners);
+
+  SmallVector<SILValue, 4> values;
   std::move(rv).forwardAll(SGF, values);
 
   // Lifetime any address only values that we may have.
-  llvm::SmallVector<SILValue, 4> lifetimeExtendingBoxes;
+  SmallVector<SILValue, 4> lifetimeExtendingBoxes;
   lifetimeExtendAddressOnlyRValueSubValues(SGF, loc, values,
                                            lifetimeExtendingBoxes);
 
@@ -88,29 +101,37 @@ RValue Scope::popPreservingValue(RValue &&rv) {
   pop();
 
   // Then create cleanups for any lifetime extending boxes that we may have to
-  // ensure that the boxes are cleaned up /after/ the value stored in the box.
+  // ensure that the boxes are cleaned up /after/ the value stored in the
+  // box. We assume that our values will be destroyed via a destroy_addr or the
+  // like /before/ the end of our box's lifetime, implying that the value inside
+  // the box should be uninitialized when the box is destroyed, so it is
+  // important that we use a dealloc_box.
   for (auto v : lifetimeExtendingBoxes) {
-    SGF.emitManagedRValueWithCleanup(v);
+    SGF.enterDeallocBoxCleanup(v);
   }
 
   // Reconstruct the managed values from the underlying sil values in the outer
   // scope. Since the RValue wants a std::vector value, we use that instead.
   std::vector<ManagedValue> managedValues;
-  std::transform(
-      values.begin(), values.end(), std::back_inserter(managedValues),
-      [&cloner](SILValue v) -> ManagedValue { return cloner.clone(v); });
+  for (unsigned i : indices(values)) {
+    managedValues.push_back(cloners[i].clone(values[i]));
+  }
 
   // And then assemble the managed values into a rvalue.
   return RValue(SGF, std::move(managedValues), type, numEltsRemaining);
 }
 
 void Scope::popImpl() {
-  cleanups.stack.checkIterator(depth);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  assert(cleanups.innermostScope == depth && "popping scopes out of order");
-
+  verify();
   cleanups.innermostScope = savedInnermostScope;
   cleanups.endScope(depth, loc);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  cleanups.popTopDeadCleanups(cleanups.innermostScope);
+  if (cleanups.innermostScope)
+    cleanups.stack.checkIterator(cleanups.innermostScope->depth);
+  cleanups.popTopDeadCleanups();
+}
+
+void Scope::verify() {
+  assert(cleanups.innermostScope == this && "popping scopes out of order");
+  assert(depth.isValid());
+  cleanups.stack.checkIterator(depth);
 }

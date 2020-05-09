@@ -1,0 +1,29 @@
+// RUN: %swift -module-name test -import-objc-header %S/Inputs/ptrauth-foreign.h %s -parse-stdlib -parse-as-library -emit-ir -target arm64e-apple-ios12.0  | %FileCheck %s --check-prefix=CHECK
+
+// REQUIRES: CPU=arm64e
+// REQUIRES: OS=ios
+
+sil @test0 : $() -> () {
+bb0:
+  %0 = metatype $@thick IntPair.Type
+
+// CHECK:      @"$sSo9WidgetRefaMn.ptrauth" =
+// CHECK-SAME:   @"$sSo9WidgetRefaMn"
+// CHECK-SAME:   @"$sSo9WidgetRefaMf", i32 0, i32 2
+// CHECK-SAME:   i64 44678
+// CHECK-SAME:   section "llvm.ptrauth"
+// CHECK:      @"$sSo9WidgetRefaMf" = linkonce_odr hidden constant
+// CHECK-SAME:   @"$sSo9WidgetRefaMn.ptrauth"
+  %1 = metatype $@thick Widget.Type
+
+// CHECK:      @"$sSo7IntPairVMn.ptrauth" =
+// CHECK-SAME:   @"$sSo7IntPairVMn"
+// CHECK-SAME:   @"$sSo7IntPairVMf", i32 0, i32 2
+// CHECK-SAME:   i64 44678
+// CHECK-SAME:   section "llvm.ptrauth"
+// CHECK:      @"$sSo7IntPairVMf" = linkonce_odr hidden constant
+// CHECK-SAME:   @"$sSo7IntPairVMn.ptrauth"
+
+  %ret = tuple ()
+  return %ret : $()
+}

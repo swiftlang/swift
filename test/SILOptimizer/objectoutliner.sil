@@ -1,0 +1,247 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -object-outliner | %FileCheck %s
+//
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Obj {
+  @_hasStorage var value: Int64
+  init()
+}
+
+// CHECK-LABEL: sil_global private @outline_global_simpleTv_ : $Obj = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
+// CHECK-NEXT:    %initval = object $Obj (%1 : $Int64)
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_global private @outline_global_tailelemsTv_ : $Obj = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 3
+// CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
+// CHECK-NEXT:    %2 = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:    %3 = struct $Int64 (%2 : $Builtin.Int64)
+// CHECK-NEXT:    %4 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    %5 = struct $Int64 (%4 : $Builtin.Int64)
+// CHECK-NEXT:    %initval = object $Obj (%5 : $Int64, [tail_elems] %3 : $Int64, %1 : $Int64)
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil @outline_global_simple
+// CHECK: [[G:%[0-9]+]] = global_value @outline_global_simpleTv_ : $Obj
+// CHECK: strong_retain [[G]] : $Obj
+// CHECK-NOT: store
+// CHECK: strong_release [[G]] : $Obj
+// CHECK: return
+sil @outline_global_simple : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// CHECK-LABEL: sil @outline_global_tailelems
+// CHECK: [[G:%[0-9]+]] = global_value @outline_global_tailelemsTv_ : $Obj
+// CHECK: strong_retain [[G]] : $Obj
+// CHECK-NOT: store
+// CHECK: strong_release [[G]] : $Obj
+// CHECK: return
+sil @outline_global_tailelems : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 2
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %5 = struct $Int64 (%2 : $Builtin.Int64)
+  %6 = struct $Int64 (%3 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %15 = ref_tail_addr %7 : $Obj, $Int64
+  store %5 to %15 : $*Int64
+  %19 = integer_literal $Builtin.Word, 1
+  %20 = index_addr %15 : $*Int64, %19 : $Builtin.Word
+  store %6 to %20 : $*Int64
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @handle_deallocation
+// CHECK:      global_value
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @handle_deallocation : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %6 = ref_element_addr %5 : $Obj, #Obj.value
+  store %4 to %6 : $*Int64
+  set_deallocating %5 : $Obj
+  dealloc_ref %5 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_without_tail_elems
+// CHECK: alloc_ref
+// CHECK: store
+// CHECK: return
+sil @dont_outline_without_tail_elems : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_global_double_store
+// CHECK: alloc_ref
+// CHECK: store
+// CHECK: return
+sil @dont_outline_global_double_store : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  store %4 to %9 : $*Int64
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_global_missing_store
+// CHECK: alloc_ref
+// CHECK: return
+sil @dont_outline_global_missing_store : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_objc_allocation
+// CHECK: alloc_ref
+// CHECK: return
+sil @dont_outline_objc_allocation : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  // A hack, because Obj is not really an ObjC class. But for the test it should be ok.
+  %7 = alloc_ref [objc] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @take_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
+
+// CHECK-LABEL: sil @dont_outline_global_unknown_addr_use
+// CHECK: alloc_ref
+// CHECK: return
+sil @dont_outline_global_unknown_addr_use : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = address_to_pointer %9 : $*Int64 to $Builtin.RawPointer
+  %f = function_ref @take_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  %a = apply %f(%10) : $@convention(thin) (Builtin.RawPointer) -> ()
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_global_escaping_obj
+// CHECK: alloc_ref
+// CHECK: return
+sil @dont_outline_global_escaping_obj : $@convention(thin) (@inout Obj) -> () {
+bb0(%0: $*Obj):
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Word, 0
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %2 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  store %7 to %0 : $*Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_global_missing_tailelem_store
+// CHECK: alloc_ref
+// CHECK: return
+sil @dont_outline_global_missing_tailelem_store : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 2
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %5 = struct $Int64 (%2 : $Builtin.Int64)
+  %6 = struct $Int64 (%3 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %15 = ref_tail_addr %7 : $Obj, $Int64
+  store %5 to %15 : $*Int64
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_global_double_tailelem_store
+// CHECK: alloc_ref
+// CHECK: return
+sil @dont_outline_global_double_tailelem_store : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 2
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %5 = struct $Int64 (%2 : $Builtin.Int64)
+  %6 = struct $Int64 (%3 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %15 = ref_tail_addr %7 : $Obj, $Int64
+  store %5 to %15 : $*Int64
+  store %5 to %15 : $*Int64
+  %19 = integer_literal $Builtin.Word, 1
+  %20 = index_addr %15 : $*Int64, %19 : $Builtin.Word
+  store %6 to %20 : $*Int64
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}

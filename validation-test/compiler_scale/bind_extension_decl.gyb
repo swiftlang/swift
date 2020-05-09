@@ -1,0 +1,5 @@
+// RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select InterfaceTypeRequest %s
+// REQUIRES: asserts
+
+struct Struct${N} {}
+extension Struct${N} {}

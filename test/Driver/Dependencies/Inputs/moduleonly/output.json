@@ -1,0 +1,21 @@
+{
+  "./foo.swift": {
+    "object": "./foo.o",
+    "swift-dependencies": "./foo.swiftdeps",
+    "swiftmodule": "./foo~partial.swiftmodule"
+  },
+  "./bar.swift": {
+    "object": "./bar.o",
+    "swift-dependencies": "./bar.swiftdeps",
+    "swiftmodule": "./bar~partial.swiftmodule"
+  },
+  "./baz.swift": {
+    "object": "./baz.o",
+    "swift-dependencies": "./baz.swiftdeps",
+    "swiftmodule": "./baz~partial.swiftmodule"
+  },
+  "": {
+    "swift-dependencies": "./buildrecord.swiftdeps"
+  }
+}
+

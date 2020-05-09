@@ -10,13 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_inlineable
-@_versioned
+@inlinable
 internal func _writeBackMutableSlice<C, Slice_>(
   _ self_: inout C, bounds: Range<C.Index>, slice: Slice_
 ) where
-  C : MutableCollection,
-  Slice_ : Collection,
+  C: MutableCollection,
+  Slice_: Collection,
   C.Element == Slice_.Element,
   C.Index == Slice_.Index {
 

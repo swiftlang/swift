@@ -24,8 +24,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dead-object-elim"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -33,14 +35,13 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
-#include "swift/SILOptimizer/Utils/IndexTrie.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/IndexTrie.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -51,6 +52,9 @@ STATISTIC(DeadAllocRefEliminated,
 
 STATISTIC(DeadAllocStackEliminated,
           "number of AllocStack instructions removed");
+
+STATISTIC(DeadKeyPathEliminated,
+          "number of keypath instructions removed");
 
 STATISTIC(DeadAllocApplyEliminated,
           "number of allocating Apply instructions removed");
@@ -76,17 +80,17 @@ static SILFunction *getDestructor(AllocRefInst *ARI) {
   SILDeclRef Ref(Destructor);
   SILFunction *Fn = ARI->getModule().lookUpFunction(Ref);
   if (!Fn || Fn->empty()) {
-    DEBUG(llvm::dbgs() << "    Could not find destructor.\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Could not find destructor.\n");
     return nullptr;
   }
 
-  DEBUG(llvm::dbgs() << "    Found destructor!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Found destructor!\n");
 
   // If the destructor has an objc_method calling convention, we cannot
   // analyze it since it could be swapped out from under us at runtime.
   if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
-    DEBUG(llvm::dbgs() << "        Found Objective-C destructor. Can't "
-          "analyze!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        Found Objective-C destructor. Can't "
+               "analyze!\n");
     return nullptr;
   }
 
@@ -107,18 +111,18 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
          "Destructor should have only one argument, self.");
   SILArgument *Self = Fn->begin()->getArgument(0);
 
-  DEBUG(llvm::dbgs() << "    Analyzing destructor.\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Analyzing destructor.\n");
 
   // For each BB in the destructor...
   for (auto &BB : *Fn)
     // For each instruction I in BB...
     for (auto &I : BB) {
-      DEBUG(llvm::dbgs() << "        Visiting: " << I);
+      LLVM_DEBUG(llvm::dbgs() << "        Visiting: " << I);
 
       // If I has no side effects, we can ignore it.
       if (!I.mayHaveSideEffects()) {
-        DEBUG(llvm::dbgs() << "            SAFE! Instruction has no side "
-              "effects.\n");
+        LLVM_DEBUG(llvm::dbgs() << "            SAFE! Instruction has no side "
+                   "effects.\n");
         continue;
       }
 
@@ -131,20 +135,20 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
           // just in case.
           assert(RefInst->getNumOperands() == 1 &&
                  "Make sure RefInst only has one argument.");
-          DEBUG(llvm::dbgs() << "            SAFE! Ref count operation on "
-                "Self.\n");
+          LLVM_DEBUG(llvm::dbgs() << "            SAFE! Ref count operation on "
+                     "Self.\n");
           continue;
         } else {
-          DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation not on"
-                " self.\n");
+          LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
+                     "not on self.\n");
           return true;
         }
       }
 
       // dealloc_stack can be ignored.
       if (isa<DeallocStackInst>(I)) {
-        DEBUG(llvm::dbgs() << "            SAFE! dealloc_stack can be "
-              "ignored.\n");
+        LLVM_DEBUG(llvm::dbgs() << "            SAFE! dealloc_stack can be "
+                   "ignored.\n");
         continue;
       }
 
@@ -152,11 +156,11 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
         if (stripCasts(DeallocRef->getOperand()) == Self) {
-          DEBUG(llvm::dbgs() << "            SAFE! dealloc_ref on self.\n");
+          LLVM_DEBUG(llvm::dbgs() <<"            SAFE! dealloc_ref on self.\n");
           continue;
         } else {
-          DEBUG(llvm::dbgs() << "            UNSAFE! dealloc_ref on value "
-                "besides self.\n");
+          LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! dealloc_ref on value "
+                     "besides self.\n");
           return true;
         }
       }
@@ -164,12 +168,12 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       // Storing into the object can be ignored.
       if (auto *SI = dyn_cast<StoreInst>(&I))
         if (stripAddressProjections(SI->getDest()) == Self) {
-          DEBUG(llvm::dbgs() << "            SAFE! Instruction is a store into "
-                "self.\n");
+          LLVM_DEBUG(llvm::dbgs() << "            SAFE! Instruction is a store "
+                     "into self.\n");
           continue;
         }
 
-      DEBUG(llvm::dbgs() << "            UNSAFE! Unknown instruction.\n");
+      LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Unknown instruction.\n");
       // Otherwise, we can't remove the deallocation completely.
       return true;
     }
@@ -181,8 +185,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
 void static
 removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
   for (auto *I : UsersToRemove) {
-    if (!I->use_empty())
-      I->replaceAllUsesWith(SILUndef::get(I->getType(), I->getModule()));
+    I->replaceAllUsesOfAllResultsWithUndef();
     // Now we know that I should not have any uses... erase it from its parent.
     I->eraseFromParent();
   }
@@ -194,30 +197,50 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 
 /// Returns false if Inst is an instruction that would require us to keep the
 /// alloc_ref alive.
-static bool canZapInstruction(SILInstruction *Inst) {
+static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
+                              bool onlyAcceptTrivialStores) {
+  if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst))
+    return true;
+
   // It is ok to eliminate various retains/releases. We are either removing
   // everything or nothing.
-  if (isa<RefCountingInst>(Inst))
+  if (isa<RefCountingInst>(Inst) ||
+      // dealloc_partial_ref invokes releases implicitly
+      isa<DeallocPartialRefInst>(Inst))
+    return acceptRefCountInsts;
+
+  if (isa<InjectEnumAddrInst>(Inst))
+    return true;
+
+  if (isa<KeyPathInst>(Inst))
+    return true;
+
+  // We know that the destructor has no side effects so we can remove the
+  // deallocation instruction too.
+  if (isa<DeallocationInst>(Inst) || isa<AllocationInst>(Inst))
+    return true;
+
+  // Much like deallocation, destroy addr is safe.
+  if (isa<DestroyAddrInst>(Inst))
     return true;
 
   // If we see a store here, we have already checked that we are storing into
   // the pointer before we added it to the worklist, so we can skip it.
-  if (isa<StoreInst>(Inst))
+  if (auto *store = dyn_cast<StoreInst>(Inst)) {
+    // TODO: when we have OSSA, we can also accept stores of non trivial values:
+    //       just replace the store with a destroy_value.
+    return !onlyAcceptTrivialStores ||
+           store->getSrc()->getType().isTrivial(*store->getFunction());
+  }
+
+  // Conceptually this instruction has no side-effects.
+  if (isa<InitExistentialAddrInst>(Inst))
     return true;
 
   // If Inst does not read or write to memory, have side effects, and is not a
   // terminator, we can zap it.
   if (!Inst->mayHaveSideEffects() && !Inst->mayReadFromMemory() &&
       !isa<TermInst>(Inst))
-    return true;
-
-  // We know that the destructor has no side effects so we can remove the
-  // deallocation instruction too.
-  if (isa<DeallocationInst>(Inst))
-    return true;
-
-  // Much like deallocation, destroy addr is safe.
-  if (isa<DestroyAddrInst>(Inst))
     return true;
 
   // Otherwise we do not know how to handle this instruction. Be conservative
@@ -228,47 +251,51 @@ static bool canZapInstruction(SILInstruction *Inst) {
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
+hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
+                    bool acceptRefCountInsts, bool onlyAcceptTrivialStores) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
-  DEBUG(llvm::dbgs() << "    Analyzing Use Graph.");
+  LLVM_DEBUG(llvm::dbgs() << "    Analyzing Use Graph.");
 
   while (!Worklist.empty()) {
     SILInstruction *I = Worklist.pop_back_val();
 
-    DEBUG(llvm::dbgs() << "        Visiting: " << *I);
+    LLVM_DEBUG(llvm::dbgs() << "        Visiting: " << *I);
 
     // Insert the instruction into our InvolvedInstructions set.  If we have
     // already seen it, then don't reprocess all of the uses.
     if (!Users.insert(I)) {
-      DEBUG(llvm::dbgs() << "        Already seen skipping...\n");
+      LLVM_DEBUG(llvm::dbgs() << "        Already seen skipping...\n");
       continue;
     }
 
     // If we can't zap this instruction... bail...
-    if (!canZapInstruction(I)) {
-      DEBUG(llvm::dbgs() << "        Found instruction we can't zap...\n");
+    if (!canZapInstruction(I, acceptRefCountInsts, onlyAcceptTrivialStores)) {
+      LLVM_DEBUG(llvm::dbgs() << "        Found instruction we can't zap...\n");
       return true;
     }
 
     // At this point, we can remove the instruction as long as all of its users
     // can be removed as well. Scan its users and add them to the worklist for
     // recursive processing.
-    for (auto *Op : I->getUses()) {
-      auto *User = Op->getUser();
+    for (auto result : I->getResults()) {
+      for (auto *Op : result->getUses()) {
+        auto *User = Op->getUser();
 
-      // Make sure that we are only storing into our users, not storing our
-      // users which would be an escape.
-      if (auto *SI = dyn_cast<StoreInst>(User))
-        if (Op->get() == SI->getSrc()) {
-          DEBUG(llvm::dbgs() << "        Found store of pointer. Failure: " <<
-                *SI);
-          return true;
-        }
+        // Make sure that we are only storing into our users, not storing our
+        // users which would be an escape.
+        if (auto *SI = dyn_cast<StoreInst>(User))
+          if (Op->get() == SI->getSrc()) {
+            LLVM_DEBUG(llvm::dbgs() << "        Found store of pointer. "
+                                       "Failure: "
+                                    << *SI);
+            return true;
+          }
 
-      // Otherwise, add normal instructions to the worklist for processing.
-      Worklist.push_back(User);
+        // Otherwise, add normal instructions to the worklist for processing.
+        Worklist.push_back(User);
+      }
     }
   }
 
@@ -300,7 +327,7 @@ class DeadObjectAnalysis {
   UserList AllUsers;
 
   // Trie of stored locations.
-  IndexTrieNode *AddressProjectionTrie;
+  std::unique_ptr<IndexTrieNode> AddressProjectionTrie;
 
   // Track all stores of refcounted elements per address projection.
   AddressToStoreMap StoredLocations;
@@ -312,10 +339,6 @@ public:
   explicit DeadObjectAnalysis(SILValue V):
     NewAddrValue(V), AddressProjectionTrie(nullptr), SeenPtrToAddr(false) {}
 
-  ~DeadObjectAnalysis() {
-    delete AddressProjectionTrie;
-  }
-
   bool analyze();
 
   ArrayRef<SILInstruction*> getAllUsers() const {
@@ -324,7 +347,7 @@ public:
 
   template<typename Visitor>
   void visitStoreLocations(Visitor visitor) {
-    visitStoreLocations(visitor, AddressProjectionTrie);
+    visitStoreLocations(visitor, AddressProjectionTrie.get());
   }
 
 private:
@@ -341,7 +364,7 @@ private:
 // Record a store into this object.
 void DeadObjectAnalysis::
 addStore(StoreInst *Store, IndexTrieNode *AddressNode) {
-  if (Store->getSrc()->getType().isTrivial(Store->getModule()))
+  if (Store->getSrc()->getType().isTrivial(*Store->getFunction()))
     return;
 
   // SSAUpdater cannot handle multiple defs in the same blocks. Therefore, we
@@ -388,7 +411,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     auto User = Op->getUser();
 
     // Lifetime endpoints that don't allow the address to escape.
-    if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User)) {
+    if (isa<RefCountingInst>(User) ||
+        isa<DebugValueInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -396,7 +420,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     if (auto *Store = dyn_cast<StoreInst>(User)) {
       // Bail if this address is stored to another object.
       if (Store->getDest() != DefInst) {
-        DEBUG(llvm::dbgs() << "        Found an escaping store: " << *User);
+        LLVM_DEBUG(llvm::dbgs() <<"        Found an escaping store: " << *User);
         return false;
       }
       IndexTrieNode *StoreAddrNode = AddressNode;
@@ -409,47 +433,49 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       AllUsers.insert(User);
       continue;
     }
-    if (isa<PointerToAddressInst>(User)) {
+    if (auto PTAI = dyn_cast<PointerToAddressInst>(User)) {
       // Only one pointer-to-address is allowed for safety.
       if (SeenPtrToAddr)
         return false;
 
       SeenPtrToAddr = true;
-      if (!recursivelyCollectInteriorUses(User, AddressNode, IsInteriorAddress))
+      if (!recursivelyCollectInteriorUses(PTAI, AddressNode, IsInteriorAddress))
         return false;
 
       continue;
     }
     // Recursively follow projections.
-    ProjectionIndex PI(User);
-    if (PI.isValid()) {
-      IndexTrieNode *ProjAddrNode = AddressNode;
-      bool ProjInteriorAddr = IsInteriorAddress;
-      if (Projection::isAddressProjection(User)) {
-        if (User->getKind() == ValueKind::IndexAddrInst) {
-          // Don't support indexing within an interior address.
-          if (IsInteriorAddress)
-            return false;
+    if (auto ProjInst = dyn_cast<SingleValueInstruction>(User)) {
+      ProjectionIndex PI(ProjInst);
+      if (PI.isValid()) {
+        IndexTrieNode *ProjAddrNode = AddressNode;
+        bool ProjInteriorAddr = IsInteriorAddress;
+        if (Projection::isAddressProjection(ProjInst)) {
+          if (isa<IndexAddrInst>(ProjInst)) {
+            // Don't support indexing within an interior address.
+            if (IsInteriorAddress)
+              return false;
+          }
+          else if (!IsInteriorAddress) {
+            // Push an extra zero index node for the first interior address.
+            ProjAddrNode = AddressNode->getChild(0);
+            ProjInteriorAddr = true;
+          }
         }
-        else if (!IsInteriorAddress) {
-          // Push an extra zero index node for the first interior address.
-          ProjAddrNode = AddressNode->getChild(0);
-          ProjInteriorAddr = true;
+        else if (IsInteriorAddress) {
+          // Don't expect to extract values once we've taken an address.
+          return false;
         }
+        if (!recursivelyCollectInteriorUses(ProjInst,
+                                            ProjAddrNode->getChild(PI.Index),
+                                            ProjInteriorAddr)) {
+          return false;
+        }
+        continue;
       }
-      else if (IsInteriorAddress) {
-        // Don't expect to extract values once we've taken an address.
-        return false;
-      }
-      if (!recursivelyCollectInteriorUses(User,
-                                          ProjAddrNode->getChild(PI.Index),
-                                          ProjInteriorAddr)) {
-        return false;
-      }
-      continue;
     }
     // Otherwise bail.
-    DEBUG(llvm::dbgs() << "        Found an escaping use: " << *User);
+    LLVM_DEBUG(llvm::dbgs() << "        Found an escaping use: " << *User);
     return false;
   }
   return true;
@@ -458,13 +484,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 // Track the lifetime, release points, and released values referenced by a
 // newly allocated object.
 bool DeadObjectAnalysis::analyze() {
-  DEBUG(llvm::dbgs() << "    Analyzing nontrivial dead object: "
-        << NewAddrValue);
+  LLVM_DEBUG(llvm::dbgs() << "    Analyzing nontrivial dead object: "
+                          << NewAddrValue);
 
   // Populate AllValues, AddressProjectionTrie, and StoredLocations.
-  AddressProjectionTrie = new IndexTrieNode();
+  AddressProjectionTrie.reset(new IndexTrieNode());
   if (!recursivelyCollectInteriorUses(NewAddrValue,
-                                      AddressProjectionTrie, false)) {
+                                      AddressProjectionTrie.get(), false)) {
     return false;
   }
   // If all stores are leaves in the AddressProjectionTrie, then we can analyze
@@ -532,7 +558,7 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
 // TODO: This relies on the lowest level array.uninitialized not being
 // inlined. To do better we could either run this pass before semantic inlining,
 // or we could also handle calls to array.init.
-static bool removeAndReleaseArray(SILInstruction *NewArrayValue,
+static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
                                   DeadEndBlocks &DEBlocks) {
   TupleExtractInst *ArrayDef = nullptr;
   TupleExtractInst *StorageAddress = nullptr;
@@ -551,7 +577,7 @@ static bool removeAndReleaseArray(SILInstruction *NewArrayValue,
   if (!ArrayDef)
     return false; // No Array object to delete.
 
-  assert(!ArrayDef->getType().isTrivial(ArrayDef->getModule()) &&
+  assert(!ArrayDef->getType().isTrivial(*ArrayDef->getFunction()) &&
          "Array initialization should produce the proper tuple type.");
 
   // Analyze the array object uses.
@@ -571,7 +597,7 @@ static bool removeAndReleaseArray(SILInstruction *NewArrayValue,
     removeInstructions(DeadArray.getAllUsers());
     return true;
   }
-  assert(StorageAddress->getType().isTrivial(ArrayDef->getModule()) &&
+  assert(StorageAddress->getType().isTrivial(*ArrayDef->getFunction()) &&
          "Array initialization should produce the proper tuple type.");
 
   // Analyze the array storage uses.
@@ -617,7 +643,8 @@ static bool removeAndReleaseArray(SILInstruction *NewArrayValue,
 /// side effect?
 static bool isAllocatingApply(SILInstruction *Inst) {
   ArraySemanticsCall ArrayAlloc(Inst);
-  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized;
+  return ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitialized ||
+         ArrayAlloc.getKind() == ArrayCallKind::kArrayUninitializedIntrinsic;
 }
 
 namespace {
@@ -626,17 +653,20 @@ class DeadObjectElimination : public SILFunctionTransform {
   llvm::SmallVector<SILInstruction*, 16> Allocations;
 
   void collectAllocations(SILFunction &Fn) {
-    for (auto &BB : Fn)
+    for (auto &BB : Fn) {
       for (auto &II : BB) {
-        if (isa<AllocationInst>(&II))
+        if (isa<AllocationInst>(&II) ||
+            isAllocatingApply(&II) ||
+            isa<KeyPathInst>(&II)) {
           Allocations.push_back(&II);
-        else if (isAllocatingApply(&II))
-          Allocations.push_back(&II);
+        }
       }
+    }
   }
 
   bool processAllocRef(AllocRefInst *ARI);
   bool processAllocStack(AllocStackInst *ASI);
+  bool processKeyPath(KeyPathInst *KPI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
   bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
 
@@ -651,6 +681,8 @@ class DeadObjectElimination : public SILFunctionTransform {
         Changed |= processAllocRef(A);
       else if (auto *A = dyn_cast<AllocStackInst>(II))
         Changed |= processAllocStack(A);
+      else if (auto *KPI = dyn_cast<KeyPathInst>(II))
+        Changed |= processKeyPath(KPI);
       else if (auto *A = dyn_cast<AllocBoxInst>(II))
         Changed |= processAllocBox(A);
       else if (auto *A = dyn_cast<ApplyInst>(II))
@@ -660,6 +692,10 @@ class DeadObjectElimination : public SILFunctionTransform {
   }
 
   void run() override {
+    // FIXME: We should support ownership eventually.
+    if (getFunction()->hasOwnership())
+      return;
+
     if (processFunction(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
@@ -690,75 +726,136 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
     DestructorAnalysisCache[Type] = HasSideEffects;
   }
 
-  if (HasSideEffects) {
-    DEBUG(llvm::dbgs() << " Destructor had side effects. \n");
-    return false;
-  }
-
   // Our destructor has no side effects, so if we can prove that no loads
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ARI, UsersToRemove)) {
-    DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
+  if (hasUnremovableUsers(ARI, UsersToRemove,
+                          /*acceptRefCountInsts=*/ !HasSideEffects,
+                          /*onlyAcceptTrivialStores*/false)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
 
   // Remove the AllocRef and all of its users.
   removeInstructions(
     ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
-  DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_ref.\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_ref.\n");
 
   ++DeadAllocRefEliminated;
   return true;
 }
 
 bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
-  // Trivial types don't have destructors. Let's try to zap this AllocStackInst.
-  if (!ASI->getElementType().isTrivial(ASI->getModule()))
-    return false;
-
+  // Trivial types don't have destructors.
+  bool isTrivialType = ASI->getElementType().isTrivial(*ASI->getFunction());
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ASI, UsersToRemove)) {
-    DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
+  if (hasUnremovableUsers(ASI, UsersToRemove, /*acceptRefCountInsts=*/ true,
+      /*onlyAcceptTrivialStores*/!isTrivialType)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
 
   // Remove the AllocRef and all of its users.
   removeInstructions(
     ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
-  DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_stack.\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_stack.\n");
 
   ++DeadAllocStackEliminated;
+  return true;
+}
+
+bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
+  UserList UsersToRemove;
+  if (hasUnremovableUsers(KPI, UsersToRemove, /*acceptRefCountInsts=*/ true,
+      /*onlyAcceptTrivialStores*/ false)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
+    return false;
+  }
+
+  // For simplicity just bail if the keypath has a non-trivial operands.
+  // TODO: don't bail but insert compensating destroys for such operands.
+  for (const Operand &Op : KPI->getAllOperands()) {
+    if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
+      return false;
+  }
+
+  // Remove the keypath and all of its users.
+  removeInstructions(
+    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating keypath.\n");
+
+  ++DeadKeyPathEliminated;
+  return true;
+}
+
+/// If AI is the version of an initializer where we pass in either an apply or
+/// an alloc_ref to initialize in place, validate that we are able to continue
+/// optimizing and return To
+static bool getDeadInstsAfterInitializerRemoved(
+    ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy) {
+  assert(ToDestroy.empty() && "We assume that ToDestroy is empty, so on "
+                              "failure we can clear without worrying about the "
+                              "caller accumulating and thus our eliminating "
+                              "passed in state.");
+  SILValue Arg0 = AI->getArgument(0);
+
+  if (Arg0->getType().isExistentialType()) {
+    // This is a version of the initializer which receives a pre-allocated
+    // buffer as first argument. To completely eliminate the allocation, we must
+    // destroy the extra allocations as well as the initializer,
+    if (auto *Result = dyn_cast<ApplyInst>(Arg0)) {
+      ToDestroy.emplace_back(Result);
+      return true;
+    }
+
+    return false;
+  }
+
+  if (auto *ARI = dyn_cast<AllocRefInst>(Arg0)) {
+    if (all_of(ARI->getUses(), [&](Operand *Op) -> bool {
+          if (Op->getUser() == AI)
+            return true;
+          if (auto *SRI = dyn_cast<StrongReleaseInst>(Op->getUser())) {
+            ToDestroy.emplace_back(SRI);
+            return true;
+          }
+          return false;
+        })) {
+      return true;
+    }
+  }
+
+  // We may have added elements to the array before we failed. To avoid such a
+  // problem, we clear the out array here. We assert at the beginning that the
+  // out array is empty, so this is safe.
+  ToDestroy.clear();
   return true;
 }
 
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
-  if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized)
+  if (ArraySemanticsCall(AI).getKind() != ArrayCallKind::kArrayUninitialized &&
+      ArraySemanticsCall(AI).getKind() !=
+          ArrayCallKind::kArrayUninitializedIntrinsic)
     return false;
 
-  ApplyInst *AllocBufferAI = nullptr;
-  SILValue Arg0 = AI->getArgument(0);
-  if (Arg0->getType().isExistentialType()) {
-    // This is a version of the initializer which receives a pre-allocated
-    // buffer as first argument. If we want to delete the initializer we also
-    // have to delete the allocation.
-    AllocBufferAI = dyn_cast<ApplyInst>(Arg0);
-    if (!AllocBufferAI)
-      return false;
-  }
+  llvm::SmallVector<SILInstruction *, 8> instsDeadAfterInitializerRemoved;
+  if (!getDeadInstsAfterInitializerRemoved(AI,
+                                           instsDeadAfterInitializerRemoved))
+    return false;
 
   if (!removeAndReleaseArray(AI, DEBlocks))
     return false;
 
-  DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
 
   eraseUsesOfInstruction(AI);
   assert(AI->use_empty() && "All users should have been removed.");
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
-  if (AllocBufferAI) {
-    recursivelyDeleteTriviallyDeadInstructions(AllocBufferAI, true);
+  if (instsDeadAfterInitializerRemoved.size()) {
+    recursivelyDeleteTriviallyDeadInstructions(instsDeadAfterInitializerRemoved,
+                                               true);
   }
   ++DeadAllocApplyEliminated;
   return true;

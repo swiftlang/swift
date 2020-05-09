@@ -1,4 +1,9 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s
+// RUN: %target-sil-opt -enforce-exclusivity=none -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s
+
+// Declare this SIL to be canonical because some tests break raw SIL
+// conventions. e.g. address-type block args. -enforce-exclusivity=none is also
+// required to allow address-type block args in canonical SIL.
+sil_stage canonical
 
 import Builtin
 import Swift
@@ -250,8 +255,8 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $*Int32):
 
 bb1:                                              // Preds: bb0
   %4 = tuple (%0 : $Int32, %1 : $Int32)           // user: %5
-  %5 = enum $XYZ, #XYZ.B!enumelt.1, %4 : $(Int32, Int32) // user: %6
-  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt.1: bb4, case #XYZ.C!enumelt.1: bb6 // id: %6
+  %5 = enum $XYZ, #XYZ.B!enumelt, %4 : $(Int32, Int32) // user: %6
+  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt: bb4, case #XYZ.C!enumelt: bb6 // id: %6
 
 bb2:                                              // Preds: bb1
   br bb3                                          // id: %7
@@ -306,13 +311,13 @@ sil @store_promotion : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
-  %2 = store %0 to %1a : $*B
+  store %0 to %1a : $*B
   %3 = load %1a : $*B
   %4 = load %1a : $*B
-  %5 = strong_retain %3 : $B
-  %6 = strong_retain %4 : $B
+  strong_retain %3 : $B
+  strong_retain %4 : $B
   %7 = tuple()
-  %8 = return %7 : $()
+  return %7 : $()
 }
 
 // CHECK-LABEL: sil @eliminate_duplicate_loads_over_noread_builtins
@@ -433,10 +438,10 @@ sil @store_loaded_value : $@convention(thin) (@inout Agg2, @inout Agg1) -> () {
 bb0(%0 : $*Agg2, %1 : $*Agg1):
   %2 = load %1 : $*Agg1
   %3 = load %0 : $*Agg2
-  %4 = store %2 to %1 : $*Agg1
-  %5 = store %3 to %0 : $*Agg2
+  store %2 to %1 : $*Agg1
+  store %3 to %0 : $*Agg2
   %6 = tuple()
-  %7 = return %6 : $()
+  return %6 : $()
 }
 
 // Check load forwarding across strong_release in case the stored memory does
@@ -583,8 +588,10 @@ bb5:
 // CHECK: store
 // CHECK-NOT: = load
 // CHECK: bb2:
-// CHECK: bb3:
-// CHECK: = load
+// CHECK: bb3([[A:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NOT: = load
+// CHECK: apply %{{[0-9]+}}([[A]])
+// CHECK-LABEL: } // end sil function 'load_to_load_conflicting_branches_diamond'
 sil @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
 // %0                                             // users: %1, %4, %9, %11, %16, %21
 bb0(%0 : $*Builtin.Int32):
@@ -1217,4 +1224,23 @@ bb0(%0 : $*Int):
 
   %3 = tuple()
   return %3 : $()
+}
+
+// Check that begin_access, end_access, strong_release, set_deallocating, and dealloc_ref don't prevent optimization.
+// CHECK-LABEL: ignore_read_write
+// CHECK: bb0
+// CHECK-NOT: load
+// CHECK-LABEL: end sil function 'ignore_read_write'
+sil @ignore_read_write : $@convention(thin) () -> Int32 {
+bb0:
+  %1 = alloc_ref [stack] $AX
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = ref_element_addr %1 : $AX, #AX.current
+  store %3 to %4 : $*Int32
+  %5 = load %4 : $*Int32
+  set_deallocating %1 : $AX
+  dealloc_ref %1 : $AX
+  dealloc_ref [stack] %1 : $AX
+  return %5 : $Int32
 }

@@ -15,14 +15,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-lower-aggregate-instrs"
+#include "swift/SIL/Projection.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/SIL/TypeLowering.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -34,7 +35,7 @@ STATISTIC(NumExpand, "Number of instructions expanded");
 //                      Higher Level Operation Expansion
 //===----------------------------------------------------------------------===//
 
-/// \brief Lower copy_addr into loads/stores/retain/release if we have a
+/// Lower copy_addr into loads/stores/retain/release if we have a
 /// non-address only type. We do this here so we can process the resulting
 /// loads/stores.
 ///
@@ -71,12 +72,18 @@ STATISTIC(NumExpand, "Number of instructions expanded");
 ///     store %new to %1 : $*T
 static bool expandCopyAddr(CopyAddrInst *CA) {
   SILModule &M = CA->getModule();
+  SILFunction *F = CA->getFunction();
   SILValue Source = CA->getSrc();
 
   // If we have an address only type don't do anything.
   SILType SrcType = Source->getType();
-  if (SrcType.isAddressOnly(M))
+  if (SrcType.isAddressOnly(*F))
     return false;
+
+  bool expand = shouldExpand(M, SrcType.getObjectType());
+  using TypeExpansionKind = Lowering::TypeLowering::TypeExpansionKind;
+  auto expansionKind = expand ? TypeExpansionKind::MostDerivedDescendents
+                              : TypeExpansionKind::None;
 
   SILBuilderWithScope Builder(CA);
 
@@ -89,7 +96,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
   // If our object type is not trivial, we may need to release the old value and
   // retain the new one.
 
-  auto &TL = M.getTypeLowering(SrcType);
+  auto &TL = F->getTypeLowering(SrcType);
 
   // If we have a non-trivial type...
   if (!TL.isTrivial()) {
@@ -109,8 +116,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   retain_value %new : $*T
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
-      TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
-                              TypeLowering::LoweringStyle::Deep);
+      TL.emitLoweredCopyValue(Builder, CA->getLoc(), New, expansionKind);
     }
 
     // If we are not initializing:
@@ -118,8 +124,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   *or*
     // release_value %old : $*T
     if (Old) {
-      TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
-                                 TypeLowering::LoweringStyle::Deep);
+      TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old, expansionKind);
     }
   }
 
@@ -132,6 +137,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
 }
 
 static bool expandDestroyAddr(DestroyAddrInst *DA) {
+  SILFunction *F = DA->getFunction();
   SILModule &Module = DA->getModule();
   SILBuilderWithScope Builder(DA);
 
@@ -141,17 +147,21 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
 
   // If we have an address only type, do nothing.
   SILType Type = Addr->getType();
-  if (Type.isAddressOnly(Module))
+  if (Type.isAddressOnly(*F))
     return false;
 
+  bool expand = shouldExpand(Module, Type.getObjectType());
+
   // If we have a non-trivial type...
-  if (!Type.isTrivial(Module)) {
+  if (!Type.isTrivial(*F)) {
     // If we have a type with reference semantics, emit a load/strong release.
     LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr,
                                       LoadOwnershipQualifier::Unqualified);
-    auto &TL = Module.getTypeLowering(Type);
-    TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
-                               TypeLowering::LoweringStyle::Deep);
+    auto &TL = F->getTypeLowering(Type);
+    using TypeExpansionKind = Lowering::TypeLowering::TypeExpansionKind;
+    auto expansionKind = expand ? TypeExpansionKind::MostDerivedDescendents
+                                : TypeExpansionKind::None;
+    TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI, expansionKind);
   }
 
   ++NumExpand;
@@ -159,6 +169,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
 }
 
 static bool expandReleaseValue(ReleaseValueInst *DV) {
+  SILFunction *F = DV->getFunction();
   SILModule &Module = DV->getModule();
   SILBuilderWithScope Builder(DV);
 
@@ -168,20 +179,25 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
 
   // If we have an address only type, do nothing.
   SILType Type = Value->getType();
-  assert(Type.isLoadable(Module) &&
+  assert(!SILModuleConventions(Module).useLoweredAddresses()
+         || Type.isLoadable(*F) &&
          "release_value should never be called on a non-loadable type.");
 
-  auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredDestroyValue(Builder, DV->getLoc(), Value,
-                             TypeLowering::LoweringStyle::Deep);
+  if (!shouldExpand(Module, Type.getObjectType()))
+    return false;
 
-  DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
+  auto &TL = F->getTypeLowering(Type);
+  TL.emitLoweredDestroyValueMostDerivedDescendents(Builder, DV->getLoc(),
+                                                   Value);
+
+  LLVM_DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
 
   ++NumExpand;
   return true;
 }
 
 static bool expandRetainValue(RetainValueInst *CV) {
+  SILFunction *F = CV->getFunction();
   SILModule &Module = CV->getModule();
   SILBuilderWithScope Builder(CV);
 
@@ -191,14 +207,17 @@ static bool expandRetainValue(RetainValueInst *CV) {
 
   // If we have an address only type, do nothing.
   SILType Type = Value->getType();
-  assert(Type.isLoadable(Module) && "Copy Value can only be called on loadable "
-         "types.");
+  assert(!SILModuleConventions(Module).useLoweredAddresses()
+         || Type.isLoadable(*F) &&
+         "Copy Value can only be called on loadable types.");
 
-  auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
-                          TypeLowering::LoweringStyle::Deep);
+  if (!shouldExpand(Module, Type.getObjectType()))
+    return false;
 
-  DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
+  auto &TL = F->getTypeLowering(Type);
+  TL.emitLoweredCopyValueMostDerivedDescendents(Builder, CV->getLoc(), Value);
+
+  LLVM_DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
 
   ++NumExpand;
   return true;
@@ -215,7 +234,7 @@ static bool processFunction(SILFunction &Fn) {
     while (II != IE) {
       SILInstruction *Inst = &*II;
 
-      DEBUG(llvm::dbgs() << "Visiting: " << *Inst);
+      LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *Inst);
 
       if (auto *CA = dyn_cast<CopyAddrInst>(Inst))
         if (expandCopyAddr(CA)) {
@@ -261,7 +280,10 @@ class SILLowerAggregate : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
+    // FIXME: Can we support ownership?
+    if (F->hasOwnership())
+      return;
+    LLVM_DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
           F->getName() << " *****\n");
     bool Changed = processFunction(*F);
     if (Changed) {

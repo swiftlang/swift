@@ -4,8 +4,8 @@ class B {
   var foo: Int
   func bar() {}
 
-  init() {}
-  init(x: Int) {}
+  init() {} // expected-note {{found this candidate}}
+  init(x: Int) {} // expected-note {{found this candidate}}
 
   subscript(x: Int) -> Int {
     get {}
@@ -16,6 +16,8 @@ class B {
 class D : B {
   override init() {
     super.init()
+    super.init(42)
+    // expected-error@-1 {{missing argument label 'x:' in call}}
   }
 
   override init(x:Int) {
@@ -32,14 +34,15 @@ class D : B {
   }
 
   func super_calls() {
-    super.foo        // expected-error {{expression resolves to an unused l-value}}
+    super.foo        // expected-error {{expression resolves to an unused property}}
     super.foo.bar    // expected-error {{value of type 'Int' has no member 'bar'}}
     super.bar        // expected-error {{expression resolves to an unused function}}
     super.bar()
-    super.init // expected-error{{'super.init' cannot be called outside of an initializer}}
+    // FIXME: should also say "'super.init' cannot be referenced outside of an initializer"
+    super.init // expected-error{{no exact matches in reference to initializer}}
     super.init() // expected-error{{'super.init' cannot be called outside of an initializer}}
-    super.init(0) // expected-error{{'super.init' cannot be called outside of an initializer}}
-    super[0]        // expected-error {{expression resolves to an unused l-value}}
+    super.init(0) // expected-error{{'super.init' cannot be called outside of an initializer}} // expected-error {{missing argument label 'x:' in call}}
+    super[0]        // expected-error {{expression resolves to an unused subscript}}
     super
       .bar()
   }
@@ -50,6 +53,11 @@ class D : B {
 
   func bad_super_2() {
     super(0) // expected-error{{expected '.' or '[' after 'super'}}
+  }
+
+  func bad_super_3() {
+    super // expected-error{{expected '.' or '[' after 'super'}}
+      [1]
   }
 }
 

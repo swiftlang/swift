@@ -1,0 +1,17 @@
+// RUN: %target-swift-frontend -primary-file %s -import-objc-header %S/Inputs/usr/include/NSOption.h -emit-ir | %FileCheck %s
+
+// REQUIRES: objc_interop
+// XFAIL: *
+
+import Swift
+
+sil public @use_witness : $@convention(thin) () -> () {
+  %0 = witness_method $SomeOptions, #Equatable."==" : <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  %1 = tuple ()
+  return %1: $()
+}
+
+// We used to emit linkonce_odr llvm linkage for this declaration.
+sil_witness_table shared SomeOptions : Equatable module __C_Synthesized
+
+// CHECK: @"$sSo11SomeOptionsVs9EquatableSCWP" = external hidden global

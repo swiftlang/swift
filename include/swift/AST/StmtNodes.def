@@ -40,8 +40,13 @@
 #define STMT_RANGE(Id, First, Last)
 #endif
 
+#ifndef LAST_STMT
+#define LAST_STMT(Id)
+#endif
+
 STMT(Brace, Stmt)
 STMT(Return, Stmt)
+STMT(Yield, Stmt)
 STMT(Defer, Stmt)
 ABSTRACT_STMT(Labeled, Stmt)
   ABSTRACT_STMT(LabeledConditional, LabeledStmt)
@@ -56,14 +61,16 @@ ABSTRACT_STMT(Labeled, Stmt)
   LABELED_STMT(Switch, LabeledStmt)
   STMT_RANGE(Labeled, If, Switch)
 STMT(Case, Stmt)
-STMT(Catch, Stmt)
 STMT(Break, Stmt)
 STMT(Continue, Stmt)
 STMT(Fallthrough, Stmt)
 STMT(Fail, Stmt)
 STMT(Throw, Stmt)
+STMT(PoundAssert, Stmt)
+LAST_STMT(PoundAssert)
 
 #undef STMT_RANGE
 #undef LABELED_STMT
 #undef ABSTRACT_STMT
 #undef STMT
+#undef LAST_STMT

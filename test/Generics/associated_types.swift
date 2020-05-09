@@ -199,3 +199,29 @@ extension M {
     _ = B.A.isP
   }
 }
+
+// SR-6097
+protocol sr6097 {
+  associatedtype A : AnyObject
+  var aProperty: A { get }
+}
+
+class C1 {}
+class C2 : sr6097 {
+  unowned let aProperty: C1 // should deduce A == C1 despite 'unowned'
+  init() { fatalError() }
+}
+
+protocol sr6097_b {
+  associatedtype A : AnyObject
+  var aProperty: A? { get }
+}
+class C3 : sr6097_b {
+  weak var aProperty: C1? // and same here, despite 'weak'
+  init() { fatalError() }
+}
+class G<T> : sr6097_b where T : AnyObject {
+  weak var aProperty: T?
+}
+
+

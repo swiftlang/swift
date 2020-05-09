@@ -1,2 +1,2 @@
-@import ClangModuleA;
+#import "ClangModuleA.h"
 void funcB(void);

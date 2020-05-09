@@ -1,7 +1,12 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s
+
+// RUN: %target-swift-frontend -emit-ir %s
 sil_stage canonical
 
 import Swift
+
+public protocol Protocol {
+  static func foo(_: Self?)
+}
 
 // SR-3021: Ensure we pass the Self type metadata for Optional methods using the
 // formal Optional type and not a lowered SIL type.
@@ -9,16 +14,12 @@ import Swift
 // CHECK-LABEL: @_TMaGSqFT_T__
 
 sil @optional_method : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
-sil @optional_witness_method : $@convention(witness_method) <T> (@in_guaranteed Optional<T>) -> ()
 
-sil @call_optional_method_with_lowered_function : $@convention(thin) (@in_guaranteed Optional<@callee_owned (@in ()) -> @out ()>) -> () {
-entry(%x : $*Optional<@callee_owned (@in ()) -> @out ()>):
+sil @call_optional_method_with_lowered_function : $@convention(thin) (@in_guaranteed Optional<@callee_guaranteed @substituted <T> () -> @out T for <()>>) -> () {
+entry(%x : $*Optional<@callee_guaranteed @substituted <T> () -> @out T for <()>>):
   %f = function_ref @optional_method : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
   apply %f<() -> ()>(%x) : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
-  %g = function_ref @optional_witness_method : $@convention(witness_method) <T> (@in_guaranteed Optional<T>) -> ()
-  apply %g<() -> ()>(%x) : $@convention(witness_method) <T> (@in_guaranteed Optional<T>) -> ()
-  %p = partial_apply %f<() -> ()>() : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
-  %q = partial_apply %g<() -> ()>() : $@convention(witness_method) <T> (@in_guaranteed Optional<T>) -> ()
+  %p = partial_apply [callee_guaranteed] %f<() -> ()>() : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
   return undef : $()
 }
 

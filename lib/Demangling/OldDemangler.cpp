@@ -100,13 +100,21 @@ public:
 
   /// Return the next character without claiming it.  Asserts that
   /// there is at least one remaining character.
-  char peek() { return Text.front(); }
+  char peek() {
+    if (isEmpty()) {
+      // Return an otherwise unused character to prevent crashes for malformed
+      // symbols.
+      return '.';
+    }
+    return Text.front();
+  }
 
   /// Claim and return the next character.  Asserts that there is at
   /// least one remaining character.
   char next() {
     char c = peek();
-    advanceOffset(1);
+    if (!isEmpty())
+      advanceOffset(1);
     return c;
   }
 
@@ -370,7 +378,10 @@ private:
       if (!w.hasValue())
         return nullptr;
       auto witness =
-        Factory.createNode(Node::Kind::ValueWitness, unsigned(w.getValue()));
+        Factory.createNode(Node::Kind::ValueWitness);
+      NodePointer Idx = Factory.createNode(Node::Kind::Index,
+                                           unsigned(w.getValue()));
+      witness->addChild(Idx, Factory);
       DEMANGLE_CHILD_OR_RETURN(witness, Type);
       return witness;
     }
@@ -600,14 +611,11 @@ private:
 
   NodePointer
   demangleFunctionSignatureSpecialization(NodePointer specialization) {
-    unsigned paramCount = 0;
-
     // Until we hit the last '_' in our specialization info...
     while (!Mangled.nextIf('_')) {
       // Create the parameter.
       NodePointer param =
-        Factory.createNode(Node::Kind::FunctionSignatureSpecializationParam,
-                            paramCount);
+        Factory.createNode(Node::Kind::FunctionSignatureSpecializationParam);
 
       // First handle options.
       if (Mangled.nextIf("n_")) {
@@ -641,6 +649,11 @@ private:
               unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
         }
 
+        if (Mangled.nextIf('o')) {
+          Value |=
+              unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned);
+        }
+
         if (Mangled.nextIf('s')) {
           Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
         }
@@ -659,7 +672,6 @@ private:
       }
 
       specialization->addChild(param, Factory);
-      paramCount++;
     }
 
     return specialization;
@@ -675,9 +687,9 @@ private:
                               Node::Kind::GenericSpecializationNotReAbstracted :
                               Node::Kind::GenericSpecialization);
 
-      // Create a node if the specialization is externally inlineable.
+      // Create a node if the specialization is serialized.
       if (Mangled.nextIf("q")) {
-        auto kind = Node::Kind::SpecializationIsFragile;
+        auto kind = Node::Kind::IsSerialized;
         spec->addChild(Factory.createNode(kind), Factory);
       }
 
@@ -692,9 +704,9 @@ private:
       auto spec =
           Factory.createNode(Node::Kind::FunctionSignatureSpecialization);
 
-      // Create a node if the specialization is externally inlineable.
+      // Create a node if the specialization is serialized.
       if (Mangled.nextIf("q")) {
-        auto kind = Node::Kind::SpecializationIsFragile;
+        auto kind = Node::Kind::IsSerialized;
         spec->addChild(Factory.createNode(kind), Factory);
       }
 
@@ -858,7 +870,8 @@ private:
     if (Mangled.nextIf('o'))
       return Factory.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     if (Mangled.nextIf('C'))
-      return Factory.createNode(Node::Kind::Module, MANGLING_MODULE_C);
+      return Factory.createNode(Node::Kind::Module,
+                                MANGLING_MODULE_CLANG_IMPORTER);
     if (Mangled.nextIf('a'))
       return createSwiftType(Node::Kind::Structure, "Array");
     if (Mangled.nextIf('b'))
@@ -1003,6 +1016,8 @@ private:
         parentOrModule->getKind() != Node::Kind::Function &&
         parentOrModule->getKind() != Node::Kind::Extension) {
       parentOrModule = demangleBoundGenericArgs(parentOrModule);
+      if (!parentOrModule)
+        return nullptr;
 
       // Rebuild this type with the new parent type, which may have
       // had its generic arguments applied.
@@ -1166,6 +1181,8 @@ private:
     // entity-name
     Node::Kind entityKind;
     bool hasType = true;
+    // Wrap the enclosed entity in a variable or subscript node
+    bool wrapEntity = false;
     NodePointer name = nullptr;
     if (Mangled.nextIf('D')) {
       entityKind = Node::Kind::Deallocator;
@@ -1184,6 +1201,7 @@ private:
     } else if (Mangled.nextIf('c')) {
       entityKind = Node::Kind::Constructor;
     } else if (Mangled.nextIf('a')) {
+      wrapEntity = true;
       if (Mangled.nextIf('O')) {
         entityKind = Node::Kind::OwningMutableAddressor;
       } else if (Mangled.nextIf('o')) {
@@ -1198,6 +1216,7 @@ private:
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('l')) {
+      wrapEntity = true;
       if (Mangled.nextIf('O')) {
         entityKind = Node::Kind::OwningAddressor;
       } else if (Mangled.nextIf('o')) {
@@ -1212,27 +1231,43 @@ private:
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('g')) {
+      wrapEntity = true;
       entityKind = Node::Kind::Getter;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('G')) {
+      wrapEntity = true;
       entityKind = Node::Kind::GlobalGetter;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('s')) {
+      wrapEntity = true;
       entityKind = Node::Kind::Setter;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('m')) {
+      wrapEntity = true;
       entityKind = Node::Kind::MaterializeForSet;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('w')) {
+      wrapEntity = true;
       entityKind = Node::Kind::WillSet;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('W')) {
+      wrapEntity = true;
       entityKind = Node::Kind::DidSet;
+      name = demangleDeclName();
+      if (!name) return nullptr;
+    } else if (Mangled.nextIf('r')) {
+      wrapEntity = true;
+      entityKind = Node::Kind::ReadAccessor;
+      name = demangleDeclName();
+      if (!name) return nullptr;
+    } else if (Mangled.nextIf('M')) {
+      wrapEntity = true;
+      entityKind = Node::Kind::ModifyAccessor;
       name = demangleDeclName();
       if (!name) return nullptr;
     } else if (Mangled.nextIf('U')) {
@@ -1263,14 +1298,69 @@ private:
     }
 
     NodePointer entity = Factory.createNode(entityKind);
-    entity->addChild(context, Factory);
+    if (wrapEntity) {
+      // Create a subscript or variable node and make it the accessor's child
+      NodePointer wrappedEntity;
+      bool isSubscript = false;
 
-    if (name) entity->addChild(name, Factory);
+      // Rewrite the subscript's name to match the new mangling scheme
+      switch (name->getKind()) {
+        case Node::Kind::Identifier:
+          if (name->getText() == "subscript") {
+            isSubscript = true;
+            // Subscripts have no 'subscript' identifier name
+            name = nullptr;
+          }
+          break;
+        case Node::Kind::PrivateDeclName: // identifier file-discriminator?
+          if (name->getNumChildren() > 1 &&
+              name->getChild(1)->getText() == "subscript") {
+            isSubscript = true;
 
-    if (hasType) {
-      auto type = demangleType();
-      if (!type) return nullptr;
-      entity->addChild(type, Factory);
+            auto discriminator = name->getChild(0);
+
+            // Create new PrivateDeclName with no 'subscript' identifier child
+            name = Factory.createNode(Node::Kind::PrivateDeclName);
+            name->addChild(discriminator, Factory);
+          }
+          break;
+        default:
+          break;
+      }
+
+      // Create wrapped entity node
+      if (isSubscript) {
+        wrappedEntity = Factory.createNode(Node::Kind::Subscript);
+      } else {
+        wrappedEntity = Factory.createNode(Node::Kind::Variable);
+      }
+      wrappedEntity->addChild(context, Factory);
+
+      // Variables mangle their name before their type
+      if (!isSubscript)
+        wrappedEntity->addChild(name, Factory);
+
+      if (hasType) {
+        auto type = demangleType();
+        if (!type) return nullptr;
+        wrappedEntity->addChild(type, Factory);
+      }
+
+      // Subscripts mangle their file-discriminator after the type
+      if (isSubscript && name)
+        wrappedEntity->addChild(name, Factory);
+
+      entity->addChild(wrappedEntity, Factory);
+    } else {
+      entity->addChild(context, Factory);
+
+      if (name) entity->addChild(name, Factory);
+
+      if (hasType) {
+        auto type = demangleType();
+        if (!type) return nullptr;
+        entity->addChild(type, Factory);
+      }
     }
     
     if (isStatic) {
@@ -1284,10 +1374,9 @@ private:
 
   NodePointer getDependentGenericParamType(unsigned depth, unsigned index) {
     DemanglerPrinter PrintName;
-    PrintName << archetypeName(index, depth);
+    PrintName << genericParameterName(depth, index);
 
-    auto paramTy = Factory.createNode(Node::Kind::DependentGenericParamType,
-                                       std::move(PrintName).str());
+    auto paramTy = Factory.createNode(Node::Kind::DependentGenericParamType);
     paramTy->addChild(Factory.createNode(Node::Kind::Index, depth), Factory);
     paramTy->addChild(Factory.createNode(Node::Kind::Index, index), Factory);
 
@@ -1336,8 +1425,11 @@ private:
       // TODO: If the protocol name was elided from the assoc type mangling,
       // we could try to fish it out of the generic signature constraints on the
       // base.
-      assocTy = demangleIdentifier(Node::Kind::DependentAssociatedTypeRef);
+      NodePointer ID = demangleIdentifier();
+      if (!ID) return nullptr;
+      assocTy = Factory.createNode(Node::Kind::DependentAssociatedTypeRef);
       if (!assocTy) return nullptr;
+      assocTy->addChild(ID, Factory);
       if (protocol)
         assocTy->addChild(protocol, Factory);
 
@@ -1626,20 +1718,6 @@ private:
       NodePointer stdlib = Factory.createNode(Node::Kind::Module, STDLIB_NAME);
       return makeAssociatedType(stdlib);
     }
-    if (Mangled.nextIf('q')) {
-      NodePointer index = demangleIndexAsNode();
-      if (!index)
-        return nullptr;
-      NodePointer decl_ctx = Factory.createNode(Node::Kind::DeclContext);
-      NodePointer ctx = demangleContext();
-      if (!ctx)
-        return nullptr;
-      decl_ctx->addChild(ctx, Factory);
-      auto qual_atype = Factory.createNode(Node::Kind::QualifiedArchetype);
-      qual_atype->addChild(index, Factory);
-      qual_atype->addChild(decl_ctx, Factory);
-      return qual_atype;
-    }
     return nullptr;
   }
 
@@ -1733,7 +1811,7 @@ private:
         if (demangleBuiltinSize(size)) {
           return Factory.createNode(
               Node::Kind::BuiltinTypeName,
-              std::move(DemanglerPrinter() << "Builtin.Float" << size).str());
+              std::move(DemanglerPrinter() << "Builtin.FPIEEE" << size).str());
         }
       }
       if (c == 'i') {
@@ -1783,6 +1861,9 @@ private:
       if (c == 'p')
         return Factory.createNode(Node::Kind::BuiltinTypeName,
                                      "Builtin.RawPointer");
+      if (c == 't')
+        return Factory.createNode(Node::Kind::BuiltinTypeName,
+                                     "Builtin.SILToken");
       if (c == 'w')
         return Factory.createNode(Node::Kind::BuiltinTypeName,
                                      "Builtin.Word");

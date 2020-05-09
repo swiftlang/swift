@@ -1,0 +1,43 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -save-optimization-record-path=%t.yaml -o /dev/null %/s
+// RUN: %FileCheck %s < %t.yaml
+
+import Builtin
+import Swift
+
+sil_stage canonical
+
+// CHECK:      --- !Missed
+// CHECK-NEXT: Pass:            sil-generic-specializer
+// CHECK-NEXT: Name:            sil.NoDef
+// CHECK-NEXT: DebugLoc:
+// CHECK:         File:            {{.*}}/specialize_no_definition.sil
+// CHECK:         Line:            36
+// CHECK:         Column:          8
+// CHECK-NEXT: Function:        foo
+// CHECK-NEXT: Args:
+// CHECK-NEXT:   - String:          'Unable to specialize generic function '
+// CHECK-NEXT:   - Callee:          '"bar"'
+// CHECK-NEXT:     DebugLoc:
+// CHECK:             File:            {{.*}}/specialize_no_definition.sil
+// CHECK:             Line:            35
+// CHECK:             Column:          21
+// CHECK-NEXT:   - String:          ' since definition is not visible'
+// CHECK-NEXT: ...
+
+// foo()
+sil hidden @foo : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 2          // user: %1
+  %1 = struct $Int64 (%0 : $Builtin.Int64)          // user: %3
+  %2 = alloc_stack $Int64                           // users: %3, %6, %5
+  store %1 to %2 : $*Int64                          // id: %3
+  // function_ref bar<A>(_:)
+  %4 = function_ref @bar : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %5
+  %5 = apply %4<Int64>(%2) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %2 : $*Int64                        // id: %6
+  %7 = tuple ()                                   // user: %8
+  return %7 : $()                                 // id: %8
+} // end sil function 'foo'
+
+// bar<A>(_:)
+sil hidden_external @bar : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()

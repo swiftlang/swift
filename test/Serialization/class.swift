@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-object -emit-module -o %t %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-object -emit-module -o %t %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: llvm-bcanalyzer %t/def_class.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-disable-pass="External Definition To Declaration" -sil-debug-serialization -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -emit-sil -sil-debug-serialization -I %t %s | %FileCheck %s -check-prefix=SIL
 // RUN: echo "import def_class; struct A : ClassProto {}" | not %target-swift-frontend -typecheck -I %t - 2>&1 | %FileCheck %s -check-prefix=CHECK-STRUCT
 
 // CHECK-NOT: UnknownCode
@@ -46,10 +46,10 @@ var p = Pair(a: 1, b: 2.5)
 p.first = 2
 p.second = 5.0
 
-struct Int {}
+struct MyInt {}
 
-var gc = GenericCtor<Int>()
-gc.doSomething()
+var gc = GenericCtor<MyInt>(42)
+gc.doSomething(42)
 
 
 a = StillEmpty()
@@ -76,7 +76,7 @@ var rsrc = Resource()
 
 getReqPairLike()
 
-// SIL-LABEL: sil public_external [transparent] [serialized] @_T0Si1poiS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
+// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$sSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
 
 func test(_ sharer: ResourceSharer) {}
 

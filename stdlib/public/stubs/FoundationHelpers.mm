@@ -21,99 +21,101 @@
 #if SWIFT_OBJC_INTEROP
 #import <CoreFoundation/CoreFoundation.h>
 #include "../SwiftShims/CoreFoundationShims.h"
+#import <objc/runtime.h>
+#include "swift/Runtime/Once.h"
+#include <dlfcn.h>
+
+typedef enum {
+    dyld_objc_string_kind
+} DyldObjCConstantKind;
 
 using namespace swift;
 
-template <class FromTy> struct DestType;
+static CFHashCode(*_CFStringHashCString)(const uint8_t *bytes, CFIndex len);
+static CFHashCode(*_CFStringHashNSString)(id str);
+static CFTypeID(*_CFGetTypeID)(CFTypeRef obj);
+static CFTypeID _CFStringTypeID = 0;
+static bool(*dyld_is_objc_constant)(DyldObjCConstantKind kind,
+                                    const void *addr);
+static swift_once_t initializeBridgingFuncsOnce;
 
-#define BRIDGE_TYPE(FROM, TO) \
-template <> struct DestType<FROM> { using type = TO; }
-
-BRIDGE_TYPE(_swift_shims_CFAllocatorRef, CFAllocatorRef);
-BRIDGE_TYPE(_swift_shims_CFStringRef, CFStringRef);
-BRIDGE_TYPE(_swift_shims_UniChar *, UniChar *);
-BRIDGE_TYPE(_swift_shims_CFStringEncoding, CFStringEncoding);
-BRIDGE_TYPE(_swift_shims_CFStringCompareFlags, CFStringCompareFlags);
-BRIDGE_TYPE(_swift_shims_CFRange *, CFRange *);
-BRIDGE_TYPE(CFComparisonResult, _swift_shims_CFComparisonResult);
-BRIDGE_TYPE(CFStringRef, _swift_shims_CFStringRef);
-
-template <class FromTy>
-static typename DestType<FromTy>::type cast(FromTy value) {
-  return (typename DestType<FromTy>::type) value;
+static void _initializeBridgingFunctionsImpl(void *ctxt) {
+  auto getStringTypeID =
+    (CFTypeID(*)(void))
+    dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
+  assert(getStringTypeID);
+  _CFStringTypeID = getStringTypeID();
+  
+  _CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(RTLD_DEFAULT, "CFGetTypeID");
+  _CFStringHashNSString = (CFHashCode(*)(id))dlsym(RTLD_DEFAULT,
+                                                   "CFStringHashNSString");
+  _CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(
+                                                   RTLD_DEFAULT,
+                                                   "CFStringHashCString");
+  if (dlsym(RTLD_NEXT, "objc_debug_tag60_permutations") /* tagged constant strings available */) {
+  dyld_is_objc_constant = (bool(*)(DyldObjCConstantKind, const void *))dlsym(
+                                                   RTLD_NEXT,
+                                                   "_dyld_is_objc_constant");
+  }
 }
 
-static CFRange cast(_swift_shims_CFRange value) {
-  return { value.location, value.length };
+static inline void initializeBridgingFunctions() {
+  swift_once(&initializeBridgingFuncsOnce,
+             _initializeBridgingFunctionsImpl,
+             nullptr);
 }
 
-void swift::_swift_stdlib_CFStringGetCharacters(
-                                         _swift_shims_CFStringRef theString,
-                                         _swift_shims_CFRange range,
-                                         _swift_shims_UniChar *buffer) {
-  return CFStringGetCharacters(cast(theString), cast(range), cast(buffer));
+__swift_uint8_t
+swift::_swift_stdlib_isNSString(id obj) {
+  initializeBridgingFunctions();
+  return _CFGetTypeID((CFTypeRef)obj) == _CFStringTypeID ? 1 : 0;
 }
 
-const _swift_shims_UniChar *
-swift::_swift_stdlib_CFStringGetCharactersPtr(
-                                         _swift_shims_CFStringRef theString) {
-  return CFStringGetCharactersPtr(cast(theString));
+_swift_shims_CFHashCode
+swift::_swift_stdlib_CFStringHashNSString(id _Nonnull obj) {
+  initializeBridgingFunctions();
+  return _CFStringHashNSString(obj);
 }
 
-_swift_shims_CFIndex
-swift::_swift_stdlib_CFStringGetLength(_swift_shims_CFStringRef theString) {
-  return CFStringGetLength(cast(theString));
+_swift_shims_CFHashCode
+swift::_swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
+                                  _swift_shims_CFIndex length) {
+  initializeBridgingFunctions();
+  return _CFStringHashCString(bytes, length);
 }
 
-_swift_shims_CFStringRef
-swift::_swift_stdlib_CFStringCreateWithSubstring(
-                                         _swift_shims_CFAllocatorRef alloc,
-                                         _swift_shims_CFStringRef str,
-                                         _swift_shims_CFRange range) {
-  return cast(CFStringCreateWithSubstring(cast(alloc), cast(str), cast(range)));
+const __swift_uint8_t *
+swift::_swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
+                                                  unsigned long encoding) {
+  typedef __swift_uint8_t * _Nullable (*cStrImplPtr)(id, SEL, unsigned long);
+  cStrImplPtr imp = (cStrImplPtr)class_getMethodImplementation([obj superclass],
+                                                               @selector(cStringUsingEncoding:));
+  return imp(obj, @selector(cStringUsingEncoding:), encoding);
 }
 
-_swift_shims_UniChar
-swift::_swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef theString,
-                                                 _swift_shims_CFIndex idx) {
-  return CFStringGetCharacterAtIndex(cast(theString), idx);
+__swift_uint8_t
+swift::_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
+                                         _swift_shims_UInt8 *buffer,
+                                         _swift_shims_CFIndex maxLength,
+                                         unsigned long encoding) {
+  typedef __swift_uint8_t (*getCStringImplPtr)(id,
+                                             SEL,
+                                             _swift_shims_UInt8 *,
+                                             _swift_shims_CFIndex,
+                                             unsigned long);
+  SEL sel = @selector(getCString:maxLength:encoding:);
+  getCStringImplPtr imp = (getCStringImplPtr)class_getMethodImplementation([obj superclass], sel);
+  
+  return imp(obj, sel, buffer, maxLength, encoding);
+
 }
 
-_swift_shims_CFStringRef
-swift::_swift_stdlib_CFStringCreateCopy(_swift_shims_CFAllocatorRef alloc,
-                                        _swift_shims_CFStringRef theString) {
-  return cast(CFStringCreateCopy(cast(alloc), cast(theString)));
+__swift_uint8_t
+swift::_swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
+  initializeBridgingFunctions();
+  if (!dyld_is_objc_constant) return false;
+  return dyld_is_objc_constant(dyld_objc_string_kind, addr) ? 1 : 0;
 }
 
-const char *
-swift::_swift_stdlib_CFStringGetCStringPtr(_swift_shims_CFStringRef theString,
-                            _swift_shims_CFStringEncoding encoding) {
-  return CFStringGetCStringPtr(cast(theString), cast(encoding));
-}
-
-_swift_shims_CFComparisonResult
-swift::_swift_stdlib_CFStringCompare(_swift_shims_CFStringRef theString1,
-                                     _swift_shims_CFStringRef theString2,
-                            _swift_shims_CFStringCompareFlags compareOptions) {
-  return cast(CFStringCompare(cast(theString1), cast(theString2),
-                              cast(compareOptions)));
-}
-
-_swift_shims_Boolean
-swift::_swift_stdlib_CFStringFindWithOptions(
-                                      _swift_shims_CFStringRef theString,
-                                      _swift_shims_CFStringRef stringToFind,
-                                      _swift_shims_CFRange rangeToSearch,
-                                      _swift_shims_CFStringCompareFlags searchOptions,
-                                      _swift_shims_CFRange *result) {
-  return CFStringFindWithOptions(cast(theString), cast(stringToFind),
-                                 cast(rangeToSearch), cast(searchOptions),
-                                 cast(result));
-}
-
-_swift_shims_CFStringRef
-swift::_swift_stdlib_objcDebugDescription(id _Nonnull nsObject) {
-  return [nsObject debugDescription];
-}
 #endif
 

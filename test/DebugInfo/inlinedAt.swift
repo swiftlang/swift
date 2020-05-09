@@ -24,14 +24,14 @@ public func f(_ i : Int) -> Int { // 301
   return g(i)                     // 302
 }
 
-// CHECK-SIL: sil {{.*}}@_T09inlinedAt1fS2iF :
+// CHECK-SIL: sil {{.*}}@$s9inlinedAt1fyS2iF :
 // CHECK-SIL-NOT: return
 // CHECK-SIL: debug_value %0 : $Int, let, name "k", argno 1
 // CHECK-SIL-SAME: line:101:10:in_prologue
 // CHECK-SIL-SAME: perf_inlined_at line:203:10
 // CHECK-SIL-SAME: perf_inlined_at line:302:10
 
-// CHECK: define {{.*}}@_T09inlinedAt1fS2iF({{.*}})
+// CHECK: define {{.*}}@"$s9inlinedAt1fyS2iF"({{.*}})
 // CHECK-NOT: ret
 // CHECK: @llvm.dbg.value
 // CHECK: @llvm.dbg.value
@@ -40,7 +40,7 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK: ![[F:.*]] = distinct !DISubprogram(name: "f",
 // CHECK: ![[G:.*]] = distinct !DISubprogram(name: "g",
 
-// CHECK: ![[L3:.*]] = !DILocation(line: 302, column: 13,
+// CHECK: ![[L3:.*]] = !DILocation(line: 302, column: 10,
 // CHECK-SAME:                     scope: ![[F_SCOPE:.*]])
 // CHECK: ![[F_SCOPE]] = distinct !DILexicalBlock(scope: ![[F]],
 // CHECK-SAME:                                    line: 301, column: 33)
@@ -49,6 +49,6 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK: ![[H:.*]] = distinct !DISubprogram(name: "h",
 // CHECK: ![[L1]] = !DILocation(line: 101, column: 8, scope: ![[H]],
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
-// CHECK: ![[L2]] = !DILocation(line: 203, column: 13, scope: ![[G_SCOPE]],
+// CHECK: ![[L2]] = !DILocation(line: 203, column: 10, scope: ![[G_SCOPE]],
 // CHECK-SAME:                  inlinedAt: ![[L3]])
 

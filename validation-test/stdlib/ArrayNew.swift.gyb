@@ -1,15 +1,13 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/main.swift
-// RUN: if [ %target-runtime == "objc" ]; then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control; \
-// RUN: else \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Array -Xfrontend -disable-access-control; \
-// RUN: fi
-// RUN: %line-directive %t/main.swift -- %target-run %t/Array
+// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control -swift-version 4.2
+// RUN: %target-codesign %t/Array && %line-directive %t/main.swift -- %target-run %t/Array
 // REQUIRES: executable_test
-// UNSUPPORTED: CPU=armv7
+
+// FIXME: rdar://problem/55944126
+// UNSUPPORTED: CPU=armv7s || CPU=armv7k
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -50,8 +48,6 @@ func withInoutT<T>(_ x: inout T, body: (_ x: inout T) -> Void) {
 %     end
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${array_type}" == "ArraySlice" },
-                 reason: "rdar://33358110"))
   .code {
   var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
@@ -123,8 +119,6 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW")
 }
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${array_type}" == "ArraySlice" },
-                 reason: "rdar://33358110"))
   .code {
   var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
@@ -377,7 +371,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
   expectEqual(30, (nsa[1] as! TestObjCValueTy).value)
 
   // Check that the Array is not affected.
-  expectEqual(20, result[1].value)
+  expectEqual(20, (result[1] as! TestObjCValueTy).value)
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
@@ -398,8 +392,8 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
   let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
-  var a: Array<AnyObject> = convertNSArrayToArray(nsa)
-  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  let a: Array<AnyObject> = convertNSArrayToArray(nsa)
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
 
   expectEqual(
     unsafeBitCast(nsa, to: Int.self),
@@ -412,8 +406,8 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
   let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
-  var a: Array<TestBridgedValueTy> = convertNSArrayToArray(nsa)
-  var bridgedBack: NSArray = convertArrayToNSArray(a)
+  let a: Array<TestBridgedValueTy> = convertNSArrayToArray(nsa)
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
 
   expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
@@ -447,7 +441,10 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
   _fixLifetime(bridgedBack)
 }
 
-ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied")
+  .skip(.iOSAny("<rdar://problem/33926468>"))
+  .skip(.tvOSAny("<rdar://problem/33926468>"))
+  .code {
   let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
 
   CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
@@ -544,13 +541,9 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
-  for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-  }
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 }
 
 for indexRange in [
@@ -604,16 +597,12 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
-  for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-  }
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
-  buffer.deallocate(capacity: 3)
+  buffer.deallocate()
   _fixLifetime(a)
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/copyWithZone") {
@@ -731,8 +720,6 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
   expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
   expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
   expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
@@ -817,14 +804,11 @@ ArrayTestSuite.test("BridgedToObjC/Custom/objectAtIndex") {
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
-  for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-  }
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 for indexRange in [
@@ -878,17 +862,14 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
-  for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-  }
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
-  buffer.deallocate(capacity: 3)
+  buffer.deallocate()
   _fixLifetime(a)
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/copyWithZone") {
@@ -1025,8 +1006,6 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
   expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
   expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
@@ -1059,8 +1038,6 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
   expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
   expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
   expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-
-  expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {
@@ -1121,14 +1098,14 @@ ArrayTestSuite.test("BridgedToObjC.Nonverbatim.RoundtripThroughSwiftArray") {
     TestBridgedValueTy.bridgeOperations = 0
     let nsa: NSArray = getAsImmutableNSArray([ 10, 20, 30 ])
     let a: Array<TestBridgedValueTy> = convertNSArrayToArray(nsa)
-    let bridgedBack = convertArrayToNSArray(a)
+    let _ = convertArrayToNSArray(a)
     expectEqual(3, TestBridgedValueTy.bridgeOperations)
   }
   do {
     TestBridgedValueTy.bridgeOperations = 0
     let nsa: NSArray = getAsImmutableNSArray([ 10, 20, 30 ])
     let a = nsa as! Array<TestBridgedValueTy>
-    let bridgedBack: NSArray = a as NSArray
+    let _: NSArray = a as NSArray
     expectEqual(3, TestBridgedValueTy.bridgeOperations)
   }
 }
@@ -1150,4 +1127,3 @@ ArrayTestSuite.tearDown {
 #endif // _runtime(_ObjC)
 
 runAllTests()
-

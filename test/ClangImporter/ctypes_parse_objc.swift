@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk
-
-// REQUIRES: objc_interop
+// RUN: %target-typecheck-verify-swift %clang-importer-sdk -enable-objc-interop
 
 import ctypes
 import CoreGraphics
@@ -72,12 +70,21 @@ func testImportMacTypes() {
 }
 
 func testImportCFTypes() {
-  let t1_unqual: Int = CFIndex_test
-  _ = t1_unqual as CoreFoundation.CFIndex
+  let t1_unqual: UInt = CFTypeID_test
+  _ = t1_unqual as CoreFoundation.CFTypeID
+
+  let t2_unqual: UInt = CFOptionFlags_test
+  _ = t2_unqual as CoreFoundation.CFOptionFlags
+
+  let t3_unqual: UInt = CFHashCode_test
+  _ = t3_unqual as CoreFoundation.CFHashCode
+
+  let t4_unqual: Int = CFIndex_test
+  _ = t4_unqual as CoreFoundation.CFIndex
 }
 
 func testImportSEL() {
-  var t1 : SEL // expected-error {{use of undeclared type 'SEL'}} {{12-15=Selector}}
+  var t1 : SEL // expected-error {{cannot find type 'SEL' in scope}} {{12-15=Selector}}
   var t2 : ctypes.SEL // expected-error {{no type named 'SEL' in module 'ctypes'}}
 }
 

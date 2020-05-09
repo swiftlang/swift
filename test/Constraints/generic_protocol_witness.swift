@@ -42,7 +42,7 @@ class TooTightConstraints : NeedsGenericMethods { // expected-error{{type 'TooTi
   func oneArgWithConstraint<U : Fungible>(x: U) {} // expected-note{{candidate has non-matching type '<U> (x: U) -> ()'}}
   func oneArgWithConstraints<U : Runcible & Fungible & Ansible>(x: U) {} // expected-note{{candidate has non-matching type '<U> (x: U) -> ()'}}
 
-  func twoArgsOneVar<U : Runcible>(x: U) {} // expected-note{{candidate has non-matching type '<U> (x: U) -> ()'}}
+  func twoArgsOneVar<U : Runcible>(x: U) {}
   func twoArgsTwoVars<U>(x: U, y: U) {} // expected-note{{candidate has non-matching type '<U> (x: U, y: U) -> ()'}}
 }
 func •(_ x: TooTightConstraints, y: Int) {} // expected-note {{candidate has non-matching type '(TooTightConstraints, Int) -> ()'}}

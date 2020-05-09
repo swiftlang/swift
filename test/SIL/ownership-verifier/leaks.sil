@@ -1,0 +1,80 @@
+// RUN: %target-sil-opt -module-name Swift -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+// This file is meant to contain dataflow tests that are true leaks. It is
+// intended to test both that we are failing and that we are emitting
+// appropriate error messages.
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil_stage canonical
+
+import Builtin
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'owned_never_consumed'
+// CHECK: Error! Found a leaked owned value that was never consumed.
+// CHECK: Value:   %1 = copy_value %0 : $Builtin.NativeObject
+// CHECK: Error#: 0. End Error in Function: 'owned_never_consumed'
+//
+// CHECK-NOT: Error#: {{[0-9][0-9]+}}. End Error in Function: 'owned_never_consumed'
+sil [ossa] @owned_never_consumed : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'owned_leaks_along_one_path'
+// CHECK: Error! Found a leak due to a consuming post-dominance failure!
+// CHECK:     Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK:     Post Dominating Failure Blocks:
+// CHECK:         bb1
+// CHECK: Error#: 0. End Error in Function: 'owned_leaks_along_one_path'
+//
+// CHECK-NOT: Error#: {{[0-9][0-9]+}}. End Error in Function: 'owned_leaks_along_one_path'
+sil [ossa] @owned_leaks_along_one_path : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we report the leak at the phi.
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'owned_leaks_with_phi'
+// CHECK: Error! Found a leaked owned value that was never consumed.
+// CHECK: Value: %6 = argument of bb4 : $Builtin.NativeObject
+// CHECK: Error#: 0. End Error in Function: 'owned_leaks_with_phi'
+//
+// CHECK-NOT: Error#: {{[0-9][0-9]+}}. End Error in Function: 'owned_leaks_with_phi'
+sil [ossa] @owned_leaks_with_phi : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  cond_br undef, bb3, bb2
+
+bb2:
+  br bb4(%1 : $Builtin.NativeObject)
+
+bb3:
+  br bb1(%1 : $Builtin.NativeObject)
+
+bb4(%2 : @owned $Builtin.NativeObject):
+  %9999 = tuple()
+  return %9999 : $()
+}

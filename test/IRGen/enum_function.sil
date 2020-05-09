@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -gnone -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -gnone -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -12,15 +12,15 @@ bb0:
   return %0 : $()
 }
 
-// CHECK-64:  define hidden swiftcc void @test1([[WORD:i64]], [[WORD]])
-// CHECK-32:  define hidden swiftcc void @test1([[WORD:i32]], [[WORD]])
+// CHECK-64:  define hidden swiftcc void @test1([[WORD:i64]] %0, [[WORD]] %1)
+// CHECK-32:  define hidden swiftcc void @test1([[WORD:i32]] %0, [[WORD]] %1)
 sil hidden @test1 : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 bb0(%0 : $Optional<() -> ()>):
-  // CHECK: call void @_T0SqWy
+  // CHECK: call void @"$sIey_SgWOy"
   retain_value %0 : $Optional<() -> ()>
 
   // CHECK: icmp eq i64 %0, 0
-  switch_enum %0 : $Optional<() -> ()>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %0 : $Optional<() -> ()>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
   // CHECK: [[FNPTR:%.*]] = inttoptr [[WORD]] %0 to i8*
   // CHECK: [[CTX:%.*]] = inttoptr [[WORD]] %1 to %swift.refcounted*

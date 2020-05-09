@@ -28,7 +28,7 @@ case $# in
 esac
 
 # Don't update XCTest, handle spaces in directories
-for f in ./stdlib/public/SDK/*/; do
+for f in ./stdlib/public/Darwin/*/; do
   name=$(basename "${f}")
   if [[ "${name}" == "XCTest" ]]; then
     continue

@@ -1,0 +1,10 @@
+// RUN: %swift -target x86_64-unknown-windows-msvc -emit-ir -verify %s
+
+sil_stage canonical
+
+// expected-error@+1{{attribute 'weak_imported' is unsupported on target 'x86_64-unknown-windows-msvc'}}
+sil [weak_imported] @f : $@convention(thin) () -> () {
+  %unit = tuple()
+  return %unit : $()
+}
+

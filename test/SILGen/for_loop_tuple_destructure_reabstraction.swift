@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -verify %s
+// RUN: %target-swift-emit-silgen -verify %s
 
 protocol P {}
 

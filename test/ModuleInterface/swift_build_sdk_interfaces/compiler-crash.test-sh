@@ -1,0 +1,10 @@
+# For its Windows counterpart, see compiler-crash-windows.test-sh
+UNSUPPORTED: windows
+
+RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -o %t/output -debug-crash-compiler 2>&1 | %FileCheck %s
+
+CHECK: Program arguments:
+CHECK-SAME: -debug-crash-immediately
+CHECK-SAME: {{.+}}.swiftinterface
+
+REQUIRES: asserts

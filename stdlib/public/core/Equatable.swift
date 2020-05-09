@@ -29,15 +29,15 @@
 /// example shows how the `contains(_:)` method can be used with an array of
 /// strings.
 ///
-///     let students = ["Nora", "Fern", "Ryan", "Rainer"]
+///     let students = ["Kofi", "Abena", "Efua", "Kweku", "Akosua"]
 ///
-///     let nameToCheck = "Ryan"
+///     let nameToCheck = "Kofi"
 ///     if students.contains(nameToCheck) {
 ///         print("\(nameToCheck) is signed up!")
 ///     } else {
 ///         print("No record of \(nameToCheck).")
 ///     }
-///     // Prints "Ryan is signed up!"
+///     // Prints "Kofi is signed up!"
 ///
 /// Conforming to the Equatable Protocol
 /// ====================================
@@ -48,17 +48,28 @@
 /// `Comparable` protocols, which allow more uses of your custom type, such as
 /// constructing sets or sorting the elements of a collection.
 ///
-/// To adopt the `Equatable` protocol, implement the equal-to operator (`==`)
-/// as a static method of your type. The standard library provides an
+/// You can rely on automatic synthesis of the `Equatable` protocol's
+/// requirements for a custom type when you declare `Equatable` conformance in
+/// the type's original declaration and your type meets these criteria:
+///
+/// - For a `struct`, all its stored properties must conform to `Equatable`.
+/// - For an `enum`, all its associated values must conform to `Equatable`. (An
+///   `enum` without associated values has `Equatable` conformance even
+///   without the declaration.)
+///
+/// To customize your type's `Equatable` conformance, to adopt `Equatable` in a
+/// type that doesn't meet the criteria listed above, or to extend an existing
+/// type to conform to `Equatable`, implement the equal-to operator (`==`) as
+/// a static method of your type. The standard library provides an
 /// implementation for the not-equal-to operator (`!=`) for any `Equatable`
 /// type, which calls the custom `==` function and negates its result.
 ///
-/// As an example, consider a `StreetAddress` structure that holds the parts of
-/// a street address: a house or building number, the street name, and an
+/// As an example, consider a `StreetAddress` class that holds the parts of a
+/// street address: a house or building number, the street name, and an
 /// optional unit number. Here's the initial declaration of the
 /// `StreetAddress` type:
 ///
-///     struct StreetAddress {
+///     class StreetAddress {
 ///         let number: String
 ///         let street: String
 ///         let unit: String?
@@ -151,7 +162,7 @@
 /// triple-equals identical-to operator (`===`). For example:
 ///
 ///     let c = a
-///     print(a === c, b === c, separator: ", ")
+///     print(c === a, c === b, separator: ", ")
 ///     // Prints "true, false"
 public protocol Equatable {
   /// Returns a Boolean value indicating whether two values are equal.
@@ -177,6 +188,8 @@ extension Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
+  // transparent because sometimes types that use this generate compile-time
+  // warnings, e.g. that an expression always evaluates to true
   @_transparent
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
@@ -233,13 +246,11 @@ extension Equatable {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
+@inlinable // trivial-implementation
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
-    return Bool(Builtin.cmp_eq_RawPointer(
-        Builtin.bridgeToRawPointer(Builtin.castToUnknownObject(l)),
-        Builtin.bridgeToRawPointer(Builtin.castToUnknownObject(r))
-      ))
+    return ObjectIdentifier(l) == ObjectIdentifier(r)
   case (nil, nil):
     return true
   default:
@@ -257,6 +268,7 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
+@inlinable // trivial-implementation
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }

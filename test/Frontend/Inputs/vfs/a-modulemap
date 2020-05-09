@@ -1,0 +1,7 @@
+module VFSMappedModule {
+  header "VFSMappedModule.h"
+}
+
+module YetAnotherVFSMappedModule {
+  header "YetAnotherVFSMappedModule.h"
+}

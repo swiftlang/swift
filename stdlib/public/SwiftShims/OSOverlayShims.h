@@ -14,13 +14,9 @@
 #define SWIFT_STDLIB_SHIMS_OS_OVERLAY_H
 
 #include <os/log.h>
+#include <os/signpost.h>
 #include <stdarg.h>
-
-extern const void * _Nullable _swift_os_log_return_address(void);
-
-extern void _swift_os_log(const void * _Nullable dso, const void * _Nullable retaddr,
-                          os_log_t _Nonnull oslog, os_log_type_t type, 
-                          const char * _Nonnull format, va_list args);
+#include "Visibility.h"
 
 static inline os_log_t _Nonnull
 _swift_os_log_default(void) {
@@ -32,5 +28,64 @@ _swift_os_log_disabled(void) {
   return OS_LOG_DISABLED;
 }
 
-#endif // SWIFT_STDLIB_SHIMS_OS_OVERLAY_H
+static inline const unsigned char * _Nonnull
+_swift_os_signpost_points_of_interest(void) {
+  /* OS_LOG_CATEGORY_POINTS_OF_INTEREST */
+  return "PointsOfInterest";
+}
 
+static inline os_signpost_id_t
+_swift_os_signpost_id_exclusive(void) {
+  /* OS_SIGNPOST_ID_EXCLUSIVE */
+  return (os_signpost_id_t)0xEEEEB0B5B2B2EEEE;
+}
+
+static inline os_signpost_id_t
+_swift_os_signpost_id_invalid(void) {
+  /* OS_SIGNPOST_ID_INVALID */
+  return (os_signpost_id_t)~0;
+}
+
+static inline os_signpost_id_t
+_swift_os_signpost_id_null(void) {
+  /* OS_SIGNPOST_ID_NULL */
+  return (os_signpost_id_t)0;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+extern const void * _Nullable
+_swift_os_log_return_address(void);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+extern void
+_swift_os_log(
+    const void * _Nullable dso,
+    const void * _Nullable ra,
+    os_log_t _Nonnull h,
+    os_log_type_t type,
+    const char * _Nonnull fmt,
+    va_list args);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+extern void
+_swift_os_signpost_with_format(
+    const void * _Nullable dso,
+    const void * _Nullable ra,
+    os_log_t _Nonnull h,
+    os_signpost_type_t spty,
+    const char * _Nonnull spnm,
+    os_signpost_id_t spid,
+    const char * _Nullable fmt,
+    va_list args);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+extern void
+_swift_os_signpost(
+    const void * _Nullable dso,
+    const void * _Nullable ra,
+    os_log_t _Nonnull h,
+    os_signpost_type_t spty,
+    const char * _Nonnull spnm,
+    os_signpost_id_t spid);
+
+#endif // SWIFT_STDLIB_SHIMS_OS_OVERLAY_H

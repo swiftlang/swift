@@ -38,14 +38,14 @@ class RCStateTransitionKindVisitor {
   ImplTy &asImpl() { return *reinterpret_cast<ImplTy *>(this); }
 
 public:
-#define KIND(K) ResultTy visit ## K(ValueBase *) { return ResultTy(); }
+#define KIND(K) ResultTy visit ## K(SILNode *) { return ResultTy(); }
 #include "RCStateTransition.def"
 
-  ResultTy visit(ValueBase *V) {
-    switch (getRCStateTransitionKind(V)) {
+  ResultTy visit(SILNode *N) {
+    switch (getRCStateTransitionKind(N)) {
 #define KIND(K)                                 \
   case RCStateTransitionKind::K:                \
-    return asImpl().visit ## K(V);
+    return asImpl().visit ## K(N);
 #include "RCStateTransition.def"
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -128,9 +128,9 @@ public:
       ARCState &DataflowState, bool FreezeOwnedArgEpilogueReleases,
       IncToDecStateMapTy &IncToDecStateMap,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
-  DataflowResult visitAutoreleasePoolCall(ValueBase *V);
-  DataflowResult visitStrongDecrement(ValueBase *V);
-  DataflowResult visitStrongIncrement(ValueBase *V);
+  DataflowResult visitAutoreleasePoolCall(SILNode *N);
+  DataflowResult visitStrongDecrement(SILNode *N);
+  DataflowResult visitStrongIncrement(SILNode *N);
 };
 
 } // end swift namespace
@@ -163,13 +163,14 @@ public:
       RCIdentityFunctionInfo *RCFI, ARCState &State,
       DecToIncStateMapTy &DecToIncStateMap,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
-  DataflowResult visitAutoreleasePoolCall(ValueBase *V);
-  DataflowResult visitStrongDecrement(ValueBase *V);
-  DataflowResult visitStrongIncrement(ValueBase *V);
-  DataflowResult visitStrongEntrance(ValueBase *V);
+  DataflowResult visitAutoreleasePoolCall(SILNode *N);
+  DataflowResult visitStrongDecrement(SILNode *N);
+  DataflowResult visitStrongIncrement(SILNode *N);
+  DataflowResult visitStrongEntrance(SILNode *N);
 
 private:
   DataflowResult visitStrongEntranceApply(ApplyInst *AI);
+  DataflowResult visitStrongEntrancePartialApply(PartialApplyInst *PAI);
   DataflowResult visitStrongEntranceArgument(SILFunctionArgument *Arg);
   DataflowResult visitStrongEntranceAllocRef(AllocRefInst *ARI);
   DataflowResult visitStrongEntranceAllocRefDynamic(AllocRefDynamicInst *ARI);

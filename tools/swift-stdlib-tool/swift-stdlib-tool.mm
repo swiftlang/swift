@@ -80,6 +80,7 @@ const char *usage =
 #include <libkern/OSByteOrder.h>
 
 #include <algorithm>
+#include <vector>
 using namespace std;
 
 #include <Foundation/Foundation.h>
@@ -471,7 +472,7 @@ int parse_macho(int fd, uint32_t offset, uint32_t size,
             else if (uuidVisitor  &&  cmd->cmd() == LC_UUID) {
                 macho_uuid_command<T>* uuid_cmd = (macho_uuid_command<T>*)cmd;
                 if (uuid_cmd->cmdsize() < sizeof(uuid_command)) continue;
-                CFUUIDBytes uuid_bytes = *(CFUUIDBytes *)uuid_cmd->uuid();
+                CFUUIDBytes uuid_bytes = *(const CFUUIDBytes *)uuid_cmd->uuid();
                 NSUUID *uuid = (NSUUID *)
                     CFUUIDCreateFromUUIDBytes(nil, uuid_bytes);
                 uuidVisitor(uuid);
@@ -672,9 +673,10 @@ bool operator <= (const struct timespec &lhs, const struct timespec &rhs)
 NSString *self_executable = []() -> NSString * {
     uint32_t len = 0;
     _NSGetExecutablePath(nil, &len);
-    char buf[len];
-    _NSGetExecutablePath(buf, &len);
-    return [[NSString alloc] initWithUTF8String:buf];
+    std::vector<char> buffer;
+    buffer.reserve(len);
+    _NSGetExecutablePath(buffer.data(), &len);
+    return [[NSString alloc] initWithUTF8String:buffer.data()];
 }();
 
 
@@ -985,7 +987,7 @@ int main(int argc, const char *argv[])
             src_dir = [[[self_executable stringByDeletingLastPathComponent]
                         stringByDeletingLastPathComponent]
                        sst_stringByAppendingPathComponents:
-                       @[ @"lib", @"swift", platform ]];
+                       @[ @"lib", @"swift-5.0", platform ]];
         } else if (!platform) {
             // src_dir is set but platform is not. 
             // Pick platform from src_dir's name.

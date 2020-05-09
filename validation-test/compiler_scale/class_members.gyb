@@ -1,0 +1,16 @@
+// RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select InterfaceTypeRequest %s
+// REQUIRES: asserts
+
+class Class${N} {
+% if int(N) > 1:
+    func method(_: Class${int(N)-1}) {}
+    var prop: Class${int(N)-1} { return Class${int(N)-1}() }
+    static var prop: Class${int(N)-1} = Class${int(N)-1}()
+    subscript(n: Int) -> Class${int(N)-1} { return Class${int(N)-1}() }
+% else:
+    func method() {}
+    var prop: Int { return 0 }
+    static var prop = 0
+    subscript(n: Int) -> Int { return 0 }
+% end
+}

@@ -46,10 +46,6 @@ class C : P, CP {
     print("Allocating C")
   }
 
-  deinit {
-    print("Destroying C")
-  }
-
   func f() -> Self {
     print("C.f()")
     return self
@@ -80,7 +76,6 @@ print("C() as non-class existential")
 // CHECK-NEXT: Between calls
 // CHECK-NEXT: C.g()
 // CHECK-NEXT: After second call
-// CHECK-NEXT: Destroying C
 callDynamicSelfExistential(C())
 
 // CHECK-NEXT: C() as class existential
@@ -91,7 +86,6 @@ print("C() as class existential")
 // CHECK-NEXT: Between calls
 // CHECK-NEXT: C.g()
 // CHECK-NEXT: After second call
-// CHECK-NEXT: Destroying C
 callDynamicSelfClassExistential(C())
 
 print("-------------------------------")
@@ -191,6 +185,104 @@ print(Derived().returnsNewInstanceTransparentProtocol())
 print((Derived() as Base).returnsNewInstance())
 print((Derived() as Base).returnsNewInstanceTransparent())
 print((Derived() as Base).returnsNewInstanceTransparentProtocol())
+
+
+// Read-only properties and subscripts returning Self
+
+open class A1<T> {
+  let i: Int
+  public required init(i: Int) {
+    self.i = i
+  }
+  func copy() -> Self {
+    let copy = Self.init(i: 81)
+    return copy
+  }
+
+  open var copied: Self {
+    let copy = Self.init(i: 82)
+    return copy
+  }
+  open subscript (i: Int) -> Self {
+    return Self.init(i: 80+i)
+  }
+}
+
+class B1: A1<Int> {
+  let j = 88
+  override func copy() -> Self {
+    let copy = super.copy() as! Self // supported
+    return copy
+  }
+  override var copied: Self {
+    let copy = Self.init(i: 99)
+    return copy
+  }
+  //  override subscript (i: Int) -> Self {
+  //    return Self.init(i: i+1000)
+  //  }
+}
+
+// CHECK: 181
+// CHECK: 88
+// CHECK: 88
+// CHECK: 82
+// CHECK: 99
+print(A1<Int>(i: 100)[101].i)
+print(B1(i: 100)[101].j)
+print(B1(i: 100).copy().j)
+print(A1<Int>(i: 100).copied.i)
+print(B1(i: 100).copied.i)
+
+class A0<T, S> {
+  var i = "Base"
+  required init() {}
+
+  func copy() -> Self {
+    let copy = Self.init()
+    return copy
+  }
+
+  var copied: Self {
+    get {
+      let copy = Self.init()
+      return copy
+    }
+  }
+  open subscript (i: Int) -> Self {
+    get {
+      return Self.init()
+    }
+  }
+}
+
+protocol Prot3 {
+  static func +(x: Self, y: Self) -> String
+}
+
+class B: A0<Int, Double>, Prot3 {
+  var j = "Derived"
+  static func + (x: B, y: B) -> String {
+    return x.j + x.j
+  }
+  override func copy() -> Self {
+    let copy = Self.init()
+    return copy
+  }
+  override var copied: Self {
+    get {
+      return copy() as! Self
+    }
+  }
+  //  override subscript (i: Int) -> Self {
+  //    return Self.init()
+  //  }
+}
+
+// CHECK: DerivedDerived
+// CHECK: DerivedDerived
+print(B()[0][0].j + B().copied.copied.j)
+print(B()[0][0] + B().copied.copied)
 
 // CHECK-NEXT: Done
 print("Done")

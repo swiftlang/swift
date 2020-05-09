@@ -17,6 +17,6 @@ using namespace swift;
 using namespace swift::syntax;
 
 void UnknownSyntax::validate() const {
-  assert(Data->Raw->isUnknown());
+  assert(Data->getRaw()->isUnknown());
 }
 

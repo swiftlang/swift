@@ -1,5 +1,4 @@
-// RUN: %scale-test --sum-multi --typecheck --begin 5 --end 16 --step 5 --select validateDecl %s
-// REQUIRES: OS=macosx
+// RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select InterfaceTypeRequest %s
 // REQUIRES: asserts
 
 enum Enum${N} {

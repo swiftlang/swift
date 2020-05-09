@@ -13,23 +13,24 @@
 #define DEBUG_TYPE "serialized-sil-loader"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "DeserializeSIL.h"
-#include "swift/Serialization/ModuleFile.h"
+#include "ModuleFile.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/AST/ASTMangler.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
 
-SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
-                                         SILModule *SILMod,
-                                         Callback *callback) {
+SerializedSILLoader::SerializedSILLoader(
+    ASTContext &Ctx, SILModule *SILMod,
+    DeserializationNotificationHandlerSet *callbacks) {
 
   // Get a list of SerializedModules from ASTContext.
   // FIXME: Iterating over LoadedModules is not a good way to do this.
   for (auto &Entry : Ctx.LoadedModules) {
     for (auto File : Entry.second->getFiles()) {
       if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
-        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, callback);
+        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, callbacks);
 #ifndef NDEBUG
         SILMod->verify();
 #endif
@@ -41,14 +42,15 @@ SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
 
 SerializedSILLoader::~SerializedSILLoader() {}
 
-SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
+SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
+                                                    bool onlyUpdateLinkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Callee)) {
-      DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-            << Des->getModuleIdentifier().str() << "\n");
+    if (auto Func = Des->lookupSILFunction(Callee, onlyUpdateLinkage)) {
+      LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
+                 << Des->getModuleIdentifier().str() << "\n");
       if (!Func->empty())
         return Func;
       retVal = Func;
@@ -65,14 +67,15 @@ SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Name, declarationOnly)) {
-      DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-            << Des->getModuleIdentifier().str() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
+                 << Des->getModuleIdentifier().str() << "\n");
       if (Linkage) {
         // This is not the linkage we are looking for.
         if (Func->getLinkage() != *Linkage) {
-          DEBUG(llvm::dbgs()
-                << "Wrong linkage for Function: " << Func->getName() << " : "
-                << (int)Func->getLinkage() << "\n");
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Wrong linkage for Function: "
+                     << Func->getName() << " : "
+                     << (int)Func->getLinkage() << "\n");
           Des->invalidateFunction(Func);
           Func->getModule().eraseFunction(Func);
           continue;
@@ -99,9 +102,12 @@ bool SerializedSILLoader::hasSILFunction(StringRef Name,
 }
 
 
-SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
+SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
+  Mangle::ASTMangler mangler;
+  std::string mangledClassName = mangler.mangleNominalType(C);
+
   for (auto &Des : LoadedSILSections) {
-    if (auto VT = Des->lookupVTable(Name))
+    if (auto VT = Des->lookupVTable(mangledClassName))
       return VT;
   }
   return nullptr;
@@ -120,6 +126,22 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
     if (auto wT = Des->lookupDefaultWitnessTable(WT))
       return wT;
   return nullptr;
+}
+
+SILDifferentiabilityWitness *
+SerializedSILLoader::lookupDifferentiabilityWitness(
+    SILDifferentiabilityWitnessKey key) {
+  Mangle::ASTMangler mangler;
+  std::string mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(key);
+  // It is possible that one module has a declaration of a
+  // SILDifferentiabilityWitness, while another has the full definition.
+  SILDifferentiabilityWitness *dw = nullptr;
+  for (auto &Des : LoadedSILSections) {
+    dw = Des->lookupDifferentiabilityWitness(mangledKey);
+    if (dw && dw->isDefinition())
+      return dw;
+  }
+  return dw;
 }
 
 void SerializedSILLoader::invalidateCaches() {
@@ -174,5 +196,14 @@ void SerializedSILLoader::getAllDefaultWitnessTables() {
     Des->getAllDefaultWitnessTables();
 }
 
-// Anchor the SerializedSILLoader v-table.
-void SerializedSILLoader::Callback::_anchor() {}
+/// Deserialize all Properties in all SILModules.
+void SerializedSILLoader::getAllProperties() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllProperties();
+}
+
+/// Deserialize all DifferentiabilityWitnesses in all SILModules.
+void SerializedSILLoader::getAllDifferentiabilityWitnesses() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDifferentiabilityWitnesses();
+}

@@ -255,14 +255,14 @@ var JoinTestSuite = TestSuite("Join")
 
 from gyb_stdlib_support import (
     TRAVERSALS,
-    sliceTypeName
+    collectionTypeName
 )
 
 from itertools import product
 
 base_kinds = [ 'Defaulted', 'Minimal' ]
 collections = [
-  (base_kind + sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=True).replace('Slice', 'Collection'), traversal)
+  (base_kind + collectionTypeName(traversal=traversal, mutable=False, rangeReplaceable=True), traversal)
     for base_kind, traversal in product(base_kinds, TRAVERSALS)
 ]
 other_array_types = [ 'Array', 'ArraySlice', 'ContiguousArray' ]

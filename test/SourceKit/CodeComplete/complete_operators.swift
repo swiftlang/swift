@@ -11,6 +11,7 @@ struct MyInt {
   var bigPowers: Int { return 1 }
 }
 func +(x: MyInt, y: MyInt) -> MyInt { return x }
+postfix operator ++
 postfix func ++(x: inout MyInt) -> MyInt { return x }
 func !=(x: MyInt, y: MyInt) -> Bool { return true }
 

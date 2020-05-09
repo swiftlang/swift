@@ -1,0 +1,234 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -late-release-hoisting %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil_stage canonical
+
+//===----------------------------------------------------------------------===//
+// Unit tests for reachability to and from local objects.
+//===----------------------------------------------------------------------===//
+
+class HasObj {
+  var o : AnyObject
+}
+
+class HasInt64 {
+  var i : Int64
+}
+
+class HasHasObj {
+  var ho : HasObj
+}
+
+// The release of %lo can be hoisted over the load because it does not
+// point to any escaping references.
+//
+// CHECK-LABEL: sil @testLocalNotReachesEscaped : $@convention(thin) (Int64, @owned HasObj) -> AnyObject {
+// CHECK: bb0(%0 : $Int64, %1 : $HasObj):
+// CHECK:   [[LO:%.*]] = alloc_ref $HasInt
+// CHECK:   [[IADR:%.*]] = ref_element_addr [[LO]] : $HasInt64, #HasInt64.i
+// CHECK:   store %0 to [[IADR]] : $*Int64
+// CHECK:   strong_release [[LO]] : $HasInt
+// CHECK:   [[OADR:%.*]] = ref_element_addr %1 : $HasObj, #HasObj.o
+// CHECK:   [[O:%.*]] = load [[OADR]] : $*AnyObject
+// CHECK:   return [[O]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testLocalNotReachesEscaped'
+sil @testLocalNotReachesEscaped : $@convention(thin) (Int64, @owned HasObj) -> AnyObject {
+bb0(%0 : $Int64, %1 : $HasObj):
+  %lo = alloc_ref $HasInt64
+  %iadr = ref_element_addr %lo : $HasInt64, #HasInt64.i
+  store %0 to %iadr : $*Int64
+
+  %oadr = ref_element_addr %1 : $HasObj, #HasObj.o
+  %o = load %oadr : $*AnyObject
+  strong_release %lo : $HasInt64
+  return %o : $AnyObject
+}
+
+// The release of %lo cannot be hoisted over the load.
+//
+// CHECK-LABEL: sil @testLocalReachesEscaped : $@convention(thin) (@owned AnyObject) -> AnyObject {
+// CHECK: bb0(%0 : $AnyObject):
+// CHECK:   [[LO:%.*]] = alloc_ref $HasObj
+// CHECK:   [[IADR:%.*]] = ref_element_addr [[LO]] : $HasObj, #HasObj.o
+// CHECK:   store %0 to [[IADR]] : $*AnyObject
+// CHECK:   [[OADR:%.*]] = ref_element_addr [[LO]] : $HasObj, #HasObj.o
+// CHECK:   [[O:%.*]] = load [[OADR]] : $*AnyObject
+// CHECK:   strong_release [[LO]] : $HasObj
+// CHECK:   return [[O]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testLocalReachesEscaped'
+sil @testLocalReachesEscaped : $@convention(thin) (@owned AnyObject) -> AnyObject {
+bb0(%0 : $AnyObject):
+  %lo = alloc_ref $HasObj
+  %iadr = ref_element_addr %lo : $HasObj, #HasObj.o
+  store %0 to %iadr : $*AnyObject
+
+  %oadr = ref_element_addr %lo : $HasObj, #HasObj.o
+  %o = load %oadr : $*AnyObject
+  strong_release %lo : $HasObj
+  return %o : $AnyObject
+}
+
+// The release of %lo can be hoisted above the load from %oadr.  There
+// is a points-to relation between %lo and %oadr. However, the
+// points-to path from %lo to %oadr reaches another reference counted
+// object before reaching $oadr.
+//
+// CHECK-LABEL: sil @testLocalReachesRCEscaped : $@convention(thin) (@owned HasObj) -> AnyObject {
+// CHECK: bb0(%0 : $HasObj):
+// CHECK:   [[LO:%.*]] = alloc_ref $HasHasObj
+// CHECK:   [[HOADR:%.*]] = ref_element_addr [[LO]] : $HasHasObj, #HasHasObj.ho
+// CHECK:   strong_retain %0 : $HasObj
+// CHECK:   store %0 to [[HOADR]] : $*HasObj
+// CHECK:   [[HO:%.*]] = load [[HOADR]] : $*HasObj
+// CHECK:   strong_release [[LO]] : $HasHasObj
+// CHECK:   [[OADR:%.*]] = ref_element_addr [[HO]] : $HasObj, #HasObj.o
+// CHECK:   [[O:%.*]] = load [[OADR]] : $*AnyObject
+// CHECK:   return [[O]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testLocalReachesRCEscaped'
+sil @testLocalReachesRCEscaped : $@convention(thin) (@owned HasObj) -> AnyObject {
+bb0(%0 : $HasObj):
+  %lo = alloc_ref $HasHasObj
+  %hoadr = ref_element_addr %lo : $HasHasObj, #HasHasObj.ho
+  strong_retain %0 : $HasObj
+  store %0 to %hoadr : $*HasObj
+  %ho = load %hoadr : $*HasObj
+  %oadr = ref_element_addr %ho : $HasObj, #HasObj.o
+  %o = load %oadr : $*AnyObject
+  // Normally a retain of %o would precede this release of %c. But
+  // let's assume some aggressive optimization happened.
+  strong_release %lo : $HasHasObj
+  return %o : $AnyObject
+}
+
+// Two local references, one reachable from the other.
+//
+// TODO: We do not currently hoist strong_release %hho above
+// strong_retain %o because %hho is marked as escaping. However, it is
+// only stored to another local object, so in theory it does not need
+// to be marked escaping.
+//
+// CHECK-LABEL: sil @testLocalReachesEscapingLocal : $@convention(thin) (AnyObject) -> AnyObject {
+// CHECK: bb0(%0 : $AnyObject):
+// CHECK: [[LO:%.*]] = alloc_ref $HasObj
+// CHECK: [[OADR:%.*]] = ref_element_addr %1 : $HasObj, #HasObj.o
+// CHECK: strong_retain %0 : $AnyObject
+// CHECK: store %0 to [[OADR]] : $*AnyObject
+// CHECK: [[HHO:%.*]] = alloc_ref $HasHasObj
+// CHECK: [[HOADR:%.*]] = ref_element_addr [[HHO]] : $HasHasObj, #HasHasObj.ho
+// CHECK: store [[LO]] to [[HOADR]] : $*HasObj
+// CHECK: [[HO:%.*]] = load [[HOADR]] : $*HasObj
+// CHECK: [[OADR2:%.*]] = ref_element_addr [[HO]] : $HasObj, #HasObj.o
+// CHECK: [[O:%.*]] = load [[OADR2]] : $*AnyObject
+// CHECK: strong_retain [[O]] : $AnyObject
+// CHECK: strong_release [[HHO]] : $HasHasObj
+// CHECK: return [[O]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testLocalReachesEscapingLocal'
+sil @testLocalReachesEscapingLocal : $@convention(thin) (AnyObject) -> AnyObject {
+bb0(%0 : $AnyObject):
+  %ho = alloc_ref $HasObj
+  %oadr = ref_element_addr %ho : $HasObj, #HasObj.o
+  strong_retain %0 : $AnyObject
+  store %0 to %oadr : $*AnyObject
+
+  %hho = alloc_ref $HasHasObj
+  %hoadr = ref_element_addr %hho : $HasHasObj, #HasHasObj.ho
+  store %ho to %hoadr : $*HasObj
+
+  %ho2 = load %hoadr : $*HasObj
+  %oadr2 = ref_element_addr %ho2 : $HasObj, #HasObj.o
+  %o = load %oadr2 : $*AnyObject
+  strong_retain %o : $AnyObject
+  strong_release %hho : $HasHasObj
+  return %o : $AnyObject
+}
+
+// Two local references, one reachable from the other. We assume that
+// the reachable one has its own reference count and hoist
+// strong_release %hho above load %oadr.
+//
+// CHECK-LABEL: sil @testLocalReachesRCLocal : $@convention(thin) (AnyObject) -> AnyObject {
+// CHECK: bb0(%0 : $AnyObject):
+// CHECK: [[LO:%.*]] = alloc_ref $HasObj
+// CHECK: [[OADR:%.*]] = ref_element_addr %1 : $HasObj, #HasObj.o
+// CHECK: strong_retain %0 : $AnyObject
+// CHECK: store %0 to [[OADR]] : $*AnyObject
+// CHECK: [[HHO:%.*]] = alloc_ref $HasHasObj
+// CHECK: [[HOADR:%.*]] = ref_element_addr [[HHO]] : $HasHasObj, #HasHasObj.ho
+// CHECK: store [[LO]] to [[HOADR]] : $*HasObj
+// CHECK: [[HO:%.*]] = load [[HOADR]] : $*HasObj
+// CHECK: strong_release [[HHO]] : $HasHasObj
+// CHECK: [[OADR2:%.*]] = ref_element_addr [[HO]] : $HasObj, #HasObj.o
+// CHECK: [[O:%.*]] = load [[OADR2]] : $*AnyObject
+// CHECK: strong_retain [[O]] : $AnyObject
+// CHECK: return [[O]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testLocalReachesRCLocal'
+sil @testLocalReachesRCLocal : $@convention(thin) (AnyObject) -> AnyObject {
+bb0(%0 : $AnyObject):
+  %ho = alloc_ref $HasObj
+  %oadr = ref_element_addr %ho : $HasObj, #HasObj.o
+  strong_retain %0 : $AnyObject
+  store %0 to %oadr : $*AnyObject
+
+  %hho = alloc_ref $HasHasObj
+  %hoadr = ref_element_addr %hho : $HasHasObj, #HasHasObj.ho
+  store %ho to %hoadr : $*HasObj
+
+  %ho2 = load %hoadr : $*HasObj
+  %oadr2 = ref_element_addr %ho2 : $HasObj, #HasObj.o
+  %o = load %oadr2 : $*AnyObject
+  strong_release %hho : $HasHasObj
+  strong_retain %o : $AnyObject
+  return %o : $AnyObject
+}
+
+// Hoist the release of an escaping object above memory operations on
+// a local object that never escapes.
+//
+// CHECK-LABEL: sil @testEscapeNotReachesLocal : $@convention(thin) (Int64, @owned HasObj) -> Int64 {
+// CHECK: bb0(%0 : $Int64, %1 : $HasObj):
+// CHECK:   strong_release %1 : $HasObj
+// CHECK:   [[LO:%.*]] = alloc_ref $HasInt64
+// CHECK:   [[IADR:%.*]] = ref_element_addr [[LO]] : $HasInt64, #HasInt64.i
+// CHECK:   store %0 to [[IADR]] : $*Int64
+// CHECK:   [[I:%.*]] = load [[IADR]] : $*Int64
+// CHECK:   return [[I]] : $Int64
+// CHECK-LABEL: } // end sil function 'testEscapeNotReachesLocal'
+sil @testEscapeNotReachesLocal : $@convention(thin) (Int64, @owned HasObj) -> Int64 {
+bb0(%0 : $Int64, %1 : $HasObj):
+  %lo = alloc_ref $HasInt64
+  %iadr = ref_element_addr %lo : $HasInt64, #HasInt64.i
+  store %0 to %iadr : $*Int64
+  %i = load %iadr : $*Int64
+  strong_release %1 : $HasObj
+  return %i : $Int64
+}
+
+// EscapeAnalysis must consider the local object %lo as globally
+// escaping because it is stored into an object that escapes via an
+// incoming argument. This creates an aliasing relationship preventing
+// the strong_release from being hoisted.
+//
+// CHECK-LABEL: sil @testEscapeReachesLocal : $@convention(thin) (@owned AnyObject, @owned HasHasObj) -> AnyObject {
+// CHECK: bb0(%0 : $AnyObject, %1 : $HasHasObj):
+// CHECK:   [[LO:%.*]] = alloc_ref $HasObj
+// CHECK:   [[OADR:%.*]] = ref_element_addr [[LO]] : $HasObj, #HasObj.o
+// CHECK:   store %0 to [[OADR]] : $*AnyObject
+// CHECK:   [[HOADR:%.*]] = ref_element_addr %1 : $HasHasObj, #HasHasObj.ho
+// CHECK:   store [[LO]] to [[HOADR]] : $*HasObj
+// CHECK:   [[O:%.*]] = load [[OADR]] : $*AnyObject
+// CHECK:   strong_release %1 : $HasHasObj
+// CHECK:   return [[O]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'testEscapeReachesLocal'
+sil @testEscapeReachesLocal : $@convention(thin) (@owned AnyObject, @owned HasHasObj) -> AnyObject {
+bb0(%0 : $AnyObject, %1 : $HasHasObj):
+  %lo = alloc_ref $HasObj
+  %oadr = ref_element_addr %lo : $HasObj, #HasObj.o
+  store %0 to %oadr : $*AnyObject
+  %hoadr = ref_element_addr %1 : $HasHasObj, #HasHasObj.ho
+  store %lo to %hoadr : $*HasObj
+  %o = load %oadr : $*AnyObject
+  strong_release %1 : $HasHasObj
+  return %o : $AnyObject
+}

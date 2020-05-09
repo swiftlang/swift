@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-ide-test -F %S/Inputs/custom-frameworks -print-module -source-filename %s -module-to-print=APINotesFrameworkTest -function-definitions=false -print-regular-comments -swift-version 4 | %FileCheck -check-prefix=CHECK-SWIFT-4 -check-prefix=CHECK-BOTH %s
+// RUN: %target-swift-ide-test -F %S/Inputs/custom-frameworks -print-module -source-filename %s -module-to-print=APINotesFrameworkTest -function-definitions=false -print-regular-comments -swift-version 5 | %FileCheck -check-prefix=CHECK-SWIFT-5 -check-prefix=CHECK-BOTH %s
 
-// RUN: %target-swift-ide-test -F %S/Inputs/custom-frameworks -print-module -source-filename %s -module-to-print=APINotesFrameworkTest -function-definitions=false -print-regular-comments -swift-version 3 | %FileCheck -check-prefix=CHECK-SWIFT-3 -check-prefix=CHECK-BOTH %s
+// RUN: %target-swift-ide-test -F %S/Inputs/custom-frameworks -print-module -source-filename %s -module-to-print=APINotesFrameworkTest -function-definitions=false -print-regular-comments -swift-version 4 | %FileCheck -check-prefix=CHECK-SWIFT-4 -check-prefix=CHECK-BOTH %s
 
 // REQUIRES: objc_interop
 
@@ -18,19 +18,19 @@
 // CHECK-BOTH-DAG: func accessorsOnlyWeak() -> Any?
 // CHECK-BOTH-DAG: func setAccessorsOnlyWeak(_ accessorsOnlyWeak: Any?)
 
-// CHECK-SWIFT-4-DAG: var accessorsOnlyInVersion3: Any
-// CHECK-SWIFT-4-DAG: class var accessorsOnlyForClassInVersion3: Any
-// CHECK-SWIFT-3-DAG: func accessorsOnlyInVersion3() -> Any
-// CHECK-SWIFT-3-DAG: func setAccessorsOnlyInVersion3(_ accessorsOnlyInVersion3: Any)
-// CHECK-SWIFT-3-DAG: class func accessorsOnlyForClassInVersion3() -> Any
-// CHECK-SWIFT-3-DAG: class func setAccessorsOnlyForClassInVersion3(_ accessorsOnlyForClassInVersion3: Any)
+// CHECK-SWIFT-5-DAG: var accessorsOnlyInVersion4: Any
+// CHECK-SWIFT-5-DAG: class var accessorsOnlyForClassInVersion4: Any
+// CHECK-SWIFT-4-DAG: func accessorsOnlyInVersion4() -> Any
+// CHECK-SWIFT-4-DAG: func setAccessorsOnlyInVersion4(_ accessorsOnlyInVersion4: Any)
+// CHECK-SWIFT-4-DAG: class func accessorsOnlyForClassInVersion4() -> Any
+// CHECK-SWIFT-4-DAG: class func setAccessorsOnlyForClassInVersion4(_ accessorsOnlyForClassInVersion4: Any)
 
-// CHECK-SWIFT-4-DAG: func accessorsOnlyExceptInVersion3() -> Any
-// CHECK-SWIFT-4-DAG: func setAccessorsOnlyExceptInVersion3(_ accessorsOnlyExceptInVersion3: Any)
-// CHECK-SWIFT-4-DAG: class func accessorsOnlyForClassExceptInVersion3() -> Any
-// CHECK-SWIFT-4-DAG: class func setAccessorsOnlyForClassExceptInVersion3(_ accessorsOnlyForClassExceptInVersion3: Any)
-// CHECK-SWIFT-3-DAG: var accessorsOnlyExceptInVersion3: Any
-// CHECK-SWIFT-3-DAG: class var accessorsOnlyForClassExceptInVersion3: Any
+// CHECK-SWIFT-5-DAG: func accessorsOnlyExceptInVersion4() -> Any
+// CHECK-SWIFT-5-DAG: func setAccessorsOnlyExceptInVersion4(_ accessorsOnlyExceptInVersion4: Any)
+// CHECK-SWIFT-5-DAG: class func accessorsOnlyForClassExceptInVersion4() -> Any
+// CHECK-SWIFT-5-DAG: class func setAccessorsOnlyForClassExceptInVersion4(_ accessorsOnlyForClassExceptInVersion4: Any)
+// CHECK-SWIFT-4-DAG: var accessorsOnlyExceptInVersion4: Any
+// CHECK-SWIFT-4-DAG: class var accessorsOnlyForClassExceptInVersion4: Any
 
 // CHECK-BOTH: {{^}$}}
 
@@ -46,12 +46,12 @@
 
 // CHECK-BOTH: {{^}$}}
 
-// CHECK-SWIFT-3-DAG: func renamedAndRetyped() -> Any{{$}}
-// CHECK-SWIFT-3-DAG: func setRenamedAndRetyped(_ accessorsOnlyRenamedRetyped: Any?)
-// CHECK-SWIFT-4-DAG: var accessorsOnlyRenamedRetyped: Any!
+// CHECK-SWIFT-4-DAG: func renamedAndRetyped() -> Any{{$}}
+// CHECK-SWIFT-4-DAG: func setRenamedAndRetyped(_ accessorsOnlyRenamedRetyped: Any?)
+// CHECK-SWIFT-5-DAG: var accessorsOnlyRenamedRetyped: Any!
 
-// CHECK-SWIFT-3-DAG: class func renamedAndRetypedClass() -> Any{{$}}
-// CHECK-SWIFT-3-DAG: class func setRenamedAndRetypedClass(_ accessorsOnlyRenamedRetypedClass: Any?)
-// CHECK-SWIFT-4-DAG: class var accessorsOnlyRenamedRetypedClass: Any!
+// CHECK-SWIFT-4-DAG: class func renamedAndRetypedClass() -> Any{{$}}
+// CHECK-SWIFT-4-DAG: class func setRenamedAndRetypedClass(_ accessorsOnlyRenamedRetypedClass: Any?)
+// CHECK-SWIFT-5-DAG: class var accessorsOnlyRenamedRetypedClass: Any!
 
 // CHECK-BOTH: {{^}$}}

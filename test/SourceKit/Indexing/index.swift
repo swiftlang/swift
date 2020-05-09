@@ -1,9 +1,5 @@
-// FIXME(integers): %t.response content is non-deterministic with the new
-// integer protocols
-// XFAIL: *
-
-// RUN: %sourcekitd-test -req=index %s -- -serialize-diagnostics-path %t.dia %s | %sed_clean > %t.response
-// RUN: diff -u %s.response %t.response
+// RUN: %sourcekitd-test -req=index %s -- -Xfrontend -serialize-diagnostics-path -Xfrontend %t.dia %s | %sed_clean | sed -e 's/key.usr: \".*\"/key.usr: <usr>/g' > %t.response
+// RUN: %diff -u %s.response %t.response
 
 var globV: Int
 
@@ -56,7 +52,7 @@ extension CC : Prot {
   var extV : Int { return 0 }
 }
 
-class SubCC : CC, Prot {}
+class SubCC : CC {}
 
 var globV2: SubCC
 

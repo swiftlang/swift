@@ -11,7 +11,7 @@ representation of source, and facilities for *structured editing*.
 What is structured editing? It's an editing strategy that is keenly aware of the
 *structure* of source code, not necessarily its *representation* (i.e.
 characters or bytes). This can be achieved at different granularities: replacing
-an identifier, changing a call to global function to a method call, or indenting
+an identifier, changing a global function call to a method call, or indenting
 and formatting an entire source file based on declarative rules. These kinds of
 diverse operations are critical to the Swift Migrator, which is the immediate
 client for this library, now developed in the open. Along with that, the library
@@ -163,7 +163,7 @@ struct YourStruct {}
 At any point in the building process, you can call `build()` and get a
 reasonably formed Syntax node (i.e. with no raw `nullptr`s) using what you've
 provided to the builder so far. Anything that you haven't supplied is marked as
-*missing*. This is essentially what the parser does so, looking forward to
+*missing*. This is essentially what the parser does; so, looking forward to
 future adoption, the builders are designed with the parser in mind, with the
 hope that we can better specify recovery behavior and incremental (re-)parsing.
 
@@ -260,7 +260,7 @@ pieces of syntax that aren't really relevant to the semantics of the program,
 such as whitespace and comments. These are modeled as collections and, with the
 exception of comments, are sort of "run-length" encoded. For example, a sequence
 of four spaces is represented by `{ Kind: TriviaKind::Space, Count: 4 }`, not
-the literal text `"    "`.
+the literal text `"    "`.
 
 Some examples of the "atoms" of `Trivia`:
 
@@ -280,7 +280,10 @@ new `Syntax` nodes:
    the next newline character.
 
 2. Looking backward in the text, a token owns all of the leading trivia
-   up to and including the first contiguous sequence of newlines characters.
+   up to and including the first newline character.
+   
+In other words, a contiguous stretch of trivia between two tokens is split on the
+leftmost newline.
 
 Let's take a look at how this shows up in practice with a small snippet of Swift
 code.
@@ -387,7 +390,8 @@ Beyond this, `SyntaxData` nodes have *no significant public API*.
 
 - `SyntaxData` are immutable.
    However, they may mutate themselves in order to implement lazy instantiation
-   of children and caching. That caching operation transparent and thread-safe.
+   of children and caching. That caching operation is transparent and
+   thread-safe.
 - `SyntaxData` have identity, i.e. they can be compared with "pointer equality".
 - `SyntaxData` are implementation detail have no public API.
 
@@ -425,10 +429,10 @@ auto Integer = SyntaxFactory::makeIntegerLiteralExpr(IntegerTok);
 auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
 
 // This ReturnStmtSyntax is floating, with no root.
-auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer, 
+auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer,
                                             /*Semicolon=*/ None);
 
-auto RightBrace = SyntaxFactory::makeLeftBraceToken({}, {});
+auto RightBrace = SyntaxFactory::makeRightBraceToken({}, {});
 
 auto Statements = SyntaxFactory::makeBlankStmtList()
   .addStmt(Return);
@@ -466,7 +470,7 @@ Legend:
 
 A couple of interesting points and reminders:
 - All strong references point downward in the tree.
-- One `SyntaxData` for each `RawSyntax`.  
+- One `SyntaxData` for each `RawSyntax`.
   Remember, a `SyntaxData` is essentially a `RawSyntax` with a parent pointer
   and cached `SyntaxData` children.
 - Parent pointers are omitted here but there are weak references pointing
@@ -492,8 +496,8 @@ class has the following fields:
 | --- | ---- | ----------- |
 | `kind` | `String` | The "base class" for this node. Must be one of `["Syntax", "SyntaxCollection", "Expr", "Stmt", "Decl", "Pattern", "Type"]`. |
 | `element` | `String?` | If the node is a `SyntaxCollection`, then this is the `SyntaxKind` of the element of this collection. If this is not a `SyntaxCollection`, then this value is ignored. |
-| `element_name` | `String?` | If the node is a `SyntaxCollection`, then this is a different name for the element that you wish to appear in the generated API. Some nodes cannot find a good upper-bound for the element, and so must defer to `Syntax` -- those nodes use this field to populate a better name for `add${element_name}` APIs.
-| `children` | `[[String: Child]]?` | The children of this node.
+| `element_name` | `String?` | If the node is a `SyntaxCollection`, then this is a different name for the element that you wish to appear in the generated API. Some nodes cannot find a good upper-bound for the element, and so must defer to `Syntax` -- those nodes use this field to populate a better name for `add${element_name}` APIs. |
+| `children` | `[[String: Child]]?` | The children of this node. |
 
 #### Children
 
@@ -502,7 +506,7 @@ following fields:
 
 | Key | Type | Description |
 | --- | ---- | ----------- |
-| `kind` | `String` | The `SyntaxKind` of this child. This must have a corresponding `Node` with that kind. |
+| `kind` | `String` | The `SyntaxKind` of this child. This must have a corresponding `Node` with that kind (or corresponding `Token` in both `include/swift/Syntax/TokenKinds.def` and `SYNTAX_TOKENS`). |
 | `is_optional` | `Bool?` | Whether this child is required in a fully-formed object, or if it is allowed to remain `missing`. Defaults to `false` if not present.
 | `token_choices` | `[String]?` | A list of `Token`s which are considered "valid" values for `Token` children. |
 | `text_choices` | `[String]?` | A list of valid textual values for tokens. If this is not provided, any textual value is accepted for tokens like `IdentifierToken`. |
@@ -510,10 +514,10 @@ following fields:
 #### Tokens
 
 A `Token` represents one of the `tok::` enums in
-`include/Syntax/TokenKinds.def`. `Token.py` has a top-level array of token
+`include/swift/Syntax/TokenKinds.def`. `Token.py` has a top-level array of token
 declarations. The `Token` class has the following fields.
 
-| Key | Type | Description |f
+| Key | Type | Description |
 | --- | ---- | ----------- |
 | `kind` | `String` | The name of the token in the C++ `tok::` namespace. This is what we use to map these nodes to C++ tokens. |
 | `text` | `String?` | If the text of this node is fixed, then this field contains that text. For example, `Struct` has text `"struct"` and kind `"kw_struct"`. |
@@ -523,21 +527,18 @@ declarations. The `Token` class has the following fields.
 
 libSyntax uses Swift's `gyb` tool to generate the `Syntax` subclasses,
 `SyntaxFactory` methods, `SyntaxKind` enum entry, and `SyntaxBuilder` class.
-These files rely on a support library located at `utils/gyb_syntax_support.py`
+These files rely on a support library located at `utils/gyb_syntax_support/`
 which holds some common logic used inside the `gyb` files. These `gyb` files
 will be re-generated whenever any Python files are changed.
 
 ## Adding new Syntax Nodes
 
 Here's a handy checklist when implementing a production in the grammar.
-- Check that the corresponding `lib/AST` node has `SourceLocs` for all terms. If
-  it doesn't, [file a Swift bug][NewSwiftBug] and fix that first.
-  - **Add the `Syntax` bug label!**
 - Check if it's not already being worked on, and then
-  [file a Swift bug][NewSwiftBug], noting which grammar productions
-  are affected.
+  [file a Swift bug](https://bugs.swift.org/secure/CreateIssue!default.jspa),
+  noting which grammar productions are affected.
   - **Add the `Syntax` bug label!**
-- Create the `${KIND}` entry in the appropriate Python file (Expr, Stmt, 
+- Create the `${KIND}` entry in the appropriate Python file (Expr, Stmt,
   Pattern, etc.).
   - Add C++ unit tests for `with` APIs for all layout elements
       (e.g. `withLeftTypeIdentifier(...)`).
@@ -558,4 +559,5 @@ Here's a handy checklist when implementing a production in the grammar.
     - check for a zero-diff print with `-round-trip-parse`
 - Update `lib/Syntax/Status.md` if applicable.
 
-[NewSwiftBug]: https://bugs.swift.org/secure/CreateIssue!default.jspa)
+## Use libSyntax from Swift code
+SwiftSyntax has been moved to [its own repository](https://github.com/apple/swift-syntax) as a SwiftPM package. Please follow the instructions in that repository for how to use it for a Swift tool.

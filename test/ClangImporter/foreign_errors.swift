@@ -17,7 +17,7 @@ func test0() {
 func testAndReturnError() throws {
   try ErrorProne.fail()
   try ErrorProne.go()
-  try ErrorProne.tryAndReturnError() // collides with 'try' keyword
+  try ErrorProne.tryAndReturnError(()) // collides with 'try' keyword
 
   ErrorProne.messUpSignatureAndReturnError(nil) // wrong signature
 }
@@ -77,7 +77,7 @@ func testBlockFinal() throws {
 #if !EMIT_SIL
 func testNonBlockFinal() throws {
   ErrorProne.runWithError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
-  ErrorProne.run(count: 0) // expected-error {{incorrect argument label in call (have 'count:', expected 'callback:')}}
+  ErrorProne.run(count: 0) // expected-error {{missing argument for parameter 'withAnError' in call}} {{18-18=withAnError: <#AutoreleasingUnsafeMutablePointer<NSError?>?#>, }}
 }
 #endif
 

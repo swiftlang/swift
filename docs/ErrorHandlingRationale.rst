@@ -577,9 +577,9 @@ be able to recognize specific classes of error, but libraries
 generally want to reserve flexibility about the exact kind of error
 they produce, and so many errors just end up falling into broad
 buckets.  Different libraries end up with their own library-specific
-general error classes, and exceptions list end up just restating the
+general error classes, and exception lists end up just restating the
 library's own dependencies or wrapping the underlying errors in ways
-that loses critical information.
+that lose critical information.
 
 
 Tradeoffs of typed propagation
@@ -799,7 +799,7 @@ significantly for the common case of frames that just need to run some
 clean-ups before propagating the error further.  It may even
 completely eliminate the need for a landing pad.
 
-The ObjC/C++ exceptions system on iOS/ARM32 is kindof like that
+The ObjC/C++ exceptions system on iOS/ARM32 is kind of like that
 hybrid.  Propagation and clean-up code is explicit in the function,
 but the registered context includes the "personality" information from
 the unwinding tables, which makes the decision whether to land at the
@@ -1096,7 +1096,7 @@ exceptions.
 
 Objective-C exceptions are *mostly* only used for unrecoverable
 conditions, akin to what I called "failures" above.  There are a few
-major exceptions to this rule, where APIs that do use exceptions to
+major exceptions to this rule, where APIs do use exceptions to
 report errors.
 
 Instead, Objective-C mostly relies on manual propagation,
@@ -1134,7 +1134,7 @@ failures in our scheme; essentially, Java attempts to promote a fully
 statically-enforced model where truly catastrophic problems can still
 be handled when necessary.  Unfortunately, these motivations don't
 seem to have been communicated very well to developers, and the result
-is kindof a mess.
+is kind of a mess.
 
 Java allows methods to be very specific about the kinds of exception
 they throw.  In my experience, exceptions tend to fall into two
@@ -1180,7 +1180,7 @@ Haskell
 Haskell provides three different common error-propagation mechanisms.
 
 The first is that, like many other functional languages, it supports
-manual propagation with a ``Maybe`` type.  A function can return ``None``
+manual propagation with a ``Maybe`` type.  A function can return ``Nothing``
 to indicate that it couldn't produce a more useful result.  This is
 the most common failure method for functions in the functional subset
 of the library.
@@ -1420,9 +1420,9 @@ It is valuable to be able to overload higher-order functions based on
 whether an argument function throws; it is easy to imagine algorithms
 that can be implemented more efficiently if they do not need to worry
 about exceptions.  (We do not, however, particularly want to encourage
-a pattern of duplicating This is straightforward if the primary
+a pattern of duplicating. This is straightforward if the primary
 type-checking pass is able to reliably decide whether a function value
-can throw.
+can throw.)
 
 Typed propagation checking can generally be performed in a secondary
 pass over a type-checked function body: if a function is not permitted
@@ -1509,7 +1509,7 @@ code using the protocol to deal with probably-spurious errors, or
 aggressively forbid them, and thus forbid conformances by types whose
 operations naturally throw.
 
-There are several different ways we could approach this problem, but
+There are several different ways we could approach this problem, and
 after some investigation I feel confident that they're workable.
 Unfortunately, they are clearly out-of-scope for the first release.
 For now, the standard library should provide protocols that cannot

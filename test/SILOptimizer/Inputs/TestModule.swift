@@ -1,10 +1,11 @@
 
-@_versioned
+@usableFromInline
 protocol Proto {
   func confx()
 }
 
 public struct MyStruct : Proto {
+  @usableFromInline
   func confx() {
   }
 
@@ -13,7 +14,7 @@ public struct MyStruct : Proto {
 }
 
 @inline(never)
-@_versioned
+@usableFromInline
 func callit(_ p: Proto) {
 }
 

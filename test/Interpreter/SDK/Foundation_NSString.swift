@@ -11,7 +11,9 @@ print(hello)
 
 // CHECK: ello,
 var helloStr: String = hello as String
-print(String(helloStr._core[NSRange(location: 1, length: 5).toRange()!]))
+let i1 = helloStr.index(helloStr.startIndex, offsetBy: 1)
+let i2 = helloStr.index(helloStr.startIndex, offsetBy: 6)
+print(String(helloStr[i1..<i2]))
 
 var upperHello = hello.uppercased
 // CHECK: HELLO, WORLD!

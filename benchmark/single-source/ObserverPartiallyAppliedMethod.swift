@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+import TestsUtils
+
+public let ObserverPartiallyAppliedMethod = BenchmarkInfo(
+  name: "ObserverPartiallyAppliedMethod",
+  runFunction: run_ObserverPartiallyAppliedMethod,
+  tags: [.validation],
+  legacyFactor: 20)
+
 class Observer {
   @inline(never)
   func receive(_ value: Int) {
@@ -33,7 +41,7 @@ class Signal {
 public func run_ObserverPartiallyAppliedMethod(_ iterations: Int) {
   let signal = Signal()
   let observer = Observer()
-  for _ in 0 ..< 10_000 * iterations {
+  for _ in 0 ..< 500 * iterations {
     signal.subscribe(observer.receive)
   }
   signal.send(1)

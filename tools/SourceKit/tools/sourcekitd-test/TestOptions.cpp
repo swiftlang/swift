@@ -16,6 +16,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace sourcekitd_test;
@@ -105,6 +106,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     case OPT_req:
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
         .Case("version", SourceKitRequest::ProtocolVersion)
+        .Case("compiler-version", SourceKitRequest::CompilerVersion)
         .Case("demangle", SourceKitRequest::DemangleNames)
         .Case("mangle", SourceKitRequest::MangleSimpleClasses)
         .Case("index", SourceKitRequest::Index)
@@ -114,9 +116,12 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("complete.update", SourceKitRequest::CodeCompleteUpdate)
         .Case("complete.cache.ondisk", SourceKitRequest::CodeCompleteCacheOnDisk)
         .Case("complete.setpopularapi", SourceKitRequest::CodeCompleteSetPopularAPI)
+        .Case("typecontextinfo", SourceKitRequest::TypeContextInfo)
+        .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
         .Case("syntax-map", SourceKitRequest::SyntaxMap)
+        .Case("syntax-tree", SourceKitRequest::SyntaxTree)
         .Case("structure", SourceKitRequest::Structure)
         .Case("format", SourceKitRequest::Format)
         .Case("expand-placeholder", SourceKitRequest::ExpandPlaceholder)
@@ -127,23 +132,41 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("find-usr", SourceKitRequest::FindUSR)
         .Case("find-interface", SourceKitRequest::FindInterfaceDoc)
         .Case("open", SourceKitRequest::Open)
+        .Case("close", SourceKitRequest::Close)
         .Case("edit", SourceKitRequest::Edit)
         .Case("print-annotations", SourceKitRequest::PrintAnnotations)
         .Case("print-diags", SourceKitRequest::PrintDiags)
         .Case("extract-comment", SourceKitRequest::ExtractComment)
         .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Case("range", SourceKitRequest::RangeInfo)
+        .Case("syntactic-rename", SourceKitRequest::SyntacticRename)
+        .Case("find-rename-ranges", SourceKitRequest::FindRenameRanges)
+        .Case("find-local-rename-ranges", SourceKitRequest::FindLocalRenameRanges)
         .Case("translate", SourceKitRequest::NameTranslation)
+        .Case("local-rename", SourceKitRequest::LocalRename)
+        .Case("extract-expr", SourceKitRequest::ExtractExpr)
+        .Case("extract-repeated", SourceKitRequest::ExtractRepeatedExpr)
+        .Case("extract-func", SourceKitRequest::ExtractFunction)
+        .Case("fill-stub", SourceKitRequest::FillProtocolStub)
+        .Case("expand-default", SourceKitRequest::ExpandDefault)
+        .Case("localize-string", SourceKitRequest::LocalizeString)
         .Case("markup-xml", SourceKitRequest::MarkupToXML)
+        .Case("stats", SourceKitRequest::Statistics)
+        .Case("track-compiles", SourceKitRequest::EnableCompileNotifications)
+        .Case("collect-type", SourceKitRequest::CollectExpresstionType)
+        .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Default(SourceKitRequest::None);
+
       if (Request == SourceKitRequest::None) {
-        llvm::errs() << "error: invalid request, expected one of "
+        llvm::errs() << "error: invalid request '" << InputArg->getValue()
+            << "'\nexpected one of "
             << "version/demangle/mangle/index/complete/complete.open/complete.cursor/"
                "complete.update/complete.cache.ondisk/complete.cache.setpopularapi/"
                "cursor/related-idents/syntax-map/structure/format/expand-placeholder/"
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
-               "open/edit/print-annotations/print-diags/extract-comment/module-groups/"
-               "range/translate/markup-xml\n";
+               "open/close/edit/print-annotations/print-diags/extract-comment/module-groups/"
+               "range/syntactic-rename/find-rename-ranges/translate/markup-xml/stats/"
+               "track-compiles/collect-type\n";
         return true;
       }
       break;
@@ -186,15 +209,13 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       break;
     }
 
-      case OPT_swift_version: {
-        unsigned ver;
-        if (StringRef(InputArg->getValue()).getAsInteger(10, ver)) {
-          llvm::errs() << "error: expected integer for 'swift-version'\n";
-          return true;
-        }
-        SwiftVersion = ver;
-        break;
-      }
+    case OPT_swift_version:
+      SwiftVersion = InputArg->getValue();
+      break;
+
+    case OPT_pass_version_as_string:
+      PassVersionAsString = true;
+      break;
 
     case OPT_line:
       if (StringRef(InputArg->getValue()).getAsInteger(10, Line)) {
@@ -261,10 +282,18 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       PrintRawResponse = true;
       break;
 
+    case OPT_dont_print_response:
+      PrintResponse = false;
+      break;
+
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
       SourceText = llvm::None;
       Inputs.push_back(InputArg->getValue());
+      break;
+
+    case OPT_rename_spec:
+      RenameSpecPath = InputArg->getValue();
       break;
 
     case OPT_json_request_path:
@@ -299,6 +328,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ObjCSelector = InputArg->getValue();
       break;
 
+    case OPT_name:
+      Name = InputArg->getValue();
+      break;
+
     case OPT_cancel_on_subsequent_request:
       unsigned Cancel;
       if (StringRef(InputArg->getValue()).getAsInteger(10, Cancel)) {
@@ -306,6 +339,71 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         return true;
       }
       CancelOnSubsequentRequest = Cancel;
+      break;
+
+    case OPT_time_request:
+      timeRequest = true;
+      break;
+
+    case OPT_repeat_request:
+      if (StringRef(InputArg->getValue()).getAsInteger(10, repeatRequest)) {
+        llvm::errs() << "error: expected integer for 'cancel-on-subsequent-request'\n";
+        return true;
+      } else if (repeatRequest < 1) {
+        llvm::errs() << "error: repeat-request must be >= 1\n";
+        return true;
+      }
+      break;
+
+    case OPT_vfs_files:
+      VFSName = VFSName.getValueOr("in-memory-vfs");
+      for (const char *vfsFile : InputArg->getValues()) {
+        StringRef name, target;
+        std::tie(name, target) = StringRef(vfsFile).split('=');
+        llvm::SmallString<64> nativeName;
+        llvm::sys::path::native(name, nativeName);
+        bool passAsSourceText = target.consume_front("@");
+        VFSFiles.try_emplace(nativeName.str(), VFSFile(target.str(), passAsSourceText));
+      }
+      break;
+
+    case OPT_vfs_name:
+      VFSName = InputArg->getValue();
+      break;
+
+    case OPT_optimize_for_ide: {
+      bool Value;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, Value)) {
+        llvm::errs() << "error: expected 0 or 1 for 'for-ide'\n";
+        return true;
+      }
+      OptimizeForIde = Value;
+      break;
+    }
+
+    case OPT_completion_check_dependency_interval: {
+      int64_t Value;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, Value)) {
+        llvm::errs() << "error: expected number for inteval\n";
+        return true;
+      } else if (Value < 0) {
+        llvm::errs() << "error: completion-check-dependency-interval must be > 0\n";
+        return true;
+      }
+      CompletionCheckDependencyInterval = Value;
+      break;
+    }
+
+    case OPT_suppress_config_request:
+      SuppressDefaultConfigRequest = true;
+      break;
+
+    case OPT_module_cache_path:
+      ModuleCachePath = InputArg->getValue();
+      break;
+
+    case OPT_shell:
+      ShellExecution = true;
       break;
 
     case OPT_UNKNOWN:
@@ -334,6 +432,6 @@ void TestOptions::printHelp(bool ShowHidden) const {
 
   TestOptTable Table;
 
-  Table.PrintHelp(llvm::outs(), "sourcekitd-test", "SourceKit Testing Tool",
-                      ShowHidden);
+  Table.PrintHelp(llvm::outs(), "sourcekitd-test [options] <inputs>",
+                  "SourceKit Testing Tool", ShowHidden);
 }

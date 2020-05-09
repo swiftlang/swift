@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 3 %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 4.2 %t/main.swift
 
 func testUnaryMinusInUnsigned() {
-  var a: UInt8 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt8'}} expected-note * {{}} expected-warning * {{}}
+  var a: UInt8 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt8'}} expected-note * {{}} expected-warning * {{}}
 
-  var b: UInt16 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt16'}} expected-note * {{}} expected-warning * {{}}
+  var b: UInt16 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt16'}} expected-note * {{}} expected-warning * {{}}
 
-  var c: UInt32 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt32'}} expected-note * {{}} expected-warning * {{}}
+  var c: UInt32 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt32'}} expected-note * {{}} expected-warning * {{}}
 
-  var d: UInt64 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt64'}} expected-note * {{}} expected-warning * {{}}
+  var d: UInt64 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt64'}} expected-note * {{}} expected-warning * {{}}
 }
 
 // Int and UInt are not identical to any fixed-size integer type
@@ -25,61 +25,6 @@ var u32 : UInt32 = u // expected-error {{}}
 var u16 : UInt16 = u // expected-error {{}}
 var u8  : UInt8  = u // expected-error {{}}
 
-func expectSameType<T>(_: T.Type, _: T.Type) {}
-
-func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
-  // Audit and update this test when adding new integer types.
-  expectSameType(Int64.self, IntMax.self)
-  expectSameType(UInt64.self, UIntMax.self)
-
-  _ = UInt8(truncatingBitPattern: UInt(0))
-  _ = UInt16(truncatingBitPattern: UInt(0))
-  _ = UInt32(truncatingBitPattern: UInt(0))
-  UInt64(truncatingBitPattern: UInt(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
-// expected-note @-1 {{overloads for 'UInt64' exist with these partially matching parameter lists}}
-  UInt(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
-
-  _ = Int8(truncatingBitPattern: UInt(0))
-  _ = Int16(truncatingBitPattern: UInt(0))
-  _ = Int32(truncatingBitPattern: UInt(0))
-  Int64(truncatingBitPattern: UInt(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
-// expected-note @-1 {{overloads for 'Int64' exist with}}
-  Int(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
-
-  _ = UInt8(truncatingBitPattern: Int(0))
-  _ = UInt16(truncatingBitPattern: Int(0))
-  _ = UInt32(truncatingBitPattern: Int(0))
-  UInt64(truncatingBitPattern: Int(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
-// expected-note @-1 {{overloads for 'UInt64' exist with these partially matching parameter lists}}
-  UInt(truncatingBitPattern: Int(0))   // expected-error {{}} expected-note * {{}}
-
-  _ = Int8(truncatingBitPattern: Int(0))
-  _ = Int16(truncatingBitPattern: Int(0))
-  _ = Int32(truncatingBitPattern: Int(0))
-  Int64(truncatingBitPattern: Int(0)) // expected-error {{}} expected-note * {{}}
-  Int(truncatingBitPattern: Int(0))   // expected-error {{}} expected-note * {{}}
-
-  UInt(truncatingBitPattern: UInt8(0))  // expected-error {{}} expected-note * {{}}
-  UInt(truncatingBitPattern: UInt16(0))  // expected-error {{}} expected-note * {{}}
-  UInt(truncatingBitPattern: UInt32(0))  // expected-error {{}} expected-note * {{}}
-  _ = UInt(truncatingBitPattern: UInt64(0))
-
-  Int(truncatingBitPattern: UInt8(0))  // expected-error {{}} expected-note * {{}}
-  Int(truncatingBitPattern: UInt16(0)) // expected-error {{}} expected-note * {{}}
-  Int(truncatingBitPattern: UInt32(0)) // expected-error {{}} expected-note * {{}}
-  _ = Int(truncatingBitPattern: UInt64(0))
-
-  UInt(truncatingBitPattern: Int8(0))  // expected-error {{}} expected-note * {{}}
-  UInt(truncatingBitPattern: Int16(0)) // expected-error {{}} expected-note * {{}}
-  UInt(truncatingBitPattern: Int32(0)) // expected-error {{}} expected-note * {{}}
-  _ = UInt(truncatingBitPattern: Int64(0))
-
-  Int(truncatingBitPattern: Int8(0))  // expected-error {{}} expected-note * {{}}
-  Int(truncatingBitPattern: Int16(0)) // expected-error {{}} expected-note * {{}}
-  Int(truncatingBitPattern: Int32(0)) // expected-error {{}} expected-note * {{}}
-  _ = Int(truncatingBitPattern: Int64(0))
-}
-
 func testMixedSignArithmetic() {
   // Ensure that the generic arithmetic operators for Strideable don't
   // allow mixed-sign arithmetic to compile.  We create a deliberate
@@ -89,28 +34,27 @@ func testMixedSignArithmetic() {
     typealias Stride = ${T}.Stride
     _ = ${T}(1) + 0     // OK
     _ = 0 + ${T}(1)     // OK
-    _ = ${T}(1) + Stride(0) // expected-warning {{}} // mixed-type arithmetics
-    _ = Stride(1) + ${T}(0) // expected-warning {{}} // mixed-type arithmetics
-    _ = ${T}(1) - Stride(0) // expected-warning {{}} // mixed-type arithmetics
+    _ = ${T}(1) + Stride(0) // expected-error {{}} expected-note {{}}
+    _ = Stride(1) + ${T}(0) // expected-error {{}} expected-note {{}}
+    _ = ${T}(1) - Stride(0) // expected-error {{}} expected-note {{}}
     var x: ${T} = 0
     x += 1              // OK
-    x += Stride(1)      // expected-warning {{}} // mixed-type arithmetics
-    x -= Stride(1)      // expected-warning {{}} // mixed-type arithmetics
+    x += Stride(1) // expected-error {{cannot convert value of type 'Stride' (aka 'Int') to expected argument type '${T}'}} {{10-10=${T}(}} {{19-19=)}}
+    x -= Stride(1) // expected-error {{cannot convert value of type 'Stride' (aka 'Int') to expected argument type '${T}'}} {{10-10=${T}(}} {{19-19=)}}
 
-    _ = (x - x) as Stride   // expected-warning {{}} // ambiguous use of operator '-'
+    _ = (x - x) as Stride // expected-error {{}}
 
     //===------------------------------------------------------------------===//
     // The following errors are different because they're not being
     // disabled by the ambiguity trick.
     //===------------------------------------------------------------------===//
 
-    (x + x) as Stride   // expected-error {{cannot convert value of type '${T}' to type 'Stride' (aka 'Int') in coercion}}
+    (x + x) as Stride   // expected-error {{}}
     Stride(1) - ${T}(0) // expected-error {{}} expected-note {{}}
 
-    // These tests are expected to start failing when we get improved diagnostics.
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{}} expected-note {{}}
-    y -= ${T}(1)        // expected-error {{}} expected-note {{}}
+    y += ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Int'}} {{10-10=Int(}}
+    y -= ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Int'}} {{10-10=Int(}}
   }
 % end
 }

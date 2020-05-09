@@ -11,6 +11,7 @@
 
 import os
 import os.path
+import platform
 import shutil
 import sys
 import tempfile
@@ -61,7 +62,8 @@ class ShellTestCase(unittest.TestCase):
         self.assertEqual(self.stdout.getvalue(), "")
         self.assertEqual(self.stderr.getvalue(), '''\
 + cp {foo_file} {bar_file}
-'''.format(foo_file=foo_file, bar_file=bar_file))
+'''.format(foo_file=self._platform_quote(foo_file),
+           bar_file=self._platform_quote(bar_file)))
 
     def test_capture(self):
         self.assertEqual(shell.capture(["echo", "hi"]), "hi\n")
@@ -97,7 +99,7 @@ class ShellTestCase(unittest.TestCase):
         self.assertEqual(self.stderr.getvalue(), '''\
 + mkdir -p {path}
 + rm -rf {path}
-'''.format(path=path))
+'''.format(path=self._platform_quote(path)))
 
     def test_pushd(self):
         shell.dry_run = False
@@ -138,7 +140,7 @@ class ShellTestCase(unittest.TestCase):
 + pushd {tmpdir}
 + rm -rf foo
 + popd
-'''.format(tmpdir=self.tmpdir))
+'''.format(tmpdir=self._platform_quote(self.tmpdir)))
 
     def test_dry_run(self):
         shell.dry_run = True
@@ -167,6 +169,13 @@ class ShellTestCase(unittest.TestCase):
 + touch testfile
 + popd
 + rm -rf {tmpdir}
-'''.format(foobar_dir=foobar_dir, tmpdir=self.tmpdir))
+'''.format(foobar_dir=self._platform_quote(foobar_dir),
+           tmpdir=self._platform_quote(self.tmpdir)))
         self.assertEqual(self.stderr.getvalue(), "")
         self.dry_run = False
+
+    def _platform_quote(self, path):
+        if platform.system() == 'Windows':
+            return "'{}'".format(path)
+        else:
+            return path

@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol P {
-  func foo(_ i: Int, x: Float) // expected-note 4{{requirement 'foo(_:x:)' declared here}}
+  func foo(_ i: Int, x: Float) // expected-note 5 {{requirement 'foo(_:x:)' declared here}}
 }
 
 struct S1 : P {
@@ -9,20 +9,25 @@ struct S1 : P {
 }
 
 struct S2 : P {
-  func foo(_ i: Int, _ x: Float) { } // expected-error{{method 'foo' has different argument names from those required by protocol 'P' ('foo(_:x:)')}}{{22-24=}}
+  func foo(_ i: Int, _ x: Float) { } // expected-error{{method 'foo' has different argument labels from those required by protocol 'P' ('foo(_:x:)')}}{{22-24=}}
 }
 
 struct S3 : P {
-  func foo(_ i: Int, y: Float) { } // expected-error{{method 'foo(_:y:)' has different argument names from those required by protocol 'P' ('foo(_:x:)')}}{{22-22=x }}
+  func foo(_ i: Int, y: Float) { } // expected-error{{method 'foo(_:y:)' has different argument labels from those required by protocol 'P' ('foo(_:x:)')}}{{22-22=x }}
 }
 
 struct S4 : P {
-  func foo(_ i: Int, _: Float) { } // expected-error{{method 'foo' has different argument names from those required by protocol 'P' ('foo(_:x:)')}}{{22-22=x }}
+  func foo(_ i: Int, _: Float) { } // expected-error{{method 'foo' has different argument labels from those required by protocol 'P' ('foo(_:x:)')}}{{22-22=x }}
 }
 
 struct S5 : P {
-  func foo(_ i: Int, z x: Float) { } // expected-error{{method 'foo(_:z:)' has different argument names from those required by protocol 'P' ('foo(_:x:)')}}{{22-24=}}
+  func foo(_ i: Int, z x: Float) { } // expected-error{{method 'foo(_:z:)' has different argument labels from those required by protocol 'P' ('foo(_:x:)')}}{{22-24=}}
 }
+
+struct S5a {
+  func foo(_ i: Int, z x: Float) { } // expected-note {{'foo(_:z:)' declared here}} {{none}}
+}
+extension S5a: P {} // expected-error{{method 'foo(_:z:)' has different argument labels from those required by protocol 'P' ('foo(_:x:)')}} {{none}}
 
 struct Loadable { }
 
@@ -36,10 +41,10 @@ struct UnlabeledWitness : LabeledRequirement {
 
 // rdar://problem/21333445
 protocol P2 {
-	init(_ : Int) // expected-note{{requirement 'init' declared here}}
+	init(_ : Int) // expected-note{{requirement 'init(_:)' declared here}}
 }
 
-struct XP2 : P2 { // expected-error{{initializer 'init(foo:)' has different argument names from those required by protocol 'P2' ('init')}}
+struct XP2 : P2 { // expected-error{{initializer 'init(foo:)' has different argument labels from those required by protocol 'P2' ('init(_:)')}}
   let foo: Int 
 }
 
@@ -49,7 +54,7 @@ protocol P3 {
 }
 
 class MislabeledSubscript : P3 {
-  subscript(val: String, label: String) -> Int { // expected-error{{method 'subscript' has different argument names from those required by protocol 'P3' ('subscript(_:label:)')}}
+  subscript(val: String, label: String) -> Int { // expected-error{{subscript 'subscript(_:_:)' has different argument labels from those required by protocol 'P3' ('subscript(_:label:)')}}
     return 1
   }
 }

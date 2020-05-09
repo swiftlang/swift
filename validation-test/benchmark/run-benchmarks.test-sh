@@ -1,0 +1,6 @@
+// RUN: %Benchmark_O --num-iters=1 --num-samples=1
+// REQUIRES: benchmark
+
+// Run all the benchmarks to make sure they don't crash, or uncover any stdlib
+// issues. This is most useful in +Asserts builds of the stdlib, which isn't a
+// useful configuration for actual benchmarking.

@@ -42,3 +42,13 @@ func bar(_ c: C) { print("Right") }
 foo(D())
 // CHECK: Right
 bar(D())
+
+protocol Number {}
+extension Int: Number {}
+
+func foo() -> (String, String, String, Number, Number) {
+    return ("1", "2", "3", 42, 7)
+}
+
+// CHECK: ("1", "2", "3", 42, 7)
+print(foo())

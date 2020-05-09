@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s 2>&1 | %FileCheck %s
 // -- Check that we can successfully round-trip.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -D IRGEN -emit-ir %s >/dev/null
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -D IRGEN -emit-ir -primary-file %s | %FileCheck -check-prefix=CHECK-IR %s
 
 // REQUIRES: objc_interop
 
@@ -227,3 +227,6 @@ let _: UnknownOptionsThanksToAPINotes = .first // expected-error {{has no member
 #endif
 let _ = UnknownEnumThanksToAPINotesFirst
 let _ = UnknownOptionsThanksToAPINotesFirst
+
+// CHECK-IR: $s4enum12testMangling2e12e22e3ySo9EnumByTagV_So0gH7TypedefaSo0gH4BothVtF
+func testMangling(e1: EnumByTag, e2: EnumByTypedef, e3: EnumByBoth) {}

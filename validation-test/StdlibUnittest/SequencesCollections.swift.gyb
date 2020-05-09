@@ -7,8 +7,8 @@
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
-    sliceTypeName,
-    protocolsForCollectionFeatures
+    protocolsForCollectionFeatures,
+    collectionTypeName
 )
 
 }%
@@ -22,8 +22,7 @@ import StdlibCollectionUnittest
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %  for mutable in [ False, True ]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%    SelfSlice = sliceTypeName(traversal=traversal, mutable=mutable, rangeReplaceable=False)
-%    Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%    Self = 'Minimal' + collectionTypeName(traversal=traversal, mutable=mutable, rangeReplaceable=False)
 
 var ${Self}TestSuite = TestSuite("${Self}")
 
@@ -116,8 +115,7 @@ ${Self}TestSuite.test("subscript(_:Index)/Set/DifferentCollections") {
 %end
 
 %for traversal in TRAVERSALS:
-%  SelfSlice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=True)
-%  Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%  Self = 'Minimal' + collectionTypeName(traversal=traversal, mutable=False, rangeReplaceable=True)
 
 func getTwoInterchangeable${Self}(_ elements: [Int])
   -> (${Self}<OpaqueValue<Int>>, ${Self}<OpaqueValue<Int>>) {

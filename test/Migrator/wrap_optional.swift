@@ -1,7 +1,7 @@
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.mod)
 // RUN: %target-swift-frontend -emit-module -o %t.mod/Cities.swiftmodule %S/Inputs/Cities.swift -module-name Cities -parse-as-library
-// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -disable-migrator-fixits -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/API.json -emit-migrated-file-path %t/wrap_optional.swift.result -o %t/wrap_optional.swift.remap -o /dev/null
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -disable-migrator-fixits -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/API.json -emit-migrated-file-path %t/wrap_optional.swift.result -o /dev/null
 // RUN: diff -u %S/wrap_optional.swift.expected %t/wrap_optional.swift.result
 
 import Cities
@@ -31,13 +31,13 @@ extension ExtraCities {
 }
 
 class MyExtraCities : ExtraCities {
-  func blibli(x: (String?, String) -> String!) {}
+  func blibli(x: (String?, String) -> String?) {}
   func currimundi(x: (Int, (Int, Int))!) {}
 }
 
 typealias IntAnd<T> = (Int, T)
 class Outer {
-  typealias Inner = (String?, String) -> String!
+  typealias Inner = (String?, String) -> String?
 }
 
 class MyExtraCitiesWithAliases : ExtraCities {
@@ -46,9 +46,9 @@ class MyExtraCitiesWithAliases : ExtraCities {
 }
 
 typealias OptString = String?
-typealias ImplicitlyUnwrapped<T> = T!
+typealias OptGeneric<T> = T?
 
 class MyExtraCitiesWithMoreAliases : ExtraCities {
-  func blibli(x: (OptString, String) -> String!) {}
-  func currimundi(x: ImplicitlyUnwrapped<(Int, (Int, Int))>) {}
+  func blibli(x: (OptString, String) -> String?) {}
+  func currimundi(x: OptGeneric<(Int, (Int, Int))>) {}
 }

@@ -1,0 +1,25 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
+
+// UNSUPPORTED: OS=windows-msvc
+
+sil_stage canonical
+
+// CHECK-DAG: define{{( protected)?}} swiftcc void @weakButDefined() {{#[0-9]+}} {
+sil public [weak_imported] @weakButDefined : $@convention(thin) () -> () {
+  %unit = tuple()
+  return %unit : $()
+}
+
+// CHECK-DAG: declare extern_weak swiftcc void @weakExternal()
+sil public_external [weak_imported] @weakExternal : $@convention(thin) () -> ()
+
+sil [weak_imported] @testWeak : $@convention(thin) () -> () {
+  %weakButDefined = function_ref @weakButDefined : $@convention(thin) () -> ()
+  %wbdResult      = apply %weakButDefined() : $@convention(thin) () -> ()
+  %weakExternal   = function_ref @weakExternal : $@convention(thin) () -> ()
+  %weResult       = apply %weakExternal() : $@convention(thin) () -> ()
+  %unit = tuple()
+  return %unit : $()
+}
+

@@ -13,8 +13,10 @@
 #ifndef SWIFT_SERIALIZATION_SILLOADER_H
 #define SWIFT_SERIALIZATION_SILLOADER_H
 
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
+#include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
 #include <memory>
@@ -31,75 +33,41 @@ class SILModule;
 class SILVTable;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
+class SILDifferentiabilityWitness;
 
 /// Maintains a list of SILDeserializer, one for each serialized modules
 /// in ASTContext. It provides lookupSILFunction that will perform lookup
 /// on each SILDeserializer.
 class SerializedSILLoader {
-public:
-  class Callback {
-  public:
-    /// Observe that we deserialized a function declaration.
-    virtual void didDeserialize(ModuleDecl *M, SILFunction *fn) {}
-
-    /// Observe that we successfully deserialized a function body.
-    virtual void didDeserializeFunctionBody(ModuleDecl *M, SILFunction *fn) {}
-
-    /// Observe that we successfully deserialized a witness table's entries.
-    virtual void didDeserializeWitnessTableEntries(ModuleDecl *M,
-                                                   SILWitnessTable *wt) {}
-
-    /// Observe that we successfully deserialized a default witness table's
-    /// entries.
-    virtual void didDeserializeDefaultWitnessTableEntries(ModuleDecl *M,
-                                                  SILDefaultWitnessTable *wt) {}
-
-    /// Observe that we deserialized a global variable declaration.
-    virtual void didDeserialize(ModuleDecl *M, SILGlobalVariable *var) {}
-
-    /// Observe that we deserialized a v-table declaration.
-    virtual void didDeserialize(ModuleDecl *M, SILVTable *vtable) {}
-
-    /// Observe that we deserialized a witness-table declaration.
-    virtual void didDeserialize(ModuleDecl *M, SILWitnessTable *wtable) {}
-
-    /// Observe that we deserialized a default witness-table declaration.
-    virtual void didDeserialize(ModuleDecl *M, SILDefaultWitnessTable *wtable) {}
-
-    virtual ~Callback() = default;
-  private:
-    virtual void _anchor();
-  };
-
 private:
-  std::vector<std::unique_ptr<SILDeserializer> > LoadedSILSections;
+  std::vector<std::unique_ptr<SILDeserializer>> LoadedSILSections;
 
-  explicit SerializedSILLoader(ASTContext &ctx, SILModule *SILMod,
-                               Callback *callback);
+  explicit SerializedSILLoader(
+      ASTContext &ctx, SILModule *SILMod,
+      DeserializationNotificationHandlerSet *callbacks);
 
 public:
   /// Create a new loader.
   ///
-  /// \param callback - not owned by the loader
-  static std::unique_ptr<SerializedSILLoader> create(ASTContext &ctx,
-                                                     SILModule *SILMod,
-                                                     Callback *callback) {
+  /// \param callbacks - not owned by the loader
+  static std::unique_ptr<SerializedSILLoader>
+  create(ASTContext &ctx, SILModule *SILMod,
+         DeserializationNotificationHandlerSet *callbacks) {
     return std::unique_ptr<SerializedSILLoader>(
-      new SerializedSILLoader(ctx, SILMod, callback));
+        new SerializedSILLoader(ctx, SILMod, callbacks));
   }
   ~SerializedSILLoader();
 
-  SILFunction *lookupSILFunction(SILFunction *Callee);
+  SILFunction *lookupSILFunction(SILFunction *Callee, bool onlyUpdateLinkage);
   SILFunction *
   lookupSILFunction(StringRef Name, bool declarationOnly = false,
                     Optional<SILLinkage> linkage = None);
   bool hasSILFunction(StringRef Name, Optional<SILLinkage> linkage = None);
-  SILVTable *lookupVTable(Identifier Name);
-  SILVTable *lookupVTable(const ClassDecl *C) {
-    return lookupVTable(C->getName());
-  }
+  SILVTable *lookupVTable(const ClassDecl *C);
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
   SILDefaultWitnessTable *lookupDefaultWitnessTable(SILDefaultWitnessTable *C);
+  SILDifferentiabilityWitness *
+  lookupDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
 
   /// Invalidate the cached entries for deserialized SILFunctions.
   void invalidateCaches();
@@ -131,6 +99,12 @@ public:
 
   /// Deserialize all DefaultWitnessTables in all SILModules.
   void getAllDefaultWitnessTables();
+
+  /// Deserialize all Properties in all SILModules.
+  void getAllProperties();
+
+  /// Deserialize all DifferentiabilityWitnesses in all SILModules.
+  void getAllDifferentiabilityWitnesses();
 
   SerializedSILLoader(const SerializedSILLoader &) = delete;
   SerializedSILLoader(SerializedSILLoader &&) = delete;

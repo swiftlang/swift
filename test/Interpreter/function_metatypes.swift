@@ -25,8 +25,8 @@ var i = 0
 
 // Dynamic casting
 var f = foo((Int, Int).self)
-var g = f as! (Int, Int) -> Int
-print(g(1010, 2020))
+var g = f as! ((Int, Int)) -> Int
+print(g((1010, 2020)))
 // CHECK: 6060
 
 // Struct with InOut

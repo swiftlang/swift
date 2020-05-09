@@ -1,0 +1,20 @@
+[
+  {
+    "key.name": "example",
+    "key.newname": "Example",
+    "key.is_function_like": 1,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 31,
+        "key.column": 21,
+        "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 33,
+        "key.column": 27,
+        "key.nametype": source.syntacticrename.unknown
+      }
+    ]
+  }
+]

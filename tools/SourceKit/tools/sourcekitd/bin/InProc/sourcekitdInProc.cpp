@@ -15,6 +15,7 @@
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/UIdent.h"
 
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 
@@ -79,19 +80,44 @@ UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
   return UIdent::getFromOpaqueValue(uid);
 }
 
-std::string sourcekitd::getRuntimeLibPath() {
-  // FIXME: Move to an LLVM API. Note that libclang does the same thing.
+static void getToolchainPrefixPath(llvm::SmallVectorImpl<char> &Path) {
 #if defined(_WIN32)
-#error Not implemented
+  MEMORY_BASIC_INFORMATION mbi;
+  char path[MAX_PATH + 1];
+  if (!VirtualQuery(static_cast<void *>(sourcekitd_initialize), &mbi,
+                    sizeof(mbi)))
+    llvm_unreachable("call to VirtualQuery failed");
+  if (!GetModuleFileNameA(static_cast<HINSTANCE>(mbi.AllocationBase), path,
+                          MAX_PATH))
+    llvm_unreachable("call to GetModuleFileNameA failed");
+  auto parent =
+      llvm::sys::path::parent_path(llvm::sys::path::parent_path(path));
+  Path.append(parent.begin(), parent.end());
 #else
   // This silly cast below avoids a C++ warning.
   Dl_info info;
   if (dladdr((void *)(uintptr_t)sourcekitd_initialize, &info) == 0)
     llvm_unreachable("Call to dladdr() failed");
 
-  // We now have the path to the shared lib, move to the parent 'lib' path.
-  return llvm::sys::path::parent_path(info.dli_fname);
+  // We now have the path to the shared lib, move to the parent prefix path.
+  auto parent = llvm::sys::path::parent_path(
+      llvm::sys::path::parent_path(info.dli_fname));
+  Path.append(parent.begin(), parent.end());
 #endif
+}
+
+std::string sourcekitd::getRuntimeLibPath() {
+  llvm::SmallString<128> libPath;
+  getToolchainPrefixPath(libPath);
+  llvm::sys::path::append(libPath, "lib");
+  return libPath.str().str();
+}
+
+std::string sourcekitd::getDiagnosticDocumentationPath() {
+  llvm::SmallString<128> docPath;
+  getToolchainPrefixPath(docPath);
+  llvm::sys::path::append(docPath, "share", "doc", "swift", "diagnostics");
+  return docPath.str().str();
 }
 
 void sourcekitd::set_interrupted_connection_handler(
@@ -154,15 +180,12 @@ sourcekitd_set_notification_handler(sourcekitd_response_receiver_t receiver) {
 }
 
 void sourcekitd::postNotification(sourcekitd_response_t Notification) {
-  sourcekitd_response_receiver_t receiver = Block_copy(NotificationReceiver);
-  if (!receiver) {
-    sourcekitd_response_dispose(Notification);
-    return;
-  }
-
   WorkQueue::dispatchOnMain([=]{
+    if (!NotificationReceiver) {
+      sourcekitd_response_dispose(Notification);
+      return;
+    }
     // The receiver accepts ownership of the notification object.
-    receiver(Notification);
-    Block_release(receiver);
+    NotificationReceiver(Notification);
   });
 }

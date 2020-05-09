@@ -55,7 +55,7 @@ final public class A0 {
 // DISABLECHECK-NOT: ref_element_addr
 // DISABLECHECK-NOT: struct_element_addr
 // DISABLECHECK-NOT: bb1
-// DISABLECHECK: function_ref @_T015let_propagation6actionyyF
+// DISABLECHECK: function_ref @$s15let_propagation6actionyyF
 // DISABLECHECK: apply
 // DISABLECHECK: apply
 // DISABLECHECK: apply
@@ -152,8 +152,8 @@ func sum3() -> Int32 {
 // Check that gx and gy are loaded only once and then reused.
 // DISABLECHECK-LABEL: sil {{.*}}testUseGlobalLet
 // DISABLECHECK: bb0
-// DISABLECHECK: global_addr @_T015let_propagation2gys5Int32Vv
-// DISABLECHECK: global_addr @_T015let_propagation2gxs5Int32Vv
+// DISABLECHECK: global_addr @$s15let_propagation2gys5Int32Vv
+// DISABLECHECK: global_addr @$s15let_propagation2gxs5Int32Vv
 // DISABLECHECK: struct_element_addr
 // DISABLECHECK: load
 // DISABLECHECK: struct_element_addr
@@ -173,6 +173,13 @@ public func testUseGlobalLet() -> Int32 {
 }
 */
 
+// FIXME: 'A1's let properties cannot be optimized in -primary-file
+// mode. However, this case could potentially be handled in WMO mode
+// by finding all enclosing types that reference 'A1'. If they are all
+// either internal or resilient and no pointers to these types escape,
+// then it may be possible to prove that code outside this module
+// never overwrites a value of type 'A1'. This will be easier to do
+// when access markers are guaranteed complete in the -O pipeline.
 struct A1 {
   private let x: Int32
   
@@ -189,26 +196,26 @@ struct A1 {
     }
   }
 
-  // CHECK-LABEL: sil hidden @_T015let_propagation2A1V2f1{{[_0-9a-zA-Z]*}}F
-  // CHECK: bb0
-  // CHECK: struct_extract {{.*}}#A1.x
-  // CHECK: struct_extract {{.*}}#Int32._value
-  // CHECK-NOT: load
-  // CHECK-NOT: struct_extract
-  // CHECK-NOT: struct_element_addr
-  // CHECK-NOT: ref_element_addr
-  // CHECK-NOT: bb1
+  // CHECK-LABEL: sil hidden @$s15let_propagation2A1V2f1{{[_0-9a-zA-Z]*}}F
+  // FIX_CHECK: bb0
+  // FIX_CHECK: struct_extract {{.*}}#A1.x
+  // FIX_CHECK: struct_extract {{.*}}#Int32._value
+  // FIX_CHECK-NOT: load
+  // FIX_CHECK-NOT: struct_extract
+  // FIX_CHECK-NOT: struct_element_addr
+  // FIX_CHECK-NOT: ref_element_addr
+  // FIX_CHECK-NOT: bb1
   // CHECK: return
   func f1() -> Int32 {
     // x should be loaded only once.
     return x + x
   }
 
-  // CHECK-LABEL: sil hidden @_T015let_propagation2A1V2f2{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s15let_propagation2A1V2f2{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0
-  // CHECK: integer_literal $Builtin.Int32, 200
-  // CHECK-NEXT: struct $Int32
-  // CHECK-NEXT: return
+  // FIX_CHECK: integer_literal $Builtin.Int32, 200
+  // FIX_CHECK-NEXT: struct $Int32
+  // FIX_CHECK-NEXT: return
   func f2() -> Int32 {
     // load y only once.
     return y + y
@@ -219,7 +226,7 @@ struct A1 {
 
 class A2 {
   let x: B2 = B2()
-  // CHECK-LABEL: sil hidden @_T015let_propagation2A2C2af{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s15let_propagation2A2C2af{{[_0-9a-zA-Z]*}}F
   // bb0
   // CHECK: %[[X:[0-9]+]] = ref_element_addr {{.*}}A2.x
   // CHECK-NEXT: load %[[X]]
@@ -311,12 +318,13 @@ public func testLetTuple(s: S3) -> Int32 {
 
 // Check that s.x.0 is reloaded every time.
 // CHECK-LABEL: sil {{.*}}testVarTuple
-// CHECK: tuple_element_addr
-// CHECK: %[[X:[0-9]+]] = struct_element_addr
-// CHECK: load %[[X]]
-// CHECK: load %[[X]]
-// CHECK: load %[[X]]
-// CHECK: load %[[X]]
+// CHECK: [[X0:%[0-9]+]] = load
+// CHECK: [[X1:%[0-9]+]] = load
+// CHECK: builtin "sadd_with_overflow{{.*}}"([[X0]] {{.*}}, [[X1]]
+// CHECK: [[X2:%[0-9]+]] = load
+// CHECK: builtin "sadd_with_overflow{{.*}} [[X2]]
+// CHECK: [[X3:%[0-9]+]] = load
+// CHECK: builtin "sadd_with_overflow{{.*}} [[X3]]
 // CHECK: return
 public func testVarTuple(s: S3) -> Int32 {
   var counter: Int32 = 0

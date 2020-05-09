@@ -11,10 +11,10 @@ class AClass : AProtocol {
    init() { x = 0xDEADBEEF }
    func print() { markUsed("x = \(x)")}
 }
-// CHECK: define hidden {{.*}}void @_T017ProtocolContainer3foo{{[_0-9a-zA-Z]*}}F
+// CHECK: define hidden {{.*}}void @"$s17ProtocolContainer3foo{{[_0-9a-zA-Z]*}}F"
 // CHECK-NEXT: entry:
 // CHECK:      %[[X:.*]] = alloca %T17ProtocolContainer9AProtocolP, align {{(4|8)}}
-// CHECK:      call void @llvm.dbg.declare(metadata %T17ProtocolContainer9AProtocolP* %[[X]], metadata ![[XMD:.*]], metadata !{{[0-9]+}})
+// CHECK:      call void @llvm.dbg.declare(metadata %T17ProtocolContainer9AProtocolP* %[[X]], metadata ![[XMD:.*]], metadata !DIExpression())
 // CHECK-NOT: !DILocalVariable({{.*}} name: "x"
 // CHECK-NOT: !DILocalVariable({{.*}} name: "x"
 func foo (_ x : AProtocol) {

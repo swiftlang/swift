@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let RangeAssignment = BenchmarkInfo(
+  name: "RangeAssignment",
+  runFunction: run_RangeAssignment,
+  tags: [.validation, .api])
+
 @inline(never)
 public func run_RangeAssignment(_ scale: Int) {
   let range: Range = 100..<200

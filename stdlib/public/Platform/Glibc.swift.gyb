@@ -12,8 +12,7 @@
 
 @_exported import SwiftGlibc // Clang module
 
-public let MAP_FAILED =
-  UnsafeMutableRawPointer(bitPattern: -1)! as UnsafeMutableRawPointer!
+public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 
 //  Constants defined by <math.h>
 @available(swift, deprecated: 3.0, message: "Please use 'Double.pi' or '.pi' to get the value of correct type and avoid casting.")
@@ -37,7 +36,7 @@ public let FLT_RADIX = Double.radix
 
 %for type, prefix in [('Float', 'FLT'), ('Double', 'DBL'), ('Float80', 'LDBL')]:
 % if type == "Float80":
-#if arch(i386) || arch(x86_64)
+#if !os(Android) && (arch(i386) || arch(x86_64))
 % end
 //  Where does the 1 come from? C counts the usually-implicit leading
 //  significand bit, but Swift does not. Neither is really right or wrong.

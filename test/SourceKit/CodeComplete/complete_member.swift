@@ -32,7 +32,7 @@ class Base {
 }
 
 class Derived: Base {
-    func foo() {}
+    override func foo() {}
 }
 
 func testOverrideUSR() {
@@ -40,7 +40,7 @@ func testOverrideUSR() {
 }
 
 // RUN: %sourcekitd-test -req=complete -pos=15:5 %s -- %s > %t.response
-// RUN: diff -u %s.response %t.response
+// RUN: %diff -u %s.response %t.response
 //
 // RUN: %sourcekitd-test -req=complete -pos=19:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-OPTIONAL
 // RUN: %sourcekitd-test -req=complete.open -pos=19:5 %s -- %s | %FileCheck %s -check-prefix=CHECK-OPTIONAL-OPEN
@@ -51,8 +51,9 @@ func testOverrideUSR() {
 // CHECK-OPTIONAL-NEXT:       key.description: "fooInstanceFunc1(a: Int)",
 // CHECK-OPTIONAL-NEXT:       key.typename: "Double",
 // CHECK-OPTIONAL-NEXT:       key.context: source.codecompletion.context.thisclass,
+// CHECK-OPTIONAL-NEXT:       key.typerelation: source.codecompletion.typerelation.unrelated,
 // CHECK-OPTIONAL-NEXT:       key.num_bytes_to_erase: 1,
-// CHECK-OPTIONAL-NEXT:       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1SdSiF",
+// CHECK-OPTIONAL-NEXT:       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1ySdSiF",
 // CHECK-OPTIONAL-NEXT:       key.modulename: "complete_member"
 // CHECK-OPTIONAL-NEXT:     },
 
@@ -72,6 +73,7 @@ func testOverrideUSR() {
 // CHECK-OVERRIDE_USR-NEXT:     key.description: "foo()",
 // CHECK-OVERRIDE_USR-NEXT:     key.typename: "Void",
 // CHECK-OVERRIDE_USR-NEXT:     key.context: source.codecompletion.context.thisclass,
+// CHECK-OVERRIDE_USR-NEXT:     key.typerelation: source.codecompletion.typerelation.unrelated,
 // CHECK-OVERRIDE_USR-NEXT:     key.num_bytes_to_erase: 0,
 // CHECK-OVERRIDE_USR-NEXT:     key.associated_usrs: "s:15complete_member7DerivedC3fooyyF s:15complete_member4BaseC3fooyyF",
 // CHECK-OVERRIDE_USR-NEXT:     key.modulename: "complete_member"

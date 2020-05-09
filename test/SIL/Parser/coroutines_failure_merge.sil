@@ -1,0 +1,21 @@
+// RUN: not --crash %target-swift-frontend %s -emit-silgen -verify
+// REQUIRES: asserts
+
+sil_stage raw
+
+import Swift
+
+sil [ossa] @yield : $@yield_many (Int, Float) -> (@yields Int, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
+  yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  unreachable
+}
+

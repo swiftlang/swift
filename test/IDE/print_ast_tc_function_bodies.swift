@@ -37,7 +37,7 @@ struct FooStruct {
       instanceVar = i + j
     }
   }
-// CHECK-NEXT: {{^}}  subscript(i: Int, j: Int) -> Double {{{$}}
+// CHECK: {{^}}  subscript(i: Int, j: Int) -> Double {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK-NEXT: {{^}}    }{{$}}
@@ -139,7 +139,7 @@ class InClassVar1 {
       if true {}
     }
   }
-// CHECK-NEXT: {{^}}  var instanceVar2: Int {{{$}}
+// CHECK: {{^}}  var instanceVar2: Int {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK-NEXT: {{^}}    }{{$}}
@@ -228,6 +228,28 @@ class InClassSubscript3 {
     }
   }
 // CHECK: {{^}}  subscript(i: Int) -> Int {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
+// CHECK-NEXT: {{^}}      return {{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK: {{^}}    set(foo) {{{$}}
+// CHECK-NEXT: {{^}}      if  {{{$}}
+// CHECK-NEXT: {{^}}      }{{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK-NEXT: {{^}}  }{{$}}
+// CHECK-NOT: subscript
+}
+
+class InClassSubscript4 {
+// CHECK-LABEL: InClassSubscript4
+  subscript<T>(i: T) -> T where T: Equatable {
+    get {
+      return i
+    }
+    set(foo) {
+      if true {}
+    }
+  }
+// CHECK: {{^}}  subscript<T>(i: T) -> T where T : Equatable {{{$}}
 // CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
 // CHECK-NEXT: {{^}}    }{{$}}

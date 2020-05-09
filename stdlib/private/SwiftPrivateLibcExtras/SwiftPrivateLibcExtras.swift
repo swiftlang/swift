@@ -11,18 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftPrivate
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
 import Glibc
 #elseif os(Windows)
-import ucrt
+import MSVCRT
 #endif
 
-#if !os(Windows)
 public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {
-#if os(Android)
-  preconditionFailure("mkstemps doesn't work on Android")
+#if os(Android) || os(Haiku) || os(Windows) || os(WASI)
+  preconditionFailure("mkstemps doesn't work on your platform")
 #else
   var utf8CStr = template.utf8CString
   let (fd, fileName) = utf8CStr.withUnsafeMutableBufferPointer {
@@ -35,8 +34,8 @@ public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CIn
   return fd
 #endif
 }
-#endif
 
+#if !os(Windows)
 public var _stdlib_FD_SETSIZE: CInt {
   return 1024
 }
@@ -85,7 +84,6 @@ public struct _stdlib_fd_set {
   }
 }
 
-#if !os(Windows)
 public func _stdlib_select(
   _ readfds: inout _stdlib_fd_set, _ writefds: inout _stdlib_fd_set,
   _ errorfds: inout _stdlib_fd_set, _ timeout: UnsafeMutablePointer<timeval>?
@@ -127,6 +125,8 @@ public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
   let ret = fds.withUnsafeMutableBufferPointer { unsafeFds -> CInt in
 #if os(Windows)
     return _pipe(unsafeFds.baseAddress, 0, 0)
+#elseif os(WASI)
+    preconditionFailure("No pipes available on WebAssembly/WASI")
 #else
     return pipe(unsafeFds.baseAddress)
 #endif
@@ -135,6 +135,7 @@ public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
 }
 
 
+#if !os(Windows)
 //
 // Functions missing in `Darwin` module.
 //
@@ -161,3 +162,5 @@ public func WEXITSTATUS(_ status: CInt) -> CInt {
 public func WTERMSIG(_ status: CInt) -> CInt {
   return _WSTATUS(status)
 }
+#endif
+

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -enable-spec-devirt -O -emit-sil  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib,CPU=x86_64
 
 // Test inline cache with a global class. Make sure the retain|release pair
@@ -19,7 +19,6 @@ public func testit() {
 // CHECK-LABEL: sil @{{.*}}testityyF
 // CHECK:     bb0:
 // CHECK-NOT:   {{.*(retain|release).*}}
-// CHECK:       checked_cast_br
 // CHECK:     bb1{{.*}}:
 // CHECK-NOT:   {{.*(retain|release).*}}
 // CHECK:       return

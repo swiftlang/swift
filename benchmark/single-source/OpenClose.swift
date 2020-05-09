@@ -11,10 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 import TestsUtils
-import Foundation
-
 
 // A micro benchmark for checking the speed of string-based enums.
+public let OpenClose = BenchmarkInfo(
+  name: "OpenClose",
+  runFunction: run_OpenClose,
+  tags: [.validation, .api, .String])
 
 enum MyState : String {
     case Closed = "Closed"
@@ -30,8 +32,7 @@ func check_state(_ state : MyState) -> Int {
 public func run_OpenClose(_ N: Int) {
   var c = 0
   for _ in 1...N*10000 {
-      c += check_state(MyState.Closed)
+      c += check_state(identity(MyState.Closed))
   }
   CheckResults(c == 0)
 }
-

@@ -28,3 +28,9 @@ protocol P3 {
 extension X : P3 { } // okay
 
 struct X2 : P3 { } // expected-error{{type 'X2' does not conform to protocol 'P3'}}
+
+protocol P4 {
+  associatedtype AssocType4 : AnyObject = Int // expected-note{{default type 'Int' for associated type 'AssocType4' (from protocol 'P4') does not conform to 'AnyObject'}}
+}
+
+struct X4 : P4 {} // expected-error{{type 'X4' does not conform to protocol 'P4'}}

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -assume-parsing-unqualified-ownership-sil %s -assume-single-threaded | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -assume-parsing-unqualified-ownership-sil %s -O -assume-single-threaded | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -assume-single-threaded | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -O -assume-single-threaded | %FileCheck %s
 
 // Check that all reference counting instructions are converted to [nonatomic]
 // if -assume-single-threaded is used.
@@ -46,6 +46,6 @@ bb0(%0 : $C):
 }
 
 sil_vtable C {
-  #C.deinit!deallocator: _TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
+  #C.deinit!deallocator: @_TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
 }
 

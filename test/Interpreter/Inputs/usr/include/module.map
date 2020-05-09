@@ -1,0 +1,4 @@
+module Newtype {
+  header "newtype.h"
+  export *
+}

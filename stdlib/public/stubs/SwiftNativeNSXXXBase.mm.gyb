@@ -24,9 +24,9 @@
 // To trick Swift into using its fast refcounting and allocation
 // directly (rather than going through objc_msgSend to arrive at the
 // implementations defined here), we define subclasses on the Swift
-// side but hide the inheritance relationship from the Swift compiler
-// and only establish it dynamically, in the '+ load' method of each
-// class defined here.
+// side but we establish the inheritance relationship with
+// the special @_swift_native_objc_runtime_base attribute rather
+// than directly subclassing the classes defined here.
 //
 //===----------------------------------------------------------------------===//
 
@@ -45,190 +45,64 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern "C" CFHashCode CFStringHashCString(const uint8_t *bytes, CFIndex len);
-
 using namespace swift;
 
-% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator', 'Data', 'IndexSet'):
-SWIFT_RUNTIME_STDLIB_INTERFACE
-@interface _SwiftNativeNS${Class}Base : NS${Class}
+// NOTE: older runtimes called these _SwiftNativeNSXXXBase. The two must
+// coexist, so these were renamed. The old names must not be used in the new
+// runtime.
+% for Class in ('Array', 'MutableArray', 'Dictionary', 'Set', 'String', 'Enumerator'):
+SWIFT_RUNTIME_STDLIB_API
+@interface __SwiftNativeNS${Class}Base : NSObject
 {
+ @private
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 }
 @end
 
 
-@implementation _SwiftNativeNS${Class}Base
+@implementation __SwiftNativeNS${Class}Base
 
-- (id)retain {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_retain(SELF);
-  return self;
-}
-- (oneway void)release {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_release(SELF);
-}
-- (id)autorelease {
-  return _objc_rootAutorelease(self);
+- (id)initWithCoder: (NSCoder *)coder {
+  return [super init];
 }
 
-- (BOOL)_tryRetain {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  return (bool)swift_tryRetain(SELF);
-}
-- (BOOL)_isDeallocating {
-  return swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)allowsWeakReference {
-  return !swift_isDeallocating(reinterpret_cast<HeapObject *>(self));
-}
-- (BOOL)retainWeakReference {
-  return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
++ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key {
+  return NO;
 }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
-- (void)dealloc {
-  swift_rootObjCDealloc(reinterpret_cast<HeapObject *>(self));
-}
+
+STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
+
 #pragma clang diagnostic pop
 
 @end
 % end
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
-swift_stdlib_NSObject_isEqual(NSObject *NS_RELEASES_ARGUMENT lhs,
-                              NSObject *NS_RELEASES_ARGUMENT rhs) {
-  bool Result = (lhs == rhs) || [lhs isEqual:rhs];
-  swift_unknownRelease(lhs);
-  swift_unknownRelease(rhs);
-  return Result;
+swift_stdlib_NSObject_isEqual(id lhs,
+                              id rhs) {
+  return (lhs == rhs) || [lhs isEqual:rhs];
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
-    NSString *NS_RELEASES_ARGUMENT lhs, NSString *NS_RELEASES_ARGUMENT rhs) {
-  // 'kCFCompareNonliteral' actually means "normalize to NFD".
-  int Result = CFStringCompare((__bridge CFStringRef)lhs,
-                               (__bridge CFStringRef)rhs, kCFCompareNonliteral);
-  swift_unknownRelease(lhs);
-  swift_unknownRelease(rhs);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t
-swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
-                                                             void *Rhs) {
-  NSString *lhs = (NSString *)Lhs;
-  NSString *rhs = (NSString *)Rhs;
-
-  // 'kCFCompareNonliteral' actually means "normalize to NFD".
-  int Result = CFStringCompare((__bridge CFStringRef)lhs,
-                               (__bridge CFStringRef)rhs, kCFCompareNonliteral);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t
-swift_stdlib_CFStringHashCString(const uint8_t *bytes, CFIndex len) {
-  CFHashCode Result = CFStringHashCString(bytes, len);
-
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t
-swift_stdlib_NSStringHashValue(NSString *NS_RELEASES_ARGUMENT str,
-                               bool isASCII) {
-  size_t Result =
-      isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
-
-  swift_unknownRelease(str);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t
-swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
-  NSString *str = (NSString *)opaque;
-  return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
-}
-
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
-                                       NSString *prefix) {
-  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
-  int Result = CFStringFindWithOptions(
-      (__bridge CFStringRef)theString, (__bridge CFStringRef)prefix,
-      CFRangeMake(0, Length), kCFCompareAnchored | kCFCompareNonliteral,
-      nullptr);
-  swift_unknownRelease(theString);
-  swift_unknownRelease(prefix);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-bool swift_stdlib_NSStringHasPrefixNFDPointer(void *theString,
-                                              void *prefix) {
-  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
-  int Result = CFStringFindWithOptions(
-      (__bridge CFStringRef)theString, (__bridge CFStringRef)prefix,
-      CFRangeMake(0, Length), kCFCompareAnchored | kCFCompareNonliteral,
-      nullptr);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
-swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
-                                  NSString *NS_RELEASES_ARGUMENT suffix) {
-  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
-  int Result = CFStringFindWithOptions(
-      (__bridge CFStringRef)theString, (__bridge CFStringRef)suffix,
-      CFRangeMake(0, Length),
-      kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
-  swift_unknownRelease(theString);
-  swift_unknownRelease(suffix);
-  return Result;
+swift_stdlib_connectNSBaseClasses() {
+% for Class in ('Array', 'MutableArray', 'Dictionary', 'Set', 'String', 'Enumerator'):
+  Class NS${Class}Super = objc_lookUpClass("NS${Class}");
+  if (!NS${Class}Super) return false;
+  Class NS${Class}OurClass = objc_lookUpClass("__SwiftNativeNS${Class}Base");
+  if (!NS${Class}OurClass) return false;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  class_setSuperclass(NS${Class}OurClass, NS${Class}Super);
+#pragma clang diagnostic pop
+% end
+  return true;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-bool swift_stdlib_NSStringHasSuffixNFDPointer(void *theString,
-                                              void *suffix) {
-  auto Length = CFStringGetLength((__bridge CFStringRef)theString);
-  int Result = CFStringFindWithOptions(
-      (__bridge CFStringRef)theString, (__bridge CFStringRef)suffix,
-      CFRangeMake(0, Length),
-      kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
-  NSString *Result = objc_retain(str.lowercaseString);
-  swift_unknownRelease(str);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
-  NSString *Result = objc_retain(str.uppercaseString);
-  swift_unknownRelease(str);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift_stdlib_CFSetGetValues(NSSet *NS_RELEASES_ARGUMENT set,
-                                            const void **values) {
-  CFSetGetValues((__bridge CFSetRef)set, values);
-  swift_unknownRelease(set);
-}
 #endif
 
 // ${'Local Variables'}:

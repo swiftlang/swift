@@ -1,0 +1,131 @@
+#!/usr/bin/env python
+# split-cmdline - Split swift compiler command lines ------------*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ----------------------------------------------------------------------------
+#
+# Split swift compiler command lines into multiple lines.
+#
+# Reads the command line from stdin an outputs the split line to stdout.
+# Example:
+#
+# $ swiftc -c hello.swift -### | split-cmdline
+# /path-to-swift/bin/swift \
+#   -frontend \
+#   -c \
+#   -primary-file hello.swift \
+#   -target x86_64-apple-macosx10.9 \
+#   -enable-objc-interop \
+#   -color-diagnostics \
+#   -module-name hello \
+#   -o hello.o
+#
+# Example usage in vim:
+# *) make sure that split-cmdline is in the $PATH
+# *) copy-paste the swift command line the text buffer
+# *) select the command line
+# *) go to the command prompt (= press ':')
+# :'<,'>!split-cmdline
+#
+# ----------------------------------------------------------------------------
+
+from __future__ import print_function
+
+import os
+import re
+import shlex
+import sys
+
+
+def main():
+    for line in sys.stdin:
+        first = True
+        is_arg_param = False
+        # Handle escaped spaces
+        args = shlex.split(line)
+        for arg in args:
+            if arg == "":
+                continue
+            if not first:
+                # Print option arguments in the same line
+                print(" " if is_arg_param else " \\\n  ", end="")
+            first = False
+
+            # Expand @ option files
+            m = re.match(r"^@(\S+\.txt)$", arg)
+            if m:
+                cmd_file = m.group(1)
+                if os.path.isfile(cmd_file):
+                    with open(cmd_file) as f:
+                        for ln in f.readlines():
+                            for name in ln.rstrip().split(";"):
+                                if name != "":
+                                    print(name + " \\")
+                first = True
+                continue
+
+            if " " in arg:
+                print('"' + arg + '"', end="")
+            else:
+                print(arg, end="")
+
+            # A hard-coded list of options which expect a parameter
+            is_arg_param = arg in [
+                "-o",
+                "-target",
+                "-isysroot",
+                "-emit-sil",
+                "-emit-ir",
+                "-module-name",
+                "-framework",
+                "-Xlinker",
+                "-arch",
+                "-D",
+                "-sdk",
+                "-module-cache-path",
+                "-F",
+                "-output-file-map",
+                "-emit-module-path",
+                "-Xcc",
+                "-I",
+                "-iquote",
+                "-emit-objc-header-path",
+                "-Xfrontend",
+                "-filelist",
+                "-num-threads",
+                "-Xclang",
+                "-x",
+                "-L",
+                "-rpath",
+                "-macosx_version_min",
+                "-syslibroot",
+                "-add_ast_path",
+                "-import-objc-header",
+                "-serialize-diagnostics-path",
+                "-emit-dependencies-path",
+                "-emit-reference-dependencies-path",
+                "-primary-file",
+                "-resource-dir",
+                "--sdk",
+                "--toolchain",
+                "-emit-module-doc-path",
+                "-module-link-name",
+                "-group-info-path",
+                "-fileno",
+                "-swift-version",
+                "-Xllvm",
+            ]
+
+        # Print 2 new lines after each command line
+        print("\n")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
-@_fixed_layout
+@frozen
 public struct UnicodeScalar {
   var _value: UInt32
   public var value: UInt32 { return _value }
@@ -31,27 +31,28 @@ public func mangle(s: [UnicodeScalar]) -> [UnicodeScalar] {
 
 // The patterns in the first case statement each define an anonymous variable,
 // which shares the storage with the expression in the switch statement. Make
-// sure we only emit live range extensions for the storage once per basic block.
+// sure we emit a dbg.value once per basic block.
 
-// CHECK: define {{.*}}@_T011patternvars6mangleSayAA13UnicodeScalarVGAE1s_tFA2DcfU_
-// CHECK: call void asm sideeffect "", "r"
-// CHECK-NOT: call void asm sideeffect "", "r"
-// CHECK: br {{.*}}label
-// CHECK: call void asm sideeffect "", "r"
-// CHECK-NOT: call void asm sideeffect "", "r"
-// CHECK: br {{.*}}label
-// CHECK: call void asm sideeffect "", "r"
-// CHECK-NOT: call void asm sideeffect "", "r"
-// CHECK: br {{.*}}label
-// CHECK: call void asm sideeffect "", "r"
-// CHECK-NOT: call void asm sideeffect "", "r"
-// CHECK: br {{.*}}label
-// CHECK: call void asm sideeffect "", "r"
-// CHECK-NOT: call void asm sideeffect "", "r"
-// CHECK: br {{.*}}label
-// CHECK: call void asm sideeffect "", "r"
-// CHECK-NOT: call void asm sideeffect "", "r"
-// CHECK: br {{.*}}label
-// CHECK: call void asm sideeffect "", "r"
-// CHECK-NOT: call void asm sideeffect "", "r"
-// CHECK: br {{.*}}label
+// CHECK: define {{.*}}@"$s11patternvars6mangle1sSayAA13UnicodeScalarVGAF_tFA2EXEfU_"
+// CHECK: %[[VAL:[0-9]+]] = call swiftcc i32 @"$s11patternvars13UnicodeScalarV5values6UInt32Vvg"(i32 %0)
+// CHECK-NEXT:  call void @llvm.dbg.value(metadata i32 %[[VAL]]
+// CHECK:       {{[0-9]+}}:
+// CHECK:       call void @llvm.dbg.value(metadata i32 %[[VAL]]
+// CHECK-NOT:   call void @llvm.dbg.value
+// CHECK-NOT:   call void asm sideeffect "", "r"
+
+// CHECK:       {{[0-9]+}}:
+// CHECK:       call void @llvm.dbg.value(metadata i32 %[[VAL]]
+// CHECK-NOT:   call void @llvm.dbg.value
+// CHECK-NOT:   call void asm sideeffect "", "r"
+
+// CHECK:       {{[0-9]+}}:
+// CHECK:       call void @llvm.dbg.value(metadata i32 %[[VAL]]
+// CHECK-NOT:   call void @llvm.dbg.value
+// CHECK-NOT:   call void asm sideeffect "", "r"
+
+// CHECK:       {{[0-9]+}}:
+// CHECK:       call void @llvm.dbg.value(metadata i32 %[[VAL]]
+// CHECK-NOT:   call void @llvm.dbg.value
+// CHECK-NOT:   call void asm sideeffect "", "r"
+

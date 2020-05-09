@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,16 +17,13 @@
 
 namespace swift {
 
+//===----------------------------------------------------------------------===//
+//                         SSA Use-Def Helpers
+//===----------------------------------------------------------------------===//
+
 /// Strip off casts/indexing insts/address projections from V until there is
 /// nothing left to strip.
 SILValue getUnderlyingObject(SILValue V);
-
-/// Strip off indexing and address projections.
-///
-/// This is similar to getUnderlyingObject, except that it does not strip any
-/// object-to-address projections, like ref_element_addr. In other words, the
-/// result is always an address value.
-SILValue getUnderlyingAddressRoot(SILValue V);
 
 SILValue getUnderlyingObjectStopAtMarkDependence(SILValue V);
 
@@ -40,6 +37,10 @@ SILValue stripCasts(SILValue V);
 /// mark_dependence) from the current SILValue.
 SILValue stripCastsWithoutMarkDependence(SILValue V);
 
+/// Return the underlying SILValue after stripping off all copy_value and
+/// begin_borrow instructions.
+SILValue stripOwnershipInsts(SILValue v);
+
 /// Return the underlying SILValue after stripping off all upcasts from the
 /// current SILValue.
 SILValue stripUpCasts(SILValue V);
@@ -51,10 +52,6 @@ SILValue stripClassCasts(SILValue V);
 /// Return the underlying SILValue after stripping off all address projection
 /// instructions.
 SILValue stripAddressProjections(SILValue V);
-
-/// Return the underlying SILValue after stripping off all address projection
-/// instructions which have a single operand.
-SILValue stripUnaryAddressProjections(SILValue V);
 
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.
@@ -73,47 +70,108 @@ SILValue stripIndexingInsts(SILValue V);
 /// intrinsic call.
 SILValue stripExpectIntrinsic(SILValue V);
 
-/// A utility class for evaluating whether a newly parsed or deserialized
-/// function has qualified or unqualified ownership.
+/// If V is a begin_borrow, strip off the begin_borrow and return. Otherwise,
+/// ust return V.
+SILValue stripBorrow(SILValue V);
+
+//===----------------------------------------------------------------------===//
+//                         Instruction Properties
+//===----------------------------------------------------------------------===//
+
+/// Return a non-null SingleValueInstruction if the given instruction merely
+/// copies the value of its first operand, possibly changing its type or
+/// ownership state, but otherwise having no effect.
 ///
-/// The reason that we are using this is that we would like to avoid needing to
-/// add code to the SILParser or to the Serializer to support this temporary
-/// staging concept of a function having qualified or unqualified
-/// ownership. Once SemanticARC is complete, SILFunctions will always have
-/// qualified ownership, so the notion of an unqualified ownership function will
-/// no longer exist.
+/// The returned instruction may have additional "incidental" operands;
+/// mark_dependence for example.
 ///
-/// Thus we note that there are three sets of instructions in SIL from an
-/// ownership perspective:
+/// This is useful for checking all users of a value to verify that the value is
+/// only used in recognizable patterns without otherwise "escaping". These are
+/// instructions that the use-visitor can recurse into. Note that the value's
+/// type may be changed by a cast.
+SingleValueInstruction *getSingleValueCopyOrCast(SILInstruction *I);
+
+/// Return true if this instruction terminates a SIL-level scope. Scope end
+/// instructions do not produce a result.
+bool isEndOfScopeMarker(SILInstruction *user);
+
+/// Return true if the given instruction has no effect on it's operand values
+/// and produces no result. These are typically end-of scope markers.
 ///
-///    a. ownership qualified instructions
-///    b. ownership unqualified instructions
-///    c. instructions that do not have ownership semantics (think literals,
-///       geps, etc).
+/// This is useful for checking all users of a value to verify that the value is
+/// only used in recognizable patterns without otherwise "escaping".
+bool isIncidentalUse(SILInstruction *user);
+
+/// Return true if the given `user` instruction modifies the value's refcount
+/// without propagating the value or having any other effect aside from
+/// potentially destroying the value itself (and executing associated cleanups).
 ///
-/// The set of functions can be split into ownership qualified and ownership
-/// unqualified using the rules that:
+/// This is useful for checking all users of a value to verify that the value is
+/// only used in recognizable patterns without otherwise "escaping".
+bool onlyAffectsRefCount(SILInstruction *user);
+
+/// Returns true if the given user instruction checks the ref count of a
+/// pointer.
+bool mayCheckRefCount(SILInstruction *User);
+
+/// Return true when the instruction represents added instrumentation for
+/// run-time sanitizers.
+bool isSanitizerInstrumentation(SILInstruction *Instruction);
+
+/// Check that this is a partial apply of a reabstraction thunk and return the
+/// argument of the partial apply if it is.
+SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
+
+/// Returns true if \p PAI is only used by an assign_by_wrapper instruction as
+/// init or set function.
+bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
+
+/// If V is a function closure, return the reaching set of partial_apply's.
+void findClosuresForFunctionValue(SILValue V,
+                                  TinyPtrVector<PartialApplyInst *> &results);
+
+/// Given a polymorphic builtin \p bi that may be generic and thus have in/out
+/// params, stash all of the information needed for either specializing while
+/// inlining or propagating the type in constant propagation.
 ///
-///    a. a function can never contain both ownership qualified and ownership
-///       unqualified instructions.
-///    b. a function that contains only instructions without ownership semantics
-///       is considered ownership qualified.
-///
-/// Thus we can know when parsing/serializing what category of function we have
-/// and set the bit appropriately.
-class FunctionOwnershipEvaluator {
-  NullablePtr<SILFunction> F;
-  bool HasOwnershipQualifiedInstruction = false;
+/// NOTE: If we perform this transformation, our builtin will no longer have any
+/// substitutions since we only substitute to concrete static overloads.
+struct PolymorphicBuiltinSpecializedOverloadInfo {
+  const BuiltinInfo *builtinInfo;
+  Identifier staticOverloadIdentifier;
+  SmallVector<SILType, 8> argTypes;
+  SILType resultType;
+  bool hasOutParam;
+
+private:
+  bool isInitialized;
 
 public:
-  FunctionOwnershipEvaluator() {}
-  FunctionOwnershipEvaluator(SILFunction *F) : F(F) {}
-  void reset(SILFunction *NewF) {
-    F = NewF;
-    HasOwnershipQualifiedInstruction = false;
+  PolymorphicBuiltinSpecializedOverloadInfo()
+      : builtinInfo(nullptr), staticOverloadIdentifier(), argTypes(),
+        resultType(), hasOutParam(false), isInitialized(false) {}
+
+  /// Returns true if we were able to map the polymorphic builtin to a static
+  /// overload. False otherwise.
+  ///
+  /// NOTE: This does not mean that the static overload actually exists.
+  bool init(BuiltinInst *bi);
+
+  bool doesOverloadExist() const {
+    CanBuiltinType builtinType = argTypes.front().getAs<BuiltinType>();
+    return canBuiltinBeOverloadedForType(builtinInfo->ID, builtinType);
   }
-  bool evaluate(SILInstruction *I);
+
+private:
+  bool init(SILFunction *fn, BuiltinValueKind builtinKind,
+            ArrayRef<SILType> oldOperandTypes, SILType oldResultType);
 };
+
+/// Given a polymorphic builtin \p bi, analyze its types and create a builtin
+/// for the static overload that the builtin corresponds to. If \p bi is not a
+/// polymorphic builtin or does not have any available overload for these types,
+/// return SILValue().
+SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
 
 } // end namespace swift
 

@@ -19,12 +19,16 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Compiler.h"
 #include <functional>
 #include <string>
 
@@ -35,16 +39,15 @@ class ArchetypeType;
 class ClassDecl;
 class CanType;
 class EnumDecl;
-class GenericSignature;
-class LazyResolver;
+class GenericSignatureImpl;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
 class NormalProtocolConformance;
-enum OptionalTypeKind : unsigned;
 class ProtocolConformanceRef;
 class ProtocolDecl;
 class ProtocolType;
+class SILModule;
 class StructDecl;
 class SubstitutableType;
 class SubstitutionMap;
@@ -52,8 +55,9 @@ class TypeBase;
 class Type;
 class TypeWalker;
 struct ExistentialLayout;
-
-/// \brief Type substitution mapping from substitutable types to their
+enum class ResilienceExpansion : unsigned;
+  
+/// Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
@@ -63,6 +67,12 @@ typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 /// this substitutable type; otherwise, the replacement type.
 using TypeSubstitutionFn
   = llvm::function_ref<Type(SubstitutableType *dependentType)>;
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// replaces archetypes with their interface types.
+struct MapTypeOutOfContext {
+  Type operator()(SubstitutableType *type) const;
+};
 
 /// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c TypeSubstitutionMap.
@@ -81,19 +91,11 @@ struct QueryTypeSubstitutionMapOrIdentity {
   Type operator()(SubstitutableType *type) const;
 };
 
-/// A function object suitable for use as a \c TypeSubstitutionFn that
-/// queries an underlying \c SubstitutionMap.
-struct QuerySubstitutionMap {
-  const SubstitutionMap &subMap;
-
-  Type operator()(SubstitutableType *type) const;
-};
-
 /// Function used to resolve conformances.
 using GenericFunction = auto(CanType dependentType,
-  Type conformingReplacementType,
-  ProtocolType *conformedProtocol)
-  ->Optional<ProtocolConformanceRef>;
+                             Type conformingReplacementType,
+                             ProtocolDecl *conformedProtocol)
+                            -> ProtocolConformanceRef;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
@@ -103,25 +105,10 @@ class LookUpConformanceInModule {
 public:
   explicit LookUpConformanceInModule(ModuleDecl *M)
     : M(M) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
-};
 
-/// Functor class suitable for use as a \c LookupConformanceFn to look up a
-/// conformance in a \c SubstitutionMap.
-class LookUpConformanceInSubstitutionMap {
-  const SubstitutionMap &Subs;
-public:
-  explicit LookUpConformanceInSubstitutionMap(const SubstitutionMap &Subs)
-    : Subs(Subs) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -129,39 +116,41 @@ public:
 /// type is an opaque generic type.
 class MakeAbstractConformanceForGenericType {
 public:
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
 /// conformances from a generic signature.
 class LookUpConformanceInSignature {
-  const GenericSignature &Sig;
+  const GenericSignatureImpl *Sig;
 public:
-  LookUpConformanceInSignature(const GenericSignature &Sig)
-    : Sig(Sig) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+  LookUpConformanceInSignature(const GenericSignatureImpl *Sig)
+    : Sig(Sig) {
+      assert(Sig && "Cannot lookup conformance in null signature!");
+    }
+
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const;
 };
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
-  /// If a type cannot be produced because some member type is
-  /// missing, place an 'error' type into the position of the base.
-  UseErrorType = 0x01,
   /// Allow substitutions to recurse into SILFunctionTypes.
   /// Normally, SILType::subst() should be used for lowered
   /// types, however in special cases where the substitution
   /// is just changing between contextual and interface type
   /// representations, using Type::subst() is allowed.
-  AllowLoweredTypes = 0x02,
+  AllowLoweredTypes = 0x01,
   /// Map member types to their desugared witness type.
-  DesugarMemberTypes = 0x04,
+  DesugarMemberTypes = 0x02,
+  /// Substitute types involving opaque type archetypes.
+  SubstituteOpaqueArchetypes = 0x04,
+  /// Force substitution of opened archetypes. Normally -- without these flag --
+  /// opened archetype conformances are not substituted.
+  ForceSubstituteOpenedExistentials = 0x08,
 };
 
 /// Options for performing substitutions into a type.
@@ -307,8 +296,8 @@ public:
   /// \param options Options that affect the substitutions.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(const SubstitutionMap &substitutions,
-             SubstOptions options = None) const;
+  Type subst(SubstitutionMap substitutions,
+             SubstOptions options=None) const;
 
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
@@ -323,14 +312,14 @@ public:
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(TypeSubstitutionFn substitutions,
              LookupConformanceFn conformances,
-             SubstOptions options = None) const;
+             SubstOptions options=None) const;
 
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
+  
+  bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
-  bool isPrivateStdlibType(bool whitelistProtocols=true) const;
-
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
@@ -338,6 +327,20 @@ public:
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
+
+  friend llvm::hash_code hash_value(Type type) {
+    using llvm::hash_value;
+    return hash_value(type.getPointer());
+  }
+
+  /// Return the name of the type, adding parens in cases where
+  /// appending or prepending text to the result would cause that text
+  /// to be appended to only a portion of the returned type. For
+  /// example for a function type "Int -> Float", adding text after
+  /// the type would make it appear that it's appended to "Float" as
+  /// opposed to the entire type.
+  std::string
+  getStringAsComponent(const PrintOptions &PO = PrintOptions()) const;
 
   /// Computes the join between two types.
   ///
@@ -352,15 +355,19 @@ public:
   /// class D { }
   /// \endcode
   ///
-  /// The join of B and C is A, the join of A and B is A. However, there is no
-  /// join of D and A (or D and B, or D and C) because there is no common
-  /// superclass. One would have to jump to an existential (e.g., \c AnyObject)
-  /// to find a common type.
-  /// 
-  /// \returns the join of the two types, if there is a concrete type that can
-  /// express the join, or a null type if the only join would be a more-general
-  /// existential type (e.g., \c Any).
-  static Type join(Type type1, Type type2);
+  /// The join of B and C is A, the join of A and B is A.
+  ///
+  /// The Any type is considered the common supertype by default when no
+  /// closer common supertype exists.
+  ///
+  /// In unsupported cases where we cannot yet compute an accurate join,
+  /// we return None.
+  ///
+  /// \returns the join of the two types, if there is a concrete type
+  /// that can express the join, or Any if the only join would be a
+  /// more-general existential type, or None if we cannot yet compute a
+  /// correct join but one better than Any may exist.
+  static Optional<Type> join(Type first, Type second);
 
 private:
   // Direct comparison is disabled for types, because they may not be canonical.
@@ -368,18 +375,21 @@ private:
   void operator!=(Type T) const = delete;
 };
 
+/// Extract the source location from a given type.
+SourceLoc extractNearestSourceLoc(Type ty);
+
 /// CanType - This is a Type that is statically known to be canonical.  To get
 /// one of these, use Type->getCanonicalType().  Since all CanType's can be used
 /// as 'Type' (they just don't have sugar) we derive from Type.
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
-  static bool isReferenceTypeImpl(CanType type, bool functionsCount);
+  static bool isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
+                                  bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
-  static CanType getAnyOptionalObjectTypeImpl(CanType type,
-                                              OptionalTypeKind &kind);
+  static CanType getOptionalObjectTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -400,11 +410,35 @@ public:
       });
   }
 
+  bool findIf(llvm::function_ref<bool (CanType)> fn) const {
+    return Type::findIf([&fn](Type t) {
+      return fn(CanType(t));
+    });
+  }
+
   // Provide a few optimized accessors that are really type-class queries.
 
   /// Do values of this type have reference semantics?
+  ///
+  /// This includes isAnyClassReferenceType(), as well as function types.
   bool hasReferenceSemantics() const {
-    return isReferenceTypeImpl(*this, /*functions count*/ true);
+    return isReferenceTypeImpl(*this,
+                               /*signature*/ nullptr,
+                               /*functions count*/ true);
+  }
+
+  /// Are variables of this type permitted to have
+  /// ownership attributes?
+  ///
+  /// This includes:
+  ///   - class types, generic or not
+  ///   - archetypes with class or class protocol bounds
+  ///   - existentials with class or class protocol bounds
+  /// But not:
+  ///   - function types
+  bool allowsOwnership(GenericSignatureImpl *sig) const {
+    return isReferenceTypeImpl(*this, sig,
+                               /*functions count*/ false);
   }
 
   /// Are values of this type essentially just class references,
@@ -414,10 +448,13 @@ public:
   ///   - a class type
   ///   - a bound generic class type
   ///   - a class-bounded archetype type
+  ///   - a class-bounded type parameter
   ///   - a class-bounded existential type
   ///   - a dynamic Self type
   bool isAnyClassReferenceType() const {
-    return isReferenceTypeImpl(*this, /*functions count*/ false);
+    return isReferenceTypeImpl(*this,
+                               /*signature*/ nullptr,
+                               /*functions count*/ false);
   }
 
   /// Is this type existential?
@@ -446,13 +483,8 @@ public:
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 
-  CanType getAnyOptionalObjectType() const {
-    OptionalTypeKind kind;
-    return getAnyOptionalObjectTypeImpl(*this, kind);
-  }
-
-  CanType getAnyOptionalObjectType(OptionalTypeKind &kind) const {
-    return getAnyOptionalObjectTypeImpl(*this, kind);
+  CanType getOptionalObjectType() const {
+    return getOptionalObjectTypeImpl(*this);
   }
 
   CanType getReferenceStorageReferent() const {
@@ -536,7 +568,9 @@ template <class X> inline CanTypeWrapper<X> cast_or_null(CanType type) {
   return CanTypeWrapper<X>(cast_or_null<X>(type.getPointer()));
 }
 template <class X> inline CanTypeWrapper<X> dyn_cast(CanType type) {
-  return CanTypeWrapper<X>(dyn_cast<X>(type.getPointer()));
+  auto Ty = type.getPointer();
+  SWIFT_ASSUME(Ty != nullptr);
+  return CanTypeWrapper<X>(dyn_cast<X>(Ty));
 }
 template <class X> inline CanTypeWrapper<X> dyn_cast_or_null(CanType type) {
   return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
@@ -554,44 +588,26 @@ inline CanTypeWrapper<X> cast(CanTypeWrapper<P> type) {
 }
 template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast(CanTypeWrapper<P> type) {
-  return CanTypeWrapper<X>(dyn_cast<X>(type.getPointer()));
+  auto Ty = type.getPointer();
+  SWIFT_ASSUME(Ty != nullptr);
+  return CanTypeWrapper<X>(dyn_cast<X>(Ty));
 }
 template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast_or_null(CanTypeWrapper<P> type) {
   return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
 }
-  
-class GenericTypeParamType;
-  
-/// A reference to a canonical generic signature.
-class CanGenericSignature {
-  GenericSignature *Signature;
-  
-public:
-  CanGenericSignature() : Signature(nullptr) {}
-  CanGenericSignature(std::nullptr_t) : Signature(nullptr) {}
-  
-  // in Decl.h
-  explicit CanGenericSignature(GenericSignature *Signature);
-  ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
 
-  /// Retrieve the canonical generic environment associated with this
-  /// generic signature.
-  GenericEnvironment *getGenericEnvironment(ModuleDecl &module) const;
-
-  GenericSignature *operator->() const {
-    return Signature;
-  }
-  
-  operator GenericSignature *() const {
-    return Signature;
-  }
-  
-  GenericSignature *getPointer() const {
-    return Signature;
-  }
-};
-
+template <typename T>
+inline T *staticCastHelper(const Type &Ty) {
+  // The constructor of the ArrayRef<Type> must guarantee this invariant.
+  // XXX -- We use reinterpret_cast instead of static_cast so that files
+  // can avoid including Types.h if they want to.
+  return reinterpret_cast<T*>(Ty.getPointer());
+}
+/// TypeArrayView allows arrays of 'Type' to have a static type.
+template <typename T>
+using TypeArrayView = ArrayRefView<Type, T*, staticCastHelper,
+                                   /*AllowOrigAccess*/true>;
 } // end namespace swift
 
 namespace llvm {
@@ -629,7 +645,8 @@ namespace llvm {
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
     static swift::CanType getEmptyKey() {
-      return swift::CanType(nullptr);
+      return swift::CanType(llvm::DenseMapInfo<swift::
+                              TypeBase*>::getEmptyKey());
     }
     static swift::CanType getTombstoneKey() {
       return swift::CanType(llvm::DenseMapInfo<swift::
@@ -639,7 +656,7 @@ namespace llvm {
 
   // A Type is "pointer like".
   template<>
-  class PointerLikeTypeTraits<swift::Type> {
+  struct PointerLikeTypeTraits<swift::Type> {
   public:
     static inline void *getAsVoidPointer(swift::Type I) {
       return (void*)I.getPointer();
@@ -651,26 +668,13 @@ namespace llvm {
   };
   
   template<>
-  class PointerLikeTypeTraits<swift::CanType> :
+  struct PointerLikeTypeTraits<swift::CanType> :
     public PointerLikeTypeTraits<swift::Type> {
   public:
     static inline swift::CanType getFromVoidPointer(void *P) {
       return swift::CanType((swift::TypeBase*)P);
     }
   };
-
-  template<>
-  class PointerLikeTypeTraits<swift::CanGenericSignature> {
-  public:
-    static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
-      return swift::CanGenericSignature((swift::GenericSignature*)P);
-    }
-    static inline void *getAsVoidPointer(swift::CanGenericSignature S) {
-      return (void*)S.getPointer();
-    }
-    enum { NumLowBitsAvailable = swift::TypeAlignInBits };
-  };
-  
 } // end namespace llvm
 
 #endif

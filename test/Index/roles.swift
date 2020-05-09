@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/imported_swift_module.swift
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s -I %t | %FileCheck %s
@@ -7,73 +6,77 @@
 import func imported_swift_module.importedFunc
 // CHECK: [[@LINE-1]]:35 | function/Swift | importedFunc() | s:21imported_swift_module0A4FuncyyF | Ref | rel: 0
 import var imported_swift_module.importedGlobal
-// CHECK: [[@LINE-1]]:34 | variable/Swift | importedGlobal | s:21imported_swift_module0A6GlobalSiv | Ref | rel: 0
+// CHECK: [[@LINE-1]]:34 | variable/Swift | importedGlobal | s:21imported_swift_module0A6GlobalSivp | Ref | rel: 0
 
 // Definition
 let x = 2
-// CHECK: [[@LINE-1]]:5 | variable/Swift | x | s:14swift_ide_test1xSiv | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable/Swift | x | s:14swift_ide_test1xSivp | Def | rel: 0
 
 // Definition + Read of x
 var y = x + 1
-// CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:14swift_ide_test1ySiv | Def | rel: 0
-// CHECK: [[@LINE-2]]:9 | variable/Swift | x | s:14swift_ide_test1xSiv | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:11 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiS2i_SitFZ | Ref | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:14swift_ide_test1ySivp | Def | rel: 0
+// CHECK: [[@LINE-2]]:9 | variable/Swift | x | s:14swift_ide_test1xSivp | Ref,Read | rel: 0
+// CHECK: [[@LINE-3]]:11 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiyS2i_SitFZ | Ref,Call,RelRec | rel: 1
+// CHECK-NEXT: RelRec | struct/Swift | Int | s:Si
 
 // Read of x + Write of y
 y = x + 1
-// CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:14swift_ide_test1ySiv | Ref,Writ | rel: 0
-// CHECK: [[@LINE-2]]:5 | variable/Swift | x | s:14swift_ide_test1xSiv | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:7 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiS2i_SitFZ | Ref | rel: 0
+// CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:14swift_ide_test1ySivp | Ref,Writ | rel: 0
+// CHECK: [[@LINE-2]]:5 | variable/Swift | x | s:14swift_ide_test1xSivp | Ref,Read | rel: 0
+// CHECK: [[@LINE-3]]:7 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiyS2i_SitFZ | Ref,Call,RelRec | rel: 1
+// CHECK-NEXT: RelRec | struct/Swift | Int | s:Si
+
 
 // Read of y + Write of y
 y += x
-// CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:14swift_ide_test1ySiv | Ref,Read,Writ | rel: 0
-// CHECK: [[@LINE-2]]:3 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiySiz_SitFZ | Ref | rel: 0
-// CHECK: [[@LINE-3]]:6 | variable/Swift | x | s:14swift_ide_test1xSiv | Ref,Read | rel: 0
+// CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:14swift_ide_test1ySivp | Ref,Read,Writ | rel: 0
+// CHECK: [[@LINE-2]]:3 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiyySiz_SitFZ | Ref,Call,RelRec | rel: 1
+// CHECK-NEXT: RelRec | struct/Swift | Int | s:Si
+// CHECK: [[@LINE-4]]:6 | variable/Swift | x | s:14swift_ide_test1xSivp | Ref,Read | rel: 0
 
 var z: Int {
-// CHECK: [[@LINE-1]]:5 | variable/Swift | z | s:14swift_ide_test1zSiv | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable/Swift | z | s:14swift_ide_test1zSivp | Def | rel: 0
   get {
-    // CHECK: [[@LINE-1]]:3 | function/acc-get/Swift | getter:z | s:14swift_ide_test1zSifg | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:3 | function/acc-get/Swift | getter:z | s:14swift_ide_test1zSivg | Def,RelChild,RelAcc | rel: 1
 
     return y
-    // CHECK: [[@LINE-1]]:12 | variable/Swift | y | s:14swift_ide_test1ySiv | Ref,Read,RelCont | rel: 1
-    // CHECK-NEXT: RelCont | function/acc-get/Swift | getter:z | s:14swift_ide_test1zSifg
+    // CHECK: [[@LINE-1]]:12 | variable/Swift | y | s:14swift_ide_test1ySivp | Ref,Read,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | function/acc-get/Swift | getter:z | s:14swift_ide_test1zSivg
   }
   set {
-    // CHECK: [[@LINE-1]]:3 | function/acc-set/Swift | setter:z | s:14swift_ide_test1zSifs | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:3 | function/acc-set/Swift | setter:z | s:14swift_ide_test1zSivs | Def,RelChild,RelAcc | rel: 1
 
     y = newValue
-    // CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:14swift_ide_test1ySiv | Ref,Writ,RelCont | rel: 1
-    // CHECK-NEXT: RelCont | function/acc-set/Swift | setter:z | s:14swift_ide_test1zSifs
+    // CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:14swift_ide_test1ySivp | Ref,Writ,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | function/acc-set/Swift | setter:z | s:14swift_ide_test1zSivs
   }
 }
 // Write + Read of z
 z = z + 1
-// CHECK: [[@LINE-1]]:1 | variable/Swift | z | s:14swift_ide_test1zSiv | Ref,Writ | rel: 0
-// CHECK: [[@LINE-2]]:1 | function/acc-set/Swift | setter:z | s:14swift_ide_test1zSifs | Ref,Call,Impl | rel: 0
-// CHECK: [[@LINE-3]]:5 | variable/Swift | z | s:14swift_ide_test1zSiv | Ref,Read | rel: 0
-// CHECK: [[@LINE-4]]:5 | function/acc-get/Swift | getter:z | s:14swift_ide_test1zSifg | Ref,Call,Impl | rel: 0
+// CHECK: [[@LINE-1]]:1 | variable/Swift | z | s:14swift_ide_test1zSivp | Ref,Writ | rel: 0
+// CHECK: [[@LINE-2]]:1 | function/acc-set/Swift | setter:z | s:14swift_ide_test1zSivs | Ref,Call,Impl | rel: 0
+// CHECK: [[@LINE-3]]:5 | variable/Swift | z | s:14swift_ide_test1zSivp | Ref,Read | rel: 0
+// CHECK: [[@LINE-4]]:5 | function/acc-get/Swift | getter:z | s:14swift_ide_test1zSivg | Ref,Call,Impl | rel: 0
 
 // Call
 func aCalledFunction(a: Int, b: inout Int) {
-// CHECK: [[@LINE-1]]:6 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF | Def | rel: 0
+// CHECK: [[@LINE-1]]:6 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF | Def | rel: 0
 // CHECK: [[@LINE-2]]:22 | param/Swift | a | s:{{.*}} | Def,RelChild | rel: 1
-// CHECK-NEXT: RelChild | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
+// CHECK-NEXT: RelChild | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF
 // CHECK: [[@LINE-4]]:30 | param/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
-// CHECK-NEXT: RelChild | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
+// CHECK-NEXT: RelChild | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF
 
   var _ = a + b
   // CHECK: [[@LINE-1]]:11 | param/Swift | a | s:{{.*}} | Ref,Read,RelCont | rel: 1
-  // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
+  // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF
   // CHECK: [[@LINE-3]]:15 | param/Swift | b | s:{{.*}} | Ref,Read,RelCont | rel: 1
-  // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
+  // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF
 
   b = a + 1
   // CHECK: [[@LINE-1]]:3 | param/Swift | b | s:{{.*}} | Ref,Writ,RelCont | rel: 1
-  // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
+  // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF
   // CHECK: [[@LINE-3]]:7 | param/Swift | a | s:{{.*}} | Ref,Read,RelCont | rel: 1
-  // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
+  // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF
 
   _ = { ignored in ignored + 1}
   // CHECK-NOT: [[@LINE-1]]:9 {{.*}} | ignored | {{.*}}
@@ -81,19 +84,19 @@ func aCalledFunction(a: Int, b: inout Int) {
 }
 
 aCalledFunction(a: 1, b: &z)
-// CHECK: [[@LINE-1]]:1 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF | Ref,Call | rel: 0
-// CHECK: [[@LINE-2]]:27 | variable/Swift | z | s:14swift_ide_test1zSiv | Ref,Read,Writ | rel: 0
+// CHECK: [[@LINE-1]]:1 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF | Ref,Call | rel: 0
+// CHECK: [[@LINE-2]]:27 | variable/Swift | z | s:14swift_ide_test1zSivp | Ref,Read,Writ | rel: 0
 
 func aCaller() {
   // CHECK: [[@LINE-1]]:6 | function/Swift | aCaller() | s:14swift_ide_test7aCalleryyF | Def | rel: 0
 
   aCalledFunction(a: 1, b: &z)
-  // CHECK: [[@LINE-1]]:3 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF | Ref,Call,RelCall,RelCont | rel: 1
+  // CHECK: [[@LINE-1]]:3 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF | Ref,Call,RelCall,RelCont | rel: 1
   // CHECK-NEXT: RelCall,RelCont | function/Swift | aCaller() | s:14swift_ide_test7aCalleryyF
 }
 
 let aRef = aCalledFunction
-// CHECK: [[@LINE-1]]:12 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF | Ref | rel: 0
+// CHECK: [[@LINE-1]]:12 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF | Ref | rel: 0
 
 // RelationChildOf, Implicit
 struct AStruct {
@@ -113,30 +116,31 @@ struct AStruct {
     x += 1
     // CHECK: [[@LINE-1]]:5 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref,Read,Writ,RelCont | rel: 1
     // CHECK-NEXT: RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
-    // CHECK: [[@LINE-3]]:5 | instance-method/acc-get/Swift | getter:x | s:14swift_ide_test7AStructV1xSifg | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
+    // CHECK: [[@LINE-3]]:5 | instance-method/acc-get/Swift | getter:x | s:14swift_ide_test7AStructV1xSivg | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
     // CHECK-NEXT: RelRec | struct/Swift | AStruct | [[AStruct_USR]]
-    // CHECK: [[@LINE-6]]:5 | instance-method/acc-set/Swift | setter:x | s:14swift_ide_test7AStructV1xSifs | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
+    // CHECK: [[@LINE-6]]:5 | instance-method/acc-set/Swift | setter:x | s:14swift_ide_test7AStructV1xSivs | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
     // CHECK-NEXT: RelRec | struct/Swift | AStruct | [[AStruct_USR]]
-    // CHECK: [[@LINE-9]]:7 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiySiz_SitFZ | Ref,RelCont | rel: 1
-    // CHECK-NEXT: RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
+    // CHECK: [[@LINE-9]]:7 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiyySiz_SitFZ | Ref,Call,RelRec,RelCall,RelCont | rel: 2
+    // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
+    // CHECK-NEXT: RelRec | struct/Swift | Int | s:Si
   }
 
   // RelationChildOf, RelationAccessorOf
   subscript(index: Int) -> Int {
-    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVyS2icip | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | struct/Swift | AStruct | [[AStruct_USR]]
 
     get {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2icfg | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:subscript(_:) | s:14swift_ide_test7AStructVyS2icig | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVyS2icip
 
       return x
     }
     set {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2icfs | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:subscript(_:) | s:14swift_ide_test7AStructVyS2icis | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVyS2ici
 
       x = newValue
     }
@@ -263,8 +267,12 @@ protocol AProtocol {
   // CHECK-NEXT: RelChild | protocol/Swift | AProtocol | s:14swift_ide_test9AProtocolP
 }
 
-protocol Q where Self: AProtocol {}
-// CHECK: [[@LINE-1]]:24 | protocol/Swift | AProtocol | [[AProtocol_USR]] | Ref | rel: 0
+protocol QBase {
+  associatedtype A
+}
+
+protocol Q : QBase where Self.A: AProtocol {}
+// CHECK: [[@LINE-1]]:34 | protocol/Swift | AProtocol | [[AProtocol_USR]] | Ref | rel: 0
 
 class ASubClass : AClass, AProtocol {
 // CHECK: [[@LINE-1]]:7 | class/Swift | ASubClass | s:14swift_ide_test9ASubClassC | Def | rel: 0
@@ -313,29 +321,35 @@ extension OuterS.InnerS : AProtocol {
   func foo() -> Int { return 1 }
 }
 
+protocol ExtendMe {}
+protocol Whatever {}
+// CHECK: [[@LINE-1]]:10 | protocol/Swift | Whatever | [[Whatever_USR:.*]] | Def | rel: 0
+extension ExtendMe where Self: Whatever {}
+// CHECK: [[@LINE-1]]:32 | protocol/Swift | Whatever | [[Whatever_USR]] | Ref | rel: 0
+
 var anInstance = AClass(x: 1)
 // CHECK: [[@LINE-1]]:18 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref | rel: 0
-// CHECK: [[@LINE-2]]:18 | constructor/Swift | init(x:) | s:14swift_ide_test6AClassCACSi1x_tcfc | Ref,Call | rel: 0
+// CHECK: [[@LINE-2]]:18 | constructor/Swift | init(x:) | s:14swift_ide_test6AClassC1xACSi_tcfc | Ref,Call | rel: 0
 
 anInstance.y.x = anInstance.y.x
-// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
+// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCvp | Ref,Read | rel: 0
 // CHECK: [[@LINE-2]]:12 | instance-property/Swift | y | [[AClass_y_USR]] | Ref,Read,Writ | rel: 0
 // CHECK: [[@LINE-3]]:14 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref,Writ | rel: 0
-// CHECK: [[@LINE-4]]:18 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
+// CHECK: [[@LINE-4]]:18 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCvp | Ref,Read | rel: 0
 // CHECK: [[@LINE-5]]:29 | instance-property/Swift | y | [[AClass_y_USR]] | Ref,Read | rel: 0
 // CHECK: [[@LINE-6]]:31 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref,Read | rel: 0
 
 anInstance.y.aMethod()
-// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
+// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCvp | Ref,Read | rel: 0
 // CHECK: [[@LINE-2]]:12 | instance-property/Swift | y | [[AClass_y_USR]] | Ref,Read,Writ | rel: 0
 // CHECK: [[@LINE-3]]:14 | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF | Ref,Call | rel: 0
 
 // FIXME Write role of z occurrence on the RHS?
 anInstance.z[1] = anInstance.z[0]
-// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
-// CHECK: [[@LINE-2]]:12 | instance-property/Swift | z | s:14swift_ide_test6AClassC1zSaySiGv | Ref,Read,Writ | rel: 0
-// CHECK: [[@LINE-3]]:19 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
-// CHECK: [[@LINE-4]]:30 | instance-property/Swift | z | s:14swift_ide_test6AClassC1zSaySiGv | Ref,Read,Writ | rel: 0
+// CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCvp | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:12 | instance-property/Swift | z | s:14swift_ide_test6AClassC1zSaySiGvp | Ref,Read,Writ | rel: 0
+// CHECK: [[@LINE-3]]:19 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCvp | Ref,Read | rel: 0
+// CHECK: [[@LINE-4]]:30 | instance-property/Swift | z | s:14swift_ide_test6AClassC1zSaySiGvp | Ref,Read,Writ | rel: 0
 
 let otherInstance = AStruct(x: 1)
 // CHECK: [[@LINE-1]]:29 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref | rel: 0
@@ -346,35 +360,35 @@ _ = AStruct.init(x:)
 // CHECK: [[@LINE-2]]:5 | struct/Swift | AStruct | [[AStruct_USR]] | Ref | rel: 0
 
 let _ = otherInstance[0]
-// CHECK: [[@LINE-1]]:9 | variable/Swift | otherInstance | s:14swift_ide_test13otherInstanceAA7AStructVv | Ref,Read | rel: 0
-// CHECK: [[@LINE-2]]:22 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici | Ref,Read | rel: 0
+// CHECK: [[@LINE-1]]:9 | variable/Swift | otherInstance | s:14swift_ide_test13otherInstanceAA7AStructVvp | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:22 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVyS2icip | Ref,Read | rel: 0
 
 let _ = anInstance[0]
-// CHECK: [[@LINE-1]]:9 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
+// CHECK: [[@LINE-1]]:9 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCvp | Ref,Read | rel: 0
 // CHECK: [[@LINE-2]]:19 | instance-property/subscript/Swift | subscript(_:) | [[AClass_subscript_USR]] | Ref,Read | rel: 0
 
 let aSubInstance: AClass = ASubClass(x: 1)
-// CHECK: [[@LINE-1]]:5 | variable/Swift | aSubInstance | s:14swift_ide_test12aSubInstanceAA6AClassCv | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable/Swift | aSubInstance | s:14swift_ide_test12aSubInstanceAA6AClassCvp | Def | rel: 0
 // CHECK: [[@LINE-2]]:28 | class/Swift | ASubClass | s:14swift_ide_test9ASubClassC | Ref | rel: 0
 
 // Dynamic, RelationReceivedBy
 let _ = aSubInstance.foo()
-// CHECK: [[@LINE-1]]:9 | variable/Swift | aSubInstance | s:14swift_ide_test12aSubInstanceAA6AClassCv | Ref,Read | rel: 0
+// CHECK: [[@LINE-1]]:9 | variable/Swift | aSubInstance | s:14swift_ide_test12aSubInstanceAA6AClassCvp | Ref,Read | rel: 0
 // CHECK: [[@LINE-2]]:22 | instance-method/Swift | foo() | [[AClass_foo_USR]] | Ref,Call,Dyn,RelRec | rel: 1
 // CHECK-NEXT: RelRec | class/Swift | AClass | s:14swift_ide_test6AClassC
 
 // RelationContainedBy
 let contained = 2
-// CHECK: [[@LINE-1]]:5 | variable/Swift | contained | s:14swift_ide_test9containedSiv | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Def | rel: 0
 
 func containing() {
 // CHECK: [[@LINE-1]]:6 | function/Swift | containing() | s:14swift_ide_test10containingyyF | Def | rel: 0
   let _ = contained
-  // CHECK: [[@LINE-1]]:11 | variable/Swift | contained | s:14swift_ide_test9containedSiv | Ref,Read,RelCont | rel: 1
+  // CHECK: [[@LINE-1]]:11 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Ref,Read,RelCont | rel: 1
   // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
 
   var x = contained
-  // CHECK: [[@LINE-1]]:11 | variable/Swift | contained | s:14swift_ide_test9containedSiv | Ref,Read,RelCont | rel: 1
+  // CHECK: [[@LINE-1]]:11 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Ref,Read,RelCont | rel: 1
   // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
 
   struct LocalStruct {
@@ -383,7 +397,7 @@ func containing() {
     // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
     // CHECK: [[@LINE-3]]:21 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelCont | rel: 1
     // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-    // CHECK: [[@LINE-5]]:31 | variable/Swift | contained | s:14swift_ide_test9containedSiv | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-5]]:31 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Ref,Read,RelCont | rel: 1
     // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
 
     init(i _: AClass) {}
@@ -396,11 +410,11 @@ func containing() {
       // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
       // CHECK: [[@LINE-3]]:23 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelCont | rel: 1
       // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-      // CHECK: [[@LINE-5]]:33 | variable/Swift | contained | s:14swift_ide_test9containedSiv | Ref,Read,RelCont | rel: 1
+      // CHECK: [[@LINE-5]]:33 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Ref,Read,RelCont | rel: 1
       // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
 
       aCalledFunction(a: 1, b: &z)
-      // CHECK: [[@LINE-1]]:7 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF | Ref,Call,RelCall,RelCont | rel: 1
+      // CHECK: [[@LINE-1]]:7 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF | Ref,Call,RelCall,RelCont | rel: 1
       // CHECK-NEXT: RelCall,RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
 
       return contained
@@ -418,6 +432,8 @@ protocol ProtRoot {
 
 protocol ProtDerived : ProtRoot {
   func fooCommon()
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedP9fooCommonyyF | Def,Dyn,RelChild,RelOver | rel: 2
+  
   func bar1()
   func bar2()
   func bar3(_ : Int)
@@ -426,9 +442,8 @@ protocol ProtDerived : ProtRoot {
 
 extension ProtDerived {
   func fooCommon() {}
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF | Def,Dyn,RelChild,RelOver | rel: 3
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF | Def,Dyn,RelChild,RelOver | rel: 2
   // CHECK-NEXT: RelOver | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedP9fooCommonyyF
-  // CHECK-NEXT: RelOver | instance-method/Swift | fooCommon() | s:14swift_ide_test8ProtRootP9fooCommonyyF
 
   func foo1() {}
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo1() | s:14swift_ide_test11ProtDerivedPAAE4foo1yyF | Def,Dyn,RelChild,RelOver | rel: 2
@@ -439,16 +454,16 @@ extension ProtDerived {
   // CHECK-NEXT: RelOver | instance-method/Swift | bar1() | s:14swift_ide_test11ProtDerivedP4bar1yyF
 
   func foo3(a : Int) {}
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo3(a:) | s:14swift_ide_test11ProtDerivedPAAE4foo3ySi1a_tF | Def,Dyn,RelChild,RelOver | rel: 2
-  // CHECK-NEXT: RelOver | instance-method/Swift | foo3(a:) | s:14swift_ide_test8ProtRootP4foo3ySi1a_tF
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo3(a:) | s:14swift_ide_test11ProtDerivedPAAE4foo31aySi_tF | Def,Dyn,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | foo3(a:) | s:14swift_ide_test8ProtRootP4foo31aySi_tF
 
   func foo3(a : String) {}
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo3(a:) | s:14swift_ide_test11ProtDerivedPAAE4foo3ySS1a_tF | Def,Dyn,RelChild,RelOver | rel: 2
-  // CHECK-NEXT: RelOver | instance-method/Swift | foo3(a:) | s:14swift_ide_test8ProtRootP4foo3ySS1a_tF
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo3(a:) | s:14swift_ide_test11ProtDerivedPAAE4foo31aySS_tF | Def,Dyn,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | foo3(a:) | s:14swift_ide_test8ProtRootP4foo31aySS_tF
 
   func bar3(_ : Int) {}
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | bar3(_:) | s:14swift_ide_test11ProtDerivedPAAE4bar3ySiF | Def,Dyn,RelChild,RelOver | rel: 2
-  // CHECK-NEXT: RelOver | instance-method/Swift | bar3(_:) | s:14swift_ide_test11ProtDerivedP4bar3ySiF
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | bar3(_:) | s:14swift_ide_test11ProtDerivedPAAE4bar3yySiF | Def,Dyn,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | bar3(_:) | s:14swift_ide_test11ProtDerivedP4bar3yySiF
 }
 
 enum MyEnum {
@@ -478,3 +493,48 @@ final class FinalClass {
   func foo() {}
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | {{.*}} | Def,RelChild | rel: 1
 }
+
+struct StructWithKeypath {
+  var x: Int = 0
+
+  subscript(idx: Int) -> Int { get { } set { } }
+}
+
+_ = \StructWithKeypath.x
+// CHECK: [[@LINE-1]]:24 | instance-property/Swift | x | s:14swift_ide_test17StructWithKeypathV1xSivp | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:24 | instance-method/acc-get/Swift | getter:x | s:14swift_ide_test17StructWithKeypathV1xSivg | Ref,Call,Impl | rel: 0
+
+_ = \StructWithKeypath.[0]
+// CHECK: [[@LINE-1]]:24 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test17StructWithKeypathVyS2icip | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:24 | instance-method/acc-get/Swift | getter:subscript(_:) | s:14swift_ide_test17StructWithKeypathVyS2icig | Ref,Call,Impl | rel: 0
+
+
+struct BStruct {
+  var x = 17
+  var y = true
+  var z = "hello"
+}
+
+func useDefaultInits() {
+  _ = BStruct(y: false)
+  // CHECK: [[@LINE-1]]:15 | instance-property/Swift | y | s:14swift_ide_test7BStructV1ySbvp | Ref,RelCont
+  // CHECK: [[@LINE-2]]:7 | constructor/Swift | init(x:y:z:) | s:14swift_ide_test7BStructV1x1y1zACSi_SbSStcfc | Ref,Call,RelCall,RelCont | rel: 1
+}
+
+internal protocol FromInt {
+    init(_ uint64: Int)
+}
+extension Int: FromInt { }
+func test<M>(_: M, value: Int?) {
+    if let idType = M.self as? FromInt.Type {
+        _ = value.flatMap(idType.init) as? M
+// CHECK: [[@LINE-1]]:34 | constructor/Swift | init(_:) | s:14swift_ide_test7FromIntPyxSicfc | Ref,RelCont | rel: 1
+    }
+}
+
+func `escapedName`(`x`: Int) {}
+// CHECK: [[@LINE-1]]:6 | function/Swift | escapedName(x:) | {{.*}} | Def | rel: 0
+`escapedName`(`x`: 2)
+// CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref,Call | rel: 0
+`escapedName`(`x`:)
+// CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref | rel: 0

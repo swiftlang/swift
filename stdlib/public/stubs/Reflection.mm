@@ -13,18 +13,16 @@
 #include "swift/Runtime/Config.h"
 
 #if SWIFT_OBJC_INTEROP
-#import <Foundation/Foundation.h>
+#import <objc/runtime.h>
+#import <objc/NSObject.h>
 
 SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 bool _swift_stdlib_NSObject_isKindOfClass(
-    id NS_RELEASES_ARGUMENT _Nonnull object,
-    NSString *NS_RELEASES_ARGUMENT _Nonnull className) {
-  bool result = [object isKindOfClass:NSClassFromString(className)];
-  [object release];
-  [className release];
-
-  return result;
+    id _Nonnull object,
+    char * _Nonnull className) {
+  Class cls = objc_lookUpClass(className);
+  return [object isKindOfClass:cls];
 }
 #endif
 

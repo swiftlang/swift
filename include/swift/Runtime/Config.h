@@ -17,8 +17,81 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
-// Bring in visibility attribute macros for library visibility.
-#include "llvm/Support/Compiler.h"
+#include "swift/Runtime/CMakeConfig.h"
+
+/// \macro SWIFT_RUNTIME_GNUC_PREREQ
+/// Extend the default __GNUC_PREREQ even if glibc's features.h isn't
+/// available.
+#ifndef SWIFT_RUNTIME_GNUC_PREREQ
+# if defined(__GNUC__) && defined(__GNUC_MINOR__) && defined(__GNUC_PATCHLEVEL__)
+#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) \
+    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) + __GNUC_PATCHLEVEL__ >= \
+     ((maj) << 20) + ((min) << 10) + (patch))
+# elif defined(__GNUC__) && defined(__GNUC_MINOR__)
+#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) \
+    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) >= ((maj) << 20) + ((min) << 10))
+# else
+#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) 0
+# endif
+#endif
+
+/// SWIFT_RUNTIME_LIBRARY_VISIBILITY - If a class marked with this attribute is
+/// linked into a shared library, then the class should be private to the
+/// library and not accessible from outside it.  Can also be used to mark
+/// variables and functions, making them private to any shared library they are
+/// linked into.
+/// On PE/COFF targets, library visibility is the default, so this isn't needed.
+#if (__has_attribute(visibility) || SWIFT_RUNTIME_GNUC_PREREQ(4, 0, 0)) &&    \
+    !defined(__MINGW32__) && !defined(__CYGWIN__) && !defined(_WIN32)
+#define SWIFT_RUNTIME_LIBRARY_VISIBILITY __attribute__ ((visibility("hidden")))
+#else
+#define SWIFT_RUNTIME_LIBRARY_VISIBILITY
+#endif
+
+/// Attributes.
+/// SWIFT_RUNTIME_ATTRIBUTE_NOINLINE - On compilers where we have a directive to do so,
+/// mark a method "not for inlining".
+#if __has_attribute(noinline) || SWIFT_RUNTIME_GNUC_PREREQ(3, 4, 0)
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE __declspec(noinline)
+#else
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+#endif
+
+/// SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE - On compilers where we have a directive to do
+/// so, mark a method "always inline" because it is performance sensitive. GCC
+/// 3.4 supported this but is buggy in various cases and produces unimplemented
+/// errors, just use it in GCC 4.0 and later.
+#if __has_attribute(always_inline) || SWIFT_RUNTIME_GNUC_PREREQ(4, 0, 0)
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE __forceinline
+#else
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+#endif
+
+#ifdef __GNUC__
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN __declspec(noreturn)
+#else
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+#endif
+
+/// SWIFT_RUNTIME_BUILTIN_TRAP - On compilers which support it, expands to an expression
+/// which causes the program to exit abnormally.
+#if __has_builtin(__builtin_trap) || SWIFT_RUNTIME_GNUC_PREREQ(4, 3, 0)
+# define SWIFT_RUNTIME_BUILTIN_TRAP __builtin_trap()
+#elif defined(_MSC_VER)
+// The __debugbreak intrinsic is supported by MSVC, does not require forward
+// declarations involving platform-specific typedefs (unlike RaiseException),
+// results in a call to vectored exception handlers, and encodes to a short
+// instruction that still causes the trapping behavior we want.
+# define SWIFT_RUNTIME_BUILTIN_TRAP __debugbreak()
+#else
+# define SWIFT_RUNTIME_BUILTIN_TRAP *(volatile int*)0x11 = 0
+#endif
 
 /// Does the current Swift platform support "unbridged" interoperation
 /// with Objective-C?  If so, the implementations of various types must
@@ -33,18 +106,6 @@
 #endif
 #endif
 
-/// Does the current Swift platform use LLVM's intrinsic "swiftcall"
-/// calling convention for Swift functions?
-#ifndef SWIFT_USE_SWIFTCALL
-// Clang doesn't support mangling functions with the swiftcall attribute
-// on Windows and crashes during compilation: http://bugs.llvm.org/show_bug.cgi?id=32000
-#if (__has_attribute(swiftcall) || defined(__linux__)) && !defined(_WIN32)
-#define SWIFT_USE_SWIFTCALL 1
-#else
-#define SWIFT_USE_SWIFTCALL 0
-#endif
-#endif
-
 /// Does the current Swift platform allow information other than the
 /// class pointer to be stored in the isa field?  If so, when deriving
 /// the class pointer of an object, we must apply a
@@ -54,7 +115,7 @@
 /// According to the Objective-C ABI, this is true only for 64-bit
 /// platforms.
 #ifndef SWIFT_HAS_ISA_MASKING
-#if SWIFT_OBJC_INTEROP && defined(__LP64__)
+#if SWIFT_OBJC_INTEROP && __POINTER_WIDTH__ == 64
 #define SWIFT_HAS_ISA_MASKING 1
 #else
 #define SWIFT_HAS_ISA_MASKING 0
@@ -66,7 +127,7 @@
 /// above, information other than the class pointer could be contained in the
 /// ISA.
 #ifndef SWIFT_HAS_OPAQUE_ISAS
-#if __ARM_ARCH_7K__ >= 2
+#if defined(__arm__) && __ARM_ARCH_7K__ >= 2
 #define SWIFT_HAS_OPAQUE_ISAS 1
 #else
 #define SWIFT_HAS_OPAQUE_ISAS 0
@@ -75,6 +136,42 @@
 
 #if SWIFT_HAS_OPAQUE_ISAS && SWIFT_HAS_ISA_MASKING
 #error Masking ISAs are incompatible with opaque ISAs
+#endif
+
+/// Which bits in the class metadata are used to distinguish Swift classes
+/// from ObjC classes?
+#ifndef SWIFT_CLASS_IS_SWIFT_MASK
+
+// Non-Apple platforms always use 1.
+# if !defined(__APPLE__)
+#  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
+
+// Builds for Swift-in-the-OS always use 2.
+# elif SWIFT_BNI_OS_BUILD
+#  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
+
+// Builds for Xcode always use 1.
+# elif SWIFT_BNI_XCODE_BUILD
+#  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
+
+// Compatibility hook libraries cannot rely on the "is swift" bit being either
+// value, since they must work with both OS and Xcode versions of the libraries.
+// Generate a reference to a nonexistent symbol so that we get obvious linker
+// errors if we try.
+# elif SWIFT_COMPATIBILITY_LIBRARY
+extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTLY__;
+#  define SWIFT_CLASS_IS_SWIFT_MASK __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTLY__
+
+// Other builds (such as local builds on developers' computers)
+// dynamically choose the bit at runtime based on the current OS
+// version.
+# else
+#  define SWIFT_CLASS_IS_SWIFT_MASK _swift_classIsSwiftMask
+#  define SWIFT_CLASS_IS_SWIFT_MASK_GLOBAL_VARIABLE 1
+#  define SWIFT_BUILD_HAS_BACK_DEPLOYMENT 1
+#  include "BackDeployment.h"
+
+# endif
 #endif
 
 // We try to avoid global constructors in the runtime as much as possible.
@@ -98,14 +195,18 @@
 // Annotation for specifying a calling convention of
 // a runtime function. It should be used with declarations
 // of runtime functions like this:
-// void runtime_function_name() SWIFT_CC(RegisterPreservingCC)
+// void runtime_function_name() SWIFT_CC(swift)
 #define SWIFT_CC(CC) SWIFT_CC_##CC
 
-#define SWIFT_CC_preserve_most __attribute__((preserve_most))
-#define SWIFT_CC_preserve_all  __attribute__((preserve_all))
+// SWIFT_CC(c) is the C calling convention.
 #define SWIFT_CC_c
 
-#if SWIFT_USE_SWIFTCALL
+// SWIFT_CC(swift) is the Swift calling convention.
+// FIXME: the next comment is false.
+// Functions outside the stdlib or runtime that include this file may be built 
+// with a compiler that doesn't support swiftcall; don't define these macros
+// in that case so any incorrect usage is caught.
+#if __has_attribute(swiftcall)
 #define SWIFT_CC_swift __attribute__((swiftcall))
 #define SWIFT_CONTEXT __attribute__((swift_context))
 #define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
@@ -117,124 +218,110 @@
 #define SWIFT_INDIRECT_RESULT
 #endif
 
-// Map a logical calling convention (e.g. RegisterPreservingCC) to LLVM calling
-// convention.
-#define SWIFT_LLVM_CC(CC) SWIFT_LLVM_CC_##CC
-
-// Currently, RuntimeFunction.def uses the following calling conventions:
-// DefaultCC, RegisterPreservingCC.
-// If new runtime calling conventions are added later, they need to be mapped
-// here to something appropriate.
-
-// DefaultCC is usually the standard C calling convention.
-#define SWIFT_CC_DefaultCC SWIFT_CC_c
-#define SWIFT_CC_DefaultCC_IMPL SWIFT_CC_c
-#define SWIFT_LLVM_CC_DefaultCC llvm::CallingConv::C
-
-#define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
-
-#if SWIFT_USE_SWIFTCALL
-#define SWIFT_LLVM_CC_SwiftCC llvm::CallingConv::Swift
+// SWIFT_CC(PreserveMost) is used in the runtime implementation to prevent
+// register spills on the hot path.
+// It is not safe to use for external calls; the loader's lazy function
+// binding may not save all of the registers required for this convention.
+#if __has_attribute(preserve_most) &&                                          \
+    (defined(__aarch64__) || defined(__x86_64__))
+#define SWIFT_CC_PreserveMost __attribute__((preserve_most))
 #else
-#define SWIFT_LLVM_CC_SwiftCC llvm::CallingConv::C
+#define SWIFT_CC_PreserveMost
 #endif
 
-// If defined, it indicates that runtime function wrappers
-// should be used on all platforms, even they do not support
-// the new calling convention which requires this.
-#define SWIFT_RT_USE_WRAPPERS_ALWAYS 1
+// This is the DefaultCC value used by the compiler.
+// FIXME: the runtime's code does not honor DefaultCC
+// so changing this value is not sufficient.
+#define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
 
-// If defined, it indicates that this calling convention is
-// supported by the current target.
-// TODO: Define it once the runtime calling convention support has
-// been integrated into clang and llvm.
-#define SWIFT_RT_USE_RegisterPreservingCC 0
-
-#if  __has_attribute(preserve_most)
-#define SWIFT_BACKEND_SUPPORTS_RegisterPreservingCC 1
+// Pointer authentication.
+#if __has_feature(ptrauth_calls)
+#define SWIFT_PTRAUTH 1
+#include <ptrauth.h>
+#define __ptrauth_swift_runtime_function_entry \
+  __ptrauth(ptrauth_key_function_pointer, 1, \
+            SpecialPointerAuthDiscriminators::RuntimeFunctionEntry)
+#define __ptrauth_swift_runtime_function_entry_with_key(__key) \
+  __ptrauth(ptrauth_key_function_pointer, 1, __key)
+#define __ptrauth_swift_runtime_function_entry_strip(__fn) \
+  ptrauth_strip(__fn, ptrauth_key_function_pointer)
+#define __ptrauth_swift_type_descriptor \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::TypeDescriptor)
+#define __ptrauth_swift_dynamic_replacement_key                                \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::DynamicReplacementKey)
+#define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer)         \
+  ptrauth_auth_and_resign(__fn, ptrauth_key_function_pointer, 0,               \
+                          ptrauth_key_process_independent_code,                \
+                          ptrauth_blend_discriminator(__buffer,                \
+            SpecialPointerAuthDiscriminators::OpaqueReadResumeFunction))
+#define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer)       \
+  ptrauth_auth_and_resign(__fn, ptrauth_key_function_pointer, 0,               \
+                          ptrauth_key_process_independent_code,                \
+                          ptrauth_blend_discriminator(__buffer,                \
+            SpecialPointerAuthDiscriminators::OpaqueModifyResumeFunction))
 #else
-#define SWIFT_BACKEND_SUPPORTS_RegisterPreservingCC 0
+#define SWIFT_PTRAUTH 0
+#define __ptrauth_swift_function_pointer(__typekey)
+#define __ptrauth_swift_class_method_pointer(__declkey)
+#define __ptrauth_swift_protocol_witness_function_pointer(__declkey)
+#define __ptrauth_swift_value_witness_function_pointer(__key)
+#define __ptrauth_swift_type_metadata_instantiation_function
+#define __ptrauth_swift_runtime_function_entry
+#define __ptrauth_swift_runtime_function_entry_with_key(__key)
+#define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)
+#define __ptrauth_swift_heap_object_destructor
+#define __ptrauth_swift_type_descriptor
+#define __ptrauth_swift_dynamic_replacement_key
+#define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer) (__fn)
+#define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer) (__fn)
 #endif
 
+#ifdef __cplusplus
 
-// RegisterPreservingCC is a dedicated runtime calling convention to be used
-// when calling the most popular runtime functions.
-#if SWIFT_RT_USE_RegisterPreservingCC &&                              \
-    SWIFT_BACKEND_SUPPORTS_RegisterPreservingCC && defined(__aarch64__)
-// Targets supporting the dedicated runtime convention should use it.
-// If a runtime function is using this calling convention, it can
-// be invoked only by means of a wrapper, which performs an indirect
-// call. Wrappers are generated by the IRGen and added to object files.
-// As a result, runtime functions are invoked only indirectly from
-// the user code.
-// This is a workaround for dynamic linking issues, where a dynamic
-// linker may clobber some of the callee-saved registers defined by
-// this new calling convention when it performs lazy binding of
-// runtime functions using this new calling convention.
-#define SWIFT_CC_RegisterPreservingCC                          \
-  SWIFT_CC_preserve_most
-#define SWIFT_CC_RegisterPreservingCC_IMPL                     \
-  SWIFT_CC_preserve_most
-
-// Indicate that wrappers should be used, because it is required
-// for the calling convention to get around dynamic linking issues.
-#define SWIFT_RT_USE_WRAPPERS 1
-
+/// Copy an address-discriminated signed pointer from the source to the dest.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline void swift_ptrauth_copy(T *dest, const T *src, unsigned extra) {
+#if SWIFT_PTRAUTH
+  *dest = ptrauth_auth_and_resign(*src,
+                                  ptrauth_key_function_pointer,
+                                  ptrauth_blend_discriminator(src, extra),
+                                  ptrauth_key_function_pointer,
+                                  ptrauth_blend_discriminator(dest, extra));
 #else
-
-// Targets not supporting the dedicated runtime calling convention
-// should use the standard calling convention instead.
-// No wrappers are required in this case by the calling convention.
-#define SWIFT_CC_RegisterPreservingCC SWIFT_CC_c
-#define SWIFT_CC_RegisterPreservingCC_IMPL SWIFT_CC_c
-
+  *dest = *src;
 #endif
+}
 
-// Generates a name of the runtime entry's implementation by
-// adding an underscore as a prefix and a suffix.
-#define SWIFT_RT_ENTRY_IMPL(Name) _##Name##_
-
-// Library internal way to invoke the implementation of a runtime entry.
-// E.g. a runtime function may be called internally via its public API
-// or via the function pointer.
-#define SWIFT_RT_ENTRY_CALL(Name) Name
-
-// Name of the symbol holding a reference to the
-// implementation of a runtime entry.
-#define SWIFT_RT_ENTRY_REF(Name) _##Name
-
-// String representation of the symbol's name.
-#define SWIFT_RT_ENTRY_REF_AS_STR(Name) "_" #Name
-
-#if defined(SWIFT_RT_USE_WRAPPERS_ALWAYS)
-#undef SWIFT_RT_USE_WRAPPERS
-#define SWIFT_RT_USE_WRAPPERS
-#endif
-
-#if defined(SWIFT_RT_USE_WRAPPERS)
-
-// Both the runtime functions and their implementation are hidden and
-// can be directly referenced only inside the runtime library.
-// User code can access these runtime entries only indirectly
-// via a global function pointer.
-// NOTE: In principle, entries may have LLVM_LIBRARY_VISIBILITY,
-// because they are never called directly from the code
-// produced by IRGen.
-// But some of the runtime entries are invoked directly from
-// the foundation. Therefore they should be visible.
-#define SWIFT_RT_ENTRY_VISIBILITY SWIFT_RUNTIME_EXPORT
-#define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
-
-// Prefix of wrappers generated for runtime functions.
-#define SWIFT_WRAPPER_PREFIX "swift_rt_"
-
+/// Initialize the destination with an address-discriminated signed pointer.
+/// This does not authenticate the source value, so be careful about how
+/// you construct it.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline void swift_ptrauth_init(T *dest, T value, unsigned extra) {
+  // FIXME: assert that T is not a function-pointer type?
+#if SWIFT_PTRAUTH
+  *dest = ptrauth_sign_unauthenticated(value,
+                                  ptrauth_key_function_pointer,
+                                  ptrauth_blend_discriminator(dest, extra));
 #else
+  *dest = value;
+#endif
+}
 
-// Runtime functions are exported, because it should be possible
-// to invoke them directly from the user code. But internal
-// implementations of runtime functions do not need to be exported.
-#define SWIFT_RT_ENTRY_VISIBILITY SWIFT_RUNTIME_EXPORT
-#define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
+template <typename T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline T swift_auth_data_non_address(T value, unsigned extra) {
+#if SWIFT_PTRAUTH
+  return (T)ptrauth_auth_data((void *)value,
+                               ptrauth_key_process_independent_data,
+                               extra);
+#else
+  return value;
+#endif
+}
 
 #endif
 

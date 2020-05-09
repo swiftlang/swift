@@ -1,6 +1,5 @@
 :orphan:
 
-.. @raise litre.TestsAreMissing
 .. _MemoryAndConcurrencyModel:
 
 Swift Memory and Concurrency Model

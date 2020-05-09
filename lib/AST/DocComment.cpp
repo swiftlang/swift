@@ -16,12 +16,15 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Markup/Markup.h"
+#include <queue>
 
 using namespace swift;
 
@@ -30,6 +33,7 @@ void *DocComment::operator new(size_t Bytes, swift::markup::MarkupContext &MC,
   return MC.allocate(Bytes, Alignment);
 }
 
+namespace {
 Optional<swift::markup::ParamField *> extractParamOutlineItem(
     swift::markup::MarkupContext &MC,
     swift::markup::MarkupASTNode *Node) {
@@ -141,7 +145,7 @@ bool extractParameterOutline(
     L->setChildren(NormalItems);
   }
 
-  return NormalItems.size() == 0;
+  return NormalItems.empty();
 }
 
 bool extractSeparatedParams(
@@ -205,7 +209,7 @@ bool extractSeparatedParams(
   if (NormalItems.size() != Children.size())
     L->setChildren(NormalItems);
 
-  return NormalItems.size() == 0;
+  return NormalItems.empty();
 }
 
 bool extractSimpleField(
@@ -280,7 +284,22 @@ bool extractSimpleField(
   if (NormalItems.size() != Children.size())
     L->setChildren(NormalItems);
 
-  return NormalItems.size() == 0;
+  return NormalItems.empty();
+}
+} // namespace
+
+void swift::printBriefComment(RawComment RC, llvm::raw_ostream &OS) {
+  markup::MarkupContext MC;
+  markup::LineList LL = MC.getLineList(RC);
+  auto *markupDoc = markup::parseDocument(MC, LL);
+
+  auto children = markupDoc->getChildren();
+  if (children.empty())
+    return;
+  auto FirstParagraph = dyn_cast<swift::markup::Paragraph>(children.front());
+  if (!FirstParagraph)
+    return;
+  swift::markup::printInlinesUnder(FirstParagraph, OS);
 }
 
 swift::markup::CommentParts
@@ -334,125 +353,190 @@ swift::extractCommentParts(swift::markup::MarkupContext &MC,
   return Parts;
 }
 
-Optional<DocComment *>
-swift::getSingleDocComment(swift::markup::MarkupContext &MC, const Decl *D) {
-  PrettyStackTraceDecl StackTrace("parsing comment for", D);
-
-  auto RC = D->getRawComment();
-  if (RC.isEmpty())
-    return None;
-
+DocComment *DocComment::create(const Decl *D, markup::MarkupContext &MC,
+                               RawComment RC) {
+  assert(!RC.isEmpty());
   swift::markup::LineList LL = MC.getLineList(RC);
   auto *Doc = swift::markup::parseDocument(MC, LL);
   auto Parts = extractCommentParts(MC, Doc);
   return new (MC) DocComment(D, Doc, Parts);
 }
 
-static Optional<DocComment *>
-getAnyBaseClassDocComment(swift::markup::MarkupContext &MC,
-                          const ClassDecl *CD,
-                          const Decl *D) {
-  RawComment RC;
+void DocComment::addInheritanceNote(swift::markup::MarkupContext &MC,
+                                    TypeDecl *base) {
+  auto text = MC.allocateCopy("This documentation comment was inherited from ");
+  auto name = MC.allocateCopy(base->getNameStr());
+  auto period = MC.allocateCopy(".");
+  auto paragraph = markup::Paragraph::create(MC, {
+    markup::Text::create(MC, text),
+    markup::Code::create(MC, name),
+    markup::Text::create(MC, period)});
 
-  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
-    const auto *BaseDecl = VD->getOverriddenDecl();
-    while (BaseDecl) {
-      RC = BaseDecl->getRawComment();
-      if (!RC.isEmpty()) {
-        swift::markup::LineList LL = MC.getLineList(RC);
-        auto *Doc = swift::markup::parseDocument(MC, LL);
-        auto Parts = extractCommentParts(MC, Doc);
+  auto note = markup::NoteField::create(MC, {paragraph});
 
-        SmallString<48> RawCascadeText;
-        llvm::raw_svector_ostream OS(RawCascadeText);
-        OS << "This documentation comment was inherited from ";
-
-
-        auto *Text = swift::markup::Text::create(MC, MC.allocateCopy(OS.str()));
-
-        auto BaseClass =
-          BaseDecl->getDeclContext()->getAsClassOrClassExtensionContext();
-
-        auto *BaseClassMonospace =
-          swift::markup::Code::create(MC,
-                                      MC.allocateCopy(BaseClass->getNameStr()));
-
-        auto *Period = swift::markup::Text::create(MC, ".");
-
-        auto *Para = swift::markup::Paragraph::create(MC, {
-          Text, BaseClassMonospace, Period
-        });
-        auto CascadeNote = swift::markup::NoteField::create(MC, {Para});
-
-        SmallVector<const swift::markup::MarkupASTNode *, 8> BodyNodes {
-          Parts.BodyNodes.begin(),
-          Parts.BodyNodes.end()
-        };
-        BodyNodes.push_back(CascadeNote);
-        Parts.BodyNodes = MC.allocateCopy(llvm::makeArrayRef(BodyNodes));
-
-        return new (MC) DocComment(D, Doc, Parts);
-      }
-
-      BaseDecl = BaseDecl->getOverriddenDecl();
-    }
-  }
-  
-  return None;
+  SmallVector<const markup::MarkupASTNode *, 8> BodyNodes{
+    Parts.BodyNodes.begin(), Parts.BodyNodes.end()};
+  BodyNodes.push_back(note);
+  Parts.BodyNodes = MC.allocateCopy(llvm::makeArrayRef(BodyNodes));
 }
 
-static Optional<DocComment *>
-getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
-                                 const ProtocolDecl *ProtoExt,
-                                 const Decl *D) {
+DocComment *swift::getSingleDocComment(swift::markup::MarkupContext &MC,
+                                       const Decl *D, bool AllowSerialized) {
+  PrettyStackTraceDecl StackTrace("parsing comment for", D);
 
-  auto getSingleRequirementWithNonemptyDoc = [](const ProtocolDecl *P,
-                                                const ValueDecl *VD)
-    -> const ValueDecl * {
-      SmallVector<ValueDecl *, 2> Members;
-      P->lookupQualified(P->getDeclaredType(), VD->getFullName(),
-                         NLOptions::NL_ProtocolMembers,
-                         /*typeResolver=*/nullptr, Members);
-    SmallVector<const ValueDecl *, 1> ProtocolRequirements;
-    for (auto Member : Members)
-      if (!Member->isDefinition())
-        ProtocolRequirements.push_back(Member);
-
-    if (ProtocolRequirements.size() == 1) {
-      auto Requirement = ProtocolRequirements.front();
-      if (!Requirement->getRawComment().isEmpty())
-        return Requirement;
-    }
-
+  auto RC = D->getRawComment(AllowSerialized);
+  if (RC.isEmpty())
     return nullptr;
-  };
-
-  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
-    SmallVector<const ValueDecl *, 4> RequirementsWithDocs;
-    if (auto Requirement = getSingleRequirementWithNonemptyDoc(ProtoExt, VD))
-      RequirementsWithDocs.push_back(Requirement);
-
-    if (RequirementsWithDocs.size() == 1)
-      return getSingleDocComment(MC, RequirementsWithDocs.front());
-  }
-  return None;
+  return DocComment::create(D, MC, RC);
 }
 
-Optional<DocComment *>
-swift::getCascadingDocComment(swift::markup::MarkupContext &MC, const Decl *D) {
-  auto Doc = getSingleDocComment(MC, D);
-  if (Doc.hasValue())
-    return Doc;
+namespace {
+const ValueDecl *findOverriddenDeclWithDocComment(const ValueDecl *VD,
+                                                  bool AllowSerialized = true) {
+  // Only applies to class member.
+  if (!VD->getDeclContext()->getSelfClassDecl())
+    return nullptr;
 
-  // If this refers to a class member, check to see if any
-  // base classes have a doc comment and cascade it to here.
-  if (const auto *CD = D->getDeclContext()->getAsClassOrClassExtensionContext())
-    if (auto BaseClassDoc = getAnyBaseClassDocComment(MC, CD, D))
-      return BaseClassDoc;
+  while (auto *baseDecl = VD->getOverriddenDecl()) {
+    if (!baseDecl->getRawComment(AllowSerialized).isEmpty())
+      return baseDecl;
+    VD = baseDecl;
+  }
 
-  if (const auto *PE = D->getDeclContext()->getAsProtocolExtensionContext())
-    if (auto ReqDoc = getProtocolRequirementDocComment(MC, PE, D))
-      return ReqDoc;
+  return nullptr;
+}
 
-  return None;
+const ValueDecl *findDefaultProvidedDeclWithDocComment(const ValueDecl *VD,
+                                                       bool AllowSerialized = false) {
+  auto protocol = VD->getDeclContext()->getExtendedProtocolDecl();
+  // Only applies to protocol extension member.
+  if (!protocol)
+    return nullptr;
+
+  ValueDecl *requirement = nullptr;
+
+  SmallVector<ValueDecl *, 2> members;
+  protocol->lookupQualified(const_cast<ProtocolDecl *>(protocol),
+                            DeclNameRef(VD->getName()),
+                            NLOptions::NL_ProtocolMembers,
+                            members);
+
+  for (auto *member : members) {
+    if (!isa<ProtocolDecl>(member->getDeclContext()) ||
+        !member->isProtocolRequirement() ||
+        member->getRawComment(AllowSerialized).isEmpty())
+      continue;
+    if (requirement)
+      // Found two or more decls with doc-comment.
+      return nullptr;
+
+    requirement = member;
+  }
+  return requirement;
+}
+
+const ValueDecl *findRequirementDeclWithDocComment(const ValueDecl *VD,
+                                                   bool AllowSerialized = false) {
+  std::queue<const ValueDecl *> requirements;
+  while (true) {
+    for (auto *req : VD->getSatisfiedProtocolRequirements()) {
+      if (!req->getRawComment().isEmpty())
+        return req;
+      else
+        requirements.push(req);
+    }
+    if (requirements.empty())
+      return nullptr;
+    VD = requirements.front();
+    requirements.pop();
+  }
+}
+} // namespace
+
+const Decl *swift::getDocCommentProvidingDecl(const Decl *D,
+                                              bool AllowSerialized) {
+  if (!D->canHaveComment())
+    return nullptr;
+
+  if (!D->getRawComment(AllowSerialized).isEmpty())
+    return D;
+
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return nullptr;
+
+  if (auto *overriden = findOverriddenDeclWithDocComment(VD, AllowSerialized))
+    return overriden;
+
+  if (auto *requirement = findDefaultProvidedDeclWithDocComment(VD, AllowSerialized))
+    return requirement;
+
+  if (auto *requirement = findRequirementDeclWithDocComment(VD, AllowSerialized))
+    return requirement;
+
+  return nullptr;
+}
+
+DocComment *
+swift::getCascadingDocComment(swift::markup::MarkupContext &MC, const Decl *D,
+                              bool AllowSerialized) {
+  auto *docD = getDocCommentProvidingDecl(D, AllowSerialized);
+  if (!docD)
+    return nullptr;
+
+  auto *doc = getSingleDocComment(MC, docD, AllowSerialized);
+  assert(doc && "getDocCommentProvidingDecl() returned decl with no comment");
+
+  // If the doc-comment is inherited from other decl, add a note about it.
+  if (docD != D) {
+    doc->setDecl(D);
+    if (auto baseD = docD->getDeclContext()->getSelfNominalTypeDecl()) {
+      doc->addInheritanceNote(MC, baseD);
+
+      // If the doc is inherited from protocol requirement, associate the
+      // requirement with the doc-comment.
+      // FIXME: This is to keep the old behavior.
+      if (isa<ProtocolDecl>(baseD))
+        doc->setDecl(docD);
+    }
+  }
+
+  return doc;
+}
+
+StringRef Decl::getBriefComment() const {
+  if (!this->canHaveComment())
+    return StringRef();
+
+  // Check the cache in ASTContext.
+  auto &Context = getASTContext();
+  if (Optional<StringRef> Comment = Context.getBriefComment(this))
+    return Comment.getValue();
+
+  // Check if the serialized module may have the brief comment available.
+  if (auto *Unit =
+          dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
+      Context.setBriefComment(this, C->Brief);
+      return C->Brief;
+    }
+  }
+
+  // Otherwise, parse the brief from the raw comment itself.
+  auto RC = getRawComment();
+
+  StringRef Result;
+  if (RC.isEmpty())
+    if (auto *docD = getDocCommentProvidingDecl(this))
+      RC = docD->getRawComment();
+  if (!RC.isEmpty()) {
+    SmallString<256> BriefStr;
+    llvm::raw_svector_ostream OS(BriefStr);
+    printBriefComment(RC, OS);
+    Result = Context.AllocateCopy(BriefStr.str());
+  }
+
+  // Cache it.
+  Context.setBriefComment(this, Result);
+  return Result;
 }

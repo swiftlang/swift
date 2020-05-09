@@ -1,0 +1,523 @@
+// RUN: %target-sil-opt -access-enforcement-dom %s -enable-sil-verify-all | %FileCheck %s
+//
+// Test AccessEnforcementDom in the presence of overlapping access scopes.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+@_hasInitialValue @_hasStorage var globalInt: Int64 { get set }
+
+// globalInt
+sil_global hidden @globalInt : $Int64
+
+
+// -----------------------------------------------------------------------------
+// (read, read), read
+
+// Yes, can optimize if the dominating access is nested outside another dynamic.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDRD_RD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRDRD_RD'
+sil hidden [noinline] @testDominatingOverlapRDRD_RD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  %a2 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// Yes, can optimize if the dominating access is nested inside.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRSRD_RD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [static] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRSRD_RD'
+sil hidden [noinline] @testDominatingOverlapRSRD_RD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [static] %ga : $*Int64
+  %a2 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// Yes, can optimize if the dominating access is nested outside.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDRS_RD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [static] [[GA]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRDRS_RD'
+sil hidden [noinline] @testDominatingOverlapRDRS_RD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  %a2 = begin_access [read] [static] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// (read, read), modify
+
+// No, cannot promote nested read to write.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDRD_MD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRDRD_MD'
+sil hidden [noinline] @testDominatingOverlapRDRD_MD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  %a2 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// No, cannot promote nested read to write.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRSRD_MD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [static] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRSRD_MD'
+sil hidden [noinline] @testDominatingOverlapRSRD_MD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [static] %ga : $*Int64
+  %a2 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// No, cannot promote nested read to write.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDRS_MD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [static] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRDRS_MD'
+sil hidden [noinline] @testDominatingOverlapRDRS_MD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  %a2 = begin_access [read] [static] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// (read, modify), read
+
+// Yes, can optimize if the dominating access is nested outside.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDMD_RD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRDMD_RD'
+sil hidden [noinline] @testDominatingOverlapRDMD_RD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  %a2 = begin_access [modify] [dynamic] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// Yes, can optimize if the dominating access is nested inside.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRSMD_RD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [static] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRSMD_RD'
+sil hidden [noinline] @testDominatingOverlapRSMD_RD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [static] %ga : $*Int64
+  %a2 = begin_access [modify] [dynamic] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// Yes, can optimize if the dominating access is nested outside.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDMS_RD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [static] [[GA]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRDMS_RD'
+sil hidden [noinline] @testDominatingOverlapRDMS_RD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  %a2 = begin_access [modify] [static] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// (read, modify), modify
+
+// Yes, can promote if the nested access is a modify.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDMD_MD : $@convention(thin) () -> () {
+// CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRDMD_MD'
+sil hidden [noinline] @testDominatingOverlapRDMD_MD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  %a2 = begin_access [modify] [dynamic] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// Yes, can optimize if the dominating access is nested inside.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRSMD_MD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [static] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRSMD_MD'
+sil hidden [noinline] @testDominatingOverlapRSMD_MD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [static] %ga : $*Int64
+  %a2 = begin_access [modify] [dynamic] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// Yes, can promote if the nested access is a modify.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDMS_MD : $@convention(thin) () -> () {
+// CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [static] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRDMS_MD'
+sil hidden [noinline] @testDominatingOverlapRDMS_MD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  %a2 = begin_access [modify] [static] %ga : $*Int64
+  end_access %a2 : $*Int64
+  end_access %a1 : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// read, (read, read)
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRD_RDRD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRD_RDRD'
+sil hidden [noinline] @testDominatingOverlapRD_RDRD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [read] [dynamic] %ga : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRD_RSRD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [static] [[GA]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRD_RSRD'
+sil hidden [noinline] @testDominatingOverlapRD_RSRD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [read] [static] %ga : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// read, (read, modify)
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRD_RDMD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRD_RDMD'
+sil hidden [noinline] @testDominatingOverlapRD_RDMD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [read] [dynamic] %ga : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRD_RSMD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [static] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRD_RSMD'
+sil hidden [noinline] @testDominatingOverlapRD_RSMD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [read] [static] %ga : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// read, (modify, read)
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRD_MDRD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRD_MDRD'
+sil hidden [noinline] @testDominatingOverlapRD_MDRD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [modify] [dynamic] %ga : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRD_MSRD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [static] [[GA]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRD_MSRD'
+sil hidden [noinline] @testDominatingOverlapRD_MSRD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [modify] [static] %ga : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// read, (modify, modify)
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRD_MDMD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRD_MDMD'
+sil hidden [noinline] @testDominatingOverlapRD_MDMD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [modify] [dynamic] %ga : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRD_MSMD : $@convention(thin) () -> () {
+// CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [modify] [static] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapRD_MSMD'
+sil hidden [noinline] @testDominatingOverlapRD_MSMD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [read] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [modify] [static] %ga : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// modify, (read, read)
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapMD_RDRD : $@convention(thin) () -> () {
+// CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapMD_RDRD'
+sil hidden [noinline] @testDominatingOverlapMD_RDRD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [modify] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [read] [dynamic] %ga : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapMD_RSRD : $@convention(thin) () -> () {
+// CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [static] [[GA]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapMD_RSRD'
+sil hidden [noinline] @testDominatingOverlapMD_RSRD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [modify] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [read] [static] %ga : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// modify, (read, modify)
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapMD_RDMD : $@convention(thin) () -> () {
+// CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapMD_RDMD'
+sil hidden [noinline] @testDominatingOverlapMD_RDMD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [modify] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [read] [dynamic] %ga : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// No, cannot optimize a nested access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapMD_RSMD : $@convention(thin) () -> () {
+// CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [static] [[GA]] : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapMD_RSMD'
+sil hidden [noinline] @testDominatingOverlapMD_RSMD : $@convention(thin) () -> () {
+bb0:
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [modify] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [read] [static] %ga : $*Int64
+  %a3 = begin_access [modify] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}
+
+// -----------------------------------------------------------------------------
+// Unidentifiable access
+
+// No, cannot optimized nest access inside an non-uniquely identified access.
+// CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapUnidentifiable : $@convention(thin) (@inout Int64) -> () {
+// CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
+// CHECK: begin_access [read] [static] %0 : $*Int64
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-LABEL: } // end sil function 'testDominatingOverlapUnidentifiable'
+sil hidden [noinline] @testDominatingOverlapUnidentifiable : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %ga = global_addr @globalInt : $*Int64
+  %a1 = begin_access [modify] [dynamic] %ga : $*Int64
+  end_access %a1 : $*Int64
+  %a2 = begin_access [read] [static] %0 : $*Int64
+  %a3 = begin_access [read] [dynamic] [no_nested_conflict] %ga : $*Int64
+  end_access %a3 : $*Int64
+  end_access %a2 : $*Int64
+  %z = tuple ()
+  return %z : $()
+}

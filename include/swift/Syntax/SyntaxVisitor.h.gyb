@@ -1,0 +1,57 @@
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From SyntaxVisitor.h.gyb.
+//// Do Not Edit Directly!
+//===---------------- SyntaxVisitor.h - SyntaxVisitor definitions ---------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_SYNTAX_VISITOR_H
+#define SWIFT_SYNTAX_VISITOR_H
+
+#include "swift/Syntax/Syntax.h"
+#include "swift/Syntax/SyntaxCollection.h"
+#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
+#include "swift/Syntax/SyntaxNodes.h"
+
+namespace swift {
+namespace syntax {
+struct SyntaxVisitor {
+  virtual ~SyntaxVisitor() {}
+
+% for node in SYNTAX_NODES:
+%   if is_visitable(node):
+  virtual void visit(${node.name} node);
+%   end
+% end
+
+  virtual void visit(TokenSyntax token) {}
+
+  virtual void visitPre(Syntax node) {}
+  virtual void visitPost(Syntax node) {}
+  virtual void visit(Syntax node);
+
+  void visitChildren(Syntax node) {
+    for (unsigned i = 0, e = node.getNumChildren(); i != e; ++i) {
+      if (auto Child = node.getChild(i))
+        visit(*Child);
+    }
+  }
+};
+}
+}
+
+#endif // SWIFT_SYNTAX_VISITOR_H

@@ -1,18 +1,18 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %s -module-name Swift -sil-serialize-all -module-link-name swiftCore -parse-as-library -parse-sil -parse-stdlib -o - | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=Swift
+// RUN: %target-swift-frontend -emit-module %s -module-name Swift -module-link-name swiftCore -parse-as-library -parse-sil -parse-stdlib -o - | %target-sil-opt -module-name=Swift
 
 struct A {
   var f : () -> ()
 }
 
-sil @callee_check : $@convention(thin) (@callee_owned () -> ()) -> ()
+sil @callee_check : $@convention(thin) (@callee_guaranteed () -> ()) -> ()
 
 sil @test1 : $@convention(thin) (@inout A) -> () {
 bb0(%0 : $*A):
   %1 = struct_element_addr %0 : $*A, #A.f
   %2 = load %0 : $*A
   %3 = struct_extract %2 : $A, #A.f
-  %4 = function_ref @callee_check : $@convention(thin) (@callee_owned () -> ()) -> ()
-  apply %4(%3) : $@convention(thin) (@callee_owned () -> ()) -> ()
+  %4 = function_ref @callee_check : $@convention(thin) (@callee_guaranteed () -> ()) -> ()
+  apply %4(%3) : $@convention(thin) (@callee_guaranteed () -> ()) -> ()
   %5 = tuple()
   return %5 : $()
 }

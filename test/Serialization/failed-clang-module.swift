@@ -15,10 +15,8 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -module-cache-path %t/mcp
 // RUN: %target-swift-frontend -typecheck %s -Xcc -DFAIL -I %t -module-cache-path %t/mcp -show-diagnostics-after-fatal -verify -verify-ignore-unknown
 
-// XFAIL: linux
-
 import SwiftModB // expected-error {{missing required module}}
-_ = TyB() // expected-error {{use of unresolved identifier 'TyB'}}
+_ = TyB() // expected-error {{cannot find 'TyB' in scope}}
 
 // -verify-ignore-unknown is for:
 // <unknown>:0: error: unexpected error produced: could not build Objective-C module 'ObjCFail'

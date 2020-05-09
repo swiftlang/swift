@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -assert-config DisableReplacement -emit-ir %s   | %FileCheck %s --check-prefix=DISABLED
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -assert-config Release -emit-ir %s   | %FileCheck %s --check-prefix=RELEASE
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -assert-config Debug -emit-ir %s   | %FileCheck %s --check-prefix=DEBUG
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -assert-config Unchecked -emit-ir %s   | %FileCheck %s --check-prefix=UNCHECKED
+// RUN: %target-swift-frontend -assert-config DisableReplacement -emit-ir %s   | %FileCheck %s --check-prefix=DISABLED
+// RUN: %target-swift-frontend -assert-config Release -emit-ir %s   | %FileCheck %s --check-prefix=RELEASE
+// RUN: %target-swift-frontend -assert-config Debug -emit-ir %s   | %FileCheck %s --check-prefix=DEBUG
+// RUN: %target-swift-frontend -assert-config Unchecked -emit-ir %s   | %FileCheck %s --check-prefix=UNCHECKED
 
 import Builtin
 

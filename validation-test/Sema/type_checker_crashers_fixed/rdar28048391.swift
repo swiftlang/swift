@@ -11,4 +11,4 @@ extension rdar28048391 {
   }
 }
 
-extension ImplicitlyUnwrappedOptional : rdar28048391 { }
+extension Optional : rdar28048391 { }

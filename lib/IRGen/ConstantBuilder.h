@@ -24,8 +24,13 @@
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
 
+namespace clang {
+class PointerAuthSchema;
+}
+
 namespace swift {
 namespace irgen {
+class PointerAuthEntity;
 
 class ConstantAggregateBuilderBase;
 class ConstantStructBuilder;
@@ -72,6 +77,10 @@ public:
     addInt(IGM().Int32Ty, value);
   }
 
+  void addInt64(uint64_t value) { addInt(IGM().Int64Ty, value); }
+
+  void addSize(Size size) { addInt(IGM().SizeTy, size.getValue()); }
+
   void addRelativeAddressOrNull(llvm::Constant *target) {
     if (target) {
       addRelativeAddress(target);
@@ -81,6 +90,7 @@ public:
   }
 
   void addRelativeAddress(llvm::Constant *target) {
+    assert(!isa<llvm::ConstantPointerNull>(target));
     addRelativeOffset(IGM().RelativeAddressTy, target);
   }
 
@@ -94,20 +104,19 @@ public:
                             unsigned(reference.isIndirect()));
   }
 
-  void addFarRelativeAddress(llvm::Constant *target) {
-    addRelativeOffset(IGM().FarRelativeAddressTy, target);
-  }
-
-  void addFarRelativeAddress(ConstantReference reference) {
-    addTaggedRelativeOffset(IGM().FarRelativeAddressTy,
-                            reference.getValue(),
-                            unsigned(reference.isIndirect()));
+  /// Add an indirect relative reference to the given address.
+  /// The target must be a "GOT-equivalent", i.e. a pointer to an
+  /// external object.
+  void addIndirectRelativeAddress(ConstantReference reference) {
+    assert(reference.isIndirect());
+    addRelativeOffset(IGM().RelativeAddressTy,
+                      reference.getValue());
   }
 
   Size getNextOffsetFromGlobal() const {
     return Size(super::getNextOffsetFromGlobal().getQuantity());
   }
-  
+
   void addAlignmentPadding(Alignment align) {
     auto misalignment = getNextOffsetFromGlobal() % IGM().getPointerAlignment();
     if (misalignment != Size(0))
@@ -115,15 +124,40 @@ public:
             llvm::ArrayType::get(IGM().Int8Ty,
                                  align.getValue() - misalignment.getValue())));
   }
+
+  using super::addSignedPointer;
+  void addSignedPointer(llvm::Constant *pointer,
+                        const clang::PointerAuthSchema &schema,
+                        const PointerAuthEntity &entity);
+
+  void addSignedPointer(llvm::Constant *pointer,
+                        const clang::PointerAuthSchema &schema,
+                        uint16_t otherDiscriminator);
 };
 
 class ConstantArrayBuilder
     : public clang::CodeGen::ConstantArrayBuilderTemplateBase<
                                                     ConstantInitBuilderTraits> {
+private:
+  llvm::Type *EltTy;
+
 public:
-  template <class... As>
-  ConstantArrayBuilder(As &&... args)
-    : ConstantArrayBuilderTemplateBase(std::forward<As>(args)...) {}
+  ConstantArrayBuilder(InitBuilder &builder,
+                       AggregateBuilderBase *parent,
+                       llvm::Type *eltTy)
+    : ConstantArrayBuilderTemplateBase(builder, parent, eltTy), EltTy(eltTy) {}
+
+  void addAlignmentPadding(Alignment align) {
+    auto misalignment = getNextOffsetFromGlobal() % align;
+    if (misalignment == Size(0))
+      return;
+
+    auto eltSize = IGM().DataLayout.getTypeStoreSize(EltTy);
+    assert(misalignment.getValue() % eltSize == 0);
+
+    for (unsigned i = 0, n = misalignment.getValue() / eltSize; i != n; ++i)
+      add(llvm::Constant::getNullValue(EltTy));
+  }
 };
 
 class ConstantStructBuilder

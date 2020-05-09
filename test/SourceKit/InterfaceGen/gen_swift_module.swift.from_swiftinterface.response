@@ -1,0 +1,111 @@
+
+public class MyClass {
+
+    public func pub_method()
+}
+
+public func pub_function()
+
+
+[
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 8,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 14,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 29,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 36,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 41,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 57,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 64,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 69,
+    key.length: 12
+  }
+]
+<<NULL>>
+[
+  {
+    key.kind: source.lang.swift.decl.class,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "MyClass",
+    key.offset: 8,
+    key.length: 47,
+    key.nameoffset: 14,
+    key.namelength: 7,
+    key.bodyoffset: 23,
+    key.bodylength: 31,
+    key.attributes: [
+      {
+        key.offset: 1,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
+    key.substructure: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "pub_method()",
+        key.offset: 36,
+        key.length: 17,
+        key.nameoffset: 41,
+        key.namelength: 12,
+        key.attributes: [
+          {
+            key.offset: 29,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "pub_function()",
+    key.offset: 64,
+    key.length: 19,
+    key.nameoffset: 69,
+    key.namelength: 14,
+    key.attributes: [
+      {
+        key.offset: 57,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ]
+  }
+]

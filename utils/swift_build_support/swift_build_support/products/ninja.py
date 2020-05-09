@@ -18,23 +18,42 @@ import os.path
 import platform
 import sys
 
+from build_swift.build_swift import cache_utils
+from build_swift.build_swift.wrappers import xcrun
+
 from . import product
-from .. import cache_util
 from .. import shell
 
 
 class Ninja(product.Product):
-    @cache_util.reify
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def new_builder(cls, args, toolchain, workspace, host):
+        return NinjaBuilder(cls, args, toolchain, workspace)
+
+
+class NinjaBuilder(product.ProductBuilder):
+    def __init__(self, product_class, args, toolchain, workspace):
+        self.source_dir = workspace.source_dir(
+            product_class.product_source_name())
+        self.build_dir = workspace.build_dir('build',
+                                             product_class.product_name())
+        self.args = args
+        self.toolchain = toolchain
+
+    @cache_utils.reify
     def ninja_bin_path(self):
         return os.path.join(self.build_dir, 'ninja')
 
-    def do_build(self):
+    def build(self):
         if os.path.exists(self.ninja_bin_path):
             return
 
         env = None
         if platform.system() == "Darwin":
-            from .. import xcrun
             sysroot = xcrun.sdk_path("macosx")
             osx_version_min = self.args.darwin_deployment_version_osx
             assert sysroot is not None

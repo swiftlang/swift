@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 import Builtin
 import Swift
@@ -130,7 +130,7 @@ bb0(%x : $Builtin.Int64):
 }
 
 class IntClass {
-  @sil_stored var value: Builtin.Int32 { get set }
+  @_hasStorage var value: Builtin.Int32 { get set }
   init(value: Builtin.Int32)
   @objc deinit
 }
@@ -141,13 +141,13 @@ enum SortaOptional1 {
 
 sil @rewrap_optional_1 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional1 {
 bb0(%0 : $SortaOptional1):
-  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt.1: bb1, case #SortaOptional1.Nope!enumelt: bb2
+  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt: bb1, case #SortaOptional1.Nope!enumelt: bb2
 
 bb1:
 // CHECK-NOT: unchecked_enum_data
 // CHECK: return %0
-  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt.1
-  %3 = enum $SortaOptional1, #SortaOptional1.Yup!enumelt.1, %2 : $IntClass
+  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt
+  %3 = enum $SortaOptional1, #SortaOptional1.Yup!enumelt, %2 : $IntClass
   return %3 : $SortaOptional1
 
 bb2:
@@ -162,14 +162,14 @@ enum SortaOptional2 {
 
 sil @rewrap_optional_2 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional2 {
 bb0(%0 : $SortaOptional1):
-  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt.1: bb1, case #SortaOptional1.Nope!enumelt: bb2
+  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt: bb1, case #SortaOptional1.Nope!enumelt: bb2
 
 bb1:
 // CHECK: [[DATA:%[0-9a-zA-Z]+]] = unchecked_enum_data %0
-// CHECK: [[RESULT:%[0-9a-zA-Z]+]] = enum $SortaOptional2, #SortaOptional2.Yup!enumelt.1, [[DATA]] : $IntClass
+// CHECK: [[RESULT:%[0-9a-zA-Z]+]] = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, [[DATA]] : $IntClass
 // CHECK: return [[RESULT]]
-  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt.1
-  %3 = enum $SortaOptional2, #SortaOptional2.Yup!enumelt.1, %2 : $IntClass // user: %4
+  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt
+  %3 = enum $SortaOptional2, #SortaOptional2.Yup!enumelt, %2 : $IntClass // user: %4
   return %3 : $SortaOptional2                      // id: %4
 
 bb2:
@@ -191,8 +191,8 @@ public enum GenericEnum<T> {
 sil @combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Int> {
 bb0(%0 : $*GenericEnum<Int>):
   %5 = load %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
-  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt.1 // user: %24
-  %24 = enum $GenericEnum<Int>, #GenericEnum.B!enumelt.1, %23 : $Int
+  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt // user: %24
+  %24 = enum $GenericEnum<Int>, #GenericEnum.B!enumelt, %23 : $Int
   return %24 : $GenericEnum<Int>
 }
 
@@ -204,8 +204,8 @@ bb0(%0 : $*GenericEnum<Int>):
 sil @dont_combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Double> {
 bb0(%0 : $*GenericEnum<Int>):
   %5 = load %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
-  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt.1 // user: %24
-  %24 = enum $GenericEnum<Double>, #GenericEnum.B!enumelt.1, %23 : $Int
+  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt // user: %24
+  %24 = enum $GenericEnum<Double>, #GenericEnum.B!enumelt, %23 : $Int
   return %24 : $GenericEnum<Double>
 }
 
@@ -313,3 +313,61 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-NEXT: return %1 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
 }
 
+public class A {
+  var b: B
+  init(b: B)
+  deinit
+}
+
+public class B {
+  var x: Int
+  init(x: Int)
+  deinit
+}
+
+// simplify access markers
+sil @simplify_accesssil : $@convention(method) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  %badr = ref_element_addr %0 : $A, #A.b
+  %ba1 = begin_access [read] [dynamic] %badr : $*B
+  end_access %ba1 : $*B
+  %ba2 = begin_access [read] [dynamic] %badr : $*B
+  fix_lifetime %ba2 : $*B
+  end_access %ba2 : $*B
+  %ba3 = begin_access [read] [dynamic] %badr : $*B
+  %b = load %ba3 : $*B
+  end_access %ba3 : $*B
+  %xadr = ref_element_addr %b : $B, #B.x
+  %xaccess = begin_access [read] [dynamic] %xadr : $*Int
+  end_access %xaccess : $*Int
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @simplify_accesssil : $@convention(method) (@guaranteed A) -> () {
+// CHECK: bb0(%0 : $A):
+// CHECK-NEXT: [[ADR:%.*]] = ref_element_addr %0 : $A, #A.b
+// CHECK-NEXT: fix_lifetime [[ADR]] : $*B
+// CHECK-NEXT: %{{.*}} = tuple ()
+// CHECK-NEXT: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'simplify_accesssil'
+
+// Test replacement of metatype instructions with metatype arguments.
+protocol SomeP {}
+
+public enum SpecialEnum : SomeP {}
+
+// CHECK-LABEL: sil @testSimplifyMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK-LABEL: }  // end sil function 'testSimplifyMetatype'
+sil @testSimplifyMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
+bb0(%0 : $@thick SpecialEnum.Type):
+  %1 = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+  %2 = metatype $@thick SpecialEnum.Type
+  %3 = init_existential_metatype %2 : $@thick SpecialEnum.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%1 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  %5 = struct $Bool (%4 : $Builtin.Int1)
+  return %5 : $Bool
+}

@@ -31,42 +31,40 @@ namespace swift {
 /// The intended clients of this class are SILGen, SIL deserializers, etc.
 class SILOpenedArchetypesTracker : public DeleteNotificationHandler {
 public:
-  typedef llvm::DenseMap<ArchetypeType *, SILValue> OpenedArchetypeDefsMap;
+  using OpenedArchetypeDefsMap =
+    llvm::DenseMap<ArchetypeType*, SingleValueInstruction*>;
 
   SILOpenedArchetypesTracker(SILOpenedArchetypesTracker &Tracker)
       : SILOpenedArchetypesTracker(Tracker.F, Tracker) {}
 
   // Re-use pre-populated map if available.
-  SILOpenedArchetypesTracker(const SILFunction &F,
+  SILOpenedArchetypesTracker(const SILFunction *F,
                              SILOpenedArchetypesTracker &Tracker)
       : F(F), OpenedArchetypeDefs(Tracker.OpenedArchetypeDefs) { }
 
   // Re-use pre-populated map if available.
-  SILOpenedArchetypesTracker(const SILFunction &F,
+  SILOpenedArchetypesTracker(const SILFunction *F,
                              OpenedArchetypeDefsMap &OpenedArchetypeDefs)
       : F(F), OpenedArchetypeDefs(OpenedArchetypeDefs) { }
 
   // Use its own local map if no pre-populated map is provided.
-  SILOpenedArchetypesTracker(const SILFunction &F)
+  SILOpenedArchetypesTracker(const SILFunction *F)
       : F(F), OpenedArchetypeDefs(LocalOpenedArchetypeDefs) { }
 
 
-  const SILFunction &getFunction() const { return F; }
-
-  // Register a definition of a given opened archetype.
-  void addOpenedArchetypeDef(CanArchetypeType archetype, SILValue Def);
-
-  void removeOpenedArchetypeDef(CanArchetypeType archetype, SILValue Def) {
-    auto FoundDef = getOpenedArchetypeDef(archetype);
-    assert(FoundDef &&
-           "Opened archetype definition is not registered in SILFunction");
-    if (FoundDef == Def)
-      OpenedArchetypeDefs.erase(archetype);
+  const SILFunction *getFunction() const {
+    assert(F && "no function context available");
+    return F;
   }
 
-  // Return the SILValue defining a given archetype.
-  // If the defining value is not known, return an empty SILValue.
-  SILValue getOpenedArchetypeDef(CanArchetypeType archetype) const {
+  // Register a definition of a given opened archetype.
+  void addOpenedArchetypeDef(CanArchetypeType archetype,
+                             SingleValueInstruction *def);
+
+  // Return the SILInstruciton* defining a given archetype.
+  // If the defining value is not known, return a null instruction.
+  SingleValueInstruction *
+  getOpenedArchetypeDef(CanArchetypeType archetype) const {
     return OpenedArchetypeDefs.lookup(archetype);
   }
 
@@ -104,14 +102,15 @@ public:
   bool needsNotifications() { return true; }
 
   // Handle notifications about removals of instructions.
-  void handleDeleteNotification(swift::ValueBase *Value);
+  void handleDeleteNotification(SILNode *node);
 
   // Dump the contents.
   void dump() const;
 
   virtual ~SILOpenedArchetypesTracker() {
     // Unregister the handler.
-    F.getModule().removeDeleteNotificationHandler(this);
+    if (F)
+      F->getModule().removeDeleteNotificationHandler(this);
   }
 
 private:
@@ -119,7 +118,7 @@ private:
   SILOpenedArchetypesTracker &operator = (const SILOpenedArchetypesTracker &) = delete;
   /// The function whose opened archetypes are being tracked.
   /// Used only for verification purposes.
-  const SILFunction &F;
+  const SILFunction *F;
 
   /// Mapping from opened archetypes to their definitions.
   OpenedArchetypeDefsMap &OpenedArchetypeDefs;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,8 +15,8 @@
 //===----------------------------------------------------------------------===//
 // Standardized uninhabited type
 //===----------------------------------------------------------------------===//
-/// The return type of functions that do not return normally; a type with no
-/// values.
+/// The return type of functions that do not return normally, that is, a type
+/// with no values.
 ///
 /// Use `Never` as the return type when declaring a closure, function, or
 /// method that unconditionally throws an error, traps, or otherwise does
@@ -25,22 +25,26 @@
 ///     func crashAndBurn() -> Never {
 ///         fatalError("Something very, very bad happened")
 ///     }
-@_fixed_layout
+@frozen
 public enum Never {}
+
+extension Never: Error {}
+
+extension Never: Equatable, Comparable, Hashable {}
 
 //===----------------------------------------------------------------------===//
 // Standardized aliases
 //===----------------------------------------------------------------------===//
-/// The return type of functions that don't explicitly specify a return type;
-/// an empty tuple (i.e., `()`).
+/// The return type of functions that don't explicitly specify a return type,
+/// that is, an empty tuple `()`.
 ///
 /// When declaring a function or method, you don't need to specify a return
 /// type if no value will be returned. However, the type of a function,
 /// method, or closure always includes a return type, which is `Void` if
 /// otherwise unspecified.
 ///
-/// Use `Void` or an empty tuple as the return type when declaring a
-/// closure, function, or method that doesn't return a value.
+/// Use `Void` or an empty tuple as the return type when declaring a closure,
+/// function, or method that doesn't return a value.
 ///
 ///     // No return type declared:
 ///     func logMessage(_ s: String) {
@@ -96,15 +100,7 @@ public typealias StringLiteralType = String
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained number literals
 //===----------------------------------------------------------------------===//
-// Integer literals are limited to 2048 bits.
-// The intent is to have arbitrary-precision literals, but implementing that
-// requires more work.
-//
-// Rationale: 1024 bits are enough to represent the absolute value of min/max
-// IEEE Binary64, and we need 1 bit to represent the sign.  Instead of using
-// 1025, we use the next round number -- 2048.
-public typealias _MaxBuiltinIntegerType = Builtin.Int2048
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE80
 #else
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
@@ -283,229 +279,6 @@ public typealias AnyObject = Builtin.AnyObject
 ///     // Prints "nil"
 public typealias AnyClass = AnyObject.Type
 
-/// A type that supports standard bitwise arithmetic operators.
-///
-/// Types that conform to the `BitwiseOperations` protocol implement operators
-/// for bitwise arithmetic. The integer types in the standard library all
-/// conform to `BitwiseOperations` by default. When you use bitwise operators
-/// with an integer, you perform operations on the raw data bits that store
-/// the integer's value.
-///
-/// In the following examples, the binary representation of any values are
-/// shown in a comment to the right, like this:
-///
-///     let x: UInt8 = 5        // 0b00000101
-///
-/// Here are the required operators for the `BitwiseOperations` protocol:
-///
-/// - The bitwise OR operator (`|`) returns a value that has each bit set to
-///   `1` where *one or both* of its arguments had that bit set to `1`. This
-///   is equivalent to the union of two sets. For example:
-///
-///         let x: UInt8 = 5        // 0b00000101
-///         let y: UInt8 = 14       // 0b00001110
-///         let z = x | y           // 0b00001111
-///
-///   Performing a bitwise OR operation with a value and `allZeros` always
-///   returns the same value.
-///
-///         print(x | .allZeros)    // 0b00000101
-///         // Prints "5"
-///
-/// - The bitwise AND operator (`&`) returns a value that has each bit set to
-///   `1` where *both* of its arguments had that bit set to `1`. This is
-///   equivalent to the intersection of two sets. For example:
-///
-///         let x: UInt8 = 5        // 0b00000101
-///         let y: UInt8 = 14       // 0b00001110
-///         let z = x & y           // 0b00000100
-///
-///   Performing a bitwise AND operation with a value and `allZeros` always
-///   returns `allZeros`.
-///
-///         print(x & .allZeros)    // 0b00000000
-///         // Prints "0"
-///
-/// - The bitwise XOR operator (`^`), or exclusive OR operator, returns a value
-///   that has each bit set to `1` where *one or the other but not both* of
-///   its operators has that bit set to `1`. This is equivalent to the
-///   symmetric difference of two sets. For example:
-///
-///         let x: UInt8 = 5        // 0b00000101
-///         let y: UInt8 = 14       // 0b00001110
-///         let z = x ^ y           // 0b00001011
-///
-///   Performing a bitwise XOR operation with a value and `allZeros` always
-///   returns the same value.
-///
-///         print(x ^ .allZeros)    // 0b00000101
-///         // Prints "5"
-///
-/// - The bitwise NOT operator (`~`) is a prefix operator that returns a value
-///   where all the bits of its argument are flipped: Bits that are `1` in the
-///   argument are `0` in the result, and bits that are `0` in the argument
-///   are `1` in the result. This is equivalent to the inverse of a set. For
-///   example:
-///
-///         let x: UInt8 = 5        // 0b00000101
-///         let notX = ~x           // 0b11111010
-///
-///   Performing a bitwise NOT operation on `allZeros` returns a value with
-///   every bit set to `1`.
-///
-///         let allOnes = ~UInt8.allZeros   // 0b11111111
-///
-/// The `OptionSet` protocol uses a raw value that conforms to
-/// `BitwiseOperations` to provide mathematical set operations like
-/// `union(_:)`, `intersection(_:)` and `contains(_:)` with O(1) performance.
-///
-/// Conforming to the BitwiseOperations Protocol
-/// ============================================
-///
-/// To make your custom type conform to `BitwiseOperations`, add a static
-/// `allZeros` property and declare the four required operator functions. Any
-/// type that conforms to `BitwiseOperations`, where `x` is an instance of the
-/// conforming type, must satisfy the following conditions:
-///
-/// - `x | Self.allZeros == x`
-/// - `x ^ Self.allZeros == x`
-/// - `x & Self.allZeros == .allZeros`
-/// - `x & ~Self.allZeros == x`
-/// - `~x == x ^ ~Self.allZeros`
-@available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use FixedWidthInteger protocol instead")
-public typealias BitwiseOperations = _BitwiseOperations
-
-public protocol _BitwiseOperations {
-  /// Returns the intersection of bits set in the two arguments.
-  ///
-  /// The bitwise AND operator (`&`) returns a value that has each bit set to
-  /// `1` where *both* of its arguments had that bit set to `1`. This is
-  /// equivalent to the intersection of two sets. For example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///     let y: UInt8 = 14       // 0b00001110
-  ///     let z = x & y           // 0b00000100
-  ///
-  /// Performing a bitwise AND operation with a value and `allZeros` always
-  /// returns `allZeros`.
-  ///
-  ///     print(x & .allZeros)    // 0b00000000
-  ///     // Prints "0"
-  ///
-  /// - Complexity: O(1).
-  static func & (lhs: Self, rhs: Self) -> Self
-
-  /// Returns the union of bits set in the two arguments.
-  ///
-  /// The bitwise OR operator (`|`) returns a value that has each bit set to
-  /// `1` where *one or both* of its arguments had that bit set to `1`. For
-  /// example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///     let y: UInt8 = 14       // 0b00001110
-  ///     let z = x | y           // 0b00001111
-  ///
-  /// Performing a bitwise OR operation with a value and `allZeros` always
-  /// returns the same value.
-  ///
-  ///     print(x | .allZeros)    // 0b00000101
-  ///     // Prints "5"
-  ///
-  /// - Complexity: O(1).
-  static func | (lhs: Self, rhs: Self) -> Self
-
-  /// Returns the bits that are set in exactly one of the two arguments.
-  ///
-  /// The bitwise XOR operator (`^`), or exclusive OR operator, returns a value
-  /// that has each bit set to `1` where *one or the other but not both* of
-  /// its operators has that bit set to `1`. This is equivalent to the
-  /// symmetric difference of two sets. For example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///     let y: UInt8 = 14       // 0b00001110
-  ///     let z = x ^ y           // 0b00001011
-  ///
-  /// Performing a bitwise XOR with a value and `allZeros` always returns the
-  /// same value:
-  ///
-  ///     print(x ^ .allZeros)    // 0b00000101
-  ///     // Prints "5"
-  ///
-  /// - Complexity: O(1).
-  static func ^ (lhs: Self, rhs: Self) -> Self
-
-  /// Returns the inverse of the bits set in the argument.
-  ///
-  /// The bitwise NOT operator (`~`) is a prefix operator that returns a value
-  /// in which all the bits of its argument are flipped: Bits that are `1` in the
-  /// argument are `0` in the result, and bits that are `0` in the argument
-  /// are `1` in the result. This is equivalent to the inverse of a set. For
-  /// example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///     let notX = ~x           // 0b11111010
-  ///
-  /// Performing a bitwise NOT operation on `allZeros` returns a value with
-  /// every bit set to `1`.
-  ///
-  ///     let allOnes = ~UInt8.allZeros   // 0b11111111
-  ///
-  /// - Complexity: O(1).
-  static prefix func ~ (x: Self) -> Self
-
-  /// The empty bitset.
-  ///
-  /// The `allZeros` static property is the [identity element][] for bitwise OR
-  /// and XOR operations and the [fixed point][] for bitwise AND operations.
-  /// For example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///
-  ///     // Identity
-  ///     x | .allZeros           // 0b00000101
-  ///     x ^ .allZeros           // 0b00000101
-  ///
-  ///     // Fixed point
-  ///     x & .allZeros           // 0b00000000
-  ///
-  /// [identity element]:http://en.wikipedia.org/wiki/Identity_element
-  /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
-  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0 or init() of a type conforming to FixedWidthInteger")
-  static var allZeros: Self { get }
-}
-
-/// Calculates the union of bits sets in the two arguments and stores the result
-/// in the first argument.
-///
-/// - Parameters:
-///   - lhs: A value to update with the union of bits set in the two arguments.
-///   - rhs: Another value.
-public func |= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
-  lhs = lhs | rhs
-}
-
-/// Calculates the intersections of bits sets in the two arguments and stores
-/// the result in the first argument.
-///
-/// - Parameters:
-///   - lhs: A value to update with the intersections of bits set in the two
-///     arguments.
-///   - rhs: Another value.
-public func &= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
-  lhs = lhs & rhs
-}
-
-/// Calculates the bits that are set in exactly one of the two arguments and
-/// stores the result in the first argument.
-///
-/// - Parameters:
-///   - lhs: A value to update with the bits that are set in exactly one of the
-///     two arguments.
-///   - rhs: Another value.
-public func ^= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
-  lhs = lhs ^ rhs
-}
-
 //===----------------------------------------------------------------------===//
 // Standard pattern matching forms
 //===----------------------------------------------------------------------===//
@@ -538,7 +311,7 @@ public func ^= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
 ///   - lhs: A value to compare.
 ///   - rhs: Another value to compare.
 @_transparent
-public func ~= <T : Equatable>(a: T, b: T) -> Bool {
+public func ~= <T: Equatable>(a: T, b: T) -> Bool {
   return a == b
 }
 
@@ -602,6 +375,7 @@ precedencegroup BitwiseShiftPrecedence {
 // Standard postfix operators.
 postfix operator ++
 postfix operator --
+postfix operator ...: Comparable
 
 // Optional<T> unwrapping operator is built into the compiler as a part of
 // postfix expression grammar.
@@ -611,70 +385,71 @@ postfix operator --
 // Standard prefix operators.
 prefix operator ++
 prefix operator --
-prefix operator !
-prefix operator ~
-prefix operator +
-prefix operator -
+prefix operator !: Bool
+prefix operator ~: BinaryInteger
+prefix operator +: AdditiveArithmetic
+prefix operator -: SignedNumeric
+prefix operator ...: Comparable
+prefix operator ..<: Comparable
 
 // Standard infix operators.
 
 // "Exponentiative"
 
-infix operator << : BitwiseShiftPrecedence
-infix operator >> : BitwiseShiftPrecedence
+infix operator  <<: BitwiseShiftPrecedence, BinaryInteger
+infix operator &<<: BitwiseShiftPrecedence, FixedWidthInteger
+infix operator  >>: BitwiseShiftPrecedence, BinaryInteger
+infix operator &>>: BitwiseShiftPrecedence, FixedWidthInteger
 
 // "Multiplicative"
 
-infix operator   * : MultiplicationPrecedence
-infix operator  &* : MultiplicationPrecedence
-infix operator   / : MultiplicationPrecedence
-infix operator   % : MultiplicationPrecedence
-infix operator   & : MultiplicationPrecedence
+infix operator   *: MultiplicationPrecedence, Numeric
+infix operator  &*: MultiplicationPrecedence, FixedWidthInteger
+infix operator   /: MultiplicationPrecedence, BinaryInteger, FloatingPoint
+infix operator   %: MultiplicationPrecedence, BinaryInteger
+infix operator   &: MultiplicationPrecedence, BinaryInteger
 
 // "Additive"
 
-infix operator   + : AdditionPrecedence
-infix operator  &+ : AdditionPrecedence
-infix operator   - : AdditionPrecedence
-infix operator  &- : AdditionPrecedence
-infix operator   | : AdditionPrecedence
-infix operator   ^ : AdditionPrecedence
+infix operator   +: AdditionPrecedence, AdditiveArithmetic, String, Array, Strideable
+infix operator  &+: AdditionPrecedence, FixedWidthInteger
+infix operator   -: AdditionPrecedence, AdditiveArithmetic, Strideable
+infix operator  &-: AdditionPrecedence, FixedWidthInteger
+infix operator   |: AdditionPrecedence, BinaryInteger
+infix operator   ^: AdditionPrecedence, BinaryInteger
 
 // FIXME: is this the right precedence level for "..." ?
-infix operator  ... : RangeFormationPrecedence
-infix operator  ..< : RangeFormationPrecedence
-postfix operator ...
-prefix operator ...
-prefix operator ..<
+infix operator  ...: RangeFormationPrecedence, Comparable
+infix operator  ..<: RangeFormationPrecedence, Comparable
 
 // The cast operators 'as' and 'is' are hardcoded as if they had the
 // following attributes:
-// infix operator as : CastingPrecedence
+// infix operator as: CastingPrecedence
 
 // "Coalescing"
-infix operator ?? : NilCoalescingPrecedence
+
+infix operator ??: NilCoalescingPrecedence
 
 // "Comparative"
 
-infix operator  <  : ComparisonPrecedence
-infix operator  <= : ComparisonPrecedence
-infix operator  >  : ComparisonPrecedence
-infix operator  >= : ComparisonPrecedence
-infix operator  == : ComparisonPrecedence
-infix operator  != : ComparisonPrecedence
-infix operator === : ComparisonPrecedence
-infix operator !== : ComparisonPrecedence
+infix operator  <: ComparisonPrecedence, Comparable
+infix operator  <=: ComparisonPrecedence, Comparable
+infix operator  >: ComparisonPrecedence, Comparable
+infix operator  >=: ComparisonPrecedence, Comparable
+infix operator  ==: ComparisonPrecedence, Equatable
+infix operator  !=: ComparisonPrecedence, Equatable
+infix operator ===: ComparisonPrecedence
+infix operator !==: ComparisonPrecedence
 // FIXME: ~= will be built into the compiler.
-infix operator  ~= : ComparisonPrecedence
+infix operator  ~=: ComparisonPrecedence
 
 // "Conjunctive"
 
-infix operator && : LogicalConjunctionPrecedence
+infix operator &&: LogicalConjunctionPrecedence, Bool
 
 // "Disjunctive"
 
-infix operator || : LogicalDisjunctionPrecedence
-
+infix operator ||: LogicalDisjunctionPrecedence, Bool
 
 // User-defined ternary operators are not supported. The ? : operator is
 // hardcoded as if it had the following attributes:
@@ -682,20 +457,25 @@ infix operator || : LogicalDisjunctionPrecedence
 
 // User-defined assignment operators are not supported. The = operator is
 // hardcoded as if it had the following attributes:
-// infix operator = : AssignmentPrecedence
+// infix operator =: AssignmentPrecedence
 
 // Compound
 
-infix operator  *= : AssignmentPrecedence
-infix operator  /= : AssignmentPrecedence
-infix operator  %= : AssignmentPrecedence
-infix operator  += : AssignmentPrecedence
-infix operator  -= : AssignmentPrecedence
-infix operator <<= : AssignmentPrecedence
-infix operator >>= : AssignmentPrecedence
-infix operator  &= : AssignmentPrecedence
-infix operator  ^= : AssignmentPrecedence
-infix operator  |= : AssignmentPrecedence
+infix operator   *=: AssignmentPrecedence, Numeric
+infix operator  &*=: AssignmentPrecedence, FixedWidthInteger
+infix operator   /=: AssignmentPrecedence, BinaryInteger
+infix operator   %=: AssignmentPrecedence, BinaryInteger
+infix operator   +=: AssignmentPrecedence, AdditiveArithmetic, String, Array, Strideable
+infix operator  &+=: AssignmentPrecedence, FixedWidthInteger
+infix operator   -=: AssignmentPrecedence, AdditiveArithmetic, Strideable
+infix operator  &-=: AssignmentPrecedence, FixedWidthInteger
+infix operator  <<=: AssignmentPrecedence, BinaryInteger
+infix operator &<<=: AssignmentPrecedence, FixedWidthInteger
+infix operator  >>=: AssignmentPrecedence, BinaryInteger
+infix operator &>>=: AssignmentPrecedence, FixedWidthInteger
+infix operator   &=: AssignmentPrecedence, BinaryInteger
+infix operator   ^=: AssignmentPrecedence, BinaryInteger
+infix operator   |=: AssignmentPrecedence, BinaryInteger
 
 // Workaround for <rdar://problem/14011860> SubTLF: Default
 // implementations in protocols.  Library authors should ensure

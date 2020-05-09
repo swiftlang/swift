@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
-// UNSUPPORTED: CPU=armv7
 
 // Create a new array
 var a = [Int](repeating: 0, count: 10)
@@ -55,10 +54,15 @@ class Canary {
 
 print("")
 
+@inline(never)
+func return_array() -> [Canary] {
+  return [Canary(), Canary(), Canary()]
+}
+
 // CHECK: dead
 // CHECK: dead
 // CHECK: dead
-_ = { [Canary(), Canary(), Canary()] }()
+return_array()
 
 // Create an array of (String, Bool) pairs. <rdar://problem/16916422>
 repeat {
@@ -157,3 +161,25 @@ test()
 let mdaPerf = [[1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12]]
 print(mdaPerf)
 // CHECK: {{\[}}[1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12]]
+
+class Deinitable {
+  deinit {
+    print("deinit called")
+  }
+}
+
+enum E : Error {
+  case error
+}
+
+func throwingFunc() throws -> Deinitable {
+  throw E.error
+}
+
+do {
+  let array = try [Deinitable(), throwingFunc()]
+} catch {
+  // CHECK: deinit called
+  // CHECK: error thrown
+  print("error thrown")
+}

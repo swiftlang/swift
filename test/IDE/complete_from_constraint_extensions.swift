@@ -22,7 +22,8 @@ func foo1() {
   I1.#^CONSTRAINT1^#
 }
 
-// CONSTRAINT1: 	 Begin completions, 1 items
+// CONSTRAINT1: 	 Begin completions, 2 items
+// CONSTRAINT1-NEXT: Keyword[self]/CurrNominal: self[#Example<S1>#]; name=self
 // CONSTRAINT1-NEXT: Decl[InstanceMethod]/CurrNominal:   P1Method()[#Void#]; name=P1Method()
 // CONSTRAINT1-NEXT: End completions
 
@@ -31,7 +32,8 @@ func foo2() {
   I2.#^CONSTRAINT2^#
 }
 
-// CONSTRAINT2:      Begin completions, 1 items
+// CONSTRAINT2:      Begin completions, 2 items
+// CONSTRAINT2-NEXT: Keyword[self]/CurrNominal: self[#Example<S2>#]; name=self
 // CONSTRAINT2-NEXT: Decl[InstanceMethod]/CurrNominal:   P2Method()[#Void#]; name=P2Method()
 // CONSTRAINT2-NEXT: End completions
 
@@ -48,6 +50,7 @@ struct ConcreteCollection<Element> : MyCollection {}
 func foo3() {
   ConcreteCollection<Int>().#^CONSTRAINT3^#
 }
-// CONSTRAINT3:      Begin completions, 1 items
+// CONSTRAINT3:      Begin completions, 2 items
+// CONSTRAINT3-NEXT: Keyword[self]/CurrNominal: self[#ConcreteCollection<Int>#]; name=self
 // CONSTRAINT3-NEXT: Decl[InstanceVar]/Super:            indices[#MyDefaultIndices<ConcreteCollection<Int>>#]; name=indices
 // CONSTRAINT3-NEXT: End completions

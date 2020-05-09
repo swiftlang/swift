@@ -1,0 +1,30 @@
+// REQUIRES: CPU=x86_64
+// REQUIRES: OS=macosx
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
+// RUN: %target-swift-frontend -disable-type-layout -I %t -emit-ir -enable-library-evolution %s | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+import resilient_struct
+
+public enum EnumWithClassArchetypeAndDynamicSize<T : AnyObject> {
+  case A(T)
+  case B(Size)
+}
+
+// CHECK-LABEL: define swiftcc void @copyDynamicMultiEnum(%swift.type* %"EnumWithClassArchetypeAndDynamicSize<T>", %swift.type* %U, %T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* noalias nocapture swiftself %0)
+// CHECK: call %T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* @"$s20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeOyxGRlzCr0_lWOc"(%T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* %0, %T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* {{.*}}, %swift.type* %"EnumWithClassArchetypeAndDynamicSize<T>")
+// CHECK: ret void
+sil [ossa] @copyDynamicMultiEnum : $@convention(method) <T, U where T: AnyObject> (@in_guaranteed EnumWithClassArchetypeAndDynamicSize<T>) -> () {
+bb0(%0 : $*EnumWithClassArchetypeAndDynamicSize<T>):
+  %1 = alloc_stack $EnumWithClassArchetypeAndDynamicSize<T> 
+  copy_addr %0 to [initialization] %1 : $*EnumWithClassArchetypeAndDynamicSize<T>
+  destroy_addr %1 : $*EnumWithClassArchetypeAndDynamicSize<T>
+  dealloc_stack %1 : $*EnumWithClassArchetypeAndDynamicSize<T>
+  %ret = tuple ()
+  return %ret : $()
+}

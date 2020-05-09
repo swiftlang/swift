@@ -12,6 +12,11 @@
 
 import TestsUtils
 
+public let XorLoop = BenchmarkInfo(
+  name: "XorLoop",
+  runFunction: run_XorLoop,
+  tags: [.validation])
+
 @inline(never)
 public func run_XorLoop(_ N: Int) {
   for _ in 1...5*N {

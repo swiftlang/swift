@@ -40,6 +40,10 @@ enum class ObjCClassFlags : uint32_t {
   /// This class has the exception attribute.
   Exception            = 0x00020,
 
+  /// This class provides a metadata update callback trailing the ro-data.
+  /// Note that we're re-using the obsolete flag above.
+  HasMetadataUpdateCallback = 0x00040,
+
   /// (Obsolete) ARC-specific: this class has a .release_ivars method.
   HasIvarReleaser      = 0x00040,
 
@@ -61,4 +65,4 @@ inline ObjCClassFlags operator|(ObjCClassFlags lhs, ObjCClassFlags rhs) {
 
 }
 
-#endif /* SWIFT_ABI_CLASS_H */
+#endif // SWIFT_ABI_CLASS_H

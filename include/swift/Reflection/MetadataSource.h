@@ -1,4 +1,4 @@
-//===--- MetadataSource.h - Swift Metadata Sources for Reflection ---------===//
+//===- MetadataSource.h - Swift Metadata Sources for Reflection -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -147,25 +147,6 @@ class MetadataSource {
   }
 
   template <typename Allocator>
-  static const MetadataSource*
-  decodeParent(Allocator &A,
-               std::string::const_iterator &it,
-               const std::string::const_iterator &end) {
-    if (it == end || *it != 'P')
-      return nullptr;
-
-    ++it;
-    auto Child = decode(A, it, end);
-    if (!Child)
-      return nullptr;
-
-    if (it == end || *it != '_')
-      return nullptr;
-
-    return A.createParent(Child);
-  }
-
-  template <typename Allocator>
   static const MetadataSource *decode(Allocator &A,
                                       std::string::const_iterator &it,
                                       const std::string::const_iterator &end) {
@@ -180,8 +161,6 @@ class MetadataSource {
         return decodeMetadataCapture(A, it, end);
       case 'G':
         return decodeGenericArgument(A, it, end);
-      case 'P':
-        return decodeParent(A, it, end);
       case 'S':
         ++it;
         return A.createSelf();
@@ -198,7 +177,7 @@ public:
   }
 
   void dump() const;
-  void dump(std::ostream &OS, unsigned Indent = 0) const;
+  void dump(FILE *file, unsigned Indent = 0) const;
   template <typename Allocator>
   static const MetadataSource *decode(Allocator &A, const std::string &str) {
     auto begin = str.begin();
@@ -315,29 +294,6 @@ public:
 
   static bool classof(const MetadataSource *MS) {
     return MS->getKind() == MetadataSourceKind::GenericArgument;
-  }
-};
-
-/// Metadata gotten through the parent of a nominal type's metadata.
-class ParentMetadataSource final : public MetadataSource {
-  const MetadataSource *Child;
-public:
-  ParentMetadataSource(const MetadataSource *Child)
-    : MetadataSource(MetadataSourceKind::Parent),
-      Child(Child) {}
-
-  template <typename Allocator>
-  static const ParentMetadataSource*
-  create(Allocator &A, const MetadataSource *Child) {
-    return A.template make_source<ParentMetadataSource>(Child);
-  }
-
-  const MetadataSource *getChild() const {
-    return Child;
-  }
-
-  static bool classof(const MetadataSource *MS) {
-    return MS->getKind() == MetadataSourceKind::Parent;
   }
 };
 

@@ -3,7 +3,6 @@
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
-// UNSUPPORTED: CPU=armv7
 
 import Foundation
 

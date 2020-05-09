@@ -33,6 +33,7 @@ public:
            Optional<llvm::StringRef> DocBrief,
            Optional<llvm::StringRef> AssocUSRs,
            SourceKit::UIdent SemanticContext,
+           SourceKit::UIdent TypeRelation,
            bool NotRecommended,
            unsigned NumBytesToErase);
 

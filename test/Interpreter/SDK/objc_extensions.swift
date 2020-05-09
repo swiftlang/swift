@@ -6,15 +6,15 @@
 import Foundation
 
 extension NSObject {
-  func frob() {
+  @objc func frob() {
     print("I've been frobbed!")
   }
 
-  var asHerself : NSObject {
+  @objc var asHerself : NSObject {
     return self
   }
 
-  var blackHoleWithHawkingRadiation : NSObject? {
+  @objc var blackHoleWithHawkingRadiation : NSObject? {
     get {
       print("e+")
       return nil

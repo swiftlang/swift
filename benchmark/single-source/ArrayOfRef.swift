@@ -14,7 +14,15 @@
 // references. It is meant to be a baseline for comparison against
 // ArrayOfGenericRef.
 //
-// For comparison, we always create four arrays of 10,000 words.
+// For comparison, we always create four arrays of 1,000 words.
+
+import TestsUtils
+
+public let ArrayOfRef = BenchmarkInfo(
+  name: "ArrayOfRef",
+  runFunction: run_ArrayOfRef,
+  tags: [.validation, .api, .Array],
+  legacyFactor: 10)
 
 protocol Constructible {
   associatedtype Element
@@ -25,9 +33,9 @@ class ConstructibleArray<T:Constructible> {
 
   init(_ e:T.Element) {
     array = [T]()
-    array.reserveCapacity(10_000)
-    for _ in 0...10_000 {
-      array.append(T(e:e) as T)
+    array.reserveCapacity(1_000)
+    for _ in 0...1_000 {
+      array.append(T(e:e))
     }
   }
 }
@@ -41,7 +49,7 @@ class POD : Constructible {
 
 @inline(never)
 func genPODRefArray() {
-  _ = ConstructibleArray<POD>(3)
+  blackHole(ConstructibleArray<POD>(3))
   // should be a nop
 }
 
@@ -57,7 +65,7 @@ class CommonRef : Constructible {
 @inline(never)
 func genCommonRefArray() {
   let d = Dummy()
-  _ = ConstructibleArray<CommonRef>(d)
+  blackHole(ConstructibleArray<CommonRef>(d))
   // should be a nop
 }
 
@@ -70,7 +78,7 @@ enum RefEnum {
 class RefArray<T> {
   var array : [T]
 
-  init(_ i:T, count:Int = 10_000) {
+  init(_ i:T, count:Int = 1_000) {
     array = [T](repeating: i, count: count)
   }
 }
@@ -78,7 +86,7 @@ class RefArray<T> {
 @inline(never)
 func genRefEnumArray() {
   let e = RefEnum.Some(Dummy())
-  _ = RefArray<RefEnum>(e)
+  blackHole(RefArray<RefEnum>(e))
   // should be a nop
 }
 
@@ -92,13 +100,13 @@ struct S : Constructible {
 @inline(never)
 func genRefStructArray() {
   let d = Dummy()
-  _ = ConstructibleArray<S>(d)
+  blackHole(ConstructibleArray<S>(d))
   // should be a nop
 }
 
 @inline(never)
 public func run_ArrayOfRef(_ N: Int) {
-  for _ in 0...N {
+  for _ in 0..<N {
     genPODRefArray()
     genCommonRefArray()
     genRefEnumArray()

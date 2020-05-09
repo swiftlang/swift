@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
-// REQUIRES: executable_test
 
-// XFAIL: linux
+// REQUIRES: executable_test
+// REQUIRES: objc_interop
 
 import Foundation
 

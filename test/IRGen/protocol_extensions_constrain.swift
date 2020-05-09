@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
 // rdar://20532214 -- Wrong code for witness method lookup lets executable crash
 
@@ -37,4 +37,4 @@ let s = C2()
 
 s.bar
 
-// CHECK: call {{.*}} @_T029protocol_extensions_constrain2C3VAA2P3AAWP
+// CHECK: call {{.*}} @"$s29protocol_extensions_constrain2C3VAA2P3AAWP"

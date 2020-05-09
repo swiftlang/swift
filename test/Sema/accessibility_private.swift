@@ -69,7 +69,6 @@ extension Container {
     _ = Container.PrivateInner()
   }
 
-  // FIXME: Why do these errors happen twice?
   var extensionInner: PrivateInner? { return nil } // expected-error {{property must be declared private because its type uses a private type}}
   var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error {{property must be declared private because its type uses a private type}}
 }
@@ -82,13 +81,12 @@ extension Container.Inner {
     obj.privateExtensionMethod()
 
     // FIXME: Unqualified lookup won't look into Container from here.
-    _ = PrivateInner() // expected-error {{use of unresolved identifier 'PrivateInner'}}
+    _ = PrivateInner() // expected-error {{cannot find 'PrivateInner' in scope}}
     _ = Container.PrivateInner()
   }
 
-  // FIXME: Why do these errors happen twice?
   // FIXME: Unqualified lookup won't look into Container from here.
-  var inner: PrivateInner? { return nil } // expected-error 2 {{use of undeclared type 'PrivateInner'}}
+  var inner: PrivateInner? { return nil } // expected-error {{cannot find type 'PrivateInner' in scope}}
   var innerQualified: Container.PrivateInner? { return nil } // expected-error {{invalid redeclaration of 'innerQualified'}} expected-error {{property must be declared private because its type uses a private type}}
 }
 
@@ -120,18 +118,21 @@ protocol VeryImportantProto {
 }
 
 private struct VIPPrivateType : VeryImportantProto {
-  private typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}}
+  private typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
+  // expected-note@-1 {{mark the type alias as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
   var value: Int
 }
 
 private struct VIPPrivateProp : VeryImportantProto {
   typealias Assoc = Int
-  private var value: Int // expected-error {{property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{3-10=fileprivate}}
+  private var value: Int // expected-error {{property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
+  // expected-note@-1 {{mark the property as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 
 private struct VIPPrivateSetProp : VeryImportantProto {
   typealias Assoc = Int
-  private(set) var value: Int // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{3-10=fileprivate}}
+  private(set) var value: Int // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}}
+  // expected-note@-1 {{mark the property as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 
 private class VIPPrivateSetBase {
@@ -142,21 +143,23 @@ private class VIPPrivateSetSub : VIPPrivateSetBase, VeryImportantProto { // expe
 }
 
 private class VIPPrivateSetPropBase {
-  private(set) var value: Int = 0 // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{3-10=fileprivate}}
+  private(set) var value: Int = 0
+  // expected-note@-1 {{mark the property as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 private class VIPPrivateSetPropSub : VIPPrivateSetPropBase, VeryImportantProto {
+  // expected-error@-1 {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
   typealias Assoc = Int
 }
 
 extension Container {
-  private typealias ExtensionConflictingType = Int // expected-note {{found candidate with type}} expected-note {{previously declared here}}
+  private typealias ExtensionConflictingType = Int // expected-note {{found candidate with type}} expected-note {{previously declared here}} expected-note{{found this candidate}}
 }
 extension Container {
-  private typealias ExtensionConflictingType = Double  // expected-error {{invalid redeclaration of 'ExtensionConflictingType'}} expected-note {{found candidate with type}}
+  private typealias ExtensionConflictingType = Double  // expected-error {{invalid redeclaration of 'ExtensionConflictingType'}} expected-note {{found candidate with type}} expected-note{{found this candidate}}
 }
 extension Container {
   func test() {
-    let a: ExtensionConflictingType? = nil
+    let a: ExtensionConflictingType? = nil // expected-error{{'ExtensionConflictingType' is ambiguous for type lookup in this context}}
     let b: Container.ExtensionConflictingType? = nil // expected-error {{ambiguous type name 'ExtensionConflictingType' in 'Container'}}
     _ = ExtensionConflictingType()
     _ = Container.ExtensionConflictingType()
@@ -168,8 +171,10 @@ extension Container {
 extension Container {
   private struct VeryPrivateStruct { // expected-note * {{type declared here}}
     private typealias VeryPrivateType = Int // expected-note * {{type declared here}}
+    private struct VeryPrivateInnerStruct {}
     var privateVar: VeryPrivateType { fatalError() } // expected-error {{property must be declared private because its type uses a private type}}
     var privateVar2 = VeryPrivateType() // expected-error {{property must be declared private because its type 'Container.VeryPrivateStruct.VeryPrivateType' (aka 'Int') uses a private type}}
+    var privateVar3 = VeryPrivateInnerStruct() // expected-error {{property must be declared private because its type 'Container.VeryPrivateStruct.VeryPrivateInnerStruct' uses a private type}}
     typealias PrivateAlias = VeryPrivateType // expected-error {{type alias must be declared private because its underlying type uses a private type}}
     subscript(_: VeryPrivateType) -> Void { return () } // expected-error {{subscript must be declared private because its index uses a private type}}
     func privateMethod(_: VeryPrivateType) -> Void {} // expected-error {{method must be declared private because its parameter uses a private type}} {{none}}
@@ -189,9 +194,10 @@ extension Container {
   fileprivate subscript(_: VeryPrivateStruct) -> Void { return () } // expected-error {{subscript cannot be declared fileprivate because its index uses a private type}} {{none}}
   fileprivate func privateMethod(_: VeryPrivateStruct) -> Void {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}} {{none}}
   fileprivate enum PrivateRawValue: VeryPrivateStruct {} // expected-error {{enum cannot be declared fileprivate because its raw type uses a private type}} {{none}}
-  // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by any literal}}
+  // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by a string, integer, or floating-point literal}}
   // expected-error@-2 {{'Container.PrivateRawValue' declares raw type 'Container.VeryPrivateStruct', but does not conform to RawRepresentable and conformance could not be synthesized}}
   // expected-error@-3 {{RawRepresentable conformance cannot be synthesized because raw type 'Container.VeryPrivateStruct' is not Equatable}}
+  // expected-error@-4 {{an enum with no cases cannot declare a raw type}}
   fileprivate enum PrivatePayload {
     case A(VeryPrivateStruct) // expected-error {{enum case in an internal enum uses a private type}} {{none}}
   }

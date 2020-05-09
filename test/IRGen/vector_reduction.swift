@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -Ounchecked %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Ounchecked %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -7,7 +7,7 @@
 
 // We were missing target transform info and not vectorizing the loop below.
 
-// CHECK: xor <2 x i64>
+// CHECK: xor <{{(2|4|8)}} x i64>
 
 public func f(a: UnsafePointer<Int>, b: UnsafePointer<Int>, count: Int) -> Int {
   var c = 0

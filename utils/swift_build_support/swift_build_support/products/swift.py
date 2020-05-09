@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 from . import product
+from ..cmake import CMakeOptions
 
 
 class Swift(product.Product):
@@ -30,15 +31,19 @@ class Swift(product.Product):
         # Add benchmark specific flags.
         self.cmake_options.extend(self._benchmark_flags)
 
-        # Add any sil ownership flags.
-        self.cmake_options.extend(self._sil_ownership_flags)
-
         # Generate the compile db.
         self.cmake_options.extend(self._compile_db_flags)
 
         # Add the flag if we are supposed to force the typechecker to compile
         # with optimization.
         self.cmake_options.extend(self._force_optimized_typechecker_flags)
+
+        # Add any exclusivity checking flags for stdlibcore.
+        self.cmake_options.extend(self._stdlibcore_exclusivity_checking_flags)
+
+        # Add experimental differentiable programming flag.
+        self.cmake_options.extend(
+            self._enable_experimental_differentiable_programming)
 
     @property
     def _runtime_sanitizer_flags(self):
@@ -47,8 +52,7 @@ class Swift(product.Product):
             sanitizer_list += ['Thread']
         if len(sanitizer_list) == 0:
             return []
-        return ["-DSWIFT_RUNTIME_USE_SANITIZERS=%s" %
-                ";".join(sanitizer_list)]
+        return [('SWIFT_RUNTIME_USE_SANITIZERS', ';'.join(sanitizer_list))]
 
     @property
     def _compiler_vendor_flags(self):
@@ -64,31 +68,27 @@ updated without updating swift.py?")
             swift_compiler_version = self.args.swift_compiler_version
 
         return [
-            "-DSWIFT_VENDOR=Apple",
-            "-DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift",
+            ('SWIFT_VENDOR', 'Apple'),
+            ('SWIFT_VENDOR_UTI', 'com.apple.compilers.llvm.swift'),
 
             # This has a default of 3.0, so it should be safe to use here.
-            "-DSWIFT_VERSION={}".format(self.args.swift_user_visible_version),
+            ('SWIFT_VERSION', str(self.args.swift_user_visible_version)),
 
             # FIXME: We are matching build-script-impl here. But it seems like
             # bit rot since this flag is specified in another place with the
             # exact same value in build-script-impl.
-            "-DSWIFT_COMPILER_VERSION={}".format(swift_compiler_version),
+            ('SWIFT_COMPILER_VERSION', str(swift_compiler_version)),
         ]
 
     @property
     def _version_flags(self):
-        r = []
+        r = CMakeOptions()
         if self.args.swift_compiler_version is not None:
             swift_compiler_version = self.args.swift_compiler_version
-            r.append(
-                "-DSWIFT_COMPILER_VERSION={}".format(swift_compiler_version)
-            )
+            r.define('SWIFT_COMPILER_VERSION', str(swift_compiler_version))
         if self.args.clang_compiler_version is not None:
             clang_compiler_version = self.args.clang_compiler_version
-            r.append(
-                "-DCLANG_COMPILER_VERSION={}".format(clang_compiler_version)
-            )
+            r.define('CLANG_COMPILER_VERSION', str(clang_compiler_version))
         return r
 
     @property
@@ -99,22 +99,25 @@ updated without updating swift.py?")
         onone_iters = self.args.benchmark_num_onone_iterations
         o_iters = self.args.benchmark_num_o_iterations
         return [
-            "-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS={}".format(onone_iters),
-            "-DSWIFT_BENCHMARK_NUM_O_ITERATIONS={}".format(o_iters)
+            ('SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS', onone_iters),
+            ('SWIFT_BENCHMARK_NUM_O_ITERATIONS', o_iters)
         ]
 
     @property
-    def _sil_ownership_flags(self):
-        if not self.args.enable_sil_ownership:
-            return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE"]
-        return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE"]
-
-    @property
     def _compile_db_flags(self):
-        return ['-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE']
+        return [('CMAKE_EXPORT_COMPILE_COMMANDS', True)]
 
     @property
     def _force_optimized_typechecker_flags(self):
-        if not self.args.force_optimized_typechecker:
-            return ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE']
-        return ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=TRUE']
+        return [('SWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL',
+                 self.args.force_optimized_typechecker)]
+
+    @property
+    def _stdlibcore_exclusivity_checking_flags(self):
+        return [('SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL',
+                 self.args.enable_stdlibcore_exclusivity_checking)]
+
+    @property
+    def _enable_experimental_differentiable_programming(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL',
+                 self.args.enable_experimental_differentiable_programming)]

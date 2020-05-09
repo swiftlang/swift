@@ -12,32 +12,36 @@ public protocol Runcible {
   func runce()
 }
 
-// CHECK-LABEL: @"\01l_protocol_conformances" = private constant [
-
-// CHECK:         %swift.protocol_conformance {
+// CHECK-LABEL: @"$sSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
-// CHECK:           [[RUNCIBLE:%swift.protocol\* @_T033protocol_conformance_records_objc8RuncibleMp]]
-// -- type metadata
-// CHECK:           @_T0SC6NSRectVN
+// CHECK-SAME:           [[RUNCIBLE:@"\$s33protocol_conformance_records_objc8RuncibleMp"]]
+// -- nominal type descriptor
+// CHECK-SAME:           @"$sSo6NSRectVMn"
 // -- witness table
-// CHECK:           @_T0SC6NSRectV33protocol_conformance_records_objc8RuncibleACWP
-// -- flags 0x02: nonunique direct metadata
-// CHECK:           i32 2 },
+// CHECK-SAME:           @"$sSo6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
+// -- flags
+// CHECK-SAME:           i32 0
+// CHECK-SAME:         },
 extension NSRect: Runcible {
   public func runce() {}
 }
 
-// -- TODO class refs should be indirected through their ref variable
-// CHECK:         %swift.protocol_conformance {
+// CHECK-LABEL:         @"$sSo5GizmoC33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
-// CHECK:           [[RUNCIBLE]]
-// -- class object (TODO should be class ref variable)
-// CHECK:           @"got.OBJC_CLASS_$_Gizmo"
+// CHECK-SAME:           [[RUNCIBLE]]
+// -- class name reference
+// CHECK-SAME:           @[[GIZMO_NAME:[0-9]+]]
 // -- witness table
-// CHECK:           @_T0So5GizmoC33protocol_conformance_records_objc8RuncibleACWP
-// -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)
-// CHECK:           i32 1
-// CHECK:         }
+// CHECK-SAME:           @"$sSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
+// -- flags
+// CHECK-SAME:           i32 16
+// CHECK-SAME:         }
 extension Gizmo: Runcible {
   public func runce() {}
 }
+
+// CHECK: @[[GIZMO_NAME]] = private constant [6 x i8] c"Gizmo\00"
+
+// CHECK-LABEL: @"\01l_protocol_conformances" = private constant [
+// CHECK-SAME: @"$sSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc"
+// CHECK-SAME: @"$sSo5GizmoC33protocol_conformance_records_objc8RuncibleACMc"

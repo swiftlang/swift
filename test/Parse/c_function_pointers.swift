@@ -11,19 +11,12 @@ class C {
 }
 
 if true {
-  var x = 0
   func local() -> Int { return 0 }
-  func localWithContext() -> Int { return x }
 
   let a: @convention(c) () -> Int = global
   let _: @convention(c) () -> Int = main.global
   let _: @convention(c) () -> Int = { 0 }
   let _: @convention(c) () -> Int = local
-
-  // Can't convert a closure with context to a C function pointer
-  let _: @convention(c) () -> Int = { x } // expected-error{{cannot be formed from a closure that captures context}}
-  let _: @convention(c) () -> Int = { [x] in x } // expected-error{{cannot be formed from a closure that captures context}}
-  let _: @convention(c) () -> Int = localWithContext // expected-error{{cannot be formed from a local function that captures context}}
 
   // Can't convert a closure value to a C function pointer
   let global2 = global
@@ -51,14 +44,14 @@ if true {
   handler(iuo_global) // expected-error{{a C function pointer can only be formed from a reference to a 'func' or a literal closure}}
 }
 
-class Generic<X : C> {
-  func f<Y : C>(_ y: Y) {
-    let _: @convention(c) () -> Int = { return 0 }
-    let _: @convention(c) () -> Int = { return X.staticMethod() } // expected-error{{cannot be formed from a closure that captures generic parameters}}
-    let _: @convention(c) () -> Int = { return Y.staticMethod() } // expected-error{{cannot be formed from a closure that captures generic parameters}}
-  }
-}
-
 func genericFunc<T>(_ t: T) -> T { return t }
 
 let f: @convention(c) (Int) -> Int = genericFunc // expected-error{{cannot be formed from a reference to a generic function}}
+
+func ct1() -> () { print("") }
+
+let ct1ref0 : @convention(c, cType: "void (*)(void)") () -> () = ct1
+let ct1ref1 : @convention(c, cType: "void (*)(void)") = ct1 // expected-error{{expected type}}
+let ct1ref2 : @convention(c, ) () -> () = ct1 // expected-error{{expected 'cType' label in 'convention' attribute}}
+let ct1ref3 : @convention(c, cType) () -> () = ct1 // expected-error{{expected ':' after 'cType' for 'convention' attribute}}
+let ct1ref4 : @convention(c, cType: ) () -> () = ct1 // expected-error{{expected string literal containing clang type for 'cType' in 'convention' attribute}}

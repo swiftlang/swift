@@ -12,7 +12,11 @@ extension {Type}: _ObjectiveCBridgeable {{
                         _getObjCTypeEncoding({Type}.self)) == 0,
                  "NSValue does not contain the right type to bridge to {Type}")
     result = {Type}()
-    source.getValue(&result!)
+    if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {{
+      source.getValue(&result!, size: MemoryLayout<{Type}>.size)
+    }} else {{
+      source.getValue(&result!)
+    }}
   }}
 
   public static func _conditionallyBridgeFromObjectiveC(_ source: NSValue,
@@ -23,7 +27,11 @@ extension {Type}: _ObjectiveCBridgeable {{
       return false
     }}
     result = {Type}()
-    source.getValue(&result!)
+    if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {{
+      source.getValue(&result!, size: MemoryLayout<{Type}>.size)
+    }} else {{
+      source.getValue(&result!)
+    }}
     return true
   }}
 
@@ -34,7 +42,11 @@ extension {Type}: _ObjectiveCBridgeable {{
                         _getObjCTypeEncoding({Type}.self)) == 0,
                  "NSValue does not contain the right type to bridge to {Type}")
     var result = {Type}()
-    unwrappedSource.getValue(&result)
+    if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {{
+      unwrappedSource.getValue(&result, size: MemoryLayout<{Type}>.size)
+    }} else {{
+      unwrappedSource.getValue(&result)
+    }}
     return result
   }}
 }}

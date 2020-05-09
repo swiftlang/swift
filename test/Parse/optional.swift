@@ -14,4 +14,4 @@ var e : (() -> A)?
 var f = e?()
 
 struct B<T> {}
-var g = B<A!>()
+var g = B<A?>()

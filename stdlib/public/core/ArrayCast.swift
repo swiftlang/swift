@@ -16,8 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Called by the casting machinery.
 @_silgen_name("_swift_arrayDownCastIndirect")
-public func _arrayDownCastIndirect<SourceValue, TargetValue>(
+internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>) {
   target.initialize(to: _arrayForceCast(source.pointee))
@@ -27,6 +28,7 @@ public func _arrayDownCastIndirect<SourceValue, TargetValue>(
 ///
 /// - Note: When SourceElement and TargetElement are both bridged verbatim, type
 ///   checking is deferred until elements are actually accessed.
+@inlinable //for performance reasons
 public func _arrayForceCast<SourceElement, TargetElement>(
   _ source: Array<SourceElement>
 ) -> Array<TargetElement> {
@@ -50,17 +52,9 @@ public func _arrayForceCast<SourceElement, TargetElement>(
   return source.map { $0 as! TargetElement }
 }
 
-internal struct _UnwrappingFailed : Error {}
-
-extension Optional {
-  internal func unwrappedOrError() throws -> Wrapped {
-    if let x = self { return x }
-    throw _UnwrappingFailed()
-  }
-}
-
+/// Called by the casting machinery.
 @_silgen_name("_swift_arrayDownCastConditionalIndirect")
-public func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
+internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>
 ) -> Bool {
@@ -76,8 +70,18 @@ public func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
 /// return `nil` if any element fails to convert.
 ///
 /// - Complexity: O(n), because each element must be checked.
+@inlinable //for performance reasons
 public func _arrayConditionalCast<SourceElement, TargetElement>(
   _ source: [SourceElement]
 ) -> [TargetElement]? {
-  return try? source.map { try ($0 as? TargetElement).unwrappedOrError() }
+  var successfulCasts = ContiguousArray<TargetElement>()
+  successfulCasts.reserveCapacity(source.count)
+  for element in source {
+    if let casted = element as? TargetElement {
+      successfulCasts.append(casted)
+    } else {
+      return nil
+    }
+  }
+  return Array(successfulCasts)
 }

@@ -5,10 +5,7 @@ target triple = "x86_64-apple-macosx10.9"
 
 %swift.refcounted = type { %swift.heapmetadata*, i64 }
 %swift.heapmetadata = type { i64 (%swift.refcounted*)*, i64 (%swift.refcounted*)* }
-%objc_object = type opaque
 
-declare %objc_object* @objc_retain(%objc_object*)
-declare void @objc_release(%objc_object*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
 declare void @swift_release(%swift.refcounted* nocapture)
 declare void @swift_retain(%swift.refcounted* ) nounwind

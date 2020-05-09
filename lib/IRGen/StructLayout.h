@@ -60,7 +60,7 @@ enum class LayoutKind {
 class NonFixedOffsetsImpl;
 
 /// The type to pass around for non-fixed offsets.
-typedef Optional<NonFixedOffsetsImpl*> NonFixedOffsets;
+using NonFixedOffsets = Optional<NonFixedOffsetsImpl *>;
 
 /// An abstract class for determining non-fixed offsets.
 class NonFixedOffsetsImpl {
@@ -81,7 +81,13 @@ class ElementLayout {
 public:
   enum class Kind {
     /// The element is known to require no storage in the aggregate.
+    /// Its offset in the aggregate is always statically zero.
     Empty,
+
+    /// The element is known to require no storage in the aggregate.
+    /// But it has an offset in the aggregate. This is to support getting the
+    /// offset of tail allocated storage using MemoryLayout<>.offset(of:).
+    EmptyTailAllocatedCType,
 
     /// The element can be positioned at a fixed offset within the
     /// aggregate.
@@ -95,12 +101,14 @@ public:
     /// offset zero.  This is necessary because LLVM forbids even a
     /// 'gep 0' on an unsized type.
     InitialNonFixedSize
+
+    // IncompleteKind comes here
   };
 
 private:
-  enum : unsigned { IncompleteKind  = 4 };
+  enum : unsigned { IncompleteKind  = unsigned(Kind::InitialNonFixedSize) + 1 };
 
-  /// The swift type information for this element.
+  /// The swift type information for this element's layout.
   const TypeInfo *Type;
 
   /// The offset in bytes from the start of the struct.
@@ -137,19 +145,17 @@ public:
     Index = other.Index;
   }
 
-  void completeEmpty(IsPOD_t isPOD, Size byteOffset) {
+  void completeEmpty(IsPOD_t isPOD) {
     TheKind = unsigned(Kind::Empty);
     IsPOD = unsigned(isPOD);
-    // We still want to give empty fields an offset for use by things like
-    // ObjC ivar emission. We use the first field in a class layout as the
-    // instanceStart.
-    ByteOffset = byteOffset.getValue();
+    ByteOffset = 0;
     Index = 0; // make a complete write of the bitfield
   }
 
   void completeInitialNonFixedSize(IsPOD_t isPOD) {
     TheKind = unsigned(Kind::InitialNonFixedSize);
     IsPOD = unsigned(isPOD);
+    ByteOffset = 0;
     Index = 0; // make a complete write of the bitfield
   }
 
@@ -158,6 +164,15 @@ public:
     IsPOD = unsigned(isPOD);
     ByteOffset = byteOffset.getValue();
     Index = structIndex;
+
+    assert(getByteOffset() == byteOffset);
+  }
+
+  void completeEmptyTailAllocatedCType(IsPOD_t isPOD, Size byteOffset) {
+    TheKind = unsigned(Kind::EmptyTailAllocatedCType);
+    IsPOD = unsigned(isPOD);
+    ByteOffset = byteOffset.getValue();
+    Index = 0;
 
     assert(getByteOffset() == byteOffset);
   }
@@ -180,7 +195,8 @@ public:
 
   /// Is this element known to be empty?
   bool isEmpty() const {
-    return getKind() == Kind::Empty;
+    return getKind() == Kind::Empty ||
+           getKind() == Kind::EmptyTailAllocatedCType;
   }
 
   /// Is this element known to be POD?
@@ -189,10 +205,26 @@ public:
     return IsPOD_t(IsPOD);
   }
 
+  /// Can we access this element at a static offset?
+  bool hasByteOffset() const {
+    switch (getKind()) {
+    case Kind::Empty:
+    case Kind::EmptyTailAllocatedCType:
+    case Kind::Fixed:
+      return true;
+
+    // FIXME: InitialNonFixedSize should go in the above, but I'm being
+    // paranoid about changing behavior.
+    case Kind::InitialNonFixedSize:
+    case Kind::NonFixed:
+      return false;
+    }
+    llvm_unreachable("bad kind");
+  }
+
   /// Given that this element has a fixed offset, return that offset in bytes.
   Size getByteOffset() const {
-    assert(isCompleted() &&
-           (getKind() == Kind::Fixed || getKind() == Kind::Empty));
+    assert(isCompleted() && hasByteOffset());
     return Size(ByteOffset);
   }
 
@@ -219,11 +251,12 @@ public:
 class StructLayoutBuilder {
 protected:
   IRGenModule &IGM;
-private:
   SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
+  Size headerSize = Size(0);
+private:
   Alignment CurAlignment = Alignment(1);
-  SpareBitVector CurSpareBits;
+  SmallVector<SpareBitVector, 8> CurSpareBits;
   unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
   IsPOD_t IsKnownPOD = IsPOD;
@@ -246,6 +279,13 @@ public:
   /// requirements of the layout.
   bool addFields(llvm::MutableArrayRef<ElementLayout> fields,
                  LayoutStrategy strategy);
+
+  /// Add a field to the layout.  The field layout needs
+  /// only have the TypeInfo set; the rest will be filled out.
+  ///
+  /// Returns true if the field may have increased the storage
+  /// requirements of the layout.
+  bool addField(ElementLayout &elt, LayoutStrategy strategy);
 
   /// Return whether the layout is known to be empty.
   bool empty() const { return IsFixedLayout && CurSize == Size(0); }
@@ -275,14 +315,14 @@ public:
   /// Return the size of the structure built so far.
   Size getSize() const { return CurSize; }
 
+  // Return the size of the header.
+  Size getHeaderSize() const { return headerSize; }
+
   /// Return the alignment of the structure built so far.
   Alignment getAlignment() const { return CurAlignment; }
-  
-  /// Return the spare bit mask of the structure built so far.
-  const SpareBitVector &getSpareBits() const { return CurSpareBits; }
 
   /// Return the spare bit mask of the structure built so far.
-  SpareBitVector &getSpareBits() { return CurSpareBits; }
+  SpareBitVector getSpareBits() const;
 
   /// Build the current elements as a new anonymous struct type.
   llvm::StructType *getAsAnonStruct() const;
@@ -303,7 +343,7 @@ private:
 /// Apply layout attributes such as @_alignment to the layout properties of a
 /// type, diagnosing any problems with them.
 void applyLayoutAttributes(IRGenModule &IGM,
-                           CanType ty,
+                           NominalTypeDecl *decl,
                            bool isFixedLayout,
                            /*inout*/ Alignment &alignment);
 
@@ -314,6 +354,9 @@ class StructLayout {
 
   /// The statically-known minimum bound on the size.
   Size MinimumSize;
+
+  /// The size of a header if present.
+  Size headerSize;
   
   /// The statically-known spare bit mask.
   SpareBitVector SpareBits;
@@ -326,7 +369,6 @@ class StructLayout {
   IsBitwiseTakable_t IsKnownBitwiseTakable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
   
-  CanType ASTTy;
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
 
@@ -339,24 +381,24 @@ public:
   ///   layout must include the reference-counting header
   /// \param typeToFill - if present, must be an opaque type whose body
   ///   will be filled with this layout
-  StructLayout(IRGenModule &IGM, CanType astTy,
+  StructLayout(IRGenModule &IGM, NominalTypeDecl *decl,
                LayoutKind kind, LayoutStrategy strategy,
                ArrayRef<const TypeInfo *> fields,
                llvm::StructType *typeToFill = 0);
 
   /// Create a structure layout from a builder.
   StructLayout(const StructLayoutBuilder &builder,
-               CanType astTy,
+               NominalTypeDecl *decl,
                llvm::Type *type,
                ArrayRef<ElementLayout> elements)
     : MinimumAlign(builder.getAlignment()),
       MinimumSize(builder.getSize()),
+      headerSize(builder.getHeaderSize()),
       SpareBits(builder.getSpareBits()),
       IsFixedLayout(builder.isFixedLayout()),
       IsKnownPOD(builder.isPOD()),
       IsKnownBitwiseTakable(builder.isBitwiseTakable()),
       IsKnownAlwaysFixedSize(builder.isAlwaysFixedSize()),
-      ASTTy(astTy),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
 
@@ -367,6 +409,7 @@ public:
   
   llvm::Type *getType() const { return Ty; }
   Size getSize() const { return MinimumSize; }
+  Size getHeaderSize() const { return headerSize; }
   Alignment getAlignment() const { return MinimumAlign; }
   const SpareBitVector &getSpareBits() const { return SpareBits; }
   SpareBitVector &getSpareBits() { return SpareBits; }
@@ -386,48 +429,6 @@ public:
   /// Bitcast the given pointer to this type.
   Address emitCastTo(IRGenFunction &IGF, llvm::Value *ptr,
                      const llvm::Twine &name = "") const;
-};
-
-Size getHeapHeaderSize(IRGenModule &IGM);
-
-/// Different policies for accessing a physical field.
-enum class FieldAccess : uint8_t {
-  /// Instance variable offsets are constant.
-  ConstantDirect,
-  
-  /// Instance variable offsets must be loaded from "direct offset"
-  /// global variables.
-  NonConstantDirect,
-  
-  /// Instance variable offsets are kept in fields in metadata, but
-  /// the offsets of those fields within the metadata are constant.
-  ConstantIndirect,
-  
-  /// Instance variable offsets are kept in fields in metadata, and
-  /// the offsets of those fields within the metadata must be loaded
-  /// from "indirect offset" global variables.
-  NonConstantIndirect
-};
-
-struct ClassLayout {
-  /// Lazily-initialized array of all fragile stored properties in the class
-  /// (including superclass stored properties).
-  ArrayRef<VarDecl*> AllStoredProperties;
-  /// Lazily-initialized array of all fragile stored properties inherited from
-  /// superclasses.
-  ArrayRef<VarDecl*> InheritedStoredProperties;
-  /// Lazily-initialized array of all field access methods.
-  ArrayRef<FieldAccess> AllFieldAccesses;
-  /// Does the class metadata require dynamic initialization.
-  bool MetadataRequiresDynamicInitialization;
-
-  unsigned getFieldIndex(VarDecl *field) const {
-    // FIXME: This is algorithmically terrible.
-    auto found = std::find(AllStoredProperties.begin(),
-                           AllStoredProperties.end(), field);
-    assert(found != AllStoredProperties.end() && "didn't find field in type?!");
-    return found - AllStoredProperties.begin();
-  }
 };
 
 } // end namespace irgen

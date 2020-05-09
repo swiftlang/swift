@@ -384,7 +384,7 @@ public:
 private:
   /// A pointer to one of a Loop, Basic Block, or Function represented by this
   /// region.
-  llvm::PointerUnion3<FunctionTy *, LoopTy *, BlockTy *> Ptr;
+  llvm::PointerUnion<FunctionTy *, LoopTy *, BlockTy *> Ptr;
 
   /// The ID of this region.
   unsigned ID;
@@ -479,10 +479,10 @@ private:
       return subregion_iterator(Subregions.end(), &Subloops);
     }
     subregion_reverse_iterator rbegin() const {
-      return subregion_reverse_iterator(begin());
+      return subregion_reverse_iterator(end());
     }
     subregion_reverse_iterator rend() const {
-      return subregion_reverse_iterator(end());
+      return subregion_reverse_iterator(begin());
     }
 
     unsigned size() const { return Subregions.size(); }
@@ -591,11 +591,11 @@ public:
     return getSubregionData().rend();
   }
 
-  llvm::iterator_range<subregion_iterator> getSubregions() const {
+  iterator_range<subregion_iterator> getSubregions() const {
     return {subregion_begin(), subregion_end()};
   }
 
-  llvm::iterator_range<subregion_reverse_iterator>
+  iterator_range<subregion_reverse_iterator>
   getReverseSubregions() const {
     return {subregion_rbegin(), subregion_rend()};
   }
@@ -674,7 +674,7 @@ public:
   unsigned succ_size() const { return Succs.size(); }
 
 private:
-  using InnerSuccRange = IteratorRange<decltype(Succs)::const_iterator>;
+  using InnerSuccRange = iterator_range<decltype(Succs)::const_iterator>;
 
 public:
   using SuccRange =
@@ -762,7 +762,7 @@ private:
 
   unsigned addSucc(LoopRegion *Successor) {
     assert(!isFunction() && "Functions cannot have successors");
-    return Succs.insert(SuccessorID(Successor->getID(), false));
+    return Succs.insert(SuccessorID(Successor->getID(), false)).first;
   }
 
   void replacePred(unsigned OldPredID, unsigned NewPredID) {
@@ -964,7 +964,7 @@ public:
   const_iterator end() const { return IDToRegionMap.end(); }
   unsigned size() const { return IDToRegionMap.size(); }
   bool empty() const { return IDToRegionMap.empty(); }
-  llvm::iterator_range<const_iterator> getRegions() const {
+  iterator_range<const_iterator> getRegions() const {
     return {begin(), end()};
   }
 
@@ -1066,7 +1066,8 @@ class LoopRegionAnalysis : public FunctionAnalysisBase<LoopRegionFunctionInfo> {
 
 public:
   LoopRegionAnalysis(SILModule *M)
-    : FunctionAnalysisBase<LoopRegionFunctionInfo>(AnalysisKind::LoopRegion) {}
+      : FunctionAnalysisBase<LoopRegionFunctionInfo>(
+            SILAnalysisKind::LoopRegion) {}
 
   LoopRegionAnalysis(const LoopRegionAnalysis &) = delete;
   LoopRegionAnalysis &operator=(const LoopRegionAnalysis &) = delete;
@@ -1076,11 +1077,13 @@ public:
   virtual void initialize(SILPassManager *PM) override;
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::LoopRegion;
+    return S->getKind() == SILAnalysisKind::LoopRegion;
   }
 
-  virtual LoopRegionFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new LoopRegionFunctionInfo(F, POA->get(F), SLA->get(F));
+  virtual std::unique_ptr<LoopRegionFunctionInfo>
+  newFunctionAnalysis(SILFunction *F) override {
+    return std::make_unique<LoopRegionFunctionInfo>(F, POA->get(F),
+                                                     SLA->get(F));
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

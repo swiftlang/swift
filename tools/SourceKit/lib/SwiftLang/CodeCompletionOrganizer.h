@@ -22,6 +22,9 @@ class CompilerInvocation;
 }
 
 namespace SourceKit {
+
+  using TypeContextKind = swift::ide::CodeCompletionContext::TypeContextKind;
+
 namespace CodeCompletion {
 
 struct Options {
@@ -33,11 +36,14 @@ struct Options {
   bool addInnerResults = false;
   bool addInnerOperators = true;
   bool addInitsToTopLevel = false;
+  bool callPatternHeuristics = true;
   bool hideUnderscores = true;
   bool reallyHideAllUnderscores = false;
   bool hideLowPriority = true;
   bool hideByNameStyle = true;
   bool fuzzyMatching = true;
+  bool reuseASTContextIfPossible = true;
+  bool annotatedDescription = false;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 
@@ -49,7 +55,7 @@ struct Options {
 
 struct SwiftCompletionInfo {
   swift::ASTContext *swiftASTContext = nullptr;
-  swift::CompilerInvocation *invocation = nullptr;
+  const swift::CompilerInvocation *invocation = nullptr;
   swift::ide::CodeCompletionContext *completionContext = nullptr;
 };
 
@@ -74,7 +80,7 @@ class CodeCompletionOrganizer {
   const Options &options;
 public:
   CodeCompletionOrganizer(const Options &options, CompletionKind kind,
-                          bool hasExpectedTypes);
+                          TypeContextKind typeContextKind);
   ~CodeCompletionOrganizer();
 
   static void

@@ -1,10 +1,7 @@
 // Make sure that we can deserialize foundation.
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %platform-sdk-overlay-dir/Foundation.swiftmodule > /dev/null
-// RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/Foundation.swiftmodule | %FileCheck %s
+// RUN: %target-sil-opt %platform-sdk-overlay-dir/Foundation.swiftmodule/%target-swiftmodule-name -module-name Foundation > /dev/null
+// RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/Foundation.swiftmodule/%target-swiftmodule-name | %FileCheck %s
 
 // REQUIRES: objc_interop
 
-// CHECK-NOT: Unknown
-
-// FIXME: rdar://23805004 Non-fragile shared functions are incorrectly being referenced in fragile functions
-// REQUIRES: rdar23805004
+// CHECK-NOT: Unknown{{Code|Block}}

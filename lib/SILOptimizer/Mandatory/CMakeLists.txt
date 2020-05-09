@@ -1,16 +1,26 @@
-set(MANDATORY_SOURCES
-  Mandatory/AccessEnforcementSelection.cpp
-  Mandatory/AccessMarkerElimination.cpp
-  Mandatory/AddressLowering.cpp
-  Mandatory/DefiniteInitialization.cpp
-  Mandatory/DIMemoryUseCollector.cpp
-  Mandatory/DIMemoryUseCollectorOwnership.cpp
-  Mandatory/DataflowDiagnostics.cpp
-  Mandatory/DiagnoseStaticExclusivity.cpp
-  Mandatory/DiagnoseUnreachable.cpp
-  Mandatory/GuaranteedARCOpts.cpp
-  Mandatory/MandatoryInlining.cpp
-  Mandatory/PredictableMemOpt.cpp
-  Mandatory/ConstantPropagation.cpp
-  Mandatory/SemanticARCOpts.cpp
-  PARENT_SCOPE)
+silopt_register_sources(
+  AccessEnforcementSelection.cpp
+  AccessMarkerElimination.cpp
+  AddressLowering.cpp
+  ClosureLifetimeFixup.cpp
+  ConstantPropagation.cpp
+  DefiniteInitialization.cpp
+  DIMemoryUseCollector.cpp
+  DataflowDiagnostics.cpp
+  DiagnoseInfiniteRecursion.cpp
+  DiagnoseInvalidEscapingCaptures.cpp
+  DiagnoseStaticExclusivity.cpp
+  DiagnoseUnreachable.cpp
+  Differentiation.cpp
+  GuaranteedARCOpts.cpp
+  IRGenPrepare.cpp
+  MandatoryInlining.cpp
+  PredictableMemOpt.cpp
+  PMOMemoryUseCollector.cpp
+  RawSILInstLowering.cpp
+  SILGenCleanup.cpp
+  YieldOnceCheck.cpp
+  MandatoryCombine.cpp
+  OSLogOptimization.cpp
+  OwnershipModelEliminator.cpp
+)

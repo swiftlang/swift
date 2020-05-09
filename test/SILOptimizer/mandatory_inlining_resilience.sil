@@ -1,0 +1,49 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+@_fixed_layout
+public struct S {
+  public let y: Int
+}
+
+sil_global [let] @my_global : $Int
+
+sil hidden [global_init] [ossa] @private_function : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %4 = global_addr @my_global : $*Int
+  %5 = address_to_pointer %4 : $*Int to $Builtin.RawPointer
+  return %5 : $Builtin.RawPointer
+}
+
+// This function is transparent, but not serialized. We cannot inline it into
+// serialized_caller.
+sil [transparent] [ossa] @transparent_callee : $@convention(thin) () -> Int {
+bb0:
+  %0 = function_ref @private_function : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int
+  %3 = load [trivial] %2 : $*Int
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @serialized_callee
+sil [serialized] [ossa] @serialized_callee : $@convention(method) (@thin S.Type) -> S {
+bb0(%0 : $@thin S.Type):
+  %1 = alloc_box ${ var S }, var, name "self"
+  %2 = mark_uninitialized [rootself] %1 : ${ var S }
+  %3 = project_box %2 : ${ var S }, 0
+  // CHECK: function_ref @transparent_callee
+  %4 = function_ref @transparent_callee : $@convention(thin) () -> Int
+  %5 = apply %4() : $@convention(thin) () -> Int
+  %6 = struct_element_addr %3 : $*S, #S.y
+  assign %5 to %6 : $*Int
+  %8 = load [trivial] %3 : $*S
+  destroy_value %2 : ${ var S }
+  // CHECK: return
+  return %8 : $S
+}
+

@@ -44,7 +44,6 @@ sil_default_witness_table hidden DerivedFromSimpleAssoc {
   no_default
 }
 
-// CHECK: @_T04test15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWG = internal global
-// CHECK: define internal void @_T04test15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWI
+// CHECK: define internal void @"$s4test15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"
 
 

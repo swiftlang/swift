@@ -17,9 +17,15 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "ConstraintSystem.h"
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -65,7 +71,7 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
   
   // Make sure this argument's sugar is consistent with the sugar we
   // already found.
-  if (argTy->isSpelledLike(resultSugarTy))
+  if (argTy.getPointer() == resultSugarTy.getPointer())
     return;
   uniqueSugarTy = false;
 }
@@ -102,7 +108,7 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
     // constructed.  Apply the sugar onto it.
     if (auto FT = E->getType()->getAs<FunctionType>())
       if (FT->getResult()->isEqual(resultSugar) && !resultSugar->isCanonical()){
-        auto NFT = FunctionType::get(FT->getInput(), resultSugar,
+        auto NFT = FunctionType::get(FT->getParams(), resultSugar,
                                      FT->getExtInfo());
         E->setType(NFT);
         return E;
@@ -121,64 +127,68 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   return E;
 }
 
-/// Look up the builtin precedence group with the given name.
-static PrecedenceGroupDecl *
-getBuiltinPrecedenceGroup(TypeChecker &TC, DeclContext *DC, Identifier name,
-                          SourceLoc loc) {
-  auto group = TC.lookupPrecedenceGroup(DC, name,
-                                        /*suppress diags*/ SourceLoc());
-  if (!group) {
-    TC.diagnose(loc, diag::missing_builtin_precedence_group, name);
-  }
-  return group;
-}
-
-static PrecedenceGroupDecl *
-lookupPrecedenceGroupForOperator(TypeChecker &TC, DeclContext *DC,
-                                 Identifier name, SourceLoc loc) {
-  SourceFile *SF = DC->getParentSourceFile();
-  bool isCascading = DC->isCascadingContextForLookup(true);
-  if (auto op = SF->lookupInfixOperator(name, isCascading, loc)) {
-    TC.validateDecl(op);
+static PrecedenceGroupDecl *lookupPrecedenceGroupForOperator(DeclContext *DC,
+                                                             Identifier name,
+                                                             SourceLoc loc) {
+  auto desc = OperatorLookupDescriptor::forFile(
+      DC->getParentSourceFile(), name, DC->isCascadingContextForLookup(true),
+      loc);
+  auto &Ctx = DC->getASTContext();
+  if (auto op = evaluateOrDefault(Ctx.evaluator,
+                                  LookupInfixOperatorRequest{desc},
+                                  nullptr)) {
     return op->getPrecedenceGroup();
   } else {
-    TC.diagnose(loc, diag::unknown_binop);
+    Ctx.Diags.diagnose(loc, diag::unknown_binop);
   }
   return nullptr;
 }
 
 PrecedenceGroupDecl *
 TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
+  /// Look up the builtin precedence group with the given name.
+
+  auto getBuiltinPrecedenceGroup = [](DeclContext *DC, Identifier name,
+                                      SourceLoc loc) {
+    auto group = TypeChecker::lookupPrecedenceGroup(DC, name, loc);
+    if (!group) {
+      DC->getASTContext().Diags.diagnose(
+          loc, diag::missing_builtin_precedence_group, name);
+    }
+    return group;
+  };
+  
+  auto &Context = DC->getASTContext();
   if (auto ifExpr = dyn_cast<IfExpr>(E)) {
     // Ternary has fixed precedence.
-    return getBuiltinPrecedenceGroup(*this, DC, Context.Id_TernaryPrecedence,
+    return getBuiltinPrecedenceGroup(DC, Context.Id_TernaryPrecedence,
                                      ifExpr->getQuestionLoc());
   }
 
   if (auto assignExpr = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
-    return getBuiltinPrecedenceGroup(*this, DC, Context.Id_AssignmentPrecedence,
+    return getBuiltinPrecedenceGroup(DC, Context.Id_AssignmentPrecedence,
                                      assignExpr->getEqualLoc());
   }
 
   if (auto castExpr = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
-    return getBuiltinPrecedenceGroup(*this, DC, Context.Id_CastingPrecedence,
+    return getBuiltinPrecedenceGroup(DC, Context.Id_CastingPrecedence,
                                      castExpr->getAsLoc());
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    Identifier name = DRE->getDecl()->getBaseName().getIdentifier();
-    return lookupPrecedenceGroupForOperator(*this, DC, name, DRE->getLoc());
+    Identifier name = DRE->getDecl()->getBaseIdentifier();
+    return lookupPrecedenceGroupForOperator(DC, name, DRE->getLoc());
   }
 
   if (auto *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
-    Identifier name = OO->getDecls()[0]->getBaseName().getIdentifier();
-    return lookupPrecedenceGroupForOperator(*this, DC, name, OO->getLoc());
+    Identifier name = OO->getDecls()[0]->getBaseIdentifier();
+    return lookupPrecedenceGroupForOperator(DC, name, OO->getLoc());
   }
 
   if (auto arrowExpr = dyn_cast<ArrowExpr>(E)) {
-    return getBuiltinPrecedenceGroup(*this, DC,
+    return getBuiltinPrecedenceGroup(DC,
                                      Context.Id_FunctionArrowPrecedence,
                                      arrowExpr->getArrowLoc());
   }
@@ -189,18 +199,82 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
     return lookupPrecedenceGroupForInfixOperator(DC, binaryExpr->getFn());
   }
 
+  if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E)) {
+    return lookupPrecedenceGroupForInfixOperator(DC, DSCE->getFn());
+  }
+
+  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    Identifier name = MRE->getDecl().getDecl()->getBaseIdentifier();
+    return lookupPrecedenceGroupForOperator(DC, name, MRE->getLoc());
+  }
+
   // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
   // otherwise emit an error.
   if (!isa<ErrorExpr>(E))
-    diagnose(E->getLoc(), diag::unknown_binop);
+    Context.Diags.diagnose(E->getLoc(), diag::unknown_binop);
 
   return nullptr;
+}
+
+/// Find LHS as if we append binary operator to existing pre-folded expresion.
+/// Returns found expression, or \c nullptr if the operator is not applicable.
+///
+/// For example, given '(== R (* A B))':
+/// 'findLHS(DC, expr, "+")' returns '(* A B)'.
+/// 'findLHS(DC, expr, "<<")' returns 'B'.
+/// 'findLHS(DC, expr, '==')' returns nullptr.
+Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
+  auto right = lookupPrecedenceGroupForOperator(DC, name, E->getEndLoc());
+  if (!right)
+    return nullptr;
+
+  while (true) {
+
+    // Look through implicit conversions.
+    if (auto ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+      E = ICE->getSyntacticSubExpr();
+      continue;
+    }
+    if (auto ACE = dyn_cast<AutoClosureExpr>(E)) {
+      E = ACE->getSingleExpressionBody();
+      continue;
+    }
+
+    auto left = lookupPrecedenceGroupForInfixOperator(DC, E);
+    if (!left)
+      // LHS is not binary expression.
+      return E;
+    switch (DC->getASTContext().associateInfixOperators(left, right)) {
+      case swift::Associativity::None:
+        return nullptr;
+      case swift::Associativity::Left:
+        return E;
+      case swift::Associativity::Right:
+        break;
+    }
+    // Find the RHS of the current binary expr.
+    if (auto *assignExpr = dyn_cast<AssignExpr>(E)) {
+      E = assignExpr->getSrc();
+    } else if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
+      E = ifExpr->getElseExpr();
+    } else if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
+      auto *Args = dyn_cast<TupleExpr>(binaryExpr->getArg());
+      if (!Args || Args->getNumElements() != 2)
+        return nullptr;
+      E = Args->getElement(1);
+    } else {
+      // E.g. 'fn() as Int << 2'.
+      // In this case '<<' has higher precedence than 'as', but the LHS should
+      // be 'fn() as Int' instead of 'Int'.
+      return E;
+    }
+  }
 }
 
 // The way we compute isEndOfSequence relies on the assumption that
 // the sequence-folding algorithm never recurses with a prefix of the
 // entire sequence.
-static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
+static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
                        PrecedenceGroupDecl *opPrecedence,
                        bool isEndOfSequence) {
   if (!LHS || !RHS)
@@ -263,16 +337,17 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
         (opPrecedence && opPrecedence->isAssignment())) {
       if (!isEndOfSequence) {
         if (isa<IfExpr>(Op)) {
-          TC.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
-                      static_cast<unsigned>(tryKind));
+          Ctx.Diags.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
+                             static_cast<unsigned>(tryKind));
         } else {
-          TC.diagnose(RHS->getStartLoc(), diag::try_assign_rhs_noncovering,
-                      static_cast<unsigned>(tryKind));
+          Ctx.Diags.diagnose(RHS->getStartLoc(),
+                             diag::try_assign_rhs_noncovering,
+                             static_cast<unsigned>(tryKind));
         }
       }
     } else {
-      TC.diagnose(RHS->getStartLoc(), diag::try_rhs,
-                  static_cast<unsigned>(tryKind));
+      Ctx.Diags.diagnose(RHS->getStartLoc(), diag::try_rhs,
+                         static_cast<unsigned>(tryKind));
     }
   }
 
@@ -323,9 +398,9 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   
   // Build the argument to the operation.
   Expr *ArgElts[] = { LHS, RHS };
-  auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
-  TupleExpr *Arg = TupleExpr::create(TC.Context,
-                                     SourceLoc(), 
+  auto ArgElts2 = Ctx.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
+  TupleExpr *Arg = TupleExpr::create(Ctx,
+                                     SourceLoc(),
                                      ArgElts2, { }, { }, SourceLoc(),
                                      /*HasTrailingClosure=*/false,
                                      /*Implicit=*/true);
@@ -333,7 +408,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   
   
   // Build the operation.
-  return makeResultExpr(new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit()));
+  return makeResultExpr(new (Ctx) BinaryExpr(Op, Arg, Op->isImplicit()));
 }
 
 namespace {
@@ -344,20 +419,20 @@ namespace {
     PrecedenceBound(PrecedenceGroupDecl *decl, bool isStrict)
       : GroupAndIsStrict(decl, isStrict) {}
 
-    bool shouldConsider(TypeChecker &TC, PrecedenceGroupDecl *group) {
+    bool shouldConsider(PrecedenceGroupDecl *group) {
       auto storedGroup = GroupAndIsStrict.getPointer();
       if (!storedGroup) return true;
       if (!group) return false;
       if (storedGroup == group) return !GroupAndIsStrict.getInt();
-      return TC.Context.associateInfixOperators(group, storedGroup)
-               == Associativity::Left;
+      return group->getASTContext().associateInfixOperators(group, storedGroup)
+               != Associativity::Right;
     }
   };
 } // end anonymous namespace
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
-static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
+static Expr *foldSequence(DeclContext *DC,
                           Expr *LHS,
                           ArrayRef<Expr*> &S,
                           PrecedenceBound precedenceBound) {
@@ -378,8 +453,8 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     Expr *op = S[0];
 
     // If the operator's precedence is lower than the minimum, stop here.
-    auto opPrecedence = TC.lookupPrecedenceGroupForInfixOperator(DC, op);
-    if (!precedenceBound.shouldConsider(TC, opPrecedence))
+    auto opPrecedence = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, op);
+    if (!precedenceBound.shouldConsider(opPrecedence))
       return {nullptr, nullptr};
     return {op, opPrecedence};
   };
@@ -392,15 +467,16 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   // Pull out the prospective RHS and slice off the first two elements.
   Expr *RHS = S[1];
   S = S.slice(2);
-  
+
+  auto &Ctx = DC->getASTContext();
   while (!S.empty()) {
     assert((S.size() & 1) == 0);
-    assert(precedenceBound.shouldConsider(TC, op1.precedence));
+    assert(precedenceBound.shouldConsider(op1.precedence));
 
     // If the operator is a cast operator, the RHS can't extend past the type
     // that's part of the cast production.
     if (isa<ExplicitCastExpr>(op1.op)) {
-      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
       op1 = getNextOperator();
       if (!op1) return LHS;
       RHS = S[1];
@@ -409,11 +485,11 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     }
     
     // Pull out the next binary operator.
-    Op op2 = { S[0], TC.lookupPrecedenceGroupForInfixOperator(DC, S[0]) };
+    Op op2{ S[0], TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, S[0]) };
 
     // If the second operator's precedence is lower than the
     // precedence bound, break out of the loop.
-    if (!precedenceBound.shouldConsider(TC, op2.precedence)) break;
+    if (!precedenceBound.shouldConsider(op2.precedence)) break;
 
     // If we're missing precedence info for either operator, treat them
     // as non-associative.
@@ -422,13 +498,13 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
       associativity = Associativity::None;
     } else {
       associativity =
-        TC.Context.associateInfixOperators(op1.precedence, op2.precedence);
+        Ctx.associateInfixOperators(op1.precedence, op2.precedence);
     }
 
     // Apply left-associativity immediately by folding the first two
     // operands.
     if (associativity == Associativity::Left) {
-      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
       op1 = op2;
       RHS = S[1];
       S = S.slice(2);
@@ -441,7 +517,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // repeat.
     if (associativity == Associativity::Right &&
         op1.precedence != op2.precedence) {
-      RHS = foldSequence(TC, DC, RHS, S,
+      RHS = foldSequence(DC, RHS, S,
                          PrecedenceBound(op1.precedence, /*strict*/ true));
       continue;
     }
@@ -449,15 +525,15 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // Apply right-associativity by recursively folding operators
     // starting from this point, then immediately folding the LHS and RHS.
     if (associativity == Associativity::Right) {
-      RHS = foldSequence(TC, DC, RHS, S,
+      RHS = foldSequence(DC, RHS, S,
                          PrecedenceBound(op1.precedence, /*strict*/ false));
-      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
 
       // Otherwise, start all over with our new LHS.
-      return foldSequence(TC, DC, LHS, S, precedenceBound);
+      return foldSequence(DC, LHS, S, precedenceBound);
     }
 
     // If we ended up here, it's because we're either:
@@ -473,51 +549,62 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     } else if (op1.precedence == op2.precedence) {
       assert(op1.precedence->isNonAssociative());
       // FIXME: QoI ranges
-      TC.diagnose(op1.op->getLoc(), diag::non_associative_adjacent_operators,
-                  op1.precedence->getName())
+      Ctx.Diags.diagnose(op1.op->getLoc(),
+                         diag::non_associative_adjacent_operators,
+                         op1.precedence->getName())
         .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));
 
     } else {
-      TC.diagnose(op1.op->getLoc(), diag::unordered_adjacent_operators,
-                  op1.precedence->getName(), op2.precedence->getName())
+      Ctx.Diags.diagnose(op1.op->getLoc(),
+                         diag::unordered_adjacent_operators,
+                         op1.precedence->getName(), op2.precedence->getName())
         .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));      
     }
     
     // Recover by arbitrarily binding the first two.
-    LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
-    return foldSequence(TC, DC, LHS, S, precedenceBound);
+    LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
+    return foldSequence(DC, LHS, S, precedenceBound);
   }
 
   // Fold LHS and RHS together and declare completion.
-  return makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+  return makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
 }
 
-bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
-  if (Context.hasOptionalIntrinsics(this)) return false;
+bool TypeChecker::requireOptionalIntrinsics(ASTContext &ctx, SourceLoc loc) {
+  if (ctx.hasOptionalIntrinsics())
+    return false;
 
-  diagnose(loc, diag::optional_intrinsics_not_found);
+  ctx.Diags.diagnose(loc, diag::optional_intrinsics_not_found);
   return true;
 }
 
-bool TypeChecker::requirePointerArgumentIntrinsics(SourceLoc loc) {
-  if (Context.hasPointerArgumentIntrinsics(this)) return false;
+bool TypeChecker::requirePointerArgumentIntrinsics(ASTContext &ctx,
+                                                   SourceLoc loc) {
+  if (ctx.hasPointerArgumentIntrinsics())
+    return false;
 
-  diagnose(loc, diag::pointer_argument_intrinsics_not_found);
+  ctx.Diags.diagnose(loc, diag::pointer_argument_intrinsics_not_found);
   return true;
 }
 
-bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
-  if (Context.hasArrayLiteralIntrinsics(this)) return false;
-  
-  diagnose(loc, diag::array_literal_intrinsics_not_found);
+bool TypeChecker::requireArrayLiteralIntrinsics(ASTContext &ctx,
+                                                SourceLoc loc) {
+  if (ctx.hasArrayLiteralIntrinsics())
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::array_literal_intrinsics_not_found);
   return true;
 }
 
 Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
                                        DeclNameLoc loc, bool Implicit) {
-  auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
-  AccessSemantics semantics = value->getAccessSemanticsFromContext(UseDC);
-  return new (Context) DeclRefExpr(value, loc, Implicit, semantics, type);
+  auto type = constraints::ConstraintSystem::getUnopenedTypeOfReference(
+      value, Type(), UseDC,
+      [&](VarDecl *var) -> Type { return value->getType(); });
+  auto semantics = value->getAccessSemanticsFromContext(UseDC,
+                                                       /*isAccessOnSelf*/false);
+  return new (value->getASTContext())
+      DeclRefExpr(value, loc, Implicit, semantics, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
@@ -525,8 +612,10 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                 bool Implicit, FunctionRefKind functionRefKind) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
+  auto &Context = UseDC->getASTContext();
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    AccessSemantics semantics = Decls[0]->getAccessSemanticsFromContext(UseDC);
+    auto semantics = Decls[0]->getAccessSemanticsFromContext(UseDC,
+                                                       /*isAccessOnSelf*/false);
     return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit, semantics);
   }
 
@@ -537,20 +626,20 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   return result;
 }
 
-static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
+static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
+  auto &ctx = dc->getASTContext();
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(dc))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookup = TC.lookupUnqualified(dc->getModuleScopeContext(),
-                                     TC.Context.getIdentifier(name),
-                                     SourceLoc(),
-                                     lookupOptions);
+  DeclNameRef nameRef(ctx.getIdentifier(name));
+  auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
+                                               nameRef, SourceLoc(),
+                                               lookupOptions);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
-  TC.validateDecl(TD);
-
+  
   if (TD->isInvalid())
     return Type();
 
@@ -559,111 +648,67 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
   return cast<TypeAliasDecl>(TD)->getDeclaredInterfaceType();
 }
 
+static Optional<KnownProtocolKind>
+getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)              \
+  if (protocol == TypeChecker::getProtocol(protocol->getASTContext(),          \
+                                           SourceLoc(),                        \
+                                           KnownProtocolKind::Id))             \
+    return KnownProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+
+  return None;
+}
+
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
-  Type *type = nullptr;
-  const char *name = nullptr;
+  if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
+    return evaluateOrDefault(
+        protocol->getASTContext().evaluator,
+        DefaultTypeRequest{knownProtocolKindIfAny.getValue(), dc}, nullptr);
+  }
+  return Type();
+}
 
-  // ExpressibleByUnicodeScalarLiteral -> UnicodeScalarType
-  if (protocol ==
-           getProtocol(
-               SourceLoc(),
-               KnownProtocolKind::ExpressibleByUnicodeScalarLiteral)) {
-    type = &UnicodeScalarType;
-    name = "UnicodeScalarType";
+static std::pair<const char *, bool> lookupDefaultTypeInfoForKnownProtocol(
+    const KnownProtocolKind knownProtocolKind) {
+  switch (knownProtocolKind) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName,          \
+                                                  performLocalLookup)          \
+  case KnownProtocolKind::Id:                                                  \
+    return {typeName, performLocalLookup};
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+  default:
+    return {nullptr, false};
   }
-  // ExpressibleByExtendedGraphemeClusterLiteral -> ExtendedGraphemeClusterType
-  else if (protocol ==
-           getProtocol(
-               SourceLoc(),
-               KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral)) {
-    type = &ExtendedGraphemeClusterType;
-    name = "ExtendedGraphemeClusterType";
-  }
-  // ExpressibleByStringLiteral -> StringLiteralType
-  // ExpressibleByStringInterpolation -> StringLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByStringLiteral) ||
-           protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByStringInterpolation)) {
-    type = &StringLiteralType;
-    name = "StringLiteralType";
-  }
-  // ExpressibleByIntegerLiteral -> IntegerLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-    type = &IntLiteralType;
-    name = "IntegerLiteralType";
-  }
-  // ExpressibleByFloatLiteral -> FloatLiteralType
-  else if (protocol == getProtocol(SourceLoc(),
-                                   KnownProtocolKind::ExpressibleByFloatLiteral)){
-    type = &FloatLiteralType;
-    name = "FloatLiteralType";
-  }
-  // ExpressibleByBooleanLiteral -> BoolLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByBooleanLiteral)){
-    type = &BooleanLiteralType;
-    name = "BooleanLiteralType";
-  }
-  // ExpressibleByArrayLiteral -> Array
-  else if (protocol == getProtocol(SourceLoc(),
-                                   KnownProtocolKind::ExpressibleByArrayLiteral)){
-    type = &ArrayLiteralType;
-    name = "Array";
-  }
-  // ExpressibleByDictionaryLiteral -> Dictionary
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByDictionaryLiteral)) {
-    type = &DictionaryLiteralType;
-    name = "Dictionary";
-  }
-  // _ExpressibleByColorLiteral -> _ColorLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByColorLiteral)) {
-    type = &ColorLiteralType;
-    name = "_ColorLiteralType";
-  }
-  // _ExpressibleByImageLiteral -> _ImageLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByImageLiteral)) {
-    type = &ImageLiteralType;
-    name = "_ImageLiteralType";
-  }
-  // _ExpressibleByFileReferenceLiteral -> _FileReferenceLiteralType
-  else if (protocol == getProtocol(
-                         SourceLoc(),
-                         KnownProtocolKind::ExpressibleByFileReferenceLiteral)) {
-    type = &FileReferenceLiteralType;
-    name = "_FileReferenceLiteralType";
-  }
+}
 
-  if (!type)
+Type
+swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
+                                    KnownProtocolKind knownProtocolKind,
+                                    const DeclContext *dc) const {
+  const char *name;
+  bool performLocalLookup;
+  std::tie(name, performLocalLookup) =
+      lookupDefaultTypeInfoForKnownProtocol(knownProtocolKind);
+  if (!name)
     return nullptr;
 
-  // If we haven't found the type yet, look for it now.
-  if (!*type) {
-    *type = lookupDefaultLiteralType(*this, dc, name);
+  Type type;
+  if (performLocalLookup)
+    type = lookupDefaultLiteralType(dc, name);
 
-    if (!*type)
-      *type = lookupDefaultLiteralType(*this, getStdlibModule(dc), name);
+  if (!type)
+    type = lookupDefaultLiteralType(TypeChecker::getStdlibModule(dc), name);
 
-    // Strip off one level of sugar; we don't actually want to print
-    // the name of the typealias itself anywhere.
-    if (type && *type) {
-      if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
-        *type = typeAlias->getSinglyDesugaredType();
-    }
+  // Strip off one level of sugar; we don't actually want to print
+  // the name of the typealias itself anywhere.
+  if (type) {
+    if (auto boundTypeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
+      type = boundTypeAlias->getSinglyDesugaredType();
   }
-
-  return *type;
+  return type;
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
@@ -674,8 +719,141 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   Expr *LHS = Elts[0];
   Elts = Elts.slice(1);
 
-  Expr *Result = ::foldSequence(*this, dc, LHS, Elts, PrecedenceBound());
+  Expr *Result = ::foldSequence(dc, LHS, Elts, PrecedenceBound());
   assert(Elts.empty());
 
   return Result;
+}
+
+static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
+                                         SourceLoc loc) {
+  auto &ctx = param->getASTContext();
+  switch (param->getDefaultArgumentKind()) {
+  case DefaultArgumentKind::Column:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Column, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::File:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::File, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::FilePath:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::FilePath, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::Line:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Line, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::Function:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Function, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::DSOHandle:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::DSOHandle, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::NilLiteral:
+    return new (ctx) NilLiteralExpr(loc, /*Implicit=*/true);
+    break;
+
+  case DefaultArgumentKind::EmptyArray: {
+    auto *initExpr = ArrayExpr::create(ctx, loc, {}, {}, loc);
+    initExpr->setImplicit();
+    return initExpr;
+  }
+  case DefaultArgumentKind::EmptyDictionary: {
+    auto *initExpr = DictionaryExpr::create(ctx, loc, {}, {}, loc);
+    initExpr->setImplicit();
+    return initExpr;
+  }
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::Inherited:
+  case DefaultArgumentKind::StoredProperty:
+    llvm_unreachable("Not a caller-side default");
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+Expr *CallerSideDefaultArgExprRequest::evaluate(
+    Evaluator &evaluator, DefaultArgumentExpr *defaultExpr) const {
+  auto *param = defaultExpr->getParamDecl();
+  auto paramTy = defaultExpr->getType();
+
+  // Re-create the default argument using the location info of the call site.
+  auto *initExpr =
+      synthesizeCallerSideDefault(param, defaultExpr->getArgumentListLoc());
+  auto *dc = defaultExpr->ContextOrCallerSideExpr.get<DeclContext *>();
+  assert(dc && "Expected a DeclContext before type-checking caller-side arg");
+
+  auto &ctx = param->getASTContext();
+  DiagnosticTransaction transaction(ctx.Diags);
+  if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
+                                              param->isAutoClosure())) {
+    if (param->hasDefaultExpr()) {
+      // HACK: If we were unable to type-check the default argument in context,
+      // then retry by type-checking it within the parameter decl, which should
+      // also fail. This will present the user with a better error message and
+      // allow us to avoid diagnosing on each call site.
+      transaction.abort();
+      (void)param->getTypeCheckedDefaultExpr();
+      assert(ctx.Diags.hadAnyError());
+    }
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
+  }
+  return initExpr;
+}
+
+bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
+                                               ClosureExpr *closure) const {
+  // A walker that looks for 'return' statements that aren't
+  // nested within closures or nested declarations.
+  class FindReturns : public ASTWalker {
+    bool FoundResultReturn = false;
+    bool FoundNoResultReturn = false;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      return {false, expr};
+    }
+
+    bool walkToDeclPre(Decl *decl) override { return false; }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      // Record return statements.
+      if (auto ret = dyn_cast<ReturnStmt>(stmt)) {
+        if (ret->isImplicit())
+          return {true, stmt};
+
+        // If it has a result, remember that we saw one, but keep
+        // traversing in case there's a no-result return somewhere.
+        if (ret->hasResult()) {
+          FoundResultReturn = true;
+
+          // Otherwise, stop traversing.
+        } else {
+          FoundNoResultReturn = true;
+          return {false, nullptr};
+        }
+      }
+      return {true, stmt};
+    }
+
+  public:
+    bool hasResult() const { return !FoundNoResultReturn && FoundResultReturn; }
+  };
+
+  auto body = closure->getBody();
+  if (!body)
+    return false;
+
+  FindReturns finder;
+  body->walk(finder);
+  return finder.hasResult();
 }

@@ -1,0 +1,6 @@
+Name:            resilient_struct
+Decls:
+  - Name:            16resilient_struct15ResilientDoubleV
+    Size:            8
+    Alignment:       8
+    ExtraInhabitants: 0

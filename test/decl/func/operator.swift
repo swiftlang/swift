@@ -11,7 +11,27 @@ struct Y {}
 
 func +(lhs: X, rhs: X) -> X {} // okay
 
-func +++(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}
+func <=>(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+
+extension X {
+    static func <=>(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+}
+
+extension X {
+    struct Z {
+        static func <=> (lhs: Z, rhs: Z) -> Z {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+    }
+}
+
+extension X {
+    static prefix func <=>(lhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=prefix operator <=> : <# Precedence Group #>\n}}
+}
+
+extension X {
+    struct ZZ {
+        static prefix func <=>(lhs: ZZ) -> ZZ {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=prefix operator <=> : <# Precedence Group #>\n}}
+    }
+}
 
 infix operator ++++ : ReallyHighPrecedence
 precedencegroup ReallyHighPrecedence {
@@ -112,7 +132,7 @@ var f2 : (Int) -> Int = (+-+)
 var f3 : (inout Int) -> Int = (-+-) // expected-error{{ambiguous use of operator '-+-'}}
 var f4 : (inout Int, Int) -> Int = (+-+=)
 var r5 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (+, -)
-var r6 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (b : +, a : -)
+var r6 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (b : +, a : -) // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
 
 struct f6_S {
   subscript(op : (Int, Int) -> Int) -> Int {
@@ -142,19 +162,25 @@ func test_14705150() {
 
 }
 
+postfix operator ++
+prefix operator ++
+
 prefix postfix func ++(x: Int) {} // expected-error {{'postfix' contradicts previous modifier 'prefix'}} {{8-16=}}
 postfix prefix func ++(x: Float) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}}
 postfix prefix infix func ++(x: Double) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}} expected-error {{'infix' contradicts previous modifier 'postfix'}} {{16-22=}}
-infix prefix func +-+(x: Int, y: Int) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
+infix prefix func +-+(x: Double, y: Double) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
 
 // Don't allow one to define a postfix '!'; it's built into the
 // language. Also illegal to have any postfix operator starting with '!'.
-postfix operator !  // expected-error {{cannot declare a custom postfix '!' operator}} expected-error {{expected operator name in operator declaration}}
+postfix operator !  // expected-error {{cannot declare a custom postfix '!' operator}} expected-error {{postfix operator names starting with '?' or '!' are disallowed}}
 prefix operator &  // expected-error {{cannot declare a custom prefix '&' operator}}
 
 // <rdar://problem/14607026> Restrict use of '<' and '>' as prefix/postfix operator names
 postfix operator >  // expected-error {{cannot declare a custom postfix '>' operator}}
 prefix operator <  // expected-error {{cannot declare a custom prefix '<' operator}}
+
+infix operator =  // expected-error {{cannot declare a custom infix '=' operator}}
+infix operator ->  // expected-error {{cannot declare a custom infix '->' operator}}
 
 postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
 postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}
@@ -165,7 +191,8 @@ func operator_in_func_bad () {
     prefix func + (input: String) -> String { return "+" + input } // expected-error {{operator functions can only be declared at global or in type scope}}
 }
 
-infix operator ?  // expected-error {{expected operator name in operator declaration}} 
+infix operator ?  // expected-error {{cannot declare a custom infix '?' operator}}
+prefix operator ?  // expected-error {{cannot declare a custom prefix '?' operator}}
 
 infix operator ??=
 
@@ -185,15 +212,15 @@ postfix func☃⃠(a : Int) -> Int { return a }
 
 _ = n☃⃠ ☃⃠ n   // Ok.
 _ = n ☃⃠ ☃⃠n   // Ok.
-_ = n ☃⃠☃⃠ n   // expected-error {{use of unresolved operator '☃⃠☃⃠'}}
+_ = n ☃⃠☃⃠ n   // expected-error {{cannot find operator '☃⃠☃⃠' in scope}}
 _ = n☃⃠☃⃠n     // expected-error {{ambiguous missing whitespace between unary and binary operators}}
 // expected-note @-1 {{could be binary '☃⃠' and prefix '☃⃠'}} {{12-12= }} {{18-18= }}
 // expected-note @-2 {{could be postfix '☃⃠' and binary '☃⃠'}} {{6-6= }} {{12-12= }}
 
-_ = n☃⃠☃⃠ // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
-_ = ~!n  // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
-_ = -+n  // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
-_ = -++n // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
+_ = n☃⃠☃⃠ // expected-error {{unary operators must not be juxtaposed; parenthesize inner expression}}
+_ = ~!n  // expected-error {{unary operators must not be juxtaposed; parenthesize inner expression}}
+_ = -+n  // expected-error {{unary operators must not be juxtaposed; parenthesize inner expression}}
+_ = -++n // expected-error {{unary operators must not be juxtaposed; parenthesize inner expression}}
 
 // <rdar://problem/16230507> Cannot use a negative constant as the second operator of ... operator
 _ = 3...-5  // expected-error {{ambiguous missing whitespace between unary and binary operators}} expected-note {{could be postfix '...' and binary '-'}} expected-note {{could be binary '...' and prefix '-'}}
@@ -204,7 +231,7 @@ protocol P0 {
 }
 
 protocol P1 {
-  func %%%(lhs: Self, rhs: Self) -> Self // expected-warning{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
+  func %%%(lhs: Self, rhs: Self) -> Self // expected-error{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
 }
 
 struct S0 {
@@ -220,7 +247,7 @@ struct S1 {
 }
 
 extension S1 {
-  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in extension of 'S1' must be 'static'}}{{3-3=static }}
 }
 
 class C0 {
@@ -352,6 +379,46 @@ class C6 {
   static func == (lhs: C6, rhs: C6) -> Bool { return false }
 
   func test1(x: C6) {
-    if x == x && x = x { } // expected-error{{cannot assign to value: '&&' returns immutable value}}
+    if x == x && x = x { } // expected-error{{use of '=' in a boolean context, did you mean '=='?}} {{20-21===}}
+    // expected-error@-1 {{cannot convert value of type 'C6' to expected argument type 'Bool'}}
   }
+}
+
+prefix operator ∫
+
+prefix func ∫(arg: (Int, Int)) {}
+
+func testPrefixOperatorOnTuple() {
+
+  let foo = (1, 2)
+  _ = ∫foo
+  _ = (∫)foo
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-warning@-2 {{expression of type '(Int, Int)' is unused}}
+  (∫)(foo)
+  _ = ∫(1, 2)
+  _ = (∫)(1, 2) // expected-error {{operator function '∫' expects a single parameter of type '(Int, Int)'}}
+  (∫)((1, 2))
+}
+
+postfix operator §
+
+postfix func §<T, U>(arg: (T, (U, U), T)) {} // expected-note {{in call to operator '§'}}
+
+func testPostfixOperatorOnTuple<A, B>(a: A, b: B) {
+
+  let foo = (a, (b, b), a)
+  _ = foo§
+
+  // FIX-ME: "...could not be inferred" is irrelevant
+  _ = (§)foo
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-3 {{generic parameter 'U' could not be inferred}}
+  // expected-warning@-4 {{expression of type '(A, (B, B), A)' is unused}}
+  (§)(foo)
+  _ = (a, (b, b), a)§
+  _ = (§)(a, (b, b), a) // expected-error {{operator function '§' expects a single parameter of type '(T, (U, U), T)'}}
+  (§)((a, (b, b), a))
+  _ = (a, ((), (b, (a, a), b)§), a)§
 }

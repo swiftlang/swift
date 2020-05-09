@@ -10,83 +10,254 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SwiftRemoteMirror/Platform.h"
+#include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
+
+#define SWIFT_CLASS_IS_SWIFT_MASK swift_reflection_classIsSwiftMask
+extern "C" {
+SWIFT_REMOTE_MIRROR_LINKAGE
+unsigned long long swift_reflection_classIsSwiftMask = 2;
+}
+
+#include "swift/Demangling/Demangler.h"
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/Runtime/Unreachable.h"
-#include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
+
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
 
 using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
 
-using NativeReflectionContext
-  = swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+using NativeReflectionContext = swift::reflection::ReflectionContext<
+    External<RuntimeTarget<sizeof(uintptr_t)>>>;
+
+struct SwiftReflectionContext {
+  NativeReflectionContext *nativeContext;
+  std::vector<std::function<void()>> freeFuncs;
+  std::vector<std::tuple<swift_addr_t, swift_addr_t>> dataSegments;
+  
+  SwiftReflectionContext(MemoryReaderImpl impl) {
+    auto Reader = std::make_shared<CMemoryReader>(impl);
+    nativeContext = new NativeReflectionContext(Reader);
+  }
+  
+  ~SwiftReflectionContext() {
+    delete nativeContext;
+    for (auto f : freeFuncs)
+      f();
+  }
+};
+
 
 uint16_t
 swift_reflection_getSupportedMetadataVersion() {
   return SWIFT_REFLECTION_METADATA_VERSION;
 }
 
+template <uint8_t WordSize>
+static int minimalDataLayoutQueryFunction(void *ReaderContext,
+                                          DataLayoutQueryType type,
+                                          void *inBuffer, void *outBuffer) {
+    // TODO: The following should be set based on the target.
+    // This code sets it to match the platform this code was compiled for.
+#if defined(__APPLE__) && __APPLE__
+    auto applePlatform = true;
+#else
+    auto applePlatform = false;
+#endif
+#if defined(__APPLE__) && __APPLE__ && ((defined(TARGET_OS_IOS) && TARGET_OS_IOS) || (defined(TARGET_OS_IOS) && TARGET_OS_WATCH) || (defined(TARGET_OS_TV) && TARGET_OS_TV))
+    auto iosDerivedPlatform = true;
+#else
+    auto iosDerivedPlatform = false;
+#endif
+
+  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+    auto result = static_cast<uint8_t *>(outBuffer);
+    *result = WordSize;
+    return 1;
+  }
+  if (type == DLQ_GetObjCReservedLowBits) {
+    auto result = static_cast<uint8_t *>(outBuffer);
+    if (applePlatform && !iosDerivedPlatform && WordSize == 8) {
+      // Obj-C reserves low bit on 64-bit macOS only.
+      // Other Apple platforms don't reserve this bit (even when
+      // running on x86_64-based simulators).
+      *result = 1;
+    } else {
+      *result = 0;
+    }
+    return 1;
+  }
+  if (type == DLQ_GetLeastValidPointerValue) {
+    auto result = static_cast<uint64_t *>(outBuffer);
+    if (applePlatform && WordSize == 8) {
+      // Swift reserves the first 4GiB on all 64-bit Apple platforms
+      *result = 0x100000000;
+    } else {
+      // Swift reserves the first 4KiB everywhere else
+      *result = 0x1000;
+    }
+    return 1;
+  }
+  return 0;
+}
+
+// Caveat: This basically only works correctly if running on the same
+// host as the target.  Otherwise, you'll need to use
+// swift_reflection_createReflectionContextWithDataLayout() below
+// with an appropriate data layout query function that understands
+// the target environment.
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
-                                         PointerSizeFunction getPointerSize,
-                                         SizeSizeFunction getSizeSize,
-                                         ReadBytesFunction readBytes,
-                                         GetStringLengthFunction getStringLength,
-                                         GetSymbolAddressFunction getSymbolAddress) {
+                                         uint8_t PointerSize,
+                                         FreeBytesFunction Free,
+                                         ReadBytesFunction ReadBytes,
+                                         GetStringLengthFunction GetStringLength,
+                                         GetSymbolAddressFunction GetSymbolAddress) {
+  assert((PointerSize == 4 || PointerSize == 8) && "We only support 32-bit and 64-bit.");
+  assert(PointerSize == sizeof(uintptr_t) &&
+         "We currently only support the pointer size this file was compiled with.");
+
+  auto *DataLayout = PointerSize == 4 ? minimalDataLayoutQueryFunction<4>
+                                      : minimalDataLayoutQueryFunction<8>;
   MemoryReaderImpl ReaderImpl {
     ReaderContext,
-    getPointerSize,
-    getSizeSize,
-    readBytes,
-    getStringLength,
-    getSymbolAddress
+    DataLayout,
+    Free,
+    ReadBytes,
+    GetStringLength,
+    GetSymbolAddress
   };
 
-  auto Reader = std::make_shared<CMemoryReader>(ReaderImpl);
-  auto Context
-    = new swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>(Reader);
-  return reinterpret_cast<SwiftReflectionContextRef>(Context);
+  return new SwiftReflectionContext(ReaderImpl);
+}
+
+SwiftReflectionContextRef
+swift_reflection_createReflectionContextWithDataLayout(void *ReaderContext,
+                                    QueryDataLayoutFunction DataLayout,
+                                    FreeBytesFunction Free,
+                                    ReadBytesFunction ReadBytes,
+                                    GetStringLengthFunction GetStringLength,
+                                    GetSymbolAddressFunction GetSymbolAddress) {
+  MemoryReaderImpl ReaderImpl {
+    ReaderContext,
+    DataLayout,
+    Free,
+    ReadBytes,
+    GetStringLength,
+    GetSymbolAddress
+  };
+
+  return new SwiftReflectionContext(ReaderImpl);
 }
 
 void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef ContextRef) {
-  auto Context = reinterpret_cast<swift::reflection::ReflectionContext<InProcess> *>(ContextRef);
-  delete Context;
+  delete ContextRef;
+}
+
+template<typename Iterator>
+ReflectionSection<Iterator> sectionFromInfo(const swift_reflection_info_t &Info,
+                              const swift_reflection_section_pair_t &Section) {
+  auto RemoteSectionStart = (uint64_t)(uintptr_t)Section.section.Begin
+    - Info.LocalStartAddress
+    + Info.RemoteStartAddress;
+  
+  auto Start = RemoteRef<void>(RemoteSectionStart, Section.section.Begin);
+  
+  return ReflectionSection<Iterator>(Start,
+             (uintptr_t)Section.section.End - (uintptr_t)Section.section.Begin);
 }
 
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
-  Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
+  auto Context = ContextRef->nativeContext;
+  
+  // The `offset` fields must be zero.
+  if (Info.field.offset != 0
+      || Info.associated_types.offset != 0
+      || Info.builtin_types.offset != 0
+      || Info.capture.offset != 0
+      || Info.type_references.offset != 0
+      || Info.reflection_strings.offset != 0) {
+    fprintf(stderr, "reserved field in swift_reflection_info_t is not zero\n");
+    abort();
+  }
+  
+  ReflectionInfo ContextInfo{
+    sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
+    sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
+    sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
+    sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
+    sectionFromInfo<const void *>(Info, Info.type_references),
+    sectionFromInfo<const void *>(Info, Info.reflection_strings)};
+  
+  Context->addReflectionInfo(ContextInfo);
+}
+
+int
+swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
+                          swift_addr_t imageStart) {
+  auto Context = ContextRef->nativeContext;
+  return Context->addImage(RemoteAddress(imageStart));
 }
 
 int
 swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
                              uintptr_t *outIsaMask) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto isaMask = Context->readIsaMask();
-  *outIsaMask = isaMask.second;
-  return isaMask.first;
+  if (isaMask) {
+    *outIsaMask = *isaMask;
+    return true;
+  }
+  *outIsaMask = 0;
+  return false;
 }
 
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Metadata) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = Context->readTypeFromMetadata(Metadata);
   return reinterpret_cast<swift_typeref_t>(TR);
+}
+
+int
+swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object) {
+  auto Context = ContextRef->nativeContext;
+  return Context->ownsObject(RemoteAddress(Object));
+}
+
+int
+swift_reflection_ownsAddress(SwiftReflectionContextRef ContextRef, uintptr_t Address) {
+  auto Context = ContextRef->nativeContext;
+  return Context->ownsAddress(RemoteAddress(Address));
+}
+
+uintptr_t
+swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
+                                   uintptr_t Object) {
+  auto Context = ContextRef->nativeContext;
+  auto MetadataAddress = Context->readMetadataFromInstance(Object);
+  if (!MetadataAddress)
+    return 0;
+  return *MetadataAddress;
 }
 
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto MetadataAddress = Context->readMetadataFromInstance(Object);
-  if (!MetadataAddress.first)
+  if (!MetadataAddress)
     return 0;
-  auto TR = Context->readTypeFromMetadata(MetadataAddress.second);
+  auto TR = Context->readTypeFromMetadata(*MetadataAddress);
   return reinterpret_cast<swift_typeref_t>(TR);
 }
 
@@ -94,9 +265,19 @@ swift_typeref_t
 swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledTypeName,
                                            uint64_t Length) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = Context->readTypeFromMangledName(MangledTypeName, Length);
   return reinterpret_cast<swift_typeref_t>(TR);
+}
+
+char *
+swift_reflection_copyDemangledNameForTypeRef(
+  SwiftReflectionContextRef ContextRef, swift_typeref_t OpaqueTypeRef) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+
+  Demangle::Demangler Dem;
+  auto Name = nodeToString(TR->getDemangling(Dem));
+  return strdup(Name.c_str());
 }
 
 swift_typeref_t
@@ -125,6 +306,9 @@ swift_reflection_genericArgumentCountOfTypeRef(swift_typeref_t OpaqueTypeRef) {
 
 swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   switch (TI.getKind()) {
+  case TypeInfoKind::Invalid: {
+    return SWIFT_UNKNOWN;
+  }
   case TypeInfoKind::Builtin: {
     auto &BuiltinTI = cast<BuiltinTypeInfo>(TI);
     if (BuiltinTI.getMangledTypeName() == "Bp")
@@ -140,12 +324,6 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_TUPLE;
     case RecordKind::Struct:
       return SWIFT_STRUCT;
-    case RecordKind::NoPayloadEnum:
-      return SWIFT_NO_PAYLOAD_ENUM;
-    case RecordKind::SinglePayloadEnum:
-      return SWIFT_SINGLE_PAYLOAD_ENUM;
-    case RecordKind::MultiPayloadEnum:
-      return SWIFT_MULTI_PAYLOAD_ENUM;
     case RecordKind::ThickFunction:
       return SWIFT_THICK_FUNCTION;
     case RecordKind::OpaqueExistential:
@@ -162,17 +340,24 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
       return SWIFT_CLOSURE_CONTEXT;
     }
   }
+  case TypeInfoKind::Enum: {
+    auto &EnumTI = cast<EnumTypeInfo>(TI);
+    switch (EnumTI.getEnumKind()) {
+    case EnumKind::NoPayloadEnum:
+      return SWIFT_NO_PAYLOAD_ENUM;
+    case EnumKind::SinglePayloadEnum:
+      return SWIFT_SINGLE_PAYLOAD_ENUM;
+    case EnumKind::MultiPayloadEnum:
+      return SWIFT_MULTI_PAYLOAD_ENUM;
+    }
+  }
   case TypeInfoKind::Reference: {
     auto &ReferenceTI = cast<ReferenceTypeInfo>(TI);
     switch (ReferenceTI.getReferenceKind()) {
-    case ReferenceKind::Strong:
-      return SWIFT_STRONG_REFERENCE;
-    case ReferenceKind::Unowned:
-      return SWIFT_UNOWNED_REFERENCE;
-    case ReferenceKind::Weak:
-      return SWIFT_WEAK_REFERENCE;
-    case ReferenceKind::Unmanaged:
-      return SWIFT_UNMANAGED_REFERENCE;
+    case ReferenceKind::Strong: return SWIFT_STRONG_REFERENCE;
+#define REF_STORAGE(Name, name, NAME) \
+    case ReferenceKind::Name: return SWIFT_##NAME##_REFERENCE;
+#include "swift/AST/ReferenceStorage.def"
     }
   }
   }
@@ -192,8 +377,11 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
   }
 
   unsigned NumFields = 0;
-  if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI))
+  if (auto *RecordTI = dyn_cast<EnumTypeInfo>(TI)) {
+    NumFields = RecordTI->getNumCases();
+  } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
     NumFields = RecordTI->getNumFields();
+  }
 
   return {
     getTypeInfoKind(*TI),
@@ -205,21 +393,27 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
 }
 
 static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
-  auto *RecordTI = cast<RecordTypeInfo>(TI);
-  auto &FieldInfo = RecordTI->getFields()[Index];
+  const FieldInfo *FieldInfo;
+  if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
+    FieldInfo = &(EnumTI->getCases()[Index]);
+  } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
+    FieldInfo = &(RecordTI->getFields()[Index]);
+  } else {
+    assert(false && "convertChild(TI): TI must be record or enum typeinfo");
+  }
 
   return {
-    FieldInfo.Name.c_str(),
-    FieldInfo.Offset,
-    getTypeInfoKind(FieldInfo.TI),
-    reinterpret_cast<swift_typeref_t>(FieldInfo.TR),
+    FieldInfo->Name.c_str(),
+    FieldInfo->Offset,
+    getTypeInfoKind(FieldInfo->TI),
+    reinterpret_cast<swift_typeref_t>(FieldInfo->TR),
   };
 }
 
 swift_typeinfo_t
 swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR);
   return convertTypeInfo(TI);
@@ -229,7 +423,7 @@ swift_childinfo_t
 swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef,
                                 unsigned Index) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto *TI = Context->getTypeInfo(TR);
   return convertChild(TI, Index);
@@ -238,7 +432,7 @@ swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
 swift_typeinfo_t
 swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto *TI = Context->getMetadataTypeInfo(Metadata);
   return convertTypeInfo(TI);
 }
@@ -247,7 +441,7 @@ swift_childinfo_t
 swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto *TI = Context->getMetadataTypeInfo(Metadata);
   return convertChild(TI, Index);
 }
@@ -255,7 +449,7 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
 swift_typeinfo_t
 swift_reflection_infoForInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto *TI = Context->getInstanceTypeInfo(Object);
   return convertTypeInfo(TI);
 }
@@ -264,7 +458,7 @@ swift_childinfo_t
 swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object,
                                  unsigned Index) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto *TI = Context->getInstanceTypeInfo(Object);
   return convertChild(TI, Index);
 }
@@ -274,7 +468,7 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
                                         swift_addr_t *StartOfInstanceData) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
   auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
   const TypeRef *InstanceTR = nullptr;
@@ -292,46 +486,79 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
   return Success;
 }
 
+int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
+                                      swift_addr_t EnumAddress,
+                                      swift_typeref_t EnumTypeRef,
+                                      int *CaseIndex) {
+  auto Context = ContextRef->nativeContext;
+  auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
+  auto RemoteEnumAddress = RemoteAddress(EnumAddress);
+  if (!Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex)) {
+    return false;
+  }
+  auto TI = Context->getTypeInfo(EnumTR);
+  auto *RecordTI = dyn_cast<EnumTypeInfo>(TI);
+  assert(RecordTI != nullptr);
+  if (static_cast<size_t>(*CaseIndex) >= RecordTI->getNumCases()) {
+    return false;
+  }
+  return true;
+}
+
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   if (TR == nullptr) {
-    std::cout << "<null type reference>\n";
+    fprintf(stdout, "<null type reference>\n");
   } else {
-    TR->dump(std::cout);
+    TR->dump(stdout);
   }
 }
 
 void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
                                          swift_typeref_t OpaqueTypeRef) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR);
   if (TI == nullptr) {
-    std::cout << "<null type info>\n";
+    fprintf(stdout, "<null type info>\n");
   } else {
-    TI->dump(std::cout);
+    TI->dump(stdout);
+    Demangle::Demangler Dem;
+    std::string MangledName = mangleNode(TR->getDemangling(Dem));
+    fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
+            MangledName.c_str());
+
+    char *DemangledName =
+      swift_reflection_copyDemangledNameForTypeRef(ContextRef, OpaqueTypeRef);
+    fprintf(stdout, "Demangled name: %s\n", DemangledName);
+    free(DemangledName);
+
+#ifndef NDEBUG
+    assert(mangleNode(TR->getDemangling(Dem)) == MangledName &&
+           "round-trip diff");
+#endif
   }
 }
 
 void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Metadata) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TI = Context->getMetadataTypeInfo(Metadata);
   if (TI == nullptr) {
-    std::cout << "<null type info>\n";
+    fprintf(stdout, "<null type info>\n");
   } else {
-    TI->dump(std::cout);
+    TI->dump(stdout);
   }
 }
 
 void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Object) {
-  auto Context = reinterpret_cast<NativeReflectionContext *>(ContextRef);
+  auto Context = ContextRef->nativeContext;
   auto TI = Context->getInstanceTypeInfo(Object);
   if (TI == nullptr) {
-    std::cout << "<null type info>\n";
+    fprintf(stdout, "%s", "<null type info>\n");
   } else {
-    TI->dump(std::cout);
+    TI->dump(stdout);
   }
 }
 

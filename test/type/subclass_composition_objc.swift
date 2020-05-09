@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-typecheck-verify-swift -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 @objc class ObjCClass {}
 @objc protocol ObjCProtocol {}
@@ -24,23 +24,22 @@ class SomeMethods {
 
 // Test self-conformance
 
-func takesObjCClass<T : ObjCClass>(_: T) {}
-func takesObjCProtocol<T : ObjCProtocol>(_: T) {}
-func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {}
-// expected-note@-1 2 {{in call to function 'takesObjCClassAndProtocol'}}
+func takesObjCClass<T : ObjCClass>(_: T) {} // expected-note {{where 'T' = 'ObjCProtocol'}}
+func takesObjCProtocol<T : ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'ObjCClass'}}
+func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'ObjCProtocol'}} expected-note {{where 'T' = 'ObjCClass'}}
 
 func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProtocol) {
   takesObjCClass(c)
-  takesObjCClass(p) // expected-error {{cannot convert value of type 'ObjCProtocol' to expected argument type 'ObjCClass'}}
+  takesObjCClass(p) // expected-error {{global function 'takesObjCClass' requires that 'ObjCProtocol' inherit from 'ObjCClass'}}
   takesObjCClass(cp)
 
-  takesObjCProtocol(c) // expected-error {{argument type 'ObjCClass' does not conform to expected type 'ObjCProtocol'}}
+  takesObjCProtocol(c) // expected-error {{global function 'takesObjCProtocol' requires that 'ObjCClass' conform to 'ObjCProtocol'}}
   takesObjCProtocol(p)
   takesObjCProtocol(cp)
 
   // FIXME: Bad diagnostics
-  takesObjCClassAndProtocol(c) // expected-error {{generic parameter 'T' could not be inferred}}
-  takesObjCClassAndProtocol(p) // expected-error {{generic parameter 'T' could not be inferred}}
+  takesObjCClassAndProtocol(c) // expected-error {{global function 'takesObjCClassAndProtocol' requires that 'ObjCClass' conform to 'ObjCProtocol'}}
+  takesObjCClassAndProtocol(p) // expected-error {{global function 'takesObjCClassAndProtocol' requires that 'ObjCProtocol' inherit from 'ObjCClass'}}
   takesObjCClassAndProtocol(cp)
 }
 
@@ -51,12 +50,8 @@ func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProt
 func takesStaticObjCProtocol<T : StaticObjCProtocol>(_: T) {}
 
 func testSelfConformance(cp: ObjCClass & StaticObjCProtocol) {
-
-  // FIXME: Terrible diagnostic
   takesStaticObjCProtocol(cp)
-  // expected-error@-1 {{cannot invoke 'takesStaticObjCProtocol' with an argument list of type '(ObjCClass & StaticObjCProtocol)'}}
-  // expected-note@-2 {{expected an argument list of type '(T)'}}
-
+  // expected-error@-1 {{'ObjCClass & StaticObjCProtocol' cannot be used as a type conforming to protocol 'StaticObjCProtocol' because 'StaticObjCProtocol' has static requirements}}
 }
 
 func testMetatypeSelfConformance(m1: (ObjCClass & ObjCProtocol).Protocol,
@@ -64,6 +59,6 @@ func testMetatypeSelfConformance(m1: (ObjCClass & ObjCProtocol).Protocol,
   _ = m1 as (ObjCClass & ObjCProtocol).Type
   _ = m1 as? (ObjCClass & ObjCProtocol).Type // expected-warning {{always succeeds}}
 
-  _ = m2 as (ObjCClass & StaticObjCProtocol).Type // expected-error {{'(ObjCClass & StaticObjCProtocol).Protocol' is not convertible to '(ObjCClass & StaticObjCProtocol).Type'; did you mean to use 'as!' to force downcast?}}
+  _ = m2 as (ObjCClass & StaticObjCProtocol).Type // expected-error {{cannot convert value of type '(ObjCClass & StaticObjCProtocol).Protocol' to type '(ObjCClass & StaticObjCProtocol).Type' in coercion}}
   _ = m2 as? (ObjCClass & StaticObjCProtocol).Type // FIXME should 'always fail'
 }

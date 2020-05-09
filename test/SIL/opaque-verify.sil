@@ -1,0 +1,23 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values %s
+
+// REQUIRES: asserts
+
+protocol P {
+  func foo()
+}
+
+// Ensure that open_existential_addr can be used by an unqualified load.
+sil @loadFromExis : $@convention(thin) (@in P) -> () {
+bb(%0 : $P):
+  %tempP = alloc_stack $P, var
+  store %0 to %tempP : $*P
+  %opened = open_existential_addr immutable_access %tempP : $*P to $*@opened("295A5344-9728-11E7-B89E-38C9860EC692") P
+  %val = load %opened : $*@opened("295A5344-9728-11E7-B89E-38C9860EC692") P
+  %copy = copy_value %val : $@opened("295A5344-9728-11E7-B89E-38C9860EC692") P
+  %wm = witness_method $@opened("295A5344-9728-11E7-B89E-38C9860EC692") P, #P.foo : <Self where Self : P> (Self) -> () -> (), %opened : $*@opened("295A5344-9728-11E7-B89E-38C9860EC692") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %call = apply %wm<@opened("295A5344-9728-11E7-B89E-38C9860EC692") P>(%copy) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %val : $@opened("295A5344-9728-11E7-B89E-38C9860EC692") P
+  dealloc_stack %tempP : $*P
+  %void = tuple ()
+  return %void : $()
+}

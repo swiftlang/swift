@@ -21,8 +21,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
+#include "swift/Remote/MetadataReader.h"
 
-#include <iostream>
 #include <memory>
 
 namespace swift {
@@ -30,6 +30,7 @@ namespace reflection {
 
 using llvm::cast;
 using llvm::dyn_cast;
+using remote::RemoteRef;
 
 class TypeRef;
 class TypeRefBuilder;
@@ -41,6 +42,23 @@ class EnumTypeInfoBuilder;
 class RecordTypeInfoBuilder;
 class ExistentialTypeInfoBuilder;
 
+enum class EnumKind : unsigned {
+  // An enum with no payload cases. The record will have no fields, but
+  // will have the correct size.
+  NoPayloadEnum,
+
+  // An enum with a single payload case and zero or more no-payload
+  // cases.  The no-payload cases may be encoded with an extra tag
+  // byte or as invalid payload values ("extra inhabitants").
+  SinglePayloadEnum,
+
+  // An enum with multiple payload cases and zero or more non-payload
+  // cases.  The selector that indicates what case is currently active
+  // may be encoded in unused "spare bits" common to all payloads and/or
+  // may use a separate tag byte.
+  MultiPayloadEnum,
+};
+
 enum class RecordKind : unsigned {
   Invalid,
 
@@ -49,18 +67,6 @@ enum class RecordKind : unsigned {
 
   // A Swift struct type.
   Struct,
-
-  // An enum with no payload cases. The record will have no fields, but
-  // will have the correct size.
-  NoPayloadEnum,
-
-  // An enum with a single payload case. The record consists of a single
-  // field, being the enum payload.
-  SinglePayloadEnum,
-
-  // An enum with multiple payload cases. The record consists of a multiple
-  // fields, one for each enum payload.
-  MultiPayloadEnum,
 
   // A Swift-native function is always a function pointer followed by a
   // retainable, nullable context pointer.
@@ -97,28 +103,36 @@ enum class ReferenceCounting : unsigned {
 
 enum class ReferenceKind : unsigned {
   Strong,
-  Unowned,
-  Weak,
-  Unmanaged
+#define REF_STORAGE(Name, ...) Name,
+#include "swift/AST/ReferenceStorage.def"
 };
 
 enum class TypeInfoKind : unsigned {
   Builtin,
   Record,
   Reference,
+  Invalid,
+  Enum,
 };
 
 class TypeInfo {
   TypeInfoKind Kind;
   unsigned Size, Alignment, Stride, NumExtraInhabitants;
+  bool BitwiseTakable;
 
 public:
   TypeInfo(TypeInfoKind Kind,
            unsigned Size, unsigned Alignment,
-           unsigned Stride, unsigned NumExtraInhabitants)
+           unsigned Stride, unsigned NumExtraInhabitants,
+           bool BitwiseTakable)
     : Kind(Kind), Size(Size), Alignment(Alignment), Stride(Stride),
-      NumExtraInhabitants(NumExtraInhabitants) {
+      NumExtraInhabitants(NumExtraInhabitants),
+      BitwiseTakable(BitwiseTakable) {
     assert(Alignment > 0);
+  }
+
+  TypeInfo(): Kind(TypeInfoKind::Invalid), Size(0), Alignment(0), Stride(0),
+              NumExtraInhabitants(0), BitwiseTakable(true) {
   }
 
   TypeInfoKind getKind() const { return Kind; }
@@ -127,14 +141,28 @@ public:
   unsigned getAlignment() const { return Alignment; }
   unsigned getStride() const { return Stride; }
   unsigned getNumExtraInhabitants() const { return NumExtraInhabitants; }
+  bool isBitwiseTakable() const { return BitwiseTakable; }
 
   void dump() const;
-  void dump(std::ostream &OS, unsigned Indent = 0) const;
+  void dump(FILE *file, unsigned Indent = 0) const;
+
+  // Using the provided reader, inspect our value.
+  // Return false if we can't inspect value.
+  // Set *inhabitant to <0 if the value is valid (not an XI)
+  // Else set *inhabitant to the XI value (counting from 0)
+  virtual bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                        remote::RemoteAddress address,
+                                        int *index) const {
+    return false;
+  }
+
+  virtual ~TypeInfo() { }
 };
 
 struct FieldInfo {
   std::string Name;
   unsigned Offset;
+  int Value;
   const TypeRef *TR;
   const TypeInfo &TI;
 };
@@ -144,11 +172,16 @@ class BuiltinTypeInfo : public TypeInfo {
   std::string Name;
 
 public:
-  explicit BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor);
+  explicit BuiltinTypeInfo(TypeRefBuilder &builder,
+                           RemoteRef<BuiltinTypeDescriptor> descriptor);
 
   const std::string &getMangledTypeName() const {
     return Name;
   }
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Builtin;
@@ -163,17 +196,81 @@ class RecordTypeInfo : public TypeInfo {
 public:
   RecordTypeInfo(unsigned Size, unsigned Alignment,
                  unsigned Stride, unsigned NumExtraInhabitants,
+                 bool BitwiseTakable,
                  RecordKind SubKind, const std::vector<FieldInfo> &Fields)
     : TypeInfo(TypeInfoKind::Record, Size, Alignment, Stride,
-               NumExtraInhabitants),
+               NumExtraInhabitants, BitwiseTakable),
       SubKind(SubKind), Fields(Fields) {}
 
   RecordKind getRecordKind() const { return SubKind; }
   unsigned getNumFields() const { return Fields.size(); }
   const std::vector<FieldInfo> &getFields() const { return Fields; }
 
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *index) const;
+
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Record;
+  }
+};
+
+/// Enums
+class EnumTypeInfo : public TypeInfo {
+  EnumKind SubKind;
+  std::vector<FieldInfo> Cases;
+
+protected:
+  EnumTypeInfo(unsigned Size, unsigned Alignment,
+               unsigned Stride, unsigned NumExtraInhabitants,
+               bool BitwiseTakable,
+               EnumKind SubKind, const std::vector<FieldInfo> &Cases)
+    : TypeInfo(TypeInfoKind::Enum, Size, Alignment, Stride,
+               NumExtraInhabitants, BitwiseTakable),
+      SubKind(SubKind), Cases(Cases) {}
+
+public:
+  EnumKind getEnumKind() const { return SubKind; }
+  const std::vector<FieldInfo> &getCases() const { return Cases; }
+  unsigned getNumCases() const { return Cases.size(); }
+  unsigned getNumPayloadCases() const {
+    auto Cases = getCases();
+    return std::count_if(Cases.begin(), Cases.end(),
+                         [](const FieldInfo &Case){return Case.TR != 0;});
+  }
+  // Size of the payload area.
+  unsigned getPayloadSize() const {
+    return EnumTypeInfo::getPayloadSizeForCases(Cases);
+  }
+
+  static unsigned getPayloadSizeForCases(const std::vector<FieldInfo> &Cases) {
+    unsigned size = 0;
+    for (auto Case : Cases) {
+      if (Case.TR != 0 && Case.TI.getSize() > size) {
+        size = Case.TI.getSize();
+      }
+    }
+    return size;
+  }
+
+  // Returns true if this enum is `Optional`
+  // (This was factored out of a piece of code that was just
+  // checking the EnumKind.  This is vastly better than that,
+  // but could probably be improved further.)
+  bool isOptional() const {
+    return
+      SubKind == EnumKind::SinglePayloadEnum
+      && Cases.size() == 2
+      && Cases[0].Name == "some"
+      && Cases[1].Name == "none";
+  }
+
+  virtual bool projectEnumValue(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *CaseIndex) const = 0;
+
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Enum;
   }
 };
 
@@ -186,9 +283,10 @@ class ReferenceTypeInfo : public TypeInfo {
 public:
   ReferenceTypeInfo(unsigned Size, unsigned Alignment,
                     unsigned Stride, unsigned NumExtraInhabitants,
-                    ReferenceKind SubKind, ReferenceCounting Refcounting)
+                    bool BitwiseTakable, ReferenceKind SubKind,
+                    ReferenceCounting Refcounting)
     : TypeInfo(TypeInfoKind::Reference, Size, Alignment, Stride,
-               NumExtraInhabitants),
+               NumExtraInhabitants, BitwiseTakable),
       SubKind(SubKind), Refcounting(Refcounting) {}
 
   ReferenceKind getReferenceKind() const {
@@ -197,6 +295,16 @@ public:
 
   ReferenceCounting getReferenceCounting() const {
     return Refcounting;
+  }
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const {
+    if (getNumExtraInhabitants() == 0) {
+      *extraInhabitantIndex = -1;
+      return true;
+    }
+    return reader.readHeapObjectExtraInhabitantIndex(address, extraInhabitantIndex);
   }
 
   static bool classof(const TypeInfo *TI) {
@@ -275,7 +383,7 @@ private:
   const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>
-  const TypeInfoTy *makeTypeInfo(Args... args) {
+  const TypeInfoTy *makeTypeInfo(Args &&... args) {
     auto TI = new TypeInfoTy(::std::forward<Args>(args)...);
     Pool.push_back(std::unique_ptr<const TypeInfo>(TI));
     return TI;
@@ -287,6 +395,7 @@ private:
 class RecordTypeInfoBuilder {
   TypeConverter &TC;
   unsigned Size, Alignment, NumExtraInhabitants;
+  bool BitwiseTakable;
   RecordKind Kind;
   std::vector<FieldInfo> Fields;
   bool Empty;
@@ -295,14 +404,15 @@ class RecordTypeInfoBuilder {
 public:
   RecordTypeInfoBuilder(TypeConverter &TC, RecordKind Kind)
     : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
-      Kind(Kind), Empty(true), Invalid(false) {}
+      BitwiseTakable(true), Kind(Kind), Empty(true), Invalid(false) {}
 
   bool isInvalid() const {
     return Invalid;
   }
 
   unsigned addField(unsigned fieldSize, unsigned fieldAlignment,
-                    unsigned numExtraInhabitants);
+                    unsigned numExtraInhabitants,
+                    bool bitwiseTakable);
 
   // Add a field of a record type, such as a struct.
   void addField(const std::string &Name, const TypeRef *TR);

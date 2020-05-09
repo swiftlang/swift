@@ -11,17 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-mem-behavior-dumper"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
+
+static llvm::cl::opt<bool> EnableDumpAll(
+    "enable-mem-behavior-dump-all", llvm::cl::init(false),
+    llvm::cl::desc("With -mem-behavior-dump, dump all memory access pairs."));
 
 //===----------------------------------------------------------------------===//
 //                               Value Gatherer
@@ -33,9 +38,10 @@ static bool gatherValues(SILFunction &Fn, std::vector<SILValue> &Values) {
   for (auto &BB : Fn) {
     for (auto *Arg : BB.getArguments())
       Values.push_back(SILValue(Arg));
-    for (auto &II : BB)
-      if (II.hasValue())
-        Values.push_back(&II);
+    for (auto &II : BB) {
+      for (auto result : II.getResults())
+        Values.push_back(result);
+    }
   }
   return Values.size() > 1;
 }
@@ -53,7 +59,7 @@ class MemBehaviorDumper : public SILModuleTransform {
   // selected types of instructions.
   static bool shouldTestInstruction(SILInstruction *I) {
     // Only consider function calls.
-    if (FullApplySite::isa(I))
+    if ((EnableDumpAll && I->mayReadOrWriteMemory()) || FullApplySite::isa(I))
       return true;
 
     return false;
@@ -77,11 +83,14 @@ class MemBehaviorDumper : public SILModuleTransform {
             // Print the memory behavior in relation to all other values in the
             // function.
             for (auto &V : Values) {
+              if (V->getDefiningInstruction() == &I)
+                continue;
+
               bool Read = AA->mayReadFromMemory(&I, V);
               bool Write = AA->mayWriteToMemory(&I, V);
               bool SideEffects = AA->mayHaveSideEffects(&I, V);
               llvm::outs() << "PAIR #" << PairCount++ << ".\n"
-                           << "  " << SILValue(&I) << "  " << V
+                           << "  " << I << "  " << V
                            << "  r=" << Read << ",w=" << Write
                            << ",se=" << SideEffects << "\n";
             }

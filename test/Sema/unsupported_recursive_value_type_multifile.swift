@@ -3,5 +3,5 @@
 struct A {
   var b: B?
   // expected-error@-1 {{value type 'A' cannot have a stored property that recursively contains it}}
-  // expected-note@-2 {{cycle beginning here: B? -> (some: B) -> (a: A)}}
+  // expected-note@-2 {{cycle beginning here: B? -> (some(_:): B) -> (a: A)}}
 }

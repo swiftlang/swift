@@ -1,8 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
 // REQUIRES: objc_interop
-
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
 
 // See https://bugs.swift.org/browse/SR-5065, rdar://32511494
 // XFAIL: *
@@ -19,18 +16,18 @@ class ZZZ {
 
 class C {}
 
-sil @stringcore_invariant_check : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
+sil @stringcore_invariant_check : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
 sil @reabstraction_thunk : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
 
-// CHECK-LABEL: sil @dead_closure_elimination : $@convention(thin) (@owned _StringCore) -> ()
+// CHECK-LABEL: sil @dead_closure_elimination : $@convention(thin) (@owned _LegacyStringCore) -> ()
 // CHECK: bb0
 // CHECK-NEXT: release_value
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @dead_closure_elimination : $@convention(thin) (@owned _StringCore) -> () {
-bb0(%0 : $_StringCore):
-  %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
-  %2 = partial_apply %1(%0) : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
+sil @dead_closure_elimination : $@convention(thin) (@owned _LegacyStringCore) -> () {
+bb0(%0 : $_LegacyStringCore):
+  %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
+  %2 = partial_apply %1(%0) : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
   %3 = function_ref @reabstraction_thunk : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
   %4 = partial_apply %3(%2) : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
   strong_release %4 : $@callee_owned () -> @out Optional<_CocoaString>
@@ -45,10 +42,10 @@ bb0(%0 : $_StringCore):
 // CHECK-NEXT:   release_value
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-sil @dead_closure_elimination2 : $@convention(thin) (@owned _StringCore) -> () {
-bb0(%0 : $_StringCore):
-  %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
-  %2 = partial_apply %1(%0) : $@convention(thin) (@owned _StringCore) -> @owned Optional<_CocoaString>
+sil @dead_closure_elimination2 : $@convention(thin) (@owned _LegacyStringCore) -> () {
+bb0(%0 : $_LegacyStringCore):
+  %1 = function_ref @stringcore_invariant_check : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
+  %2 = partial_apply %1(%0) : $@convention(thin) (@owned _LegacyStringCore) -> @owned Optional<_CocoaString>
   %3 = function_ref @reabstraction_thunk : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
   %4 = partial_apply %3(%2) : $@convention(thin) (@owned @callee_owned () -> @owned Optional<_CocoaString>) -> @out Optional<_CocoaString>
   br bb1
@@ -78,7 +75,7 @@ bb0(%0 : $ZZZ):
   store %0 to %6 : $*ZZZ
   %8 = struct_extract %4 : $Array<ZZZ>, #Array._buffer
   %9 = struct_extract %8 : $_ArrayBuffer<ZZZ>, #_ArrayBuffer._storage
-  %10 = struct_extract %9 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  %10 = struct_extract %9 : $_BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   strong_release %10 : $Builtin.BridgeObject
   %12 = tuple ()
   return %12 : $()
@@ -129,7 +126,7 @@ bb0(%0 : $*_HeapBuffer<C, Int>):
   %14 = apply %10(%12) : $@convention(thin) (@owned @callee_owned () -> Bool) -> ()
   %15 = struct_extract %4 : $Array<_HeapBuffer<C, Int>>, #Array._buffer // user: %16
   %16 = struct_extract %15 : $_ArrayBuffer<_HeapBuffer<C, Int>>, #_ArrayBuffer._storage // user: %17
-  %17 = struct_extract %16 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue // user: %18
+  %17 = struct_extract %16 : $_BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue // user: %18
   strong_release %17 : $Builtin.BridgeObject      // id: %18
   %19 = tuple ()                                  // user: %20
   return %19 : $()                                // id: %20
@@ -147,7 +144,7 @@ bb0(%0 : $C):
   %1 = alloc_stack $Int
   %2 = alloc_stack $C
   store %0 to %2 : $*C
-  unconditional_checked_cast_addr take_always C in %2 : $*C to Int in %1 : $*Int
+  unconditional_checked_cast_addr C in %2 : $*C to Int in %1 : $*Int
   %4 = load %1 : $*Int
   dealloc_stack %2 : $*C
   dealloc_stack %1 : $*Int

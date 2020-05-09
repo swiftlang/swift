@@ -123,6 +123,31 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_3 | %FileCheck %s -check-prefix=STRING_INTERP
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERP_4 | %FileCheck %s -check-prefix=STRING_INTERP
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_1 > %t.for_collection1
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection1
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_2 > %t.for_collection2
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection2
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_3 > %t.for_collection3
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection3
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_4 > %t.for_collection4
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection4
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_5 > %t.for_collection5
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection5
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_6 > %t.for_collection6
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection6
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_7 > %t.for_collection7
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection7
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOR_COLLECTION_8 > %t.for_collection8
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.for_collection8
+// RUN: %FileCheck %s -check-prefix=FOR_COLLECTION < %t.for_collection8
+
 // Test code completion in top-level code.
 //
 // This test is not meant to test that we can correctly form all kinds of
@@ -142,6 +167,11 @@ func fooFunc2(_ a: Int, _ b: Double) {}
 
 func erroneous1(_ x: Undeclared) {}
 
+// FIXME: Hides all other string interpolation completion.
+//extension DefaultStringInterpolation {
+//  mutating func appendInterpolation(interpolate: Double) {}
+//}
+
 //===--- Test code completions of expressions that can be typechecked.
 
 // Although the parser can recover in most of these test cases, we resync it
@@ -153,7 +183,8 @@ fooObject#^TYPE_CHECKED_EXPR_1^#
 // TYPE_CHECKED_EXPR_1: Begin completions
 // TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceVar]/CurrNominal:      .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_1-NEXT:BuiltinOperator/None:                = {#FooStruct#}[#Void#]; name== FooStruct
+// TYPE_CHECKED_EXPR_1-NEXT: BuiltinOperator/None:               = {#FooStruct#}[#Void#]; name== FooStruct
+// TYPE_CHECKED_EXPR_1-NEXT: Keyword[self]/CurrNominal:          .self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_1-NEXT: End completions
 
 func resyncParser2() {}
@@ -166,6 +197,7 @@ fooObject#^TYPE_CHECKED_EXPR_2^#
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#]; name== FooStruct
+// TYPE_CHECKED_EXPR_2-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_2-NEXT: End completions
 
 func resyncParser3() {}
@@ -175,12 +207,14 @@ fooObject#^TYPE_CHECKED_EXPR_3^#.bar
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#]; name== FooStruct
+// TYPE_CHECKED_EXPR_3-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_3-NEXT: End completions
 
 func resyncParser4() {}
 
 fooObject.#^TYPE_CHECKED_EXPR_4^#
 // TYPE_CHECKED_EXPR_4: Begin completions
+// TYPE_CHECKED_EXPR_4-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_4-NEXT: End completions
@@ -189,6 +223,7 @@ func resyncParser5() {}
 
 fooObject.#^TYPE_CHECKED_EXPR_5^#.bar
 // TYPE_CHECKED_EXPR_5: Begin completions
+// TYPE_CHECKED_EXPR_5-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_5-NEXT: End completions
@@ -211,6 +246,7 @@ var fooObjectWithErrorInInit : FooStruct = unknown_var
 
 fooObjectWithErrorInInit.#^TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1^#
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1: Begin completions
+// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: End completions
@@ -231,9 +267,12 @@ func resyncParser7() {}
 
 var topLevelVar2 = FooStruct#^TOP_LEVEL_VAR_INIT_2^#
 // TOP_LEVEL_VAR_INIT_2: Begin completions
-// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#self: FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(self): FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct.Type#]; name=self
+// TOP_LEVEL_VAR_INIT_2-NEXT: Keyword/CurrNominal:       .Type[#FooStruct.Type#]; name=Type
 // TOP_LEVEL_VAR_INIT_2-NEXT: End completions
 
 func resyncParser8() {}
@@ -431,11 +470,23 @@ func resyncParserB14() {}
 var stringInterp = "\(#^STRING_INTERP_3^#)"
 _ = "" + "\(#^STRING_INTERP_4^#)" + ""
 // STRING_INTERP: Begin completions
+// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(value): T#}[')'][#Void#];
 // STRING_INTERP-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#];
-// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#];
+// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: fooFunc1()[#Void#];
+// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: optStr()[#String?#];
 // STRING_INTERP-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#];
 // STRING_INTERP: End completions
 func resyncParserC1() {}
+
+// FOR_COLLECTION-NOT: forIndex
+for forIndex in [#^FOR_COLLECTION_1^#] {}
+for forIndex in [1,#^FOR_COLLECTION_2^#] {}
+for forIndex in [1:#^FOR_COLLECTION_3^#] {}
+for forIndex in [#^FOR_COLLECTION_4^#:] {}
+for forIndex in [#^FOR_COLLECTION_5^#:2] {}
+for forIndex in [1:2, #^FOR_COLLECTION_6^#] {}
+for forIndex in [1:2, #^FOR_COLLECTION_7^#:] {}
+for forIndex in [1:2, #^FOR_COLLECTION_8^#:2] {}
 
 
 //

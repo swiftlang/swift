@@ -30,6 +30,10 @@
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/type_incomplete2.swift | %FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/type_incomplete3.swift | %FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/type_incomplete4.swift | %FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/invalid_interpolation1.swift | %FileCheck %s -check-prefix=COMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/multi_line_string1.swift | %FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/multi_line_string2.swift | %FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/multi_line_string3.swift | %FileCheck %s -check-prefix=INCOMPLETE
 
 // INCOMPLETE: IS_INCOMPLETE
 // COMPLETE: IS_COMPLETE

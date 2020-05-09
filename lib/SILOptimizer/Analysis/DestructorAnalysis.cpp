@@ -14,6 +14,8 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Support/Debug.h"
 
@@ -27,11 +29,12 @@ using namespace swift;
 ///  * is a value type that implements the _DestructorSafeContainer protocol and
 ///    whose type parameters are safe types T1...Tn.
 bool DestructorAnalysis::mayStoreToMemoryOnDestruction(SILType T) {
-  bool IsSafe = isSafeType(T.getSwiftRValueType());
-  DEBUG(llvm::dbgs() << " DestructorAnalysis::mayStoreToMemoryOnDestruction is"
-                     << (IsSafe ? " false: " : " true: "));
-  DEBUG(T.getSwiftRValueType()->print(llvm::errs()));
-  DEBUG(llvm::errs() << "\n");
+  bool IsSafe = isSafeType(T.getASTType());
+  LLVM_DEBUG(llvm::dbgs() << " DestructorAnalysis::"
+                             "mayStoreToMemoryOnDestruction is"
+                          << (IsSafe ? " false: " : " true: "));
+  LLVM_DEBUG(T.getASTType()->print(llvm::errs()));
+  LLVM_DEBUG(llvm::errs() << "\n");
   return !IsSafe;
 }
 
@@ -70,10 +73,10 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
       return cacheResult(Ty, true);
 
     // Check the stored properties.
-    for (auto SP : Struct->getStoredProperties())
+    for (auto SP : Struct->getStoredProperties()) {
       if (!isSafeType(SP->getInterfaceType()->getCanonicalType()))
         return cacheResult(Ty, false);
-
+    }
     return cacheResult(Ty, true);
   }
 

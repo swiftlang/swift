@@ -25,24 +25,29 @@
 namespace swift {
 class DiagnosticEngine;
 
-/// \brief Parses a -sanitize= argument's values.
+/// Parses a -sanitize= argument's values.
 ///
 /// \param Diag If non null, the argument is used to diagnose invalid values.
 /// \param sanitizerRuntimeLibExists Function which checks for existence of a
 //         sanitizer dylib with a given name.
 /// \return Returns a SanitizerKind.
 OptionSet<SanitizerKind> parseSanitizerArgValues(
-        const llvm::opt::ArgList &Args,
-        const llvm::opt::Arg *A,
-        const llvm::Triple &Triple,
-        DiagnosticEngine &Diag,
-        llvm::function_ref<bool(llvm::StringRef)> sanitizerRuntimeLibExists);
+    const llvm::opt::ArgList &Args, const llvm::opt::Arg *A,
+    const llvm::Triple &Triple, DiagnosticEngine &Diag,
+    llvm::function_ref<bool(llvm::StringRef, bool)> sanitizerRuntimeLibExists);
 
-/// \brief Parses a -sanitize-coverage= argument's value.
+OptionSet<SanitizerKind> parseSanitizerRecoverArgValues(
+    const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
+    DiagnosticEngine &Diags, bool emitWarnings);
+
+/// Parses a -sanitize-coverage= argument's value.
 llvm::SanitizerCoverageOptions parseSanitizerCoverageArgValue(
         const llvm::opt::Arg *A,
         const llvm::Triple &Triple,
         DiagnosticEngine &Diag,
         OptionSet<SanitizerKind> sanitizers);
+
+/// Returns the active sanitizers as a comma-separated list.
+std::string getSanitizerList(const OptionSet<SanitizerKind> &Set);
 }
 #endif // SWIFT_OPTIONS_SANITIZER_OPTIONS_H

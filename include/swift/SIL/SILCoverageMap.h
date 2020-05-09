@@ -22,16 +22,16 @@
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILPrintContext.h"
-#include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
+#include "llvm/ADT/ilist_node.h"
 #include "llvm/ProfileData/Coverage/CoverageMapping.h"
 
 namespace llvm {
 namespace coverage {
 struct CounterExpression;
 struct Counter;
-}
-}
+} // namespace coverage
+} // namespace llvm
 
 namespace swift {
 
@@ -61,8 +61,8 @@ private:
   // The mangled name of the function covered by this mapping.
   StringRef Name;
 
-  // Whether or not the covered function may have external linkage.
-  bool External;
+  // The name of this function as recorded in the profile symtab.
+  std::string PGOFuncName;
 
   // The coverage hash of the function covered by this mapping.
   uint64_t Hash;
@@ -78,14 +78,15 @@ private:
   SILCoverageMap &operator=(const SILCoverageMap &) = delete;
 
   /// Private constructor. Create these using SILCoverageMap::create.
-  SILCoverageMap(uint64_t Hash, bool External);
+  SILCoverageMap(uint64_t Hash);
 
 public:
   ~SILCoverageMap();
 
   static SILCoverageMap *
-  create(SILModule &M, StringRef Filename, StringRef Name, bool External,
-         uint64_t Hash, ArrayRef<MappedRegion> MappedRegions,
+  create(SILModule &M, StringRef Filename, StringRef Name,
+         StringRef PGOFuncName, uint64_t Hash,
+         ArrayRef<MappedRegion> MappedRegions,
          ArrayRef<llvm::coverage::CounterExpression> Expressions);
 
   /// Return the name of the source file where this mapping is found.
@@ -94,8 +95,8 @@ public:
   /// Return the mangled name of the function this mapping covers.
   StringRef getName() const { return Name; }
 
-  /// Check whether the covered function may have external linkage.
-  bool isPossiblyUsedExternally() const { return External; }
+  /// Return the name of this function as recorded in the profile symtab.
+  StringRef getPGOFuncName() const { return PGOFuncName; }
 
   /// Return the coverage hash for function this mapping covers.
   uint64_t getHash() const { return Hash; }
@@ -122,7 +123,7 @@ public:
   void dump() const;
 };
 
-} // end swift namespace
+} // namespace swift
 
 namespace llvm {
 
@@ -131,9 +132,9 @@ namespace llvm {
 //===----------------------------------------------------------------------===//
 
 template <>
-struct ilist_traits<::swift::SILCoverageMap> :
-public ilist_default_traits<::swift::SILCoverageMap> {
-  typedef ::swift::SILCoverageMap SILCoverageMap;
+struct ilist_traits<::swift::SILCoverageMap>
+    : public ilist_node_traits<::swift::SILCoverageMap> {
+  using SILCoverageMap = ::swift::SILCoverageMap;
 
 public:
   static void deleteNode(SILCoverageMap *VT) { VT->~SILCoverageMap(); }
@@ -142,6 +143,6 @@ private:
   void createNode(const SILCoverageMap &);
 };
 
-} // end llvm namespace
+} // namespace llvm
 
 #endif // SWIFT_SIL_SILCOVERAGEMAP_H

@@ -14,24 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
-#endif
-
-#ifndef ERROR
-#  define ERROR(ID,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Options,Text,Signature)
-#endif
-
-#ifndef WARNING
-#  define WARNING(ID,Options,Text,Signature) \
-  DIAG(WARNING,ID,Options,Text,Signature)
-#endif
-
-#ifndef NOTE
-#  define NOTE(ID,Options,Text,Signature) \
-  DIAG(NOTE,ID,Options,Text,Signature)
-#endif
+#define DEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"
 
 #define DIAG_NO_UNDEF
 
@@ -43,12 +27,10 @@
 #include "DiagnosticsIRGen.def"
 #include "DiagnosticsFrontend.def"
 #include "DiagnosticsDriver.def"
+#include "DiagnosticsRefactoring.def"
+#include "DiagnosticsModuleDiffer.def"
 
 #undef DIAG_NO_UNDEF
 
-#if defined(DIAG)
-#  undef DIAG
-#endif
-#undef NOTE
-#undef WARNING
-#undef ERROR
+#define UNDEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"

@@ -26,7 +26,7 @@ Algorithm.test("min,max") {
   let a3 = MinimalComparableValue(0, identity: 3)
   let b1 = MinimalComparableValue(1, identity: 4)
   let b2 = MinimalComparableValue(1, identity: 5)
-  let b3 = MinimalComparableValue(1, identity: 6)
+  _ = MinimalComparableValue(1, identity: 6)
   let c1 = MinimalComparableValue(2, identity: 7)
   let c2 = MinimalComparableValue(2, identity: 8)
   let c3 = MinimalComparableValue(2, identity: 9)
@@ -74,16 +74,13 @@ Algorithm.test("min,max") {
   expectEqual(c1.identity, max(a1, b1, c2, c1).identity)
 }
 
-Algorithm.test("sorted/strings")
-  .xfail(.nativeRuntime("String comparison: ICU vs. Foundation " +
-    "https://bugs.swift.org/browse/SR-530"))
-  .code {
+Algorithm.test("sorted/strings") {
   expectEqual(
     ["Banana", "apple", "cherry"],
     ["apple", "Banana", "cherry"].sorted())
 
   let s = ["apple", "Banana", "cherry"].sorted() {
-    $0.characters.count > $1.characters.count
+    $0.count > $1.count
   }
   expectEqual(["Banana", "cherry", "apple"], s)
 }
@@ -137,13 +134,14 @@ struct A<T> : MutableCollection, RandomAccessCollection {
 }
 
 func randomArray() -> A<Int> {
-  let count = Int(rand32(exclusiveUpperBound: 50))
-  return A(randArray(count))
+  let count = Int.random(in: 0 ..< 50)
+  let array = (0 ..< count).map { _ in Int.random(in: .min ... .max) }
+  return A(array)
 }
 
 Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
-    var a = randomArray()
+    let a = randomArray()
     _blackHole(a.sorted(by: $0))
   }
   withInvalidOrderings {
@@ -221,38 +219,7 @@ Algorithm.test("sorted/complexity") {
 }
 
 Algorithm.test("sorted/return type") {
-  let x: Array = ([5, 4, 3, 2, 1] as ArraySlice).sorted()
-}
-
-Algorithm.test("sort3/simple")
-  .forEach(in: [
-    [1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]
-  ]) {
-    var input = $0
-    _sort3(&input, 0, 1, 2)
-    expectEqual([1, 2, 3], input)
-}
-
-func isSorted<T>(_ a: [T], by areInIncreasingOrder: (T, T) -> Bool) -> Bool {
-  return !a.dropFirst().enumerated().contains(where: { (offset, element) in
-    areInIncreasingOrder(element, a[offset])
-  })
-}
-
-Algorithm.test("sort3/stable")
-  .forEach(in: [
-    [1, 1, 2], [1, 2, 1], [2, 1, 1], [1, 2, 2], [2, 1, 2], [2, 2, 1], [1, 1, 1]
-  ]) {
-    // decorate with offset, but sort by value
-    var input = Array($0.enumerated())
-    _sort3(&input, 0, 1, 2) { $0.element < $1.element }
-    // offsets should still be ordered for equal values
-    expectTrue(isSorted(input) {
-      if $0.element == $1.element {
-        return $0.offset < $1.offset
-      }
-      return $0.element < $1.element
-    })
+  let _: Array = ([5, 4, 3, 2, 1] as ArraySlice).sorted()
 }
 
 runAllTests()

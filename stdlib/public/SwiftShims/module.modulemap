@@ -6,14 +6,22 @@ module SwiftShims {
   header "HeapObject.h"
   header "KeyPath.h"
   header "LibcShims.h"
+  header "Random.h"
   header "RefCount.h"
   header "RuntimeShims.h"
   header "RuntimeStubs.h"
   header "SwiftStdbool.h"
   header "SwiftStddef.h"
   header "SwiftStdint.h"
+  header "System.h"
+  header "ThreadLocalStorage.h"
   header "UnicodeShims.h"
   header "Visibility.h"
+  export *
+}
+
+module SwiftOverlayShims {
+  header "LibcOverlayShims.h"
   export *
 }
 
@@ -58,4 +66,16 @@ module _SwiftCoreFoundationOverlayShims {
 
 module _SwiftFoundationOverlayShims {
   header "FoundationOverlayShims.h"
+}
+
+module _SwiftNetworkOverlayShims {
+  header "NetworkOverlayShims.h"
+}
+
+module _SwiftClockKitOverlayShims {
+    header "ClockKitOverlayShims.h"
+}
+
+module _SwiftCoreMediaOverlayShims {
+  header "CoreMediaOverlayShims.h"
 }

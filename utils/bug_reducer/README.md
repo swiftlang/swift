@@ -62,7 +62,7 @@ Then I invoke the bug reducer as follows:
 
 Then the bug_reducer will first attempt to reduce the passes. Then, it will
 attempt to reduce the test case by splitting the module and only optimizing part
-of it. The output will be look something like:
+of it. The output will look something like:
 
     *** Successfully Reduced file!
     *** Final File: ${FINAL_SIB_FILE}

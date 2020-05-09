@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -enable-sil-verify-all=0 -module-name ObjectiveC -o /dev/null %s 2>&1
+// REQUIRES: asserts
+// REQUIRES: objc_interop
+
+@objc protocol NSBurrito {}
+
+class Protocol : NSBurrito {}
+
+sil [ossa] @test_objc_protocol : $@convention(thin) () -> @owned Protocol {
+bb0:
+  %0 = objc_protocol #NSBurrito : $Protocol
+  %1 = copy_value %0 : $Protocol
+  return %1 : $Protocol
+}
+
+
+@objc class Gizmo {
+  init()
+  static func runce()
+}
+class Hoozit : Gizmo {
+  override init()
+}
+
+sil hidden [ossa] @test_objc_super_method : $@convention(method) (@thick Hoozit.Type) -> () {
+bb0(%0 : $@thick Hoozit.Type):
+  %2 = upcast %0 : $@thick Hoozit.Type to $@thick Gizmo.Type
+  %3 = objc_super_method %0 : $@thick Hoozit.Type, #Gizmo.runce!foreign : (Gizmo.Type) -> () -> (), $@convention(objc_method) (@objc_metatype Gizmo.Type) -> ()
+  %4 = tuple()
+  return %4 : $()
+}

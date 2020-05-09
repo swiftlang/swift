@@ -22,7 +22,7 @@ module ClangModuleUser {
   export *
 }
 
-module ClangModuleWithAdapter {
+module ClangModuleWithOverlay {
   link "UnderlyingClangLibrary"
 }
 
@@ -36,8 +36,17 @@ module CoreCooling {
   export *
 }
 
+module CXXInterop {
+  header "cxx_interop.h"
+}
+
 module ctypes_bits_exported {
   header "ctypes_bits_exported.h"
+  export *
+}
+
+module EnumExhaustivity {
+  header "EnumExhaustivity.h"
   export *
 }
 
@@ -48,6 +57,11 @@ module HasSubmodule {
   module Submodule {
     header "Submodule.h"
   }
+}
+
+module ImageInitializers {
+  header "ImageInitializers.h"
+  export *
 }
 
 module ImportsMissingHeader {
@@ -82,6 +96,10 @@ module Newtype {
   header "Newtype.h"
 }
 
+module NewtypeSystem [system] {
+  header "NewtypeSystem.h"
+}
+
 module ImportAsMember {
   export *
 
@@ -97,6 +115,11 @@ module ObjCIRExtras {
 
 module ObjCParseExtras {
   header "ObjCParseExtras.h"
+  export *
+}
+
+module ObjCParseExtrasInitHelper {
+  header "ObjCParseExtrasInitHelper.h"
   export *
 }
 
@@ -140,8 +163,14 @@ module Redeclaration {
   export *
 }
 
+module SubclassExistentialsExtra {
+  header "SubclassExistentialsExtra.h"
+  export *
+}
+
 module SwiftPrivateAttr {
   header "SwiftPrivateAttr.h"
+  export *
 }
 
 module TestProtocols { header "Protocols.h" }
@@ -153,6 +182,9 @@ module TypeAndValue {
 
 module UnimportableMembers {
   header "UnimportableMembers.h"
+}
+module UnimportableMembersUser {
+  header "UnimportableMembersUser.h"
 }
 
 module UsesSubmodule {
@@ -183,4 +215,35 @@ module IndirectFields {
 
 module ObjCBridgeNonconforming {
   header "ObjCBridgeNonconforming.h"
+}
+
+module BlocksReturningBool {
+  header "BlocksReturningBool.h"
+}
+
+module Warnings1 { header "Warnings1.h" }
+module Warnings2 { header "Warnings2.h" }
+module Warnings3 { header "Warnings3.h" }
+module Warnings4 { header "Warnings4.h" }
+module Warnings5 { header "Warnings5.h" }
+module Warnings6 { header "Warnings6.h" }
+module Warnings7 { header "Warnings7.h" }
+module Warnings8 { header "Warnings8.h" }
+module Warnings9 { header "Warnings9.h" }
+
+module ConditionallyFoo {
+  header "ConditionallyFoo.h"
+  config_macros [exhaustive] WANT_FOO
+}
+
+module ForwardDeclarationsHelper {
+  header "ForwardDeclarationsHelper.h"
+}
+
+module LocalVsFileScopeBase {
+  header "LocalVsFileScopeBase.h"
+}
+module LocalVsFileScope {
+  header "LocalVsFileScope.h"
+  export *
 }

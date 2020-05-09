@@ -1,14 +1,14 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
-@objc enum Foo: Int {
+@objc enum Foo: Int32 {
   case Zim, Zang, Zung
 }
 
-@objc enum Generic<T>: Int { // expected-error{{'@objc' enum cannot be generic}} {{1-7=}}
+@objc enum Generic<T>: Int32 { // expected-error{{'@objc' enum cannot be generic}} {{1-7=}}
   case Zim, Zang, Zung
 }
 
-@objc(EnumRuntimeName) enum RuntimeNamed: Int {
+@objc(EnumRuntimeName) enum RuntimeNamed: Int32 {
   case Zim, Zang, Zung
 }
 
@@ -16,7 +16,7 @@
   case Zim, Zang, Zung
 }
 
-@objc enum NonIntegerRawType: Float { // expected-error{{'@objc' enum raw type 'Float' is not an integer type}} expected-error {{'NonIntegerRawType' declares raw type 'Float', but does not conform to RawRepresentable and conformance could not be synthesized}}
+@objc enum NonIntegerRawType: Float { // expected-error{{'@objc' enum raw type 'Float' is not an integer type}}
   case Zim = 1.0, Zang = 1.5, Zung = 2.0
 }
 
@@ -30,7 +30,7 @@ class Bar {
 }
 
 // <rdar://problem/23681566> @objc enums with payloads rejected with no source location info
-@objc enum r23681566 : Int {  // expected-error {{'r23681566' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{declared raw type 'Int' here}}
+@objc enum r23681566 : Int32 {  // expected-error {{'r23681566' declares raw type 'Int32', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{declared raw type 'Int32' here}}
   case Foo(progress: Int)     // expected-error {{enum with raw type cannot have cases with arguments}}
 }
 

@@ -1,13 +1,12 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
-// REQUIRES: OS=macosx
-// FIXME: <rdar://problem/19452886> test/ClangModules/objc_init.swift should not require REQUIRES: OS=macosx
 
 import AppKit
 import objc_ext
 import TestProtocols
 import ObjCParseExtras
+import ObjCParseExtrasInitHelper
 
 // rdar://problem/18500201
 extension NSSet {
@@ -59,7 +58,10 @@ class MyDocument3 : NSAwesomeDocument {
 
 func createMyDocument3(_ url: NSURL) {
   var md = MyDocument3()
+#if os(macOS)
+  // Limit this particular test to macOS; it depends on availability.
   md = try! MyDocument3(contentsOf: url as URL, ofType:"")
+#endif
   _ = md
 }
 
@@ -119,6 +121,7 @@ func checkInitWithCoder(_ coder: NSCoder) {
   MyViewController(coder: coder) // expected-warning{{unused}}
   MyTableViewController(coder: coder) // expected-warning{{unused}}
   MyOtherTableViewController(coder: coder) // expected-error{{incorrect argument label in call (have 'coder:', expected 'int:')}}
+  // expected-error@-1 {{cannot convert value of type 'NSCoder' to expected argument type 'Int'}}
   MyThirdTableViewController(coder: coder) // expected-warning{{unused}}
 }
 
@@ -165,9 +168,45 @@ class DesignedInitSubSub : DesignatedInitSub {
   init(string: String) { super.init() } // expected-error {{must call a designated initializer of the superclass 'DesignatedInitSub'}}
 }
 
+class DesignatedInitWithClassExtensionSubImplicit : DesignatedInitWithClassExtension {}
+
+class DesignatedInitWithClassExtensionSub : DesignatedInitWithClassExtension {
+  override init(int: Int) { super.init(int: 0) }
+  override init(float: Float) { super.init(float: 0) }
+}
+
+class DesignatedInitWithClassExtensionInAnotherModuleSub : DesignatedInitWithClassExtensionInAnotherModule {}
+
+func testInitializerInheritance() {
+  _ = DesignatedInitWithClassExtensionSubImplicit(int: 0)
+  _ = DesignatedInitWithClassExtensionSubImplicit(convenienceInt: 0)
+  _ = DesignatedInitWithClassExtensionSubImplicit(float: 0)
+
+  _ = DesignatedInitWithClassExtensionSub(int: 0)
+  _ = DesignatedInitWithClassExtensionSub(convenienceInt: 0)
+  _ = DesignatedInitWithClassExtensionSub(float: 0)
+
+  _ = DesignatedInitWithClassExtensionInAnotherModuleSub(int: 0)
+  _ = DesignatedInitWithClassExtensionInAnotherModuleSub(convenienceInt: 0)
+  _ = DesignatedInitWithClassExtensionInAnotherModuleSub(float: 0)
+}
+
 // Make sure that our magic doesn't think the class property with the type name is an init
 func classPropertiesAreNotInit() -> ProcessInfo {
   var procInfo = NSProcessInfo.processInfo // expected-error{{'NSProcessInfo' has been renamed to 'ProcessInfo'}}
   procInfo = ProcessInfo.processInfo // okay
   return procInfo
+}
+
+// Make sure we can still inherit a convenience initializer when we have a
+// designated initializer override in Obj-C that isn't considered a proper
+// override in Swift. In this case, both the superclass and subclass have a
+// designed init with the selector `initWithI:`, however the Swift signature for
+// the subclass' init is `init(__i:)` rather than `init(i:)`.
+extension SuperclassWithDesignatedInitInCategory {
+  convenience init(y: Int) { self.init(i: y) }
+}
+
+func testConvenienceInitInheritance() {
+  _ = SubclassWithSwiftPrivateDesignatedInit(y: 5)
 }

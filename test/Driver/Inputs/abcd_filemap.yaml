@@ -1,0 +1,27 @@
+"":
+  swift-dependencies: "master.yaml"
+"a.swift":
+  object: "a.o"
+  dependencies: "a.d"
+  diagnostics: "a.dia"
+  swift-dependencies: "a.swiftdeps"
+"b.swift":
+  object: "b.o"
+  dependencies: "b.d"
+  diagnostics: "b.dia"
+  swift-dependencies: "b.swiftdeps"
+"c.swift":
+  object: "c.o"
+  dependencies: "c.d"
+  diagnostics: "c.dia"
+  swift-dependencies: "c.swiftdeps"
+"d.swift":
+  object: "d.o"
+  dependencies: "d.d"
+  diagnostics: "d.dia"
+  swift-dependencies: "d.swiftdeps"
+"main.swift":
+  object: "main.o"
+  dependencies: "main.d"
+  diagnostics: "main.dia"
+  swift-dependencies: "main.swiftdeps"

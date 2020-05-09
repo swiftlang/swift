@@ -20,8 +20,10 @@
 
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/OptimizationMode.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include <string>
 #include <climits>
 
@@ -32,32 +34,15 @@ public:
   /// Controls the aggressiveness of the performance inliner.
   int InlineThreshold = -1;
 
+  /// Controls the aggressiveness of the performance inliner for Osize.
+  int CallerBaseBenefitReductionFactor = 2;
+
+  /// Controls the aggressiveness of the loop unroller.
+  int UnrollThreshold = 250;
+
   /// The number of threads for multi-threaded code generation.
   int NumThreads = 0;
   
-  enum LinkingMode {
-    /// Skip SIL linking.
-    LinkNone,
-
-    /// Perform normal SIL linking.
-    LinkNormal,
-
-    /// Link all functions during SIL linking.
-    LinkAll
-  };
-
-  /// Representation of optimization modes.
-  enum class SILOptMode: unsigned {
-    NotSet,
-    None,
-    Debug,
-    Optimize,
-    OptimizeUnchecked
-  };
-
-  /// Controls how to perform SIL linking.
-  LinkingMode LinkMode = LinkNormal;
-
   /// Controls whether to pull in SIL from partial modules during the
   /// merge modules step. Could perhaps be merged with the link mode
   /// above but the interactions between all the flags are tricky.
@@ -69,13 +54,27 @@ public:
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
+  /// Controls whether specific OSSA optimizations are run. For benchmarking
+  /// purposes.
+  bool EnableOSSAOptimizations = true;
+
+  /// Controls whether to turn on speculative devirtualization.
+  /// It is turned off by default.
+  bool EnableSpeculativeDevirtualization = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
   bool DisableSILPerfOptimizations = false;
 
+  /// Controls whether cross module optimization is enabled.
+  bool CrossModuleOptimization = false;
+  
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
+
+  /// If true, no SIL verification is done at all.
+  bool VerifyNone = false;
 
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;
@@ -83,8 +82,18 @@ public:
   /// Whether to dump verbose SIL with scope and location information.
   bool EmitVerboseSIL = false;
 
+  /// Should we sort SIL functions, vtables, witness tables, and global
+  /// variables by name when we print it out. This eases diffing of SIL files.
+  bool EmitSortedSIL = false;
+
+  /// Whether to stop the optimization pipeline after serializing SIL.
+  bool StopOptimizationAfterSerialization = false;
+
+  /// Whether to skip emitting non-inlinable function bodies.
+  bool SkipNonInlinableFunctionBodies = false;
+
   /// Optimization mode being used.
-  SILOptMode Optimization = SILOptMode::NotSet;
+  OptimizationMode OptMode = OptimizationMode::NotSet;
 
   enum AssertConfiguration: unsigned {
     // Used by standard library code to distinguish between a debug and release
@@ -106,15 +115,14 @@ public:
   /// Instrument code to generate profiling information.
   bool GenerateProfile = false;
 
+  /// Path to the profdata file to be used for PGO, or the empty string.
+  std::string UseProfile = "";
+
   /// Emit a mapping of profile counters for use in coverage.
   bool EmitProfileCoverageMapping = false;
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   llvm::StringRef ExternalPassPipelineFilename;
-  
-  /// Emit captures and function contexts using +0 caller-guaranteed ARC
-  /// conventions.
-  bool EnableGuaranteedClosureContexts = false;
 
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;
@@ -123,10 +131,7 @@ public:
   std::string SILOutputFileNameForDebugging;
 
   /// If set to true, compile with the SIL Ownership Model enabled.
-  bool EnableSILOwnership = false;
-
-  /// When parsing SIL, assume unqualified ownership.
-  bool AssumeUnqualifiedOwnershipWhenParsing = false;
+  bool VerifySILOwnership = true;
 
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
@@ -140,22 +145,36 @@ public:
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = true;
 
-  /// Enable the mandatory semantic arc optimizer.
-  bool EnableMandatorySemanticARCOpts = false;
+  /// Emit extra exclusvity markers for memory access and verify coverage.
+  bool VerifyExclusivity = false;
 
-  /// \brief Enable large loadable types IRGen pass.
+  /// Calls to the replaced method inside of the replacement method will call
+  /// the previous implementation.
+  ///
+  /// @_dynamicReplacement(for: original())
+  /// func replacement() {
+  ///   if (...)
+  ///     original() // calls original() implementation if true
+  /// }
+  bool EnableDynamicReplacementCanCallPreviousImplementation = true;
+
+  /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
 
-  /// Enables the "fully fragile" resilience strategy.
-  ///
-  /// \see ResilienceStrategy::Fragile
-  bool SILSerializeAll = false;
+  /// Should the default pass pipelines strip ownership during the diagnostic
+  /// pipeline or after serialization.
+  bool StripOwnershipAfterSerialization = true;
 
-  /// If set, SIL witness tables will be serialized.
-  ///
-  /// It is supposed to be used only for compiling overlays.
-  /// User code should never be compiled with this flag set.
-  bool SILSerializeWitnessTables = false;
+  /// The name of the file to which the backend should save optimization
+  /// records.
+  std::string OptRecordFile;
+
+  /// The regex that filters the passes that should be saved to the optimization
+  /// records.
+  std::string OptRecordPasses;
+
+  /// The format used for serializing remarks (default: YAML)
+  llvm::remarks::Format OptRecordFormat = llvm::remarks::Format::YAML;
 
   SILOptions() {}
 
@@ -164,6 +183,14 @@ public:
   llvm::hash_code getPCHHashComponents() const {
     return llvm::hash_value(0);
   }
+
+  bool shouldOptimize() const {
+    return OptMode > OptimizationMode::NoOptimization;
+  }
+
+  bool hasMultipleIRGenThreads() const { return NumThreads > 1; }
+  bool shouldPerformIRGenerationInParallel() const { return NumThreads != 0; }
+  bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
 };
 
 } // end namespace swift

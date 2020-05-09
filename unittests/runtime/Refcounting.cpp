@@ -17,6 +17,10 @@
 using namespace swift;
 
 struct TestObject : HeapObject {
+  constexpr TestObject(HeapMetadata const *newMetadata)
+    : HeapObject(newMetadata, InlineRefCounts::Immortal)
+    , Addr(NULL), Value(0) {}
+
   size_t *Addr;
   size_t Value;
 };
@@ -31,9 +35,10 @@ static SWIFT_CC(swift) void destroyTestObject(SWIFT_CONTEXT HeapObject *_object)
 
 static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
   { { &destroyTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
-  { { { MetadataKind::Class } }, 0, /*rodata*/ 1,
-  ClassFlags::UsesSwift1Refcounting, nullptr, 0, 0, 0, 0, 0 }
+  { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
 };
+
+static TestObject ImmortalTestObject{&TestClassObjectMetadata};
 
 /// Create an object that, when deallocated, stores the given value to
 /// the given pointer.
@@ -67,37 +72,6 @@ TEST(RefcountingTest, retain_release) {
   EXPECT_EQ(1u, value);
 }
 
-TEST(RefcountingTest, pin_unpin) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  auto pinResult = swift_tryPin(object);
-  EXPECT_EQ(object, pinResult);
-  EXPECT_EQ(0u, value);
-  swift_release(object);
-  EXPECT_EQ(0u, value);
-  swift_unpin(object);
-  EXPECT_EQ(1u, value);
-}
-
-TEST(RefcountingTest, pin_pin_unpin_unpin) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  auto pinResult = swift_tryPin(object);
-  EXPECT_EQ(object, pinResult);
-  EXPECT_EQ(0u, value);
-  auto pinResult2 = swift_tryPin(object);
-  EXPECT_EQ(nullptr, pinResult2);
-  EXPECT_EQ(0u, value);
-  swift_unpin(pinResult2);
-  EXPECT_EQ(0u, value);
-  swift_release(object);
-  EXPECT_EQ(0u, value);
-  swift_unpin(object);
-  EXPECT_EQ(1u, value);
-}
-
 TEST(RefcountingTest, retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
@@ -121,17 +95,17 @@ TEST(RefcountingTest, unknown_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  swift_unknownRetain_n(object, 32);
-  swift_unknownRetain(object);
+  swift_unknownObjectRetain_n(object, 32);
+  swift_unknownObjectRetain(object);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
-  swift_unknownRelease_n(object, 31);
+  swift_unknownObjectRelease_n(object, 31);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(3u, swift_retainCount(object));
-  swift_unknownRelease(object);
+  swift_unknownObjectRelease(object);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(2u, swift_retainCount(object));
-  swift_unknownRelease_n(object, 1);
+  swift_unknownObjectRelease_n(object, 1);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(1u, swift_retainCount(object));
 }
@@ -187,30 +161,6 @@ TEST(RefcountingTest, isUniquelyReferenced) {
   EXPECT_EQ(1u, value);
 }
 
-TEST(RefcountingTest, isUniquelyReferencedOrPinned) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  // RC 1, unpinned
-  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
-
-  swift_retain(object);
-  // RC big, unpinned
-  EXPECT_FALSE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
-
-  swift_tryPin(object);
-  // RC big, pinned
-  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
-
-  swift_release(object);
-  // RC 1, pinned
-  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
-
-  swift_unpin(object);
-  swift_release(object);
-  EXPECT_EQ(1u, value);
-}
-
 /////////////////////////////////////////
 // Non-atomic reference counting tests //
 /////////////////////////////////////////
@@ -235,43 +185,14 @@ TEST(RefcountingTest, nonatomic_retain_release) {
   EXPECT_EQ(1u, value);
 }
 
-TEST(RefcountingTest, nonatomic_pin_unpin) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  auto pinResult = swift_nonatomic_tryPin(object);
-  EXPECT_EQ(object, pinResult);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_release(object);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_unpin(object);
-  EXPECT_EQ(1u, value);
-}
-
-TEST(RefcountingTest, nonatomic_pin_pin_unpin_unpin) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  auto pinResult = swift_nonatomic_tryPin(object);
-  EXPECT_EQ(object, pinResult);
-  EXPECT_EQ(0u, value);
-  auto pinResult2 = swift_nonatomic_tryPin(object);
-  EXPECT_EQ(nullptr, pinResult2);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_unpin(pinResult2);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_release(object);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_unpin(object);
-  EXPECT_EQ(1u, value);
-}
-
 TEST(RefcountingTest, nonatomic_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  swift_nonatomic_retain_n(object, 32);
-  swift_nonatomic_retain(object);
+  auto res = swift_nonatomic_retain_n(object, 32);
+  EXPECT_EQ(object, res);
+  res = swift_nonatomic_retain(object);
+  EXPECT_EQ(object, res);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
   swift_nonatomic_release_n(object, 31);
@@ -289,17 +210,65 @@ TEST(RefcountingTest, nonatomic_unknown_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  swift_nonatomic_unknownRetain_n(object, 32);
-  swift_nonatomic_unknownRetain(object);
+  auto res = swift_nonatomic_unknownObjectRetain_n(object, 32);
+  EXPECT_EQ(object, res);
+  res = swift_nonatomic_unknownObjectRetain(object);
+  EXPECT_EQ(object, res);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
-  swift_nonatomic_unknownRelease_n(object, 31);
+  swift_nonatomic_unknownObjectRelease_n(object, 31);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(3u, swift_retainCount(object));
-  swift_nonatomic_unknownRelease(object);
+  swift_nonatomic_unknownObjectRelease(object);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(2u, swift_retainCount(object));
-  swift_nonatomic_unknownRelease_n(object, 1);
+  swift_nonatomic_unknownObjectRelease_n(object, 1);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(1u, swift_retainCount(object));
+}
+
+// Verify that refcounting operations on immortal objects never changes the
+// refcount field.
+TEST(RefcountingTest, immortal_retain_release) {
+  auto initialBitsValue = ImmortalTestObject.refCounts.getBitsValue();
+
+  swift_retain(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_release(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_nonatomic_retain(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_nonatomic_release(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+
+  swift_unownedRetain(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_unownedRelease(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_nonatomic_unownedRetain(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  swift_nonatomic_unownedRelease(&ImmortalTestObject);
+  EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+
+  for (unsigned i = 0; i < 32; i++) {
+    uint32_t amount = 1U << i;
+
+    swift_retain_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_release_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_nonatomic_retain_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_nonatomic_release_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    
+    swift_unownedRetain_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_unownedRelease_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_nonatomic_unownedRetain_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+    swift_nonatomic_unownedRelease_n(&ImmortalTestObject, amount);
+    EXPECT_EQ(initialBitsValue, ImmortalTestObject.refCounts.getBitsValue());
+  }
 }

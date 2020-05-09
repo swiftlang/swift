@@ -1,0 +1,16 @@
+class A {
+  var a = 2
+  fileprivate func new_name() -> Int {
+return 1
+}
+
+subscript(_ : Int) -> Int {
+    get {
+      return new_name()
+    }
+    set {
+      a = newValue
+    }
+  }
+}
+

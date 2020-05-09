@@ -29,16 +29,16 @@ struct S1 {
     _ = a.count
   }
 }
-// CHECK1: public struct Array<Int> : RandomAccessCollection, MutableCollection {
+// CHECK1: public struct Array<Int>
 
-// CHECK2: public struct Array<String> : RandomAccessCollection, MutableCollection {
+// CHECK2: public struct Array<String>
 
 // CHECK3: public struct A
 // CHECK3: public func fa()
 // CHECK3: public func fea1()
 // CHECK3: public func fea2()
 
-// CHECK4: public struct Array<A> : RandomAccessCollection, MutableCollection {
+// CHECK4: public struct Array<A>
 
 public protocol P1 { }
 public class T1 : P1 { }

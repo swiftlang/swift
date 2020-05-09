@@ -14,6 +14,7 @@
 
 #include <Foundation/Foundation.h>
 #include <objc/runtime.h>
+#include <objc/message.h>
 
 static int Errors;
 
@@ -36,9 +37,9 @@ static int Errors;
 /*
   Summary of Swift definitions from SwiftObjectNSObject.swift:
 
-  class SwiftObject <NSObject> { ... }
+  class Swift._SwiftObject <NSObject> { ... }
 
-  class C : SwiftObject {
+  class C : Swift._SwiftObject {
   @objc func cInstanceMethod()
   @objc class func cClassMethod()
   }
@@ -50,29 +51,40 @@ static int Errors;
 */
 
 // Add methods to class SwiftObject that can be called by performSelector: et al
-    @interface SwiftObject /* trust me, I know what I'm doing */ @end
-      @implementation SwiftObject (MethodsToPerform)
-      -(id) perform0 {
-        return self;
-    }
 
--(id) perform1:(id)one {
+static const char *SwiftObjectDemangledName;
+
+static id Perform0(id self, SEL sel) {
+    return self;
+}
+
+static id Perform1(id self, SEL sel, id one) {
   expectTrue ([one isEqual:@1]);
   return self;
 }
 
--(id) perform2:(id)one :(id)two {
+static id Perform2(id self, SEL sel, id one, id two) {
   expectTrue ([one isEqual:@1]);
   expectTrue ([two isEqual:@2]);
   return self;
 }
-@end
+
+static __attribute__((constructor))
+void HackSwiftObject()
+{
+    SwiftObjectDemangledName = "Swift._SwiftObject";
+    Class cls = objc_getClass(SwiftObjectDemangledName);
+
+    class_addMethod(cls, @selector(perform0), (IMP)Perform0, "@@:");
+    class_addMethod(cls, @selector(perform1:), (IMP)Perform1, "@@:@");
+    class_addMethod(cls, @selector(perform2::), (IMP)Perform2, "@@:@@");
+}
 
 void TestSwiftObjectNSObject(id c, id d)
 {
   printf("TestSwiftObjectNSObject\n");
 
-  Class S = objc_getClass("SwiftObject");
+  Class S = objc_getClass(SwiftObjectDemangledName);
   Class C = objc_getClass("SwiftObjectNSObject.C");
   Class D = objc_getClass("SwiftObjectNSObject.D");
 
@@ -400,10 +412,15 @@ void TestSwiftObjectNSObject(id c, id d)
   expectTrue ([[c description] isEqual:@"SwiftObjectNSObject.C"]);
   expectTrue ([[D description] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C description] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S description] isEqual:@"SwiftObject"]);
   expectTrue ([[D_meta description] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C_meta description] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S_meta description] isEqual:@"SwiftObject"]);
+  expectTrue ([[S_meta description] isEqual:@(SwiftObjectDemangledName)]);
+
+  // NSLog() calls -description and also some private methods.
+  // This output is checked by FileCheck in SwiftObjectNSObject.swift.
+  NSLog(@"c ##%@##", c);
+  NSLog(@"d ##%@##", d);
+  NSLog(@"S ##%@##", S);
 
 
   printf("NSObjectProtocol.debugDescription\n");
@@ -412,10 +429,9 @@ void TestSwiftObjectNSObject(id c, id d)
   expectTrue ([[c debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
   expectTrue ([[D debugDescription] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S debugDescription] isEqual:@"SwiftObject"]);
   expectTrue ([[D_meta debugDescription] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C_meta debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S_meta debugDescription] isEqual:@"SwiftObject"]);
+  expectTrue ([[S_meta debugDescription] isEqual:@(SwiftObjectDemangledName)]);
 
 
   printf("NSObjectProtocol.performSelector\n");
@@ -566,6 +582,222 @@ void TestSwiftObjectNSObject(id c, id d)
   expectFalse([D_meta instancesRespondToSelector:@selector(DESSLOK)]);
   expectFalse([C_meta instancesRespondToSelector:@selector(DESSLOK)]);
   expectFalse([S_meta instancesRespondToSelector:@selector(DESSLOK)]);
+
+
+  printf("NSObject.methodForSelector\n");
+
+  IMP fwd = (IMP)_objc_msgForward;
+  IMP imp, imp2;
+
+  // instance method from root class
+  // that has no root metaclass override
+  imp = [S methodForSelector:@selector(self)];
+  expectTrue (imp != nil);
+  expectTrue (imp != fwd);
+  expectTrue ([c methodForSelector:@selector(self)] == imp);
+  expectTrue ([d methodForSelector:@selector(self)] == imp);
+  expectTrue ([C methodForSelector:@selector(self)] == imp);
+  expectTrue ([D methodForSelector:@selector(self)] == imp);
+  expectTrue ([S_meta methodForSelector:@selector(self)] == imp);
+  expectTrue ([C_meta methodForSelector:@selector(self)] == imp);
+  expectTrue ([D_meta methodForSelector:@selector(self)] == imp);
+
+  // instance method from root class
+  // that also has a root metaclass override
+  imp = [c methodForSelector:@selector(class)];
+  expectTrue (imp != nil);
+  expectTrue (imp != fwd);
+  imp2 = [C methodForSelector:@selector(class)];
+  expectTrue (imp2 != nil);
+  expectTrue (imp2 != fwd);
+  expectTrue (imp2 != imp);
+  expectTrue ([d methodForSelector:@selector(class)] == imp);
+  expectTrue ([S methodForSelector:@selector(class)] == imp2);
+  expectTrue ([D methodForSelector:@selector(class)] == imp2);
+  expectTrue ([S_meta methodForSelector:@selector(class)] == imp2);
+  expectTrue ([C_meta methodForSelector:@selector(class)] == imp2);
+  expectTrue ([D_meta methodForSelector:@selector(class)] == imp2);
+
+  // non-instance class method from root class
+  imp = [S methodForSelector:@selector(alloc)];
+  expectTrue (imp != nil);
+  expectTrue (imp != fwd);
+  expectTrue ([c methodForSelector:@selector(alloc)] == fwd);
+  expectTrue ([d methodForSelector:@selector(alloc)] == fwd);
+  expectTrue ([C methodForSelector:@selector(alloc)] == imp);
+  expectTrue ([D methodForSelector:@selector(alloc)] == imp);
+  expectTrue ([S_meta methodForSelector:@selector(alloc)] == imp);
+  expectTrue ([C_meta methodForSelector:@selector(alloc)] == imp);
+  expectTrue ([D_meta methodForSelector:@selector(alloc)] == imp);
+
+  // instance method from subclass C
+  imp = [c methodForSelector:@selector(cInstanceMethod)];
+  expectTrue (imp != nil);
+  expectTrue (imp != fwd);
+  expectTrue ([d methodForSelector:@selector(cInstanceMethod)] == imp);
+  expectTrue ([S methodForSelector:@selector(cInstanceMethod)] == fwd);
+  expectTrue ([C methodForSelector:@selector(cInstanceMethod)] == fwd);
+  expectTrue ([D methodForSelector:@selector(cInstanceMethod)] == fwd);
+  expectTrue ([S_meta methodForSelector:@selector(cInstanceMethod)] == fwd);
+  expectTrue ([C_meta methodForSelector:@selector(cInstanceMethod)] == fwd);
+  expectTrue ([D_meta methodForSelector:@selector(cInstanceMethod)] == fwd);
+
+  // class method from subclass C
+  imp = [C methodForSelector:@selector(cClassMethod)];
+  expectTrue (imp != nil);
+  expectTrue (imp != fwd);
+  expectTrue ([c methodForSelector:@selector(cClassMethod)] == fwd);
+  expectTrue ([d methodForSelector:@selector(cClassMethod)] == fwd);
+  expectTrue ([S methodForSelector:@selector(cClassMethod)] == fwd);
+  expectTrue ([D methodForSelector:@selector(cClassMethod)] == imp);
+  expectTrue ([S_meta methodForSelector:@selector(cClassMethod)] == fwd);
+  expectTrue ([C_meta methodForSelector:@selector(cClassMethod)] == fwd);
+  expectTrue ([D_meta methodForSelector:@selector(cClassMethod)] == fwd);
+
+  // instance method from subclass D
+  imp = [d methodForSelector:@selector(dInstanceMethod)];
+  expectTrue (imp != nil);
+  expectTrue (imp != fwd);
+  expectTrue ([c methodForSelector:@selector(dInstanceMethod)] == fwd);
+  expectTrue ([S methodForSelector:@selector(dInstanceMethod)] == fwd);
+  expectTrue ([C methodForSelector:@selector(dInstanceMethod)] == fwd);
+  expectTrue ([D methodForSelector:@selector(dInstanceMethod)] == fwd);
+  expectTrue ([S_meta methodForSelector:@selector(dInstanceMethod)] == fwd);
+  expectTrue ([C_meta methodForSelector:@selector(dInstanceMethod)] == fwd);
+  expectTrue ([D_meta methodForSelector:@selector(dInstanceMethod)] == fwd);
+
+  // class method from subclass D
+  imp = [D methodForSelector:@selector(dClassMethod)];
+  expectTrue (imp != nil);
+  expectTrue (imp != fwd);
+  expectTrue ([c methodForSelector:@selector(dClassMethod)] == fwd);
+  expectTrue ([d methodForSelector:@selector(dClassMethod)] == fwd);
+  expectTrue ([S methodForSelector:@selector(dClassMethod)] == fwd);
+  expectTrue ([C methodForSelector:@selector(dClassMethod)] == fwd);
+  expectTrue ([S_meta methodForSelector:@selector(dClassMethod)] == fwd);
+  expectTrue ([C_meta methodForSelector:@selector(dClassMethod)] == fwd);
+  expectTrue ([D_meta methodForSelector:@selector(dClassMethod)] == fwd);
+
+  // instance method from subclass C overridden by D
+  imp = [c methodForSelector:@selector(cInstanceOverride)];
+  expectTrue (imp != nil);
+  expectTrue (imp != fwd);
+  imp2 = [d methodForSelector:@selector(cInstanceOverride)];
+  expectTrue (imp2 != nil);
+  expectTrue (imp2 != fwd);
+  expectTrue (imp2 != imp);
+  expectTrue ([S methodForSelector:@selector(cInstanceOverride)] == fwd);
+  expectTrue ([C methodForSelector:@selector(cInstanceOverride)] == fwd);
+  expectTrue ([D methodForSelector:@selector(cInstanceOverride)] == fwd);
+  expectTrue ([S_meta methodForSelector:@selector(cInstanceOverride)] == fwd);
+  expectTrue ([C_meta methodForSelector:@selector(cInstanceOverride)] == fwd);
+  expectTrue ([D_meta methodForSelector:@selector(cInstanceOverride)] == fwd);
+
+  // class method from subclass C overridden by D
+  imp = [C methodForSelector:@selector(cClassOverride)];
+  expectTrue (imp != nil);
+  expectTrue (imp != fwd);
+  imp2 = [D methodForSelector:@selector(cClassOverride)];
+  expectTrue (imp2 != nil);
+  expectTrue (imp2 != fwd);
+  expectTrue (imp2 != imp);
+  expectTrue ([c methodForSelector:@selector(cClassOverride)] == fwd);
+  expectTrue ([d methodForSelector:@selector(cClassOverride)] == fwd);
+  expectTrue ([S methodForSelector:@selector(cClassOverride)] == fwd);
+  expectTrue ([S_meta methodForSelector:@selector(cClassOverride)] == fwd);
+  expectTrue ([C_meta methodForSelector:@selector(cClassOverride)] == fwd);
+  expectTrue ([D_meta methodForSelector:@selector(cClassOverride)] == fwd);
+
+  // nonexistent method
+  expectTrue ([c methodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([d methodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([S methodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([C methodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([D methodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([S_meta methodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([C_meta methodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([D_meta methodForSelector:@selector(DESSLOK)] == fwd);
+
+
+  printf("NSObject.instanceMethodForSelector\n");
+
+  // non-class objects need not apply
+  expectFalse([d respondsToSelector:@selector(instanceMethodForSelector:)]);
+  expectFalse([c respondsToSelector:@selector(instanceMethodForSelector:)]);
+  expectTrue ([S respondsToSelector:@selector(instanceMethodForSelector:)]);
+
+  // instance method from root class
+  // that has no root metaclass override
+  expectTrue ([C instanceMethodForSelector:@selector(self)] == [c methodForSelector:@selector(self)]);
+  expectTrue ([D instanceMethodForSelector:@selector(self)] == [d methodForSelector:@selector(self)]);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(self)] == [S methodForSelector:@selector(self)]);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(self)] == [C methodForSelector:@selector(self)]);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(self)] == [D methodForSelector:@selector(self)]);
+
+  // instance method from root class
+  // that also has a root metaclass override
+  expectTrue ([C instanceMethodForSelector:@selector(class)] == [c methodForSelector:@selector(class)]);
+  expectTrue ([D instanceMethodForSelector:@selector(class)] == [d methodForSelector:@selector(class)]);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(class)] == [S methodForSelector:@selector(class)]);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(class)] == [C methodForSelector:@selector(class)]);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(class)] == [D methodForSelector:@selector(class)]);
+
+  // non-instance class method from root class
+  expectTrue ([C instanceMethodForSelector:@selector(alloc)] == [c methodForSelector:@selector(alloc)]);
+  expectTrue ([D instanceMethodForSelector:@selector(alloc)] == [d methodForSelector:@selector(alloc)]);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(alloc)] == [S methodForSelector:@selector(alloc)]);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(alloc)] == [C methodForSelector:@selector(alloc)]);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(alloc)] == [D methodForSelector:@selector(alloc)]);
+
+  // instance method from subclass C
+  expectTrue ([C instanceMethodForSelector:@selector(cInstanceMethod)] == [c methodForSelector:@selector(cInstanceMethod)]);
+  expectTrue ([D instanceMethodForSelector:@selector(cInstanceMethod)] == [d methodForSelector:@selector(cInstanceMethod)]);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(cInstanceMethod)] == [S methodForSelector:@selector(cInstanceMethod)]);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(cInstanceMethod)] == [C methodForSelector:@selector(cInstanceMethod)]);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(cInstanceMethod)] == [D methodForSelector:@selector(cInstanceMethod)]);
+
+  // class method from subclass C
+  expectTrue ([C instanceMethodForSelector:@selector(cClassMethod)] == [c methodForSelector:@selector(cClassMethod)]);
+  expectTrue ([D instanceMethodForSelector:@selector(cClassMethod)] == [d methodForSelector:@selector(cClassMethod)]);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(cClassMethod)] == [S methodForSelector:@selector(cClassMethod)]);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(cClassMethod)] == [C methodForSelector:@selector(cClassMethod)]);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(cClassMethod)] == [D methodForSelector:@selector(cClassMethod)]);
+
+  // instance method from subclass D
+  expectTrue ([C instanceMethodForSelector:@selector(dInstanceMethod)] == [c methodForSelector:@selector(dInstanceMethod)]);
+  expectTrue ([D instanceMethodForSelector:@selector(dInstanceMethod)] == [d methodForSelector:@selector(dInstanceMethod)]);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(dInstanceMethod)] == [S methodForSelector:@selector(dInstanceMethod)]);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(dInstanceMethod)] == [C methodForSelector:@selector(dInstanceMethod)]);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(dInstanceMethod)] == [D methodForSelector:@selector(dInstanceMethod)]);
+
+  // class method from subclass D
+  expectTrue ([C instanceMethodForSelector:@selector(dClassMethod)] == [c methodForSelector:@selector(dClassMethod)]);
+  expectTrue ([D instanceMethodForSelector:@selector(dClassMethod)] == [d methodForSelector:@selector(dClassMethod)]);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(dClassMethod)] == [S methodForSelector:@selector(dClassMethod)]);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(dClassMethod)] == [C methodForSelector:@selector(dClassMethod)]);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(dClassMethod)] == [D methodForSelector:@selector(dClassMethod)]);
+
+  // instance method from subclass C overridden by D
+  expectTrue ([C instanceMethodForSelector:@selector(cInstanceOverride)] == [c methodForSelector:@selector(cInstanceOverride)]);
+  expectTrue ([D instanceMethodForSelector:@selector(cInstanceOverride)] == [d methodForSelector:@selector(cInstanceOverride)]);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(cInstanceOverride)] == [S methodForSelector:@selector(cInstanceOverride)]);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(cInstanceOverride)] == [C methodForSelector:@selector(cInstanceOverride)]);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(cInstanceOverride)] == [D methodForSelector:@selector(cInstanceOverride)]);
+
+  // class method from subclass C overridden by D
+  expectTrue ([C instanceMethodForSelector:@selector(cClassOverride)] == [c methodForSelector:@selector(cClassOverride)]);
+  expectTrue ([D instanceMethodForSelector:@selector(cClassOverride)] == [d methodForSelector:@selector(cClassOverride)]);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(cClassOverride)] == [S methodForSelector:@selector(cClassOverride)]);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(cClassOverride)] == [C methodForSelector:@selector(cClassOverride)]);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(cClassOverride)] == [D methodForSelector:@selector(cClassOverride)]);
+
+  // nonexistent method
+  expectTrue ([S instanceMethodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([C instanceMethodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([D instanceMethodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([S_meta instanceMethodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([C_meta instanceMethodForSelector:@selector(DESSLOK)] == fwd);
+  expectTrue ([D_meta instanceMethodForSelector:@selector(DESSLOK)] == fwd);
 
 
   printf("TestSwiftObjectNSObject: %d error%s\n",

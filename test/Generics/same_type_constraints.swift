@@ -348,27 +348,78 @@ func intracomponent<T: P11>(_: T) // expected-note{{previous same-type constrain
 
 func intercomponentSameComponents<T: P10>(_: T)
   where T.A == T.B, // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
-        T.B == T.A { } // expected-note{{previous same-type constraint 'T.A' == 'T.B' written here}}
-                       // FIXME: directionality of constraint above is weird
+        T.B == T.A { } // expected-note{{previous same-type constraint 'T.B' == 'T.A' written here}}
 
 func intercomponentMoreThanSpanningTree<T: P10>(_: T)
   where T.A == T.B,
         T.B == T.C,
         T.D == T.E, // expected-note{{previous same-type constraint 'T.D' == 'T.E' written here}}
         T.D == T.B,
-        T.E == T.B  // expected-warning{{redundant same-type constraint 'T.B' == 'T.E'}}
+        T.E == T.B  // expected-warning{{redundant same-type constraint 'T.E' == 'T.B'}}
         { }
 
 func trivialRedundancy<T: P10>(_: T) where T.A == T.A { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.A'}}
 
 struct X11<T: P10> where T.A == T.B { }
 
-func intracomponentInferred<T>(_: X11<T>) // expected-note{{previous same-type constraint 'T.A' == 'T.B' inferred from type here}}
-  where T.A == T.B { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
+func intracomponentInferred<T>(_: X11<T>)
+  where T.A == T.B { }
 
 // Suppress redundant same-type constraint warnings from result types.
 struct StructTakingP1<T: P1> { }
 
 func resultTypeSuppress<T: P1>() -> StructTakingP1<T> {
   return StructTakingP1()
+}
+
+// Check directly-concrete same-type constraints
+typealias NotAnInt = Double
+
+extension X11 where NotAnInt == Int { }
+// expected-error@-1{{generic signature requires types 'NotAnInt' (aka 'Double') and 'Int' to be the same}}
+
+
+struct X12<T> { }
+
+protocol P12 {
+  associatedtype A
+  associatedtype B
+}
+
+func testP12a<T: P12>(_: T) where T.A == X12<Int>, T.A == X12<T.B>, T.B == Int { }
+// expected-warning@-1{{redundant same-type constraint 'T.B' == 'Int'}}
+// expected-note@-2{{same-type constraint 'T.B' == 'Int' written here}}
+
+func testP12b<T: P12>(_: T) where T.B == Int, T.A == X12<T.B>, X12<T.B> == T.A { }
+// expected-warning@-1{{redundant same-type constraint 'T.A' == 'X12<Int>'}}
+// expected-note@-2{{same-type constraint 'T.A' == 'X12<Int>' written here}}
+
+// rdar://45307061 - dropping delayed same-type constraints when merging
+// equivalence classes
+
+protocol FakeIterator {
+  associatedtype Element
+}
+
+protocol FakeSequence {
+  associatedtype Iterator : FakeIterator
+  associatedtype Element where Iterator.Element == Element
+}
+
+protocol ObserverType {
+  associatedtype E
+}
+
+struct Bad<S: FakeSequence, O> where S.Element : ObserverType, S.Element.E == O {}
+
+func good<S: FakeSequence, O>(_: S, _: O) where S.Element : ObserverType, O == S.Element.E {
+  _ = Bad<S, O>()
+}
+
+func bad<S: FakeSequence, O>(_: S, _: O) where S.Element : ObserverType, O == S.Iterator.Element.E {
+  _ = Bad<S, O>()
+}
+
+func ugly<S: FakeSequence, O>(_: S, _: O) where S.Element : ObserverType, O == S.Iterator.Element.E, O == S.Element.E {
+  _ = Bad<S, O>()
 }

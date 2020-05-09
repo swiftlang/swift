@@ -60,6 +60,13 @@ module ucrt [system] {
     module stdio {
       header "stdio.h"
       export *
+
+      // NOTE(compnerd) this is a horrible workaround for the fact that
+      // Microsoft has fully inlined nearly all of the printf family of
+      // functions in the headers which results in the definitions being elided
+      // resulting in undefined symbols.  The legacy_stdio_definitions provides
+      // out-of-line definitions for these functions.
+      link "legacy_stdio_definitions"
     }
 
     module stdlib {
@@ -78,6 +85,11 @@ module ucrt [system] {
     }
 
     module POSIX {
+      module fcntl {
+        header "fcntl.h"
+        export *
+      }
+
       module sys {
         export *
 
@@ -99,9 +111,30 @@ module ucrt [system] {
     }
   }
 
-  module io {
-    header "corecrt_io.h"
+  module process {
+    header "process.h"
     export *
+  }
+
+  module corecrt {
+    header "corecrt.h"
+    header "corecrt_stdio_config.h"
+    export *
+
+    module io {
+      header "corecrt_io.h"
+      export *
+    }
+
+    module math {
+      header "corecrt_math.h"
+      export *
+    }
+
+    module stdio {
+      header "corecrt_wstdio.h"
+      export *
+    }
   }
 }
 

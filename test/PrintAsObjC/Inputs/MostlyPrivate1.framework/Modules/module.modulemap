@@ -1,0 +1,5 @@
+framework module MostlyPrivate1 {
+  umbrella header "MostlyPrivate1.h"
+  export *
+  module * { export * }
+}

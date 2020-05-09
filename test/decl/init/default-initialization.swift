@@ -105,7 +105,7 @@ class MultipleInitBase {
 }
 
 class MultipleInitDerived : MultipleInitBase {
-  override init() { } // expected-error{{super.init isn't called on all paths before returning from initializer}}
+  override init() { } // expected-error{{'super.init' isn't called on all paths before returning from initializer}}
 }
 
 // rdar://20944100

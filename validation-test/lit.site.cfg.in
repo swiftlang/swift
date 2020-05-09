@@ -27,12 +27,30 @@ config.variant_suffix = "@VARIANT_SUFFIX@"
 config.variant_sdk = "@VARIANT_SDK@"
 config.swift_test_results_dir = \
     lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
+
+# --- Darwin Configuration ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
+
+# --- Android Configuration ---
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 
+# --- Windows MSVC Configuration ---
+config.swift_stdlib_msvc_runtime = None
+if "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreaded":
+    config.swift_stdlib_msvc_runtime = 'MT'
+elif "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreadedDebug":
+    config.swift_stdlib_msvc_runtime = 'MTd'
+elif "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreadedDLL":
+    config.swift_stdlib_msvc_runtime = 'MD'
+elif "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreadedDebugDLL":
+    config.swift_stdlib_msvc_runtime = 'MDd'
+else:
+    assert(False)
+
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 config.lldb_build_root = "@LLDB_BUILD_DIR@"
+config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
 
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
@@ -68,9 +86,6 @@ if "@SWIFT_OPTIMIZED@" == "TRUE":
 if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
     config.available_features.add('sourcekit')
 
-if "@SWIFT_STDLIB_ENABLE_RESILIENCE@" == "TRUE":
-    config.available_features.add("resilient_stdlib")
-
 if "@SWIFT_STDLIB_USE_NONATOMIC_RC@" == "TRUE":
     config.available_features.add("nonatomic_rc")
 
@@ -83,7 +98,12 @@ if "@CMAKE_GENERATOR@" == "Xcode":
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
+if "@SWIFT_ENABLE_LLD_LINKER@" == "TRUE":
+    config.android_linker_name = "lld"
+else:
+    # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
+    config.android_linker_name = "gold"
+
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/validation-test/lit.cfg")
-

@@ -40,6 +40,11 @@ public:
 
     if (auto BuiltinKind = BI->getBuiltinKind()) {
       switch (BuiltinKind.getValue()) {
+      // BUILTIN_TYPE_CHECKER_OPERATION does not live past the type checker.
+#define BUILTIN_TYPE_CHECKER_OPERATION(ID, NAME)                               \
+  case BuiltinValueKind::ID:                                                   \
+    llvm_unreachable("Unexpected type checker operation seen in SIL!");
+
 #define BUILTIN(ID, NAME, ATTRS)                                               \
   case BuiltinValueKind::ID:                                                   \
     return asImpl().visit##ID(BI, ATTRS);

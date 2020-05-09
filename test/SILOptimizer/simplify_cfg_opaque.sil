@@ -1,0 +1,37 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+
+sil_stage canonical
+
+protocol P {}
+
+// Test jump threading into a destination block terminated by checked_cast_value_br.
+//
+// CHECK-LABEL: sil @testJumpThread : $@convention(thin) (Any, Any) -> () {
+// CHECK: bb0(%0 : $Any, %1 : $Any):
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK:   retain_value %0 : $Any
+// CHECK:   release_value %0 : $Any
+// CHECK:   checked_cast_value_br Any in %0 : $Any to P
+// CHECK: bb2:
+// CHECK:   checked_cast_value_br Any in %1 : $Any to P
+// CHECK-LABEL: } // end sil function 'testJumpThread'
+sil @testJumpThread : $@convention(thin) (Any, Any) -> () {
+bb0(%0 : $Any, %1 : $Any):
+  cond_br undef, bb1, bb2
+bb1:
+  retain_value %0 : $Any // force jump-threading
+  br bb6(%0 : $Any)
+bb2:
+  br bb6(%1 : $Any)
+bb6(%any : $Any):
+  release_value %any : $Any // force jump-threading
+  checked_cast_value_br Any in %any : $Any to P, bb7, bb8
+bb7(%p : $P):
+  br bb9
+bb8:
+  br bb9
+bb9:
+  %999 = tuple ()
+  return %999 : $()
+}

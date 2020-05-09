@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing Mach error codes.
-@objc public enum MachErrorCode : Int32 {
+@objc
+public enum MachErrorCode : Int32 {
   case success                  = 0
 
   /// Specified address is not currently valid.
@@ -201,4 +202,4 @@
   /// The requested property cannot be changed at this time.
   case policyStatic             = 51
 }
-#endif // os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+#endif // os(macOS) || os(iOS) || os(tvOS) || os(watchOS)

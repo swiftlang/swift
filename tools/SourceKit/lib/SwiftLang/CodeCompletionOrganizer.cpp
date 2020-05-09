@@ -14,7 +14,9 @@
 #include "SourceKit/Support/FuzzyStringMatcher.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
+#include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Markup/XMLUtils.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseSet.h"
@@ -58,7 +60,7 @@ class ImportDepth {
 
 public:
   ImportDepth() = default;
-  ImportDepth(ASTContext &context, CompilerInvocation &invocation);
+  ImportDepth(ASTContext &context, const CompilerInvocation &invocation);
 
   Optional<uint8_t> lookup(StringRef module) {
     auto I = depths.find(module);
@@ -103,7 +105,7 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
     if (result->getSemanticContext() == SemanticContextKind::OtherModule) {
       builder.setModuleImportDepth(depth.lookup(result->getModuleName()));
 
-      if (info.completionContext->HasExpectedTypeRelation &&
+      if (info.completionContext->typeContextKind == TypeContextKind::Required &&
           result->getKind() == Completion::Declaration) {
         // FIXME: because other-module results are cached, they will not be
         // given a type-relation of invalid.  As a hack, we look at the text of
@@ -112,7 +114,7 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
           using ChunkKind = ide::CodeCompletionString::Chunk::ChunkKind;
           if (chunk.is(ChunkKind::TypeAnnotation) && chunk.hasText() &&
               chunk.getText() == "Void") {
-            builder.setNotRecommended(Completion::TypeMismatch);
+            builder.setExpectedTypeRelation(Completion::Invalid);
           }
         }
       }
@@ -158,7 +160,8 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     CodeCompletion::SwiftResult swiftResult(
         CodeCompletion::SwiftResult::ResultKind::Pattern,
         SemanticContextKind::ExpressionSpecific,
-        /*NumBytesToErase=*/0, completionString);
+        /*NumBytesToErase=*/0, completionString,
+        CodeCompletionResult::ExpectedTypeRelation::Unknown);
 
     CompletionBuilder builder(sink, swiftResult);
     builder.setCustomKind(customCompletion.Kind);
@@ -176,9 +179,9 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
       }
       break;
     case CompletionKind::PostfixExprBeginning:
-    case CompletionKind::AssignmentRHS:
     case CompletionKind::CallArg:
     case CompletionKind::ReturnStmtExpr:
+    case CompletionKind::YieldStmtExpr:
       if (custom.Contexts.contains(CustomCompletionInfo::Expr)) {
         changed = true;
         addCompletion(custom);
@@ -190,6 +193,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
         addCompletion(custom);
       }
       break;
+    case CompletionKind::TypeDeclResultBeginning:
     case CompletionKind::TypeSimpleBeginning:
       if (custom.Contexts.contains(CustomCompletionInfo::Type)) {
         changed = true;
@@ -211,13 +215,13 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
 class CodeCompletionOrganizer::Impl {
   std::unique_ptr<Group> rootGroup;
   CompletionKind completionKind;
-  bool completionHasExpectedTypes;
+  TypeContextKind typeContextKind;
 
   void groupStemsRecursive(Group *group, bool recurseIntoNewGroups,
                            StringRef(getStem)(StringRef));
 
 public:
-  Impl(CompletionKind kind, bool hasExpectedTypes);
+  Impl(CompletionKind kind, TypeContextKind typeContextKind);
 
   void addCompletionsWithFilter(ArrayRef<Completion *> completions,
                                 StringRef filterText, Options options,
@@ -274,8 +278,8 @@ public:
 
 CodeCompletionOrganizer::CodeCompletionOrganizer(const Options &options,
                                                  CompletionKind kind,
-                                                 bool hasExpectedTypes)
-    : impl(*new Impl(kind, hasExpectedTypes)), options(options) {}
+                                                 TypeContextKind typeContextKind)
+    : impl(*new Impl(kind, typeContextKind)), options(options) {}
 CodeCompletionOrganizer::~CodeCompletionOrganizer() { delete &impl; }
 
 void CodeCompletionOrganizer::preSortCompletions(
@@ -319,7 +323,8 @@ CodeCompletionViewRef CodeCompletionOrganizer::takeResultsView() {
 // ImportDepth
 //===----------------------------------------------------------------------===//
 
-ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
+ImportDepth::ImportDepth(ASTContext &context,
+                         const CompilerInvocation &invocation) {
   llvm::DenseSet<ModuleDecl *> seen;
   std::deque<std::pair<ModuleDecl *, uint8_t>> worklist;
 
@@ -332,18 +337,22 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
   // specially by applying import depth 0.
   llvm::StringSet<> auxImports;
   for (StringRef moduleName :
-       invocation.getFrontendOptions().ImplicitImportModuleNames)
+       invocation.getFrontendOptions().getImplicitImportModuleNames())
     auxImports.insert(moduleName);
 
   // Private imports from this module.
   // FIXME: only the private imports from the current source file.
+  ModuleDecl::ImportFilter importFilter;
+  importFilter |= ModuleDecl::ImportFilterKind::Private;
+  importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  // FIXME: ImportFilterKind::ShadowedBySeparateOverlay?
   SmallVector<ModuleDecl::ImportedModule, 16> mainImports;
-  main->getImportedModules(mainImports, ModuleDecl::ImportFilter::Private);
+  main->getImportedModules(mainImports, importFilter);
   for (auto &import : mainImports) {
     uint8_t depth = 1;
-    if (auxImports.count(import.second->getName().str()))
+    if (auxImports.count(import.importedModule->getName().str()))
       depth = 0;
-    worklist.emplace_back(import.second, depth);
+    worklist.emplace_back(import.importedModule, depth);
   }
 
   // Fill depths with BFS over module imports.
@@ -371,10 +380,11 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
       uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap
 
       // Implicitly imported sub-modules get the same depth as their parent.
-      if (const clang::Module *CMI = import.second->findUnderlyingClangModule())
+      if (const clang::Module *CMI =
+              import.importedModule->findUnderlyingClangModule())
         if (CM && CMI->isSubModuleOf(CM))
           next = depth;
-      worklist.emplace_back(import.second, next);
+      worklist.emplace_back(import.importedModule, next);
     }
   }
 }
@@ -390,16 +400,16 @@ static StringRef copyString(llvm::BumpPtrAllocator &allocator, StringRef str) {
 }
 
 static std::unique_ptr<Group> make_group(StringRef name) {
-  auto g = llvm::make_unique<Group>();
-  g->name = name;
-  g->description = name;
+  auto g = std::make_unique<Group>();
+  g->name = name.str();
+  g->description = name.str();
   return g;
 }
 
 static std::unique_ptr<Result> make_result(Completion *result) {
-  auto r = llvm::make_unique<Result>(result);
-  r->name = result->getName();
-  r->description = result->getDescription();
+  auto r = std::make_unique<Result>(result);
+  r->name = result->getName().str();
+  r->description = result->getDescription().str();
   return r;
 }
 
@@ -408,8 +418,8 @@ static std::unique_ptr<Result> make_result(Completion *result) {
 // CodeCompletionOrganizer::Impl implementation
 //===----------------------------------------------------------------------===//
 
-CodeCompletionOrganizer::Impl::Impl(CompletionKind kind, bool hasExpectedTypes)
-    : completionKind(kind), completionHasExpectedTypes(hasExpectedTypes) {
+CodeCompletionOrganizer::Impl::Impl(CompletionKind kind, TypeContextKind typeContextKind)
+    : completionKind(kind), typeContextKind(typeContextKind) {
   assert(!rootGroup && "initialized twice");
   rootGroup = make_group("");
 }
@@ -533,13 +543,16 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
   if (filterText.empty()) {
     bool hideLowPriority =
         options.hideLowPriority &&
+        completionKind != CompletionKind::TypeDeclResultBeginning &&
         completionKind != CompletionKind::TypeSimpleBeginning &&
         completionKind != CompletionKind::PostfixExpr;
     for (Completion *completion : completions) {
       if (rules.hideCompletion(completion))
         continue;
 
-      if (options.hideLowPriority && completion->isNotRecommended())
+      if (options.hideLowPriority &&
+          (completion->isNotRecommended() ||
+           completion->getExpectedTypeRelation() == Completion::Invalid))
         continue;
 
       NameStyle style(completion->getName());
@@ -568,7 +581,7 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
         if (completion->getExpectedTypeRelation() >= Completion::Convertible ||
             (completion->getKind() == Completion::Literal &&
              completionKind != CompletionKind::StmtOrExpr &&
-             !completionHasExpectedTypes))
+             typeContextKind < TypeContextKind::Required))
           break;
 
         if (completion->getKind() == Completion::Keyword &&
@@ -598,7 +611,7 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     // Hide literals other than the ones that are also keywords if they don't
     // match the expected types.
     if (completion->getKind() == Completion::Literal &&
-        completionHasExpectedTypes &&
+        typeContextKind == TypeContextKind::Required &&
         completion->getExpectedTypeRelation() < Completion::Convertible &&
         completion->getLiteralKind() !=
             CodeCompletionLiteralKind::BooleanLiteral &&
@@ -714,7 +727,7 @@ enum class ResultBucket {
 };
 } // end anonymous namespace
 
-static ResultBucket getResultBucket(Item &item, bool hasExpectedTypes,
+static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
                                     bool skipMetaGroups = false) {
   if (item.isExactMatch && !skipMetaGroups)
     return ResultBucket::ExactMatch;
@@ -734,14 +747,11 @@ static ResultBucket getResultBucket(Item &item, bool hasExpectedTypes,
   if (completion->isOperator())
     return ResultBucket::Operator;
 
-  bool matchesType =
-      completion->getExpectedTypeRelation() >= Completion::Convertible;
-
   switch (completion->getKind()) {
   case Completion::Literal:
-    if (matchesType) {
+    if (completion->getExpectedTypeRelation() >= Completion::Convertible) {
       return ResultBucket::LiteralTypeMatch;
-    } else if (!hasExpectedTypes) {
+    } else if (!hasRequiredTypes) {
       return ResultBucket::Literal;
     } else {
       // When we have type context, we still show literals that are keywords,
@@ -754,7 +764,19 @@ static ResultBucket getResultBucket(Item &item, bool hasExpectedTypes,
                : ResultBucket::Normal;
   case Completion::Pattern:
   case Completion::Declaration:
-    return matchesType ? ResultBucket::NormalTypeMatch : ResultBucket::Normal;
+    switch (completion->getExpectedTypeRelation()) {
+    case swift::ide::CodeCompletionResult::Convertible:
+    case swift::ide::CodeCompletionResult::Identical:
+      return ResultBucket::NormalTypeMatch;
+    case swift::ide::CodeCompletionResult::NotApplicable:
+    case swift::ide::CodeCompletionResult::Unknown:
+    case swift::ide::CodeCompletionResult::Unrelated:
+      return ResultBucket::Normal;
+    case swift::ide::CodeCompletionResult::Invalid:
+      if (!skipMetaGroups)
+        return ResultBucket::NotRecommended;
+      return ResultBucket::Normal;
+    }
   case Completion::BuiltinOperator:
     llvm_unreachable("operators should be handled above");
   }
@@ -811,7 +833,7 @@ static int compareLiterals(Item &a_, Item &b_) {
 
   // Sort true before false instead of alphabetically.
   if (cast<Result>(a_).value->getLiteralKind() == CodeCompletionLiteralKind::BooleanLiteral)
-    return a_.name > b_.name;
+    return b_.name.compare(a_.name);
 
   return 0;
 }
@@ -906,19 +928,19 @@ static bool isTopNonLiteralResult(Item &item, ResultBucket literalBucket) {
 }
 
 static void sortTopN(const Options &options, Group *group,
-                     bool hasExpectedTypes) {
+                     bool hasRequiredTypes) {
 
   auto &contents = group->contents;
   if (contents.empty() || options.showTopNonLiteralResults == 0)
     return;
 
-  auto best = getResultBucket(*contents[0], hasExpectedTypes);
+  auto best = getResultBucket(*contents[0], hasRequiredTypes);
   if (best == ResultBucket::LiteralTypeMatch || best == ResultBucket::Literal) {
 
     unsigned beginNewIndex = 0;
     unsigned endNewIndex = 0;
     for (unsigned i = 1; i < contents.size(); ++i) {
-      auto bucket = getResultBucket(*contents[i], hasExpectedTypes);
+      auto bucket = getResultBucket(*contents[i], hasRequiredTypes);
       if (bucket < best) {
         // This algorithm assumes we don't have both literal and
         // literal-type-match at the start of the list.
@@ -963,13 +985,13 @@ static void sortTopN(const Options &options, Group *group,
 }
 
 static void sortRecursive(const Options &options, Group *group,
-                          bool hasExpectedTypes) {
+                          bool hasRequiredTypes) {
   // Sort all of the subgroups first, and fill in the bucket for each result.
   auto &contents = group->contents;
   double best = -1.0;
   for (auto &item : contents) {
     if (auto *g = dyn_cast<Group>(item.get())) {
-      sortRecursive(options, g, hasExpectedTypes);
+      sortRecursive(options, g, hasRequiredTypes);
     } else {
       Result *r = cast<Result>(item.get());
       item->finalScore = combinedScore(options, item->matchScore, r->value);
@@ -995,8 +1017,8 @@ static void sortRecursive(const Options &options, Group *group,
     Item &a = *a_;
     Item &b = *b_;
 
-    auto bucketA = getResultBucket(a, hasExpectedTypes);
-    auto bucketB = getResultBucket(b, hasExpectedTypes);
+    auto bucketA = getResultBucket(a, hasRequiredTypes);
+    auto bucketB = getResultBucket(b, hasRequiredTypes);
     if (bucketA < bucketB)
       return false;
     else if (bucketB < bucketA)
@@ -1007,8 +1029,8 @@ static void sortRecursive(const Options &options, Group *group,
     if (bucketA == ResultBucket::ExactMatch ||
         bucketA == ResultBucket::ExpressionSpecific ||
         bucketA == ResultBucket::NotRecommended) {
-      bucketA = getResultBucket(a, hasExpectedTypes, /*skipMetaGroups*/ true);
-      bucketB = getResultBucket(b, hasExpectedTypes, /*skipMetaGroups*/ true);
+      bucketA = getResultBucket(a, hasRequiredTypes, /*skipMetaGroups*/ true);
+      bucketB = getResultBucket(b, hasRequiredTypes, /*skipMetaGroups*/ true);
       if (bucketA < bucketB)
         return false;
       else if (bucketB < bucketA)
@@ -1043,9 +1065,10 @@ static void sortRecursive(const Options &options, Group *group,
 }
 
 void CodeCompletionOrganizer::Impl::sort(Options options) {
-  sortRecursive(options, rootGroup.get(), completionHasExpectedTypes);
+  bool hasRequiredTypes = typeContextKind == TypeContextKind::Required;
+  sortRecursive(options, rootGroup.get(), hasRequiredTypes);
   if (options.showTopNonLiteralResults != 0)
-    sortTopN(options, rootGroup.get(), completionHasExpectedTypes);
+    sortTopN(options, rootGroup.get(), hasRequiredTypes);
 }
 
 void CodeCompletionOrganizer::Impl::groupStemsRecursive(
@@ -1191,7 +1214,9 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
 
   auto FirstTextChunk = str->getFirstTextChunkIndex();
   if (FirstTextChunk.hasValue()) {
-    for (auto C : str->getChunks().slice(*FirstTextChunk)) {
+    auto chunks = str->getChunks().slice(*FirstTextChunk);
+    for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
+      auto &C = *i;
 
       if (C.is(ChunkKind::BraceStmtWithCursor))
         break; // Don't include brace-stmt in filter name.
@@ -1206,13 +1231,26 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
       case ChunkKind::TypeAnnotation:
       case ChunkKind::CallParameterInternalName:
       case ChunkKind::CallParameterClosureType:
+      case ChunkKind::CallParameterClosureExpr:
       case ChunkKind::CallParameterType:
       case ChunkKind::DeclAttrParamColon:
       case ChunkKind::Comma:
       case ChunkKind::Whitespace:
       case ChunkKind::Ellipsis:
       case ChunkKind::Ampersand:
+      case ChunkKind::OptionalMethodCallTail:
         continue;
+      case ChunkKind::CallParameterTypeBegin: {
+        // Skip call parameter type type structure.
+        auto nestingLevel = C.getNestingLevel();
+        ++i;
+        for (; i != e; ++i) {
+          if (i->endsPreviousNestedGroup(nestingLevel))
+            break;
+        }
+        --i;
+        continue;
+      }
       case ChunkKind::CallParameterColon:
         // Since we don't add the type, also don't add the space after ':'.
         if (shouldPrint)
@@ -1228,41 +1266,9 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
   }
 }
 
-void CompletionBuilder::getDescription(SwiftResult *result, raw_ostream &OS,
-                                       bool leadingPunctuation) {
-  auto str = result->getCompletionString();
-  bool isOperator = result->isOperator();
-
-  auto FirstTextChunk = str->getFirstTextChunkIndex(leadingPunctuation);
-  int TextSize = 0;
-  if (FirstTextChunk.hasValue()) {
-    for (auto C : str->getChunks().slice(*FirstTextChunk)) {
-      using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
-
-      // FIXME: we need a more uniform way to handle operator completions.
-      if (C.is(ChunkKind::Equal))
-        isOperator = true;
-
-      if (C.is(ChunkKind::TypeAnnotation) ||
-          C.is(ChunkKind::CallParameterClosureType) ||
-          C.is(ChunkKind::Whitespace))
-        continue;
-      if (isOperator && C.is(ChunkKind::CallParameterType))
-        continue;
-      if (C.hasText()) {
-        TextSize += C.getText().size();
-        OS << C.getText();
-      }
-    }
-  }
-  assert((TextSize > 0) &&
-         "code completion result should have non-empty description!");
-}
-
 CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
     : sink(sink), current(base) {
-  isNotRecommended = current.isNotRecommended();
-  notRecommendedReason = current.getNotRecommendedReason();
+  typeRelation = current.getExpectedTypeRelation();
   semanticContext = current.getSemanticContext();
   completionString =
       const_cast<CodeCompletionString *>(current.getCompletionString());
@@ -1310,12 +1316,13 @@ Completion *CompletionBuilder::finish() {
       base = SwiftResult(
           semanticContext, current.getNumBytesToErase(), completionString,
           current.getAssociatedDeclKind(), current.getModuleName(),
-          isNotRecommended, notRecommendedReason, current.getBriefDocComment(),
-          current.getAssociatedUSRs(), current.getDeclKeywords(), opKind);
+          current.isNotRecommended(),  current.getNotRecommendedReason(),
+          current.getBriefDocComment(), current.getAssociatedUSRs(),
+          current.getDeclKeywords(), typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext,
                          current.getNumBytesToErase(), completionString,
-                         current.getExpectedTypeRelation(), opKind);
+                         typeRelation, opKind);
     }
 
     llvm::raw_svector_ostream OSS(nameStorage);
@@ -1326,7 +1333,8 @@ Completion *CompletionBuilder::finish() {
   llvm::SmallString<64> description;
   {
     llvm::raw_svector_ostream OSS(description);
-    getDescription(&base, OSS, /*leadingPunctuation*/ true);
+    ide::printCodeCompletionResultDescription(base, OSS,
+                                              /*leadingPunctuation=*/true);
   }
 
   auto *result = new (sink.allocator)

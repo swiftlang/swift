@@ -1,0 +1,8 @@
+REQUIRES: sftp_server
+
+RUN: %empty-directory(%t)
+RUN: %empty-directory(%t/REMOTE/input)
+RUN: chmod a-w %t/REMOTE/input
+RUN: %debug-remote-run --remote-dir %t/REMOTE --input-prefix %S/Inputs/upload/ true -- %S/Inputs/upload/1.txt 2>&1 | %FileCheck %s
+
+CHECK: Permission denied

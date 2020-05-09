@@ -1,0 +1,99 @@
+//===--- NameLookupTypeIDZone.def -------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This definition file describes the types in the name-lookup
+//  TypeID zone, for use with the TypeID template.
+//
+//===----------------------------------------------------------------------===//
+
+SWIFT_REQUEST(NameLookup, AnyObjectLookupRequest,
+              QualifiedLookupResult(const DeclContext *, DeclName, NLOptions),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest,
+              NominalTypeDecl *(CustomAttr *, DeclContext *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, DirectLookupRequest,
+              TinyPtrVector<ValueDecl *>(DirectLookupDescriptor), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, DirectOperatorLookupRequest,
+              TinyPtrVector<OperatorDecl *>(OperatorLookupDescriptor,
+                                            OperatorFixity),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, DirectPrecedenceGroupLookupRequest,
+              TinyPtrVector<PrecedenceGroupDecl *>(OperatorLookupDescriptor),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, ExpandASTScopeRequest,
+              ast_scope::ASTScopeImpl* (ast_scope::ASTScopeImpl*, ast_scope::ScopeCreator*),
+              SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, ExtendedNominalRequest,
+              NominalTypeDecl *(ExtensionDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, GenericParamListRequest,
+              GenericParamList *(GenericContext *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, GetDestructorRequest, DestructorDecl *(ClassDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
+              DirectlyReferencedTypeDecls(
+                  llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned),
+              Uncached, HasNearestLocation)
+SWIFT_REQUEST(NameLookup, InheritedProtocolsRequest,
+              ArrayRef<ProtocolDecl *>(ProtocolDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupConformanceInModuleRequest,
+              ProtocolConformanceRef(LookupConformanceDescriptor),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupInModuleRequest,
+              QualifiedLookupResult(const DeclContext *, DeclName, NLKind,
+                                    namelookup::ResolutionKind,
+                                    const DeclContext *),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, ModuleQualifiedLookupRequest,
+              QualifiedLookupResult(
+                  const DeclContext *, ModuleDecl *, DeclNameRef, NLOptions),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, QualifiedLookupRequest,
+              QualifiedLookupResult(
+                  const DeclContext *, SmallVector<NominalTypeDecl *, 4>,
+                  DeclNameRef, NLOptions),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest,
+              SelfBounds(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, SuperclassDeclRequest, ClassDecl *(NominalTypeDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, HasMissingDesignatedInitializersRequest,
+              bool(ClassDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest,
+              DirectlyReferencedTypeDecls(ExtensionDecl *), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest,
+              DirectlyReferencedTypeDecls(TypeAliasDecl *), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, UnqualifiedLookupRequest,
+              LookupResult(UnqualifiedLookupDescriptor), Uncached,
+              NoLocationInfo)
+
+SWIFT_REQUEST(NameLookup, LookupPrefixOperatorRequest,
+              PrefixOperatorDecl *(OperatorLookupDescriptor),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupInfixOperatorRequest,
+              InfixOperatorDecl *(OperatorLookupDescriptor),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupPostfixOperatorRequest,
+              PostfixOperatorDecl *(OperatorLookupDescriptor),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupPrecedenceGroupRequest,
+              PrecedenceGroupDecl *(OperatorLookupDescriptor),
+              Cached, NoLocationInfo)

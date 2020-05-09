@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: echo "public struct X {}; public var x = X()" | %target-swift-frontend -module-name import_builtin -parse-stdlib -emit-module -o %t -
 // RUN: echo "public func foo() -> Int { return false }" > %t/import_text.swift
-// RUN: echo "public func pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -enable-source-import -module-name main -verify -show-diagnostics-after-fatal -verify-ignore-unknown
+// RUN: echo "public func phoûx() -> Int { return false }" > %t/français.swift
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/../../Inputs/ -sdk "" -enable-source-import -module-name main -verify -show-diagnostics-after-fatal -verify-ignore-unknown
 
 // -verify-ignore-unknown is for:
 // <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?
@@ -68,3 +68,5 @@ import français
 import func français.phoûx
 
 import main // expected-warning {{file 'import.swift' is part of module 'main'; ignoring import}}
+
+@_exported @_implementationOnly import empty // expected-error {{module 'empty' cannot be both exported and implementation-only}} {{12-33=}}

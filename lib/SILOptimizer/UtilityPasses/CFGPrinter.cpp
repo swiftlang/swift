@@ -29,19 +29,37 @@ using namespace swift;
 //                                  Options
 //===----------------------------------------------------------------------===//
 
+llvm::cl::opt<std::string> SILViewCFGOnlyFun(
+    "sil-view-cfg-only-function", llvm::cl::init(""),
+    llvm::cl::desc("Only produce a graphviz file for this function"));
+
+llvm::cl::opt<std::string> SILViewCFGOnlyFuns(
+    "sil-view-cfg-only-functions", llvm::cl::init(""),
+    llvm::cl::desc("Only produce a graphviz file for the sil for the functions "
+                   "whose name contains this substring"));
+
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
 namespace {
+
 class SILCFGPrinter : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
 
+    // If we are not supposed to dump view this cfg, return.
+    if (!SILViewCFGOnlyFun.empty() && F && F->getName() != SILViewCFGOnlyFun)
+      return;
+    if (!SILViewCFGOnlyFuns.empty() && F &&
+        F->getName().find(SILViewCFGOnlyFuns, 0) == StringRef::npos)
+      return;
+
     F->viewCFG();
   }
 };
+
 } // end anonymous namespace
 
 SILTransform *swift::createCFGPrinter() {

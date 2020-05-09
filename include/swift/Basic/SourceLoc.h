@@ -17,7 +17,9 @@
 #ifndef SWIFT_BASIC_SOURCELOC_H
 #define SWIFT_BASIC_SOURCELOC_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
 #include <functional>
@@ -68,14 +70,23 @@ public:
   void print(raw_ostream &OS, const SourceManager &SM,
              unsigned &LastBufferID) const;
 
-  void printLineAndColumn(raw_ostream &OS, const SourceManager &SM) const;
+  void printLineAndColumn(raw_ostream &OS, const SourceManager &SM,
+                          unsigned BufferID = 0) const;
 
   void print(raw_ostream &OS, const SourceManager &SM) const {
     unsigned Tmp = ~0U;
     print(OS, SM, Tmp);
   }
 
-  void dump(const SourceManager &SM) const;
+  SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
+
+	friend size_t hash_value(SourceLoc loc) {
+		return reinterpret_cast<uintptr_t>(loc.getOpaquePointerValue());
+	}
+
+	friend void simple_display(raw_ostream &OS, const SourceLoc &loc) {
+		// Nothing meaningful to print.
+	}
 };
 
 /// SourceRange in swift is a pair of locations.  However, note that the end
@@ -96,6 +107,10 @@ public:
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return !isValid(); }
 
+  /// Extend this SourceRange to the smallest continuous SourceRange that
+  /// includes both this range and the other one.
+  void widen(SourceRange Other);
+
   bool operator==(const SourceRange &other) const {
     return Start == other.Start && End == other.End;
   }
@@ -114,7 +129,7 @@ public:
     print(OS, SM, Tmp, PrintText);
   }
 
-  void dump(const SourceManager &SM) const;
+  SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 };
 
 /// A half-open character-based source range.
@@ -123,13 +138,13 @@ class CharSourceRange {
   unsigned ByteLength;
 
 public:
-  /// \brief Constructs an invalid range.
-  CharSourceRange() {}
+  /// Constructs an invalid range.
+  CharSourceRange() = default;
 
   CharSourceRange(SourceLoc Start, unsigned ByteLength)
     : Start(Start), ByteLength(ByteLength) {}
 
-  /// \brief Constructs a character range which starts and ends at the
+  /// Constructs a character range which starts and ends at the
   /// specified character locations.
   CharSourceRange(const SourceManager &SM, SourceLoc Start, SourceLoc End);
 
@@ -163,7 +178,7 @@ public:
      less_equal(Other.getEnd().Value.getPointer(), getEnd().Value.getPointer());
   }
 
-  /// \brief expands *this to cover Other
+  /// expands *this to cover Other
   void widen(CharSourceRange Other) {
     auto Diff = Other.getEnd().Value.getPointer() - getEnd().Value.getPointer();
     if (Diff > 0) {
@@ -178,14 +193,15 @@ public:
   }
 
   bool overlaps(CharSourceRange Other) const {
-    return contains(Other.getStart()) || contains(Other.getEnd());
+    if (getByteLength() == 0 || Other.getByteLength() == 0) return false;
+    return contains(Other.getStart()) || Other.contains(getStart());
   }
 
   StringRef str() const {
     return StringRef(Start.Value.getPointer(), ByteLength);
   }
 
-  /// \brief Return the length of this valid range in bytes.  Can be zero.
+  /// Return the length of this valid range in bytes.  Can be zero.
   unsigned getByteLength() const {
     assert(isValid() && "length does not make sense for an invalid range");
     return ByteLength;
@@ -204,9 +220,61 @@ public:
     print(OS, SM, Tmp, PrintText);
   }
   
-  void dump(const SourceManager &SM) const;
+  SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 };
 
 } // end namespace swift
+
+namespace llvm {
+template <typename T> struct DenseMapInfo;
+
+template <> struct DenseMapInfo<swift::SourceLoc> {
+  static swift::SourceLoc getEmptyKey() {
+    return swift::SourceLoc(
+        SMLoc::getFromPointer(DenseMapInfo<const char *>::getEmptyKey()));
+  }
+
+  static swift::SourceLoc getTombstoneKey() {
+    // Make this different from empty key. See for context:
+    // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
+    return swift::SourceLoc(
+        SMLoc::getFromPointer(DenseMapInfo<const char *>::getTombstoneKey()));
+  }
+
+  static unsigned getHashValue(const swift::SourceLoc &Val) {
+    return DenseMapInfo<const void *>::getHashValue(
+        Val.getOpaquePointerValue());
+  }
+
+  static bool isEqual(const swift::SourceLoc &LHS,
+                      const swift::SourceLoc &RHS) {
+    return LHS == RHS;
+  }
+};
+
+template <> struct DenseMapInfo<swift::SourceRange> {
+  static swift::SourceRange getEmptyKey() {
+    return swift::SourceRange(swift::SourceLoc(
+        SMLoc::getFromPointer(DenseMapInfo<const char *>::getEmptyKey())));
+  }
+
+  static swift::SourceRange getTombstoneKey() {
+    // Make this different from empty key. See for context:
+    // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
+    return swift::SourceRange(swift::SourceLoc(
+        SMLoc::getFromPointer(DenseMapInfo<const char *>::getTombstoneKey())));
+  }
+
+  static unsigned getHashValue(const swift::SourceRange &Val) {
+    return hash_combine(Val.Start.getOpaquePointerValue(),
+                        Val.End.getOpaquePointerValue());
+  }
+
+  static bool isEqual(const swift::SourceRange &LHS,
+                      const swift::SourceRange &RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
 
 #endif // SWIFT_BASIC_SOURCELOC_H

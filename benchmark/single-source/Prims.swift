@@ -22,6 +22,12 @@
 // update the heap fast when we add a new node to the tree.
 import TestsUtils
 
+public let Prims = BenchmarkInfo(
+  name: "Prims",
+  runFunction: run_Prims,
+  tags: [.validation, .algorithm],
+  legacyFactor: 5)
+
 class PriorityQueue {
   final var heap: Array<EdgeCost>
   final var graphIndexToHeapIndexMap: Array<Int?>
@@ -176,10 +182,9 @@ func ==(lhs: Edge, rhs: Edge) -> Bool {
 }
 
 extension Edge : Hashable {
-  var hashValue: Int {
-    get {
-      return start.hashValue ^ end.hashValue
-    }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(start)
+    hasher.combine(end)
   }
 }
 
@@ -215,7 +220,7 @@ func Prims(_ graph : Array<GraphNode>, _ fun : (Int, Int) -> Double) -> Array<In
 
 @inline(never)
 public func run_Prims(_ N: Int) {
-  for _ in 1...5*N {
+  for _ in 1...N {
     let nodes : [Int] = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
       13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
       29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44,

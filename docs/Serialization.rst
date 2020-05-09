@@ -135,7 +135,7 @@ organizational purposes.
   of ``@_transparent``. The SIL block precedes the AST block because it affects
   which AST nodes get serialized.
 
-- The **SIL index black** contains tables for accessing various SIL entities by
+- The **SIL index block** contains tables for accessing various SIL entities by
   their names, along with a mapping of unique IDs for these to the appropriate
   bit offsets into the SIL block.
 

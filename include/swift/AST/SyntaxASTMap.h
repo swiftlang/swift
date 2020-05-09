@@ -18,15 +18,12 @@
 #define SWIFT_AST_SYNTAXASTMAP_H
 
 #include "swift/AST/ASTNode.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Syntax/Syntax.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 
 namespace swift {
-
-namespace syntax {
-  class LegacyASTTransformer;
-}
 
 /// The top-level container and manager for semantic analysis.
 ///
@@ -35,7 +32,6 @@ namespace syntax {
 /// a mapping from lib/AST nodes to lib/Syntax nodes while we integrate
 /// the infrastructure into the compiler.
 class SyntaxASTMap final {
-  friend class LegacyASTTransformer;
   llvm::DenseMap<RC<syntax::SyntaxData>, ASTNode> SyntaxMap;
 public:
 
@@ -54,7 +50,7 @@ public:
   void clearSyntaxMap();
 
   /// Dump the entire syntax node -> semantic node map for debugging purposes.
-  void dumpSyntaxMap() const;
+  SWIFT_DEBUG_DUMPER(dumpSyntaxMap());
 };
 
 } // end namespace swift

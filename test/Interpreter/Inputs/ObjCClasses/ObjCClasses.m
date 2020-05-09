@@ -170,3 +170,24 @@ static unsigned counter = 0;
 }
 
 @end
+
+@implementation OuterType
+
+- (id)init {
+  if ((self = [super init]) != nil) {
+  }
+  return self;
+}
+
+@end
+
+@implementation OuterTypeInnerType
+
+- (id)init {
+  if ((self = [super init]) != nil) {
+    self.things = [NSArray array];
+  }
+  return self;
+}
+
+@end

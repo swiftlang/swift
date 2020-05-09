@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief This file defines diagnostics for semantic analysis.
+/// This file defines diagnostics for semantic analysis.
 //
 //===----------------------------------------------------------------------===//
 
@@ -35,6 +35,8 @@ namespace swift {
   // Declare common diagnostics objects with their appropriate types.
 #define DIAG(KIND,ID,Options,Text,Signature) \
     extern detail::DiagWithArguments<void Signature>::type ID;
+#define FIXIT(ID,Text,Signature) \
+    extern detail::StructuredFixItWithArguments<void Signature>::type ID;
 #include "DiagnosticsSema.def"
   }
 }

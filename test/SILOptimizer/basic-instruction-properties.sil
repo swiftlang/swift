@@ -1,12 +1,12 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -basic-instruction-property-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -basic-instruction-property-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
 import Builtin
 
 class X {
-  @sil_stored var a: Builtin.Int32
-  @sil_stored var x: X
+  @_hasStorage var a: Builtin.Int32
+  @_hasStorage var x: X
 
   init()
   func foo()
@@ -63,7 +63,7 @@ bb0(%0 : $X):
   %5 = partial_apply %4(%0) : $@convention(thin) (@owned X, @owned X, @owned X) -> ()
   %6 = partial_apply %5(%0) : $@callee_owned @convention(thick) (@owned X, @owned X) -> ()
   %7 = partial_apply %6(%0) : $@callee_owned @convention(thick) (@owned X) -> ()
-  %8 = class_method %0 : $X, #X.foo!1 : (X) -> () -> (), $@convention(method) (@guaranteed X) -> ()
+  %8 = class_method %0 : $X, #X.foo : (X) -> () -> (), $@convention(method) (@guaranteed X) -> ()
   %9 = convert_function %6 : $@callee_owned @convention(thick) (@owned X) -> () to $@callee_owned @convention(thick) (@owned Y) -> ()
 
   apply %1(%0) : $@convention(thin) (@owned X) -> ()

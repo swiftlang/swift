@@ -11,22 +11,16 @@
 
 from __future__ import print_function
 
-import argparse
 import multiprocessing
 import os
 import shutil
 import sys
 
-from swift_build_support.swift_build_support import (
-    arguments,
-    shell
-)
+from build_swift.build_swift import argparse
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
-from swift_build_support.swift_build_support.SwiftBuildSupport import \
-    SWIFT_SOURCE_ROOT
-
-from swift_build_support.swift_build_support.targets import \
-    StdlibDeploymentTarget
+from swift_build_support.swift_build_support import shell
+from swift_build_support.swift_build_support.targets import StdlibDeploymentTarget
 
 
 TEST_MODES = [
@@ -42,14 +36,26 @@ TEST_SUBSETS = [
     'all',
     'only_validation',
     'only_long',
+    'only_stress',
 ]
 
 SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
 TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'test')
 VALIDATION_TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'validation-test')
 
-LIT_BIN_DEFAULT = os.path.join(SWIFT_SOURCE_ROOT, 'llvm',
+
+def _get_default_llvm_source_dir():
+    legacy_llvm_dir_path = os.path.join(SWIFT_SOURCE_ROOT, 'llvm')
+    if os.path.isdir(legacy_llvm_dir_path):
+        return legacy_llvm_dir_path
+    return os.path.join(SWIFT_SOURCE_ROOT, 'llvm-project', 'llvm')
+
+
+# Default path for "lit.py" executable.
+LIT_BIN_DEFAULT = os.path.join(os.environ.get("LLVM_SOURCE_DIR",
+                                              _get_default_llvm_source_dir()),
                                'utils', 'lit', 'lit.py')
+
 host_target = StdlibDeploymentTarget.host_target().name
 
 
@@ -59,9 +65,14 @@ def error_exit(msg):
 
 
 # Return true if the path looks like swift build directory.
-def is_swift_build_dir(path):
+def is_swift_build_dir(path, unified_build_dir):
+    if not unified_build_dir:
+        tests_path = [path, "test-%s" % host_target]
+    else:
+        tests_path = [path, "tools", "swift", "test-%s" % host_target]
+
     return (os.path.exists(os.path.join(path, "CMakeCache.txt")) and
-            os.path.isdir(os.path.join(path, "test-%s" % host_target)))
+            os.path.isdir(os.path.join(*tests_path)))
 
 
 # Return true if the swift build directory is configured with `Xcode`
@@ -82,14 +93,19 @@ def is_subpath(path, d):
 # Convert test path in source directory to corresponding path in build
 # directory. If the path is not sub path of test directories in source,
 # return the path as is.
-def normalize_test_path(path, build_dir, variant):
+def normalize_test_path(path, build_dir, variant, unified_build_dir):
+    if not unified_build_dir:
+        tests_path = [build_dir]
+    else:
+        tests_path = [build_dir, "tools", "swift"]
+
     for d, prefix in [(TEST_SOURCE_DIR, 'test-%s'),
                       (VALIDATION_TEST_SOURCE_DIR, 'validation-test-%s')]:
         if is_subpath(path, d):
-            return os.path.normpath(os.path.join(
-                build_dir,
-                prefix % variant,
-                os.path.relpath(path, d)))
+            return os.path.normpath(os.path.join(*(
+                tests_path +
+                [prefix % variant,
+                 os.path.relpath(path, d)])))
     return path
 
 
@@ -110,12 +126,18 @@ def main():
                         choices=["true", "verbose", "skip"], default='true',
                         help="build test dependencies before running tests "
                              "(default: true)")
+    parser.add_argument("--build-jobs",
+                        type=int,
+                        help="The number of parallel build jobs to use")
     parser.add_argument("--target",
-                        type=arguments.type.shell_split,
-                        action=arguments.action.concat,
+                        type=argparse.types.ShellSplitType(),
+                        action=argparse.actions.AppendAction,
                         dest="targets",
                         help="stdlib deployment targets to test. Accept "
                              "multiple (default: " + host_target + ")")
+    parser.add_argument("--filter", type=str, metavar="REGEX",
+                        help="only run tests with paths matching the given "
+                             "regular expression")
     parser.add_argument("--mode",
                         choices=TEST_MODES, default='optimize_none',
                         help="test mode (default: optimize_none)")
@@ -123,8 +145,8 @@ def main():
                         choices=TEST_SUBSETS, default='primary',
                         help="test subset (default: primary)")
     parser.add_argument("--param",
-                        type=arguments.type.shell_split,
-                        action=arguments.action.concat,
+                        type=argparse.types.ShellSplitType(),
+                        action=argparse.actions.AppendAction,
                         default=[],
                         help="key=value parameters they are directly passed "
                              "to lit command in addition to `mode` and "
@@ -134,11 +156,14 @@ def main():
     parser.add_argument("--lit", default=LIT_BIN_DEFAULT, metavar="PATH",
                         help="lit.py executable path "
                              "(default: ${LLVM_SOURCE_DIR}/utils/lit/lit.py)")
+    parser.add_argument("--unified", action="store_true",
+                        help="The build directory is an unified LLVM build, "
+                             "not a standalone Swift build")
 
     args = parser.parse_args()
 
     targets = args.targets
-    if targets is None:
+    if not targets:
         targets = [host_target]
 
     paths = []
@@ -152,7 +177,7 @@ def main():
         for d in [
                 build_dir,
                 os.path.join(build_dir, 'swift-%s' % host_target)]:
-            if is_swift_build_dir(d):
+            if is_swift_build_dir(d, args.unified):
                 build_dir = d
                 break
         else:
@@ -165,9 +190,8 @@ def main():
         # $ run-test --build-dir=<swift-build-dir> <test-dir-in-source> ... \
         #       --target macosx-x86_64 --target iphonesimulator-i386
         for target in targets:
-            paths += map(
-                lambda p: normalize_test_path(p, build_dir, target),
-                args.paths)
+            paths += [normalize_test_path(p, build_dir, target, args.unified)
+                      for p in args.paths]
 
     else:
         # Otherwise, we assume all given paths are valid test paths in the
@@ -182,7 +206,7 @@ def main():
             # Traverse the first test path to find the `build_dir`
             d = os.path.dirname(paths[0])
             while d not in ['', os.sep]:
-                if is_swift_build_dir(d):
+                if is_swift_build_dir(d, args.unified):
                     build_dir = d
                     break
                 d = os.path.dirname(d)
@@ -201,7 +225,8 @@ def main():
         upload_stdlib_targets = []
         need_validation = any('/validation-test-' in path for path in paths)
         for target in targets:
-            upload_stdlib_targets += ["upload-stdlib-%s" % target]
+            if args.mode != 'only_non_executable':
+                upload_stdlib_targets += ["upload-stdlib-%s" % target]
             if need_validation:
                 dependency_targets += ["swift-stdlib-%s" % target]
             else:
@@ -210,7 +235,11 @@ def main():
         cmake_build = ['cmake', '--build', build_dir, '--']
         if args.build == 'verbose':
             cmake_build += ['-v']
-        cmake_build += ['-j%d' % multiprocessing.cpu_count()]
+
+        if args.build_jobs is not None:
+            cmake_build += ['-j%d' % args.build_jobs]
+        else:
+            cmake_build += ['-j%d' % multiprocessing.cpu_count()]
 
         print("--- Building test dependencies %s ---" %
               ', '.join(dependency_targets))
@@ -242,6 +271,9 @@ def main():
         test_args += ['--param', 'swift_test_results_dir=%s' % args.result_dir,
                       '--xunit-xml-output=%s' % os.path.join(args.result_dir,
                                                              'lit-tests.xml')]
+
+    if args.filter:
+        test_args += ['--filter', args.filter]
 
     test_cmd = [sys.executable, args.lit] + test_args + paths
 

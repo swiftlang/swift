@@ -1,0 +1,21 @@
+@propertyWrapper
+struct Wrapper<T> {
+    var wrappedValue: T
+    /*split:def*/<keywordBase>init</keywordBase>(<arglabel index=0>initialValue</arglabel><param index=0></param>: T, <arglabel index=1>fieldName</arglabel><param index=1></param>: String, <arglabel index=2>special</arglabel><param index=2></param>: Bool = false) {
+        wrappedValue = initialValue
+    }
+}
+let /*someValue:def*/someValue = "some"
+struct User {
+    @/*split:call*/Wrapper(<callarg index=1>fieldName</callarg><callcolon index=1>: </callcolon>"bar")
+    var bar = 10
+
+    @/*split:call*/Wrapper(<callarg index=1>fieldName</callarg><callcolon index=1>: </callcolon>{
+        return /*someValue*/someValue
+    }(), <callarg index=2>special</callarg><callcolon index=2>: </callcolon>true)
+    var complex: Int = {
+        return /*someValue*/someValue.starts(with: "b") ? 43 : 0
+    }()
+}
+
+

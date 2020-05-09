@@ -13,11 +13,11 @@ class CIFilter {
 }
 
 class MyClass {
-  // CHECK: define hidden {{.*}} %T7iuo_arg7UIImageC* @_T07iuo_arg7MyClassC11filterImageAA7UIImageCSQyAFG_SbtF
+  // CHECK: define hidden {{.*}} %T7iuo_arg7UIImageC* @"$s7iuo_arg7MyClassC11filterImageyAA7UIImageCAFSg_SbtF"
   func filterImage(_ image: UIImage!, _ doSomething:Bool) -> UIImage
 	{
     // Test that image is in an alloca, but not an indirect location.
-    // CHECK: call void @llvm.dbg.declare(metadata {{(i32|i64)}}* %[[ALLOCA:.*]], metadata ![[IMAGE:.*]], metadata !{{[0-9]+}})
+    // CHECK: call void @llvm.dbg.declare(metadata {{(i32|i64)}}* %[[ALLOCA:.*]], metadata ![[IMAGE:.*]], metadata !DIExpression())
     // CHECK: store {{(i32|i64)}} %0, {{(i32|i64)}}* %[[ALLOCA]], align
     // CHECK: ![[IMAGE]] = !DILocalVariable(name: "image", arg: 1
     // CHECK-NOT:                           flags:

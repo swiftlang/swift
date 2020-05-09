@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg -sil-combine -simplify-cfg -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg -sil-combine -jumpthread-simplify-cfg -sil-combine | %FileCheck %s
 
 // These require both SimplifyCFG and SILCombine
 
@@ -22,15 +22,15 @@ sil @select_enum_dominance_simplification : $@convention(thin) (Optional<Int32>)
 bb0(%0 : $Optional<Int32>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
-  %1 = select_enum %0 : $Optional<Int32>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  %1 = select_enum %0 : $Optional<Int32>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
   cond_br %1, bb1, bb2
 
 bb1:
-  %2 = select_enum %0 : $Optional<Int32>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  %2 = select_enum %0 : $Optional<Int32>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
   cond_br %2, bb3, bb4
 
 bb2:
-  %3 = select_enum %0 : $Optional<Int32>, case #Optional.some!enumelt.1: %f, case #Optional.none!enumelt: %t : $Builtin.Int1
+  %3 = select_enum %0 : $Optional<Int32>, case #Optional.some!enumelt: %f, case #Optional.none!enumelt: %t : $Builtin.Int1
   cond_br %3, bb5, bb6
 
 bb3:
@@ -67,10 +67,10 @@ sil @switch_enum_dominates_select_enum : $@convention(thin) (Optional<Int32>) ->
 bb0(%0 : $Optional<Int32>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
-  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt.1: bb1
+  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt: bb1
 
 bb1:
-  %c = select_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: %f, case #Optional.some!enumelt.1: %t : $Builtin.Int1
+  %c = select_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: %f, case #Optional.some!enumelt: %t : $Builtin.Int1
   cond_br %c, bb2, bb3
 
 bb2:
@@ -96,16 +96,16 @@ bb5:
 // CHECK-LABEL: sil @switch_enum_dominates_select_enum2 : $@convention(thin) (Optional<Int32>) -> Builtin.Int32 {
 // CHECK-DAG: [[L2:%[0-9]+]] = integer_literal {{.*}}, 2
 // CHECK-DAG: [[L1:%[0-9]+]] = integer_literal {{.*}}, 1
-// CHECK: [[R:%[0-9]+]] = select_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: [[L2]], case #Optional.some!enumelt.1: [[L1]]
+// CHECK: [[R:%[0-9]+]] = select_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: [[L2]], case #Optional.some!enumelt: [[L1]]
 // CHECK-NEXT: return [[R]]
 sil @switch_enum_dominates_select_enum2 : $@convention(thin) (Optional<Int32>) -> Builtin.Int32 {
 bb0(%0 : $Optional<Int32>):
   %i1 = integer_literal $Builtin.Int32, 1
   %i0 = integer_literal $Builtin.Int32, 0
-  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb2, case #Optional.some!enumelt.1: bb1
+  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb2, case #Optional.some!enumelt: bb1
 
 bb1:
-  %c = select_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: %i0, case #Optional.some!enumelt.1: %i1 : $Builtin.Int32
+  %c = select_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: %i0, case #Optional.some!enumelt: %i1 : $Builtin.Int32
   br bb3(%c : $Builtin.Int32)
 
 bb2:
@@ -160,7 +160,7 @@ bb2:                                              // Preds: bb1
 bb3(%17 : $Builtin.Int32, %18 : $Optional<Int32>):   // Preds: bb2 bb4
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
-  %19 = select_enum %18 : $Optional<Int32>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  %19 = select_enum %18 : $Optional<Int32>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
   cond_br %19, bb5, bb8                           // id: %20
 
 bb4:                                              // Preds: bb1
@@ -169,14 +169,14 @@ bb4:                                              // Preds: bb1
   %24 = builtin "sadd_with_overflow_Int32"(%11 : $Builtin.Int32, %21 : $Builtin.Int32, %23 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %25
   %25 = tuple_extract %24 : $(Builtin.Int32, Builtin.Int1), 0 // user: %28
   %26 = struct $Int32 (%11 : $Builtin.Int32)      // user: %27
-  %27 = enum $Optional<Int32>, #Optional.some!enumelt.1, %26 : $Int32 // user: %28
+  %27 = enum $Optional<Int32>, #Optional.some!enumelt, %26 : $Int32 // user: %28
   br bb3(%25 : $Builtin.Int32, %27 : $Optional<Int32>) // id: %28
 
 bb5:                                              // Preds: bb3
-  switch_enum %18 : $Optional<Int32>, case #Optional.some!enumelt.1: bb6, case #Optional.none!enumelt: bb7 // id: %29
+  switch_enum %18 : $Optional<Int32>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb7 // id: %29
 
 bb6:                                              // Preds: bb5
-  %30 = unchecked_enum_data %18 : $Optional<Int32>, #Optional.some!enumelt.1 // user: %31
+  %30 = unchecked_enum_data %18 : $Optional<Int32>, #Optional.some!enumelt // user: %31
   %31 = struct_extract %30 : $Int32, #Int32._value // user: %34
   %33 = integer_literal $Builtin.Int1, 0          // user: %34
   %34 = builtin "smul_with_overflow_Int32"(%10 : $Builtin.Int32, %31 : $Builtin.Int32, %33 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %35
@@ -220,7 +220,7 @@ bb2:                                              // Preds: bb1
 bb3(%17 : $Builtin.Int32, %18 : $Optional<Int32>):   // Preds: bb2 bb4
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
-  %19 = select_enum %18 : $Optional<Int32>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  %19 = select_enum %18 : $Optional<Int32>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
   cond_br %19, bb8, bb5                           // id: %20
 
 bb4:                                              // Preds: bb1
@@ -229,14 +229,14 @@ bb4:                                              // Preds: bb1
   %24 = builtin "sadd_with_overflow_Int32"(%11 : $Builtin.Int32, %21 : $Builtin.Int32, %23 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %25
   %25 = tuple_extract %24 : $(Builtin.Int32, Builtin.Int1), 0 // user: %28
   %26 = struct $Int32 (%11 : $Builtin.Int32)         // user: %27
-  %27 = enum $Optional<Int32>, #Optional.some!enumelt.1, %26 : $Int32 // user: %28
+  %27 = enum $Optional<Int32>, #Optional.some!enumelt, %26 : $Int32 // user: %28
   br bb3(%25 : $Builtin.Int32, %27 : $Optional<Int32>) // id: %28
 
 bb5:                                              // Preds: bb3
-  switch_enum %18 : $Optional<Int32>, case #Optional.some!enumelt.1: bb6, case #Optional.none!enumelt: bb7 // id: %29
+  switch_enum %18 : $Optional<Int32>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb7 // id: %29
 
 bb6:                                              // Preds: bb5
-  %30 = unchecked_enum_data %18 : $Optional<Int32>, #Optional.some!enumelt.1 // user: %31
+  %30 = unchecked_enum_data %18 : $Optional<Int32>, #Optional.some!enumelt // user: %31
   %31 = struct_extract %30 : $Int32, #Int32._value     // user: %34
   %33 = integer_literal $Builtin.Int1, 0          // user: %34
   %34 = builtin "smul_with_overflow_Int32"(%10 : $Builtin.Int32, %31 : $Builtin.Int32, %33 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %35
@@ -256,18 +256,18 @@ bb8:                                              // Preds: bb3
 // CHECK:      bb0(%0 : $Optional<Builtin.Int32>):
 // CHECK-NEXT:   %1 = integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:   %2 = integer_literal $Builtin.Int32, 3
-// CHECK-NEXT:   %3 = select_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: %1, case #Optional.some!enumelt.1: %2
+// CHECK-NEXT:   %3 = select_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: %1, case #Optional.some!enumelt: %2
 // CHECK-NEXT:   return %3
 sil @switch_enum_dominates_switch_enum_noarg : $@convention(thin) (Optional<Builtin.Int32>) -> Builtin.Int32 {
 bb0(%0 : $Optional<Builtin.Int32>):
-  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 
 bb1:
   %i1 = integer_literal $Builtin.Int32, 1
   br bb5(%i1 : $Builtin.Int32)
 
 bb2:
-  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb3, case #Optional.some!enumelt.1: bb4
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb3, case #Optional.some!enumelt: bb4
 
 bb3:
   %i2 = integer_literal $Builtin.Int32, 2

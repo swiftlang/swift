@@ -11,16 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "use-prespecialized"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILModule.h"
-#include "llvm/Support/Debug.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -55,6 +55,8 @@ class UsePrespecialized: public SILModuleTransform {
   bool replaceByPrespecialized(SILFunction &F);
 };
 
+} // end anonymous namespace
+
 // Analyze the function and replace each apply of
 // a generic function by an apply of the corresponding
 // pre-specialized function, if such a pre-specialization exists.
@@ -66,29 +68,30 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
   collectApplyInst(F, NewApplies);
 
   for (auto &AI : NewApplies) {
-    auto *ReferencedF = AI.getReferencedFunction();
+    auto *ReferencedF = AI.getReferencedFunctionOrNull();
     if (!ReferencedF)
       continue;
 
-    DEBUG(llvm::dbgs() << "Trying to use specialized function for:\n";
-          AI.getInstruction()->dumpInContext());
+    LLVM_DEBUG(llvm::dbgs() << "Trying to use specialized function for:\n";
+               AI.getInstruction()->dumpInContext());
 
     // Check if it is a call of a generic function.
     // If this is the case, check if there is a specialization
     // available for it already and use this specialization
     // instead of the generic version.
-
-    SubstitutionList Subs = AI.getSubstitutions();
-    if (Subs.empty())
+    if (!AI.hasSubstitutions())
       continue;
+
+    SubstitutionMap Subs = AI.getSubstitutionMap();
 
     // Bail if any generic type parameters are unbound.
     // TODO: Remove this limitation once public partial specializations
     // are supported and can be provided by other modules.
-    if (hasArchetypes(Subs))
+    if (Subs.hasArchetypes())
       continue;
 
-    ReabstractionInfo ReInfo(AI, ReferencedF, Subs);
+    ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), AI,
+                             ReferencedF, Subs, IsNotSerialized);
 
     if (!ReInfo.canBeSpecialized())
       continue;
@@ -99,9 +102,10 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (SpecType->hasArchetype())
       continue;
 
-    // Create a name of the specialization.
+    // Create a name of the specialization. All external pre-specializations
+    // are serialized without bodies. Thus use IsNotSerialized here.
     Mangle::GenericSpecializationMangler NewGenericMangler(ReferencedF,
-                                              Subs, ReferencedF->isSerialized(),
+                                              Subs, IsNotSerialized,
                                               /*isReAbstracted*/ true);
     std::string ClonedName = NewGenericMangler.mangle();
       
@@ -109,12 +113,13 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // If we already have this specialization, reuse it.
     auto PrevF = M.lookUpFunction(ClonedName);
     if (PrevF) {
-      DEBUG(llvm::dbgs() << "Found a specialization: " << ClonedName << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Found a specialization: " << ClonedName
+                              << "\n");
       if (PrevF->getLinkage() != SILLinkage::SharedExternal)
         NewF = PrevF;
       else {
-        DEBUG(llvm::dbgs() << "Wrong linkage: " << (int)PrevF->getLinkage()
-                           << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "Wrong linkage: " << (int)PrevF->getLinkage()
+                                << "\n");
       }
     }
 
@@ -122,9 +127,9 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       // Check for the existence of this function in another module without
       // loading the function body.
       PrevF = lookupPrespecializedSymbol(M, ClonedName);
-      DEBUG(llvm::dbgs()
-            << "Checked if there is a specialization in a different module: "
-            << PrevF << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Checked if there is a specialization in a "
+                                 "different module: "
+                              << PrevF << "\n");
       if (!PrevF)
         continue;
       assert(PrevF->isExternalDeclaration() &&
@@ -136,19 +141,29 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       continue;
 
     // An existing specialization was found.
-    DEBUG(llvm::dbgs() << "Found a specialization of " << ReferencedF->getName()
-                       << " : " << NewF->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Found a specialization of "
+                            << ReferencedF->getName()
+                            << " : " << NewF->getName() << "\n");
 
     auto NewAI = replaceWithSpecializedFunction(AI, NewF, ReInfo);
-    AI.getInstruction()->replaceAllUsesWith(NewAI.getInstruction());
+    switch (AI.getKind()) {
+    case ApplySiteKind::ApplyInst:
+      cast<ApplyInst>(AI)->replaceAllUsesWith(cast<ApplyInst>(NewAI));
+      break;
+    case ApplySiteKind::PartialApplyInst:
+      cast<PartialApplyInst>(AI)->replaceAllUsesWith(
+          cast<PartialApplyInst>(NewAI));
+      break;
+    case ApplySiteKind::TryApplyInst:
+    case ApplySiteKind::BeginApplyInst:
+      break;
+    }
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
     Changed = true;
   }
 
   return Changed;
 }
-
-} // end anonymous namespace
 
 
 SILTransform *swift::createUsePrespecialized() {

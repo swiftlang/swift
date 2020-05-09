@@ -2,14 +2,13 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
-// UNSUPPORTED: CPU=armv7
 
 // rdar://problem/19060227
 
 import Foundation
 
 class ObservedValue: NSObject {
-	dynamic var amount = 0
+	@objc dynamic var amount = 0
 }
 
 class ValueObserver: NSObject {

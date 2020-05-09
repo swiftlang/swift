@@ -14,46 +14,46 @@ func testVariableTypes(_ param: Int, param2: inout Double) {
 
   var a1 = 42
 // CHECK: VarDecl '''a1''' Int{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int{{$}}
 // FULL:  VarDecl '''a1''' Swift.Int{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Swift.Int{{$}}
   a1 = 17; _ = a1
 
   
   var a2 : Int = 42
 // CHECK: VarDecl '''a2''' Int{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int{{$}}
 // FULL:  VarDecl '''a2''' Swift.Int{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Swift.Int{{$}}
   a2 = 17; _ = a2
 
   var a3 = Int16(42)
 // CHECK: VarDecl '''a3''' Int16{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int16{{$}}
 // FULL:  VarDecl '''a3''' Swift.Int16{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Swift.Int16{{$}}
   a3 = 17; _ = a3
 
 
   var a4 = Int32(42)
 // CHECK: VarDecl '''a4''' Int32{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int32{{$}}
 // FULL:  VarDecl '''a4''' Swift.Int32{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Swift.Int32{{$}}
   a4 = 17; _ = a4
 
   var a5 : Int64 = 42
 // CHECK: VarDecl '''a5''' Int64{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int64{{$}}
 // FULL:  VarDecl '''a5''' Swift.Int64{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Swift.Int64{{$}}
   a5 = 17; _ = a5
 
   var typealias1 : MyInt = 42
 // CHECK: VarDecl '''typealias1''' MyInt{{$}}
-// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
+// CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int{{$}}
 // FULL:  VarDecl '''typealias1''' swift_ide_test.MyInt{{$}}
-// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+// FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Swift.Int{{$}}
   _ = typealias1 ; typealias1 = 1
 
   var optional1 = Optional<Int>.none
@@ -111,7 +111,7 @@ struct GenericStruct<A, B : FooProtocol> {}
 
 func testInGenericFunc1<A, B : FooProtocol, C : FooProtocol & BarProtocol>(_ a: A, b: B, c: C) {
 // CHECK: FuncDecl '''testInGenericFunc1''' <A, B, C where B : FooProtocol, C : BarProtocol, C : FooProtocol> (A, b: B, c: C) -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc1''' <A, B, C where B : FooProtocol, C : BarProtocol, C : FooProtocol> (A, b: B, c: C) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc1''' <A, B, C where B : swift_ide_test.FooProtocol, C : swift_ide_test.BarProtocol, C : swift_ide_test.FooProtocol> (A, b: B, c: C) -> (){{$}}
 
   var a1 = a
   _ = a1; a1 = a
@@ -136,5 +136,5 @@ func testInGenericFunc1<A, B : FooProtocol, C : FooProtocol & BarProtocol>(_ a: 
 
 func testInGenericFunc2<T : QuxProtocol, U : QuxProtocol>(_: T, _: U) where T.Qux == U.Qux {}
 // CHECK: FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : swift_ide_test.QuxProtocol, U : swift_ide_test.QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
 

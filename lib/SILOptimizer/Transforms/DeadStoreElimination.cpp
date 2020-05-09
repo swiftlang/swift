@@ -60,16 +60,17 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/MemoryLifetime.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -147,14 +148,21 @@ static inline bool isPerformingDSE(DSEKind Kind) {
 /// general sense but are inert from a load store perspective.
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
-  case ValueKind::StrongRetainInst:
-  case ValueKind::StrongRetainUnownedInst:
-  case ValueKind::UnownedRetainInst:
-  case ValueKind::RetainValueInst:
-  case ValueKind::DeallocStackInst:
-  case ValueKind::DeallocRefInst:
-  case ValueKind::CondFailInst:
-  case ValueKind::FixLifetimeInst:
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#include "swift/AST/ReferenceStorage.def"
+  case SILInstructionKind::StrongRetainInst:
+  case SILInstructionKind::RetainValueInst:
+  case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocRefInst:
+  case SILInstructionKind::CondFailInst:
+  case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::EndAccessInst:
+  case SILInstructionKind::SetDeallocatingInst:
     return true;
   default:
     return false;
@@ -215,40 +223,40 @@ public:
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
   /// upward visible store at the end of the basic block.
-  llvm::SmallBitVector BBWriteSetOut;
+  SmallBitVector BBWriteSetOut;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
   /// upward visible store in middle of the basic block.
-  llvm::SmallBitVector BBWriteSetMid;
+  SmallBitVector BBWriteSetMid;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If a bit in the vector is set, then the location has an
   /// upward visible store at the beginning of the basic block.
-  llvm::SmallBitVector BBWriteSetIn;
+  SmallBitVector BBWriteSetIn;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the current basic block
   /// generates an upward visible store.
-  llvm::SmallBitVector BBGenSet;
+  SmallBitVector BBGenSet;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the current basic block
   /// kills an upward visible store.
-  llvm::SmallBitVector BBKillSet;
+  SmallBitVector BBKillSet;
 
   /// A bit vector to keep the maximum number of stores that can reach a 
   /// certain point of the basic block. If a bit is set, that means there is
   /// potentially an upward visible store to the location at the particular
   /// point of the basic block.
-  llvm::SmallBitVector BBMaxStoreSet;
+  SmallBitVector BBMaxStoreSet;
 
   /// If a bit in the vector is set, then the location is dead at the end of
   /// this basic block. 
-  llvm::SmallBitVector BBDeallocateLocation;
+  SmallBitVector BBDeallocateLocation;
 
   /// The dead stores in the current basic block.
-  llvm::DenseSet<SILInstruction *> DeadStores;
+  llvm::SmallVector<SILInstruction *, 2> DeadStores;
 
   /// Keeps track of what stores to generate after the data flow stabilizes.
   /// these stores come from partial dead stores.
@@ -264,17 +272,19 @@ public:
     init(LocationNum, Optimistic);
   }
 
+  void dump();
+
   /// Initialize the bitvectors for the current basic block.
   void init(unsigned LocationNum, bool Optimistic);
 
   /// Check whether the BBWriteSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
-  bool updateBBWriteSetIn(llvm::SmallBitVector &X);
+  bool updateBBWriteSetIn(SmallBitVector &X);
 
   /// Functions to manipulate the write set.
-  void startTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
-  void stopTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
-  bool isTrackingLocation(llvm::SmallBitVector &BV, unsigned bit);
+  void startTrackingLocation(SmallBitVector &BV, unsigned bit);
+  void stopTrackingLocation(SmallBitVector &BV, unsigned bit);
+  bool isTrackingLocation(SmallBitVector &BV, unsigned bit);
 
   /// Set the store bit for stack slot deallocated in this basic block. 
   void initStoreSetAtEndOfBlock(DSEContext &Ctx);
@@ -282,22 +292,22 @@ public:
 
 } // end anonymous namespace
 
-bool BlockState::updateBBWriteSetIn(llvm::SmallBitVector &X) {
+bool BlockState::updateBBWriteSetIn(SmallBitVector &X) {
   if (BBWriteSetIn == X)
     return false;
   BBWriteSetIn = X;
   return true;
 }
 
-void BlockState::startTrackingLocation(llvm::SmallBitVector &BV, unsigned i) {
+void BlockState::startTrackingLocation(SmallBitVector &BV, unsigned i) {
   BV.set(i);
 }
 
-void BlockState::stopTrackingLocation(llvm::SmallBitVector &BV, unsigned i) {
+void BlockState::stopTrackingLocation(SmallBitVector &BV, unsigned i) {
   BV.reset(i);
 }
 
-bool BlockState::isTrackingLocation(llvm::SmallBitVector &BV, unsigned i) {
+bool BlockState::isTrackingLocation(SmallBitVector &BV, unsigned i) {
   return BV.test(i);
 }
 
@@ -443,6 +453,8 @@ public:
              llvm::SpecificBumpPtrAllocator<BlockState> &BPA) 
     : Mod(M), F(F), PM(PM), AA(AA), TE(TE), EAFI(EAFI), BPA(BPA) {}
 
+  void dump();
+
   /// Entry point for dead store elimination.
   bool run();
 
@@ -476,6 +488,12 @@ public:
 
 } // end anonymous namespace
 
+void BlockState::dump() {
+  llvm::dbgs() << "  block " << BB->getDebugID() << ": in=" << BBWriteSetIn
+               << ", out=" << BBWriteSetOut << ", mid=" << BBWriteSetMid
+               << ", gen=" << BBGenSet << ", kill=" << BBKillSet << '\n';
+}
+
 void BlockState::init(unsigned LocationNum, bool Optimistic) {
   // For function that requires just 1 iteration of the data flow to converge
   // we set the initial state of BBWriteSetIn to 0.
@@ -506,6 +524,21 @@ void BlockState::init(unsigned LocationNum, bool Optimistic) {
 
   // DeallocateLocation initially empty.
   BBDeallocateLocation.resize(LocationNum, false);
+}
+
+#if __has_attribute(used)
+__attribute((used))
+#endif
+void DSEContext::dump() {
+  llvm::dbgs() << "Locations:\n";
+  unsigned idx = 0;
+  for (const LSLocation &loc : LocationVault) {
+    llvm::dbgs() << "  #" << idx << ": " << loc.getBase();
+    ++idx;
+  }
+  for (SILBasicBlock &BB : *F) {
+    getBlockState(&BB)->dump();
+  }
 }
 
 unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
@@ -686,6 +719,10 @@ void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
   // dead for block with no successor.
   BlockState *C = getBlockState(BB);
   if (BB->succ_empty()) {
+    if (isa<UnreachableInst>(BB->getTerminator())) {
+      C->BBWriteSetOut.set();
+      return;
+    }
     C->BBWriteSetOut |= C->BBDeallocateLocation;
     return;
   }
@@ -820,7 +857,8 @@ void DSEContext::processRead(SILInstruction *I, SILValue Mem, DSEKind Kind) {
   // Expand the given Mem into individual fields and process them as separate
   // reads.
   LSLocationList Locs;
-  LSLocation::expand(L, &I->getModule(), Locs, TE);
+  LSLocation::expand(L, &I->getModule(),
+                     TypeExpansionContext(*I->getFunction()), Locs, TE);
 
   // Are we building the genset and killset.
   if (isBuildingGenKillSet(Kind)) {
@@ -905,8 +943,8 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
   // writes.
   bool Dead = true;
   LSLocationList Locs;
-  LSLocation::expand(L, Mod, Locs, TE);
-  llvm::SmallBitVector V(Locs.size());
+  LSLocation::expand(L, Mod, TypeExpansionContext(*I->getFunction()), Locs, TE);
+  SmallBitVector V(Locs.size());
 
   // Are we computing max store set.
   if (isComputeMaxStoreSet(Kind)) {
@@ -942,8 +980,8 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
   // Fully dead store - stores to all the components are dead, therefore this
   // instruction is dead.
   if (Dead) {
-    DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
-    S->DeadStores.insert(I);
+    LLVM_DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
+    S->DeadStores.push_back(I);
     ++NumDeadStores;
     return;
   }
@@ -951,18 +989,18 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
   // Partial dead store - stores to some locations are dead, but not all. This
   // is a partially dead store. Also at this point we know what locations are
   // dead.
-  llvm::DenseSet<LSLocation> Alives;
+  LSLocationList Alives;
   if (V.any()) {
     // Take out locations that are dead.
     for (unsigned i = 0; i < V.size(); ++i) {
       if (V.test(i))
         continue;
       // This location is alive.
-      Alives.insert(Locs[i]);
+      Alives.push_back(Locs[i]);
     }
 
     // Try to create as few aggregated stores as possible out of the locations.
-    LSLocation::reduce(L, Mod, Alives);
+    LSLocation::reduce(L, Mod, TypeExpansionContext(*I->getFunction()), Alives);
 
     // Oops, we have too many smaller stores generated, bail out.
     if (Alives.size() > MaxPartialStoreCount)
@@ -990,8 +1028,8 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
     }
 
     // Lastly, mark the old store as dead.
-    DEBUG(llvm::dbgs() << "Instruction Partially Dead: " << *I << "\n");
-    S->DeadStores.insert(I);
+    LLVM_DEBUG(llvm::dbgs() << "Instruction Partially Dead: " << *I << "\n");
+    S->DeadStores.push_back(I);
     ++NumPartialDeadStores;
   }
 }
@@ -1109,7 +1147,8 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
   }  
 
   // Check whether this instruction will invalidate any other locations.
-  invalidateBase(I, getBlockState(I), Kind);
+  for (auto result : I->getResults())
+    invalidateBase(result, getBlockState(I), Kind);
 }
 
 void DSEContext::runIterativeDSE() {
@@ -1164,7 +1203,7 @@ bool DSEContext::run() {
     return false;
 
   // Do we run a pessimistic data flow ?
-  bool Optimistic = Kind == ProcessKind::ProcessOptimistic ? true : false;
+  const bool Optimistic = (Kind == ProcessKind::ProcessOptimistic);
 
   // For all basic blocks in the function, initialize a BB state.
   //
@@ -1214,16 +1253,16 @@ bool DSEContext::run() {
     for (auto &X : S->LiveAddr) {
       Changed = true;
       auto I = S->LiveStores.find(X);
-      SILInstruction *Inst = cast<SILInstruction>(I->first);
+      SILInstruction *Inst = I->first->getDefiningInstruction();
       auto *IT = &*std::next(Inst->getIterator());
       SILBuilderWithScope Builder(IT);
-      Builder.createStore(Inst->getLoc(), I->second, Inst,
+      Builder.createStore(Inst->getLoc(), I->second, I->first,
                           StoreOwnershipQualifier::Unqualified);
     }
     // Delete the dead stores.
     for (auto &I : getBlockState(&BB)->DeadStores) {
       Changed = true;
-      DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
+      LLVM_DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
       // This way, we get rid of pass dependence on DCE.
       recursivelyDeleteTriviallyDeadInstructions(I, true);
     }
@@ -1243,7 +1282,8 @@ public:
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName()
+                            << " ***\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();

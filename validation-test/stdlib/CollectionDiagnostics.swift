@@ -7,9 +7,7 @@ import StdlibCollectionUnittest
 // Check that Collection.SubSequence is constrained to Collection.
 //
 
-// expected-error@+3 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Collection'}}
-// expected-error@+2 {{type 'CollectionWithBadSubSequence' does not conform to protocol '_IndexableBase'}}
-// expected-error@+1 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Sequence'}}
+// expected-error@+1 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Collection'}}
 struct CollectionWithBadSubSequence : Collection {
   var startIndex: MinimalIndex {
     fatalError("unreachable")
@@ -23,8 +21,6 @@ struct CollectionWithBadSubSequence : Collection {
     fatalError("unreachable")
   }
 
-  // expected-note@+3 {{possibly intended match}}
-  // expected-note@+2 {{possibly intended match}}
   // expected-note@+1 {{possibly intended match}}
   typealias SubSequence = OpaqueValue<Int8>
 }
@@ -52,41 +48,42 @@ func sortResultIgnored<
   array.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(by:)' is unused}}
 }
 
-// expected-warning@+1 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
+// expected-warning@+2 {{'Indexable' is deprecated: renamed to 'Collection'}}
+// expected-note@+1 {{use 'Collection' instead}}
 struct GoodIndexable : Indexable { 
   func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
-  subscript(bounds: Range<Int>) -> [Int] { return [] }
+  subscript(bounds: Range<Int>) -> ArraySlice<Int> { return [] }
 }
 
 
-// expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
-// expected-error@+1 {{type 'BadIndexable1' does not conform to protocol '_IndexableBase'}}
-struct BadIndexable1 : Indexable {
+// expected-warning@+2 {{'Indexable' is deprecated: renamed to 'Collection'}}
+// expected-note@+1 {{use 'Collection' instead}}
+struct AnotherGoodIndexable1 : Indexable {
   func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
-
-  // Missing 'subscript(_:) -> SubSequence'.
 }
 
-// expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
-// expected-error@+1 {{type 'BadIndexable2' does not conform to protocol '_IndexableBase'}}
+// expected-warning@+3 {{'Indexable' is deprecated: renamed to 'Collection'}}
+// expected-error@+2 {{type 'BadIndexable2' does not conform to protocol 'Collection'}}
+// expected-note@+1 {{use 'Collection' instead}}
 struct BadIndexable2 : Indexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
-  subscript(bounds: Range<Int>) -> [Int] { return [] }
+  subscript(bounds: Range<Int>) -> ArraySlice<Int> { return [] }
   // Missing index(after:) -> Int
 }
 
-// expected-warning@+1 {{'BidirectionalIndexable' is deprecated: it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead}}
+// expected-warning@+2 {{'BidirectionalIndexable' is deprecated: renamed to 'BidirectionalCollection'}}
+// expected-note@+1 {{use 'BidirectionalCollection' instead}}
 struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
@@ -94,23 +91,24 @@ struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
   func index(before i: Int) -> Int { return i - 1 }
 
   subscript(pos: Int) -> Int { return 0 }
-  subscript(bounds: Range<Int>) -> [Int] { return [] }
+  subscript(bounds: Range<Int>) -> ArraySlice<Int> { return [] }
 }
 
 // We'd like to see: {{type 'BadBidirectionalIndexable' does not conform to protocol 'BidirectionalIndexable'}}
 // But the compiler doesn't generate that error.
-// expected-warning@+1 {{'BidirectionalIndexable' is deprecated: it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead}}
+// expected-warning@+2 {{'BidirectionalIndexable' is deprecated: renamed to 'BidirectionalCollection'}}
+// expected-note@+1 {{use 'BidirectionalCollection' instead}}
 struct BadBidirectionalIndexable : BidirectionalIndexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
 
   subscript(pos: Int) -> Int { return 0 }
-  subscript(bounds: Range<Int>) -> [Int] { return [] }
+  subscript(bounds: Range<Int>) -> ArraySlice<Int> { return [] }
 
   // This is a poor error message; it would be better to get a message
   // that index(before:) was missing.
   //
-  // expected-error@+1 {{'index(after:)' has different argument names from those required by protocol '_BidirectionalIndexable' ('index(before:)'}}
+  // expected-error@+1 {{'index(after:)' has different argument labels from those required by protocol 'BidirectionalCollection' ('index(before:)'}}
   func index(after i: Int) -> Int { return 0 }
 }
 

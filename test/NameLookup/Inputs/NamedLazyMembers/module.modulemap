@@ -1,0 +1,4 @@
+module NamedLazyMembers {
+  header "NamedLazyMembers.h"
+  export *
+}

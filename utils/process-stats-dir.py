@@ -17,174 +17,48 @@
 
 import argparse
 import csv
-import datetime
+import itertools
 import json
 import os
 import platform
-import random
 import re
 import sys
 import time
 import urllib
 import urllib2
+from collections import namedtuple
+from operator import attrgetter
+
+from jobstats import (list_stats_dir_profiles,
+                      load_stats_dir, merge_all_jobstats)
 
 
-class JobStats:
-
-    def __init__(self, jobkind, jobid, module, start_usec, dur_usec,
-                 jobargs, stats):
-        self.jobkind = jobkind
-        self.jobid = jobid
-        self.module = module
-        self.start_usec = start_usec
-        self.dur_usec = dur_usec
-        self.jobargs = jobargs
-        self.stats = stats
-
-    def is_driver_job(self):
-        return self.jobkind == 'driver'
-
-    def is_frontend_job(self):
-        return self.jobkind == 'frontend'
-
-    def driver_jobs_ran(self):
-        assert(self.is_driver_job())
-        return self.stats.get("Driver.NumDriverJobsRun", 0)
-
-    def driver_jobs_skipped(self):
-        assert(self.is_driver_job())
-        return self.stats.get("Driver.NumDriverJobsSkipped", 0)
-
-    def driver_jobs_total(self):
-        assert(self.is_driver_job())
-        return self.driver_jobs_ran() + self.driver_jobs_skipped()
-
-    def merged_with(self, other):
-        merged_stats = {}
-        for k, v in self.stats.items() + other.stats.items():
-            merged_stats[k] = v + merged_stats.get(k, 0.0)
-        merged_kind = self.jobkind
-        if other.jobkind != merged_kind:
-            merged_kind = "<merged>"
-        merged_module = self.module
-        if other.module != merged_module:
-            merged_module = "<merged>"
-        merged_start = min(self.start_usec, other.start_usec)
-        merged_end = max(self.start_usec + self.dur_usec,
-                         other.start_usec + other.dur_usec)
-        merged_dur = merged_end - merged_start
-        return JobStats(merged_kind, random.randint(0, 1000000000),
-                        merged_module, merged_start, merged_dur,
-                        self.jobargs + other.jobargs, merged_stats)
-
-    def incrementality_percentage(self):
-        assert(self.is_driver_job())
-        ran = self.driver_jobs_ran()
-        total = self.driver_jobs_total()
-        return round((float(ran) / float(total)) * 100.0, 2)
-
-    # Return a JSON-formattable object of the form preferred by google chrome's
-    # 'catapult' trace-viewer.
-    def to_catapult_trace_obj(self):
-        return {"name": self.module,
-                "cat": self.jobkind,
-                "ph": "X",              # "X" == "complete event"
-                "pid": self.jobid,
-                "tid": 1,
-                "ts": self.start_usec,
-                "dur": self.dur_usec,
-                "args": self.jobargs}
-
-    def start_timestr(self):
-        t = datetime.datetime.fromtimestamp(self.start_usec / 1000000.0)
-        return t.strftime("%Y-%m-%d %H:%M:%S")
-
-    def end_timestr(self):
-        t = datetime.datetime.fromtimestamp((self.start_usec +
-                                             self.dur_usec) / 1000000.0)
-        return t.strftime("%Y-%m-%d %H:%M:%S")
-
-    def pick_lnt_metric_suffix(self, metric_name):
-        if "BytesOutput" in metric_name:
-            return "code_size"
-        if "RSS" in metric_name or "BytesAllocated" in metric_name:
-            return "mem"
-        return "compile"
-
-    # Return a JSON-formattable object of the form preferred by LNT's
-    # 'submit' format.
-    def to_lnt_test_obj(self, args):
-        run_info = {
-            "run_order": str(args.lnt_order),
-            "tag": str(args.lnt_tag),
-        }
-        run_info.update(dict(args.lnt_run_info))
-        stats = self.stats
-        return {
-            "Machine":
-            {
-                "Name": args.lnt_machine,
-                "Info": dict(args.lnt_machine_info)
-            },
-            "Run":
-            {
-                "Start Time": self.start_timestr(),
-                "End Time": self.end_timestr(),
-                "Info": run_info
-            },
-            "Tests":
-            [
-                {
-                    "Data": [v],
-                    "Info": {},
-                    "Name": "%s.%s.%s.%s" % (args.lnt_tag, self.module,
-                                             k, self.pick_lnt_metric_suffix(k))
-                }
-                for (k, v) in stats.items()
-            ]
-        }
+MODULE_PAT = re.compile(r'^(\w+)\.')
 
 
-# Return an array of JobStats objects
-def load_stats_dir(path):
-    jobstats = []
-    auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
-              r"-(?P<out>[^-]+)-(?P<opt>[^-]+)")
-    fpat = (r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-" +
-            auxpat +
-            r"-(?P<pid>\d+)(-.*)?.json$")
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            m = re.match(fpat, f)
-            if m:
-                # NB: "pid" in fpat is a random number, not unix pid.
-                mg = m.groupdict()
-                jobkind = mg['kind']
-                jobid = int(mg['pid'])
-                start_usec = int(mg['start'])
-                module = mg["module"]
-                jobargs = [mg["input"], mg["triple"], mg["out"], mg["opt"]]
+def module_name_of_stat(name):
+    return re.match(MODULE_PAT, name).groups()[0]
 
-                j = json.load(open(os.path.join(root, f)))
-                dur_usec = 1
-                patstr = (r"time\.swift-" + jobkind + r"\." + auxpat +
-                          r"\.wall$")
-                pat = re.compile(patstr)
-                stats = dict()
-                for (k, v) in j.items():
-                    if k.startswith("time."):
-                        v = int(1000000.0 * float(v))
-                    stats[k] = v
-                    tm = re.match(pat, k)
-                    if tm:
-                        dur_usec = v
 
-                e = JobStats(jobkind=jobkind, jobid=jobid,
-                             module=module, start_usec=start_usec,
-                             dur_usec=dur_usec, jobargs=jobargs,
-                             stats=stats)
-                jobstats.append(e)
-    return jobstats
+def stat_name_minus_module(name):
+    return re.sub(MODULE_PAT, '', name)
+
+
+# Perform any custom processing of args here, in particular the
+# select_stats_from_csv_baseline step, which is a bit subtle.
+def vars_of_args(args):
+    vargs = vars(args)
+    if args.select_stats_from_csv_baseline is not None:
+        b = read_stats_dict_from_csv(args.select_stats_from_csv_baseline)
+        # Sniff baseline stat-names to figure out if they're module-qualified
+        # even when the user isn't asking us to _output_ module-grouped data.
+        all_triples = all(len(k.split('.')) == 3 for k in b.keys())
+        if args.group_by_module or all_triples:
+            vargs['select_stat'] = set(stat_name_minus_module(k)
+                                       for k in b.keys())
+        else:
+            vargs['select_stat'] = b.keys()
+    return vargs
 
 
 # Passed args with 2-element remainder ["old", "new"], return a list of tuples
@@ -195,14 +69,15 @@ def load_paired_stats_dirs(args):
     assert(len(args.remainder) == 2)
     paired_stats = []
     (old, new) = args.remainder
+    vargs = vars_of_args(args)
     for p in sorted(os.listdir(old)):
         full_old = os.path.join(old, p)
         full_new = os.path.join(new, p)
         if not (os.path.exists(full_old) and os.path.isdir(full_old) and
                 os.path.exists(full_new) and os.path.isdir(full_new)):
             continue
-        old_stats = load_stats_dir(full_old)
-        new_stats = load_stats_dir(full_new)
+        old_stats = load_stats_dir(full_old, **vargs)
+        new_stats = load_stats_dir(full_new, **vargs)
         if len(old_stats) == 0 or len(new_stats) == 0:
             continue
         paired_stats.append((p, (old_stats, new_stats)))
@@ -211,15 +86,20 @@ def load_paired_stats_dirs(args):
 
 def write_catapult_trace(args):
     allstats = []
+    vargs = vars_of_args(args)
     for path in args.remainder:
-        allstats += load_stats_dir(path)
+        allstats += load_stats_dir(path, **vargs)
+    allstats.sort(key=attrgetter('start_usec'))
+    for i in range(len(allstats)):
+        allstats[i].jobid = i
     json.dump([s.to_catapult_trace_obj() for s in allstats], args.output)
 
 
 def write_lnt_values(args):
+    vargs = vars_of_args(args)
     for d in args.remainder:
-        stats = load_stats_dir(d)
-        merged = merge_all_jobstats(stats)
+        stats = load_stats_dir(d, **vargs)
+        merged = merge_all_jobstats(stats, **vargs)
         j = merged.to_lnt_test_obj(args)
         if args.lnt_submit is None:
             json.dump(j, args.output, indent=4)
@@ -240,16 +120,6 @@ def write_lnt_values(args):
                 sys.exit(1)
 
 
-def merge_all_jobstats(jobstats):
-    m = None
-    for j in jobstats:
-        if m is None:
-            m = j
-        else:
-            m = m.merged_with(j)
-    return m
-
-
 def show_paired_incrementality(args):
     fieldnames = ["old_pct", "old_skip",
                   "new_pct", "new_skip",
@@ -257,12 +127,13 @@ def show_paired_incrementality(args):
                   "name"]
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
+    vargs = vars_of_args(args)
 
     for (name, (oldstats, newstats)) in load_paired_stats_dirs(args):
-        olddriver = merge_all_jobstats([x for x in oldstats
-                                        if x.is_driver_job()])
-        newdriver = merge_all_jobstats([x for x in newstats
-                                        if x.is_driver_job()])
+        olddriver = merge_all_jobstats((x for x in oldstats
+                                        if x.is_driver_job()), **vargs)
+        newdriver = merge_all_jobstats((x for x in newstats
+                                        if x.is_driver_job()), **vargs)
         if olddriver is None or newdriver is None:
             continue
         oldpct = olddriver.incrementality_percentage()
@@ -282,8 +153,9 @@ def show_incrementality(args):
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
 
+    vargs = vars_of_args(args)
     for path in args.remainder:
-        stats = load_stats_dir(path)
+        stats = load_stats_dir(path, **vargs)
         for s in stats:
             if s.is_driver_job():
                 pct = s.incrementality_percentage()
@@ -322,15 +194,19 @@ def update_epoch_value(d, name, epoch, value):
     return (epoch, value, changed)
 
 
-def read_stats_dict_from_csv(f):
+def read_stats_dict_from_csv(f, select_stat=''):
     infieldnames = ["epoch", "name", "value"]
     c = csv.DictReader(f, infieldnames,
                        dialect='excel-tab',
                        quoting=csv.QUOTE_NONNUMERIC)
     d = {}
+    sre = re.compile('.*' if len(select_stat) == 0 else
+                     '|'.join(select_stat))
     for row in c:
         epoch = int(row["epoch"])
         name = row["name"]
+        if sre.search(name) is None:
+            continue
         value = int(row["value"])
         update_epoch_value(d, name, epoch, value)
     return d
@@ -355,9 +231,11 @@ def read_stats_dict_from_csv(f):
 # next baseline-set is done.
 def set_csv_baseline(args):
     existing = None
+    vargs = vars_of_args(args)
     if os.path.exists(args.set_csv_baseline):
         with open(args.set_csv_baseline, "r") as f:
-            existing = read_stats_dict_from_csv(f)
+            ss = vargs['select_stat']
+            existing = read_stats_dict_from_csv(f, select_stat=ss)
             print ("updating %d baseline entries in %s" %
                    (len(existing), args.set_csv_baseline))
     else:
@@ -366,8 +244,12 @@ def set_csv_baseline(args):
     with open(args.set_csv_baseline, "wb") as f:
         out = csv.DictWriter(f, fieldnames, dialect='excel-tab',
                              quoting=csv.QUOTE_NONNUMERIC)
-        m = merge_all_jobstats([s for d in args.remainder
-                                for s in load_stats_dir(d)])
+        m = merge_all_jobstats((s for d in args.remainder
+                                for s in load_stats_dir(d, **vargs)),
+                               **vargs)
+        if m is None:
+            print "no stats found"
+            return 1
         changed = 0
         newepoch = int(time.time())
         for name in sorted(m.stats.keys()):
@@ -387,32 +269,279 @@ def set_csv_baseline(args):
     return 0
 
 
+OutputRow = namedtuple("OutputRow",
+                       ["name", "old", "new",
+                        "delta", "delta_pct"])
+
+
+def compare_stats(args, old_stats, new_stats):
+    for name in sorted(old_stats.keys()):
+        old = old_stats[name]
+        new = new_stats.get(name, 0)
+        (delta, delta_pct) = diff_and_pct(old, new)
+        yield OutputRow(name=name,
+                        old=int(old), new=int(new),
+                        delta=int(delta),
+                        delta_pct=delta_pct)
+
+
+IMPROVED = -1
+UNCHANGED = 0
+REGRESSED = 1
+
+
+def row_state(row, args):
+    delta_pct_over_thresh = abs(row.delta_pct) > args.delta_pct_thresh
+    if (row.name.startswith("time.") or '.time.' in row.name):
+        # Timers are judged as changing if they exceed
+        # the percentage _and_ absolute-time thresholds
+        delta_usec_over_thresh = abs(row.delta) > args.delta_usec_thresh
+        if delta_pct_over_thresh and delta_usec_over_thresh:
+            return (REGRESSED if row.delta > 0 else IMPROVED)
+    elif delta_pct_over_thresh:
+        return (REGRESSED if row.delta > 0 else IMPROVED)
+    return UNCHANGED
+
+
+def write_comparison(args, old_stats, new_stats):
+    rows = list(compare_stats(args, old_stats, new_stats))
+    sort_key = (attrgetter('delta_pct')
+                if args.sort_by_delta_pct
+                else attrgetter('name'))
+
+    regressed = [r for r in rows if row_state(r, args) == REGRESSED]
+    unchanged = [r for r in rows if row_state(r, args) == UNCHANGED]
+    improved = [r for r in rows if row_state(r, args) == IMPROVED]
+    regressions = len(regressed)
+
+    if args.markdown:
+
+        def format_time(v):
+            if abs(v) > 1000000:
+                return "{:.1f}s".format(v / 1000000.0)
+            elif abs(v) > 1000:
+                return "{:.1f}ms".format(v / 1000.0)
+            else:
+                return "{:.1f}us".format(v)
+
+        def format_field(field, row):
+            if field == 'name':
+                if args.group_by_module:
+                    return stat_name_minus_module(row.name)
+                else:
+                    return row.name
+            elif field == 'delta_pct':
+                s = str(row.delta_pct) + "%"
+                if args.github_emoji:
+                    if row_state(row, args) == REGRESSED:
+                        s += " :no_entry:"
+                    elif row_state(row, args) == IMPROVED:
+                        s += " :white_check_mark:"
+                return s
+            else:
+                v = int(vars(row)[field])
+                if row.name.startswith('time.'):
+                    return format_time(v)
+                else:
+                    return "{:,d}".format(v)
+
+        def format_table(elts):
+            out = args.output
+            out.write('\n')
+            out.write(' | '.join(OutputRow._fields))
+            out.write('\n')
+            out.write(' | '.join('---:' for _ in OutputRow._fields))
+            out.write('\n')
+            for e in elts:
+                out.write(' | '.join(format_field(f, e)
+                                     for f in OutputRow._fields))
+                out.write('\n')
+
+        def format_details(name, elts, is_closed):
+            out = args.output
+            details = '<details>\n' if is_closed else '<details open>\n'
+            out.write(details)
+            out.write('<summary>%s (%d)</summary>\n'
+                      % (name, len(elts)))
+            if args.group_by_module:
+                def keyfunc(e):
+                    return module_name_of_stat(e.name)
+                elts.sort(key=attrgetter('name'))
+                for mod, group in itertools.groupby(elts, keyfunc):
+                    groupelts = list(group)
+                    groupelts.sort(key=sort_key, reverse=args.sort_descending)
+                    out.write(details)
+                    out.write('<summary>%s in %s (%d)</summary>\n'
+                              % (name, mod, len(groupelts)))
+                    format_table(groupelts)
+                    out.write('</details>\n')
+            else:
+                elts.sort(key=sort_key, reverse=args.sort_descending)
+                format_table(elts)
+            out.write('</details>\n')
+
+        closed_regressions = (args.close_regressions or len(regressed) == 0)
+        format_details('Regressed', regressed, closed_regressions)
+        format_details('Improved', improved, True)
+        format_details('Unchanged (delta < %s%% or delta < %s)' %
+                       (args.delta_pct_thresh,
+                        format_time(args.delta_usec_thresh)),
+                       unchanged, True)
+
+    else:
+        rows.sort(key=sort_key, reverse=args.sort_descending)
+        out = csv.DictWriter(args.output, OutputRow._fields,
+                             dialect='excel-tab')
+        out.writeheader()
+        for row in rows:
+            if row_state(row, args) != UNCHANGED:
+                out.writerow(row._asdict())
+
+    return regressions
+
+
 def compare_to_csv_baseline(args):
-    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline)
-    m = merge_all_jobstats([s for d in args.remainder
-                            for s in load_stats_dir(d)])
+    vargs = vars_of_args(args)
+    old_stats = read_stats_dict_from_csv(args.compare_to_csv_baseline,
+                                         select_stat=vargs['select_stat'])
+    m = merge_all_jobstats((s for d in args.remainder
+                            for s in load_stats_dir(d, **vargs)),
+                           **vargs)
+    old_stats = dict((k, v) for (k, (_, v)) in old_stats.items())
     new_stats = m.stats
 
-    regressions = 0
-    outfieldnames = ["old", "new", "delta_pct", "name"]
-    out = csv.DictWriter(args.output, outfieldnames, dialect='excel-tab')
-    out.writeheader()
+    return write_comparison(args, old_stats, new_stats)
 
-    for stat_name in sorted(old_stats.keys()):
-        (_, old) = old_stats[stat_name]
-        new = new_stats.get(stat_name, 0)
-        (delta, delta_pct) = diff_and_pct(old, new)
-        if (stat_name.startswith("time.") and
-           abs(delta) < args.delta_usec_thresh):
+
+# Summarize immediate difference between two stats-dirs, optionally
+def compare_stats_dirs(args):
+    if len(args.remainder) != 2:
+        raise ValueError("Expected exactly 2 stats-dirs")
+
+    vargs = vars_of_args(args)
+    (old, new) = args.remainder
+    old_stats = merge_all_jobstats(load_stats_dir(old, **vargs), **vargs)
+    new_stats = merge_all_jobstats(load_stats_dir(new, **vargs), **vargs)
+
+    return write_comparison(args, old_stats.stats, new_stats.stats)
+
+
+# Evaluate a boolean expression in terms of the provided stats-dir; all stats
+# are projected into python dicts (thus variables in the eval expr) named by
+# the last identifier in the stat definition. This means you can evaluate
+# things like 'NumIRInsts < 1000' or
+# 'NumTypesValidated == NumTypesDeserialized'
+def evaluate(args):
+    if len(args.remainder) != 1:
+        raise ValueError("Expected exactly 1 stats-dir to evaluate against")
+
+    d = args.remainder[0]
+    vargs = vars_of_args(args)
+    merged = merge_all_jobstats(load_stats_dir(d, **vargs), **vargs)
+    env = {}
+    ident = re.compile(r'(\w+)$')
+    for (k, v) in merged.stats.items():
+        if k.startswith("time.") or '.time.' in k:
             continue
-        if abs(delta_pct) < args.delta_pct_thresh:
+        m = re.search(ident, k)
+        if m:
+            i = m.groups()[0]
+            if args.verbose:
+                print("%s => %s" % (i, v))
+            env[i] = v
+    try:
+        if eval(args.evaluate, env):
+            return 0
+        else:
+            print("evaluate condition failed: '%s'" % args.evaluate)
+            return 1
+    except Exception as e:
+        print(e)
+        return 1
+
+
+# Evaluate a boolean expression in terms of deltas between the provided two
+# stats-dirs; works like evaluate() above but on absolute differences
+def evaluate_delta(args):
+    if len(args.remainder) != 2:
+        raise ValueError("Expected exactly 2 stats-dirs to evaluate-delta")
+
+    (old, new) = args.remainder
+    vargs = vars_of_args(args)
+    old_stats = merge_all_jobstats(load_stats_dir(old, **vargs), **vargs)
+    new_stats = merge_all_jobstats(load_stats_dir(new, **vargs), **vargs)
+
+    env = {}
+    ident = re.compile(r'(\w+)$')
+    for r in compare_stats(args, old_stats.stats, new_stats.stats):
+        if r.name.startswith("time.") or '.time.' in r.name:
             continue
-        out.writerow(dict(name=stat_name,
-                          old=int(old), new=int(new),
-                          delta_pct=delta_pct))
-        if delta > 0:
-            regressions += 1
-    return regressions
+        m = re.search(ident, r.name)
+        if m:
+            i = m.groups()[0]
+            if args.verbose:
+                print("%s => %s" % (i, r.delta))
+            env[i] = r.delta
+    try:
+        if eval(args.evaluate_delta, env):
+            return 0
+        else:
+            print("evaluate-delta condition failed: '%s'" %
+                  args.evaluate_delta)
+            return 1
+    except Exception as e:
+        print(e)
+        return 1
+
+
+def render_profiles(args):
+    flamegraph_pl = args.flamegraph_script
+    if flamegraph_pl is None:
+        import distutils.spawn
+        flamegraph_pl = distutils.spawn.find_executable("flamegraph.pl")
+    if flamegraph_pl is None:
+        print("Need flamegraph.pl in $PATH, or pass --flamegraph-script")
+
+    vargs = vars_of_args(args)
+    for statsdir in args.remainder:
+        jobprofs = list_stats_dir_profiles(statsdir, **vargs)
+        index_path = os.path.join(statsdir, "profile-index.html")
+        all_profile_types = set([k for keys in [j.profiles.keys()
+                                                for j in jobprofs
+                                                if j.profiles is not None]
+                                 for k in keys])
+        with open(index_path, "wb") as index:
+            for ptype in all_profile_types:
+                index.write("<h2>Profile type: " + ptype + "</h2>\n")
+                index.write("<ul>\n")
+                for j in jobprofs:
+                    if j.is_frontend_job():
+                        index.write("    <li>" +
+                                    ("Module %s :: %s" %
+                                     (j.module, " ".join(j.jobargs))) + "\n")
+                        index.write("    <ul>\n")
+                        profiles = sorted(j.profiles.get(ptype, {}).items())
+                        for counter, path in profiles:
+                            title = ("Module: %s, File: %s, "
+                                     "Counter: %s, Profile: %s" %
+                                     (j.module, j.input, counter, ptype))
+                            subtitle = j.triple + ", -" + j.opt
+                            svg = os.path.abspath(path + ".svg")
+                            with open(path) as p, open(svg, "wb") as g:
+                                import subprocess
+                                print("Building flamegraph " + svg)
+                                subprocess.check_call([flamegraph_pl,
+                                                       "--title", title,
+                                                       "--subtitle", subtitle],
+                                                      stdin=p, stdout=g)
+                            link = ("<tt><a href=\"file://%s\">%s</a></tt>" %
+                                    (svg, counter))
+                            index.write("        <li>" + link + "\n")
+                        index.write("    </ul>\n")
+                        index.write("    </li>\n")
+        if args.browse_profiles:
+            import webbrowser
+            webbrowser.open_new_tab("file://" + os.path.abspath(index_path))
 
 
 def main():
@@ -443,6 +572,62 @@ def main():
                         help="Tag for LNT submission")
     parser.add_argument("--lnt-submit", type=str, default=None,
                         help="URL to submit LNT data to (rather than print)")
+    parser.add_argument("--select-module",
+                        default=[],
+                        action="append",
+                        help="Select specific modules")
+    parser.add_argument("--group-by-module",
+                        default=False,
+                        action="store_true",
+                        help="Group stats by module")
+    parser.add_argument("--select-stat",
+                        default=[],
+                        action="append",
+                        help="Select specific statistics")
+    parser.add_argument("--select-stats-from-csv-baseline",
+                        type=argparse.FileType('rb', 0), default=None,
+                        help="Select statistics present in a CSV baseline")
+    parser.add_argument("--exclude-timers",
+                        default=False,
+                        action="store_true",
+                        help="only select counters, exclude timers")
+    parser.add_argument("--sort-by-delta-pct",
+                        default=False,
+                        action="store_true",
+                        help="Sort comparison results by delta-%%, not stat")
+    parser.add_argument("--sort-descending",
+                        default=False,
+                        action="store_true",
+                        help="Sort comparison results in descending order")
+    parser.add_argument("--merge-by",
+                        default="sum",
+                        type=str,
+                        help="Merge identical metrics by (sum|min|max)")
+    parser.add_argument("--merge-timers",
+                        default=False,
+                        action="store_true",
+                        help="Merge timers across modules/targets/etc.")
+    parser.add_argument("--divide-by",
+                        default=1,
+                        metavar="D",
+                        type=int,
+                        help="Divide stats by D (to take an average)")
+    parser.add_argument("--markdown",
+                        default=False,
+                        action="store_true",
+                        help="Write output in markdown table format")
+    parser.add_argument("--include-unchanged",
+                        default=False,
+                        action="store_true",
+                        help="Include unchanged stats values in comparison")
+    parser.add_argument("--close-regressions",
+                        default=False,
+                        action="store_true",
+                        help="Close regression details in markdown")
+    parser.add_argument("--github-emoji",
+                        default=False,
+                        action="store_true",
+                        help="Add github-emoji indicators to markdown")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
@@ -454,8 +639,21 @@ def main():
                        type=argparse.FileType('rb', 0), default=None,
                        metavar="BASELINE.csv",
                        help="Compare stats dir to named CSV baseline")
+    modes.add_argument("--compare-stats-dirs",
+                       action="store_true",
+                       help="Compare two stats dirs directly")
     modes.add_argument("--lnt", action="store_true",
                        help="Emit an LNT-compatible test summary")
+    modes.add_argument("--evaluate", type=str, default=None,
+                       help="evaluate an expression of stat-names")
+    modes.add_argument("--evaluate-delta", type=str, default=None,
+                       help="evaluate an expression of stat-deltas")
+    modes.add_argument("--render-profiles", action="store_true",
+                       help="render any profiles to SVG flamegraphs")
+    parser.add_argument("--flamegraph-script", type=str, default=None,
+                        help="path to flamegraph.pl")
+    parser.add_argument("--browse-profiles", action="store_true",
+                        help="open web browser tabs with rendered profiles")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
                         help="stats-dirs to process")
 
@@ -465,6 +663,8 @@ def main():
         return 1
     if args.catapult:
         write_catapult_trace(args)
+    elif args.compare_stats_dirs:
+        return compare_stats_dirs(args)
     elif args.set_csv_baseline is not None:
         return set_csv_baseline(args)
     elif args.compare_to_csv_baseline is not None:
@@ -476,6 +676,12 @@ def main():
             show_incrementality(args)
     elif args.lnt:
         write_lnt_values(args)
+    elif args.evaluate:
+        return evaluate(args)
+    elif args.evaluate_delta:
+        return evaluate_delta(args)
+    elif args.render_profiles:
+        return render_profiles(args)
     return None
 
 

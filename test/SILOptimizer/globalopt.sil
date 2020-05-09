@@ -1,446 +1,55 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -global-opt | %FileCheck %s
-//
-// ginit.cold has a hammock with an initializer call on the slow path.
-// ginit.loop has a loop containing an initializer call.
+// RUN: %target-sil-opt -enable-sil-verify-all %s -global-opt | %FileCheck %s
 
 sil_stage canonical
-
 
 import Builtin
 import Swift
 
-// globalinit_token0
-sil_global private @globalinit_token0 : $Builtin.Word
-sil_global @MyConst : $Int32
+private var testGlobal: Int64
 
-// globalinit_func0
-sil private @globalinit_func0 : $@convention(thin) () -> () {
+sil_global private @globalinit_33_00F4D2139E6BDDFEC71E5005B67B5674_token0 : $Builtin.Word
+
+sil_global private @$s4test10testGlobalSivp : $Int64
+
+sil private @globalinit_33_00F4D2139E6BDDFEC71E5005B67B5674_func0 : $@convention(c) () -> () {
 bb0:
-  %0 = global_addr @MyConst : $*Int32               // user: %3
-  %1 = integer_literal $Builtin.Int32, 0           // user: %2
-  %2 = struct $Int32 (%1 : $Builtin.Int32)           // user: %3
-  store %2 to %0 : $*Int32                          // id: %3
-  %4 = tuple ()                                   // user: %5
-  return %4 : $()                                 // id: %5
+  alloc_global @$s4test10testGlobalSivp
+  %1 = global_addr @$s4test10testGlobalSivp : $*Int64
+  %2 = integer_literal $Builtin.Int64, 27
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to %1 : $*Int64
+  %5 = tuple ()
+  return %5 : $()
 }
 
-// ginit.MyConst.mutableAddressor : Swift.Int32
-sil [global_init] @_TF5ginita7MyConstSi : $@convention(thin) () -> Builtin.RawPointer {
+sil hidden [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
-  %1 = global_addr @globalinit_token0 : $*Builtin.Word // user: %2
-  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer // user: %5
-  // function_ref globalinit_func0
-  %3 = function_ref @globalinit_func0 : $@convention(thin) () -> () // user: %4
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
-  %6 = global_addr @MyConst : $*Int32               // user: %7
-  %7 = address_to_pointer %6 : $*Int32 to $Builtin.RawPointer // user: %8
-  return %7 : $Builtin.RawPointer                 // id: %8
+  %0 = global_addr @globalinit_33_00F4D2139E6BDDFEC71E5005B67B5674_token0 : $*Builtin.Word
+  %1 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
+  %2 = function_ref @globalinit_33_00F4D2139E6BDDFEC71E5005B67B5674_func0 : $@convention(c) () -> ()
+  %3 = builtin "once"(%1 : $Builtin.RawPointer, %2 : $@convention(c) () -> ()) : $()
+  %4 = global_addr @$s4test10testGlobalSivp : $*Int64
+  %5 = address_to_pointer %4 : $*Int64 to $Builtin.RawPointer
+  return %5 : $Builtin.RawPointer
 }
 
-// Don't hoist this initializer call.
-// ginit.cold (Swift.Int32) -> Swift.Int32
-// CHECK-LABEL: sil @_TF5ginit4coldFSiSi
-// CHECK-NOT: 5ginita7MyConst
-// CHECK: bb1:
-// CHECK: 5ginita7MyConst
-// CHECK: {{^bb2}}
-sil @_TF5ginit4coldFSiSi : $@convention(thin) (Int32) -> Int32 {
-bb0(%0 : $Int32):
-  %1 = integer_literal $Builtin.Int32, 0           // users: %4, %5, %13
-  %3 = struct_extract %0 : $Int32, #Int32._value       // user: %4
-  %4 = builtin "cmp_sgt_Int32"(%3 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1 // user: %5
-  cond_br %4, bb1, bb2(%1 : $Builtin.Int32)        // id: %5
-
-bb1:                                              // Preds: bb0
-  // function_ref ginit.MyConst.mutableAddressor : Swift.Int32
-  %6 = function_ref @_TF5ginita7MyConstSi : $@convention(thin) () -> Builtin.RawPointer // user: %7
-  %7 = apply %6() : $@convention(thin) () -> Builtin.RawPointer // user: %8
-  %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Int32 // user: %9
-  %9 = struct_element_addr %8 : $*Int32, #Int32._value // user: %10
-  %10 = load %9 : $*Builtin.Int32                  // user: %13
-  %12 = integer_literal $Builtin.Int1, -1         // user: %13
-  %13 = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %14
-  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0 // user: %15
-  br bb2(%14 : $Builtin.Int32)                     // id: %15
-
-bb2(%16 : $Builtin.Int32):                         // Preds: bb0 bb1
-  %17 = struct $Int32 (%16 : $Builtin.Int32)         // user: %18
-  return %17 : $Int32                               // id: %18
+// CHECK-LABEL: sil @dont_propagate_global_with_multiple_writes
+// CHECK:   [[V:%[0-9]+]] = load
+// CHECK:   return [[V]]
+// CHECK: } // end sil function 'dont_propagate_global_with_multiple_writes'
+sil @dont_propagate_global_with_multiple_writes : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int64
+  %5 = integer_literal $Builtin.Int64, 42
+  %6 = struct $Int64 (%5 : $Builtin.Int64)
+  %7 = begin_access [modify] [dynamic] [no_nested_conflict] %4 : $*Int64
+  store %6 to %7 : $*Int64
+  end_access %7 : $*Int64
+  %33 = begin_access [read] [dynamic] [no_nested_conflict] %4 : $*Int64
+  %35 = load %33 : $*Int64
+  end_access %33 : $*Int64
+  return %35 : $Int64
 }
-
-// Do hoist this initializer call.
-// ginit.loop (Swift.Int32) -> Swift.Int32
-// CHECK-LABEL: sil @_TF5ginit4loopFSiSi
-// CHECK: {{^bb0}}
-// CHECK: 5ginita7MyConst
-// CHECK: {{^bb1}}
-// CHECK-NOT: 5ginita7MyConst
-sil @_TF5ginit4loopFSiSi : $@convention(thin) (Int32) -> Int32 {
-bb0(%0 : $Int32):
-  %1 = integer_literal $Builtin.Int32, 0           // user: %8
-  %2 = integer_literal $Builtin.Int32, 1           // users: %6, %8, %22
-  %3 = struct_extract %0 : $Int32, #Int32._value       // user: %6
-  %5 = integer_literal $Builtin.Int1, -1          // users: %6, %22, %37
-  %6 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %2 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %7
-  %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0 // user: %13
-  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32)  // id: %8
-
-bb1(%9 : $Builtin.Int32, %10 : $Builtin.Int32):     // Preds: bb0 bb5
-  %11 = struct $Int32 (%10 : $Builtin.Int32)         // user: %24
-  %13 = builtin "cmp_eq_Int32"(%10 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int1 // user: %14
-  cond_br %13, bb2, bb4                           // id: %14
-
-bb2:                                              // Preds: bb1
-  %15 = enum $Optional<Int32>, #Optional.none!enumelt // user: %16
-  br bb3(%10 : $Builtin.Int32, %15 : $Optional<Int32>) // id: %16
-
-bb3(%17 : $Builtin.Int32, %18 : $Optional<Int32>):   // Preds: bb2 bb4
-  %19 = alloc_stack $Optional<Int32>                // users: %20, %26, %27, %40
-  store %18 to %19 : $*Optional<Int32>            // id: %20
-  switch_enum %18 : $Optional<Int32>, case #Optional.some!enumelt.1: bb5, case #Optional.none!enumelt: bb6 // id: %21
-
-bb4:                                              // Preds: bb1
-  %22 = builtin "sadd_with_overflow_Int32"(%10 : $Builtin.Int32, %2 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %23
-  %23 = tuple_extract %22 : $(Builtin.Int32, Builtin.Int1), 0 // user: %25
-  %24 = enum $Optional<Int32>, #Optional.some!enumelt.1, %11 : $Int32 // user: %25
-  br bb3(%23 : $Builtin.Int32, %24 : $Optional<Int32>) // id: %25
-
-bb5:                                              // Preds: bb3
-  %26 = unchecked_take_enum_data_addr %19 : $*Optional<Int32>, #Optional.some!enumelt.1
-  dealloc_stack %19 : $*Optional<Int32> // id: %27
-  %28 = alloc_stack $Optional<Int32>                // users: %29, %30, %31
-  store %18 to %28 : $*Optional<Int32>            // id: %29
-  %30 = unchecked_take_enum_data_addr %28 : $*Optional<Int32>, #Optional.some!enumelt.1
-  dealloc_stack %28 : $*Optional<Int32> // id: %31
-  // function_ref ginit.MyConst.mutableAddressor : Swift.Int32
-  %32 = function_ref @_TF5ginita7MyConstSi : $@convention(thin) () -> Builtin.RawPointer // user: %33
-  %33 = apply %32() : $@convention(thin) () -> Builtin.RawPointer // user: %34
-  %34 = pointer_to_address %33 : $Builtin.RawPointer to [strict] $*Int32 // user: %35
-  %35 = struct_element_addr %34 : $*Int32, #Int32._value // user: %36
-  %36 = load %35 : $*Builtin.Int32                 // user: %37
-  %37 = builtin "sadd_with_overflow_Int32"(%9 : $Builtin.Int32, %36 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %38
-  %38 = tuple_extract %37 : $(Builtin.Int32, Builtin.Int1), 0 // user: %39
-  br bb1(%38 : $Builtin.Int32, %17 : $Builtin.Int32) // id: %39
-
-bb6:                                              // Preds: bb3
-  dealloc_stack %19 : $*Optional<Int32> // id: %40
-  %41 = struct $Int32 (%9 : $Builtin.Int32)          // user: %42
-  return %41 : $Int32                               // id: %42
-}
-
-// libg.MyGlobal.mutableAddressor : Swift.Int32
-sil [global_init] @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
-
-// Hoist this initializer call out of a loop, but not into the function entry.
-// ginit.loop (Swift.Int32) -> Swift.Int32
-// CHECK-LABEL: sil @_TF10ginitloops3runFSiSi
-// CHECK: {{^bb2}}
-// CHECK: function_ref @_TF4libga8MyGlobalSi
-// CHECK-NEXT: apply
-// CHECK: {{^bb6}}
-// CHECK-NOT: addressor
-// CHECK-NOT: mutableAddressor
-// CHECK: pointer_to_address
-// CHECK: {{br bb6}}
-//
-// ginitloops.run (Swift.Int32) -> Swift.Int32
-sil @_TF10ginitloops3runFSiSi : $@convention(thin) (Int32) -> Int32 {
-bb0(%0 : $Int32):
-  %1 = integer_literal $Builtin.Int32, 1000        // user: %4
-  %3 = struct_extract %0 : $Int32, #Int32._value       // users: %4, %16, %29
-  %4 = builtin "cmp_sgt_Int32"(%3 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1 // user: %5
-  cond_br %4, bb1, bb2                            // id: %5
-
-bb1:                                              // Preds: bb0
-  %6 = integer_literal $Builtin.Int32, -1          // user: %7
-  %7 = struct $Int32 (%6 : $Builtin.Int32)           // user: %8
-  br bb9(%7 : $Int32)                               // id: %8
-
-bb2:                                              // Preds: bb0
-  %9 = integer_literal $Builtin.Int32, 0           // user: %11
-  %10 = integer_literal $Builtin.Int32, 1          // users: %11, %22, %25, %34
-  br bb3(%9 : $Builtin.Int32, %10 : $Builtin.Int32) // id: %11
-
-bb3(%12 : $Builtin.Int32, %13 : $Builtin.Int32):    // Preds: bb2 bb7
-  %14 = struct $Int32 (%13 : $Builtin.Int32)         // user: %24
-  %16 = builtin "cmp_eq_Int32"(%13 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1 // user: %17
-  cond_br %16, bb4, bb5                           // id: %17
-
-bb4:                                              // Preds: bb3
-  %18 = struct $Int32 (%12 : $Builtin.Int32)         // user: %19
-  br bb9(%18 : $Int32)                              // id: %19
-
-bb5:                                              // Preds: bb3
-  %21 = integer_literal $Builtin.Int1, -1         // user: %22
-  %22 = builtin "sadd_with_overflow_Int32"(%13 : $Builtin.Int32, %10 : $Builtin.Int32, %21 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %23
-  %23 = tuple_extract %22 : $(Builtin.Int32, Builtin.Int1), 0 // user: %31
-  %24 = enum $Optional<Int32>, #Optional.some!enumelt.1, %14 : $Int32
-  br bb6(%12 : $Builtin.Int32, %10 : $Builtin.Int32) // id: %25
-
-bb6(%26 : $Builtin.Int32, %27 : $Builtin.Int32):    // Preds: bb5 bb8
-  %28 = struct $Int32 (%27 : $Builtin.Int32)         // user: %36
-  %29 = builtin "cmp_eq_Int32"(%27 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1 // user: %30
-  cond_br %29, bb7, bb8                           // id: %30
-
-bb7:                                              // Preds: bb6
-  br bb3(%26 : $Builtin.Int32, %23 : $Builtin.Int32) // id: %31
-
-bb8:                                              // Preds: bb6
-  %33 = integer_literal $Builtin.Int1, -1         // user: %34
-  %34 = builtin "sadd_with_overflow_Int32"(%27 : $Builtin.Int32, %10 : $Builtin.Int32, %33 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %35
-  %35 = tuple_extract %34 : $(Builtin.Int32, Builtin.Int1), 0 // user: %46
-  %36 = enum $Optional<Int32>, #Optional.some!enumelt.1, %28 : $Int32
-  // function_ref libg.MyGlobal.mutableAddressor : Swift.Int32
-  %37 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer // user: %38
-  %38 = apply %37() : $@convention(thin) () -> Builtin.RawPointer // user: %39
-  %39 = pointer_to_address %38 : $Builtin.RawPointer to [strict] $*Int32 // user: %40
-  %40 = struct_element_addr %39 : $*Int32, #Int32._value // user: %41
-  %41 = load %40 : $*Builtin.Int32                 // user: %44
-  %43 = integer_literal $Builtin.Int1, -1         // user: %44
-  %44 = builtin "sadd_with_overflow_Int32"(%26 : $Builtin.Int32, %41 : $Builtin.Int32, %43 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %45
-  %45 = tuple_extract %44 : $(Builtin.Int32, Builtin.Int1), 0 // user: %46
-  br bb6(%45 : $Builtin.Int32, %35 : $Builtin.Int32) // id: %46
-
-bb9(%47 : $Int32):                                  // Preds: bb1 bb4
-  return %47 : $Int32                               // id: %48
-}
-
-
-// Do NOT hoist this initializer out of a cold block.
-// CHECK-LABEL: sil @_TF9ginitcold3runFSiSi
-// CHECK-NOT: addressor
-// CHECK-NOT: mutableAddressor
-// CHECK: {{^bb3}}
-// CHECK: cond_br
-// CHECK: {{^bb4}}
-// CHECK: function_ref @_TF4libga8MyGlobalSi
-// CHECK-NEXT: apply
-// CHECK: pointer_to_address
-// CHECK: br
-sil @_TF9ginitcold3runFSiSi : $@convention(thin) (Int32) -> Int32 {
-bb0(%0 : $Int32):
-  %1 = integer_literal $Builtin.Int32, 0           // users: %4, %19
-  %2 = integer_literal $Builtin.Int32, 1           // users: %4, %14
-  %3 = struct_extract %0 : $Int32, #Int32._value       // user: %8
-  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32)  // id: %4
-
-bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32):      // Preds: bb0 bb5
-  %8 = builtin "cmp_eq_Int32"(%6 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1 // user: %9
-  cond_br %8, bb2, bb3                            // id: %9
-
-bb2:                                              // Preds: bb1
-  %10 = struct $Int32 (%5 : $Builtin.Int32)          // user: %11
-  return %10 : $Int32                               // id: %11
-
-bb3:                                              // Preds: bb1
-  %13 = integer_literal $Builtin.Int1, -1         // users: %14, %29
-  %14 = builtin "sadd_with_overflow_Int32"(%6 : $Builtin.Int32, %2 : $Builtin.Int32, %13 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %15
-  %15 = tuple_extract %14 : $(Builtin.Int32, Builtin.Int1), 0 // user: %33
-  %16 = integer_literal $Builtin.Int32, 10         // user: %18
-  %18 = builtin "srem_Int32"(%5 : $Builtin.Int32, %16 : $Builtin.Int32) : $Builtin.Int32 // user: %19
-  %19 = builtin "cmp_eq_Int32"(%18 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1 // user: %22
-  %20 = integer_literal $Builtin.Int1, 0          // user: %22
-  %22 = builtin "int_expect_Int1"(%19 : $Builtin.Int1, %20 : $Builtin.Int1) : $Builtin.Int1 // user: %23
-  cond_br %22, bb4, bb5(%5 : $Builtin.Int32)       // id: %23
-
-bb4:                                              // Preds: bb3
-  // function_ref libg.MyGlobal.mutableAddressor : Swift.Int32
-  %24 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer // user: %25
-  %25 = apply %24() : $@convention(thin) () -> Builtin.RawPointer // user: %26
-  %26 = pointer_to_address %25 : $Builtin.RawPointer to [strict] $*Int32 // user: %27
-  %27 = struct_element_addr %26 : $*Int32, #Int32._value // user: %28
-  %28 = load %27 : $*Builtin.Int32                 // user: %29
-  %29 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %28 : $Builtin.Int32, %13 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %30
-  %30 = tuple_extract %29 : $(Builtin.Int32, Builtin.Int1), 0 // user: %31
-  br bb5(%30 : $Builtin.Int32)                     // id: %31
-
-bb5(%32 : $Builtin.Int32):                         // Preds: bb3 bb4
-  br bb1(%32 : $Builtin.Int32, %15 : $Builtin.Int32) // id: %33
-}
-
-// Combine two init calls into one in the common dominator
-// CHECK-LABEL: sil @test_common_dominator
-// CHECK: bb0(%0 : $Builtin.Int1):
-// CHECK: apply
-// CHECK: bb1:
-// CHECK-NOT: apply
-// CHECK: return
-sil @test_common_dominator : $@convention(thin) (Builtin.Int1) -> Int64 {
-bb0(%0 : $Builtin.Int1):
-  %1 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
-  %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int64
-  %4 = struct_element_addr %3 : $*Int64, #Int64._value
-  %5 = load %4 : $*Builtin.Int64
-  cond_br %0, bb1, bb2(%5 : $Builtin.Int64)
-
-bb1:
-  %8 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Int64
-  %10 = struct_element_addr %9 : $*Int64, #Int64._value
-  %11 = load %10 : $*Builtin.Int64
-  br bb2(%11 : $Builtin.Int64)
-
-bb2(%18 : $Builtin.Int64):
-  %19 = struct $Int64 (%18 : $Builtin.Int64)
-  return %19 : $Int64
-}
-
-// Combine two init calls into one in the common dominator
-// CHECK-LABEL: sil @test_common_dominator2
-// CHECK: bb0(%0 : $Builtin.Int1):
-// CHECK: apply
-// CHECK: bb1:
-// CHECK-NOT: apply
-// CHECK: return
-sil @test_common_dominator2 : $@convention(thin) (Builtin.Int1) -> Int64 {
-bb0(%0 : $Builtin.Int1):
-  cond_br %0, bb1, bb2
-
-bb1:
-  %1 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
-  %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int64
-  %4 = struct_element_addr %3 : $*Int64, #Int64._value
-  %5 = load %4 : $*Builtin.Int64
-  br bb3(%5 : $Builtin.Int64)
-
-bb2:
-  %11 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
-  %12 = apply %11() : $@convention(thin) () -> Builtin.RawPointer
-  %13 = pointer_to_address %12 : $Builtin.RawPointer to [strict] $*Int64
-  %14 = struct_element_addr %13 : $*Int64, #Int64._value
-  %15 = load %14 : $*Builtin.Int64
-  br bb3(%15 : $Builtin.Int64)
-
-bb3(%18 : $Builtin.Int64):
-  %19 = struct $Int64 (%18 : $Builtin.Int64)
-  return %19 : $Int64
-}
-
-// Test a special case: If there is a call in a loop and in its exit block, which is located
-// before the loop, the init-call should still be hoisted out of the loop.
-// CHECK-LABEL: sil @test_loopexit_and_loop
-// CHECK: bb0(%0 : $Builtin.Int1):
-// CHECK: apply
-// CHECK: bb1:
-// CHECK-NOT: apply
-// CHECK: return
-sil @test_loopexit_and_loop : $@convention(thin) (Builtin.Int1) -> Int64 {
-bb0(%0 : $Builtin.Int1):
-  br bb2
-
-bb1:
-  %1 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
-  %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int64
-  %4 = struct_element_addr %3 : $*Int64, #Int64._value
-  %5 = load %4 : $*Builtin.Int64
-  %r1 = struct $Int64 (%5 : $Builtin.Int64)
-  return %r1 : $Int64
-
-bb2:
-  %11 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
-  %12 = apply %11() : $@convention(thin) () -> Builtin.RawPointer
-  %13 = pointer_to_address %12 : $Builtin.RawPointer to [strict] $*Int64
-  %14 = struct_element_addr %13 : $*Int64, #Int64._value
-  %15 = load %14 : $*Builtin.Int64
-  cond_br %0, bb2, bb1
-}
-
-// An init-call, which is guarded by an availability-check may not be speculated.
-// In this test it may not be hoisted out of the loop.
-// CHECK-LABEL: sil @test_availability_loop
-// CHECK: [[INIT:%[0-9]+]] = function_ref @_TF4libga8MyGlobalSi
-// CHECK: {{^bb2:}}
-// CHECK-NEXT: apply [[INIT]]()
-sil @test_availability_loop : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : $Builtin.Int1):
-  %f1 = function_ref @test_availability : $@convention(thin) () -> Builtin.Int1
-  %f2 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
-  br bb1
-
-bb1:
-  %a1 = apply %f1() : $@convention(thin) () -> Builtin.Int1
-  cond_br %a1, bb2, bb4
-
-bb2:
-  %a2 = apply %f2() : $@convention(thin) () -> Builtin.RawPointer
-  br bb3
-
-bb3:
-  cond_br %0, bb1, bb4
-
-bb4:
-  %r = tuple ()
-  return %r : $()
-}
-
-// The init-call should be hoisted out of the inner loop, but not out of the
-// outer loop, because of the availability check around the inner loop.
-// CHECK-LABEL: sil @test_availability_loop_nest
-// CHECK: [[INIT:%[0-9]+]] = function_ref @_TF4libga8MyGlobalSi
-// CHECK: {{^bb2:}}
-// CHECK-NEXT: apply [[INIT]]()
-sil @test_availability_loop_nest : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : $Builtin.Int1):
-  %f1 = function_ref @test_availability : $@convention(thin) () -> Builtin.Int1
-  %f2 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
-  br bb1
-
-bb1:
-  %a1 = apply %f1() : $@convention(thin) () -> Builtin.Int1
-  cond_br %a1, bb2, bb4
-
-bb2:
-  br bb3
-
-bb3:
-  %a2 = apply %f2() : $@convention(thin) () -> Builtin.RawPointer
-  cond_br %0, bb3, bb4
-
-bb4:
-  cond_br %0, bb1, bb5
-
-bb5:
-  %r = tuple ()
-  return %r : $()
-}
-
-// The init-calls may not be moved to their common dominator because of
-// availability guards.
-// CHECK-LABEL: sil @test_availability_common_dominator
-// CHECK: [[INIT:%[0-9]+]] = function_ref @_TF4libga8MyGlobalSi
-// CHECK: {{^bb2:}}
-// CHECK-NEXT: apply [[INIT]]()
-// CHECK: {{^bb4:}}
-// CHECK-NEXT: apply [[INIT]]()
-sil @test_availability_common_dominator : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : $Builtin.Int1):
-  %f1 = function_ref @test_availability : $@convention(thin) () -> Builtin.Int1
-  %f2 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
-  cond_br %0, bb1, bb3
-
-bb1:
-  %a1 = apply %f1() : $@convention(thin) () -> Builtin.Int1
-  cond_br %a1, bb2, bb5
-
-bb2:
-  %a2 = apply %f2() : $@convention(thin) () -> Builtin.RawPointer
-  br bb5
-
-bb3:
-  %a3 = apply %f1() : $@convention(thin) () -> Builtin.Int1
-  cond_br %0, bb4, bb5
-
-bb4:
-  %a4 = apply %f2() : $@convention(thin) () -> Builtin.RawPointer
-  br bb5
-
-bb5:
-  %r = tuple ()
-  return %r : $()
-}
-
-sil [_semantics "availability.test"] @test_availability : $@convention(thin) () -> Builtin.Int1
 

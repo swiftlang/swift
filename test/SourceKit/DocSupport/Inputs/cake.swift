@@ -9,6 +9,7 @@ public class C1 : Prot {
   public typealias Element = Int
   public var p : Int = 0
   public func foo() {}
+  public __consuming func foo1(i0: __owned Int, i1: __shared Int) {}
 
   public subscript(index: Int) -> Int { return 0 }
   public subscript(index i: Float) -> Int { return 0 }
@@ -83,3 +84,40 @@ extension C1 : P4 {
     public func C1S1foo(a : P4) {}
   }
 }
+
+// rdar://problem/36553066
+
+public protocol P5 {
+    associatedtype Element
+}
+public protocol P6: P5 {}
+extension P6 {
+    public var null: Element? { return nil }
+}
+public struct S3<Wrapped: P5>: P5 {
+    public typealias Element = Wrapped.Element
+}
+extension S3: P6 where Wrapped: P6 {}
+
+/**
+some comments
+*/
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+public extension C1 {
+  func addition() {}
+}
+
+
+public struct Box<Wrapped> {
+    public func boxes() -> [Box<Wrapped.Element>] where Wrapped: Sequence { fatalError() }
+}
+
+public protocol P {
+    func foo()
+}
+
+public extension P {
+    func bar() where Self: Equatable {}
+}
+
+public func shouldPrintAnyAsKeyword(x: Any) {}

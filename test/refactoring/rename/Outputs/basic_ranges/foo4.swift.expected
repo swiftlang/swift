@@ -1,0 +1,29 @@
+struct S1 {}
+func foo1(a: S1) {}
+class C1 {}
+func foo2(c : C1) {}
+enum E1 {}
+func foo3(e : E1) {}
+func <base>foo4</base>(<arglabel index=0>a</arglabel><param index=0></param> : S1, <arglabel index=1>b</arglabel><param index=1></param> : C1, <arglabel index=2>c</arglabel><param index=2></param>: E1) { <base>foo4</base>(<callarg index=0>a</callarg><callcolon index=0>: </callcolon>a, <callarg index=1>b</callarg><callcolon index=1>: </callcolon>b, <callarg index=2>c</callarg><callcolon index=2> :</callcolon>c) }
+
+func test() {
+  struct SLocal {
+    init(x: S1) {}
+  }
+  func local(a: SLocal) {}
+  local(a: SLocal(x: S1()))
+}
+
+guard let top = Optional.some("top") else {
+  fatalError()
+}
+print(top)
+
+protocol P1 {}
+struct Test {
+  var test: P1 {
+    struct SP1: P1 {}
+    return SP1()
+  }
+}
+

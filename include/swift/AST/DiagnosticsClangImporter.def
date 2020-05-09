@@ -17,30 +17,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
-#endif
-
-#ifndef ERROR
-#  define ERROR(ID,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Options,Text,Signature)
-#endif
-
-#ifndef WARNING
-#  define WARNING(ID,Options,Text,Signature) \
-  DIAG(WARNING,ID,Options,Text,Signature)
-#endif
-
-#ifndef NOTE
-#  define NOTE(ID,Options,Text,Signature) \
-  DIAG(NOTE,ID,Options,Text,Signature)
-#endif
+#define DEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"
 
 WARNING(warning_from_clang,none,
   "%0", (StringRef))
 ERROR(error_from_clang,none,
   "%0", (StringRef))
 NOTE(note_from_clang,none,
+  "%0", (StringRef))
+REMARK(remark_from_clang,none,
   "%0", (StringRef))
 
 ERROR(clang_cannot_build_module,Fatal,
@@ -56,6 +42,12 @@ WARNING(could_not_rewrite_bridging_header,none,
 ERROR(bridging_header_pch_error,Fatal,
    "failed to emit precompiled header '%0' for bridging header '%1'",
    (StringRef, StringRef))
+
+ERROR(emit_pcm_error,Fatal,
+   "failed to emit precompiled module '%0' for module map '%1'",
+   (StringRef, StringRef))
+ERROR(dump_pcm_error,Fatal,
+   "failed to dump precompiled module '%0'", (StringRef))
 
 WARNING(invalid_swift_name_method,none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
@@ -79,16 +71,14 @@ WARNING(unresolvable_clang_decl,none,
         "imported declaration '%0' could not be mapped to '%1'",
         (StringRef, StringRef))
 
+NOTE(unresolvable_clang_decl_is_a_framework_bug,none,
+     "please report this issue to the owners of '%0'",
+     (StringRef))
+
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "
         "is deprecated and will be removed in a later version of Swift",
         (StringRef, Identifier))
 
-#ifndef DIAG_NO_UNDEF
-# if defined(DIAG)
-#  undef DIAG
-# endif
-# undef NOTE
-# undef WARNING
-# undef ERROR
-#endif
+#define UNDEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"

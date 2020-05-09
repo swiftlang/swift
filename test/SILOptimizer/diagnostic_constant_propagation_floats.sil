@@ -1,0 +1,86 @@
+// RUN: %target-sil-opt %s -diagnostic-constant-propagation -o /dev/null -verify
+//
+// Tests for checking floating-point diagnostics produced by constant
+// propagation phase on SIL inputs. The diagnostics rely on AST information.
+// This file tests to make sure that diagnostics are correctly emitted when
+// AST information is not available.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil @testFPToInt8 : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0xC060000000000000 // -128
+%1 = builtin "fptosi_FPIEEE64_Int8"(%0 : $Builtin.FPIEEE64) : $Builtin.Int8
+%2 = float_literal $Builtin.FPIEEE64, 0xC060200000000000 // -129
+%3 = builtin "fptosi_FPIEEE64_Int8"(%2 : $Builtin.FPIEEE64) : $Builtin.Int8 // expected-error {{invalid conversion: '-129' overflows 'Builtin.Int8'}}
+return %1 : $Builtin.Int8
+}
+
+sil @testFPToUInt8 : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x4070000000000000 // 256
+%1 = builtin "fptoui_FPIEEE64_Int8"(%0 : $Builtin.FPIEEE64) : $Builtin.Int8 // expected-error {{invalid conversion: '256' overflows 'Builtin.Int8'}}
+%2 = float_literal $Builtin.FPIEEE64, 0x8000000000000000 // -0
+%3 = builtin "fptoui_FPIEEE64_Int8"(%2 : $Builtin.FPIEEE64) : $Builtin.Int8
+%4 = float_literal $Builtin.FPIEEE64, 0xC069000000000000 // -200
+%5 = builtin "fptoui_FPIEEE64_Int8"(%4 : $Builtin.FPIEEE64) : $Builtin.Int8 // expected-error {{negative literal '-200' cannot be converted to unsigned 'Builtin.Int8'}}
+return %5 : $Builtin.Int8
+}
+
+sil @testFPToInt16 : $@convention(thin) () -> Builtin.Int16 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x40DFFFC000000000 // 32767
+%1 = builtin "fptosi_FPIEEE64_Int16"(%0 : $Builtin.FPIEEE64) : $Builtin.Int16
+%2 = float_literal $Builtin.FPIEEE64, 0x40E0000000000000 // 32768
+%3 = builtin "fptosi_FPIEEE64_Int16"(%2 : $Builtin.FPIEEE64) : $Builtin.Int16 // expected-error {{invalid conversion: '32768' overflows 'Builtin.Int16'}}
+%4 = float_literal $Builtin.FPIEEE64,  0xC0E3880000000000 // -4.0E+4
+%5 = builtin "fptosi_FPIEEE64_Int16"(%4 : $Builtin.FPIEEE64) : $Builtin.Int16 // expected-error {{invalid conversion: '-4.0E+4' overflows 'Builtin.Int16'}}
+return %1 : $Builtin.Int16
+}
+
+sil @testFPToUInt16 : $@convention(thin) () -> Builtin.Int16 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x40EFFFE000000000 // 65535
+%1 = builtin "fptoui_FPIEEE64_Int16"(%0 : $Builtin.FPIEEE64) : $Builtin.Int16
+%2 = float_literal $Builtin.FPIEEE64, 0x40F0000000000000 // 65536
+%3 = builtin "fptoui_FPIEEE64_Int16"(%2 : $Builtin.FPIEEE64) : $Builtin.Int16 // expected-error {{invalid conversion: '65536' overflows 'Builtin.Int16'}}
+%4 = float_literal $Builtin.FPIEEE64, 0xC0F1170000000000 // -7.0E+4
+%5 = builtin "fptoui_FPIEEE64_Int16"(%4 : $Builtin.FPIEEE64) : $Builtin.Int16 // expected-error {{negative literal '-7.0E+4' cannot be converted to unsigned 'Builtin.Int16'}}
+return %1 : $Builtin.Int16
+}
+
+sil @testFPToInt32 : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0xC1E0000000000000 // -2147483648
+%1 = builtin "fptosi_FPIEEE64_Int32"(%0 : $Builtin.FPIEEE64) : $Builtin.Int32
+%2 = float_literal $Builtin.FPIEEE64, 0xC1E0000000200000 // -2147483649
+%3 = builtin "fptosi_FPIEEE64_Int32"(%2 : $Builtin.FPIEEE64) : $Builtin.Int32 // expected-error {{invalid conversion: '-2147483649' overflows 'Builtin.Int32'}}
+%4 = float_literal $Builtin.FPIEEE64, 0x41E65A0BC0000000 // 3.0E+9
+%5 = builtin "fptosi_FPIEEE64_Int32"(%4 : $Builtin.FPIEEE64) : $Builtin.Int32 // expected-error {{invalid conversion: '3.0E+9' overflows 'Builtin.Int32'}}
+return %1 : $Builtin.Int32
+}
+
+sil @testFPToUInt32 : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x41EFFFFFFFE00000 // 4294967295
+%1 = builtin "fptoui_FPIEEE64_Int32"(%0 : $Builtin.FPIEEE64) : $Builtin.Int32
+%2 = float_literal $Builtin.FPIEEE64, 0x41F0000000000000 // 4294967296
+%3 = builtin "fptoui_FPIEEE64_Int32"(%2 : $Builtin.FPIEEE64) : $Builtin.Int32 // expected-error {{invalid conversion: '4294967296' overflows 'Builtin.Int32'}}
+%4 = float_literal $Builtin.FPIEEE64,  0xC1F2A05F20000000 // -5.0E+9
+%5 = builtin "fptoui_FPIEEE64_Int32"(%4 : $Builtin.FPIEEE64) : $Builtin.Int32 // expected-error {{negative literal '-5.0E+9' cannot be converted to unsigned 'Builtin.Int32'}}
+return %1 : $Builtin.Int32
+}
+
+sil @testFPToInt64 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x43E0000000000000 // 9223372036854775807
+%1 = builtin "fptosi_FPIEEE64_Int64"(%0 : $Builtin.FPIEEE64) : $Builtin.Int64 // expected-error {{invalid conversion: '9.2233720368547758E+18' overflows 'Builtin.Int64'}}
+%2 = float_literal $Builtin.FPIEEE64, 0xC3E0000000000000 // -9223372036854775808
+%3 = builtin "fptosi_FPIEEE64_Int64"(%2 : $Builtin.FPIEEE64) : $Builtin.Int64
+%4 = float_literal $Builtin.FPIEEE64, 0x43E0000000000000 // 9223372036854775808
+%5 = builtin "fptosi_FPIEEE64_Int64"(%4 : $Builtin.FPIEEE64) : $Builtin.Int64 // expected-error {{invalid conversion: '9.2233720368547758E+18' overflows 'Builtin.Int64'}}
+return %1 : $Builtin.Int64
+}

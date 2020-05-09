@@ -1,0 +1,5 @@
+// RUN: rm -f %t.*
+// RUN: %target-sil-opt -enable-sil-verify-all=true -sil-disable-ast-dump %platform-module-dir/Swift.swiftmodule/%target-swiftmodule-name -module-name=Swift -o %t.sil || %target-sil-opt -enable-sil-verify-all=true -sil-disable-ast-dump %platform-module-dir/Swift.swiftmodule -module-name=Swift -o %t.sil
+// RUN: %target-sil-opt -enable-sil-verify-all=true %t.sil > /dev/null
+// REQUIRES: long_test
+// REQUIRES: nonexecutable_test

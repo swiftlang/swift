@@ -35,8 +35,8 @@ using namespace swift;
 //                              Extra Interfaces
 //===----------------------------------------------------------------------===//
 
-void swift_leaks_stopTrackingObjCObject(id obj);
-void swift_leaks_startTrackingObjCObject(id obj);
+static void _swift_leaks_stopTrackingObjCObject(id obj);
+static void _swift_leaks_startTrackingObjCObject(id obj);
 
 //===----------------------------------------------------------------------===//
 //                                   State
@@ -64,24 +64,23 @@ static IMP old_allocWithZone_fun;
 //===----------------------------------------------------------------------===//
 
 static void __swift_leaks_dealloc(id self, SEL _cmd) {
-  swift_leaks_stopTrackingObjCObject(self);
+  _swift_leaks_stopTrackingObjCObject(self);
   ((void (*)(id, SEL))old_dealloc_fun)(self, _cmd);
 }
 
 static id __swift_leaks_alloc(id self, SEL _cmd) {
   id result = ((id (*)(id, SEL))old_alloc_fun)(self, _cmd);
-  swift_leaks_startTrackingObjCObject(result);
+  _swift_leaks_startTrackingObjCObject(result);
   return result;
 }
 
 static id __swift_leaks_allocWithZone(id self, SEL _cmd, id zone) {
   id result = ((id (*)(id, SEL, id))old_allocWithZone_fun)(self, _cmd, zone);
-  swift_leaks_startTrackingObjCObject(result);
+  _swift_leaks_startTrackingObjCObject(result);
   return result;
 }
 
-SWIFT_CC(swift)
-extern "C" void swift_leaks_startTrackingObjects(const char *name) {
+void _swift_leaks_startTrackingObjects(const char *name) {
   pthread_mutex_lock(&LeaksMutex);
 
   // First clear our tracked objects set.
@@ -132,10 +131,13 @@ static void dumpSwiftHeapObjects() {
     kindDescriptor = #name;                                                    \
     break;
 #include "swift/ABI/MetadataKind.def"
+    default:
+      kindDescriptor = "unknown";
+      break;
     }
 
-    if (const NominalTypeDescriptor *NTD =
-            Metadata->getNominalTypeDescriptor()) {
+    if (auto *NTD =
+            Metadata->getTypeContextDescriptor()) {
       fprintf(stderr, "{"
                       "\"type\": \"nominal\", "
                       "\"name\": \"%s\", "
@@ -160,8 +162,7 @@ static void dumpObjCHeapObjects() {
   }
 }
 
-SWIFT_CC(swift)
-extern "C" int swift_leaks_stopTrackingObjects(const char *name) {
+int _swift_leaks_stopTrackingObjects(const char *name) {
   pthread_mutex_lock(&LeaksMutex);
   unsigned Result = TrackedSwiftObjects->size() + TrackedObjCObjects->size();
 
@@ -198,7 +199,7 @@ extern "C" int swift_leaks_stopTrackingObjects(const char *name) {
 //                               Tracking Code
 //===----------------------------------------------------------------------===//
 
-extern "C" void swift_leaks_startTrackingObject(HeapObject *Object) {
+void _swift_leaks_startTrackingObject(HeapObject *Object) {
   pthread_mutex_lock(&LeaksMutex);
   if (ShouldTrackObjects) {
     TrackedSwiftObjects->insert(Object);
@@ -206,13 +207,13 @@ extern "C" void swift_leaks_startTrackingObject(HeapObject *Object) {
   pthread_mutex_unlock(&LeaksMutex);
 }
 
-extern "C" void swift_leaks_stopTrackingObject(HeapObject *Object) {
+void _swift_leaks_stopTrackingObject(HeapObject *Object) {
   pthread_mutex_lock(&LeaksMutex);
   TrackedSwiftObjects->erase(Object);
   pthread_mutex_unlock(&LeaksMutex);
 }
 
-void swift_leaks_startTrackingObjCObject(id Object) {
+static void _swift_leaks_startTrackingObjCObject(id Object) {
   pthread_mutex_lock(&LeaksMutex);
   if (ShouldTrackObjects) {
     TrackedObjCObjects->insert(Object);
@@ -220,7 +221,7 @@ void swift_leaks_startTrackingObjCObject(id Object) {
   pthread_mutex_unlock(&LeaksMutex);
 }
 
-void swift_leaks_stopTrackingObjCObject(id Object) {
+static void _swift_leaks_stopTrackingObjCObject(id Object) {
   pthread_mutex_lock(&LeaksMutex);
   TrackedObjCObjects->erase(Object);
   pthread_mutex_unlock(&LeaksMutex);

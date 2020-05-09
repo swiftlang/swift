@@ -28,21 +28,11 @@
 
 from __future__ import print_function
 
+import argparse
 import re
 import subprocess
 import sys
 import tempfile
-
-
-def help():
-    print("""\
-Usage:
-
-viewcfg [output-suffix] < file
-
-By default all CFGs are opened in the same window.
-Use the a unique output-suffix to open a CFG in a new window.
-""")
 
 
 class Block(object):
@@ -77,30 +67,41 @@ class Block(object):
                 for match in re.finditer(r'\bbb[0-9]+\b', self.last_line):
                     self.succs.append(match.group())
 
-                for match in re.finditer(r'\blabel %(\S+)\b', self.last_line):
+                it = re.finditer(r'\blabel %"?([^\s"]+)\b', self.last_line)
+                for match in it:
                     self.succs.append(match.group(1))
 
         return self.succs
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="""
+    Simple regex based transform of SIL and LLVM-IR into graphviz form.
+    """)
+    parser.add_argument("output_suffix", nargs='?')
+    parser.add_argument("--input_file", type=argparse.FileType('r'),
+                        default=sys.stdin)
+    parser.add_argument("--renderer", choices=["Graphviz", "dot"],
+                        default="Graphviz", help="Default is Graphviz")
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     suffix = ""
-    if len(sys.argv) >= 2:
-        if sys.argv[1].startswith('-'):
-            help()
-            return
-        suffix = sys.argv[1]
+    if args.output_suffix:
+        suffix = args.output_suffix
 
     block_list = []
     block_map = {}
     cur_block = None
     sil_block_pattern = re.compile(r'^(\S+)(\(.*\))?: *(\/\/ *Preds:(.*))?$')
-    llvm_block_pattern1 = re.compile(r'^(\S+): *; *preds =(.*)?$')
-    llvm_block_pattern2 = re.compile(r'^; <label>:(\d+):? *; *preds =(.*)?$')
+    llvm_block_pattern1 = re.compile(r'^"?([^\s"]+)"?: *; *preds =(.*)?$')
+    llvm_block_pattern2 = re.compile(r'^(\d+):? *; *preds =(.*)?$')
 
     # Scan the input file.
-
-    for line in sys.stdin:
+    for line in args.input_file.readlines():
         sil_block_match = sil_block_pattern.match(line)
         llvm_block_match1 = llvm_block_pattern1.match(line)
         llvm_block_match2 = llvm_block_pattern2.match(line)
@@ -148,7 +149,6 @@ def main():
                 pred_block.get_succs().append(block.name)
 
     # Write the output dot file.
-
     file_name = tempfile.gettempdir() + "/viewcfg" + suffix + ".dot"
     with open(file_name, 'w') as out_file:
         out_file.write('digraph "CFG" {\n')
@@ -171,9 +171,15 @@ def main():
 
         out_file.write("}\n")
 
-    # Open the dot file (should be done with Graphviz).
-
-    subprocess.call(["open", file_name])
+    # Open the dot file with the appropriate renderer.
+    if args.renderer == 'Graphviz':
+        subprocess.call(["open", "-a", "Graphviz", file_name])
+    elif args.renderer == 'dot':
+        pdf = '%s.pdf' % file_name
+        subprocess.call(["dot", "-Tpdf", file_name, '-o%s' % pdf])
+        subprocess.call(["open", "-a", "Preview", pdf])
+    else:
+        raise RuntimeError('Unknown renderer?!')
 
 
 if __name__ == '__main__':

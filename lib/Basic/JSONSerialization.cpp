@@ -20,9 +20,6 @@ using namespace swift;
 unsigned Output::beginArray() {
   StateStack.push_back(ArrayFirstValue);
   Stream << '[';
-  if (PrettyPrint) {
-    Stream << '\n';
-  }
   return 0;
 }
 
@@ -30,11 +27,11 @@ bool Output::preflightElement(unsigned, void *&) {
   if (StateStack.back() != ArrayFirstValue) {
     assert(StateStack.back() == ArrayOtherValue && "We must be in a sequence!");
     Stream << ',';
-    if (PrettyPrint)
-      Stream << '\n';
   }
-  if (PrettyPrint)
+  if (PrettyPrint) {
+    Stream << '\n';
     indent();
+  }
   return true;
 }
 
@@ -46,8 +43,9 @@ void Output::postflightElement(void*) {
 }
 
 void Output::endArray() {
+  bool HadContent = StateStack.back() != ArrayFirstValue;
   StateStack.pop_back();
-  if (PrettyPrint) {
+  if (PrettyPrint && HadContent) {
     Stream << '\n';
     indent();
   }
@@ -66,31 +64,30 @@ bool Output::canElideEmptyArray() {
 void Output::beginObject() {
   StateStack.push_back(ObjectFirstKey);
   Stream << "{";
-  if (PrettyPrint)
-    Stream << '\n';
 }
 
 void Output::endObject() {
+  bool HadContent = StateStack.back() != ObjectFirstKey;
   StateStack.pop_back();
-  if (PrettyPrint) {
+  if (PrettyPrint && HadContent) {
     Stream << '\n';
     indent();
   }
   Stream << "}";
 }
 
-bool Output::preflightKey(const char *Key, bool Required, bool SameAsDefault,
+bool Output::preflightKey(StringRef Key, bool Required, bool SameAsDefault,
                           bool &UseDefault, void *&) {
   UseDefault = false;
   if (Required || !SameAsDefault) {
     if (StateStack.back() != ObjectFirstKey) {
       assert(StateStack.back() == ObjectOtherKey && "We must be in an object!");
       Stream << ',';
-      if (PrettyPrint)
-        Stream << '\n';
     }
-    if (PrettyPrint)
+    if (PrettyPrint) {
+      Stream << '\n';
       indent();
+    }
     Stream << '"' << Key << "\":";
     if (PrettyPrint)
       Stream << ' ';
@@ -222,6 +219,10 @@ void Output::scalarString(StringRef &S, bool MustQuote) {
     Stream << S;
 }
 
+void Output::null() {
+  Stream << "null";
+}
+
 void Output::indent() {
   Stream.indent(StateStack.size() * 2);
 }
@@ -230,18 +231,17 @@ void Output::indent() {
 //  traits for built-in types
 //===----------------------------------------------------------------------===//
 
-void ScalarTraits<bool>::output(const bool &Val, raw_ostream &Out) {
-  Out << (Val ? "true" : "false");
+StringRef ScalarReferenceTraits<bool>::stringRef(const bool &Val) {
+  return (Val ? "true" : "false");
 }
 
-void ScalarTraits<StringRef>::output(const StringRef &Val,
-                                     raw_ostream &Out) {
-  Out << Val;
+StringRef ScalarReferenceTraits<StringRef>::stringRef(const StringRef &Val) {
+  return Val;
 }
 
-void ScalarTraits<std::string>::output(const std::string &Val,
-                                       raw_ostream &Out) {
-  Out << Val;
+StringRef
+ScalarReferenceTraits<std::string>::stringRef(const std::string &Val) {
+  return Val;
 }
 
 void ScalarTraits<uint8_t>::output(const uint8_t &Val,

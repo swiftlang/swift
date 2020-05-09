@@ -5,8 +5,8 @@ var f = false
 
 func markUsed<T>(_ t: T) {}
 
-markUsed(t != nil) // expected-warning {{comparing non-optional value of type 'Bool' to nil always returns true}}
-markUsed(f != nil) // expected-warning {{comparing non-optional value of type 'Bool' to nil always returns true}}
+markUsed(t != nil) // expected-warning {{comparing non-optional value of type 'Bool' to 'nil' always returns true}}
+markUsed(f != nil) // expected-warning {{comparing non-optional value of type 'Bool' to 'nil' always returns true}}
 
 class C : Equatable {}
 
@@ -15,7 +15,7 @@ func == (lhs: C, rhs: C) -> Bool {
 }
 
 func test(_ c: C) {
-  if c == nil {}  // expected-warning {{comparing non-optional value of type 'C' to nil always returns false}}
+  if c == nil {}  // expected-warning {{comparing non-optional value of type 'C' to 'nil' always returns false}}
 }
 
 class D {}
@@ -28,4 +28,4 @@ _ = d! // expected-error {{cannot force unwrap value of non-optional type 'D'}}
 _ = dopt == nil
 _ = diuopt == nil
 _ = diuopt is ExpressibleByNilLiteral // expected-warning {{'is' test is always true}}
-// expected-warning@-1 {{conditional cast from 'D!' to 'ExpressibleByNilLiteral' always succeeds}}
+// expected-warning@-1 {{conditional cast from 'D?' to 'ExpressibleByNilLiteral' always succeeds}}

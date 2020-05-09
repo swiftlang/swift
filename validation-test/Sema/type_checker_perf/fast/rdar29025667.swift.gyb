@@ -1,0 +1,10 @@
+// RUN: %scale-test --begin 2 --end 7 --step 1 --select NumLeafScopes %s
+// REQUIRES: asserts,no_asan
+
+let s: String? = nil
+
+let _:[String: Any] = [
+%for i in range(0, N):
+  "${i}":  s ?? "",
+%end
+]

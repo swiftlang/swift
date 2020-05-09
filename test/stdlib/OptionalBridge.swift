@@ -70,7 +70,9 @@ tests.test("wrapped value") {
 struct NotBridged: Hashable {
   var x: Int
 
-  var hashValue: Int { return x }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(x)
+  }
 
   static func ==(x: NotBridged, y: NotBridged) -> Bool {
     return x.x == y.x

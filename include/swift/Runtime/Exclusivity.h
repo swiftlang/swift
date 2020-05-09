@@ -24,7 +24,9 @@
 namespace swift {
 
 enum class ExclusivityFlags : uintptr_t;
-struct ValueBuffer;
+template <typename Runtime> struct TargetValueBuffer;
+struct InProcess;
+using ValueBuffer = TargetValueBuffer<InProcess>;
 
 /// Begin dynamically tracking an access.
 ///
@@ -37,6 +39,26 @@ struct ValueBuffer;
 SWIFT_RUNTIME_EXPORT
 void swift_beginAccess(void *pointer, ValueBuffer *buffer,
                        ExclusivityFlags flags, void *pc);
+
+/// Loads the replacement function pointer from \p ReplFnPtr and returns the
+/// replacement function if it should be called.
+/// Returns null if the original function (which is passed in \p CurrFn) should
+/// be called.
+#ifdef __APPLE__
+__attribute__((weak_import))
+#endif
+SWIFT_RUNTIME_EXPORT
+char *swift_getFunctionReplacement(char **ReplFnPtr, char *CurrFn);
+
+/// Returns the original function of a replaced function, which is loaded from
+/// \p OrigFnPtr.
+/// This function is called from a replacement function to call the original
+/// function.
+#ifdef __APPLE__
+__attribute__((weak_import))
+#endif
+SWIFT_RUNTIME_EXPORT
+char *swift_getOrigOfReplaceable(char **OrigFnPtr);
 
 /// Stop dynamically tracking an access.
 SWIFT_RUNTIME_EXPORT
@@ -55,6 +77,19 @@ void swift_endAccess(ValueBuffer *buffer);
 /// buffers on the stack sitting around in the runtime.)
 SWIFT_RUNTIME_EXPORT
 bool _swift_disableExclusivityChecking;
+
+#ifndef NDEBUG
+
+/// Dump all accesses currently tracked by the runtime.
+///
+/// This is a debug routine that is intended to be used from the debugger and is
+/// compiled out when asserts are disabled. The intention is that it allows one
+/// to dump the access state to easily see if/when exclusivity violations will
+/// happen. This eases debugging.
+SWIFT_RUNTIME_EXPORT
+void swift_dumpTrackedAccesses();
+
+#endif
 
 } // end namespace swift
 

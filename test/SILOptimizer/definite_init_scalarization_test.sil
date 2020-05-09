@@ -1,0 +1,222 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering | %FileCheck %s
+//
+// Make sure that we properly scalarize tuples.
+//
+// TODO: This should be split out into its own pass /before/ DI rather than
+// running during DI. Even once that happens, it is important that we update
+// this test so that the test is in its post scalarization state so we can
+// verify that DI can properly look through destructures.
+
+sil_stage raw
+
+import Builtin
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+struct TripleInt {
+  var a, b, c: Int
+}
+
+struct ObjectValue {
+  var a : Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $TripleInt, [[ARG1:%.*]] : $TripleInt, [[ARG2:%.*]] : $TripleInt):
+// CHECK:   [[BOX:%.*]] = alloc_box
+// CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
+// CHECK:   [[ELT0:%.*]] = tuple_element_addr [[PB_BOX]] : $*(TripleInt, (TripleInt, TripleInt)), 0
+// CHECK:   [[ELT1:%.*]] = tuple_element_addr [[PB_BOX]] : $*(TripleInt, (TripleInt, TripleInt)), 1
+// CHECK:   [[ELT10:%.*]] = tuple_element_addr [[ELT1]] : $*(TripleInt, TripleInt), 0
+// CHECK:   [[ELT11:%.*]] = tuple_element_addr [[ELT1]] : $*(TripleInt, TripleInt), 1
+// CHECK:   [[RHS_TUP:%.*]] = tuple ([[ARG0]] : ${{.*}}, [[ARG1:%.*]] : ${{.*}})
+// CHECK:   [[TUP:%.*]] = tuple ([[ARG2:%.*]] : ${{.*}}, [[RHS_TUP]] : ${{.*}})
+// CHECK:   ([[DESTRUCTURE_TUP_LHS:%.*]], [[DESTRUCTURE_TUP_RHS:%.*]]) = destructure_tuple [[TUP]] : $(TripleInt, (TripleInt, TripleInt))
+// CHECK:   store [[DESTRUCTURE_TUP_LHS]] to [trivial] [[ELT0]]
+// CHECK:   ([[DESTRUCTURE_TUP_RHS_LHS:%.*]], [[DESTRUCTURE_TUP_RHS_RHS:%.*]]) = destructure_tuple [[DESTRUCTURE_TUP_RHS]] : $(TripleInt, TripleInt)
+// CHECK:   store [[DESTRUCTURE_TUP_RHS_LHS]] to [trivial] [[ELT10]]
+// CHECK:   store [[DESTRUCTURE_TUP_RHS_RHS]] to [trivial] [[ELT11]]
+// CHECK:   destroy_value [[BOX]]
+// CHECK: } // end sil function 'test_store_trivial'
+sil [ossa] @test_store_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
+  %5 = tuple(%0 : $TripleInt, %1 : $TripleInt)
+  %6 = tuple(%1a : $TripleInt, %5 : $(TripleInt, TripleInt))
+  store %6 to [trivial] %4 : $*(TripleInt, (TripleInt, TripleInt))
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : @owned $Builtin.NativeObject, [[ARG2:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:   [[BOX:%.*]] = alloc_box
+// CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
+// CHECK:   [[ELT0:%.*]] = tuple_element_addr [[PB_BOX]] : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject)), 0
+// CHECK:   [[ELT1:%.*]] = tuple_element_addr [[PB_BOX]] : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject)), 1
+// CHECK:   [[ELT10:%.*]] = tuple_element_addr [[ELT1]] : $*(Builtin.NativeObject, Builtin.NativeObject), 0
+// CHECK:   [[ELT11:%.*]] = tuple_element_addr [[ELT1]] : $*(Builtin.NativeObject, Builtin.NativeObject), 1
+// CHECK:   [[RHS_TUP:%.*]] = tuple ([[ARG0]] : ${{.*}}, [[ARG1:%.*]] : ${{.*}})
+// CHECK:   [[TUP:%.*]] = tuple ([[ARG2:%.*]] : ${{.*}}, [[RHS_TUP]] : ${{.*}})
+// CHECK:   ([[DESTRUCTURE_TUP_LHS:%.*]], [[DESTRUCTURE_TUP_RHS:%.*]]) = destructure_tuple [[TUP]] : $(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+// CHECK:   store [[DESTRUCTURE_TUP_LHS]] to [init] [[ELT0]]
+// CHECK:   ([[DESTRUCTURE_TUP_RHS_LHS:%.*]], [[DESTRUCTURE_TUP_RHS_RHS:%.*]]) = destructure_tuple [[DESTRUCTURE_TUP_RHS]] : $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK:   store [[DESTRUCTURE_TUP_RHS_LHS]] to [init] [[ELT10]]
+// CHECK:   store [[DESTRUCTURE_TUP_RHS_RHS]] to [init] [[ELT11]]
+// CHECK:   destroy_value [[BOX]]
+// CHECK: } // end sil function 'test_store_owned'
+sil [ossa] @test_store_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : @owned $Builtin.NativeObject):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
+  %5 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
+  %6 = tuple(%1a : $Builtin.NativeObject, %5 : $(Builtin.NativeObject, Builtin.NativeObject))
+  store %6 to [init] %4 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_assign_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $TripleInt, [[ARG1:%.*]] : $TripleInt, [[ARG2:%.*]] : $TripleInt):
+// CHECK:   [[BOX:%.*]] = alloc_box
+// CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
+// CHECK:   [[ELT0:%.*]] = tuple_element_addr [[PB_BOX]] : $*(TripleInt, (TripleInt, TripleInt)), 0
+// CHECK:   [[ELT1:%.*]] = tuple_element_addr [[PB_BOX]] : $*(TripleInt, (TripleInt, TripleInt)), 1
+// CHECK:   [[ELT10:%.*]] = tuple_element_addr [[ELT1]] : $*(TripleInt, TripleInt), 0
+// CHECK:   [[ELT11:%.*]] = tuple_element_addr [[ELT1]] : $*(TripleInt, TripleInt), 1
+// CHECK:   [[RHS_TUP:%.*]] = tuple ([[ARG0]] : ${{.*}}, [[ARG1:%.*]] : ${{.*}})
+// CHECK:   [[TUP:%.*]] = tuple ([[ARG2:%.*]] : ${{.*}}, [[RHS_TUP]] : ${{.*}})
+// CHECK:   ([[DESTRUCTURE_TUP_LHS:%.*]], [[DESTRUCTURE_TUP_RHS:%.*]]) = destructure_tuple [[TUP]] : $(TripleInt, (TripleInt, TripleInt))
+// CHECK:   store [[DESTRUCTURE_TUP_LHS]] to [trivial] [[ELT0]]
+// CHECK:   ([[DESTRUCTURE_TUP_RHS_LHS:%.*]], [[DESTRUCTURE_TUP_RHS_RHS:%.*]]) = destructure_tuple [[DESTRUCTURE_TUP_RHS]] : $(TripleInt, TripleInt)
+// CHECK:   store [[DESTRUCTURE_TUP_RHS_LHS]] to [trivial] [[ELT10]]
+// CHECK:   store [[DESTRUCTURE_TUP_RHS_RHS]] to [trivial] [[ELT11]]
+// CHECK:   destroy_value [[BOX]]
+// CHECK: } // end sil function 'test_assign_trivial'
+sil [ossa] @test_assign_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
+  %5 = tuple(%0 : $TripleInt, %1 : $TripleInt)
+  %6 = tuple(%1a : $TripleInt, %5 : $(TripleInt, TripleInt))
+  assign %6 to %4 : $*(TripleInt, (TripleInt, TripleInt))
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_assign_trivial_2 : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $TripleInt, [[ARG1:%.*]] : $TripleInt, [[ARG2:%.*]] : $TripleInt):
+// CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[BOX]] : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
+// CHECK:   [[PROJ_BOX_0:%.*]] = tuple_element_addr [[PROJ_BOX]] : $*(TripleInt, (TripleInt, TripleInt)), 0
+// CHECK:   [[PROJ_BOX_1:%.*]] = tuple_element_addr [[PROJ_BOX]] : $*(TripleInt, (TripleInt, TripleInt)), 1
+// CHECK:   [[PROJ_BOX_10:%.*]] = tuple_element_addr %6 : $*(TripleInt, TripleInt), 0
+// CHECK:   [[PROJ_BOX_11:%.*]] = tuple_element_addr %6 : $*(TripleInt, TripleInt), 1
+// CHECK:   [[TUP11:%.*]] = tuple ([[ARG0]] : $TripleInt, [[ARG1]] : $TripleInt)
+// CHECK:   [[TUP1:%.*]] = tuple ([[ARG2]] : $TripleInt, [[TUP11]] : $(TripleInt, TripleInt))
+// CHECK:   [[TUP1_2nd:%.*]] = tuple ([[ARG2]] : $TripleInt, [[TUP11]] : $(TripleInt, TripleInt))
+// CHECK:   ([[TUP1_D_0:%.*]], [[TUP1_D_1:%.*]]) = destructure_tuple [[TUP1]] : $(TripleInt, (TripleInt, TripleInt))
+// CHECK:   store [[TUP1_D_0]] to [trivial] [[PROJ_BOX_0]] : $*TripleInt
+// CHECK:   ([[TUP1_D_1_0:%.*]], [[TUP1_D_1_1:%.*]]) = destructure_tuple [[TUP1_D_1]] : $(TripleInt, TripleInt)
+// CHECK:   store [[TUP1_D_1_0]] to [trivial] [[PROJ_BOX_10]] : $*TripleInt
+// CHECK:   store [[TUP1_D_1_1]] to [trivial] [[PROJ_BOX_11]] : $*TripleInt
+// CHECK:   ([[TUP1_2nd_0:%.*]], [[TUP1_2nd_1:%.*]]) = destructure_tuple [[TUP1_2nd]] : $(TripleInt, (TripleInt, TripleInt))
+// CHECK:   store [[TUP1_2nd_0]] to [trivial] [[PROJ_BOX_0]] : $*TripleInt
+// CHECK:   ([[TUP1_2nd_10:%.*]], [[TUP1_2nd_11:%.*]]) = destructure_tuple [[TUP1_2nd_1]] : $(TripleInt, TripleInt)
+// CHECK:   store [[TUP1_2nd_10]] to [trivial] [[PROJ_BOX_10]] : $*TripleInt
+// CHECK:   store [[TUP1_2nd_11]] to [trivial] [[PROJ_BOX_11]] : $*TripleInt
+// CHECK:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+// CHECK: } // end sil function 'test_assign_trivial_2'
+sil [ossa] @test_assign_trivial_2 : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
+  %5 = tuple(%0 : $TripleInt, %1 : $TripleInt)
+  %6 = tuple(%1a : $TripleInt, %5 : $(TripleInt, TripleInt))
+  %7 = tuple(%1a : $TripleInt, %5 : $(TripleInt, TripleInt))
+  assign %6 to %4 : $*(TripleInt, (TripleInt, TripleInt))
+  assign %7 to %4 : $*(TripleInt, (TripleInt, TripleInt))
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_assign_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : @owned $Builtin.NativeObject, [[ARG2:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[BOX]] : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
+// CHECK:   [[PROJ_BOX_0:%.*]] = tuple_element_addr [[PROJ_BOX]] : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject)), 0
+// CHECK:   [[PROJ_BOX_1:%.*]] = tuple_element_addr [[PROJ_BOX]] : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject)), 1
+// CHECK:   [[PROJ_BOX_10:%.*]] = tuple_element_addr [[PROJ_BOX_1]] : $*(Builtin.NativeObject, Builtin.NativeObject), 0
+// CHECK:   [[PROJ_BOX_11:%.*]] = tuple_element_addr [[PROJ_BOX_1]] : $*(Builtin.NativeObject, Builtin.NativeObject), 1
+// CHECK:   [[TUP_1:%.*]] = tuple ([[ARG0]] : $Builtin.NativeObject, [[ARG1]] : $Builtin.NativeObject)
+// CHECK:   [[TUP:%.*]] = tuple ([[ARG2]] : $Builtin.NativeObject, [[TUP_1]] : $(Builtin.NativeObject, Builtin.NativeObject))
+// CHECK:   ([[TUP_D_0:%.*]], [[TUP_D_1:%.*]]) = destructure_tuple [[TUP]] : $(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+// CHECK:   store [[TUP_D_0]] to [init] [[PROJ_BOX_0]] : $*Builtin.NativeObject
+// CHECK:   ([[TUP_D_10:%.*]], [[TUP_D_11:%.*]]) = destructure_tuple [[TUP_D_1]] : $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK:   store [[TUP_D_10]] to [init] [[PROJ_BOX_10]] : $*Builtin.NativeObject
+// CHECK:   store [[TUP_D_11]] to [init] [[PROJ_BOX_11]] : $*Builtin.NativeObject
+// CHECK:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+// CHECK: } // end sil function 'test_assign_owned'
+sil [ossa] @test_assign_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : @owned $Builtin.NativeObject):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
+  %5 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
+  %6 = tuple(%1a : $Builtin.NativeObject, %5 : $(Builtin.NativeObject, Builtin.NativeObject))
+  assign %6 to %4 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_assigned_owned_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : @owned $Builtin.NativeObject, [[ARG2:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[BOX]] : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
+// CHECK:   [[PROJ_BOX_0:%.*]] = tuple_element_addr [[PROJ_BOX]] : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject)), 0
+// CHECK:   [[PROJ_BOX_1:%.*]] = tuple_element_addr [[PROJ_BOX]] : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject)), 1
+// CHECK:   [[PROJ_BOX_10:%.*]] = tuple_element_addr [[PROJ_BOX_1]] : $*(Builtin.NativeObject, Builtin.NativeObject), 0
+// CHECK:   [[PROJ_BOX_11:%.*]] = tuple_element_addr [[PROJ_BOX_1]] : $*(Builtin.NativeObject, Builtin.NativeObject), 1
+// CHECK:   [[TUP_1:%.*]] = tuple ([[ARG0]] : $Builtin.NativeObject, [[ARG1]] : $Builtin.NativeObject)
+// CHECK:   [[TUP:%.*]] = tuple ([[ARG2]] : $Builtin.NativeObject, [[TUP_1]] : $(Builtin.NativeObject, Builtin.NativeObject))
+// CHECK:   [[TUP_COPY:%.*]] = copy_value [[TUP]]
+// CHECK:   ([[TUP_D_0:%.*]], [[TUP_D_1:%.*]]) = destructure_tuple [[TUP]] : $(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+// CHECK:   store [[TUP_D_0]] to [init] [[PROJ_BOX_0]] : $*Builtin.NativeObject
+// CHECK:   ([[TUP_D_10:%.*]], [[TUP_D_11:%.*]]) = destructure_tuple [[TUP_D_1]] : $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK:   store [[TUP_D_10]] to [init] [[PROJ_BOX_10]] : $*Builtin.NativeObject
+// CHECK:   store [[TUP_D_11]] to [init] [[PROJ_BOX_11]] : $*Builtin.NativeObject
+
+// CHECK:   ([[TUP_D_0:%.*]], [[TUP_D_1:%.*]]) = destructure_tuple [[TUP_COPY]] : $(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+// CHECK:   store [[TUP_D_0]] to [assign] [[PROJ_BOX_0]] : $*Builtin.NativeObject
+// CHECK:   ([[TUP_D_10:%.*]], [[TUP_D_11:%.*]]) = destructure_tuple [[TUP_D_1]] : $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK:   store [[TUP_D_10]] to [assign] [[PROJ_BOX_10]] : $*Builtin.NativeObject
+// CHECK:   store [[TUP_D_11]] to [assign] [[PROJ_BOX_11]] : $*Builtin.NativeObject
+
+// CHECK:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+// CHECK: } // end sil function 'test_assigned_owned_2'
+sil [ossa] @test_assigned_owned_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : @owned $Builtin.NativeObject):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %3 = mark_uninitialized [var] %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
+  %5 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
+  %6 = tuple(%1a : $Builtin.NativeObject, %5 : $(Builtin.NativeObject, Builtin.NativeObject))
+  %7 = copy_value %6 : $(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+  assign %6 to %4 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+  assign %7 to %4 : $*(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
+  %9999 = tuple()
+  return %9999 : $()
+}

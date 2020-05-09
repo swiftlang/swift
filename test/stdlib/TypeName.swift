@@ -59,11 +59,17 @@ TypeNameTests.test("Prints") {
   typealias F = () -> ()
   typealias F2 = () -> () -> ()
   typealias F3 = (() -> ()) -> ()
+  typealias F4 = (Int, Float) -> ()
+  typealias F5 = ((Int, Float)) -> ()
+  typealias F6 = (Int...) -> ()
 
   expectEqual("() -> ()", _typeName(F.self))
   expectEqual("() -> () -> ()", _typeName(F2.self))
   expectEqual("(() -> ()) -> ()", _typeName(F3.self))
   expectEqual("() -> ()", _typeName((() -> ()).self))
+  expectEqual("(Swift.Int, Swift.Float) -> ()", _typeName(F4.self))
+  expectEqual("((Swift.Int, Swift.Float)) -> ()", _typeName(F5.self))
+  expectEqual("(Swift.Int...) -> ()", _typeName(F6.self))
 
   expectEqual("(main.P) -> main.P2 & main.P3",
     _typeName(((P) -> P2 & P3).self))
@@ -183,6 +189,30 @@ TypeNameTests.test("Nested") {
               _typeName(SomeOuterGenericClass<Int>.SomeInnerStruct.self));
   expectEqual("main.SomeOuterGenericClass<Swift.String>.SomeInnerGenericStruct<Swift.Int>",
               _typeName(SomeOuterGenericClass<String>.SomeInnerGenericStruct<Int>.self));
+}
+
+extension SomeOuterGenericClass {
+  struct OtherInnerStruct {}
+  struct OtherInnerGenericStruct<U> {}
+}
+
+TypeNameTests.test("NestedInExtension") {
+  expectEqual("main.SomeOuterGenericClass<Swift.Int>.OtherInnerStruct",
+              _typeName(SomeOuterGenericClass<Int>.OtherInnerStruct.self));
+  expectEqual("main.SomeOuterGenericClass<Swift.Int>.OtherInnerGenericStruct<Swift.String>",
+              _typeName(SomeOuterGenericClass<Int>.OtherInnerGenericStruct<String>.self));
+}
+
+extension SomeOuterGenericClass where T == Int {
+  struct AnotherInnerStruct {}
+  struct AnotherInnerGenericStruct<U> {}
+}
+
+TypeNameTests.test("NestedInConstrainedExtension") {
+  expectEqual("(extension in main):main.SomeOuterGenericClass<Swift.Int>.AnotherInnerStruct",
+              _typeName(SomeOuterGenericClass<Int>.AnotherInnerStruct.self));
+  expectEqual("(extension in main):main.SomeOuterGenericClass<Swift.Int>.AnotherInnerGenericStruct<Swift.String>",
+              _typeName(SomeOuterGenericClass<Int>.AnotherInnerGenericStruct<String>.self));
 }
 
 runAllTests()

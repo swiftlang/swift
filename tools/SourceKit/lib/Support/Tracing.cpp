@@ -14,79 +14,76 @@
 
 #include "swift/Frontend/Frontend.h"
 
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/YAMLTraits.h"
 
 using namespace SourceKit;
 using namespace llvm;
+using swift::OptionSet;
 
-
-
-//===----------------------------------------------------------------------===//
-// General
-//===----------------------------------------------------------------------===//
-
-static std::atomic<bool> tracing_enabled(false);
-static std::atomic<uint64_t> operation_id(0);
-
-//===----------------------------------------------------------------------===//
-// Consumers
-//===----------------------------------------------------------------------===//
-struct TraceConsumerListNode {
-  trace::TraceConsumer *const Consumer;
-  TraceConsumerListNode *Next;
-};
-static std::atomic<TraceConsumerListNode *> consumers(nullptr);
-
+static llvm::sys::Mutex consumersLock;
+// Must hold consumersLock to access.
+static std::vector<trace::TraceConsumer *> consumers;
+// Must hold consumersLock to modify, but can be read any time.
+static std::atomic<uint64_t> tracedOperations;
 
 //===----------------------------------------------------------------------===//
 // Trace commands
 //===----------------------------------------------------------------------===//
 
 // Is tracing enabled
-bool trace::enabled() {
-  return tracing_enabled;
-}
+bool trace::anyEnabled() { return static_cast<bool>(tracedOperations); }
 
-void trace::enable() {
-  tracing_enabled = true;
-}
-
-void trace::disable() {
-  tracing_enabled = false;
+bool trace::enabled(OperationKind op) {
+  return OptionSet<OperationKind>(tracedOperations).contains(op);
 }
 
 // Trace start of perform sema call, returns OpId
 uint64_t trace::startOperation(trace::OperationKind OpKind,
                                const trace::SwiftInvocation &Inv,
                                const trace::StringPairs &OpArgs) {
-  auto OpId = ++operation_id;
-  if (trace::enabled()) {
-    auto Node = consumers.load(std::memory_order_acquire);
-    while (Node) {
-      Node->Consumer->operationStarted(OpId, OpKind, Inv, OpArgs);
-      Node = Node->Next;
+  static std::atomic<uint64_t> operationId(0);
+  auto OpId = ++operationId;
+  if (trace::anyEnabled()) {
+    llvm::sys::ScopedLock L(consumersLock);
+    for (auto *consumer : consumers) {
+      consumer->operationStarted(OpId, OpKind, Inv, OpArgs);
     }
   }
   return OpId;
 }
 
 // Operation previously started with startXXX has finished
-void trace::operationFinished(uint64_t OpId) {
-  if (trace::enabled()) {
-    auto Node = consumers.load(std::memory_order_acquire);
-    while (Node) {
-      Node->Consumer->operationFinished(OpId);
-      Node = Node->Next;
+void trace::operationFinished(uint64_t OpId, trace::OperationKind OpKind,
+                              ArrayRef<DiagnosticEntryInfo> Diagnostics) {
+  if (trace::anyEnabled()) {
+    llvm::sys::ScopedLock L(consumersLock);
+    for (auto *consumer : consumers) {
+      consumer->operationFinished(OpId, OpKind, Diagnostics);
     }
   }
 }
 
+// Must be called with consumersLock held.
+static void updateTracedOperations() {
+  OptionSet<trace::OperationKind> operations;
+  for (auto *consumer : consumers) {
+    operations |= consumer->desiredOperations();
+  }
+  // It is safe to store without a compare, because writers hold consumersLock.
+  tracedOperations.store(uint64_t(operations), std::memory_order_relaxed);
+}
+
 // Register trace consumer
 void trace::registerConsumer(trace::TraceConsumer *Consumer) {
-  TraceConsumerListNode *Node = new TraceConsumerListNode {Consumer, nullptr};
-  do {
-    Node->Next = consumers.load(std::memory_order_relaxed);
-  } while (!consumers.compare_exchange_weak(Node->Next, Node,
-                                            std::memory_order_release,
-                                            std::memory_order_relaxed));
+  llvm::sys::ScopedLock L(consumersLock);
+  consumers.push_back(Consumer);
+  updateTracedOperations();
+}
+
+void trace::unregisterConsumer(trace::TraceConsumer *Consumer) {
+  llvm::sys::ScopedLock L(consumersLock);
+  consumers.erase(std::remove(consumers.begin(), consumers.end(), Consumer),
+                  consumers.end());
+  updateTracedOperations();
 }

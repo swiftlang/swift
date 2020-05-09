@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name foo -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name foo -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
 
-// CHECK: %swift.type = type { [[INT:i32|i64]] }
+// CHECK: %swift.type = type { [[INT]] }
 
 // -- Classes with generic bases can't go in the @objc_classes list, since
 //    they need runtime initialization before they're valid.
@@ -19,34 +19,44 @@ class Base<T> {
   }
 }
 
-// CHECK-LABEL: define hidden %swift.type* @_T03foo12SuperDerivedCMa()
-// CHECK:          [[CACHE:%.*]] = load %swift.type*, %swift.type** @_T03foo12SuperDerivedCML
+// CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s3foo12SuperDerivedCMa"(
+// CHECK:          [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s3foo12SuperDerivedCMl", i32 0, i32 0)
 // CHECK-NEXT:     [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     call void @swift_once([[INT]]* @_T03foo12SuperDerivedCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_SuperDerived to i8*), i8* undef)
-// CHECK-NEXT:     [[METADATA:%.*]] = load %swift.type*, %swift.type** @_T03foo12SuperDerivedCML
+// CHECK-NEXT:     [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s3foo12SuperDerivedCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:     [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT:     [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT:     br label %cont
+
 // CHECK:       cont:
-// CHECK-NEXT:     [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
-// CHECK-NEXT:     ret %swift.type* [[RESULT]]
+// CHECK-NEXT:     [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT:     [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
+// CHECK-NEXT:     [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
+// CHECK-NEXT:     [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT:     ret %swift.metadata_response [[T1]]
 
 class SuperDerived: Derived {
 }
 
-// CHECK-LABEL: define hidden %swift.type* @_T03foo7DerivedCMa()
-// CHECK:          [[CACHE:%.*]] = load %swift.type*, %swift.type** @_T03foo7DerivedCML
+// CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s3foo7DerivedCMa"(
+// CHECK:          [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s3foo7DerivedCMl", i32 0, i32 0)
 // CHECK-NEXT:     [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     call void @swift_once([[INT]]* @_T03foo7DerivedCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Derived to i8*), i8* undef)
-// CHECK-NEXT:     [[METADATA:%.*]] = load %swift.type*, %swift.type** @_T03foo7DerivedCML
+// CHECK-NEXT:     [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s3foo7DerivedCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:     [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT:     [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT:     br label %cont
+
 // CHECK:       cont:
-// CHECK-NEXT:     [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
-// CHECK-NEXT:     ret %swift.type* [[RESULT]]
+// CHECK-NEXT:     [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT:     [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
+// CHECK-NEXT:     [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
+// CHECK-NEXT:     [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT:     ret %swift.metadata_response [[T1]]
 
 class Derived: Base<String> {
   var third: String
@@ -71,9 +81,6 @@ presentBase(Derived(x: "two"))
 presentBase(Base(x: "two"))
 presentBase(Base(x: 2))
 
-// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_SuperDerived(i8*)
-// CHECK:         [[TMP:%.*]] = call %swift.type* @_T03foo7DerivedCMa()
-// CHECK-NEXT:    store %swift.type* [[TMP]], %swift.type** getelementptr inbounds ({{.*}} @_T03foo12SuperDerivedCMf{{.*}}, i32 1), align
-// CHECK:         [[METADATA:%.*]] = call %swift.type* @swift_initClassMetadata_UniversalStrategy(
-// CHECK:         store atomic %swift.type* [[METADATA]], %swift.type** @_T03foo12SuperDerivedCML release,
-// CHECK:         ret void
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s3foo12SuperDerivedCMr"(%swift.type* %0, i8* %1, i8** %2)
+// -- ClassLayoutFlags = 0x100 (HasStaticVTable)
+// CHECK:         call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, {{.*}})

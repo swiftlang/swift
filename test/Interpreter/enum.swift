@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
-// UNSUPPORTED: CPU=armv7
 
 enum Singleton {
   case x(Int, UnicodeScalar)
@@ -521,10 +521,10 @@ func presentEitherOrsOf<T, U>(t: T, u: U) {
   presentEitherOr(EitherOr<T, U>.Right(u))
 }
 
-presentEitherOr(EitherOr<(), ()>.Left())  // CHECK-NEXT: Left(())
+presentEitherOr(EitherOr<(), ()>.Left(()))  // CHECK-NEXT: Left(())
 presentEitherOr(EitherOr<(), ()>.Middle)  // CHECK-NEXT: Middle
 presentEitherOr(EitherOr<(), ()>.Center)  // CHECK-NEXT: Center
-presentEitherOr(EitherOr<(), ()>.Right()) // CHECK-NEXT: Right(())
+presentEitherOr(EitherOr<(), ()>.Right(())) // CHECK-NEXT: Right(())
 
 // CHECK-NEXT: Left(())
 // CHECK-NEXT: Middle
@@ -543,7 +543,7 @@ presentEitherOr(EitherOr<Int, String>.Right("foo")) // CHECK-NEXT: Right(foo)
 // CHECK-NEXT: Right(foo)
 presentEitherOrsOf(t: 1, u: "foo")
 
-presentEitherOr(EitherOr<(), String>.Left())       // CHECK-NEXT: Left(())
+presentEitherOr(EitherOr<(), String>.Left(()))       // CHECK-NEXT: Left(())
 presentEitherOr(EitherOr<(), String>.Middle)       // CHECK-NEXT: Middle
 presentEitherOr(EitherOr<(), String>.Center)       // CHECK-NEXT: Center
 presentEitherOr(EitherOr<(), String>.Right("foo")) // CHECK-NEXT: Right(foo)
@@ -601,3 +601,100 @@ print(createTestB())
 print(createTestA())
 // CHECK-NEXT: done
 print("done")
+
+public enum MyOptional<T> {
+  case Empty
+  case SecondEmpty
+  case Some(T)
+}
+
+public class StopSpecialization {
+  public func generate<T>(_ e: T) -> MyOptional<T> {
+    return MyOptional.Some(e)
+  }
+  public func generate2<T>(_ e: T) -> MyOptional<T> {
+    return MyOptional.Empty
+  }
+}
+
+@inline(never)
+func test(_ s : StopSpecialization, _ N: Int) -> Bool {
+  let x = s.generate(N)
+  switch x {
+    case .SecondEmpty:
+      return false
+    case .Empty:
+      return false
+    case .Some(_):
+      return true
+  }
+}
+
+@inline(never)
+func test2(_ s : StopSpecialization, _ N: Int) -> Bool {
+  let x = s.generate2(N)
+  switch x {
+    case .SecondEmpty:
+      return false
+    case .Empty:
+      return true
+    case .Some(_):
+      return false
+  }
+}
+
+@inline(never)
+func run() {
+// CHECK: true
+  print(test(StopSpecialization(), 12))
+// CHECK: true
+  print(test2(StopSpecialization(), 12))
+}
+
+run()
+
+public enum Indirect<T> {
+  indirect case payload((T, other: T))
+  case none
+}
+
+public func testIndirectEnum<T>(_ payload: T) -> Indirect<T> {
+  return Indirect.payload((payload, other: payload))
+}
+
+public func testCase(_ closure: @escaping (Int) -> ()) -> Indirect<(Int) -> ()> {
+  return testIndirectEnum(closure)
+}
+
+// CHECK: payload((Function), other: (Function))
+print(testCase({ _ in }))
+
+
+enum MultiIndirectRef {
+  case empty
+  indirect case ind(Int)
+  case collection([Int])
+}
+
+struct Container {
+  var storage : MultiIndirectRef = .empty
+
+  mutating func adoptStyle(_ s: Int) {
+    storage = .ind(s)
+  }
+}
+
+func copyStorage(_ s: Int, _ x : Container) -> Container {
+  var c = x
+  c.adoptStyle(s)
+  return c
+}
+
+func testCase() {
+  let l = Container()
+  let c = copyStorage(5, l)
+  print(c)
+}
+
+// CHECK: Container(storage: a.MultiIndirectRef.ind(5))
+testCase()

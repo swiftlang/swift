@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -27,14 +27,15 @@ struct UnsafeMutablePointer<T> {
 }
 
 class X {
-  @sil_stored var a: Int32
-  @sil_stored var x: X
+  @_hasStorage var a: Int32
+  @_hasStorage var x: X
 
   init()
 }
 
-sil [_semantics "arc.programtermination_point"] @exitfunc : $@convention(thin) () -> Never
+sil [_semantics "programtermination_point"] @exitfunc : $@convention(thin) () -> Never
 sil [readnone] @pure_func : $@convention(thin) () -> ()
+sil [releasenone] @releasenone_func : $@convention(thin) () -> ()
 sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
 sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
 
@@ -42,7 +43,7 @@ sil @unknown_func : $@convention(thin) () -> ()
 
 
 struct SP {
-  var value: Builtin.BridgeObject
+  var value: X
 }
 
 enum EP {
@@ -147,7 +148,7 @@ bb0(%0 : $*X, %1 : $X):
 }
 
 // CHECK-LABEL: sil @release_owned
-// CHECK: <func=rw+-,param0=-;alloc;trap;readrc>
+// CHECK: <func=,param0=->
 sil @release_owned : $@convention(thin) (@owned X) -> () {
 bb0(%0 : $X):
   strong_release %0 : $X
@@ -204,7 +205,7 @@ bb0(%0 : $Builtin.Int1):
 // CHECK: <func=,param0=r;trap>
 sil @checkedcast : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  unconditional_checked_cast %0 : $Builtin.NativeObject to $X
+  unconditional_checked_cast %0 : $Builtin.NativeObject to X
   %r = tuple ()
   return %r : $()
 }
@@ -288,10 +289,11 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
 // CHECK: <func=,param0=r>
 sil @projections : $@convention(thin) (EP) -> Builtin.Int32 {
 bb0(%0 : $EP):
-  %ee = unchecked_enum_data %0 : $EP, #EP.data!enumelt.1
+  %ee = unchecked_enum_data %0 : $EP, #EP.data!enumelt
   %te = tuple_extract %ee : $(SP, Builtin.Int1), 0
   %se = struct_extract %te : $SP, #SP.value
-  %utbc = unchecked_trivial_bit_cast %se : $Builtin.BridgeObject to $Builtin.RawPointer
+  %urc = unchecked_ref_cast %se : $X to $Builtin.BridgeObject
+  %utbc = unchecked_trivial_bit_cast %urc : $Builtin.BridgeObject to $Builtin.RawPointer
   %idx = integer_literal $Builtin.Int32, 0
   %irp = index_raw_pointer %utbc : $Builtin.RawPointer, %idx : $Builtin.Int32
   %pta = pointer_to_address %irp : $Builtin.RawPointer to [strict] $*Int32
@@ -448,6 +450,17 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @call_releasenone
+// CHECK: <func=rw>
+sil @call_releasenone : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @releasenone_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+
 // CHECK-LABEL: sil @call_readonly_owned
 // CHECK: <func=rw+-,param0=;alloc;trap;readrc>
 sil @call_readonly_owned : $@convention(thin) (@owned X) -> () {
@@ -488,3 +501,36 @@ bb0(%0 : $*Int32):
 }
 
 sil @closure : $@convention(thin) (Bool, @in Int32) -> Int32
+
+sil public_external @public_external_func : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_public_external_func
+// CHECK-NEXT: <func=rw+-;alloc;trap;readrc>
+sil @call_public_external_func : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @public_external_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil shared_external @shared_external_func : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_shared_external_func
+// CHECK-NEXT: <func=>
+sil @call_shared_external_func : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @shared_external_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+

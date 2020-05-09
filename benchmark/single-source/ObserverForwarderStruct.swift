@@ -10,6 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+import TestsUtils
+
+public let ObserverForwarderStruct = BenchmarkInfo(
+  name: "ObserverForwarderStruct",
+  runFunction: run_ObserverForwarderStruct,
+  tags: [.validation],
+  legacyFactor: 5)
+
 class Observer {
   @inline(never)
   func receive(_ value: Int) {
@@ -45,7 +53,7 @@ class Signal {
 public func run_ObserverForwarderStruct(_ iterations: Int) {
   let signal = Signal()
   let observer = Observer()
-  for _ in 0 ..< 10_000 * iterations {
+  for _ in 0 ..< 2_000 * iterations {
     signal.subscribe(Forwarder(object: observer))
   }
   signal.send(1)

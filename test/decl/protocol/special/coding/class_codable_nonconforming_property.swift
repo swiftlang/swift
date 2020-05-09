@@ -1,9 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 struct NonCodable : Hashable {
-    var hashValue: Int {
-        return 1
-    }
+    func hash(into hasher: inout Hasher) {}
 
     static func ==(_ lhs: NonCodable, _ rhs: NonCodable) -> Bool {
         return true
@@ -12,6 +10,9 @@ struct NonCodable : Hashable {
 
 struct CodableGeneric<T> : Codable {
     let value: Int = 5
+    // expected-warning@-1 {{immutable property will not be decoded because it is declared with an initial value which cannot be overwritten}}
+    // expected-note@-2 {{set the initial value via the initializer or explicitly define a CodingKeys enum including a 'value' case to silence this warning}}
+    // expected-note@-3 {{make the property mutable instead}}{{5-8=var}}
 }
 
 // Classes whose properties are not all Codable should fail to synthesize

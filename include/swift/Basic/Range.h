@@ -15,8 +15,6 @@
 ///  This file provides classes and functions for conveniently working
 ///  with ranges,
 ///
-///  reversed returns an iterator_range out of the reverse iterators of a type.
-///
 ///  map creates an iterator_range which applies a function to all the elements
 ///  in another iterator_range.
 ///
@@ -25,10 +23,6 @@
 ///
 ///  indices returns the range of indices from [0..size()) on a
 ///  subscriptable type.
-///
-///  Note that this is kept in Swift because it's really only useful in
-///  C++11, and there aren't any major open-source subprojects of LLVM
-///  that can use C++11 yet.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -44,14 +38,7 @@
 
 namespace swift {
   using llvm::make_range;
-  using llvm::iterator_range;
 
-  template<typename T>
-  inline auto reversed(T &&container)
-  -> decltype(llvm::make_range(container.rbegin(), container.rend())) {
-    return llvm::make_range(container.rbegin(), container.rend());
-  }
-  
   // Wrapper for std::transform that creates a new back-insertable container
   // and transforms a range into it.
   template<typename T, typename InputRange, typename MapFn>
@@ -63,11 +50,47 @@ namespace swift {
     return result;
   }
 
-/// A range of integers.  This type behaves roughly like an ArrayRef.
-template <class T=unsigned> class IntRange {
-  static_assert(std::is_integral<T>::value, "T must be an integer type");
+template <class T, bool IsEnum = std::is_enum<T>::value>
+struct IntRangeTraits;
+
+template <class T>
+struct IntRangeTraits<T, /*is enum*/ false> {
+  static_assert(std::is_integral<T>::value,
+                "argument type of IntRange is either an integer nor an enum");
+  using int_type = T;
+  using difference_type = typename std::make_signed<int_type>::type;
+
+  static T addOffset(T value, difference_type quantity) {
+    return T(difference_type(value) + quantity);
+  }
+  static difference_type distance(T begin, T end) {
+    return difference_type(end) - difference_type(begin);
+  }
+};
+
+template <class T>
+struct IntRangeTraits<T, /*is enum*/ true> {
+  using int_type = typename std::underlying_type<T>::type;
+  using difference_type = typename std::make_signed<int_type>::type;
+
+  static T addOffset(T value, difference_type quantity) {
+    return T(difference_type(value) + quantity);
+  }
+  static difference_type distance(T begin, T end) {
+    return difference_type(end) - difference_type(begin);
+  }
+};
+
+/// A range of integers or enum values.  This type behaves roughly
+/// like an ArrayRef.
+template <class T = unsigned, class Traits = IntRangeTraits<T>>
+class IntRange {
   T Begin;
   T End;
+
+  using int_type = typename Traits::int_type;
+  using difference_type = typename Traits::difference_type;
+
 public:
   IntRange() : Begin(0), End(0) {}
   IntRange(T end) : Begin(0), End(end) {}
@@ -80,44 +103,55 @@ public:
     T Value;
     iterator(T value) : Value(value) {}
   public:
-    typedef T value_type;
-    typedef T reference;
-    typedef void pointer;
-    typedef typename std::make_signed<T>::type difference_type;
-    typedef std::random_access_iterator_tag iterator_category;
+    using value_type = T;
+    using reference = T;
+    using pointer = void;
+    using difference_type = typename std::make_signed<T>::type;
+    using iterator_category = std::random_access_iterator_tag;
 
     T operator*() const { return Value; }
-    iterator &operator++() { Value++; return *this; }
-    iterator operator++(int) { return iterator(Value++); }
-    iterator &operator--() {
-      Value--;
-      return *this;
+    iterator &operator++() {
+      return *this += 1;
     }
-    iterator operator--(int) { return iterator(Value--); }
-    bool operator==(iterator rhs) { return Value == rhs.Value; }
-    bool operator!=(iterator rhs) { return Value != rhs.Value; }
+    iterator operator++(int) {
+      auto copy = *this;
+      *this += 1;
+      return copy;
+    }
+    iterator &operator--() {
+      return *this -= 1;
+    }
+    iterator operator--(int) {
+      auto copy = *this;
+      *this -= 1;
+      return copy;
+    }
+    bool operator==(iterator rhs) const { return Value == rhs.Value; }
+    bool operator!=(iterator rhs) const { return Value != rhs.Value; }
 
     iterator &operator+=(difference_type i) {
-      Value += T(i);
+      Value = Traits::addOffset(Value, i);
       return *this;
     }
     iterator operator+(difference_type i) const {
-      return iterator(Value + T(i));
+      return iterator(Traits::adddOfset(Value, i));
     }
     friend iterator operator+(difference_type i, iterator base) {
-      return iterator(base.Value + T(i));
+      return iterator(Traits::addOffset(base.Value, i));
     }
     iterator &operator-=(difference_type i) {
-      Value -= T(i);
+      Value = Traits::addOffset(Value, -i);
       return *this;
     }
     iterator operator-(difference_type i) const {
-      return iterator(Value - T(i));
+      return iterator(Traits::addOffset(Value, -i));
     }
     difference_type operator-(iterator rhs) const {
-      return difference_type(Value - rhs.Value);
+      return Traits::distance(rhs.Value, Value);
     }
-    T operator[](difference_type i) const { return Value + T(i);       }
+    T operator[](difference_type i) const {
+      return Traits::addOffset(Value, i);
+    }
     bool operator<(iterator rhs) const {    return Value <  rhs.Value; }
     bool operator<=(iterator rhs) const {   return Value <= rhs.Value; }
     bool operator>(iterator rhs) const {    return Value >  rhs.Value; }
@@ -134,26 +168,27 @@ public:
   }
 
   bool empty() const { return Begin == End; }
-  size_t size() const { return End - Begin; }
+  size_t size() const { return size_t(Traits::distance(Begin, End)); }
   T operator[](size_t i) const {
     assert(i < size());
-    return Begin + i;
+    return Traits::addOffset(Begin, i);
   }
   T front() const { assert(!empty()); return Begin; }
-  T back() const { assert(!empty()); return End - 1; }
+  T back() const { assert(!empty()); return Traits::addOffset(End, -1); }
   IntRange drop_back(size_t length = 1) const {
     assert(length <= size());
-    return IntRange(Begin, End - length);
+    return IntRange(Begin, Traits::addOffset(End, -length));
   }
 
   IntRange slice(size_t start) const {
     assert(start <= size());
-    return IntRange(Begin + start, End);
+    return IntRange(Traits::addOffset(Begin, start), End);
   }
   IntRange slice(size_t start, size_t length) const {
     assert(start <= size());
-    return IntRange(Begin + start,
-                    Begin + start + std::min(length, End - (Begin + start)));
+    auto newBegin = Traits::addOffset(Begin, start);
+    auto newSize = std::min(length, size_t(Traits::distance(newBegin, End)));
+    return IntRange(newBegin, Traits::addOffset(newBegin, newSize));
   }
 
   bool operator==(IntRange other) const {
@@ -186,100 +221,9 @@ static inline IntRange<unsigned> range(unsigned end) {
 
 /// Returns a reverse Int range (start, end].
 static inline auto reverse_range(unsigned start, unsigned end) ->
-  decltype(reversed(range(start+1, end+1))) {
+  decltype(llvm::reverse(range(start+1, end+1))) {
   assert(start <= end && "Invalid integral range");
-  return reversed(range(start+1, end+1));
-}
-
-/// A random access range that provides iterators that can be used to iterate
-/// over the (element, index) pairs of a collection.
-template <typename IterTy> class EnumeratorRange {
-public:
-  using IterTraitsTy = typename std::iterator_traits<IterTy>;
-  static_assert(std::is_same<typename IterTraitsTy::iterator_category,
-                             std::random_access_iterator_tag>::value,
-                "Expected a random access iterator");
-
-private:
-  IterTy Begin;
-  IterTy End;
-
-public:
-  EnumeratorRange(IterTy begin, IterTy end) : Begin(begin), End(end) {}
-
-  class iterator {
-    friend class EnumeratorRange;
-    IterTy Begin;
-    IterTy Iter;
-
-    iterator(IterTy begin, IterTy iter) : Begin(begin), Iter(iter) {}
-
-  public:
-    using value_type =
-        std::pair<typename std::iterator_traits<IterTy>::value_type, int>;
-    using reference =
-        std::pair<typename std::iterator_traits<IterTy>::value_type, int>;
-    using pointer = void;
-    using iterator_category = std::random_access_iterator_tag;
-    using difference_type = int;
-
-    value_type operator*() const { return {*Iter, std::distance(Begin, Iter)}; }
-    iterator &operator++() {
-      Iter++;
-      return *this;
-    }
-    iterator operator++(int) { return iterator(Begin, Iter++); }
-    iterator &operator--() {
-      Iter--;
-      return *this;
-    }
-    iterator operator--(int) { return iterator(Begin, Iter--); }
-    bool operator==(iterator rhs) { return Iter == rhs.Iter; }
-    bool operator!=(iterator rhs) { return !(*this == rhs); }
-
-    iterator &operator+=(difference_type i) {
-      std::advance(Iter, i);
-      return *this;
-    }
-    iterator operator+(difference_type i) const {
-      auto IterCopy = Iter;
-      std::advance(IterCopy, i);
-      return iterator(Begin, IterCopy);
-    }
-    friend iterator operator+(difference_type i, iterator base) {
-      std::advance(base.Iter, i);
-      return base;
-    }
-    iterator &operator-=(difference_type i) {
-      *this += -i;
-      return *this;
-    }
-    iterator operator-(difference_type i) const {
-      auto NewIter = *this;
-      return NewIter -= i;
-    }
-    difference_type operator-(iterator rhs) const {
-      return difference_type(std::distance(Iter, rhs.Iter));
-    }
-  };
-
-  iterator begin() const { return iterator(Begin, Begin); }
-  iterator end() const { return iterator(Begin, End); }
-
-  using reverse_iterator = std::reverse_iterator<iterator>;
-  reverse_iterator rbegin() const { return reverse_iterator(end()); }
-  reverse_iterator rend() const { return reverse_iterator(begin()); }
-};
-
-/// enumerate - Given a type that's subscriptable with integers, return an
-/// IntEnumerateRange consisting of the valid subscripts.
-template <class T>
-EnumeratorRange<typename T::iterator> enumerate(T &collection) {
-  return EnumeratorRange<typename T::iterator>(collection.begin(),
-                                               collection.end());
-}
-template <class T> EnumeratorRange<T> enumerate(T Begin, T End) {
-  return EnumeratorRange<T>(Begin, End);
+  return llvm::reverse(range(start+1, end+1));
 }
 
 } // end namespace swift

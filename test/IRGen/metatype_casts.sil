@@ -1,17 +1,18 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %s -enable-objc-interop -emit-ir | %FileCheck %s -DINT=i%target-ptrsize -check-prefix CHECK -check-prefix CHECK-%target-import-type
 
-// REQUIRES: CPU=i386_or_x86_64
-// XFAIL: linux
+// REQUIRES: CPU=i386 || CPU=x86_64
+
+// TODO: missing `-enable-objc-interop` results in an assertion
 
 import Swift
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @archetype_metatype_cast
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @archetype_metatype_cast
 // CHECK:         %0 = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %T, %swift.type* %U)
 // CHECK:         %1 = icmp ne %swift.type* %0, null
 sil @archetype_metatype_cast : $@convention(thin) <T, U> () -> () {
 entry:
   %0 = metatype $@thick T.Type
-  checked_cast_br %0 : $@thick T.Type to $@thick U.Type, yes, no
+  checked_cast_br %0 : $@thick T.Type to @thick U.Type, yes, no
 yes(%1 : $@thick U.Type):
   br end
 
@@ -24,12 +25,12 @@ end:
 
 protocol P {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @existential_archetype_metatype_cast(%swift.type*, i8**, %swift.type* %T)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @existential_archetype_metatype_cast(%swift.type* %0, i8** %1, %swift.type* %T)
 // CHECK:         [[T0:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %0, %swift.type* %T)
 // CHECK:         [[T1:%.*]] = icmp ne %swift.type* [[T0]], null
 sil @existential_archetype_metatype_cast : $@convention(thin) <T> (@thick P.Type) -> () {
 entry(%0 : $@thick P.Type):
-  checked_cast_br %0 : $@thick P.Type to $@thick T.Type, yes, no
+  checked_cast_br %0 : $@thick P.Type to @thick T.Type, yes, no
 yes(%1 : $@thick T.Type):
   br end
 
@@ -43,7 +44,7 @@ end:
 class SomeClass {}
 sil_vtable SomeClass {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %objc_object* @metatype_object_conversion(%objc_class*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %objc_object* @metatype_object_conversion(%objc_class* %0) {{.*}} {
 // CHECK:         %1 = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* %1
 // CHECK:       }
@@ -55,7 +56,7 @@ entry(%m : $@objc_metatype SomeClass.Type):
 
 protocol SomeClassProtocol : class {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %objc_object* @existential_metatype_object_conversion(%objc_class*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %objc_object* @existential_metatype_object_conversion(%objc_class* %0, i8** %1) {{.*}} {
 // CHECK:         [[T0:%.*]] = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* [[T0]]
 // CHECK:       }
@@ -68,14 +69,15 @@ entry(%m : $@objc_metatype SomeClassProtocol.Type):
 class OtherClass : SomeClass {}
 sil_vtable OtherClass {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @value_metatype_cast(%T14metatype_casts9SomeClassC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @value_metatype_cast(%T14metatype_casts9SomeClassC* %0)
 // CHECK:         [[T0:%.*]] = bitcast %T14metatype_casts9SomeClassC* %0 to %swift.type**
 // CHECK:         [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]]
-// CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], {{.*}} @_T014metatype_casts10OtherClassCMf
+// CHECK-DIRECT:  [[T2:%.*]] = icmp eq %swift.type* [[T1]], {{.*}} @"$s14metatype_casts10OtherClassCMf"
+// CHECK-INDIRECT:[[T2:%.*]] = icmp eq %objc_class*
 sil @value_metatype_cast : $@convention(thin) (SomeClass) -> () {
 entry(%0 : $SomeClass):
   %1 = value_metatype $@thick SomeClass.Type, %0 : $SomeClass
-  checked_cast_br [exact] %1 : $@thick SomeClass.Type to $@thick OtherClass.Type, yes, no
+  checked_cast_br [exact] %1 : $@thick SomeClass.Type to @thick OtherClass.Type, yes, no
 
 yes(%2 : $@thick OtherClass.Type):
   br end
@@ -87,7 +89,7 @@ end:
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @checked_cast_to_anyobject_type
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @checked_cast_to_anyobject_type
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %0 to i8*
 // CHECK:         [[CAST:%.*]] = call { i8* } @dynamic_cast_existential_0_class_unconditional(i8* [[T0]], %swift.type* %0)
 // CHECK:         [[RESULT0:%.*]] = extractvalue { i8* } [[CAST]], 0
@@ -95,19 +97,20 @@ end:
 // CHECK:         ret %swift.type* [[RESULT]]
 sil @checked_cast_to_anyobject_type : $@convention(thin) (@thick Any.Type) -> @thick AnyObject.Type {
 entry(%0 : $@thick Any.Type):
-  %2 = unconditional_checked_cast %0 : $@thick Any.Type to $@thick AnyObject.Type
+  %2 = unconditional_checked_cast %0 : $@thick Any.Type to @thick AnyObject.Type
   return %2 : $@thick AnyObject.Type
 }
 
 // Trivial case -- we know the source is a class metatype, so there's nothing
 // to check.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @checked_cast_class_to_anyobject_type
-// CHECK:         [[METATYPE:%.*]] = call %swift.type* @_T014metatype_casts9SomeClassCMa()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @checked_cast_class_to_anyobject_type
+// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s14metatype_casts9SomeClassCMa"([[INT]] 0)
+// CHECK:         [[METATYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:         ret %swift.type* [[METATYPE]]
 sil @checked_cast_class_to_anyobject_type : $@convention(thin) () -> @thick AnyObject.Type {
 entry:
   %1 = metatype $@thick SomeClass.Type
-  %2 = unconditional_checked_cast %1 : $@thick SomeClass.Type to $@thick AnyObject.Type
+  %2 = unconditional_checked_cast %1 : $@thick SomeClass.Type to @thick AnyObject.Type
   return %2 : $@thick AnyObject.Type
 }

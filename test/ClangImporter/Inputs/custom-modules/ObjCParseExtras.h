@@ -154,6 +154,19 @@ __weak id globalWeakVar;
 - (instancetype)initWithInt:(NSInteger)value __attribute__((objc_designated_initializer));
 @end
 
+@interface DesignatedInitWithClassExtension : DesignatedInitRoot
+- (instancetype)initWithInt:(NSInteger)value __attribute__((objc_designated_initializer));
+- (instancetype)initWithConvenienceInt:(NSInteger)value;
+@end
+@interface DesignatedInitWithClassExtension ()
+- (instancetype)initWithFloat:(float)value __attribute__((objc_designated_initializer));
+@end
+
+@interface DesignatedInitWithClassExtensionInAnotherModule : DesignatedInitRoot
+- (instancetype)initWithInt:(NSInteger)value __attribute__((objc_designated_initializer));
+- (instancetype)initWithConvenienceInt:(NSInteger)value;
+@end
+
 
 @protocol ExplicitSetterProto
 @property (readonly) id foo;
@@ -197,4 +210,53 @@ typedef SomeCell <NSCopying> *CopyableSomeCell;
 @interface SelectorSplittingAccessors : NSObject
 // Note the custom setter name here; this is important.
 @property (setter=takeFooForBar:) BOOL fooForBar;
+@end
+
+@interface InstancetypeAccessor : NSObject
+@property (class, readonly) InstancetypeAccessor *prop;
++ (instancetype)prop;
+@end
+
+typedef NSArray<NSString *> *NSStringArray;
+
+@interface BridgedTypedefs : NSObject
+@property (readonly,nonnull) NSArray<NSStringArray> *arrayOfArrayOfStrings;
+@end
+
+typedef NSString * _Nonnull (*FPTypedef)(NSString * _Nonnull);
+extern FPTypedef _Nonnull getFP(void);
+
+
+#if !__has_feature(objc_arc_fields)
+# error "Your Clang is not new enough"
+#endif
+struct NonTrivialToCopy {
+  __strong id field;
+};
+
+struct NonTrivialToCopyWrapper {
+  struct NonTrivialToCopy inner;
+};
+
+struct TrivialToCopy {
+  __unsafe_unretained id field;
+};
+
+@interface OverrideInExtensionBase : NSObject
+- (void)method;
+- (void)accessWarning;
+@end
+
+@interface OverrideInExtensionSub : OverrideInExtensionBase
+@end
+
+@interface SuperclassWithDesignatedInitInCategory
+@end
+
+@interface SubclassWithSwiftPrivateDesignatedInit : SuperclassWithDesignatedInitInCategory
+-(instancetype) initWithI:(NSInteger)i __attribute__((objc_designated_initializer));
+@end
+
+@interface SuperclassWithDesignatedInitInCategory ()
+-(instancetype) initWithI:(NSInteger)i __attribute__((objc_designated_initializer));
 @end

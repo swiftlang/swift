@@ -24,27 +24,51 @@
 extern "C" {
 #endif
 
-typedef uintptr_t swift_typeref_t;
+// Pointers used here need to be pointer-sized on watchOS for binary
+// compatibility. Everywhere else, they are 64-bit so 32-bit processes can
+// potentially read from 64-bit processes.
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#if TARGET_OS_WATCH
+#define SWIFT_REFLECTION_NATIVE_POINTERS 1
+#endif
+#endif
 
-/// \brief Represents one of the Swift reflection sections of an image.
+#if SWIFT_REFLECTION_NATIVE_POINTERS
+typedef uintptr_t swift_reflection_ptr_t;
+#else
+typedef uint64_t swift_reflection_ptr_t;
+#endif
+
+typedef swift_reflection_ptr_t swift_typeref_t;
+
+/// Represents one of the Swift reflection sections of an image.
 typedef struct swift_reflection_section {
   void *Begin;
   void *End;
 } swift_reflection_section_t;
 
-/// \brief Represents the set of Swift reflection sections of an image.
+typedef struct swift_reflection_section_pair {
+  swift_reflection_section_t section;
+  swift_reflection_ptr_t offset; ///< DEPRECATED. Must be zero
+} swift_reflection_section_pair_t;
+
+/// Represents the set of Swift reflection sections of an image.
 /// Not all sections may be present.
+///
+/// DEPRECATED. New RemoteMirror clients should use
+/// \c swift_reflection_addImage .
 typedef struct swift_reflection_info {
-  swift_reflection_section_t fieldmd;
-  swift_reflection_section_t assocty;
-  swift_reflection_section_t builtin;
-  swift_reflection_section_t capture;
-  swift_reflection_section_t typeref;
-  swift_reflection_section_t reflstr;
+  swift_reflection_section_pair_t field;
+  swift_reflection_section_pair_t associated_types;
+  swift_reflection_section_pair_t builtin_types;
+  swift_reflection_section_pair_t capture;
+  swift_reflection_section_pair_t type_references;
+  swift_reflection_section_pair_t reflection_strings;
 
   // Start address in local and remote address spaces.
-  uintptr_t LocalStartAddress;
-  uintptr_t RemoteStartAddress;
+  swift_reflection_ptr_t LocalStartAddress;
+  swift_reflection_ptr_t RemoteStartAddress;
 } swift_reflection_info_t;
 
 /// The layout kind of a Swift type.
@@ -117,7 +141,7 @@ typedef struct swift_childinfo {
   swift_typeref_t TR;
 } swift_childinfo_t;
 
-/// \brief An opaque pointer to a context which maintains state and
+/// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
 typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
 

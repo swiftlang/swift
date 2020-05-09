@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 sil_stage canonical
 
@@ -69,7 +69,7 @@ bb0:
 }
 
 sil_vtable Foo {
-  #Foo.init!initializer.1: _TFC4main3FoocfMS0_FT_S0_	// main.Foo.init (main.Foo.Type)() -> main.Foo
+  #Foo.init!initializer: @_TFC4main3FoocfMS0_FT_S0_	// main.Foo.init (main.Foo.Type)() -> main.Foo
 }
 
 

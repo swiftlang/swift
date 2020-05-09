@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol _UnicodeEncoding_ {
+public protocol _UnicodeEncoding {
   /// The basic unit of encoding
-  associatedtype CodeUnit : UnsignedInteger, FixedWidthInteger
+  associatedtype CodeUnit: UnsignedInteger, FixedWidthInteger
   
   /// A valid scalar value as represented in this encoding
-  associatedtype EncodedScalar : BidirectionalCollection
+  associatedtype EncodedScalar: BidirectionalCollection
     where EncodedScalar.Iterator.Element == CodeUnit
 
   /// A unicode scalar value to be used when repairing
@@ -23,7 +23,7 @@ public protocol _UnicodeEncoding_ {
   ///
   /// If the Unicode replacement character U+FFFD is representable in this
   /// encoding, `encodedReplacementCharacter` encodes that scalar value.
-  static var encodedReplacementCharacter : EncodedScalar { get }
+  static var encodedReplacementCharacter: EncodedScalar { get }
 
   /// Converts from encoded to encoding-independent representation
   static func decode(_ content: EncodedScalar) -> Unicode.Scalar
@@ -37,19 +37,19 @@ public protocol _UnicodeEncoding_ {
   ///
   /// A default implementation of this method will be provided 
   /// automatically for any conforming type that does not implement one.
-  static func transcode<FromEncoding : Unicode.Encoding>(
+  static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar?
 
   /// A type that can be used to parse `CodeUnits` into
   /// `EncodedScalar`s.
-  associatedtype ForwardParser : Unicode.Parser
-  // where ForwardParser.Encoding == Self
+  associatedtype ForwardParser: Unicode.Parser
+    where ForwardParser.Encoding == Self
   
   /// A type that can be used to parse a reversed sequence of
   /// `CodeUnits` into `EncodedScalar`s.
-  associatedtype ReverseParser : Unicode.Parser
-  // where ReverseParser.Encoding == Self
+  associatedtype ReverseParser: Unicode.Parser
+    where ReverseParser.Encoding == Self
 
   //===--------------------------------------------------------------------===//
   // FIXME: this requirement shouldn't be here and is mitigated by the default
@@ -60,16 +60,13 @@ public protocol _UnicodeEncoding_ {
   static func _isScalar(_ x: CodeUnit) -> Bool
 }
 
-extension _UnicodeEncoding_ {
+extension _UnicodeEncoding {
   // See note on declaration of requirement, above
+  @inlinable
   public static func _isScalar(_ x: CodeUnit) -> Bool { return false }
-}
 
-public protocol _UnicodeEncoding : _UnicodeEncoding_
-where ForwardParser.Encoding == Self, ReverseParser.Encoding == Self {}
-
-extension _UnicodeEncoding_ {
-  public static func transcode<FromEncoding : Unicode.Encoding>(
+  @inlinable
+  public static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     return encode(FromEncoding.decode(content))
@@ -78,7 +75,7 @@ extension _UnicodeEncoding_ {
   /// Converts from encoding-independent to encoded representation, returning
   /// `encodedReplacementCharacter` if the scalar can't be represented in this
   /// encoding.
-  @_versioned
+  @inlinable
   internal static func _encode(_ content: Unicode.Scalar) -> EncodedScalar {
     return encode(content) ?? encodedReplacementCharacter
   }
@@ -86,15 +83,15 @@ extension _UnicodeEncoding_ {
   /// Converts a scalar from another encoding's representation, returning
   /// `encodedReplacementCharacter` if the scalar can't be represented in this
   /// encoding.
-  @_versioned
-  internal static func _transcode<FromEncoding : Unicode.Encoding>(
+  @inlinable
+  internal static func _transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar {
     return transcode(content, from: FromEncoding.self)
       ?? encodedReplacementCharacter
   }
 
-  @_versioned
+  @inlinable
   internal static func _transcode<
   Source: Sequence, SourceEncoding: Unicode.Encoding>(
     _ source: Source,

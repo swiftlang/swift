@@ -1,20 +1,38 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c %S/../Inputs/resilient_struct.swift -o %t/resilient_struct.o
-// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_struct.swift -o %t/resilient_struct.o
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -enable-library-evolution %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
+// RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
-// RUN: %target-build-swift -emit-library -Xfrontend -enable-resilience -c %S/../Inputs/resilient_class.swift -I %t/ -o %t/resilient_class.o
-// RUN: %target-build-swift -emit-module -Xfrontend -enable-resilience -c %S/../Inputs/resilient_class.swift -I %t/ -o %t/resilient_class.o
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_class)) -enable-library-evolution %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct
+// RUN: %target-codesign %t/%target-library-name(resilient_class)
 
-// RUN: %target-build-swift %s -Xlinker %t/resilient_struct.o -Xlinker %t/resilient_class.o -I %t -L %t -o %t/main
+// RUN: %target-build-swift-dylib(%t/%target-library-name(fixed_layout_class)) -enable-library-evolution %S/../Inputs/fixed_layout_class.swift -emit-module -emit-module-path %t/fixed_layout_class.swiftmodule -module-name fixed_layout_class -I%t -L%t -lresilient_struct
+// RUN: %target-codesign %t/%target-library-name(fixed_layout_class)
 
-// RUN: %target-run %t/main
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_class -lfixed_layout_class -o %t/main %target-rpath(%t)
+// RUN: %target-codesign %t/main
+
+// RUN: %target-run %t/main %t/%target-library-name(resilient_struct) %t/%target-library-name(resilient_class) %t/%target-library-name(fixed_layout_class)
+
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct_wmo)) -enable-library-evolution %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
+// RUN: %target-codesign %t/%target-library-name(resilient_struct_wmo)
+
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_class_wmo)) -enable-library-evolution %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
+// RUN: %target-codesign %t/%target-library-name(resilient_class_wmo)
+
+// RUN: %target-build-swift-dylib(%t/%target-library-name(fixed_layout_class_wmo)) -enable-library-evolution %S/../Inputs/fixed_layout_class.swift -emit-module -emit-module-path %t/fixed_layout_class.swiftmodule -module-name fixed_layout_class -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
+// RUN: %target-codesign %t/%target-library-name(fixed_layout_class_wmo)
+
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct_wmo -lresilient_class_wmo -lfixed_layout_class_wmo -o %t/main2 %target-rpath(%t) -module-name main
+// RUN: %target-codesign %t/main2
+
+// RUN: %target-run %t/main2 %t/%target-library-name(resilient_struct_wmo) %t/%target-library-name(resilient_class_wmo) %t/%target-library-name(fixed_layout_class_wmo)
 
 // REQUIRES: executable_test
 
 import StdlibUnittest
 
-
+import fixed_layout_class
 import resilient_class
 import resilient_struct
 
@@ -59,6 +77,22 @@ ResilientClassTestSuite.test("ClassWithResilientProperty") {
   expectEqual(getS(c).h, 40)
 }
 
+ResilientClassTestSuite.test("OutsideClassWithResilientProperty") {
+  let c = OutsideParentWithResilientProperty(
+      p: Point(x: 10, y: 20),
+      s: Size(w: 30, h: 40),
+      color: 50)
+
+  expectEqual(c.p.x, 10)
+  expectEqual(c.p.y, 20)
+  expectEqual(c.s.w, 30)
+  expectEqual(c.s.h, 40)
+  expectEqual(c.color, 50)
+
+  expectEqual(0, c.laziestNumber)
+  c.laziestNumber = 1
+  expectEqual(1, c.laziestNumber)
+}
 
 // Generic class with resilient stored property
 
@@ -181,9 +215,6 @@ ResilientClassTestSuite.test("ResilientOutsideParent") {
 }
 
 
-// FIXME: needs indirect metadata access
-
-#if false
 // Concrete subclass of resilient class
 
 public class ChildOfResilientOutsideParent : ResilientOutsideParent {
@@ -234,8 +265,17 @@ ResilientClassTestSuite.test("ChildOfResilientOutsideParentWithResilientStoredPr
   expectEqual(c.s.h, 40)
   expectEqual(c.color, 50)
 }
-#endif
 
+class ChildWithMethodOverride : ResilientOutsideParent {
+  override func getValue() -> Int {
+    return 1
+  }
+}
+
+ResilientClassTestSuite.test("ChildWithMethodOverride") {
+  let c = ChildWithMethodOverride()
+  expectEqual(c.getValue(), 1)
+}
 
 ResilientClassTestSuite.test("TypeByName") {
   expectTrue(_typeByName("main.ClassWithResilientProperty")
@@ -248,5 +288,46 @@ ResilientClassTestSuite.test("TypeByName") {
              == ChildOfOutsideParentWithResilientStoredProperty.self)
 }
 
+@frozen
+public struct Empty {}
 
-runAllTests()
+// rdar://48031465
+public class ClassWithEmptyThenResilient {
+  public let empty: Empty
+  public let resilient: ResilientInt
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+ResilientClassTestSuite.test("EmptyThenResilient") {
+  let c = ClassWithEmptyThenResilient(empty: Empty(),
+                                      resilient: ResilientInt(i: 17))
+  expectEqual(c.resilient.i, 17)
+}
+
+public class ClassWithResilientThenEmpty {
+  public let resilient: ResilientInt
+  public let empty: Empty
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+ResilientClassTestSuite.test("ResilientThenEmpty") {
+  let c = ClassWithResilientThenEmpty(empty: Empty(),
+                                      resilient: ResilientInt(i: 17))
+  expectEqual(c.resilient.i, 17)
+}
+
+// This test triggers SR-815 (rdar://problem/25318716) on macOS 10.9 and iOS 7.
+// Disable it for now when testing on those versions.
+if #available(macOS 10.10, iOS 8, *) {
+  runAllTests()
+} else {
+  runNoTests()
+}

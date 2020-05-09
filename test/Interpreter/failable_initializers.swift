@@ -263,11 +263,26 @@ func mustFail<T>(f: () -> T?) {
   }
 }
 
+FailableInitTestSuite.test("FailableInitSuccess_Root") {
+  _ = Bear(n: 0, before: false)
+  _ = Bear(n: 0, before: false, after: false)
+}
+
 FailableInitTestSuite.test("FailableInitFailure_Root") {
   mustFail { Bear(n: 0, before: true) }
   mustFail { Bear(n: 0, after: true) }
   mustFail { Bear(n: 0, before: true, after: false) }
   mustFail { Bear(n: 0, before: false, after: true) }
+}
+
+FailableInitTestSuite.test("FailableInitSuccess_Derived") {
+  _ = PolarBear(n: 0, before: false)
+  _ = PolarBear(n: 0, during: false)
+  _ = PolarBear(n: 0, before: false, during: false)
+  _ = PolarBear(n: 0, after: false)
+  _ = PolarBear(n: 0, during: false, after: false)
+  _ = PolarBear(n: 0, before: false, after: false)
+  _ = PolarBear(n: 0, before: false, during: false, after: false)
 }
 
 FailableInitTestSuite.test("FailableInitFailure_Derived") {
@@ -285,8 +300,25 @@ FailableInitTestSuite.test("FailableInitFailure_Derived") {
   mustFail { PolarBear(n: 0, before: false, during: false, after: true) }
 }
 
+FailableInitTestSuite.test("DesignatedInitSuccess_DerivedGeneric") {
+  _ = GuineaPig<LifetimeTracked>(t: LifetimeTracked(0), during: false)
+}
+
 FailableInitTestSuite.test("DesignatedInitFailure_DerivedGeneric") {
   mustFail { GuineaPig<LifetimeTracked>(t: LifetimeTracked(0), during: true) }
+}
+
+FailableInitTestSuite.test("ConvenienceInitSuccess_Root") {
+  _ = Bear(before: false)
+  _ = Bear(during: false)
+  _ = Bear(before: false, during: false)
+  _ = Bear(after: false)
+  _ = Bear(before: false, after: false)
+  _ = Bear(during: false, after: false)
+  _ = Bear(before: false, during: false, after: false)
+
+  _ = Bear(IUO: false)
+  _ = Bear(force: false)
 }
 
 FailableInitTestSuite.test("ConvenienceInitFailure_Root") {
@@ -305,6 +337,16 @@ FailableInitTestSuite.test("ConvenienceInitFailure_Root") {
 
   _ = Bear(IUO: false)
   _ = Bear(force: false)
+}
+
+FailableInitTestSuite.test("ConvenienceInitSuccess_Derived") {
+  _ = PolarBear(before: false)
+  _ = PolarBear(during: false)
+  _ = PolarBear(before: false, during: false)
+  _ = PolarBear(after: false)
+  _ = PolarBear(before: false, after: false)
+  _ = PolarBear(during: false, after: false)
+  _ = PolarBear(before: false, during: false, after: false)
 }
 
 FailableInitTestSuite.test("ConvenienceInitFailure_Derived") {

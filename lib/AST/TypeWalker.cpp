@@ -35,7 +35,18 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitErrorType(ErrorType *ty) { return false; }
   bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
-  bool visitNameAliasType(NameAliasType *ty) { return false; }
+  bool visitTypeAliasType(TypeAliasType *ty) {
+    if (auto parent = ty->getParent())
+      if (doIt(parent)) return true;
+
+    for (auto arg : ty->getInnermostGenericArgs())
+      if (doIt(arg))
+        return true;
+    
+    return false;
+
+  }
+  bool visitSILTokenType(SILTokenType *ty) { return false; }
 
   bool visitParenType(ParenType *ty) {
     return doIt(ty->getUnderlyingType());
@@ -74,7 +85,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitAnyFunctionType(AnyFunctionType *ty) {
     for (const auto &param : ty->getParams()) {
-      if (doIt(param.getType()))
+      if (doIt(param.getOldType()))
         return true;
     }
 
@@ -106,19 +117,37 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitSILFunctionType(SILFunctionType *ty) {
+    // TODO: Should this be the only kind of walk we allow?
+    if (auto subs = ty->getInvocationSubstitutions()) {
+      for (auto paramTy : subs.getReplacementTypes()) {
+        if (doIt(paramTy))
+          return true;
+      }
+
+      return false;
+    }
+    if (auto subs = ty->getPatternSubstitutions()) {
+      for (auto paramTy : subs.getReplacementTypes()) {
+        if (doIt(paramTy))
+          return true;
+      }
+
+      return false;
+    }
+    
     for (auto param : ty->getParameters())
-      if (doIt(param.getType()))
+      if (doIt(param.getInterfaceType()))
         return true;
     for (auto result : ty->getResults())
-      if (doIt(result.getType()))
+      if (doIt(result.getInterfaceType()))
         return true;
     if (ty->hasErrorResult())
-      if (doIt(ty->getErrorResult().getType()))
+      if (doIt(ty->getErrorResult().getInterfaceType()))
         return true;
     return false;
   }
 
-  bool visitSyntaxSugarType(SyntaxSugarType *ty) {
+  bool visitUnarySyntaxSugarType(UnarySyntaxSugarType *ty) {
     return doIt(ty->getBaseType());
   }
 
@@ -158,6 +187,19 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
     return false;
   }
+  
+  bool visitArchetypeType(ArchetypeType *ty) {
+    // If the root is an opaque archetype, visit its substitution replacement
+    // types.
+    if (auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(ty->getRoot())) {
+      for (auto arg : opaqueRoot->getSubstitutions().getReplacementTypes()) {
+        if (doIt(arg)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
   bool visitTypeVariableType(TypeVariableType *ty) { return false; }
   
@@ -166,8 +208,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitSILBoxType(SILBoxType *ty) {
-    for (auto &arg : ty->getGenericArgs()) {
-      if (doIt(arg.getReplacement()))
+    for (Type type : ty->getSubstitutions().getReplacementTypes()) {
+      if (type && doIt(type))
         return true;
     }
     return false;

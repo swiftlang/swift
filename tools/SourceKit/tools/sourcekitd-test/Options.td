@@ -61,6 +61,10 @@ def req_opts : CommaJoined<["-"], "req-opts=">,
   HelpText<"Pass the comma separated options in <arg> as request specific options">,
   MetaVarName<"<arg>">;
 
+def rename_spec : Separate<["-"], "rename-spec">,
+  HelpText<"The JSON format rename spec file (req=syntactic-rename)">;
+def rename_spec_EQ : Joined<["-"], "rename-spec=">, Alias<rename_spec>;
+
 def check_interface_is_ascii : Flag<["-"], "check-interface-ascii">,
   HelpText<"Check that the module interface text is ASCII">;
 
@@ -75,6 +79,9 @@ def print_response_as_json : Flag<["-"], "print-response-as-json">,
 
 def print_raw_response : Flag<["-"], "print-raw-response">,
   HelpText<"Dump the response to stdout">;
+
+def dont_print_response : Flag<["-"], "dont-print-response">,
+  HelpText<"Do not print the response">;
 
 def group_name : Separate<["-"], "group-name">,
   HelpText<"Module group name to print">;
@@ -100,11 +107,17 @@ def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;
 def swift_version : Separate<["-"], "swift-version">, HelpText<"the swift version to use">;
 def swift_version_EQ : Joined<["-"], "swift-version=">, Alias<swift_version>;
 
+def pass_version_as_string : Flag<["-"], "pass-version-as-string">,
+  HelpText<"Pass swift-version as string">;
+
 def swift_name : Separate<["-"], "swift-name">,
   HelpText<"Swift name to translate from">;
 
 def objc_name : Separate<["-"], "objc-name">,
   HelpText<"Objective-C name to translate from">;
+
+def name : Separate<["-"], "name">,
+  HelpText<"The preferred name when performing semantic refactoring">;
 
 def objc_selector : Separate<["-"], "objc-selector">,
   HelpText<"Objective-C selector name to translate from">;
@@ -113,6 +126,36 @@ def cancel_on_subsequent_request : Separate<["-"], "cancel-on-subsequent-request
   HelpText<"Whether to cancel if there is a subsequent request using the same AST">;
 def cancel_on_subsequent_request_EQ : Joined<["-"], "cancel-on-subsequent-request=">,
   Alias<cancel_on_subsequent_request>;
+
+def time_request : Flag<["-"], "time-request">,
+  HelpText<"Print the time taken to process the request">;
+
+def repeat_request : Separate<["-"], "repeat-request">,
+  HelpText<"Repeat the request n times">, MetaVarName<"<n>">;
+def repeat_request_EQ : Joined<["-"], "repeat-request=">, Alias<repeat_request>;
+
+def vfs_files : CommaJoined<["-"], "vfs-files=">,
+  HelpText<"Injects a VFS into the request, overlaying files specified by the given <name>=<target> pairs over the real filesystem. Prefix destination with '@' to pass as sourcetext.">;
+
+def vfs_name : Separate<["-"], "vfs-name">,
+  HelpText<"Specify a virtual filesystem name">;
+
+def optimize_for_ide : Joined<["-"], "for-ide=">,
+  HelpText<"Value for the OptimizeForIde global configuration setting">;
+
+def completion_check_dependency_interval : Separate<["-"], "completion-check-dependency-interval">,
+  HelpText<"Inteval seconds for checking dependencies in fast completion">;
+def completion_check_dependency_interval_EQ : Joined<["-"], "completion-check-dependency-interval=">,
+  Alias<completion_check_dependency_interval>;
+
+def suppress_config_request : Flag<["-"], "suppress-config-request">,
+  HelpText<"Suppress the default global configuration request, that is otherwise sent before any other request (except for the global-config request itself)">;
+
+def module_cache_path: Separate<["-"], "module-cache-path">, HelpText<"module cache path">;
+def module_cache_path_EQ : Joined<["-"], "module-cache-path=">, Alias<module_cache_path>;
+
+def shell: Flag<["-"], "shell">,
+  HelpText<"Run shell command">;
 
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;

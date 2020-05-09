@@ -34,7 +34,7 @@
 #ifndef SWIFT_BASIC_PREFIXMAP_H
 #define SWIFT_BASIC_PREFIXMAP_H
 
-#include "swift/Basic/Algorithm.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/type_traits.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -52,8 +52,8 @@ template <class KeyElementType> class PrefixMapKeyPrinter;
 /// A map whose keys are sequences of comparable values, optimized for
 /// finding a mapped value for the longest matching initial subsequence.
 template <class KeyElementType, class ValueType,
-          size_t InlineKeyCapacity
-             = max<size_t>((sizeof(void*) - 1) / sizeof(KeyElementType), 1)>
+          size_t InlineKeyCapacity = std::max(
+              (sizeof(void *) - 1) / sizeof(KeyElementType), size_t(1))>
 class PrefixMap {
 public:
   using KeyType = ArrayRef<KeyElementType>;
@@ -66,17 +66,15 @@ public:
 private:
   template <typename T>
   union UninitializedStorage {
-    T Storage;
-    UninitializedStorage() = default;
-    UninitializedStorage(const UninitializedStorage &other) = default;
-    UninitializedStorage &operator=(const UninitializedStorage &other)
-      = default;
-    ~UninitializedStorage() = default;
+    alignas(T) char Storage[sizeof(T)];
 
     template <typename... A>
-    void initializeFrom(A && ...value) {
+    void emplace(A && ...value) {
       ::new((void*) &Storage) T(std::forward<A>(value)...);
     }
+
+    T &get() { return *reinterpret_cast<T*>(Storage); }
+    const T &get() const { return *reinterpret_cast<T*>(Storage); }
   };
 
   // We expect to see a lot of entries for keys like:
@@ -119,16 +117,34 @@ private:
     KeyType getLocalKey() const { return { Key, KeyLength }; }
   };
   struct Node : NodeBase {
+  private:
     UninitializedStorage<ValueType> Value;
 
+  public:
     Node() { /* leave Value uninitialized */ }
 
     // We split NodeBase out so that we can just delegate to something that
     // copies all the other fields.
     Node(const Node &other) : NodeBase(other) {
       if (this->HasValue) {
-        Value.initializeFrom(other.Value.Storage);
+        Value.emplace(other.Value.get());
       }
+    }
+
+    ValueType &get() {
+      assert(this->HasValue);
+      return Value.get();
+    }
+    const ValueType &get() const {
+      assert(this->HasValue);
+      return Value.get();
+    }
+
+    template <typename... A>
+    void emplace(A && ...value) {
+      assert(!this->HasValue);
+      Value.emplace(std::forward<A>(value)...);
+      this->HasValue = true;
     }
   };
 
@@ -421,8 +437,7 @@ public:
       /// Return the value of the entry.  The returned reference is valid
       /// as long as the entry remains in the map.
       const ValueType &getValue() const {
-        assert(Path.back().getPointer()->HasValue);
-        return Path.back().getPointer()->Value.Storage;
+        return Path.back().getPointer()->get();
       }
 
       /// Read the value's key into the given buffer.
@@ -553,8 +568,7 @@ public:
 
     explicit operator bool() const { return Ptr != nullptr; }
     ValueType &operator*() const {
-      assert(Ptr->HasValue);
-      return Ptr->Value.Storage;
+      return Ptr->get();
     }
   };
 
@@ -590,8 +604,7 @@ public:
     if (node->HasValue) {
       return { Handle(node), false };
     } else {
-      node->Value.initializeFrom(create());
-      node->HasValue = true;
+      node->emplace(create());
       return { Handle(node), true };
     }
   }
@@ -614,9 +627,7 @@ public:
   Handle insertNewLazy(KeyType key, const Fn &create) {
     auto node = getOrCreatePrefixNode(key, nullptr);
     assert(node);
-    assert(!node->HasValue);
-    node->Value.initializeFrom(create());
-    node->HasValue = true;
+    node->emplace(create());
     return Handle(node);
   }
 
@@ -630,14 +641,14 @@ public:
                          [&]() -> const ValueType & { return value; });
   }
 
-  void dump() const { print(llvm::errs()); }
+  SWIFT_DEBUG_DUMP { print(llvm::errs()); }
   void print(raw_ostream &out) const {
     printOpaquePrefixMap(out, Root,
                          [](raw_ostream &out, void *_node) {
       Node *node = reinterpret_cast<Node*>(_node);
       PrefixMapKeyPrinter<KeyElementType>::print(out, node->getLocalKey());
       if (node->HasValue) {
-        out << " (" << node->Value.Storage << ')';
+        out << " (" << node->get() << ')';
       }
     });
   }

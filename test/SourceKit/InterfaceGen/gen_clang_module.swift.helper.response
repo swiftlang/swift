@@ -94,7 +94,7 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 163,
     key.length: 3
   },
@@ -119,7 +119,7 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 216,
     key.length: 3
   }
@@ -177,8 +177,16 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.name: "fooHelperFunc1(_:)",
     key.offset: 74,
     key.length: 40,
+    key.typename: "Int32",
     key.nameoffset: 79,
     key.namelength: 26,
+    key.attributes: [
+      {
+        key.offset: 67,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.var.parameter,
@@ -194,23 +202,39 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooHelperUnnamedEnumeratorA1",
     key.offset: 123,
     key.length: 45,
     key.typename: "Int",
     key.nameoffset: 127,
-    key.namelength: 28
+    key.namelength: 28,
+    key.bodyoffset: 162,
+    key.bodylength: 5,
+    key.attributes: [
+      {
+        key.offset: 116,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ]
   },
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooHelperUnnamedEnumeratorA2",
     key.offset: 176,
     key.length: 45,
     key.typename: "Int",
     key.nameoffset: 180,
-    key.namelength: 28
+    key.namelength: 28,
+    key.bodyoffset: 215,
+    key.bodylength: 5,
+    key.attributes: [
+      {
+        key.offset: 169,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ]
   }
 ]

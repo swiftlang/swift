@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
 
 // Check that we emit all local decls, not just the first one.
 func test1() {
@@ -20,6 +20,6 @@ func test1() {
 }
 
 // Check that we emit nominal type descriptors for all types.
-// CHECK-DAG: @_T05decls5test1yyF1aL_CMn = hidden constant
-// CHECK-DAG: @_T05decls5test1yyF1bL_CMn = hidden constant
+// CHECK-DAG: @"$s5decls5test1yyF1aL_CMn" = internal constant
+// CHECK-DAG: @"$s5decls5test1yyF1bL_CMn" = internal constant
 

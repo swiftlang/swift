@@ -1,0 +1,37 @@
+//===--- KnownObjCTypes.def - Common Objective-C types --------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This xmacro generates code for common imported Objective-C types the
+//  compiler has special knowledge of.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef KNOWN_OBJC_TYPE_DECL
+/// KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECL_CLASS)
+///
+/// The macro is expanded for each known imported Objective-C type. MODULE is
+/// bound to the name of the module the type comes from. NAME is bound to the
+/// unqualified name of the type. DECL_CLASS is bound to the Decl subclass it
+/// is expected to be an instance of.
+#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECL_CLASS)
+#endif
+
+KNOWN_OBJC_TYPE_DECL(Foundation, NSCopying, ProtocolDecl)
+KNOWN_OBJC_TYPE_DECL(Foundation, NSError, ClassDecl)
+KNOWN_OBJC_TYPE_DECL(Foundation, NSNumber, ClassDecl)
+KNOWN_OBJC_TYPE_DECL(Foundation, NSValue, ClassDecl)
+
+KNOWN_OBJC_TYPE_DECL(ObjectiveC, NSObject, ClassDecl)
+KNOWN_OBJC_TYPE_DECL(ObjectiveC, Selector, StructDecl)
+KNOWN_OBJC_TYPE_DECL(ObjectiveC, ObjCBool, StructDecl)
+
+#undef KNOWN_OBJC_TYPE_DECL

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s
+// RUN: %target-typecheck-verify-swift
 
 for var i = 0; i < 10; i++ {}
 // expected-error @-1 {{C-style for statement has been removed in Swift 3}}  {{none}}

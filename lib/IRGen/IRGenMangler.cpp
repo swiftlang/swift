@@ -12,9 +12,14 @@
 
 #include "IRGenMangler.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ProtocolAssociations.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Runtime/Metadata.h"
+#include "swift/ABI/MetadataValues.h"
+#include "swift/ClangImporter/ClangModule.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace irgen;
@@ -42,21 +47,16 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
     GET_MANGLING(AssignWithCopy) \
     GET_MANGLING(InitializeWithTake) \
     GET_MANGLING(AssignWithTake) \
-    GET_MANGLING(InitializeBufferWithTakeOfBuffer) \
-    GET_MANGLING(DestroyArray) \
-    GET_MANGLING(InitializeArrayWithCopy) \
-    GET_MANGLING(InitializeArrayWithTakeFrontToBack) \
-    GET_MANGLING(InitializeArrayWithTakeBackToFront)
-    GET_MANGLING(StoreExtraInhabitant) \
-    GET_MANGLING(GetExtraInhabitantIndex) \
+    GET_MANGLING(GetEnumTagSinglePayload) \
+    GET_MANGLING(StoreEnumTagSinglePayload) \
     GET_MANGLING(GetEnumTag) \
     GET_MANGLING(DestructiveProjectEnumData) \
     GET_MANGLING(DestructiveInjectEnumTag)
 #undef GET_MANGLING
     case ValueWitness::Size:
     case ValueWitness::Flags:
+    case ValueWitness::ExtraInhabitantCount:
     case ValueWitness::Stride:
-    case ValueWitness::ExtraInhabitantFlags:
       llvm_unreachable("not a function witness");
   }
   appendOperator("w", Code);
@@ -78,15 +78,97 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
   return finalize();
 }
 
-std::string IRGenMangler::mangleTypeForReflection(Type Ty,
-                                                  ModuleDecl *Module,
-                                                  bool isSingleFieldOfBox) {
-  Mod = Module;
+SymbolicMangling
+IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
+                                  llvm::function_ref<void ()> body) {
+  Mod = IGM.getSwiftModule();
   OptimizeProtocolNames = false;
-  appendType(Ty);
-  if (isSingleFieldOfBox)
-    appendOperator("Xb");
+  UseObjCRuntimeNames = true;
+
+  llvm::SaveAndRestore<bool>
+    AllowSymbolicReferencesLocally(AllowSymbolicReferences);
+  llvm::SaveAndRestore<std::function<bool (SymbolicReferent)>>
+    CanSymbolicReferenceLocally(CanSymbolicReference);
+
+  AllowSymbolicReferences = true;
+  CanSymbolicReference = [](SymbolicReferent s) -> bool {
+    if (auto type = s.dyn_cast<const NominalTypeDecl *>()) {
+      // The short-substitution types in the standard library have compact
+      // manglings already, and the runtime ought to have a lookup table for
+      // them. Symbolic referencing would be wasteful.
+      if (type->getModuleContext()->isStdlibModule()
+          && Mangle::getStandardTypeSubst(type->getName().str())) {
+        return false;
+      }
+      
+      // TODO: We could assign a symbolic reference discriminator to refer
+      // to objc protocol refs.
+      if (auto proto = dyn_cast<ProtocolDecl>(type)) {
+        if (proto->isObjC()) {
+          return false;
+        }
+      }
+
+      // Classes defined in Objective-C don't have descriptors.
+      // TODO: We could assign a symbolic reference discriminator to refer
+      // to objc class refs.
+      if (auto clas = dyn_cast<ClassDecl>(type)) {
+        if (clas->hasClangNode()
+            && clas->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
+          return false;
+        }
+      }
+
+      return true;
+    } else if (s.is<const OpaqueTypeDecl *>()) {
+      // Always symbolically reference opaque types.
+      return true;
+    } else {
+      llvm_unreachable("symbolic referent not handled");
+    }
+  };
+
+  SymbolicReferences.clear();
+  
+  body();
+  
+  return {finalize(), std::move(SymbolicReferences)};
+}
+
+SymbolicMangling
+IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
+                                      Type Ty) {
+  return withSymbolicReferences(IGM, [&]{
+    appendType(Ty);
+  });
+}
+
+std::string IRGenMangler::mangleProtocolConformanceDescriptor(
+                                 const RootProtocolConformance *conformance) {
+  beginMangling();
+  if (isa<NormalProtocolConformance>(conformance)) {
+    appendProtocolConformance(conformance);
+    appendOperator("Mc");
+  } else {
+    auto protocol = cast<SelfProtocolConformance>(conformance)->getProtocol();
+    appendProtocolName(protocol);
+    appendOperator("MS");
+  }
   return finalize();
+}
+
+SymbolicMangling
+IRGenMangler::mangleProtocolConformanceForReflection(IRGenModule &IGM,
+                                  Type ty, ProtocolConformanceRef conformance) {
+  return withSymbolicReferences(IGM, [&]{
+    if (conformance.isConcrete()) {
+      appendProtocolConformance(conformance.getConcrete());
+    } else {
+      // Use a special mangling for abstract conformances.
+      appendType(ty);
+      appendProtocolName(conformance.getAbstract());
+    }
+  });
 }
 
 std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {
@@ -94,7 +176,7 @@ std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {
   // don't start with a digit and don't need to be quoted.
   Buffer << 'T';
   if (auto P = dyn_cast<ProtocolType>(Ty)) {
-    appendProtocolName(P->getDecl());
+    appendProtocolName(P->getDecl(), /*allowStandardSubstitution=*/false);
     appendOperator("P");
   } else {
     appendType(Ty);
@@ -120,19 +202,17 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
       if (i == 0)
         appendOperator("_");
     }
-    if (layout.superclass) {
-      auto superclassTy = layout.superclass;
-
+    if (auto superclass = layout.explicitSuperclass) {
       // We share type infos for different instantiations of a generic type
       // when the archetypes have the same exemplars.  We cannot mangle
       // archetypes, and the mangling does not have to be unique, so we just
       // mangle the unbound generic form of the type.
-      if (superclassTy->hasArchetype()) {
-        superclassTy = superclassTy->getClassOrBoundGenericClass()
+      if (superclass->hasArchetype()) {
+        superclass = superclass->getClassOrBoundGenericClass()
           ->getDeclaredType();
       }
 
-      appendType(CanType(superclassTy));
+      appendType(CanType(superclass));
       appendOperator("Xc");
     } else if (layout.getLayoutConstraint()) {
       appendOperator("Xl");
@@ -140,5 +220,102 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
       appendOperator("p");
     }
   }
+  return finalize();
+}
+
+std::string IRGenMangler::
+mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
+                                    MangledTypeRefRole role) {
+  beginManglingWithoutPrefix();
+  const char *prefix;
+  switch (role) {
+  case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+    prefix = "default assoc type ";
+    break;
+
+  case MangledTypeRefRole::Metadata:
+  case MangledTypeRefRole::Reflection:
+    prefix = "symbolic ";
+    break;
+  }
+  auto prefixLen = strlen(prefix);
+
+  Buffer << prefix << mangling.String;
+
+  for (auto &symbol : mangling.SymbolicReferences) {
+    // Fill in the placeholder space with something printable.
+    auto referent = symbol.first;
+    auto offset = symbol.second;
+    Storage[prefixLen + offset]
+      = Storage[prefixLen + offset+1]
+      = Storage[prefixLen + offset+2]
+      = Storage[prefixLen + offset+3]
+      = Storage[prefixLen + offset+4]
+      = '_';
+    Buffer << ' ';
+    if (auto ty = referent.dyn_cast<const NominalTypeDecl*>())
+      appendContext(ty, ty->getAlternateModuleName());
+    else if (auto opaque = referent.dyn_cast<const OpaqueTypeDecl*>())
+      appendOpaqueDeclName(opaque);
+    else
+      llvm_unreachable("unhandled referent");
+  }
+  
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForAssociatedConformanceWitness(
+                                  const NormalProtocolConformance *conformance,
+                                  CanType associatedType,
+                                  const ProtocolDecl *proto) {
+  beginManglingWithoutPrefix();
+  if (conformance) {
+    Buffer << "associated conformance ";
+    appendProtocolConformance(conformance);
+  } else {
+    Buffer << "default associated conformance";
+  }
+
+  bool isFirstAssociatedTypeIdentifier = true;
+  appendAssociatedTypePath(associatedType, isFirstAssociatedTypeIdentifier);
+  appendProtocolName(proto);
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForMangledMetadataAccessorString(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type) {
+  beginManglingWithoutPrefix();
+  Buffer << kind << " ";
+
+  if (genericSig)
+    appendGenericSignature(genericSig);
+
+  if (type)
+    appendType(type);
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForMangledConformanceAccessorString(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type,
+                                           ProtocolConformanceRef conformance) {
+  beginManglingWithoutPrefix();
+  Buffer << kind << " ";
+
+  if (genericSig)
+    appendGenericSignature(genericSig);
+
+  appendAnyProtocolConformance(genericSig, type, conformance);
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
+                                              CanGenericSignature genericSig) {
+  beginManglingWithoutPrefix();
+  Buffer << "generic environment ";
+  appendGenericSignature(genericSig);
   return finalize();
 }

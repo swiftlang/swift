@@ -12,7 +12,7 @@ func basicTests() -> Int {
   return y
 }
 
-func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-error {{'var' as a parameter attribute is not allowed}}
+func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-warning {{'var' in this position is interpreted as an argument label}} {{43-46=`var`}}
   i += 1 // expected-error {{left side of mutating operator isn't mutable: 'i' is a 'let' constant}}
   var j = j
   swap(&i, &j) // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
@@ -96,8 +96,24 @@ func testInOut(_ x : inout Int) {  // Ok.
 
 struct TestStruct {
   var property = 42
-}
 
+  var mutatingProperty: Int {
+    mutating get { return 0 }
+    mutating set {}
+  }
+  var nonmutatingProperty: Int {
+    nonmutating get { return 0 }
+    nonmutating set {}
+  }
+  subscript(mutating index: Int) -> Int {
+    mutating get { return 0 }
+    mutating set {}
+  }
+  subscript(nonmutating index: Int) -> Int {
+    nonmutating get { return 0 }
+    nonmutating set {}
+  }
+}
 
 func testStructMember() -> TestStruct {
   var x = TestStruct()  // ok
@@ -105,6 +121,53 @@ func testStructMember() -> TestStruct {
   return x
 }
 
+func testMutatingProperty_get() -> TestStruct {
+  var x = TestStruct()  // ok
+  _ = x.mutatingProperty
+  return x
+}
+
+func testMutatingProperty_set() -> TestStruct {
+  var x = TestStruct()  // ok
+  x.mutatingProperty = 17
+  return x
+}
+
+func testNonmutatingProperty_get() -> TestStruct {
+  var x = TestStruct()  // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  _ = x.nonmutatingProperty
+  return x
+}
+
+func testNonmutatingProperty_set() -> TestStruct {
+  var x = TestStruct()  // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  x.nonmutatingProperty = 17
+  return x
+}
+
+func testMutatingSubscript_get() -> TestStruct {
+  var x = TestStruct()  // ok
+  _ = x[mutating: 4]
+  return x
+}
+
+func testMutatingSubscript_set() -> TestStruct {
+  var x = TestStruct()  // ok
+  x[mutating: 4] = 17
+  return x
+}
+
+func testNonmutatingSubscript_get() -> TestStruct {
+  var x = TestStruct()  // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  _ = x[nonmutating: 4]
+  return x
+}
+
+func testNonmutatingSubscript_set() -> TestStruct {
+  var x = TestStruct()  // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  x[nonmutating: 4] = 17
+  return x
+}
 
 func testSubscript() -> [Int] {
   var x = [1,2,3] // ok
@@ -112,6 +175,11 @@ func testSubscript() -> [Int] {
   return x
 }
 
+func testSubscriptNeverMutated() -> [Int] {
+  var x = [1,2,3] // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  _ = x[1]
+  return x
+}
 
 func testTuple(_ x : Int) -> Int {
   var x = x
@@ -178,7 +246,10 @@ func testBuildConfigs() {
 protocol Fooable {
   mutating func mutFoo()
   func immutFoo()
+  var mutatingProperty: Int { mutating get mutating set }
+  var nonmutatingProperty: Int { nonmutating get nonmutating set }
 }
+
 func testOpenExistential(_ x: Fooable,
                          y: Fooable) {
   var x = x
@@ -187,6 +258,25 @@ func testOpenExistential(_ x: Fooable,
   y.immutFoo()
 }
 
+func testOpenExistential_mutatingProperty_get(p: Fooable) {
+  var x = p
+  _ = x.mutatingProperty
+}
+
+func testOpenExistential_mutatingProperty_set(p: Fooable) {
+  var x = p
+  x.mutatingProperty = 4
+}
+
+func testOpenExistential_nonmutatingProperty_get(p: Fooable) {
+  var x = p // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  _ = x.nonmutatingProperty
+}
+
+func testOpenExistential_nonmutatingProperty_set(p: Fooable) {
+  var x = p // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  x.nonmutatingProperty = 4
+}
 
 func couldThrow() throws {}
 
@@ -197,7 +287,7 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
     _ = b2
   }
   
-  for var b in [42] { // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-11=}}
+  for var b in [42] { // expected-warning {{variable 'b' was never mutated; consider removing 'var' to make it constant}} {{7-11=}}
     _ = b
   }
 
@@ -273,4 +363,87 @@ for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; cons
 func sr2421() {
   let x: Int // expected-warning {{immutable value 'x' was never used; consider removing it}}
   x = 42
+}
+
+// Tests fix to SR-964
+func sr964() {
+  var noOpSetter: String {
+    get { return "" }
+    set { } // No warning
+  }
+  var suspiciousSetter: String {
+    get { return "" }
+    set {
+      print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-29=newValue}}
+    }
+  }
+  struct MemberGetterStruct {
+    var suspiciousSetter: String {
+      get { return "" }
+      set {
+        print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{15-31=newValue}}
+      }
+    }
+  }
+  class MemberGetterClass {
+    var suspiciousSetter: String {
+      get { return "" }
+      set {
+        print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{15-31=newValue}}
+      }
+    }
+  }
+  var namedSuspiciousSetter: String {
+    get { return "" }
+    set(parameter) {
+      print(namedSuspiciousSetter) // expected-warning {{setter argument 'parameter' was never used, but the property was accessed}} expected-note {{did you mean to use 'parameter' instead of accessing the property's current value?}} {{13-34=parameter}}
+    }
+  }
+  var okSetter: String {
+    get { return "" }
+    set { print(newValue) } // No warning
+  }
+  var multiTriggerSetter: String {
+    get { return "" }
+    set {
+      print(multiTriggerSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-31=newValue}}
+      print(multiTriggerSetter)
+    }
+  }
+}
+struct MemberGetterExtension {}
+extension MemberGetterExtension {
+  var suspiciousSetter: String {
+    get { return "" }
+    set {
+      print(suspiciousSetter) // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}} {{13-29=newValue}}
+    }
+  }
+}
+
+func testLocalFunc() {
+  var unusedVar = 0
+  // expected-warning@-1 {{initialization of variable 'unusedVar' was never used; consider replacing with assignment to '_' or removing it}}
+
+  var notMutatedVar = 0
+  // expected-warning@-1 {{variable 'notMutatedVar' was never mutated; consider changing to 'let' constant}}
+
+  var mutatedVar = 0
+  // expected-warning@-1 {{variable 'mutatedVar' was written to, but never read}}
+
+  func localFunc() {
+    _ = notMutatedVar
+    mutatedVar = 1
+  }
+}
+
+// False positive "'var' was never mutated" warning - rdar://60563962
+func testForwardReferenceCapture() {
+  func innerFunc() {
+    x = 10
+  }
+
+  var x: Int = 1
+  innerFunc()
+  print(x)
 }

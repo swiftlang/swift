@@ -19,11 +19,13 @@
 #define SWIFT_MIGRATOR_ASTMIGRATORPASS_H
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Migrator/EditorAdapter.h"
 
 namespace swift {
 class SourceManager;
 struct MigratorOptions;
+class DiagnosticEngine;
 
 namespace migrator {
 class ASTMigratorPass {
@@ -34,12 +36,13 @@ protected:
   const StringRef Filename;
   const unsigned BufferID;
   SourceManager &SM;
+  DiagnosticEngine &Diags;
 
   ASTMigratorPass(EditorAdapter &Editor, SourceFile *SF,
                   const MigratorOptions &Opts)
     : Editor(Editor), SF(SF), Opts(Opts), Filename(SF->getFilename()),
       BufferID(SF->getBufferID().getValue()),
-      SM(SF->getASTContext().SourceMgr) {}
+      SM(SF->getASTContext().SourceMgr), Diags(SF->getASTContext().Diags) {}
 };
 
 /// Run a general pass to migrate code based on SDK differences in the previous
@@ -48,18 +51,12 @@ void runAPIDiffMigratorPass(EditorAdapter &Editor,
                             SourceFile *SF,
                             const MigratorOptions &Opts);
 
-/// Run a pass to fix up new tuple interpretation in SE-0110.
-void runTupleSplatMigratorPass(EditorAdapter &Editor,
-                               SourceFile *SF,
-                               const MigratorOptions &Opts);
-
-/// Run a pass to prepend 'Swift.' to `type(of:)` expressions if they will
-/// be shadowed in Swift 4, as these are now resolved by normal overload
-/// resolution.
-void runTypeOfMigratorPass(EditorAdapter &Editor,
-                           SourceFile *SF,
-                           const MigratorOptions &Opts);
-
+/// Run a pass to fix up the new type of 'try?' in Swift 4
+void runOptionalTryMigratorPass(EditorAdapter &Editor,
+                                SourceFile *SF,
+                                const MigratorOptions &Opts);
+  
+  
 } // end namespace migrator
 } // end namespace swift
 

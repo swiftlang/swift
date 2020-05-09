@@ -5,6 +5,10 @@
 - (void) anse;
 @end
 
+__attribute__((swift_name("BetterAnsing")))
+@protocol NSBetterAnsing <NSAnsing>
+@end
+
 @interface NSObject (NSAnsing)
 @property Class<NSAnsing> qualifiedClassProp;
 @end
@@ -35,6 +39,7 @@ typedef long NSInteger;
 - (Gizmo*) init OBJC_DESIGNATED_INITIALIZER;
 - (Gizmo*) initWithBellsOn:(NSInteger)x OBJC_DESIGNATED_INITIALIZER;
 - (instancetype) initWithoutBells:(NSInteger)x;
++ (instancetype) gizmoWithWhistles:(NSInteger)x;
 - (void) fork NS_CONSUMES_SELF;
 - (void) enumerateSubGizmos: (void (^ _Nullable)(Gizmo*))f;
 + (void) consume: (NS_CONSUMED Gizmo*) gizmo;

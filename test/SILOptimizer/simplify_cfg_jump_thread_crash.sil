@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 
 sil_stage canonical
 
@@ -50,48 +50,48 @@ sil @get_condition : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
 public final class AA {
 }
 public final class BB {
-  @sil_stored internal weak final var n:  BB!
-  @sil_stored internal final var o: AA!
+  @_hasStorage internal weak final var n:  BB!
+  @_hasStorage internal final var o: AA!
 }
 
 // Test that SimplifyCFG does not hang when compiling an infinite loop with switch_enum.
 // CHECK-LABEL: test_inifite_loop
 sil hidden @test_inifite_loop : $@convention(method) (@owned BB) -> () {
 bb0(%0 : $BB):
-  %31 = enum $Optional<BB>, #Optional.some!enumelt.1, %0 : $BB
+  %31 = enum $Optional<BB>, #Optional.some!enumelt, %0 : $BB
   br bb4(%31 : $Optional<BB>)
 
 bb4(%36 : $Optional<BB>):
-  switch_enum %36 : $Optional<BB>, case #Optional.some!enumelt.1: bb6, default bb5
+  switch_enum %36 : $Optional<BB>, case #Optional.some!enumelt: bb6, default bb5
 
 bb5:
   br bb7
 
 bb6:
-  %39 = unchecked_enum_data %36 : $Optional<BB>, #Optional.some!enumelt.1
+  %39 = unchecked_enum_data %36 : $Optional<BB>, #Optional.some!enumelt
   %40 = ref_element_addr %39 : $BB, #BB.o
   %41 = load %40 : $*Optional<AA>
   release_value %41 : $Optional<AA>
   br bb7
 
 bb7:
-  switch_enum %36 : $Optional<BB>, case #Optional.none!enumelt: bb8, case #Optional.some!enumelt.1: bb9
+  switch_enum %36 : $Optional<BB>, case #Optional.none!enumelt: bb8, case #Optional.some!enumelt: bb9
 
 bb8:
   br bb4(%36 : $Optional<BB>)
 
 bb9:
-  %48 = unchecked_enum_data %36 : $Optional<BB>, #Optional.some!enumelt.1
+  %48 = unchecked_enum_data %36 : $Optional<BB>, #Optional.some!enumelt
   %49 = ref_element_addr %48 : $BB, #BB.n
   %50 = load_weak %49 : $*@sil_weak Optional<BB>
   release_value %36 : $Optional<BB>
-  switch_enum %50 : $Optional<BB>, case #Optional.some!enumelt.1: bb11, case #Optional.none!enumelt: bb10
+  switch_enum %50 : $Optional<BB>, case #Optional.some!enumelt: bb11, case #Optional.none!enumelt: bb10
 
 bb10:
   br bb4(%50 : $Optional<BB>)
 
 bb11:
-  %54 = unchecked_enum_data %50 : $Optional<BB>, #Optional.some!enumelt.1
+  %54 = unchecked_enum_data %50 : $Optional<BB>, #Optional.some!enumelt
   %55 = ref_to_raw_pointer %54 : $BB to $Builtin.RawPointer
   %56 = ref_to_raw_pointer %0 : $BB to $Builtin.RawPointer
   %57 = builtin "cmp_eq_RawPointer"(%55 : $Builtin.RawPointer, %56 : $Builtin.RawPointer) : $Builtin.Int1
@@ -107,3 +107,126 @@ bb13:
   return %65 : $()
 }
 
+sil @some_function : $@convention(thin) (AA) -> Optional<AA>
+
+// Another test for checking that SimplifyCFG does not hang.
+// CHECK-LABEL: test_other_infinite_loop
+sil hidden @test_other_infinite_loop : $@convention(method) (@owned AA) -> () {
+bb0(%5 : $AA):
+  strong_retain %5 : $AA
+  %6 = enum $Optional<AA>, #Optional.some!enumelt, %5 : $AA
+  br bb1(%6 : $Optional<AA>)
+
+bb1(%8 : $Optional<AA>):
+  retain_value %8 : $Optional<AA>
+  switch_enum %8 : $Optional<AA>, case #Optional.some!enumelt: bb3, default bb2
+
+bb2:
+  release_value %8 : $Optional<AA>
+  br bb6
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  %85 = tuple ()
+  return %85 : $()
+
+bb5:
+  br bb6
+
+bb6:
+  switch_enum %8 : $Optional<AA>, case #Optional.none!enumelt: bb7, default bb8
+
+bb7:
+  br bb9(%8 : $Optional<AA>)
+
+bb8:
+  %23 = unchecked_enum_data %8 : $Optional<AA>, #Optional.some!enumelt
+  strong_retain %23 : $AA
+  %25 = function_ref @some_function : $@convention(thin) (AA) -> Optional<AA>
+  %26 = apply %25(%23) : $@convention(thin) (AA) -> Optional<AA>
+  strong_release %23 : $AA
+  br bb9(%26 : $Optional<AA>)
+
+bb9(%29 : $Optional<AA>):
+  release_value %8 : $Optional<AA>
+  br bb1(%29 : $Optional<AA>)
+
+}
+
+// -----------------------------------------------------------------------------
+// Test jump-threading through a non-pure address producer.
+//
+// BB3 cannot (currently) be cloned because the block cloner does not
+// know how to sink address producers unless they are pure address
+// projections. init_existential_addr is not a pure projection. It's
+// address is transitively used outside bb3 via %17 =
+// tuple_element_addr. Test that cloning is inhibited. If cloning did
+// happen, then it would either need to sink init_existential_addr, or
+// SSA would be incorrectly updated.
+
+enum FakeOptional<T> {
+case some(T)
+case none
+}
+
+struct S {
+}
+
+struct T {
+    let s: S
+}
+
+class C {
+    func method() -> Any
+    func f() -> FakeOptional<T>
+}
+
+// Make BB3 is not jump-threaded. And init_existential_addr is not cloned
+//
+// CHECK-LABEL: sil hidden @nonPureAddressProducer : $@convention(method) (@guaranteed C) -> @out Any {
+// CHECK: bb0(%0 : $*Any, %1 : $C):
+// CHECK:   switch_enum %{{.*}} : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+// CHECK: bb3(%{{.*}} : $FakeOptional<Int64>):
+// CHECK:   init_existential_addr %0 : $*Any, $(FakeOptional<Int64>, FakeOptional<S>)
+// CHECK:   switch_enum %{{.*}} : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
+// CHECK-LABEL: } // end sil function 'nonPureAddressProducer'
+sil hidden @nonPureAddressProducer : $@convention(method) (@guaranteed C) -> @out Any {
+bb0(%0 : $*Any, %1 : $C):
+  %3 = class_method %1 : $C, #C.f : (C) -> () -> FakeOptional<T>, $@convention(method) (@guaranteed C) -> FakeOptional<T>
+  %4 = apply %3(%1) : $@convention(method) (@guaranteed C) -> FakeOptional<T>
+  switch_enum %4 : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = struct $Int64 (%7 : $Builtin.Int64)
+  %9 = enum $FakeOptional<Int64>, #FakeOptional.some!enumelt, %8 : $Int64
+  br bb3(%9 : $FakeOptional<Int64>)
+
+bb2:
+  %11 = enum $FakeOptional<Int64>, #FakeOptional.none!enumelt
+  br bb3(%11 : $FakeOptional<Int64>)
+
+bb3(%13 : $FakeOptional<Int64>):
+  %15 = init_existential_addr %0 : $*Any, $(FakeOptional<Int64>, FakeOptional<S>)
+  %16 = tuple_element_addr %15 : $*(FakeOptional<Int64>, FakeOptional<S>), 0
+  %17 = tuple_element_addr %15 : $*(FakeOptional<Int64>, FakeOptional<S>), 1
+  store %13 to %16 : $*FakeOptional<Int64>
+  switch_enum %4 : $FakeOptional<T>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
+
+bb4(%20 : $T):
+  %21 = struct_extract %20 : $T, #T.s
+  %22 = enum $FakeOptional<S>, #FakeOptional.some!enumelt, %21 : $S
+  store %22 to %17 : $*FakeOptional<S>
+  br bb5
+
+bb5:
+  %25 = tuple ()
+  return %25 : $()
+
+bb6:
+  %27 = enum $FakeOptional<S>, #FakeOptional.none!enumelt
+  store %27 to %17 : $*FakeOptional<S>
+  br bb5
+}

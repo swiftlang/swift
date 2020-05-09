@@ -35,15 +35,13 @@ func test(_ a : CFString!, b : CFString) {
   let dict = NSMutableDictionary()
   let object = NSObject()
   dict[a] = object
-
-
   dict[b] = object
 }
 
 
 // <rdar://problem/22507759> QoI: poor error message for invalid unsafeDowncast()
 let r22507759: NSObject! = "test" as NSString
-let _: NSString! = unsafeDowncast(r22507759)  // expected-error {{generic parameter 'T' could not be inferred}}
+let _: NSString! = unsafeDowncast(r22507759)  // expected-error {{missing argument for parameter 'to' in call}}
 
 // rdar://problem/29496775 / SR-3319
 func sr3319(f: CGFloat, n: NSNumber) {
@@ -73,8 +71,8 @@ func optionalityMatchingCasts(f: CGFloat?, n: NSNumber?) {
 
 func optionalityMatchingCastsIUO(f: CGFloat?!, n: NSNumber?!) {
   let _ = f as NSNumber?
-  let _ = f as? NSNumber? // expected-warning{{conditional downcast from 'CGFloat?!' to 'NSNumber?' is a bridging conversion; did you mean to use 'as'?}}
-  let _ = f as! NSNumber? // expected-warning{{forced cast from 'CGFloat?!' to 'NSNumber?' only unwraps and bridges; did you mean to use '!' with 'as'?}}
+  let _ = f as? NSNumber? // expected-warning{{conditional downcast from 'CGFloat??' to 'NSNumber?' is a bridging conversion; did you mean to use 'as'?}}
+  let _ = f as! NSNumber? // expected-warning{{forced cast from 'CGFloat??' to 'NSNumber?' only unwraps and bridges; did you mean to use '!' with 'as'?}}
   let _ = n as? CGFloat?
   let _ = n as! CGFloat?
 }

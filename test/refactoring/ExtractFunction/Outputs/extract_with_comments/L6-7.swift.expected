@@ -1,0 +1,17 @@
+public class C {
+fileprivate func new_name(_ aaa: inout Int) {
+// this is comments
+  aaa = aaa + 3
+  if aaa == 3 { aaa = 4 }
+}
+
+public func foo() -> Int{
+  var aaa = 1 + 2
+
+  new_name(&aaa)
+
+  // we have comments here too
+  return aaa
+}
+}
+

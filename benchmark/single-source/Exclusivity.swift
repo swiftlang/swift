@@ -17,6 +17,38 @@
 
 import TestsUtils
 
+public let Exclusivity = [
+  // At -Onone
+  // 25% swift_beginAccess
+  // 15% tlv_get_addr
+  // 15% swift_endAccess
+  BenchmarkInfo(
+    name: "ExclusivityGlobal",
+    runFunction: run_accessGlobal,
+    tags: [.runtime, .cpubench]
+  ),
+  // At -Onone
+  // 23% swift_retain
+  // 22% swift_release
+  //  9% swift_beginAccess
+  //  3% swift_endAccess
+  BenchmarkInfo(
+    name: "ExclusivityInMatSet",
+    runFunction: run_accessInMatSet,
+    tags: [.runtime, .cpubench, .unstable]
+  ),
+  // At -Onone
+  // 25% swift_release
+  // 23% swift_retain
+  // 16% swift_beginAccess
+  //  8% swift_endAccess
+  BenchmarkInfo(
+    name: "ExclusivityIndependent",
+    runFunction: run_accessIndependent,
+    tags: [.runtime, .cpubench]
+  ),
+]
+
 // Initially these benchmarks only measure access checks at -Onone. In
 // the future, access checks will also be emitted at -O.
 
@@ -48,7 +80,7 @@ public func run_accessGlobal(_ N: Int) {
 // Hopefully the optimizer will not see this as "final" and optimize away the
 // materializeForSet.
 public class C {
-  var counter = 0
+  public var counter = 0
 
   func inc() {
     counter += 1

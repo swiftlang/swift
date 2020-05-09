@@ -19,13 +19,25 @@
 #define SWIFT_COMPILER_IS_MSVC 0
 #endif
 
-#if SWIFT_COMPILER_IS_MSVC && _MSC_VER < 1910
-// Work around MSVC bug: attempting to reference a deleted function
-// https://connect.microsoft.com/VisualStudio/feedback/details/3116505
-#define SWIFT_DELETE_OPERATOR_DELETED                                          \
-  { llvm_unreachable("Delete operator should not be called."); }
+// Workaround non-clang compilers
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+#ifndef __has_attribute
+#define __has_attribute(x) 0
+#endif
+
+// __builtin_assume() is an optimization hint.
+#if __has_builtin(__builtin_assume)
+#define SWIFT_ASSUME(x) __builtin_assume(x)
 #else
-#define SWIFT_DELETE_OPERATOR_DELETED = delete;
+#define SWIFT_ASSUME(x)
+#endif
+
+#if __has_attribute(constructor)
+#define SWIFT_CONSTRUCTOR __attribute__((constructor))
+#else
+#define SWIFT_CONSTRUCTOR
 #endif
 
 #endif // SWIFT_BASIC_COMPILER_H

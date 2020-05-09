@@ -13,12 +13,11 @@
 // REQUIRES: executable_test
 
 //===--- Niceties ---------------------------------------------------------===//
-typealias Element_<S: Sequence> = S.Iterator.Element
 extension Collection {
-  func index(_ d: IndexDistance) -> Index {
+  func index(_ d: Int) -> Index {
     return index(startIndex, offsetBy: d)
   }
-  func offset(of i: Index) -> IndexDistance {
+  func offset(of i: Index) -> Int {
     return distance(from: startIndex, to: i)
   }
 }
@@ -35,18 +34,12 @@ protocol Pattern {
   associatedtype MatchData = ()
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
-  where C.Index == Index, Element_<C> == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  where C.Index == Index, C.Element == Element
 }
 
 extension Pattern {
   func found<C: Collection>(in c: C) -> (extent: Range<Index>, data: MatchData)?
-  where C.Index == Index, Element_<C> == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  where C.Index == Index, C.Element == Element
   {
     var i = c.startIndex
     while i != c.endIndex {
@@ -69,15 +62,12 @@ extension Pattern {
 // KMP/Boyer-Moore[-Galil]/Sustik-Moore/Z-algorithm which run in O(pattern.count
 // + c.count)
 struct LiteralMatch<T: Collection, Index: Comparable> : Pattern
-where Element_<T> : Equatable {
-  typealias Element = Element_<T>
+where T.Element : Equatable {
+  typealias Element = T.Element
   init(_ pattern: T) { self.pattern = pattern }
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
-  where C.Index == Index, Element_<C> == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  where C.Index == Index, C.Element == Element
   {
     var i = c.startIndex
     for p in pattern {
@@ -96,10 +86,7 @@ struct MatchAnyOne<T : Equatable, Index : Comparable> : Pattern {
   typealias Element = T
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
-  where C.Index == Index, Element_<C> == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  where C.Index == Index, C.Element == Element 
   {
     return c.isEmpty
     ? .notFound(resumeAt: c.endIndex)
@@ -130,10 +117,7 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
   typealias MatchData = (midPoint: M0.Index, data: (M0.MatchData, M1.MatchData))
 
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
-  where C.Index == Index, Element_<C> == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  where C.Index == Index, C.Element == Element
   {
     var src0 = c[c.startIndex..<c.endIndex]
     while true {
@@ -171,10 +155,7 @@ struct RepeatMatch<M0: Pattern> : Pattern {
   var repeatLimits: ClosedRange<Int>
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<M0.Index, MatchData>
-  where C.Index == M0.Index, Element_<C> == M0.Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == M0.Element
-  , C.SubSequence.Index == M0.Index, C.SubSequence.SubSequence == C.SubSequence
+  where C.Index == M0.Index, C.Element == M0.Element
   {
     var lastEnd = c.startIndex
     var rest = c.dropFirst(0)
@@ -183,11 +164,11 @@ struct RepeatMatch<M0: Pattern> : Pattern {
   searchLoop:
     while !rest.isEmpty {
       switch singlePattern.matched(atStartOf: rest) {
-      case .found(let x):
-        data.append(x)
-        lastEnd = x.end
+      case .found(let end1, let data1):
+        data.append((end1, data1))
+        lastEnd = end1
         if data.count == repeatLimits.upperBound { break }
-        rest = rest[x.end..<rest.endIndex]
+        rest = rest[end1..<rest.endIndex]
       case .notFound(let r):
         if !repeatLimits.contains(data.count)  {
           return .notFound(resumeAt: r)
@@ -242,10 +223,7 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
   typealias MatchData = OneOf<M0.MatchData,M1.MatchData>
 
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
-  where C.Index == Index, Element_<C> == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  where C.Index == Index, C.Element == Element
   {
     switch matchers.0.matched(atStartOf: c) {
     case .found(let end, let data):
@@ -273,8 +251,7 @@ infix operator .. : AdditionPrecedence
 postfix operator *
 postfix operator +
 
-func .. <M0: Pattern, M1: Pattern>(m0: M0, m1: M1) -> ConsecutiveMatches<M0,M1>
-where M0.Element == M1.Element, M0.Index == M1.Index {
+func .. <M0: Pattern, M1: Pattern>(m0: M0, m1: M1) -> ConsecutiveMatches<M0,M1> {
   return ConsecutiveMatches(m0, m1)
 }
 
@@ -286,8 +263,7 @@ postfix func + <M: Pattern>(m: M) -> RepeatMatch<M> {
   return RepeatMatch(singlePattern: m, repeatLimits: 1...Int.max)
 }
 
-func | <M0: Pattern, M1: Pattern>(m0: M0, m1: M1) -> MatchOneOf<M0,M1>
-where M0.Element == M1.Element, M0.Index == M1.Index {
+func | <M0: Pattern, M1: Pattern>(m0: M0, m1: M1) -> MatchOneOf<M0,M1> {
   return MatchOneOf(m0, m1)
 }
 
@@ -301,10 +277,8 @@ struct MatchStaticString : Pattern {
   init(_ x: StaticString) { content = x }
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
-  where C.Index == Index, Element_<C> == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
+  where C.Index == Index, C.Element == Element 
+{
     return content.withUTF8Buffer {
       LiteralMatch<Buffer, Index>($0).matched(atStartOf: c)
     }
@@ -336,10 +310,8 @@ extension Pattern where Element == UTF8.CodeUnit {
   func searchTest<C: Collection>(
     in c: C,
     format: (MatchData)->String = { String(reflecting: $0) })
-  where C.Index == Index, Element_<C> == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
+  where C.Index == Index, C.Element == Element
+  {
     print("searching for /\(self)/ in \(c.u8str)...", terminator: "")
     if let (extent, data) = self.found(in: c) {
       print(
@@ -370,10 +342,9 @@ let source2 = Array("hack hack cough cough cough spork".utf8)
 (%"hack ")*.searchTest(in: source2)
 (%"cough ")+.searchTest(in: source2)
 
-// The final * steps around <rdar://29229409>
 let fancyPattern
   = %"quick "..((%"brown" | %"black" | %"fox" | %"chicken") .. %" ")+ 
-  .. (%__)* .. %"do"
+  .. (%__)
 
 fancyPattern.searchTest(in: source)
 
@@ -393,10 +364,8 @@ struct Paired<T: Hashable, I: Comparable> : Pattern {
   let pairs: Dictionary<T,T>
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
-  where C.Index == Index, Element_<C> == Element
-  // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
+  where C.Index == Index, C.Element == Element
+  {
     guard let closer = c.first.flatMap({ pairs[$0] }) else {
       return .notFound(resumeAt: nil)
     }

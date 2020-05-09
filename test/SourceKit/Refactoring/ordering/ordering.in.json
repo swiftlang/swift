@@ -1,0 +1,77 @@
+[
+  {
+    "key.name": "foo1(_:)",
+    "key.newname": "p(_:)",
+    "key.is_function_like": 1,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 2,
+        "key.column": 20,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 32,
+        "key.column": 24,
+        "key.nametype": source.syntacticrename.call
+      }
+    ]
+  },
+  {
+    "key.name": "foo1(_:)",
+    "key.newname": "p(_:)",
+    "key.is_function_like": 1,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 17,
+        "key.column": 29,
+        "key.nametype": source.syntacticrename.definition
+      }
+    ]
+  },
+  {
+    key.name: "foo2(a:)",
+    key.newname: "p(b:)",
+    key.is_function_like: 1,
+    "key.is_non_protocol_type": 0,
+    key.locations: [
+      {
+        key.line: 5,
+        key.column: 20,
+        key.nametype: source.syntacticrename.definition
+      },
+      {
+        key.line: 33,
+        key.column: 24,
+        key.nametype: source.syntacticrename.call
+      }
+    ]
+  },
+  {
+    key.name: "a",
+    key.newname: "b",
+    key.is_function_like: 0,
+    "key.is_non_protocol_type": 0,
+    key.locations: [
+      {
+        key.line: 7,
+        key.column: 15,
+        key.nametype: source.syntacticrename.reference
+      }
+    ]
+  },
+  {
+    key.name: "foo2(a:)",
+    key.newname: "p(b:)",
+    key.is_function_like: 1,
+    "key.is_non_protocol_type": 0,
+    key.locations: [
+      {
+        key.line: 21,
+        key.column: 29,
+        key.nametype: source.syntacticrename.definition
+      }
+    ]
+  }
+]

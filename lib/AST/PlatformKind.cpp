@@ -16,6 +16,7 @@
 
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Platform.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -56,33 +57,52 @@ Optional<PlatformKind> swift::platformFromString(StringRef Name) {
       .Default(Optional<PlatformKind>());
 }
 
-bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
+static bool isPlatformActiveForTarget(PlatformKind Platform,
+                                      const llvm::Triple &Target,
+                                      bool EnableAppExtensionRestrictions) {
   if (Platform == PlatformKind::none)
     return true;
   
   if (Platform == PlatformKind::OSXApplicationExtension ||
-      Platform == PlatformKind::iOSApplicationExtension)
-    if (!LangOpts.EnableAppExtensionRestrictions)
+      Platform == PlatformKind::iOSApplicationExtension ||
+      Platform == PlatformKind::macCatalystApplicationExtension)
+    if (!EnableAppExtensionRestrictions)
       return false;
   
   // FIXME: This is an awful way to get the current OS.
   switch (Platform) {
     case PlatformKind::OSX:
     case PlatformKind::OSXApplicationExtension:
-      return LangOpts.Target.isMacOSX();
+      return Target.isMacOSX();
     case PlatformKind::iOS:
     case PlatformKind::iOSApplicationExtension:
-      return LangOpts.Target.isiOS() && !LangOpts.Target.isTvOS();
+      return Target.isiOS() && !Target.isTvOS();
+    case PlatformKind::macCatalyst:
+    case PlatformKind::macCatalystApplicationExtension:
+      return tripleIsMacCatalystEnvironment(Target);
     case PlatformKind::tvOS:
     case PlatformKind::tvOSApplicationExtension:
-      return LangOpts.Target.isTvOS();
+      return Target.isTvOS();
     case PlatformKind::watchOS:
     case PlatformKind::watchOSApplicationExtension:
-      return LangOpts.Target.isWatchOS();
+      return Target.isWatchOS();
     case PlatformKind::none:
       llvm_unreachable("handled above");
   }
   llvm_unreachable("bad PlatformKind");
+}
+
+bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts,
+                             bool ForTargetVariant) {
+  llvm::Triple TT = LangOpts.Target;
+
+  if (ForTargetVariant) {
+    assert(LangOpts.TargetVariant && "Must have target variant triple");
+    TT = *LangOpts.TargetVariant;
+  }
+
+  return isPlatformActiveForTarget(Platform, TT,
+                                   LangOpts.EnableAppExtensionRestrictions);
 }
 
 PlatformKind swift::targetPlatform(LangOptions &LangOpts) {
@@ -105,10 +125,33 @@ PlatformKind swift::targetPlatform(LangOptions &LangOpts) {
   }
 
   if (LangOpts.Target.isiOS()) {
+    if (tripleIsMacCatalystEnvironment(LangOpts.Target))
+      return (LangOpts.EnableAppExtensionRestrictions
+                  ? PlatformKind::macCatalystApplicationExtension
+                  : PlatformKind::macCatalyst);
     return (LangOpts.EnableAppExtensionRestrictions
                 ? PlatformKind::iOSApplicationExtension
                 : PlatformKind::iOS);
   }
 
   return PlatformKind::none;
+}
+
+bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
+                                             PlatformKind Parent) {
+  if (Child == PlatformKind::macCatalyst && Parent == PlatformKind::iOS)
+    return true;
+
+  if (Child == PlatformKind::macCatalystApplicationExtension) {
+    if (Parent == PlatformKind::iOS ||
+        Parent == PlatformKind::iOSApplicationExtension ||
+        Parent == PlatformKind::macCatalyst) {
+      return true;
+    }
+  }
+
+  // Ideally we would have all ApplicationExtension platforms
+  // inherit from their non-extension platform.
+
+  return false;
 }

@@ -1,0 +1,5 @@
+var foo: String {
+  let <base>name</base> = "white"
+  return <base>name</base>
+}
+

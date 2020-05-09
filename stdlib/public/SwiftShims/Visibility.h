@@ -26,6 +26,14 @@
 #define __has_attribute(x) 0
 #endif
 
+#if !defined(__has_builtin)
+#define __has_builtin(builtin) 0
+#endif
+
+#if !defined(__has_cpp_attribute)
+#define __has_cpp_attribute(attribute) 0
+#endif
+
 #if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
@@ -62,6 +70,24 @@
 #define SWIFT_ALWAYS_INLINE
 #endif
 
+#if __has_attribute(noinline)
+#define SWIFT_NOINLINE __attribute__((__noinline__))
+#else
+#define SWIFT_NOINLINE
+#endif
+
+#if __has_attribute(noreturn)
+#define SWIFT_NORETURN __attribute__((__noreturn__))
+#else
+#define SWIFT_NORETURN
+#endif
+
+#if __has_attribute(used)
+#define SWIFT_USED __attribute__((__used__))
+#else
+#define SWIFT_USED
+#endif
+
 #if __has_attribute(unavailable)
 #define SWIFT_ATTRIBUTE_UNAVAILABLE __attribute__((__unavailable__))
 #else
@@ -69,38 +95,40 @@
 #endif
 
 // TODO: support using shims headers in overlays by parameterizing
-// SWIFT_RUNTIME_EXPORT on the library it's exported from, then setting
-// protected vs. default based on the current value of __SWIFT_CURRENT_DYLIB.
+// SWIFT_RUNTIME_EXPORT on the library it's exported from.
 
 /// Attribute used to export symbols from the runtime.
-#if __MACH__
-# define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
-#elif __ELF__
+#if defined(__MACH__) || defined(__wasi__)
 
-// Use protected visibility for ELF, since we don't want Swift symbols to be
-// interposable. The relative relocations we form to metadata aren't
-// valid in ELF shared objects, and leaving them relocatable at load time
-// defeats the purpose of the relative references.
-//
-// Protected visibility on a declaration is interpreted to mean that the
-// symbol is defined in the current dynamic library, so if we're building
-// something else, we need to fall back on using default visibility.
-#ifdef __SWIFT_CURRENT_DYLIB
-# define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("protected")))
-#else
 # define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
-#endif
 
-#else
-# if defined(__CYGWIN__)
-#  define SWIFT_RUNTIME_EXPORT
+#elif defined(__ELF__)
+
+// We make assumptions that the runtime and standard library can refer to each
+// other's symbols as DSO-local, which means we can't allow the dynamic linker
+// to relocate these symbols. We must give them protected visibility while
+// building the standard library and runtime.
+# if defined(swiftCore_EXPORTS)
+#  define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("protected")))
 # else
+#  define SWIFT_EXPORT_ATTRIBUTE __attribute__((__visibility__("default")))
+# endif
+
+// FIXME: this #else should be some sort of #elif Windows
+#else // !__MACH__ && !__ELF__
+
+# if defined(__CYGWIN__)
+#  define SWIFT_EXPORT_ATTRIBUTE
+# else
+
 #  if defined(swiftCore_EXPORTS)
 #   define SWIFT_EXPORT_ATTRIBUTE __declspec(dllexport)
 #  else
 #   define SWIFT_EXPORT_ATTRIBUTE __declspec(dllimport)
 #  endif
+
 # endif
+
 #endif
 
 #if defined(__cplusplus)
@@ -109,11 +137,68 @@
 #define SWIFT_RUNTIME_EXPORT SWIFT_EXPORT_ATTRIBUTE
 #endif
 
-/// Attribute for runtime-stdlib SPI interfaces.
-///
-/// Since the stdlib is currently fully fragile, runtime-stdlib SPI currently
-/// needs to be exported from the core dylib. When the stdlib admits more
-/// resilience we may be able to make this hidden.
-#define SWIFT_RUNTIME_STDLIB_INTERFACE SWIFT_RUNTIME_EXPORT
+#if __cplusplus > 201402l && __has_cpp_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH [[fallthrough]]
+#elif __has_cpp_attribute(gnu::fallthrough)
+#define SWIFT_FALLTHROUGH [[gnu::fallthrough]]
+#elif __has_cpp_attribute(clang::fallthrough)
+#define SWIFT_FALLTHROUGH [[clang::fallthrough]]
+#elif __has_attribute(fallthrough)
+#define SWIFT_FALLTHROUGH __attribute__((__fallthrough__))
+#else
+#define SWIFT_FALLTHROUGH
+#endif
 
+#if __cplusplus >= 201402l && __has_cpp_attribute(nodiscard)
+#define SWIFT_NODISCARD [[nodiscard]]
+#elif __has_cpp_attribute(clang::warn_unused_result)
+#define SWIFT_NODISCARD [[clang::warn_unused_result]]
+#else
+#define SWIFT_NODISCARD
+#endif
+
+
+/// Attributes for runtime-stdlib interfaces.
+/// Use these for C implementations that are imported into Swift via SwiftShims
+/// and for C implementations of Swift @_silgen_name declarations
+/// Note that @_silgen_name implementations must also be marked SWIFT_CC(swift).
+///
+/// SWIFT_RUNTIME_STDLIB_API functions are called by compiler-generated code
+/// or by @inlinable Swift code.
+/// Such functions must be exported and must be supported forever as API.
+/// The function name should be prefixed with `swift_`.
+///
+/// SWIFT_RUNTIME_STDLIB_SPI functions are called by overlay code.
+/// Such functions must be exported, but are still SPI
+/// and may be changed at any time.
+/// The function name should be prefixed with `_swift_`.
+///
+/// SWIFT_RUNTIME_STDLIB_INTERNAL functions are called only by the stdlib.
+/// Such functions are internal and are not exported.
+#define SWIFT_RUNTIME_STDLIB_API       SWIFT_RUNTIME_EXPORT
+#define SWIFT_RUNTIME_STDLIB_SPI       SWIFT_RUNTIME_EXPORT
+
+// Match the definition of LLVM_LIBRARY_VISIBILITY from LLVM's
+// Compiler.h. That header requires C++ and this needs to work in C.
+#if __has_attribute(visibility) && (defined(__ELF__) || defined(__MACH__))
+#define SWIFT_LIBRARY_VISIBILITY __attribute__ ((__visibility__("hidden")))
+#else
+#define SWIFT_LIBRARY_VISIBILITY
+#endif
+
+#if defined(__cplusplus)
+#define SWIFT_RUNTIME_STDLIB_INTERNAL extern "C" SWIFT_LIBRARY_VISIBILITY
+#else
+#define SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_LIBRARY_VISIBILITY
+#endif
+
+#if __has_builtin(__builtin_expect)
+#define SWIFT_LIKELY(expression) (__builtin_expect(!!(expression), 1))
+#define SWIFT_UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
+#else
+#define SWIFT_LIKELY(expression) ((expression))
+#define SWIFT_UNLIKELY(expression) ((expression))
+#endif
+
+// SWIFT_STDLIB_SHIMS_VISIBILITY_H
 #endif

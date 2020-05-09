@@ -17,12 +17,11 @@
 #ifndef SWIFT_BASIC_FLAGGEDPOINTER_H
 #define SWIFT_BASIC_FLAGGEDPOINTER_H
 
+#include <algorithm>
 #include <cassert>
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
-
-#include "Algorithm.h"
 
 namespace swift {
 
@@ -152,7 +151,7 @@ public:
 
 // Teach SmallPtrSet that FlaggedPointer is "basically a pointer".
 template <typename PointerTy, unsigned BitPosition, typename PtrTraits>
-class llvm::PointerLikeTypeTraits<
+struct llvm::PointerLikeTypeTraits<
   swift::FlaggedPointer<PointerTy, BitPosition, PtrTraits>> {
 public:
   static inline void *
@@ -170,7 +169,7 @@ public:
   enum {
     NumLowBitsAvailable = (BitPosition >= PtrTraits::NumLowBitsAvailable)
       ? PtrTraits::NumLowBitsAvailable
-      : (swift::min(int(BitPosition + 1),
+      : (std::min(int(BitPosition + 1),
         int(PtrTraits::NumLowBitsAvailable)) - 1)
   };
 };

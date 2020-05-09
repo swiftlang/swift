@@ -15,27 +15,99 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/ToolChain.h"
+#include "clang/Driver/DarwinSDKInfo.h"
+#include "llvm/Option/ArgList.h"
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
+class DiagnosticEngine;
+
 namespace driver {
 namespace toolchains {
 
 class LLVM_LIBRARY_VISIBILITY Darwin : public ToolChain {
 protected:
+
+  void addLinkerInputArgs(InvocationInfo &II,
+                          const JobContext &context) const;
+
+  void addArgsToLinkARCLite(llvm::opt::ArgStringList &Arguments,
+                            const JobContext &context) const;
+
+  void addSanitizerArgs(llvm::opt::ArgStringList &Arguments,
+                        const DynamicLinkJobAction &job,
+                        const JobContext &context) const;
+
+  void addArgsToLinkStdlib(llvm::opt::ArgStringList &Arguments,
+                           const DynamicLinkJobAction &job,
+                           const JobContext &context) const;
+
+  void addProfileGenerationArgs(llvm::opt::ArgStringList &Arguments,
+                                const JobContext &context) const;
+
+  void addDeploymentTargetArgs(llvm::opt::ArgStringList &Arguments,
+                               const JobContext &context) const;
+
+  void addCommonFrontendArgs(
+      const OutputInfo &OI, const CommandOutput &output,
+      const llvm::opt::ArgList &inputArgs,
+      llvm::opt::ArgStringList &arguments) const override;
+
   InvocationInfo constructInvocation(const InterpretJobAction &job,
                                      const JobContext &context) const override;
-  InvocationInfo constructInvocation(const LinkJobAction &job,
+  InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
                                      const JobContext &context) const override;
+  InvocationInfo constructInvocation(const StaticLinkJobAction &job,
+                                     const JobContext &context) const override;
+    
+  void validateArguments(DiagnosticEngine &diags,
+                         const llvm::opt::ArgList &args,
+                         StringRef defaultTarget) const override;
+
+  void validateOutputInfo(DiagnosticEngine &diags,
+                          const OutputInfo &outputInfo) const override;
 
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
+  bool shouldStoreInvocationInDebugInfo() const override;
+
+  /// Retrieve the target SDK version for the given target triple.
+  Optional<llvm::VersionTuple>
+  getTargetSDKVersion(const llvm::Triple &triple) const ;
+
+  /// Information about the SDK that the application is being built against.
+  /// This information is only used by the linker, so it is only populated
+  /// when there will be a linker job.
+  mutable Optional<clang::driver::DarwinSDKInfo> SDKInfo;
+
+  const Optional<llvm::Triple> TargetVariant;
+
 public:
-  Darwin(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  Darwin(const Driver &D, const llvm::Triple &Triple,
+         const Optional<llvm::Triple> &TargetVariant) :
+      ToolChain(D, Triple), TargetVariant(TargetVariant) {}
+
   ~Darwin() = default;
-  bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                 StringRef sanitizerLibName)
-      const override;
+  std::string sanitizerRuntimeLibName(StringRef Sanitizer,
+                                      bool shared = true) const override;
+  
+  Optional<llvm::Triple> getTargetVariant() const {
+    return TargetVariant;
+  }
+};
+
+class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {
+protected:
+  InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const StaticLinkJobAction &job,
+                                     const JobContext &context) const override;
+
+public:
+  Windows(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  ~Windows() = default;
+  std::string sanitizerRuntimeLibName(StringRef Sanitizer,
+                                      bool shared = true) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY GenericUnix : public ToolChain {
@@ -60,54 +132,29 @@ protected:
   /// platforms.
   virtual std::string getTargetForLinker() const;
 
-  /// Whether to specify a linker -rpath to the Swift runtime library path.
-  /// -rpath is not supported on all platforms, and subclasses may override
-  /// this method to return false on platforms that don't support it. The
-  /// default is to return true (and so specify an -rpath).
-  virtual bool shouldProvideRPathToLinker() const;
+  bool addRuntimeRPath(const llvm::Triple &T,
+                       const llvm::opt::ArgList &Args) const;
 
-  /// Provides a path to an object that should be linked first. On platforms
-  /// that use ELF binaries, an object that provides markers and sizes for
-  /// metadata sections must be linked first. Platforms that do not need this
-  /// object may return an empty string; no additional objects are linked in
-  /// this case.
-  ///
-  /// \param RuntimeLibraryPath A path to the Swift resource directory, which
-  ///        on ARM architectures will contain metadata "begin" and "end"
-  ///        objects.
-  virtual std::string
-  getPreInputObjectPath(StringRef RuntimeLibraryPath) const;
-
-  /// Provides a path to an object that should be linked last. On platforms
-  /// that use ELF binaries, an object that provides markers and sizes for
-  /// metadata sections must be linked last. Platforms that do not need this
-  /// object may return an empty string; no additional objects are linked in
-  /// this case.
-  ///
-  /// \param RuntimeLibraryPath A path to the Swift resource directory, which
-  ///        on ARM architectures will contain metadata "begin" and "end"
-  ///        objects.
-  virtual std::string
-  getPostInputObjectPath(StringRef RuntimeLibraryPath) const;
-
-  InvocationInfo constructInvocation(const LinkJobAction &job,
+  InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
 
 public:
-  GenericUnix(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  GenericUnix(const Driver &D, const llvm::Triple &Triple)
+      : ToolChain(D, Triple) {}
   ~GenericUnix() = default;
-  bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                 StringRef sanitizerLibName)
-      const override;
+  std::string sanitizerRuntimeLibName(StringRef Sanitizer,
+                                      bool shared = true) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Android : public GenericUnix {
 protected:
   std::string getTargetForLinker() const override;
 
-  bool shouldProvideRPathToLinker() const override;
 public:
-  Android(const Driver &D, const llvm::Triple &Triple) : GenericUnix(D, Triple) {}
+  Android(const Driver &D, const llvm::Triple &Triple)
+      : GenericUnix(D, Triple) {}
   ~Android() = default;
 };
 
@@ -117,14 +164,20 @@ protected:
 
   std::string getTargetForLinker() const override;
 
-  std::string getPreInputObjectPath(
-    StringRef RuntimeLibraryPath) const override;
-
-  std::string getPostInputObjectPath(
-    StringRef RuntimeLibraryPath) const override;
 public:
-  Cygwin(const Driver &D, const llvm::Triple &Triple) : GenericUnix(D, Triple) {}
+  Cygwin(const Driver &D, const llvm::Triple &Triple)
+      : GenericUnix(D, Triple) {}
   ~Cygwin() = default;
+};
+
+class LLVM_LIBRARY_VISIBILITY OpenBSD : public GenericUnix {
+protected:
+  std::string getDefaultLinker() const override;
+
+public:
+  OpenBSD(const Driver &D, const llvm::Triple &Triple)
+      : GenericUnix(D, Triple) {}
+  ~OpenBSD() = default;
 };
 
 } // end namespace toolchains
@@ -132,4 +185,3 @@ public:
 } // end namespace swift
 
 #endif
-

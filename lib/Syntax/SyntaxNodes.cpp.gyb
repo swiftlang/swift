@@ -27,10 +27,10 @@ using namespace swift::syntax;
 % for node in SYNTAX_NODES:
 %   if node.requires_validation():
 void ${node.name}::validate() const {
-  if (!Data || !Data->Raw) return;
-  auto raw = Data->Raw;
+#ifndef NDEBUG
+  auto raw = Data->getRaw();
   if (isMissing()) return;
-  assert(raw->Layout.size() == ${len(node.children)});
+  assert(raw->getLayout().size() == ${len(node.children)});
 %     for child in node.children:
 %       if child.token_choices:
 %         choices = ", ".join("tok::" + choice.kind
@@ -41,37 +41,47 @@ void ${node.name}::validate() const {
 %         token_kind = child.main_token().kind
 %         choices = ", ".join("\"%s\"" % choice
 %                             for choice in child.text_choices)
-  syntax_assert_child_token_text(raw, ${child.name}, 
+  syntax_assert_child_token_text(raw, ${child.name},
                                  tok::${token_kind}, ${choices});
 %       end
+%       if child.node_choices:
+  if (auto &__Child = raw->getChild(Cursor::${child.name}))
+    assert(${check_child_condition_raw(child)}(__Child));
+%       end
 %     end
+#endif
 }
 %   end
 
 %   for child in node.children:
 %     if child.is_optional:
 llvm::Optional<${child.type_name}> ${node.name}::get${child.name}() {
-  if (getRaw()->getChild(Cursor::${child.name})->isMissing()) {
+  auto ChildData = Data->getChild(Cursor::${child.name});
+  if (!ChildData)
     return llvm::None;
-  }
-  return llvm::Optional<${child.type_name}> {
-    ${child.type_name} { Root, Data->getChild(Cursor::${child.name}).get() }
-  };
+  return ${child.type_name} {Root, ChildData.get()};
 }
 %     else:
 ${child.type_name} ${node.name}::get${child.name}() {
-  return ${child.type_name} { Root, Data->getChild(Cursor::${child.name}).get() };
+  return ${child.type_name} {Root, Data->getChild(Cursor::${child.name}).get()};
 }
 %     end
 
 %     child_node = NODE_MAP.get(child.syntax_kind)
 %     if child_node and child_node.is_syntax_collection():
-%       child_elt = child_node.collection_element_name
+%       child_elt = child.collection_element_name
 %       child_elt_type = child_node.collection_element_type
+%       if not child_elt:
+%         raise Exception("'collection_element_name' should be set for '%s' of '%s'" % (child.name, node.name))
+%       end
 ${node.name} ${node.name}::add${child_elt}(${child_elt_type} ${child_elt}) {
-  auto childRaw = getRaw()->getChild(Cursor::${child.name})
-                          ->append(${child_elt}.getRaw());
-  return Data->replaceChild<${node.name}>(childRaw, Cursor::${child.name});
+  RC<RawSyntax> raw = getRaw()->getChild(Cursor::${child.name});
+  if (raw)
+    raw = raw->append(${child_elt}.getRaw());
+  else
+    raw = RawSyntax::make(SyntaxKind::${child_node.syntax_kind},
+                          {${child_elt}.getRaw()}, SourcePresence::Present);
+  return Data->replaceChild<${node.name}>(raw, Cursor::${child.name});
 }
 %     end
 
@@ -81,10 +91,18 @@ ${node.name} ${node.name}::with${child.name}(
   if (New${child.type_name}.hasValue()) {
     raw = New${child.type_name}->getRaw();
   } else {
+% if child.is_optional:
+    raw = nullptr;
+% else:
     raw = ${make_missing_child(child)};
+% end
   }
   return Data->replaceChild<${node.name}>(raw, Cursor::${child.name});
 }
 
 %   end
 % end
+
+const char* swift::syntax::getSyntaxStructureVersioningIdentifier() {
+  return "${calculate_node_hash()}";
+}

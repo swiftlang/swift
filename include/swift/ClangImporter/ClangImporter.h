@@ -23,6 +23,7 @@
 
 namespace llvm {
   class Triple;
+  class FileCollector;
   template<typename Fn> class function_ref;
 }
 
@@ -39,6 +40,7 @@ namespace clang {
   class NamedDecl;
   class Sema;
   class TargetInfo;
+  class Type;
   class VisibleDeclConsumer;
   class DeclarationName;
 }
@@ -51,15 +53,52 @@ class ClangModuleUnit;
 class ClangNode;
 class Decl;
 class DeclContext;
+class EnumDecl;
 class ImportDecl;
 class IRGenOptions;
-class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
+class StructDecl;
+class TypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
 
-/// \brief Class that imports Clang modules into Swift, mapping directly
+/// Kinds of optional types.
+enum OptionalTypeKind : unsigned {
+  /// The type is not an optional type.
+  OTK_None = 0,
+
+  /// The type is Optional<T>.
+  OTK_Optional,
+
+  /// The type is ImplicitlyUnwrappedOptional<T>.
+  OTK_ImplicitlyUnwrappedOptional
+};
+enum { NumOptionalTypeKinds = 2 };
+
+/// This interface is implemented by LLDB to serve as a fallback when Clang
+/// modules can't be imported from source in the debugger.
+///
+/// During compile time, ClangImporter-imported Clang modules are compiled with
+/// -gmodules, which emits a DWARF rendition of all types defined in the module
+/// into the .pcm file. On Darwin, these types can be collected by
+/// dsymutil. This delegate allows DWARFImporter to ask LLDB to look up a Clang
+/// type by name, synthesize a Clang AST from it. DWARFImporter then hands this
+/// Clang AST to ClangImporter to import the type into Swift.
+class DWARFImporterDelegate {
+public:
+  virtual ~DWARFImporterDelegate() = default;
+  /// Perform a qualified lookup of a Clang type with this name.
+  /// \param kind  Only return results with this type kind.
+  /// \param inModule only return results from this module.
+  virtual void lookupValue(StringRef name, llvm::Optional<ClangTypeKind> kind,
+                           StringRef inModule,
+                           SmallVectorImpl<clang::Decl *> &results) {}
+  /// vtable anchor.
+  virtual void anchor();
+};
+
+/// Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
   friend class ClangModuleUnit;
@@ -71,10 +110,22 @@ private:
   Implementation &Impl;
 
   ClangImporter(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
-                DependencyTracker *tracker);
+                DependencyTracker *tracker,
+                DWARFImporterDelegate *dwarfImporterDelegate);
+
+  /// Creates a clone of Clang importer's compiler instance that has been
+  /// configured for operations on precompiled outputs (either emitting a
+  /// precompiled header, emitting a precompiled module, or dumping a
+  /// precompiled module).
+  ///
+  /// The caller of this method should set any action-specific invocation
+  /// options (like FrontendOptions::ProgramAction, input files, and output
+  /// paths), then create the appropriate FrontendAction and execute it.
+  std::unique_ptr<clang::CompilerInstance>
+  cloneCompilerInstanceForPrecompiling();
 
 public:
-  /// \brief Create a new Clang importer that can import a suitable Clang
+  /// Create a new Clang importer that can import a suitable Clang
   /// module into the given ASTContext.
   ///
   /// \param ctx The ASTContext into which the module will be imported.
@@ -87,13 +138,15 @@ public:
   ///
   /// \param tracker The object tracking files this compilation depends on.
   ///
+  /// \param dwarfImporterDelegate A helper object that can synthesize
+  /// Clang Decls from debug info. Used by LLDB.
+  ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx,
-         const ClangImporterOptions &importerOpts,
-         std::string swiftPCHHash = "",
-         DependencyTracker *tracker = nullptr);
+  create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
+         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
@@ -102,19 +155,28 @@ public:
 
   ~ClangImporter();
 
-  /// \brief Create a new clang::DependencyCollector customized to
+  /// Only to be used by lldb-moduleimport-test.
+  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
+
+  /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.
   static std::shared_ptr<clang::DependencyCollector>
-  createDependencyCollector();
+  createDependencyCollector(bool TrackSystemDeps,
+                            std::shared_ptr<llvm::FileCollector> FileCollector);
 
-  /// \brief Check whether the module with a given name can be imported without
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+
+  /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+  virtual bool canImportModule(Located<Identifier> named) override;
 
-  /// \brief Import a module with the given module path.
+  /// Import a module with the given module path.
   ///
   /// Clang modules will be imported using the Objective-C ARC dialect,
   /// with all warnings disabled.
@@ -128,13 +190,47 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual ModuleDecl *loadModule(
                         SourceLoc importLoc,
-                        ArrayRef<std::pair<Identifier, SourceLoc>> path)
+                        ArrayRef<Located<Identifier>> path)
                       override;
 
-  /// \brief Look for declarations associated with the given name.
+  /// Determine whether \c overlayDC is within an overlay module for the
+  /// imported context enclosing \c importedDC.
+  ///
+  /// This routine is used for various hacks that are only permitted within
+  /// overlays of imported modules, e.g., Objective-C bridging conformances.
+  bool isInOverlayModuleForImportedModule(
+                                      const DeclContext *overlayDC,
+                                      const DeclContext *importedDC) override;
+
+  /// Look for declarations associated with the given name.
   ///
   /// \param name The name we're searching for.
-  void lookupValue(DeclName name, VisibleDeclConsumer &consumer);
+  void lookupValue(DeclName name, VisibleDeclConsumer &consumer) override;
+
+  /// Look up a type declaration by its Clang name.
+  ///
+  /// Note that this method does no filtering. If it finds the type in a loaded
+  /// module, it returns it. This is intended for use in reflection / debugging
+  /// contexts where access is not a problem.
+  void lookupTypeDecl(StringRef clangName, ClangTypeKind kind,
+                      llvm::function_ref<void(TypeDecl *)> receiver) override;
+
+  /// Look up type a declaration synthesized by the Clang importer itself, using
+  /// a "related entity kind" to determine which type it should be. For example,
+  /// this can be used to find the synthesized error struct for an
+  /// NS_ERROR_ENUM.
+  ///
+  /// Note that this method does no filtering. If it finds the type in a loaded
+  /// module, it returns it. This is intended for use in reflection / debugging
+  /// contexts where access is not a problem.
+  void
+  lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
+                      StringRef relatedEntityKind,
+                      llvm::function_ref<void(TypeDecl *)> receiver) override;
+
+  /// Just like Decl::getClangNode() except we look through to the 'Code'
+  /// enum of an error wrapper struct.
+  ClangNode getEffectiveClangNode(const Decl *decl) const;
 
   /// Look for textually included declarations from the bridging header.
   ///
@@ -163,7 +259,7 @@ public:
                              llvm::function_ref<bool(ClangNode)> filter,
                              llvm::function_ref<void(Decl*)> receiver) const;
 
-  /// \brief Load extensions to the given nominal type.
+  /// Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.
   ///
@@ -232,6 +328,12 @@ public:
   /// \sa importHeader
   ModuleDecl *getImportedHeaderModule() const override;
 
+  /// Retrieves the Swift wrapper for the given Clang module, creating
+  /// it if necessary.
+  ModuleDecl *
+  getWrapperForModule(const clang::Module *mod,
+                      bool returnOverlayIfPossible = false) const override;
+
   std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
                                         time_t &fileModTime);
 
@@ -249,15 +351,42 @@ public:
   /// if we need to persist a PCH for later reuse.
   bool canReadPCH(StringRef PCHFilename);
 
+  /// Makes a temporary replica of the ClangImporter's CompilerInstance, reads a
+  /// module map into the replica and emits a PCM file for one of the modules it
+  /// declares. Delegates to clang for everything except construction of the
+  /// replica.
+  bool emitPrecompiledModule(StringRef moduleMapPath, StringRef moduleName,
+                             StringRef outputPath);
+
+  /// Makes a temporary replica of the ClangImporter's CompilerInstance and
+  /// dumps information about a PCM file (assumed to be generated by -emit-pcm
+  /// or in the Swift module cache). Delegates to clang for everything except
+  /// construction of the replica.
+  bool dumpPrecompiledModule(StringRef modulePath, StringRef outputPath);
+
   const clang::Module *getClangOwningModule(ClangNode Node) const;
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;
 
-  void setTypeResolver(LazyResolver &resolver);
-  void clearTypeResolver();
+  Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache,
+      SubASTContextDelegate &delegate) override;
 
-  clang::TargetInfo &getTargetInfo() const;
+  /// Add dependency information for the bridging header.
+  ///
+  /// \param moduleName the name of the Swift module whose dependency
+  /// information will be augmented with information about the given
+  /// bridging header.
+  ///
+  /// \param cache The module dependencies cache to update, with information
+  /// about new Clang modules discovered along the way.
+  ///
+  /// \returns \c true if an error occurred, \c false otherwise
+  bool addBridgingHeaderDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache);
+
+  clang::TargetInfo &getTargetInfo() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const override;
@@ -285,8 +414,6 @@ public:
   /// Writes the mangled name of \p clangDecl to \p os.
   void getMangledName(raw_ostream &os, const clang::NamedDecl *clangDecl) const;
 
-  using ClangModuleLoader::addDependency;
-
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
 
@@ -296,8 +423,8 @@ public:
   /// Given the path of a Clang module, collect the names of all its submodules.
   /// Calling this function does not load the module.
   void collectSubModuleNames(
-      ArrayRef<std::pair<Identifier, SourceLoc>> path,
-      std::vector<std::string> &names);
+      ArrayRef<Located<Identifier>> path,
+      std::vector<std::string> &names) const;
 
   /// Given a Clang module, decide whether this module is imported already.
   static bool isModuleImported(const clang::Module *M);
@@ -313,10 +440,26 @@ public:
   /// with -import-objc-header option.
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash, bool &isExplicit);
+
+  const clang::Type *parseClangFunctionType(StringRef type,
+                                            SourceLoc loc) const override;
+  void printClangType(const clang::Type *type,
+                      llvm::raw_ostream &os) const override;
+
+  StableSerializationPath
+  findStableSerializationPath(const clang::Decl *decl) const override;
+
+  const clang::Decl *
+  resolveStableSerializationPath(
+                            const StableSerializationPath &path) const override;
+
+  bool isSerializable(const clang::Type *type,
+                      bool checkCanonical) const override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
                              ArrayRef<clang::Module *> Exported);
-}
+
+} // end namespace swift
 
 #endif

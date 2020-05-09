@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -enable-objc-interop
 
 class A {
   func ret_sametype() -> Int { return 0 }
@@ -94,8 +94,8 @@ class F : E {
   override var var_nonclass_optional_rev: Int? { get { return 0 } set {} } // expected-error{{property 'var_nonclass_optional_rev' with type 'Int?' cannot override a property with type 'Int'}}
   override var var_class_optional: F { get { return self } set {} } // expected-error{{cannot override mutable property 'var_class_optional' of type 'F?' with covariant type 'F'}}
   override var var_class_optional_rev: E? { get { return self } set {} } // expected-error{{property 'var_class_optional_rev' with type 'E?' cannot override a property with type 'E'}}
-  override var var_class_uoptional: F { get { return F() } set {} } // expected-error{{cannot override mutable property 'var_class_uoptional' of type 'F!' with covariant type 'F'}}
-  override var var_class_uoptional_rev: E! { get { return self }  set {} } // expected-error{{property 'var_class_uoptional_rev' with type 'E!' cannot override a property with type 'E'}}
+  override var var_class_uoptional: F { get { return F() } set {} } // expected-error{{cannot override mutable property 'var_class_uoptional' of type 'F?' with covariant type 'F'}}
+  override var var_class_uoptional_rev: E! { get { return self }  set {} } // expected-error{{property 'var_class_uoptional_rev' with type 'E?' cannot override a property with type 'E'}}
   override var var_class_optional_uoptional: F! { get { return .none } set {} }
   override var var_class_optional_uoptional_rev: E? { get { return self } set {} }
 
@@ -107,7 +107,7 @@ class F : E {
   override var ro_class_optional: F { return self }
   override var ro_class_optional_rev: E? { return self } // expected-error{{property 'ro_class_optional_rev' with type 'E?' cannot override a property with type 'E'}}
   override var ro_class_uoptional: F { return F() }
-  override var ro_class_uoptional_rev: E! { return self } // expected-error{{property 'ro_class_uoptional_rev' with type 'E!' cannot override a property with type 'E'}}
+  override var ro_class_uoptional_rev: E! { return self } // expected-error{{property 'ro_class_uoptional_rev' with type 'E?' cannot override a property with type 'E'}}
   override var ro_class_optional_uoptional: F! { return .none }
   override var ro_class_optional_uoptional_rev: E? { return self }
 }
@@ -140,91 +140,92 @@ class G {
 }
 
 class H : G {
-  override func f1(_: Int, _: Int) { } // expected-error{{argument names for method 'f1' do not match those of overridden method 'f1(_:int:)'}}{{28-28=int }}
-  override func f2(_: Int, value: Int) { } // expected-error{{argument names for method 'f2(_:value:)' do not match those of overridden method 'f2(_:int:)'}}{{28-28=int }}
-  override func f3(_: Int, value int: Int) { } // expected-error{{argument names for method 'f3(_:value:)' do not match those of overridden method 'f3(_:int:)'}}{{28-34=}}
-  override func f4(_: Int, _ int: Int) { } // expected-error{{argument names for method 'f4' do not match those of overridden method 'f4(_:int:)'}}{{28-30=}}
-  override func f5(_: Int, value inValue: Int) { } // expected-error{{argument names for method 'f5(_:value:)' do not match those of overridden method 'f5(_:int:)'}}{{28-33=int}}
-  override func f6(_: Int, _ inValue: Int) { } // expected-error{{argument names for method 'f6' do not match those of overridden method 'f6(_:int:)'}}{{28-29=int}}
+  override func f1(_: Int, _: Int) { } // expected-error{{argument labels for method 'f1' do not match those of overridden method 'f1(_:int:)'}}{{28-28=int }}
+  override func f2(_: Int, value: Int) { } // expected-error{{argument labels for method 'f2(_:value:)' do not match those of overridden method 'f2(_:int:)'}}{{28-28=int }}
+  override func f3(_: Int, value int: Int) { } // expected-error{{argument labels for method 'f3(_:value:)' do not match those of overridden method 'f3(_:int:)'}}{{28-34=}}
+  override func f4(_: Int, _ int: Int) { } // expected-error{{argument labels for method 'f4' do not match those of overridden method 'f4(_:int:)'}}{{28-30=}}
+  override func f5(_: Int, value inValue: Int) { } // expected-error{{argument labels for method 'f5(_:value:)' do not match those of overridden method 'f5(_:int:)'}}{{28-33=int}}
+  override func f6(_: Int, _ inValue: Int) { } // expected-error{{argument labels for method 'f6' do not match those of overridden method 'f6(_:int:)'}}{{28-29=int}}
 
   override func f7(_: Int, int value: Int) { } // okay
 
-  override func g1(_: Int, s: String) { } // expected-error{{declaration 'g1(_:s:)' has different argument names from any potential overrides}}{{none}}
+  override func g1(_: Int, s: String) { } // expected-error{{declaration 'g1(_:s:)' has different argument labels from any potential overrides}}{{none}}
   override func g2(_: Int, string: Int) { } // expected-error{{method does not override any method from its superclass}} {{none}}
   override func g3(_: Int, path: Int) { } // expected-error{{method does not override any method from its superclass}} {{none}}
-  override func g4(_: Int, string: Int) { } // expected-error{{argument names for method 'g4(_:string:)' do not match those of overridden method 'g4'}} {{28-28=_ }}
+  override func g4(_: Int, string: Int) { } // expected-error{{argument labels for method 'g4(_:string:)' do not match those of overridden method 'g4'}} {{28-28=_ }}
 
-  override init(x: Int) {} // expected-error{{argument names for initializer 'init(x:)' do not match those of overridden initializer 'init(a:)'}} {{17-17=a }}
-  override init(x: String) {} // expected-error{{declaration 'init(x:)' has different argument names from any potential overrides}} {{none}}
+  override init(x: Int) {} // expected-error{{argument labels for initializer 'init(x:)' do not match those of overridden initializer 'init(a:)'}} {{17-17=a }}
+  override init(x: String) {} // expected-error{{declaration 'init(x:)' has different argument labels from any potential overrides}} {{none}}
   override init(a: Double) {} // expected-error{{initializer does not override a designated initializer from its superclass}} {{none}}
   override init(b: Double) {} // expected-error{{initializer does not override a designated initializer from its superclass}} {{none}}
 }
 
 @objc class IUOTestBaseClass {
-  func none() {}
+  @objc func none() {}
 
-  func oneA(_: AnyObject) {}
-  func oneB(x: AnyObject) {}
-  func oneC(_ x: AnyObject) {}
+  @objc func oneA(_: AnyObject) {}
+  @objc func oneB(x: AnyObject) {}
+  @objc func oneC(_ x: AnyObject) {}
 
-  func manyA(_: AnyObject, _: AnyObject) {}
-  func manyB(_ a: AnyObject, b: AnyObject) {}
-  func manyC(var a: AnyObject,  // expected-error {{'var' as a parameter attribute is not allowed}}
-             var b: AnyObject) {} // expected-error {{'var' as a parameter attribute is not allowed}}
+  @objc func manyA(_: AnyObject, _: AnyObject) {}
+  @objc func manyB(_ a: AnyObject, b: AnyObject) {}
+  @objc func manyC(var a: AnyObject,  // expected-warning {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
+                   var b: AnyObject) {} // expected-warning {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
 
-  func result() -> AnyObject? { return nil }
-  func both(_ x: AnyObject) -> AnyObject? { return x }
+  @objc func result() -> AnyObject? { return nil }
+  @objc func both(_ x: AnyObject) -> AnyObject? { return x }
 
-  init(_: AnyObject) {}
-  init(one: AnyObject) {}
-  init(a: AnyObject, b: AnyObject) {}
+  @objc init(_: AnyObject) {}
+  @objc init(one: AnyObject) {}
+  @objc init(a: AnyObject, b: AnyObject) {}
 }
 
 class IUOTestSubclass : IUOTestBaseClass {
-  override func oneA(_: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override func oneA(_: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
-  override func oneB(x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override func oneB(x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
-  override func oneC(_ x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override func oneC(_ x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{36-37=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{27-27=(}} {{37-37=)}}
 
-  override func manyA(_: AnyObject!, _: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override func manyA(_: AnyObject!, _: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 2 {{remove '!' to make the parameter required}}
   // expected-note@-2 2 {{add parentheses to silence this warning}}
-  override func manyB(_ a: AnyObject!, b: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override func manyB(_ a: AnyObject!, b: AnyObject!) {} // expected-warning 2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 2 {{remove '!' to make the parameter required}} 
   // expected-note@-2 2 {{add parentheses to silence this warning}}
 
-  override func result() -> AnyObject! { return nil } // expected-warning {{overriding instance method optional result type 'AnyObject?' with implicitly unwrapped optional type 'AnyObject!'}}
+  override func result() -> AnyObject! { return nil } // expected-warning {{overriding instance method optional result type 'AnyObject?' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{use '?' to make the result optional}} {{38-39=?}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{29-29=(}} {{39-39=)}}
-  override func both(_ x: AnyObject!) -> AnyObject! { return x } // expected-warning {{overriding instance method optional result type 'AnyObject?' with implicitly unwrapped optional type 'AnyObject!'}} expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override func both(_ x: AnyObject!) -> AnyObject! { return x } // expected-warning {{overriding instance method optional result type 'AnyObject?' with implicitly unwrapped optional type 'AnyObject?'}} expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{use '?' to make the result optional}} {{51-52=?}} expected-note@-1 {{remove '!' to make the parameter required}} {{36-37=}}
   // expected-note@-2 2 {{add parentheses to silence this warning}}
 
-  override init(_: AnyObject!) {} // expected-warning {{overriding initializer parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override init(_: AnyObject!) {} // expected-warning {{overriding initializer parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{29-30=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{20-20=(}} {{30-30=)}}
-  override init(one: AnyObject!) {} // expected-warning {{overriding initializer parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override init(one: AnyObject!) {} // expected-warning {{overriding initializer parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{31-32=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{22-22=(}} {{32-32=)}}
-  override init(a: AnyObject!, b: AnyObject!) {} // expected-warning 2 {{overriding initializer parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override init(a: AnyObject!, b: AnyObject!) {} // expected-warning 2 {{overriding initializer parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 2 {{remove '!' to make the parameter required}}
   // expected-note@-2 2 {{add parentheses to silence this warning}}
 }
 
 class IUOTestSubclass2 : IUOTestBaseClass {
-  override func oneA(_ x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override func oneA(_ x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{36-37=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{27-27=(}} {{37-37=)}}
 
-  override func oneB(x: ImplicitlyUnwrappedOptional<AnyObject>) {}  // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'ImplicitlyUnwrappedOptional<AnyObject>'}}
-  // expected-note@-1 {{add parentheses to silence this warning}} {{25-25=(}} {{63-63=)}}
+  override func oneB(x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
 
-  override func oneC(_: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  override func oneC(_: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
   
@@ -232,10 +233,7 @@ class IUOTestSubclass2 : IUOTestBaseClass {
 
 class IUOTestSubclassOkay : IUOTestBaseClass {
   override func oneA(_: AnyObject?) {}
-  override func oneB(x: (AnyObject!)) {}
   override func oneC(_ x: AnyObject) {}
-
-  override func result() -> (AnyObject!) { return nil }
 }
 
 class GenericBase<T> {}
@@ -267,8 +265,8 @@ class Base24646184 {
   func foo(ok: SubTy) { }
 }
 class Derived24646184 : Base24646184 {
-  override init(_: Ty) { } // expected-note {{'init' previously overridden here}}
-  override init(_: SubTy) { } // expected-error {{'init' has already been overridden}}
+  override init(_: Ty) { } // expected-note {{'init(_:)' previously overridden here}}
+  override init(_: SubTy) { } // expected-error {{'init(_:)' has already been overridden}}
   override func foo(_: Ty) { } // expected-note {{'foo' previously overridden here}}
   override func foo(_: SubTy) { } // expected-error {{'foo' has already been overridden}}
 
@@ -278,6 +276,17 @@ class Derived24646184 : Base24646184 {
   override func foo(ok: SubTy) { }
 }
 
+
+// Subscripts
+
+class SubscriptBase {
+  subscript(a a: Int) -> Int { return a }
+}
+
+class SubscriptDerived : SubscriptBase {
+  override subscript(a: Int) -> Int { return a }
+  // expected-error@-1 {{argument labels for method 'subscript(_:)' do not match those of overridden method 'subscript(a:)'}}
+}
 
 // Generic subscripts
 
@@ -307,7 +316,6 @@ class GenericSubscriptDerived : GenericSubscriptBase {
 
 
 // @escaping
-
 class CallbackBase {
   func perform(handler: @escaping () -> Void) {} // expected-note * {{here}}
   func perform(optHandler: (() -> Void)?) {} // expected-note * {{here}}
@@ -330,3 +338,79 @@ class CallbackSubC : CallbackBase {
   override func perform(nonescapingHandler: @escaping () -> Void) {} // expected-error {{method does not override any method from its superclass}}
 }
 
+// inout, varargs
+class HasFlagsBase {
+  func modify(x: inout B) {} // expected-note 2{{potential overridden instance method 'modify(x:)' here}}
+  func tweak(x: inout A) {} // expected-note 2{{potential overridden instance method 'tweak(x:)' here}}
+  func collect(x: B...) {} // expected-note 2{{potential overridden instance method 'collect(x:)' here}}
+}
+
+class HasFlagsDerivedGood : HasFlagsBase {
+  override func modify(x: inout B) {}
+  override func tweak(x: inout A) {}
+  override func collect(x: B...) {}
+}
+
+class HasFlagsDerivedBad1 : HasFlagsBase {
+  override func modify(x: inout A) {} // expected-error {{method does not override any method from its superclass}}
+  override func tweak(x: inout B) {} // expected-error {{method does not override any method from its superclass}}
+  override func collect(x: A...) {} // expected-error {{method does not override any method from its superclass}}
+}
+
+class HasFlagsDerivedBad2 : HasFlagsBase {
+  override func modify(x: B) {} // expected-error {{method does not override any method from its superclass}}
+  override func tweak(x: A) {} // expected-error {{method does not override any method from its superclass}}
+  override func collect(x: [B]) {} // expected-error {{method does not override any method from its superclass}}
+}
+
+// Issues with overrides of internal(set) and fileprivate(set) members
+public class BaseWithInternalSetter {
+    public internal(set) var someValue: Int = 0
+}
+
+public class DerivedWithInternalSetter: BaseWithInternalSetter {
+    override public internal(set) var someValue: Int {
+        get { return 0 }
+        set { }
+    }
+}
+
+class BaseWithFilePrivateSetter {
+    fileprivate(set) var someValue: Int = 0
+}
+
+class DerivedWithFilePrivateSetter: BaseWithFilePrivateSetter {
+    override fileprivate(set) var someValue: Int {
+        get { return 0 }
+        set { }
+    }
+}
+
+open class OpenBase {
+  open func instanceMethod() {}
+  open class func classMethod() {}
+}
+
+public class PublicDerived : OpenBase {
+  override public func instanceMethod() {}
+  override public class func classMethod() {}
+}
+
+open class OpenDerived : OpenBase {
+  override open func instanceMethod() {}
+  override open class func classMethod() {}
+}
+
+open class OpenDerivedPublic : OpenBase {
+  override public func instanceMethod() {} // Ok
+  override public class func classMethod() {} // Ok
+}
+
+open class OpenDerivedFinal : OpenBase {
+  override public final func instanceMethod() {}
+  override public class final func classMethod() {}
+}
+
+open class OpenDerivedStatic : OpenBase {
+  override public static func classMethod() {}
+}

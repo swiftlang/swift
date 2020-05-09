@@ -1,0 +1,25 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -sil-combine %s | %FileCheck %s
+
+struct S<T> {
+  var t : T
+}
+
+// Test SIL combine's handling of retain_value/release_value.
+//
+// CHECK-LABEL: sil @testSpecializeOpaque : $@convention(thin) <T> (@in S<T>) -> () {
+// CHECK-LABEL: bb0(%0 : $S<T>):
+// CHECK:   retain_value %0 : $S<T>
+// CHECK:   [[F:%.*]] = function_ref @testSpecializeOpaque : $@convention(thin) <τ_0_0> (@in S<τ_0_0>) -> ()
+// CHECK:   [[CALL:%.*]] = apply [[F]]<T>(%0) : $@convention(thin) <τ_0_0> (@in S<τ_0_0>) -> ()
+// CHECK:   release_value %0 : $S<T>
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'testSpecializeOpaque'
+sil @testSpecializeOpaque : $@convention(thin) <T> (@in S<T>) -> () {
+bb0(%0 : $S<T>):
+  retain_value %0 : $S<T>
+  %f = function_ref @testSpecializeOpaque : $@convention(thin) <T> (@in S<T>) -> ()
+  %call = apply %f<T>(%0) : $@convention(thin) <τ_0_0> (@in S<τ_0_0>) -> ()
+  release_value %0 : $S<T>
+  %999 = tuple ()
+  return %999 : $()
+}

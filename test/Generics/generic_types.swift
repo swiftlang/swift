@@ -72,7 +72,7 @@ func getFirst<R : IteratorProtocol>(_ r: R) -> R.Element {
   return r.next()!
 }
 
-func testGetFirst(ir: CountableRange<Int>) {
+func testGetFirst(ir: Range<Int>) {
   _ = getFirst(ir.makeIterator()) as Int
 }
 
@@ -189,7 +189,7 @@ var yarray : YArray = [1, 2, 3]
 var xarray : XArray = [1, 2, 3]
 
 // Type parameters can be referenced only via unqualified name lookup
-struct XParam<T> {
+struct XParam<T> { // expected-note{{'XParam' declared here}}
   func foo(_ x: T) {
     _ = x as T
   }
@@ -230,15 +230,18 @@ class Top {}
 class Bottom<T : Bottom<Top>> {}
 // expected-error@-1 {{generic class 'Bottom' references itself}}
 // expected-note@-2 {{type declared here}}
+// expected-error@-3 {{circular reference}}
+// expected-note@-4 {{while resolving type 'Bottom<Top>'}}
+// expected-note@-5 {{through reference here}}
 
 // Invalid inheritance clause
 
 struct UnsolvableInheritance1<T : T.A> {}
-// expected-error@-1 {{inheritance from non-protocol, non-class type 'T.A'}}
+// expected-error@-1 {{'A' is not a member type of 'T'}}
 
 struct UnsolvableInheritance2<T : U.A, U : T.A> {}
-// expected-error@-1 {{inheritance from non-protocol, non-class type 'U.A'}}
-// expected-error@-2 {{inheritance from non-protocol, non-class type 'T.A'}}
+// expected-error@-1 {{'A' is not a member type of 'U'}}
+// expected-error@-2 {{'A' is not a member type of 'T'}}
 
-enum X7<T> where X7.X : G { case X } // expected-error{{enum element 'X' is not a member type of 'X7<T>'}}
-// expected-error@-1{{use of undeclared type 'G'}}
+enum X7<T> where X7.X : G { case X } // expected-error{{enum case 'X' is not a member type of 'X7<T>'}}
+// expected-error@-1{{cannot find type 'G' in scope}}

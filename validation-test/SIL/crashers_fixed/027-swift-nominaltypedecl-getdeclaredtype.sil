@@ -40,7 +40,7 @@ strong_retain %1 : $*M
 }
 }
 bb0(thin) : AssocReqt module def_basic {}
-%12 = strong_release %5 : $*Spoon
+strong_release %5 : $*Spoon
 %8 = unchecked_addr_cast %101 = tuple(%2 : $*SomeClass.Type) -> (Int, 5
 sil [_semantics "foo(%2 = apply [fragile] @owned A>
 %14 = alloc_box $@convention(thin) : $@owned A, bb1:

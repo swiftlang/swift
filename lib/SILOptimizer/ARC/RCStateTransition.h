@@ -41,18 +41,18 @@ enum class RCStateTransitionKind : uint8_t {
 #include "RCStateTransition.def"
 };
 
-/// \returns the RCStateTransitionKind corresponding to \p V.
-RCStateTransitionKind getRCStateTransitionKind(ValueBase *V);
+/// \returns the RCStateTransitionKind corresponding to \p N.
+RCStateTransitionKind getRCStateTransitionKind(SILNode *N);
 
 /// Define predicates to test for RCStateTransition abstract value kinds.
 #define ABSTRACT_VALUE(Name, Start, End)                              \
   bool isRCStateTransition ## Name(RCStateTransitionKind Kind);       \
-  static inline bool isRCStateTransition ## Name(ValueBase *V) {      \
-    return isRCStateTransition ## Name(getRCStateTransitionKind(V));  \
+  static inline bool isRCStateTransition ## Name(SILNode *N) {        \
+    return isRCStateTransition ## Name(getRCStateTransitionKind(N));  \
   }
 #define KIND(Name)                                                      \
-  static inline bool isRCStateTransition ## Name(ValueBase *V) {        \
-    return RCStateTransitionKind::Name == getRCStateTransitionKind(V);  \
+  static inline bool isRCStateTransition ## Name(SILNode *N) {          \
+    return RCStateTransitionKind::Name == getRCStateTransitionKind(N);  \
   }
 #include "RCStateTransition.def"
 
@@ -72,7 +72,7 @@ class RCStateTransition {
 
   /// An RCStateTransition can represent either an RC end point (i.e. an initial
   /// or terminal RC transition) or a ptr set of Mutators.
-  ValueBase *EndPoint;
+  SILNode *EndPoint;
   ImmutablePointerSet<SILInstruction> *Mutators =
       ImmutablePointerSetFactory<SILInstruction>::getEmptySet();
   RCStateTransitionKind Kind;

@@ -35,9 +35,8 @@ namespace swift {
 class SILFunction;
 class SILModule;
 class ProtocolConformance;
-class NormalProtocolConformance;
+class RootProtocolConformance;
 enum IsSerialized_t : unsigned char;
-enum class ResilienceStrategy : unsigned;
 
 /// A mapping from each requirement of a protocol to the SIL-level entity
 /// satisfying the requirement for a concrete type.
@@ -84,20 +83,13 @@ public:
     ProtocolConformance *Witness;
   };
                           
-  /// A witness table entry for an optional requirement that is not present.
-  struct MissingOptionalWitness {
-    /// The witness for the optional requirement that wasn't present.
-    ValueDecl *Witness;
-  };
-  
   /// A witness table entry kind.
   enum WitnessKind {
     Invalid,
     Method,
     AssociatedType,
     AssociatedTypeProtocol,
-    BaseProtocol,
-    MissingOptional
+    BaseProtocol
   };
   
   /// A witness table entry.
@@ -108,7 +100,6 @@ public:
       AssociatedTypeWitness AssociatedType;
       AssociatedTypeProtocolWitness AssociatedTypeProtocol;
       BaseProtocolWitness BaseProtocol;
-      MissingOptionalWitness MissingOptional;
     };
     
   public:
@@ -132,12 +123,10 @@ public:
         BaseProtocol(BaseProtocol)
     {}
     
-    Entry(const MissingOptionalWitness &MissingOptional)
-      : Kind(WitnessKind::MissingOptional), MissingOptional(MissingOptional) {
-    }
-    
     WitnessKind getKind() const { return Kind; }
-    
+
+    bool isValid() const { return Kind != WitnessKind::Invalid; }
+
     const MethodWitness &getMethodWitness() const {
       assert(Kind == WitnessKind::Method);
       return Method;
@@ -156,11 +145,6 @@ public:
       return BaseProtocol;
     }
     
-    const MissingOptionalWitness &getMissingOptionalWitness() const {
-      assert(Kind == WitnessKind::MissingOptional);
-      return MissingOptional;
-    }
-
     void removeWitnessMethod() {
       assert(Kind == WitnessKind::Method);
       if (Method.Witness) {
@@ -168,8 +152,19 @@ public:
       }
       Method.Witness = nullptr;
     }
+
+    void print(llvm::raw_ostream &out, bool verbose,
+               const PrintOptions &options) const;
   };
-  
+
+  /// An entry for a conformance requirement that makes the requirement
+  /// conditional. These aren't public, but any witness thunks need to feed them
+  /// into the true witness functions.
+  struct ConditionalConformance {
+    CanType Requirement;
+    ProtocolConformanceRef Conformance;
+  };
+
 private:
   /// The module which contains the SILWitnessTable.
   SILModule &Mod;
@@ -182,11 +177,18 @@ private:
   SILLinkage Linkage;
 
   /// The conformance mapped to this witness table.
-  NormalProtocolConformance *Conformance;
+  RootProtocolConformance *Conformance;
 
   /// The various witnesses containing in this witness table. Is empty if the
   /// table has no witness entries or if it is a declaration.
   MutableArrayRef<Entry> Entries;
+
+  /// Any conditional conformances required for this witness table. These are
+  /// private to this conformance.
+  ///
+  /// (If other private entities are introduced this could/should be switched
+  /// into a private version of Entries.)
+  MutableArrayRef<ConditionalConformance> ConditionalConformances;
 
   /// Whether or not this witness table is a declaration. This is separate from
   /// whether or not entries is empty since you can have an empty witness table
@@ -198,52 +200,77 @@ private:
   bool Serialized;
 
   /// Private constructor for making SILWitnessTable definitions.
-  SILWitnessTable(SILModule &M, SILLinkage Linkage,
-                  IsSerialized_t Serialized, StringRef Name,
-                  NormalProtocolConformance *Conformance,
-                  ArrayRef<Entry> entries);
+  SILWitnessTable(SILModule &M, SILLinkage Linkage, IsSerialized_t Serialized,
+                  StringRef name, RootProtocolConformance *conformance,
+                  ArrayRef<Entry> entries,
+                  ArrayRef<ConditionalConformance> conditionalConformances);
 
   /// Private constructor for making SILWitnessTable declarations.
   SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
-                  NormalProtocolConformance *Conformance);
+                  RootProtocolConformance *conformance);
 
   void addWitnessTable();
 
 public:
   /// Create a new SILWitnessTable definition with the given entries.
-  static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
-                                 IsSerialized_t Serialized,
-                                 NormalProtocolConformance *Conformance,
-                                 ArrayRef<Entry> entries);
+  static SILWitnessTable *
+  create(SILModule &M, SILLinkage Linkage, IsSerialized_t Serialized,
+         RootProtocolConformance *conformance, ArrayRef<Entry> entries,
+         ArrayRef<ConditionalConformance> conditionalConformances);
 
   /// Create a new SILWitnessTable declaration.
   static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
-                                 NormalProtocolConformance *Conformance);
+                                 RootProtocolConformance *conformance);
 
   ~SILWitnessTable();
-  
+
   /// Return the AST ProtocolConformance this witness table represents.
-  NormalProtocolConformance *getConformance() const { return Conformance; }
+  RootProtocolConformance *getConformance() const {
+    return Conformance;
+  }
+
+  /// Return the context in which the conformance giving rise to this
+  /// witness table was defined.
+  DeclContext *getDeclContext() const;
+
+  /// Return the protocol for which this witness table is a conformance.
+  ProtocolDecl *getProtocol() const;
+
+  /// Return the formal type which conforms to the protocol.
+  ///
+  /// Note that this will not be a substituted type: it may only be meaningful
+  /// in the abstract context of the conformance rather than the context of any
+  /// particular use of it.
+  CanType getConformingType() const;
 
   /// Return the symbol name of the witness table that will be propagated to the
   /// object file level.
   StringRef getName() const { return Name; }
-
-  /// Return the symbol name of the witness table that will be propagated to the
-  /// object file as an Identifier.
-  Identifier getIdentifier() const;
 
   /// Returns true if this witness table is a declaration.
   bool isDeclaration() const { return IsDeclaration; }
 
   /// Returns true if this witness table is a definition.
   bool isDefinition() const { return !isDeclaration(); }
- 
+
   /// Returns true if this witness table is going to be (or was) serialized.
-  IsSerialized_t isSerialized() const;
+  IsSerialized_t isSerialized() const {
+    return Serialized ? IsSerialized : IsNotSerialized;
+  }
+
+  /// Sets the serialized flag.
+  void setSerialized(IsSerialized_t serialized) {
+    assert(serialized != IsSerializable);
+    Serialized = (serialized ? 1 : 0);
+  }
 
   /// Return all of the witness table entries.
   ArrayRef<Entry> getEntries() const { return Entries; }
+
+  /// Return all of the conditional conformances.
+  ArrayRef<ConditionalConformance> getConditionalConformances() const {
+    return ConditionalConformances;
+  }
 
   /// Clears methods in MethodWitness entries.
   /// \p predicate Returns true if the passed entry should be set to null.
@@ -268,13 +295,28 @@ public:
   void setLinkage(SILLinkage l) { Linkage = l; }
 
   /// Change a SILWitnessTable declaration into a SILWitnessTable definition.
-  void convertToDefinition(ArrayRef<Entry> newEntries,
-                           IsSerialized_t isSerialized);
+  void
+  convertToDefinition(ArrayRef<Entry> newEntries,
+                      ArrayRef<ConditionalConformance> conditionalConformances,
+                      IsSerialized_t isSerialized);
 
   // Whether a conformance should be serialized.
-  static bool conformanceIsSerialized(ProtocolConformance *conformance,
-                                      ResilienceStrategy strategy,
-                                      bool silSerializeWitnessTables);
+  static bool
+  conformanceIsSerialized(const RootProtocolConformance *conformance);
+
+  /// Call \c fn on each (split apart) conditional requirement of \c conformance
+  /// that should appear in a witness table, i.e., conformance requirements that
+  /// need witness tables themselves.
+  ///
+  /// The \c unsigned argument to \c fn is a counter for the conditional
+  /// conformances, and should be used for indexing arrays of them.
+  ///
+  /// This acts like \c any_of: \c fn returning \c true will stop the
+  /// enumeration and \c enumerateWitnessTableConditionalConformances will
+  /// return \c true, while \c fn returning \c false will let it continue.
+  static bool enumerateWitnessTableConditionalConformances(
+      const ProtocolConformance *conformance,
+      llvm::function_ref<bool(unsigned, CanType, ProtocolDecl *)> fn);
 
   /// Print the witness table.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;
@@ -293,8 +335,8 @@ namespace llvm {
   
 template <>
 struct ilist_traits<::swift::SILWitnessTable> :
-public ilist_default_traits<::swift::SILWitnessTable> {
-  typedef ::swift::SILWitnessTable SILWitnessTable;
+public ilist_node_traits<::swift::SILWitnessTable> {
+  using SILWitnessTable = ::swift::SILWitnessTable;
 
 public:
   static void deleteNode(SILWitnessTable *WT) { WT->~SILWitnessTable(); }

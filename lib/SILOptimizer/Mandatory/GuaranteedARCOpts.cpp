@@ -24,7 +24,7 @@ namespace {
 
 struct GuaranteedARCOptsVisitor
     : SILInstructionVisitor<GuaranteedARCOptsVisitor, bool> {
-  bool visitValueBase(ValueBase *V) { return false; }
+  bool visitSILInstruction(SILInstruction *I) { return false; }
   bool visitDestroyAddrInst(DestroyAddrInst *DAI);
   bool visitStrongReleaseInst(StrongReleaseInst *SRI);
   bool visitDestroyValueInst(DestroyValueInst *DVI);
@@ -72,14 +72,34 @@ bool GuaranteedARCOptsVisitor::visitDestroyAddrInst(DestroyAddrInst *DAI) {
 
 static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // Simple memory accesses cannot reduce refcounts.
-  if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
-      isa<RetainValueInst>(Inst) || isa<UnownedRetainInst>(Inst) ||
-      isa<UnownedReleaseInst>(Inst) || isa<StrongRetainUnownedInst>(Inst) ||
-      isa<StoreWeakInst>(Inst) || isa<StrongRetainInst>(Inst) ||
-      isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst) ||
-      isa<BeginAccessInst>(Inst) || isa<EndAccessInst>(Inst) ||
-      isa<BeginUnpairedAccessInst>(Inst) || isa<EndUnpairedAccessInst>(Inst))
+  switch (Inst->getKind()) {
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Name##RetainValueInst:                              \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Store##Name##Inst:
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
+  case SILInstructionKind::LoadInst:
+  case SILInstructionKind::StoreInst:
+  case SILInstructionKind::RetainValueInst:
+  case SILInstructionKind::StrongRetainInst:
+  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::BeginAccessInst:
+  case SILInstructionKind::EndAccessInst:
+  case SILInstructionKind::BeginUnpairedAccessInst:
+  case SILInstructionKind::EndUnpairedAccessInst:
     return false;
+  default:
+    break;
+  }
 
   // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'
   // never can either.  Nontrivial ones can though, because the overwritten
@@ -87,7 +107,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // to safely ignore one of those.
   if (auto *AI = dyn_cast<AssignInst>(Inst)) {
     SILType StoredType = AI->getOperand(0)->getType();
-    if (StoredType.isTrivial(Inst->getModule()) ||
+    if (StoredType.isTrivial(*Inst->getFunction()) ||
         StoredType.is<ReferenceStorageType>())
       return false;
   }
@@ -98,7 +118,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
       return false;
 
     SILType StoredType = CAI->getOperand(0)->getType().getObjectType();
-    if (StoredType.isTrivial(Inst->getModule()) ||
+    if (StoredType.isTrivial(*Inst->getFunction()) ||
         StoredType.is<ReferenceStorageType>())
       return false;
   }
@@ -111,7 +131,8 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
 bool GuaranteedARCOptsVisitor::visitStrongReleaseInst(StrongReleaseInst *SRI) {
   SILValue Operand = SRI->getOperand();
   // Release on a functionref is a noop.
-  if (isa<FunctionRefInst>(Operand)) {
+  if (isa<FunctionRefInst>(Operand) || isa<DynamicFunctionRefInst>(Operand) ||
+      isa<PreviousDynamicFunctionRefInst>(Operand)) {
     SRI->eraseFromParent();
     ++NumInstsEliminated;
     return true;
@@ -124,9 +145,9 @@ bool GuaranteedARCOptsVisitor::visitStrongReleaseInst(StrongReleaseInst *SRI) {
     auto *Inst = &*II;
     ++II;
 
-    if (auto *SRA = dyn_cast<StrongRetainInst>(Inst)) {
-      if (SRA->getOperand() == Operand) {
-        SRA->eraseFromParent();
+    if (isa<StrongRetainInst>(Inst) || isa<RetainValueInst>(Inst)) {
+      if (Inst->getOperand(0) == Operand) {
+        Inst->eraseFromParent();
         SRI->eraseFromParent();
         NumInstsEliminated += 2;
         return true;
@@ -179,9 +200,9 @@ bool GuaranteedARCOptsVisitor::visitReleaseValueInst(ReleaseValueInst *RVI) {
     auto *Inst = &*II;
     ++II;
 
-    if (auto *SRA = dyn_cast<RetainValueInst>(Inst)) {
-      if (SRA->getOperand() == Operand) {
-        SRA->eraseFromParent();
+    if (isa<RetainValueInst>(Inst) || isa<StrongRetainInst>(Inst)) {
+      if (Inst->getOperand(0) == Operand) {
+        Inst->eraseFromParent();
         RVI->eraseFromParent();
         NumInstsEliminated += 2;
         return true;
@@ -205,8 +226,15 @@ bool GuaranteedARCOptsVisitor::visitReleaseValueInst(ReleaseValueInst *RVI) {
 
 namespace {
 
+// Even though this is a mandatory pass, it is rerun after deserialization in
+// case DiagnosticConstantPropagation exposed anything new in this assert
+// configuration.
 struct GuaranteedARCOpts : SILFunctionTransform {
   void run() override {
+    // Skip ownership SIL. We are going to have a run of semantic arc opts here.
+    if (getFunction()->hasOwnership())
+      return;
+
     GuaranteedARCOptsVisitor Visitor;
 
     bool MadeChange = false;

@@ -1,4 +1,4 @@
-//===--- SwiftNativeNSBase.m - Test _SwiftNativeNS*Base classes -----------===//
+//===--- SwiftNativeNSBase.m - Test __SwiftNativeNS*Base classes -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -40,8 +40,23 @@ static int Errors;
   } while (0)
 
 
-void TestSwiftNativeNSBase(void)
+BOOL TestSwiftNativeNSBase_RetainCount(id object)
 {
+  Errors = 0;
+  NSUInteger rc1 = [object retainCount];
+  id object2 = [object retain];
+  expectTrue(object == object2);
+  NSUInteger rc2 = [object retainCount];
+  expectTrue(rc2 > rc1);
+  [object release];
+  NSUInteger rc3 = [object retainCount];
+  expectTrue(rc3 < rc2);
+  return Errors == 0;
+}
+
+BOOL TestSwiftNativeNSBase_UnwantedCdtors()
+{
+  Errors = 0;
   printf("TestSwiftNativeNSBase\n");
 
   unsigned int classCount;
@@ -49,19 +64,23 @@ void TestSwiftNativeNSBase(void)
 
   NSMutableSet *expectedClasses =
     [NSMutableSet setWithObjects:
-      @"_SwiftNativeNSArrayBase",
-      @"_SwiftNativeNSDictionaryBase",
-      @"_SwiftNativeNSSetBase",
-      @"_SwiftNativeNSStringBase",
-      @"_SwiftNativeNSEnumeratorBase",
-      @"_SwiftNativeNSDataBase",
-      @"_SwiftNativeNSIndexSetBase",
+      @"__SwiftNativeNSArrayBase",
+      @"__SwiftNativeNSMutableArrayBase",
+      @"__SwiftNativeNSDictionaryBase",
+      @"__SwiftNativeNSSetBase",
+      @"__SwiftNativeNSStringBase",
+      @"__SwiftNativeNSEnumeratorBase",
       nil];
 
   for (unsigned int i = 0; i < classCount; i++) {
     Class cls = classes[i];
     NSString *name = @(class_getName(cls));
-    if (! ([name hasPrefix:@"_SwiftNativeNS"] && [name hasSuffix:@"Base"])) {
+    if (! ([name hasPrefix:@"__SwiftNativeNS"] && [name hasSuffix:@"Base"])) {
+      continue;
+    }
+    if ([name isEqual: @"__SwiftNativeNSDataBase"] ||
+        [name isEqual: @"__SwiftNativeNSIndexSetBase"]) {
+      //These two were removed but are still present when back-deploying
       continue;
     }
     if (! [expectedClasses containsObject:name]) {
@@ -69,7 +88,7 @@ void TestSwiftNativeNSBase(void)
       continue;
     }
 
-    // cls is some _SwiftNativeNS*Base class
+    // cls is some __SwiftNativeNS*Base class
     [expectedClasses removeObject:name];
     printf("checking class %s\n", name.UTF8String);
 
@@ -82,5 +101,5 @@ void TestSwiftNativeNSBase(void)
 
   printf("TestSwiftNativeNSBase: %d error%s\n",
          Errors, Errors == 1 ? "" : "s");
-  exit(Errors ? 1 : 0);
+  return Errors == 0;
 }

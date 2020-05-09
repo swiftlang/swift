@@ -1,6 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
-// See test/Compatibility/tuple_arguments.swift for the Swift 3 behavior.
+// See test/Compatibility/tuple_arguments_4.swift for some
+// Swift 4-specific tests.
 
 func concrete(_ x: Int) {}
 func concreteLabeled(x: Int) {}
@@ -14,9 +15,10 @@ do {
   concreteLabeled(x: 3)
   concreteLabeled(x: (3))
   concreteLabeled((x: 3)) // expected-error {{missing argument label 'x:' in call}}
+  // expected-error@-1 {{cannot convert value of type '(x: Int)' to expected argument type 'Int'}}
 
   concreteTwo(3, 4)
-  concreteTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  concreteTwo((3, 4)) // expected-error {{global function 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
 
   concreteTuple(3, 4) // expected-error {{global function 'concreteTuple' expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   concreteTuple((3, 4))
@@ -33,8 +35,8 @@ do {
   concrete(c)
 
   concreteTwo(a, b)
-  concreteTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  concreteTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  concreteTwo((a, b)) // expected-error {{global function 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
+  concreteTwo(d) // expected-error {{global function 'concreteTwo' expects 2 separate arguments}}
 
   concreteTuple(a, b) // expected-error {{global function 'concreteTuple' expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   concreteTuple((a, b))
@@ -42,18 +44,18 @@ do {
 }
 
 do {
-  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var c = (3) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
-  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
+  var a = 3
+  var b = 4
+  var c = (3)
+  var d = (a, b)
 
   concrete(a)
   concrete((a))
   concrete(c)
 
   concreteTwo(a, b)
-  concreteTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  concreteTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  concreteTwo((a, b)) // expected-error {{global function 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
+  concreteTwo(d) // expected-error {{global function 'concreteTwo' expects 2 separate arguments}}
 
   concreteTuple(a, b) // expected-error {{global function 'concreteTuple' expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   concreteTuple((a, b))
@@ -77,9 +79,9 @@ do {
   genericLabeled(x: (3, 4))
 
   genericTwo(3, 4)
-  genericTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  genericTwo((3, 4)) // expected-error {{global function 'genericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{14-15=}} {{19-20=}}
 
-  genericTuple(3, 4) // expected-error {{global function 'genericTuple' expects a single parameter of type '(T, U)'}} {{16-16=(}} {{20-20=)}}
+  genericTuple(3, 4) // expected-error {{global function 'genericTuple' expects a single parameter of type '(T, U)' [with T = Int, U = Int]}} {{16-16=(}} {{20-20=)}}
   genericTuple((3, 4))
 }
 
@@ -97,10 +99,10 @@ do {
   generic(d)
 
   genericTwo(a, b)
-  genericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  genericTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  genericTwo((a, b)) // expected-error {{global function 'genericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{14-15=}} {{19-20=}}
+  genericTwo(d) // expected-error {{global function 'genericTwo' expects 2 separate arguments}}
 
-  genericTuple(a, b) // expected-error {{global function 'genericTuple' expects a single parameter of type '(T, U)'}} {{16-16=(}} {{20-20=)}}
+  genericTuple(a, b) // expected-error {{global function 'genericTuple' expects a single parameter of type '(T, U)' [with T = Int, U = Int]}} {{16-16=(}} {{20-20=)}}
   genericTuple((a, b))
   genericTuple(d)
 }
@@ -119,10 +121,10 @@ do {
   generic(d)
 
   genericTwo(a, b)
-  genericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  genericTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  genericTwo((a, b)) // expected-error {{global function 'genericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{14-15=}} {{19-20=}}
+  genericTwo(d) // expected-error {{global function 'genericTwo' expects 2 separate arguments}}
 
-  genericTuple(a, b) // expected-error {{global function 'genericTuple' expects a single parameter of type '(T, U)'}} {{16-16=(}} {{20-20=)}}
+  genericTuple(a, b) // expected-error {{global function 'genericTuple' expects a single parameter of type '(T, U)' [with T = Int, U = Int]}} {{16-16=(}} {{20-20=)}}
   genericTuple((a, b))
   genericTuple(d)
 }
@@ -136,7 +138,7 @@ do {
   function((3))
 
   functionTwo(3, 4)
-  functionTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  functionTwo((3, 4)) // expected-error {{var 'functionTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
 
   functionTuple(3, 4) // expected-error {{var 'functionTuple' expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   functionTuple((3, 4))
@@ -153,8 +155,8 @@ do {
   function(c)
 
   functionTwo(a, b)
-  functionTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  functionTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  functionTwo((a, b)) // expected-error {{var 'functionTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
+  functionTwo(d) // expected-error {{var 'functionTwo' expects 2 separate arguments}}
 
   functionTuple(a, b) // expected-error {{var 'functionTuple' expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   functionTuple((a, b))
@@ -172,8 +174,8 @@ do {
   function(c)
 
   functionTwo(a, b)
-  functionTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  functionTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  functionTwo((a, b)) // expected-error {{var 'functionTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
+  functionTwo(d) // expected-error {{var 'functionTwo' expects 2 separate arguments}}
 
   functionTuple(a, b) // expected-error {{var 'functionTuple' expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   functionTuple((a, b))
@@ -195,7 +197,7 @@ do {
   s.concrete((3))
 
   s.concreteTwo(3, 4)
-  s.concreteTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  s.concreteTwo((3, 4)) // expected-error {{instance method 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{17-18=}} {{22-23=}}
 
   s.concreteTuple(3, 4) // expected-error {{instance method 'concreteTuple' expects a single parameter of type '(Int, Int)'}} {{19-19=(}} {{23-23=)}}
   s.concreteTuple((3, 4))
@@ -214,8 +216,8 @@ do {
   s.concrete(c)
 
   s.concreteTwo(a, b)
-  s.concreteTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.concreteTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.concreteTwo((a, b)) // expected-error {{instance method 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{17-18=}} {{22-23=}}
+  s.concreteTwo(d) // expected-error {{instance method 'concreteTwo' expects 2 separate arguments}}
 
   s.concreteTuple(a, b) // expected-error {{instance method 'concreteTuple' expects a single parameter of type '(Int, Int)'}} {{19-19=(}} {{23-23=)}}
   s.concreteTuple((a, b))
@@ -235,8 +237,8 @@ do {
   s.concrete(c)
 
   s.concreteTwo(a, b)
-  s.concreteTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.concreteTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.concreteTwo((a, b)) // expected-error {{instance method 'concreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{17-18=}} {{22-23=}}
+  s.concreteTwo(d) // expected-error {{instance method 'concreteTwo' expects 2 separate arguments}}
 
   s.concreteTuple(a, b) // expected-error {{instance method 'concreteTuple' expects a single parameter of type '(Int, Int)'}} {{19-19=(}} {{23-23=)}}
   s.concreteTuple((a, b))
@@ -264,9 +266,9 @@ do {
   s.genericLabeled(x: (3, 4))
 
   s.genericTwo(3, 4)
-  s.genericTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  s.genericTwo((3, 4)) // expected-error {{instance method 'genericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
 
-  s.genericTuple(3, 4) // expected-error {{instance method 'genericTuple' expects a single parameter of type '(T, U)'}} {{18-18=(}} {{22-22=)}}
+  s.genericTuple(3, 4) // expected-error {{instance method 'genericTuple' expects a single parameter of type '(T, U)' [with T = Int, U = Int]}} {{18-18=(}} {{22-22=)}}
   s.genericTuple((3, 4))
 }
 
@@ -285,10 +287,10 @@ do {
   s.generic(d)
 
   s.genericTwo(a, b)
-  s.genericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.genericTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.genericTwo((a, b)) // expected-error {{instance method 'genericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
+  s.genericTwo(d) // expected-error {{instance method 'genericTwo' expects 2 separate arguments}}
 
-  s.genericTuple(a, b) // expected-error {{instance method 'genericTuple' expects a single parameter of type '(T, U)'}} {{18-18=(}} {{22-22=)}}
+  s.genericTuple(a, b) // expected-error {{instance method 'genericTuple' expects a single parameter of type '(T, U)' [with T = Int, U = Int]}} {{18-18=(}} {{22-22=)}}
   s.genericTuple((a, b))
   s.genericTuple(d)
 }
@@ -308,10 +310,10 @@ do {
   s.generic(d)
 
   s.genericTwo(a, b)
-  s.genericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.genericTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.genericTwo((a, b)) // expected-error {{instance method 'genericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
+  s.genericTwo(d) // expected-error {{instance method 'genericTwo' expects 2 separate arguments}}
 
-  s.genericTuple(a, b) // expected-error {{instance method 'genericTuple' expects a single parameter of type '(T, U)'}} {{18-18=(}} {{22-22=)}}
+  s.genericTuple(a, b) // expected-error {{instance method 'genericTuple' expects a single parameter of type '(T, U)' [with T = Int, U = Int]}} {{18-18=(}} {{22-22=)}}
   s.genericTuple((a, b))
   s.genericTuple(d)
 }
@@ -329,7 +331,7 @@ do {
   s.mutatingConcrete((3))
 
   s.mutatingConcreteTwo(3, 4)
-  s.mutatingConcreteTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingConcreteTwo((3, 4)) // expected-error {{instance method 'mutatingConcreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{30-31=}}
 
   s.mutatingConcreteTuple(3, 4) // expected-error {{instance method 'mutatingConcreteTuple' expects a single parameter of type '(Int, Int)'}} {{27-27=(}} {{31-31=)}}
   s.mutatingConcreteTuple((3, 4))
@@ -348,8 +350,8 @@ do {
   s.mutatingConcrete(c)
 
   s.mutatingConcreteTwo(a, b)
-  s.mutatingConcreteTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.mutatingConcreteTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingConcreteTwo((a, b)) // expected-error {{instance method 'mutatingConcreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{30-31=}}
+  s.mutatingConcreteTwo(d) // expected-error {{instance method 'mutatingConcreteTwo' expects 2 separate arguments}}
 
   s.mutatingConcreteTuple(a, b) // expected-error {{instance method 'mutatingConcreteTuple' expects a single parameter of type '(Int, Int)'}} {{27-27=(}} {{31-31=)}}
   s.mutatingConcreteTuple((a, b))
@@ -369,8 +371,8 @@ do {
   s.mutatingConcrete(c)
 
   s.mutatingConcreteTwo(a, b)
-  s.mutatingConcreteTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.mutatingConcreteTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingConcreteTwo((a, b)) // expected-error {{instance method 'mutatingConcreteTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{30-31=}}
+  s.mutatingConcreteTwo(d) // expected-error {{instance method 'mutatingConcreteTwo' expects 2 separate arguments}}
 
   s.mutatingConcreteTuple(a, b) // expected-error {{instance method 'mutatingConcreteTuple' expects a single parameter of type '(Int, Int)'}} {{27-27=(}} {{31-31=)}}
   s.mutatingConcreteTuple((a, b))
@@ -398,9 +400,9 @@ do {
   s.mutatingGenericLabeled(x: (3, 4))
 
   s.mutatingGenericTwo(3, 4)
-  s.mutatingGenericTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingGenericTwo((3, 4)) // expected-error {{instance method 'mutatingGenericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{24-25=}} {{29-30=}}
 
-  s.mutatingGenericTuple(3, 4) // expected-error {{instance method 'mutatingGenericTuple' expects a single parameter of type '(T, U)'}} {{26-26=(}} {{30-30=)}}
+  s.mutatingGenericTuple(3, 4) // expected-error {{instance method 'mutatingGenericTuple' expects a single parameter of type '(T, U)' [with T = Int, U = Int]}} {{26-26=(}} {{30-30=)}}
   s.mutatingGenericTuple((3, 4))
 }
 
@@ -419,10 +421,10 @@ do {
   s.mutatingGeneric(d)
 
   s.mutatingGenericTwo(a, b)
-  s.mutatingGenericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.mutatingGenericTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingGenericTwo((a, b)) // expected-error {{instance method 'mutatingGenericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{24-25=}} {{29-30=}}
+  s.mutatingGenericTwo(d) // expected-error {{instance method 'mutatingGenericTwo' expects 2 separate arguments}}
 
-  s.mutatingGenericTuple(a, b) // expected-error {{instance method 'mutatingGenericTuple' expects a single parameter of type '(T, U)'}} {{26-26=(}} {{30-30=)}}
+  s.mutatingGenericTuple(a, b) // expected-error {{instance method 'mutatingGenericTuple' expects a single parameter of type '(T, U)' [with T = Int, U = Int]}} {{26-26=(}} {{30-30=)}}
   s.mutatingGenericTuple((a, b))
   s.mutatingGenericTuple(d)
 }
@@ -442,17 +444,17 @@ do {
   s.mutatingGeneric(d)
 
   s.mutatingGenericTwo(a, b)
-  s.mutatingGenericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.mutatingGenericTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingGenericTwo((a, b)) // expected-error {{instance method 'mutatingGenericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{24-25=}} {{29-30=}}
+  s.mutatingGenericTwo(d) // expected-error {{instance method 'mutatingGenericTwo' expects 2 separate arguments}}
 
-  s.mutatingGenericTuple(a, b) // expected-error {{instance method 'mutatingGenericTuple' expects a single parameter of type '(T, U)'}} {{26-26=(}} {{30-30=)}}
+  s.mutatingGenericTuple(a, b) // expected-error {{instance method 'mutatingGenericTuple' expects a single parameter of type '(T, U)' [with T = Int, U = Int]}} {{26-26=(}} {{30-30=)}}
   s.mutatingGenericTuple((a, b))
   s.mutatingGenericTuple(d)
 }
 
 extension Concrete {
   var function: (Int) -> () { return concrete }
-  var functionTwo: (Int, Int) -> () { return concreteTwo }
+  var functionTwo: (Int, Int) -> () { return concreteTwo } // expected-note 5 {{'functionTwo' declared here}}
   var functionTuple: ((Int, Int)) -> () { return concreteTuple }
 }
 
@@ -463,9 +465,9 @@ do {
   s.function((3))
 
   s.functionTwo(3, 4)
-  s.functionTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  s.functionTwo((3, 4)) // expected-error {{property 'functionTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{17-18=}} {{22-23=}}
 
-  s.functionTuple(3, 4) // expected-error {{single parameter of type '(Int, Int)' is expected in call}} {{19-19=(}} {{23-23=)}}
+  s.functionTuple(3, 4) // expected-error {{property 'functionTuple' expects a single parameter of type '(Int, Int)'}} {{19-19=(}} {{23-23=)}}
   s.functionTuple((3, 4))
 }
 
@@ -482,11 +484,11 @@ do {
   s.function(c)
 
   s.functionTwo(a, b)
-  s.functionTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.functionTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.functionTwo((a, b)) // expected-error {{property 'functionTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{17-18=}} {{22-23=}}
+  s.functionTwo(d) // expected-error {{property 'functionTwo' expects 2 separate arguments}}
 
 
-  s.functionTuple(a, b) // expected-error {{single parameter of type '(Int, Int)' is expected in call}} {{19-19=(}} {{23-23=)}}
+  s.functionTuple(a, b) // expected-error {{property 'functionTuple' expects a single parameter of type '(Int, Int)'}} {{19-19=(}} {{23-23=)}}
   s.functionTuple((a, b))
   s.functionTuple(d)
 }
@@ -504,16 +506,16 @@ do {
   s.function(c)
 
   s.functionTwo(a, b)
-  s.functionTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  s.functionTwo(d) // expected-error {{missing argument for parameter #2 in call}}
+  s.functionTwo((a, b)) // expected-error {{property 'functionTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{17-18=}} {{22-23=}}
+  s.functionTwo(d) // expected-error {{property 'functionTwo' expects 2 separate arguments}}
 
-  s.functionTuple(a, b) // expected-error {{single parameter of type '(Int, Int)' is expected in call}} {{19-19=(}} {{23-23=)}}
+  s.functionTuple(a, b) // expected-error {{property 'functionTuple' expects a single parameter of type '(Int, Int)'}} {{19-19=(}} {{23-23=)}}
   s.functionTuple((a, b))
   s.functionTuple(d)
 }
 
 struct InitTwo {
-  init(_ x: Int, _ y: Int) {} // expected-note 5 {{'init' declared here}}
+  init(_ x: Int, _ y: Int) {} // expected-note 5 {{'init(_:_:)' declared here}}
 }
 
 struct InitTuple {
@@ -526,12 +528,12 @@ struct InitLabeledTuple {
 
 do {
   _ = InitTwo(3, 4)
-  _ = InitTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = InitTwo((3, 4)) // expected-error {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
 
   _ = InitTuple(3, 4) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   _ = InitTuple((3, 4))
 
-  _ = InitLabeledTuple(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = InitLabeledTuple(x: 3, 4) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}}
   _ = InitLabeledTuple(x: (3, 4))
 }
 
@@ -541,8 +543,8 @@ do {
   let c = (a, b)
 
   _ = InitTwo(a, b)
-  _ = InitTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = InitTwo(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = InitTwo((a, b)) // expected-error {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
+  _ = InitTwo(c) // expected-error {{initializer expects 2 separate arguments}}
 
   _ = InitTuple(a, b) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   _ = InitTuple((a, b))
@@ -550,13 +552,13 @@ do {
 }
 
 do {
-  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var c = (a, b) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
+  var a = 3
+  var b = 4
+  var c = (a, b)
 
   _ = InitTwo(a, b)
-  _ = InitTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = InitTwo(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = InitTwo((a, b)) // expected-error {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{15-16=}} {{20-21=}}
+  _ = InitTwo(c) // expected-error {{initializer expects 2 separate arguments}}
 
   _ = InitTuple(a, b) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}} {{17-17=(}} {{21-21=)}}
   _ = InitTuple((a, b))
@@ -564,7 +566,7 @@ do {
 }
 
 struct SubscriptTwo {
-  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript' declared here}}
+  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript(_:_:)' declared here}}
 }
 
 struct SubscriptTuple {
@@ -578,7 +580,7 @@ struct SubscriptLabeledTuple {
 do {
   let s1 = SubscriptTwo()
   _ = s1[3, 4]
-  _ = s1[(3, 4)] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s1[(3, 4)] // expected-error {{subscript expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{10-11=}} {{15-16=}}
 
   let s2 = SubscriptTuple()
   _ = s2[3, 4] // expected-error {{subscript expects a single parameter of type '(Int, Int)'}} {{10-10=(}} {{14-14=)}}
@@ -592,8 +594,8 @@ do {
 
   let s1 = SubscriptTwo()
   _ = s1[a, b]
-  _ = s1[(a, b)] // expected-error {{missing argument for parameter #2 in call}}
-  _ = s1[d] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s1[(a, b)] // expected-error {{subscript expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{10-11=}} {{15-16=}}
+  _ = s1[d] // expected-error {{subscript expects 2 separate arguments}}
 
   let s2 = SubscriptTuple()
   _ = s2[a, b] // expected-error {{subscript expects a single parameter of type '(Int, Int)'}} {{10-10=(}} {{14-14=)}}
@@ -601,7 +603,7 @@ do {
   _ = s2[d]
 
   let s3 = SubscriptLabeledTuple()
-  _ = s3[x: 3, 4] // expected-error {{extra argument in call}}
+  _ = s3[x: 3, 4] // expected-error {{subscript expects a single parameter of type '(Int, Int)'}}
   _ = s3[x: (3, 4)]
 }
 
@@ -613,8 +615,8 @@ do {
 
   var s1 = SubscriptTwo()
   _ = s1[a, b]
-  _ = s1[(a, b)] // expected-error {{missing argument for parameter #2 in call}}
-  _ = s1[d] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s1[(a, b)] // expected-error {{subscript expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{10-11=}} {{15-16=}}
+  _ = s1[d] // expected-error {{subscript expects 2 separate arguments}}
 
   var s2 = SubscriptTuple()
   _ = s2[a, b] // expected-error {{subscript expects a single parameter of type '(Int, Int)'}} {{10-10=(}} {{14-14=)}}
@@ -623,19 +625,20 @@ do {
 }
 
 enum Enum {
-  case two(Int, Int) // expected-note 5 {{'two' declared here}}
+  case two(Int, Int) // expected-note 6 {{'two' declared here}}
   case tuple((Int, Int))
   case labeledTuple(x: (Int, Int))
 }
 
 do {
   _ = Enum.two(3, 4)
-  _ = Enum.two((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = Enum.two((3, 4)) // expected-error {{enum case 'two' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
+  _ = Enum.two(3 > 4 ? 3 : 4) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = Enum.tuple(3, 4) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
+  _ = Enum.tuple(3, 4) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
   _ = Enum.tuple((3, 4))
 
-  _ = Enum.labeledTuple(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = Enum.labeledTuple(x: 3, 4) // expected-error {{enum case 'labeledTuple' expects a single parameter of type '(Int, Int)'}}
   _ = Enum.labeledTuple(x: (3, 4))
 }
 
@@ -645,10 +648,10 @@ do {
   let c = (a, b)
 
   _ = Enum.two(a, b)
-  _ = Enum.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = Enum.two(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = Enum.two((a, b)) // expected-error {{enum case 'two' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
+  _ = Enum.two(c) // expected-error {{enum case 'two' expects 2 separate arguments}}
 
-  _ = Enum.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
+  _ = Enum.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
   _ = Enum.tuple((a, b))
   _ = Enum.tuple(c)
 }
@@ -659,10 +662,10 @@ do {
   var c = (a, b)
 
   _ = Enum.two(a, b)
-  _ = Enum.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = Enum.two(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = Enum.two((a, b)) // expected-error {{enum case 'two' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
+  _ = Enum.two(c) // expected-error {{enum case 'two' expects 2 separate arguments}}
 
-  _ = Enum.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
+  _ = Enum.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
   _ = Enum.tuple((a, b))
   _ = Enum.tuple(c)
 }
@@ -686,7 +689,7 @@ do {
   s.genericLabeled(x: (3.0))
 
   s.genericTwo(3.0, 4.0)
-  s.genericTwo((3.0, 4.0)) // expected-error {{missing argument for parameter #2 in call}}
+  s.genericTwo((3.0, 4.0)) // expected-error {{instance method 'genericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{25-26=}}
 
   s.genericTuple(3.0, 4.0) // expected-error {{instance method 'genericTuple' expects a single parameter of type '(Double, Double)'}} {{18-18=(}} {{26-26=)}}
   s.genericTuple((3.0, 4.0))
@@ -696,7 +699,7 @@ do {
   sTwo.generic(3.0, 4.0) // expected-error {{instance method 'generic' expects a single parameter of type '(Double, Double)'}} {{16-16=(}} {{24-24=)}}
   sTwo.generic((3.0, 4.0))
 
-  sTwo.genericLabeled(x: 3.0, 4.0) // expected-error {{extra argument in call}}
+  sTwo.genericLabeled(x: 3.0, 4.0) // expected-error {{instance method 'genericLabeled' expects a single parameter of type '(Double, Double)'}}
   sTwo.genericLabeled(x: (3.0, 4.0))
 }
 
@@ -713,7 +716,7 @@ do {
   s.generic(c)
 
   s.genericTwo(a, b)
-  s.genericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.genericTwo((a, b)) // expected-error {{instance method 'genericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
 
   s.genericTuple(a, b) // expected-error {{instance method 'genericTuple' expects a single parameter of type '(Double, Double)'}} {{18-18=(}} {{22-22=)}}
   s.genericTuple((a, b))
@@ -738,7 +741,7 @@ do {
   s.generic(c)
 
   s.genericTwo(a, b)
-  s.genericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.genericTwo((a, b)) // expected-error {{instance method 'genericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
 
   s.genericTuple(a, b) // expected-error {{instance method 'genericTuple' expects a single parameter of type '(Double, Double)'}} {{18-18=(}} {{22-22=)}}
   s.genericTuple((a, b))
@@ -767,7 +770,7 @@ do {
   s.mutatingGenericLabeled(x: (3.0))
 
   s.mutatingGenericTwo(3.0, 4.0)
-  s.mutatingGenericTwo((3.0, 4.0)) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingGenericTwo((3.0, 4.0)) // expected-error {{instance method 'mutatingGenericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {24-25=}} {{33-34=}}
 
   s.mutatingGenericTuple(3.0, 4.0) // expected-error {{instance method 'mutatingGenericTuple' expects a single parameter of type '(Double, Double)'}} {{26-26=(}} {{34-34=)}}
   s.mutatingGenericTuple((3.0, 4.0))
@@ -777,7 +780,7 @@ do {
   sTwo.mutatingGeneric(3.0, 4.0) // expected-error {{instance method 'mutatingGeneric' expects a single parameter of type '(Double, Double)'}} {{24-24=(}} {{32-32=)}}
   sTwo.mutatingGeneric((3.0, 4.0))
 
-  sTwo.mutatingGenericLabeled(x: 3.0, 4.0) // expected-error {{extra argument in call}}
+  sTwo.mutatingGenericLabeled(x: 3.0, 4.0) // expected-error {{instance method 'mutatingGenericLabeled' expects a single parameter of type '(Double, Double)'}}
   sTwo.mutatingGenericLabeled(x: (3.0, 4.0))
 }
 
@@ -794,7 +797,7 @@ do {
   s.mutatingGeneric(c)
 
   s.mutatingGenericTwo(a, b)
-  s.mutatingGenericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingGenericTwo((a, b)) // expected-error {{instance method 'mutatingGenericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {24-25=}} {{29-30=}}
 
   s.mutatingGenericTuple(a, b) // expected-error {{instance method 'mutatingGenericTuple' expects a single parameter of type '(Double, Double)'}} {{26-26=(}} {{30-30=)}}
   s.mutatingGenericTuple((a, b))
@@ -819,7 +822,7 @@ do {
   s.mutatingGeneric(c)
 
   s.mutatingGenericTwo(a, b)
-  s.mutatingGenericTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.mutatingGenericTwo((a, b)) // expected-error {{instance method 'mutatingGenericTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{24-25=}} {{29-30=}}
 
   s.mutatingGenericTuple(a, b) // expected-error {{instance method 'mutatingGenericTuple' expects a single parameter of type '(Double, Double)'}} {{26-26=(}} {{30-30=)}}
   s.mutatingGenericTuple((a, b))
@@ -833,7 +836,7 @@ do {
 
 extension Generic {
   var genericFunction: (T) -> () { return generic }
-  var genericFunctionTwo: (T, T) -> () { return genericTwo }
+  var genericFunctionTwo: (T, T) -> () { return genericTwo } // expected-note 3 {{'genericFunctionTwo' declared here}}
   var genericFunctionTuple: ((T, T)) -> () { return genericTuple }
 }
 
@@ -844,14 +847,14 @@ do {
   s.genericFunction((3.0))
 
   s.genericFunctionTwo(3.0, 4.0)
-  s.genericFunctionTwo((3.0, 4.0)) // expected-error {{missing argument for parameter #2 in call}}
+  s.genericFunctionTwo((3.0, 4.0)) // expected-error {{property 'genericFunctionTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{24-25=}} {{33-34=}}
 
-  s.genericFunctionTuple(3.0, 4.0) // expected-error {{single parameter of type '(Double, Double)' is expected in call}} {{26-26=(}} {{34-34=)}}
+  s.genericFunctionTuple(3.0, 4.0) // expected-error {{property 'genericFunctionTuple' expects a single parameter of type '(Double, Double)'}} {{26-26=(}} {{34-34=)}}
   s.genericFunctionTuple((3.0, 4.0))
 
   let sTwo = Generic<(Double, Double)>()
 
-  sTwo.genericFunction(3.0, 4.0) // expected-error {{single parameter of type '(Double, Double)' is expected in call}} {{24-24=(}} {{32-32=)}}
+  sTwo.genericFunction(3.0, 4.0) // expected-error {{property 'genericFunction' expects a single parameter of type '(Double, Double)'}} {{24-24=(}} {{32-32=)}}
   sTwo.genericFunction((3.0, 4.0))
 }
 
@@ -868,14 +871,14 @@ do {
   s.genericFunction(c)
 
   s.genericFunctionTwo(a, b)
-  s.genericFunctionTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.genericFunctionTwo((a, b)) // expected-error {{property 'genericFunctionTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{24-25=}} {{29-30=}}
 
-  s.genericFunctionTuple(a, b) // expected-error {{single parameter of type '(Double, Double)' is expected in call}} {{26-26=(}} {{30-30=)}}
+  s.genericFunctionTuple(a, b) // expected-error {{property 'genericFunctionTuple' expects a single parameter of type '(Double, Double)'}} {{26-26=(}} {{30-30=)}}
   s.genericFunctionTuple((a, b))
 
   let sTwo = Generic<(Double, Double)>()
 
-  sTwo.genericFunction(a, b) // expected-error {{single parameter of type '(Double, Double)' is expected in call}} {{24-24=(}} {{28-28=)}}
+  sTwo.genericFunction(a, b) // expected-error {{property 'genericFunction' expects a single parameter of type '(Double, Double)'}} {{24-24=(}} {{28-28=)}}
   sTwo.genericFunction((a, b))
   sTwo.genericFunction(d)
 }
@@ -893,14 +896,14 @@ do {
   s.genericFunction(c)
 
   s.genericFunctionTwo(a, b)
-  s.genericFunctionTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.genericFunctionTwo((a, b)) // expected-error {{property 'genericFunctionTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{24-25=}} {{29-30=}}
 
-  s.genericFunctionTuple(a, b) // expected-error {{single parameter of type '(Double, Double)' is expected in call}} {{26-26=(}} {{30-30=)}}
+  s.genericFunctionTuple(a, b) // expected-error {{property 'genericFunctionTuple' expects a single parameter of type '(Double, Double)'}} {{26-26=(}} {{30-30=)}}
   s.genericFunctionTuple((a, b))
 
   var sTwo = Generic<(Double, Double)>()
 
-  sTwo.genericFunction(a, b) // expected-error {{single parameter of type '(Double, Double)' is expected in call}} {{24-24=(}} {{28-28=)}}
+  sTwo.genericFunction(a, b) // expected-error {{property 'genericFunction' expects a single parameter of type '(Double, Double)'}} {{24-24=(}} {{28-28=)}}
   sTwo.genericFunction((a, b))
   sTwo.genericFunction(d)
 }
@@ -914,7 +917,7 @@ struct GenericInitLabeled<T> {
 }
 
 struct GenericInitTwo<T> {
-  init(_ x: T, _ y: T) {} // expected-note 10 {{'init' declared here}}
+  init(_ x: T, _ y: T) {} // expected-note 10 {{'init(_:_:)' declared here}}
 }
 
 struct GenericInitTuple<T> {
@@ -933,29 +936,29 @@ do {
   _ = GenericInitLabeled(x: (3, 4))
 
   _ = GenericInitTwo(3, 4)
-  _ = GenericInitTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericInitTwo((3, 4)) // expected-error {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{22-23=}} {{27-28=}}
 
-  _ = GenericInitTuple(3, 4) // expected-error {{initializer expects a single parameter of type '(T, T)'}} {{24-24=(}} {{28-28=)}}
+  _ = GenericInitTuple(3, 4) // expected-error {{initializer expects a single parameter of type '(T, T)' [with T = Int]}} {{24-24=(}} {{28-28=)}}
   _ = GenericInitTuple((3, 4))
 
-  _ = GenericInitLabeledTuple(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericInitLabeledTuple(x: 3, 4) // expected-error {{initializer expects a single parameter of type '(T, T)' [with T = Int]}}
   _ = GenericInitLabeledTuple(x: (3, 4))
 }
 
 do {
-  _ = GenericInit<(Int, Int)>(3, 4) // expected-error {{extra argument in call}}
+  _ = GenericInit<(Int, Int)>(3, 4) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}}
   _ = GenericInit<(Int, Int)>((3, 4))
 
-  _ = GenericInitLabeled<(Int, Int)>(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericInitLabeled<(Int, Int)>(x: 3, 4) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}}
   _ = GenericInitLabeled<(Int, Int)>(x: (3, 4))
 
   _ = GenericInitTwo<Int>(3, 4)
-  _ = GenericInitTwo<Int>((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericInitTwo<Int>((3, 4)) // expected-error {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{27-28=}} {{32-33=}}
 
-  _ = GenericInitTuple<Int>(3, 4) // expected-error {{initializer expects a single parameter of type '(T, T)'}} {{29-29=(}} {{33-33=)}}
+  _ = GenericInitTuple<Int>(3, 4) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}} {{29-29=(}} {{33-33=)}}
   _ = GenericInitTuple<Int>((3, 4))
 
-  _ = GenericInitLabeledTuple<Int>(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericInitLabeledTuple<Int>(x: 3, 4) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}}
   _ = GenericInitLabeledTuple<Int>(x: (3, 4))
 }
 
@@ -969,10 +972,10 @@ do {
   _ = GenericInit(c)
 
   _ = GenericInitTwo(a, b)
-  _ = GenericInitTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = GenericInitTwo(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericInitTwo((a, b)) // expected-error {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{22-23=}} {{27-28=}}
+  _ = GenericInitTwo(c) // expected-error {{initializer expects 2 separate arguments}}
 
-  _ = GenericInitTuple(a, b) // expected-error {{initializer expects a single parameter of type '(T, T)'}} {{24-24=(}} {{28-28=)}}
+  _ = GenericInitTuple(a, b) // expected-error {{initializer expects a single parameter of type '(T, T)' [with T = Int]}} {{24-24=(}} {{28-28=)}}
   _ = GenericInitTuple((a, b))
   _ = GenericInitTuple(c)
 }
@@ -982,15 +985,15 @@ do {
   let b = 4
   let c = (a, b)
 
-  _ = GenericInit<(Int, Int)>(a, b) // expected-error {{extra argument in call}}
+  _ = GenericInit<(Int, Int)>(a, b) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}}
   _ = GenericInit<(Int, Int)>((a, b))
   _ = GenericInit<(Int, Int)>(c)
 
   _ = GenericInitTwo<Int>(a, b)
-  _ = GenericInitTwo<Int>((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = GenericInitTwo<Int>(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericInitTwo<Int>((a, b)) // expected-error {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{27-28=}} {{32-33=}}
+  _ = GenericInitTwo<Int>(c) // expected-error {{initializer expects 2 separate arguments}}
 
-  _ = GenericInitTuple<Int>(a, b) // expected-error {{initializer expects a single parameter of type '(T, T)'}} {{29-29=(}} {{33-33=)}}
+  _ = GenericInitTuple<Int>(a, b) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}} {{29-29=(}} {{33-33=)}}
   _ = GenericInitTuple<Int>((a, b))
   _ = GenericInitTuple<Int>(c)
 }
@@ -1005,28 +1008,28 @@ do {
   _ = GenericInit(c)
 
   _ = GenericInitTwo(a, b)
-  _ = GenericInitTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = GenericInitTwo(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericInitTwo((a, b)) // expected-error {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{22-23=}} {{27-28=}}
+  _ = GenericInitTwo(c) // expected-error {{initializer expects 2 separate arguments}}
 
-  _ = GenericInitTuple(a, b) // expected-error {{initializer expects a single parameter of type '(T, T)'}} {{24-24=(}} {{28-28=)}}
+  _ = GenericInitTuple(a, b) // expected-error {{initializer expects a single parameter of type '(T, T)' [with T = Int]}} {{24-24=(}} {{28-28=)}}
   _ = GenericInitTuple((a, b))
   _ = GenericInitTuple(c)
 }
 
 do {
-  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var c = (a, b) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
+  var a = 3
+  var b = 4
+  var c = (a, b)
 
-  _ = GenericInit<(Int, Int)>(a, b) // expected-error {{extra argument in call}}
+  _ = GenericInit<(Int, Int)>(a, b) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}}
   _ = GenericInit<(Int, Int)>((a, b))
    _ = GenericInit<(Int, Int)>(c)
 
   _ = GenericInitTwo<Int>(a, b)
-  _ = GenericInitTwo<Int>((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = GenericInitTwo<Int>(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericInitTwo<Int>((a, b)) // expected-error {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{27-28=}} {{32-33=}}
+  _ = GenericInitTwo<Int>(c) // expected-error {{initializer expects 2 separate arguments}}
 
-  _ = GenericInitTuple<Int>(a, b) // expected-error {{initializer expects a single parameter of type '(T, T)'}} {{29-29=(}} {{33-33=)}}
+  _ = GenericInitTuple<Int>(a, b) // expected-error {{initializer expects a single parameter of type '(Int, Int)'}} {{29-29=(}} {{33-33=)}}
   _ = GenericInitTuple<Int>((a, b))
   _ = GenericInitTuple<Int>(c)
 }
@@ -1040,7 +1043,7 @@ struct GenericSubscriptLabeled<T> {
 }
 
 struct GenericSubscriptTwo<T> {
-  subscript(_ x: T, _ y: T) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript' declared here}}
+  subscript(_ x: T, _ y: T) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript(_:_:)' declared here}}
 }
 
 struct GenericSubscriptLabeledTuple<T> {
@@ -1053,23 +1056,23 @@ struct GenericSubscriptTuple<T> {
 
 do {
   let s1 = GenericSubscript<(Double, Double)>()
-  _ = s1[3.0, 4.0] // expected-error {{extra argument in call}}
+  _ = s1[3.0, 4.0] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{10-10=(}} {{18-18=)}}
   _ = s1[(3.0, 4.0)]
 
   let s1a  = GenericSubscriptLabeled<(Double, Double)>()
-  _ = s1a [x: 3.0, 4.0] // expected-error {{extra argument in call}}
+  _ = s1a [x: 3.0, 4.0] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{14-14=(}} {{23-23=)}}
   _ = s1a [x: (3.0, 4.0)]
 
   let s2 = GenericSubscriptTwo<Double>()
   _ = s2[3.0, 4.0]
-  _ = s2[(3.0, 4.0)] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s2[(3.0, 4.0)] // expected-error {{subscript expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{10-11=}} {{19-20=}}
 
   let s3 = GenericSubscriptTuple<Double>()
-  _ = s3[3.0, 4.0] // expected-error {{subscript expects a single parameter of type '(T, T)'}} {{10-10=(}} {{18-18=)}}
+  _ = s3[3.0, 4.0] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{10-10=(}} {{18-18=)}}
   _ = s3[(3.0, 4.0)]
 
   let s3a = GenericSubscriptLabeledTuple<Double>()
-  _ = s3a[x: 3.0, 4.0] // expected-error {{extra argument in call}}
+  _ = s3a[x: 3.0, 4.0] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{13-13=(}} {{22-22=)}}
   _ = s3a[x: (3.0, 4.0)]
 }
 
@@ -1079,17 +1082,17 @@ do {
   let d = (a, b)
 
   let s1 = GenericSubscript<(Double, Double)>()
-  _ = s1[a, b] // expected-error {{extra argument in call}}
+  _ = s1[a, b] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{10-10=(}} {{14-14=)}}
   _ = s1[(a, b)]
   _ = s1[d]
 
   let s2 = GenericSubscriptTwo<Double>()
   _ = s2[a, b]
-  _ = s2[(a, b)] // expected-error {{missing argument for parameter #2 in call}}
-  _ = s2[d] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s2[(a, b)] // expected-error {{subscript expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{10-11=}} {{15-16=}}
+  _ = s2[d] // expected-error {{subscript expects 2 separate arguments}}
 
   let s3 = GenericSubscriptTuple<Double>()
-  _ = s3[a, b] // expected-error {{subscript expects a single parameter of type '(T, T)'}} {{10-10=(}} {{14-14=)}}
+  _ = s3[a, b] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{10-10=(}} {{14-14=)}}
   _ = s3[(a, b)]
   _ = s3[d]
 }
@@ -1101,17 +1104,17 @@ do {
   var d = (a, b) // e/xpected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   var s1 = GenericSubscript<(Double, Double)>()
-  _ = s1[a, b] // expected-error {{extra argument in call}}
+  _ = s1[a, b] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{10-10=(}} {{14-14=)}}
   _ = s1[(a, b)]
   _ = s1[d]
 
   var s2 = GenericSubscriptTwo<Double>()
   _ = s2[a, b]
-  _ = s2[(a, b)] // expected-error {{missing argument for parameter #2 in call}}
-  _ = s2[d] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s2[(a, b)] // expected-error {{subscript expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{10-11=}} {{15-16=}}
+  _ = s2[d] // expected-error {{subscript expects 2 separate arguments}}
 
   var s3 = GenericSubscriptTuple<Double>()
-  _ = s3[a, b] // expected-error {{subscript expects a single parameter of type '(T, T)'}} {{10-10=(}} {{14-14=)}}
+  _ = s3[a, b] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{10-10=(}} {{14-14=)}}
   _ = s3[(a, b)]
   _ = s3[d]
 }
@@ -1133,25 +1136,25 @@ do {
   _ = GenericEnum.labeled((3, 4)) // expected-error {{missing argument label 'x:' in call}}
 
   _ = GenericEnum.two(3, 4)
-  _ = GenericEnum.two((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericEnum.two((3, 4)) // expected-error {{enum case 'two' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{23-24=}} {{28-29=}}
 
-  _ = GenericEnum.tuple(3, 4) // expected-error {{enum element 'tuple' expects a single parameter of type '(T, T)'}} {{25-25=(}} {{29-29=)}}
+  _ = GenericEnum.tuple(3, 4) // expected-error {{enum case 'tuple' expects a single parameter of type '(T, T)' [with T = Int]}} {{25-25=(}} {{29-29=)}}
   _ = GenericEnum.tuple((3, 4))
 }
 
 do {
-  _ = GenericEnum<(Int, Int)>.one(3, 4) // expected-error {{enum element 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
+  _ = GenericEnum<(Int, Int)>.one(3, 4) // expected-error {{enum case 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
   _ = GenericEnum<(Int, Int)>.one((3, 4))
 
-  _ = GenericEnum<(Int, Int)>.labeled(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericEnum<(Int, Int)>.labeled(x: 3, 4) // expected-error {{enum case 'labeled' expects a single parameter of type '(Int, Int)'}}
   _ = GenericEnum<(Int, Int)>.labeled(x: (3, 4))
-  _ = GenericEnum<(Int, Int)>.labeled(3, 4) // expected-error {{extra argument in call}}
+  _ = GenericEnum<(Int, Int)>.labeled(3, 4) // expected-error {{enum case 'labeled' expects a single parameter of type '(Int, Int)'}}
   _ = GenericEnum<(Int, Int)>.labeled((3, 4)) // expected-error {{missing argument label 'x:' in call}}
 
   _ = GenericEnum<Int>.two(3, 4)
-  _ = GenericEnum<Int>.two((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericEnum<Int>.two((3, 4)) // expected-error {{enum case 'two' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{28-29=}} {{33-34=}}
 
-  _ = GenericEnum<Int>.tuple(3, 4) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
+  _ = GenericEnum<Int>.tuple(3, 4) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
   _ = GenericEnum<Int>.tuple((3, 4))
 }
 
@@ -1165,10 +1168,10 @@ do {
   _ = GenericEnum.one(c)
 
   _ = GenericEnum.two(a, b)
-  _ = GenericEnum.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = GenericEnum.two(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericEnum.two((a, b)) // expected-error {{enum case 'two' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{23-24=}} {{28-29=}}
+  _ = GenericEnum.two(c) // expected-error {{enum case 'two' expects 2 separate arguments}}
 
-  _ = GenericEnum.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(T, T)'}} {{25-25=(}} {{29-29=)}}
+  _ = GenericEnum.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(T, T)' [with T = Int]}} {{25-25=(}} {{29-29=)}}
   _ = GenericEnum.tuple((a, b))
   _ = GenericEnum.tuple(c)
 }
@@ -1178,15 +1181,15 @@ do {
   let b = 4
   let c = (a, b)
 
-  _ = GenericEnum<(Int, Int)>.one(a, b) // expected-error {{enum element 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
+  _ = GenericEnum<(Int, Int)>.one(a, b) // expected-error {{enum case 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
   _ = GenericEnum<(Int, Int)>.one((a, b))
   _ = GenericEnum<(Int, Int)>.one(c)
 
   _ = GenericEnum<Int>.two(a, b)
-  _ = GenericEnum<Int>.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = GenericEnum<Int>.two(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericEnum<Int>.two((a, b)) // expected-error {{enum case 'two' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{28-29=}} {{33-34=}}
+  _ = GenericEnum<Int>.two(c) // expected-error {{enum case 'two' expects 2 separate arguments}}
 
-  _ = GenericEnum<Int>.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
+  _ = GenericEnum<Int>.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
   _ = GenericEnum<Int>.tuple((a, b))
   _ = GenericEnum<Int>.tuple(c)
 }
@@ -1201,10 +1204,10 @@ do {
   _ = GenericEnum.one(c)
 
   _ = GenericEnum.two(a, b)
-  _ = GenericEnum.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = GenericEnum.two(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericEnum.two((a, b)) // expected-error {{enum case 'two' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{23-24=}} {{28-29=}}
+  _ = GenericEnum.two(c) // expected-error {{enum case 'two' expects 2 separate arguments}}
 
-  _ = GenericEnum.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(T, T)'}} {{25-25=(}} {{29-29=)}}
+  _ = GenericEnum.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(T, T)' [with T = Int]}} {{25-25=(}} {{29-29=)}}
   _ = GenericEnum.tuple((a, b))
   _ = GenericEnum.tuple(c)
 }
@@ -1214,15 +1217,15 @@ do {
   var b = 4
   var c = (a, b)
 
-  _ = GenericEnum<(Int, Int)>.one(a, b) // expected-error {{enum element 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
+  _ = GenericEnum<(Int, Int)>.one(a, b) // expected-error {{enum case 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
   _ = GenericEnum<(Int, Int)>.one((a, b))
   _ = GenericEnum<(Int, Int)>.one(c)
 
   _ = GenericEnum<Int>.two(a, b)
-  _ = GenericEnum<Int>.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
-  _ = GenericEnum<Int>.two(c) // expected-error {{missing argument for parameter #2 in call}}
+  _ = GenericEnum<Int>.two((a, b)) // expected-error {{enum case 'two' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{28-29=}} {{33-34=}}
+  _ = GenericEnum<Int>.two(c) // expected-error {{enum case 'two' expects 2 separate arguments}}
 
-  _ = GenericEnum<Int>.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
+  _ = GenericEnum<Int>.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
   _ = GenericEnum<Int>.tuple((a, b))
   _ = GenericEnum<Int>.tuple(c)
 }
@@ -1252,17 +1255,17 @@ do {
   s.requirementLabeled(x: (3.0))
 
   s.requirementTwo(3.0, 4.0)
-  s.requirementTwo((3.0, 4.0)) // expected-error {{missing argument for parameter #2 in call}}
+  s.requirementTwo((3.0, 4.0)) // expected-error {{instance method 'requirementTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{20-21=}} {{29-30=}}
 
-  s.requirementTuple(3.0, 4.0) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(Double, Double)'}} {{22-22=(}} {{30-30=)}}
+  s.requirementTuple(3.0, 4.0) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element)' (aka '(Double, Double)')}} {{22-22=(}} {{30-30=)}}
   s.requirementTuple((3.0, 4.0))
 
   let sTwo = GenericConforms<(Double, Double)>()
 
-  sTwo.requirement(3.0, 4.0) // expected-error {{instance method 'requirement' expects a single parameter of type '(Double, Double)'}} {{20-20=(}} {{28-28=)}}
+  sTwo.requirement(3.0, 4.0) // expected-error {{instance method 'requirement' expects a single parameter of type 'GenericConforms<(Double, Double)>.Element' (aka '(Double, Double)')}} {{20-20=(}} {{28-28=)}}
   sTwo.requirement((3.0, 4.0))
 
-  sTwo.requirementLabeled(x: 3.0, 4.0) // expected-error {{extra argument in call}}
+  sTwo.requirementLabeled(x: 3.0, 4.0) // expected-error {{instance method 'requirementLabeled' expects a single parameter of type 'GenericConforms<(Double, Double)>.Element' (aka '(Double, Double)')}} {{29-29=(}} {{38-38=)}}
   sTwo.requirementLabeled(x: (3.0, 4.0))
 }
 
@@ -1279,14 +1282,14 @@ do {
   s.requirement(c)
 
   s.requirementTwo(a, b)
-  s.requirementTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.requirementTwo((a, b)) // expected-error {{instance method 'requirementTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{20-21=}} {{25-26=}}
 
-  s.requirementTuple(a, b) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(Double, Double)'}} {{22-22=(}} {{26-26=)}}
+  s.requirementTuple(a, b) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element)' (aka '(Double, Double)')}} {{22-22=(}} {{26-26=)}}
   s.requirementTuple((a, b))
 
   let sTwo = GenericConforms<(Double, Double)>()
 
-  sTwo.requirement(a, b) // expected-error {{instance method 'requirement' expects a single parameter of type '(Double, Double)'}} {{20-20=(}} {{24-24=)}}
+  sTwo.requirement(a, b) // expected-error {{instance method 'requirement' expects a single parameter of type 'GenericConforms<(Double, Double)>.Element' (aka '(Double, Double)')}} {{20-20=(}} {{24-24=)}}
   sTwo.requirement((a, b))
   sTwo.requirement(d)
 }
@@ -1304,14 +1307,14 @@ do {
   s.requirement(c)
 
   s.requirementTwo(a, b)
-  s.requirementTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
+  s.requirementTwo((a, b)) // expected-error {{instance method 'requirementTwo' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{20-21=}} {{25-26=}}
 
-  s.requirementTuple(a, b) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(Double, Double)'}} {{22-22=(}} {{26-26=)}}
+  s.requirementTuple(a, b) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element)' (aka '(Double, Double)')}} {{22-22=(}} {{26-26=)}}
   s.requirementTuple((a, b))
 
   var sTwo = GenericConforms<(Double, Double)>()
 
-  sTwo.requirement(a, b) // expected-error {{instance method 'requirement' expects a single parameter of type '(Double, Double)'}} {{20-20=(}} {{24-24=)}}
+  sTwo.requirement(a, b) // expected-error {{instance method 'requirement' expects a single parameter of type 'GenericConforms<(Double, Double)>.Element' (aka '(Double, Double)')}} {{20-20=(}} {{24-24=)}}
   sTwo.requirement((a, b))
   sTwo.requirement(d)
 }
@@ -1328,9 +1331,9 @@ do {
   s.takesClosure({ x in })
   s.takesClosure({ (x: Double) in })
 
-  s.takesClosureTwo({ _ = $0 }) // expected-error {{contextual closure type '(Double, Double) -> ()' expects 2 arguments, but 1 was used in closure body}}
-  s.takesClosureTwo({ x in }) // expected-error {{contextual closure type '(Double, Double) -> ()' expects 2 arguments, but 1 was used in closure body}}
-  s.takesClosureTwo({ (x: (Double, Double)) in }) // expected-error {{contextual closure type '(Double, Double) -> ()' expects 2 arguments, but 1 was used in closure body}}
+  s.takesClosureTwo({ _ = $0 }) // expected-error {{contextual closure type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element) -> ()' (aka '(Double, Double) -> ()') expects 2 arguments, but 1 was used in closure body}}
+  s.takesClosureTwo({ x in }) // expected-error {{contextual closure type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element) -> ()' (aka '(Double, Double) -> ()') expects 2 arguments, but 1 was used in closure body}}
+  s.takesClosureTwo({ (x: (Double, Double)) in }) // expected-error {{contextual closure type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element) -> ()' (aka '(Double, Double) -> ()') expects 2 arguments, but 1 was used in closure body}}
   s.takesClosureTwo({ _ = $0; _ = $1 })
   s.takesClosureTwo({ (x, y) in })
   s.takesClosureTwo({ (x: Double, y:Double) in })
@@ -1403,13 +1406,13 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
 
   f2.forEach { block in
   // expected-note@-1 2{{'block' declared here}}
-    block(p) // expected-error {{missing argument for parameter #2 in call}}
-    block((c, c)) // expected-error {{missing argument for parameter #2 in call}}
+    block(p) // expected-error {{parameter 'block' expects 2 separate arguments}}
+    block((c, c)) // expected-error {{parameter 'block' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{11-12=}} {{16-17=}}
     block(c, c)
   }
 
   f2.forEach { (block: ((Bool, Bool)) -> ()) in
-  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '((Bool, Bool) -> ()) -> Void}}
+  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> Void' to expected argument type '(@escaping (Bool, Bool) -> ()) throws -> Void'}}
     block(p)
     block((c, c))
     block(c, c)
@@ -1417,8 +1420,8 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
 
   f2.forEach { (block: (Bool, Bool) -> ()) in
   // expected-note@-1 2{{'block' declared here}}
-    block(p) // expected-error {{missing argument for parameter #2 in call}}
-    block((c, c)) // expected-error {{missing argument for parameter #2 in call}}
+    block(p) // expected-error {{parameter 'block' expects 2 separate arguments}}
+    block((c, c)) // expected-error {{parameter 'block' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{11-12=}} {{16-17=}}
     block(c, c)
   }
 }
@@ -1465,8 +1468,11 @@ let _ = sr4745.enumerated().map { (count, element) in "\(count): \(element)" }
 // SR-4738
 
 let sr4738 = (1, (2, 3))
-[sr4738].map { (x, (y, z)) -> Int in x + y + z } // expected-error {{use of undeclared type 'y'}}
+[sr4738].map { (x, (y, z)) -> Int in x + y + z }
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{20-26=arg1}} {{38-38=let (y, z) = arg1; }}
+// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{20-20=_: }}
+// expected-error@-3 {{cannot find type 'y' in scope}}
+// expected-error@-4 {{cannot find type 'z' in scope}}
 
 // rdar://problem/31892961
 let r31892961_1 = [1: 1, 2: 2]
@@ -1475,7 +1481,9 @@ r31892961_1.forEach { (k, v) in print(k + v) }
 let r31892961_2 = [1, 2, 3]
 let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
   // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{3-3=\n  let (index, val) = arg0\n  }}
-  // expected-error@-2 {{use of undeclared type 'index'}}
+  // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{48-48=_: }}
+  // expected-error@-3 {{cannot find type 'index' in scope}}
+  // expected-error@-4 {{cannot find type 'val' in scope}}
   val + 1
 }
 
@@ -1488,12 +1496,16 @@ let r31892961_4 = (1, 2)
 _ = [r31892961_4].map { x, y in x + y }
 
 let r31892961_5 = (x: 1, (y: 2, (w: 3, z: 4)))
-[r31892961_5].map { (x: Int, (y: Int, (w: Int, z: Int))) in x + y }
+[r31892961_5].map { (x: Int, (y: Int, (w: Int, z: Int))) in x + y } // expected-note {{'x' declared here}}
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-56=arg1}} {{61-61=let (y, (w, z)) = arg1; }}
+// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{30-30=_: }}
+// expected-error@-3{{cannot find 'y' in scope; did you mean 'x'?}}
 
 let r31892961_6 = (x: 1, (y: 2, z: 4))
-[r31892961_6].map { (x: Int, (y: Int, z: Int)) in x + y }
+[r31892961_6].map { (x: Int, (y: Int, z: Int)) in x + y } // expected-note {{'x' declared here}}
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-46=arg1}} {{51-51=let (y, z) = arg1; }}
+// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{30-30=_: }}
+// expected-error@-3{{cannot find 'y' in scope; did you mean 'x'?}}
 
 // rdar://problem/32214649 -- these regressed in Swift 4 mode
 // with SE-0110 because of a problem in associated type inference
@@ -1553,11 +1565,11 @@ extension Sequence where Iterator.Element == (key: String, value: String?) {
 }
 
 func rdar33043106(_ records: [(Int)], _ other: [((Int))]) -> [Int] {
-  let x: [Int] = records.flatMap { _ in
+  let x: [Int] = records.map { _ in
     let i = 1
     return i
   }
-  let y: [Int] = other.flatMap { _ in
+  let y: [Int] = other.map { _ in
     let i = 1
     return i
   }
@@ -1570,9 +1582,9 @@ func itsFalse(_: Int) -> Bool? {
 }
 
 func rdar33159366(s: AnySequence<Int>) {
-  _ = s.flatMap(itsFalse)
+  _ = s.compactMap(itsFalse)
   let a = Array(s)
-  _ = a.flatMap(itsFalse)
+  _ = a.compactMap(itsFalse)
 }
 
 func sr5429<T>(t: T) {
@@ -1620,3 +1632,138 @@ func rdar33239714() {
   Generic<(Int, Int)>().optAliasF { x, y in }
   Generic<(Int, Int)>().optAliasF { (x, y) in }
 }
+
+// rdar://problem/35198459 - source-compat-suite failure: Moya (toType->hasUnresolvedType() && "Should have handled this above"
+do {
+  func foo(_: (() -> Void)?) {}
+  func bar() -> ((()) -> Void)? { return nil }
+  foo(bar()) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+}
+
+// https://bugs.swift.org/browse/SR-6509
+public extension Optional {
+  func apply<Result>(_ transform: ((Wrapped) -> Result)?) -> Result? {
+    return self.flatMap { value in
+      transform.map { $0(value) }
+    }
+  }
+
+  func apply<Value, Result>(_ value: Value?) -> Result?
+    where Wrapped == (Value) -> Result {
+    return value.apply(self)
+  }
+}
+
+// https://bugs.swift.org/browse/SR-6837
+
+// FIXME: Can't overlaod local functions so these must be top-level
+func takePairOverload(_ pair: (Int, Int?)) {}
+func takePairOverload(_: () -> ()) {}
+
+do {
+  func takeFn(fn: (_ i: Int, _ j: Int?) -> ()) {}
+  func takePair(_ pair: (Int, Int?)) {}
+  takeFn(fn: takePair) // expected-error {{cannot convert value of type '((Int, Int?)) -> ()' to expected argument type '(Int, Int?) -> ()'}}
+  takeFn(fn: takePairOverload) // expected-error {{cannot convert value of type '((Int, Int?)) -> ()' to expected argument type '(Int, Int?) -> ()'}}
+  takeFn(fn: { (pair: (Int, Int?)) in } ) // Disallow for -swift-version 4 and later
+  // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
+  takeFn { (pair: (Int, Int?)) in } // Disallow for -swift-version 4 and later
+  // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
+}
+
+// https://bugs.swift.org/browse/SR-6796
+do {
+  func f(a: (() -> Void)? = nil) {}
+  func log<T>() -> ((T) -> Void)? { return nil }
+
+  f(a: log() as ((()) -> Void)?) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+
+  func logNoOptional<T>() -> (T) -> Void { }
+  f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '() -> Void'}}
+
+  func g() {}
+  g(()) // expected-error {{argument passed to call that takes no arguments}}
+
+  func h(_: ()) {} // expected-note {{'h' declared here}}
+  h() // expected-error {{missing argument for parameter #1 in call}}
+}
+
+// https://bugs.swift.org/browse/SR-7191
+class Mappable<T> {
+  init(_: T) { }
+  func map<U>(_ body: (T) -> U) -> U { fatalError() }
+}
+
+let x = Mappable(())
+// expected-note@-1 2{{'x' declared here}}
+x.map { (_: Void) in return () }
+x.map { (_: ()) in () }
+
+// https://bugs.swift.org/browse/SR-9470
+do {
+  func f(_: Int...) {}
+  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot convert value of type '(Int...) -> ()' to expected argument type '((Int, Int, Int)) throws -> T'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+}
+
+// rdar://problem/48443263 - cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'
+
+protocol P_48443263 {
+  associatedtype V
+}
+
+func rdar48443263() {
+  func foo<T : P_48443263>(_: T, _: (T.V) -> Void) {}
+
+  struct S1 : P_48443263 {
+    typealias V = Void
+  }
+
+  struct S2: P_48443263 {
+    typealias V = Int
+  }
+
+  func bar(_ s1: S1, _ s2: S2, _ fn: () -> Void) {
+    foo(s1, fn) // Ok because s.V is Void
+    foo(s2, fn) // expected-error {{cannot convert value of type '() -> Void' to expected argument type '(S2.V) -> Void' (aka '(Int) -> ()')}}
+  }
+}
+
+func autoclosureSplat() {
+  func takeFn<T>(_: (T) -> ()) {}
+
+  takeFn { (fn: @autoclosure () -> Int) in }
+  // This type checks because we find a solution T:= @escaping () -> Int and
+  // wrap the closure in a function conversion.
+
+  takeFn { (fn: @autoclosure () -> Int, x: Int) in }
+  // expected-error@-1 {{contextual closure type '(() -> Int) -> ()' expects 1 argument, but 2 were used in closure body}}
+  // expected-error@-2 {{converting non-escaping value to 'T' may allow it to escape}}
+
+  takeFn { (fn: @autoclosure @escaping () -> Int) in }
+  // FIXME: It looks like matchFunctionTypes() does not check @autoclosure at all.
+  // Perhaps this is intentional, but we should document it eventually. In the
+  // interim, this test serves as "documentation"; if it fails, please investigate why
+  // instead of changing the test.
+
+  takeFn { (fn: @autoclosure @escaping () -> Int, x: Int) in }
+  // expected-error@-1 {{contextual closure type '(@escaping () -> Int) -> ()' expects 1 argument, but 2 were used in closure body}}
+}
+
+func noescapeSplat() {
+  func takesFn<T>(_ fn: (T) -> ()) -> T {}
+  func takesEscaping(_: @escaping () -> Int) {}
+
+  do {
+    let t = takesFn { (fn: () -> Int) in }
+    takesEscaping(t)
+    // This type checks because we find a solution T:= (@escaping () -> Int).
+  }
+
+  do {
+    let t = takesFn { (fn: () -> Int, x: Int) in }
+    // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+    takesEscaping(t.0)
+  }
+}
+

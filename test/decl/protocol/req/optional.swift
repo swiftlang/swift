@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 // -----------------------------------------------------------------------
 // Declaring optional requirements
@@ -113,9 +113,8 @@ extension C6 : P1 {
 }
 
 @objc class C8 : P2 { // expected-note{{class 'C8' declares conformance to protocol 'P2' here}}
-  func objcMethod(int x: Int) { } // expected-error{{Objective-C method 'objcMethodWithInt:' provided by method 'objcMethod(int:)' conflicts with optional requirement method 'method(y:)' in protocol 'P2'}}
-  // expected-note@-1{{add '@nonobjc' to silence this error}}{{3-3=@nonobjc }}
-  // expected-note@-2{{rename method to match requirement 'method(y:)'}}{{8-18=method}}{{19-22=y}}{{none}}
+  @objc func objcMethod(int x: Int) { } // expected-error{{Objective-C method 'objcMethodWithInt:' provided by method 'objcMethod(int:)' conflicts with optional requirement method 'method(y:)' in protocol 'P2'}}
+  // expected-note@-1{{rename method to match requirement 'method(y:)'}}{{14-24=method}}{{25-28=y}}{{none}}
 }
 
 
@@ -224,6 +223,7 @@ protocol optErrorProtocol {
   optional func foo(_ x: Int) // expected-error{{'optional' requirements are an Objective-C compatibility feature; add '@objc'}}{{3-3=@objc }}
   optional var bar: Int { get } // expected-error{{'optional' requirements are an Objective-C compatibility feature; add '@objc'}}{{3-3=@objc }}
   optional associatedtype Assoc  // expected-error{{'optional' modifier cannot be applied to this declaration}} {{3-12=}}
+  // expected-error@-1 {{associated type 'Assoc' cannot be declared inside '@objc' protocol 'optObjcAttributeProtocol'}}
 }
 
 @objc protocol optionalInitProto {

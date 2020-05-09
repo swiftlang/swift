@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/Remote/MetadataReader.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
@@ -22,24 +23,26 @@ static const std::string XYZ = "XYZ";
 static const std::string Empty = "";
 static const std::string MyClass = "MyClass";
 static const std::string NotMyClass = "NotMyClass";
-static const std::string Module = "Module";
+static const std::string MyModule = "MyModule";
 static const std::string Shmodule = "Shmodule";
-static const std::string Protocol = "Protocol";
+static const std::string MyProtocol = "MyProtocol";
 static const std::string Shmrotocol = "Shmrotocol";
 
-TEST(TypeRefTest, UniqueBuiltinTypeRef) {
-  TypeRefBuilder Builder;
+using Param = remote::FunctionParam<const TypeRef *>;
 
-  auto BI1 = Builder.createBuiltinType(ABC);
-  auto BI2 = Builder.createBuiltinType(ABC);
-  auto BI3 = Builder.createBuiltinType(ABCD);
+TEST(TypeRefTest, UniqueBuiltinTypeRef) {
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+
+  auto BI1 = Builder.createBuiltinType(ABC, ABC);
+  auto BI2 = Builder.createBuiltinType(ABC, ABC);
+  auto BI3 = Builder.createBuiltinType(ABCD, ABCD);
 
   EXPECT_EQ(BI1, BI2);
   EXPECT_NE(BI2, BI3);
 }
 
 TEST(TypeRefTest, UniqueNominalTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(ABC, nullptr);
@@ -55,7 +58,7 @@ TEST(TypeRefTest, UniqueNominalTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
   auto GTP01 = Builder.createGenericTypeParameterType(0, 1);
@@ -79,7 +82,7 @@ TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueTupleTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(XYZ, nullptr);
@@ -111,65 +114,122 @@ TEST(TypeRefTest, UniqueTupleTypeRef) {
 
 TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   std::vector<const TypeRef *> Void;
   auto VoidResult = Builder.createTupleType(Void, "", false);
-  std::vector<bool> VoidInout;
-  auto Arg1 = Builder.createNominalType(ABC, nullptr);
-  auto Arg2 = Builder.createNominalType(XYZ, nullptr);
+  Param Param1 = Builder.createNominalType(ABC, nullptr);
+  Param Param2 = Builder.createNominalType(XYZ, nullptr);
 
-  std::vector<const TypeRef *> Arguments1 { Arg1, Arg2 };
-  std::vector<bool> Inout1 { false, false };
-  auto Result = Builder.createTupleType({Arg1, Arg2}, "", false);
+  std::vector<Param> VoidParams;
+  std::vector<Param> Parameters1{Param1, Param2};
+  std::vector<Param> Parameters2{Param1, Param1};
 
-  std::vector<const TypeRef *> Arguments2 { Arg1, Arg1 };
-  std::vector<bool> Inout2 { false, false };
+  auto Result =
+      Builder.createTupleType({Param1.getType(), Param2.getType()}, "", false);
 
-  auto F1 = Builder.createFunctionType(Arguments1, Inout1, Result,
-                                       FunctionTypeFlags());
-  auto F2 = Builder.createFunctionType(Arguments1, Inout1, Result,
-                                       FunctionTypeFlags());
-  auto F3 = Builder.createFunctionType(Arguments2, Inout1, Result,
-                                       FunctionTypeFlags());
+  auto F1 =
+      Builder.createFunctionType(Parameters1, Result, FunctionTypeFlags());
+  auto F2 =
+      Builder.createFunctionType(Parameters1, Result, FunctionTypeFlags());
+  auto F3 =
+      Builder.createFunctionType(Parameters2, Result, FunctionTypeFlags());
 
   EXPECT_EQ(F1, F2);
   EXPECT_NE(F2, F3);
 
-  auto F4 = Builder.createFunctionType(Arguments1, Inout1, Result,
+  auto F4 = Builder.createFunctionType(Parameters1, Result,
                                        FunctionTypeFlags().withThrows(true));
-  auto F5 = Builder.createFunctionType(Arguments1, Inout1, Result,
+  auto F5 = Builder.createFunctionType(Parameters1, Result,
                                        FunctionTypeFlags().withThrows(true));
 
   EXPECT_EQ(F4, F5);
   EXPECT_NE(F4, F1);
 
-  auto VoidVoid1 = Builder.createFunctionType(Void, VoidInout, VoidResult,
-                                              FunctionTypeFlags());
-  auto VoidVoid2 = Builder.createFunctionType(Void, VoidInout, VoidResult,
-                                              FunctionTypeFlags());
+  // Test parameter with and without inout/shared/variadic and/or label.
+  ParameterFlags paramFlags;
+  auto inoutFlags = paramFlags.withValueOwnership(ValueOwnership::InOut);
+  auto variadicFlags = paramFlags.withVariadic(true);
+  auto sharedFlags = paramFlags.withValueOwnership(ValueOwnership::Shared);
+  auto ownedFlags = paramFlags.withValueOwnership(ValueOwnership::Owned);
+
+  auto F6 = Builder.createFunctionType({Param1.withFlags(inoutFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F6_1 = Builder.createFunctionType({Param1.withFlags(inoutFlags)}, Result,
+                                         FunctionTypeFlags());
+  EXPECT_EQ(F6, F6_1);
+
+  auto F7 = Builder.createFunctionType({Param1.withFlags(variadicFlags)},
+                                       Result, FunctionTypeFlags());
+  auto F7_1 = Builder.createFunctionType({Param1.withFlags(variadicFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F7, F7_1);
+
+  auto F8 = Builder.createFunctionType({Param1.withFlags(sharedFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F8_1 = Builder.createFunctionType({Param1.withFlags(sharedFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F8, F8_1);
+
+  auto F9 = Builder.createFunctionType({Param1.withFlags(ownedFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F9_1 = Builder.createFunctionType({Param1.withFlags(ownedFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F9, F9_1);
+
+  auto F10 = Builder.createFunctionType({Param1}, Result, FunctionTypeFlags());
+  auto F10_1 = Builder.createFunctionType({Param1.withLabel("foo")}, Result,
+                                         FunctionTypeFlags());
+  EXPECT_NE(F10, F10_1);
+
+  EXPECT_NE(F6, F7);
+  EXPECT_NE(F6, F8);
+  EXPECT_NE(F6, F9);
+  EXPECT_NE(F6, F10);
+  EXPECT_NE(F7, F8);
+  EXPECT_NE(F7, F9);
+  EXPECT_NE(F7, F10);
+  EXPECT_NE(F8, F9);
+  EXPECT_NE(F8, F10);
+  EXPECT_NE(F9, F10);
+
+  auto VoidVoid1 =
+      Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags());
+  auto VoidVoid2 =
+      Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags());
 
   EXPECT_EQ(VoidVoid1, VoidVoid2);
   EXPECT_NE(VoidVoid1, F1);
+
+  // Test escaping.
+  auto F11 = Builder.createFunctionType(Parameters1, Result,
+                                        FunctionTypeFlags().withEscaping(true));
+  auto F12 = Builder.createFunctionType(Parameters1, Result,
+                                        FunctionTypeFlags().withEscaping(true));
+  auto F13 = Builder.createFunctionType(
+      Parameters1, Result, FunctionTypeFlags().withEscaping(false));
+  EXPECT_EQ(F11, F12);
+  EXPECT_NE(F11, F13);
 }
 
 TEST(TypeRefTest, UniqueProtocolTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
-  auto P1 = Builder.createProtocolType(ABC, Module, "", Protocol);
-  auto P2 = Builder.createProtocolType(ABC, Module, "", Protocol);
-  auto P3 = Builder.createProtocolType(ABCD, Module, "", Shmrotocol);
-  auto P4 = Builder.createProtocolType(XYZ, Shmodule, "", Protocol);
+  TypeRefBuilder::BuiltProtocolDecl P1 = std::make_pair(ABC, false);
+  TypeRefBuilder::BuiltProtocolDecl P2 = std::make_pair(ABC, false);
+  TypeRefBuilder::BuiltProtocolDecl P3 = std::make_pair(ABCD, false);
+  TypeRefBuilder::BuiltProtocolDecl P4 = std::make_pair(XYZ, false);
 
   EXPECT_EQ(P1, P2);
   EXPECT_NE(P2, P3);
   EXPECT_NE(P2, P3);
   EXPECT_NE(P3, P4);
 
-  auto PC1 = Builder.createProtocolCompositionType({P1, P2}, false);
-  auto PC2 = Builder.createProtocolCompositionType({P1, P2}, false);
-  auto PC3 = Builder.createProtocolCompositionType({P1, P2, P2}, false);
-  auto Any = Builder.createProtocolCompositionType({}, false);
+  auto PC1 = Builder.createProtocolCompositionType({P1, P2}, nullptr, false);
+  auto PC2 = Builder.createProtocolCompositionType({P1, P2}, nullptr, false);
+  auto PC3 =
+    Builder.createProtocolCompositionType({P1, P2, P2}, nullptr, false);
+  auto Any = Builder.createProtocolCompositionType({}, nullptr, false);
 
   EXPECT_EQ(PC1, PC2);
   EXPECT_NE(PC2, PC3);
@@ -177,13 +237,13 @@ TEST(TypeRefTest, UniqueProtocolTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueMetatypeTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
-  auto M1 = Builder.createMetatypeType(N1, false);
-  auto M2 = Builder.createMetatypeType(N1, false);
-  auto MM3 = Builder.createMetatypeType(M1, false);
-  auto M4 = Builder.createMetatypeType(N1, true);
+  auto M1 = Builder.createMetatypeType(N1, None);
+  auto M2 = Builder.createMetatypeType(N1, None);
+  auto MM3 = Builder.createMetatypeType(M1, None);
+  auto M4 = Builder.createMetatypeType(N1, Demangle::ImplMetatypeRepresentation::Thick);
 
   EXPECT_EQ(M1, M2);
   EXPECT_NE(M2, MM3);
@@ -191,7 +251,7 @@ TEST(TypeRefTest, UniqueMetatypeTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueExistentialMetatypeTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto M1 = Builder.createExistentialMetatypeType(N1);
@@ -203,7 +263,7 @@ TEST(TypeRefTest, UniqueExistentialMetatypeTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueGenericTypeParameterTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
   auto GTP00_2 = Builder.createGenericTypeParameterType(0, 0);
@@ -216,12 +276,12 @@ TEST(TypeRefTest, UniqueGenericTypeParameterTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueDependentMemberTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(XYZ, nullptr);
-  auto P1 = Builder.createProtocolType(ABC, Module, "", Protocol);
-  auto P2 = Builder.createProtocolType(ABCD, Shmodule, "", Protocol);
+  TypeRefBuilder::BuiltProtocolDecl P1 = std::make_pair(ABC, false);
+  TypeRefBuilder::BuiltProtocolDecl P2 = std::make_pair(ABCD, false);
 
   auto DM1 = Builder.createDependentMemberType("Index", N1, P1);
   auto DM2 = Builder.createDependentMemberType("Index", N1, P1);
@@ -236,7 +296,7 @@ TEST(TypeRefTest, UniqueDependentMemberTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueForeignClassTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto UN1 = Builder.getUnnamedForeignClassType();
   auto UN2 = Builder.getUnnamedForeignClassType();
@@ -250,7 +310,7 @@ TEST(TypeRefTest, UniqueForeignClassTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueObjCClassTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto UN1 = Builder.getUnnamedObjCClassType();
   auto UN2 = Builder.getUnnamedObjCClassType();
@@ -264,7 +324,7 @@ TEST(TypeRefTest, UniqueObjCClassTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueOpaqueTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto Op = OpaqueTypeRef::get();
   auto Op1 = Builder.getOpaqueType();
@@ -275,7 +335,7 @@ TEST(TypeRefTest, UniqueOpaqueTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueUnownedStorageType) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(MyClass, nullptr);
   auto N2 = Builder.createNominalType(NotMyClass, nullptr);
@@ -288,7 +348,7 @@ TEST(TypeRefTest, UniqueUnownedStorageType) {
 }
 
 TEST(TypeRefTest, UniqueWeakStorageType) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(MyClass, nullptr);
   auto N2 = Builder.createNominalType(NotMyClass, nullptr);
@@ -301,7 +361,7 @@ TEST(TypeRefTest, UniqueWeakStorageType) {
 }
 
 TEST(TypeRefTest, UniqueUnmanagedStorageType) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(MyClass, nullptr);
   auto N2 = Builder.createNominalType(NotMyClass, nullptr);
@@ -317,7 +377,7 @@ TEST(TypeRefTest, UniqueUnmanagedStorageType) {
 // (with the same pointer) as an ABC<T, U> that got substituted
 // with T : Int and U : Int.
 TEST(TypeRefTest, UniqueAfterSubstitution) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   std::string MangledIntName("Si");
   auto NominalInt = Builder.createNominalType(MangledIntName,
@@ -348,7 +408,7 @@ TEST(TypeRefTest, UniqueAfterSubstitution) {
 
 // Make sure subst() and isConcrete() walk into parent types
 TEST(TypeRefTest, NestedTypes) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
 
@@ -379,7 +439,7 @@ TEST(TypeRefTest, NestedTypes) {
 }
 
 TEST(TypeRefTest, DeriveSubstitutions) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
   auto GTP01 = Builder.createGenericTypeParameterType(0, 1);
@@ -390,8 +450,8 @@ TEST(TypeRefTest, DeriveSubstitutions) {
                                                /*parent*/ nullptr);
 
   auto Result = Builder.createTupleType({GTP00, GTP01}, "", false);
-  auto Func = Builder.createFunctionType({Nominal}, {}, Result,
-                                         FunctionTypeFlags());
+  auto Func =
+      Builder.createFunctionType({Nominal}, Result, FunctionTypeFlags());
 
   std::string SubstOneName("subst1");
   auto SubstOne = Builder.createNominalType(SubstOneName, /*parent*/ nullptr);

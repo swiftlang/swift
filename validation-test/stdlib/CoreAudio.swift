@@ -160,9 +160,8 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/AssociatedTypes") {
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: IndexingIterator<Subject>.self,
-    subSequenceType: MutableRandomAccessSlice<Subject>.self,
+    subSequenceType: Slice<Subject>.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 }
 
@@ -202,7 +201,7 @@ CoreAudioTestSuite.test(
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.count") {
   let sizeInBytes = AudioBufferList.sizeInBytes(maximumBuffers: 16)
   let rawPtr = UnsafeMutableRawPointer.allocate(
-    bytes: sizeInBytes, alignedTo: MemoryLayout<AudioBufferList>.alignment)
+    byteCount: sizeInBytes, alignment: MemoryLayout<AudioBufferList>.alignment)
   let ablPtr = rawPtr.bindMemory(to: AudioBufferList.self,
     capacity: sizeInBytes / MemoryLayout<AudioBufferList>.stride)
 
@@ -218,15 +217,14 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.count") {
   ablPtrWrapper.count = 0x7765_4321
   expectEqual(0x7765_4321, rawPtr.load(as: UInt32.self))
 
-  rawPtr.deallocate(
-    bytes: sizeInBytes, alignedTo: MemoryLayout<AudioBufferList>.alignment)
+  rawPtr.deallocate()
 }
 
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)") {
   let sizeInBytes = AudioBufferList.sizeInBytes(maximumBuffers: 16)
 
   let rawPtr = UnsafeMutableRawPointer.allocate(
-    bytes: sizeInBytes, alignedTo: 1)
+    byteCount: sizeInBytes, alignment: 1)
 
   let ablPtr = rawPtr.bindMemory(
     to: AudioBufferList.self,
@@ -268,7 +266,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
     expectEqual(audioBuffer.mData, audioBufferPtr.pointee.mData)
   }
 
-  ablPtr.deallocate(capacity: sizeInBytes)
+  ablPtr.deallocate()
 }
 
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)/trap") {
@@ -303,4 +301,3 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/Collection") {
 }
 
 runAllTests()
-

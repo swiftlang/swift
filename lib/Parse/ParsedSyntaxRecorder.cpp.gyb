@@ -1,0 +1,175 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From ParsedSyntaxRecorder.cpp.gyb.
+//// Do Not Edit Directly!
+//===--- ParsedSyntaxRecorder.cpp - Parsed Syntax Recorder ----------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Parse/ParsedSyntaxRecorder.h"
+#include "swift/Parse/ParsedRawSyntaxRecorder.h"
+#include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Syntax/SyntaxFactory.h"
+
+using namespace swift;
+using namespace swift::syntax;
+
+bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
+        MutableArrayRef<ParsedRawSyntaxNode> Elements,
+        function_ref<void(syntax::SyntaxKind, MutableArrayRef<ParsedRawSyntaxNode>)> receiver) {
+  switch (Kind) {
+% for node in SYNTAX_NODES:
+  case SyntaxKind::${node.syntax_kind}: {
+% if node.children:
+%   child_count = len(node.children)
+    ParsedRawSyntaxNode Layout[${child_count}];
+    unsigned I = 0;
+%   for (child_idx, child) in enumerate(node.children):
+    // child[${child_idx}] ${child.name}
+    if (I == Elements.size() ||
+        !${check_parsed_child_condition_raw(child)}(Elements[I])) {
+%     if child.is_optional:
+      Layout[${child_idx}] = ParsedRawSyntaxNode::null();
+%     else:
+      for (unsigned i = 0, e = ${child_count}; i != e; ++i)
+        Layout[i].reset();
+      return false;
+%     end
+    } else {
+      Layout[${child_idx}] = Elements[I].unsafeCopy();
+      ++I;
+    }
+%   end
+    if (I != Elements.size()) {
+      for (unsigned i = 0, e = ${child_count}; i != e; ++i)
+        Layout[i].reset();
+      return false;
+    }
+    receiver(Kind, Layout);
+    for (unsigned i = 0, e = Elements.size(); i != e; ++i)
+      Elements[i].reset();
+    return true;
+% elif node.is_syntax_collection():
+    for (auto &E : Elements) {
+      if (!SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind::${node.syntax_kind}, E.getKind()))
+        return false;
+    }
+    receiver(Kind, Elements);
+    return true;
+% else:
+    return false;
+% end
+  }
+% end
+  default:
+    return false;
+  }
+}
+
+% for node in SYNTAX_NODES:
+%   if node.children:
+%     child_params = []
+%     child_move_args = []
+%     for child in node.children:
+%         param_type = "Parsed%s" % child.type_name
+%         if child.is_optional:
+%            param_type = "Optional<%s>" % param_type
+%         child_params.append("%s %s" % (param_type, child.name))
+%         child_move_args.append("std::move(%s)" % (child.name))
+%     child_params = ', '.join(child_params)
+%     child_move_args = ', '.join(child_move_args)
+Parsed${node.name}
+ParsedSyntaxRecorder::record${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout,
+                                       ParsedRawSyntaxRecorder &rec) {
+  auto raw = rec.recordRawSyntax(SyntaxKind::${node.syntax_kind}, layout);
+  return Parsed${node.name}(std::move(raw));
+}
+
+Parsed${node.name}
+ParsedSyntaxRecorder::defer${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout, SyntaxParsingContext &SPCtx) {
+  auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, layout, SPCtx);
+  return Parsed${node.name}(std::move(raw));
+}
+
+Parsed${node.name}
+ParsedSyntaxRecorder::make${node.syntax_kind}(${child_params},
+    SyntaxParsingContext &SPCtx) {
+  ParsedRawSyntaxNode layout[] = {
+%     for child in node.children:
+%       if child.is_optional:
+    ${child.name}.hasValue() ? ${child.name}->takeRaw() : ParsedRawSyntaxNode::null(),
+%       else:
+    ${child.name}.takeRaw(),
+%       end
+%     end
+  };
+  if (SPCtx.shouldDefer())
+    return defer${node.syntax_kind}(layout, SPCtx);
+  return record${node.syntax_kind}(layout, SPCtx.getRecorder());
+}
+
+%   elif node.is_syntax_collection():
+Parsed${node.name}
+ParsedSyntaxRecorder::record${node.syntax_kind}(
+    MutableArrayRef<ParsedRawSyntaxNode> layout,
+    ParsedRawSyntaxRecorder &rec) {
+  auto raw = rec.recordRawSyntax(SyntaxKind::${node.syntax_kind}, layout);
+  return Parsed${node.name}(std::move(raw));
+}
+
+Parsed${node.name}
+ParsedSyntaxRecorder::defer${node.syntax_kind}(
+    MutableArrayRef<ParsedRawSyntaxNode> layout,
+    SyntaxParsingContext &SPCtx) {
+  auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind},
+                             layout, SPCtx);
+  return Parsed${node.name}(std::move(raw));
+}
+
+Parsed${node.name}
+ParsedSyntaxRecorder::make${node.syntax_kind}(
+    MutableArrayRef<Parsed${node.collection_element_type}> elements,
+    SyntaxParsingContext &SPCtx) {
+  SmallVector<ParsedRawSyntaxNode, 16> layout;
+  layout.reserve(elements.size());
+  for (auto &element : elements) {
+    layout.push_back(element.takeRaw());
+  }
+  if (SPCtx.shouldDefer())
+    return defer${node.syntax_kind}(layout, SPCtx);
+  return record${node.syntax_kind}(layout, SPCtx.getRecorder());
+}
+
+Parsed${node.name}
+ParsedSyntaxRecorder::makeBlank${node.syntax_kind}(SourceLoc loc,
+        SyntaxParsingContext &SPCtx) {
+  ParsedRawSyntaxNode raw;
+  if (SPCtx.shouldDefer()) {
+    // FIXME: 'loc' is not preserved when capturing a deferred layout.
+    raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, {}, SPCtx);
+  } else {
+    raw = SPCtx.getRecorder().recordEmptyRawSyntaxCollection(SyntaxKind::${node.syntax_kind}, loc);
+  }
+  return Parsed${node.name}(std::move(raw));
+}
+%   end
+% end
+
+ParsedTupleTypeElementSyntax
+ParsedSyntaxRecorder::makeTupleTypeElement(ParsedTypeSyntax Type,
+                                    llvm::Optional<ParsedTokenSyntax> TrailingComma,
+                                    SyntaxParsingContext &SPCtx) {
+  return makeTupleTypeElement(None, None, None, None, std::move(Type), None, None,
+                              std::move(TrailingComma), SPCtx);
+}

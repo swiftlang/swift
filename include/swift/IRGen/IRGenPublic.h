@@ -14,9 +14,12 @@
 
 namespace llvm {
   class LLVMContext;
+  template<typename T, unsigned N> class SmallVector;
 }
 
 namespace swift {
+class ASTContext;
+class LinkLibrary;
 class SILModule;
 
 namespace irgen {
@@ -26,10 +29,15 @@ class IRGenModule;
 
 /// Create an IRGen module.
 std::pair<IRGenerator *, IRGenModule *>
-createIRGenModule(SILModule *SILMod, llvm::LLVMContext &LLVMContext);
+createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
+                  StringRef MainInputFilenameForDebugInfo,
+                  StringRef PrivateDiscriminator);
 
 /// Delete the IRGenModule and IRGenerator obtained by the above call.
 void deleteIRGenModule(std::pair<IRGenerator *, IRGenModule *> &Module);
+
+/// Gets the ABI version number that'll be set as a flag in the module.
+uint32_t getSwiftABIVersion();
 
 } // end namespace irgen
 } // end namespace swift

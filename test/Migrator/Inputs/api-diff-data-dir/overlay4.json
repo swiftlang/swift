@@ -1,0 +1,13 @@
+[
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@F@barGlobalFuncOldName",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "barGlobalFuncNewSwift4OverlayName(newlabel:)",
+    "ModuleName": "bar"
+  }
+]

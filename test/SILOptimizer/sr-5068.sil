@@ -1,0 +1,135 @@
+// RUN: %target-sil-opt %s -sil-combine | %FileCheck %s
+
+// REQUIRES: PTRSIZE=64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class UIViewController {
+}
+
+class ExternalFramework {
+  func objects<T>(_ type: T.Type) -> Results<T> where T : Object
+}
+
+class Object {
+}
+
+final class Results<T: Object> {
+}
+
+public protocol ReadonlyExternalFramework {
+  func objects<T>(_ type: T.Type) -> Results<T> where T : Object
+}
+
+extension ExternalFramework : ReadonlyExternalFramework {
+}
+
+public enum ExternalFrameworkProvider {
+  static func readonly() -> ReadonlyExternalFramework
+}
+
+public enum ModelDataService {
+  public static func getCurrent(from ExternalFramework: ReadonlyExternalFramework) -> Model?
+  public static func count(in ExternalFramework: ReadonlyExternalFramework) -> Int
+}
+
+var events: [String]
+
+var currentModel: Model { get }
+
+public class Model : Object {
+  @_hasStorage var id: Int { get set }
+  override init()
+  init(value: Any)
+  deinit
+}
+
+sil @ExternalFrameworkInit : $@convention(method) (@thick ExternalFramework.Type) -> (@owned ExternalFramework, @error Error)
+
+sil @ResultsCountGetter : $@convention(method) <τ_0_0 where τ_0_0 : Object> (@guaranteed Results<τ_0_0>) -> Int
+
+sil @GetRawPointer : $@convention(thin) () -> Builtin.RawPointer
+
+sil @GetOptionalModel : $@convention(method) (@in ReadonlyExternalFramework, @thin ModelDataService.Type) -> @owned Optional<Model>
+
+// CHECK-LABEL: sil hidden @BuggyFunction : $@convention(thin) () -> @owned Model {
+// CHECK: [[ALLOC:%.*]] = alloc_stack $ReadonlyExternalFramework, let, name "ExternalFramework"
+// CHECK-NEXT: [[INITE:%.*]] = init_existential_addr [[ALLOC]] : $*ReadonlyExternalFramework, $ExternalFramework
+// CHECK: [[TALLOC1:%.*]] = alloc_stack $ReadonlyExternalFramework
+// CHECK-NEXT: copy_addr [[ALLOC]] to [initialization] [[TALLOC1]] : $*ReadonlyExternalFramework
+// CHECK-NEXT: apply {{%.*}}([[TALLOC1]], {{%.*}}) : $@convention(method) (@in ReadonlyExternalFramework, @thin ModelDataService.Type) -> @owned Optional<Model>
+// CHECK: [[TALLOC2:%.*]] = alloc_stack $ReadonlyExternalFramework
+// CHECK-NEXT: copy_addr [[ALLOC]] to [initialization] [[TALLOC2]] : $*ReadonlyExternalFramework
+// CHECK-NEXT: destroy_addr [[ALLOC]]
+// CHECK: [[OEADDR:%.*]] = open_existential_addr immutable_access [[TALLOC2]] : $*ReadonlyExternalFramework
+sil hidden @BuggyFunction : $@convention(thin) () -> @owned Model {
+bb0:
+  %0 = alloc_stack $ReadonlyExternalFramework, let, name "ExternalFramework" // users: %1, %166, %72, %163, %71, %168, %10
+  %1 = init_existential_addr %0 : $*ReadonlyExternalFramework, $ExternalFramework // user: %6
+  // function_ref ExternalFramework.__allocating_init()
+  %2 = function_ref @ExternalFrameworkInit : $@convention(method) (@thick ExternalFramework.Type) -> (@owned ExternalFramework, @error Error) // user: %4
+  %3 = metatype $@thick ExternalFramework.Type                // user: %4
+  try_apply %2(%3) : $@convention(method) (@thick ExternalFramework.Type) -> (@owned ExternalFramework, @error Error), normal bb1, error bb2 // id: %4
+
+// %5                                             // user: %6
+bb1(%5 : $ExternalFramework):                                 // Preds: bb0
+  store %5 to %1 : $*ExternalFramework                        // id: %6
+  // function_ref static ModelDataService.getCurrent(from:)
+  %7 = function_ref @GetOptionalModel : $@convention(method) (@in ReadonlyExternalFramework, @thin ModelDataService.Type) -> @owned Optional<Model> // user: %11
+  %8 = metatype $@thin ModelDataService.Type      // user: %11
+  %9 = alloc_stack $ReadonlyExternalFramework                 // users: %12, %11, %10
+  copy_addr %0 to [initialization] %9 : $*ReadonlyExternalFramework // id: %10
+  %11 = apply %7(%9, %8) : $@convention(method) (@in ReadonlyExternalFramework, @thin ModelDataService.Type) -> @owned Optional<Model> // user: %13
+  dealloc_stack %9 : $*ReadonlyExternalFramework              // id: %12
+  switch_enum %11 : $Optional<Model>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb3 // id: %13
+
+// %14                                            // user: %15
+bb2(%14 : $Error):                                // Preds: bb0
+  %15 = builtin "unexpectedError"(%14 : $Error) : $()
+  unreachable                                     // id: %16
+
+bb3:                                              // Preds: bb1
+  // function_ref events.unsafeMutableAddressor
+  %17 = function_ref @GetRawPointer : $@convention(thin) () -> Builtin.RawPointer // user: %18
+  %18 = apply %17() : $@convention(thin) () -> Builtin.RawPointer // user: %19
+  %19 = pointer_to_address %18 : $Builtin.RawPointer to [strict] $*Array<String> // users: %158, %156, %152, %151
+  %70 = alloc_stack $ReadonlyExternalFramework                // users: %106, %99, %73, %107, %71
+  copy_addr %0 to [initialization] %70 : $*ReadonlyExternalFramework // id: %71
+  destroy_addr %0 : $*ReadonlyExternalFramework               // id: %72
+  debug_value_addr %70 : $*ReadonlyExternalFramework, let, name "ExternalFramework", argno 1 // id: %73
+  %75 = integer_literal $Builtin.Word, 1          // user: %78
+  %76 = integer_literal $Builtin.Int64, 1         // user: %77
+  %77 = struct $Int (%76 : $Builtin.Int64)        // user: %81
+  %78 = alloc_ref [tail_elems $Any * %75 : $Builtin.Word] $_ContiguousArrayStorage<Any> // user: %81
+  %79 = metatype $@thin Array<Any>.Type           // user: %81
+  %99 = open_existential_addr immutable_access %70 : $*ReadonlyExternalFramework to $*@opened("ED59E038-AA25-11E7-9DEA-685B3593C496") ReadonlyExternalFramework // users: %102, %102, %100
+  %100 = witness_method $@opened("ED59E038-AA25-11E7-9DEA-685B3593C496") ReadonlyExternalFramework, #ReadonlyExternalFramework.objects : <Self where Self : ReadonlyExternalFramework><T where T : Object> (Self) -> (T.Type) -> Results<T>, %99 : $*@opened("ED59E038-AA25-11E7-9DEA-685B3593C496") ReadonlyExternalFramework : $@convention(witness_method: ReadonlyExternalFramework) <τ_0_0 where τ_0_0 : ReadonlyExternalFramework><τ_1_0 where τ_1_0 : Object> (@thick τ_1_0.Type, @in_guaranteed τ_0_0) -> @owned Results<τ_1_0> // type-defs: %99; user: %102
+  %101 = metatype $@thick Model.Type              // user: %102
+  %102 = apply %100<@opened("ED59E038-AA25-11E7-9DEA-685B3593C496") ReadonlyExternalFramework, Model>(%101, %99) : $@convention(witness_method: ReadonlyExternalFramework) <τ_0_0 where τ_0_0 : ReadonlyExternalFramework><τ_1_0 where τ_1_0 : Object> (@thick τ_1_0.Type, @in_guaranteed τ_0_0) -> @owned Results<τ_1_0> // type-defs: %99; users: %105, %104
+  // function_ref Results.count.getter
+  %103 = function_ref @ResultsCountGetter : $@convention(method) <τ_0_0 where τ_0_0 : Object> (@guaranteed Results<τ_0_0>) -> Int // user: %104
+  %104 = apply %103<Model>(%102) : $@convention(method) <τ_0_0 where τ_0_0 : Object> (@guaranteed Results<τ_0_0>) -> Int // user: %108
+  strong_release %102 : $Results<Model>           // id: %105
+  destroy_addr %70 : $*ReadonlyExternalFramework              // id: %106
+  dealloc_stack %70 : $*ReadonlyExternalFramework             // id: %107
+  %159 = tuple ()
+  %160 = alloc_ref [objc] $Model                  // users: %162, %161
+  dealloc_stack %0 : $*ReadonlyExternalFramework              // id: %163
+  br bb5(%160 : $Model)                           // id: %164
+
+// %165                                           // users: %169, %167
+bb4(%165 : $Model):                               // Preds: bb1
+  destroy_addr %0 : $*ReadonlyExternalFramework               // id: %166
+  debug_value %165 : $Model, let, name "user"     // id: %167
+  dealloc_stack %0 : $*ReadonlyExternalFramework              // id: %168
+  br bb5(%165 : $Model)                           // id: %169
+
+// %170                                           // user: %171
+bb5(%170 : $Model):                               // Preds: bb3 bb4
+  return %170 : $Model                            // id: %171
+} // end sil function 'BuggyFunction'
+

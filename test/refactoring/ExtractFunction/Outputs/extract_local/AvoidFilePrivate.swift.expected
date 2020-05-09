@@ -1,0 +1,18 @@
+func returnFifteen() -> Int {
+  var y = 10
+  func new_name() {
+if y > 50 {
+      print("bigger than 50")
+    } else {
+      print("less")
+    }
+}
+
+func add() {
+    y += 5
+    new_name()
+  }
+  add()
+  return y
+}
+

@@ -20,9 +20,9 @@ namespace sourcekitd {
 
 class CompactArrayBuilderImpl {
 public:
-  std::unique_ptr<llvm::MemoryBuffer> createBuffer() const;
+  std::unique_ptr<llvm::MemoryBuffer> createBuffer(CustomBufferKind Kind) const;
   void appendTo(llvm::SmallVectorImpl<char> &Buf) const;
-
+  unsigned copyInto(char *BufPtr) const;
   size_t sizeInBytes() const;
   bool empty() const;
 
@@ -102,7 +102,9 @@ protected:
   CompactArrayReaderImpl(void *Buf) : Buf(Buf) {}
 
   uint64_t getEntriesBufSize() const {
-    return *(uint64_t*)Buf;
+    uint64_t result;
+    std::memcpy(&result, Buf, sizeof result);
+    return result;
   }
   const uint8_t *getEntriesBufStart() const {
     return (const uint8_t *)(((uint64_t*)Buf)+1);
@@ -190,7 +192,9 @@ VariantFunctions CompactVariantFuncs<T>::Funcs = {
   nullptr/*Annot_string_get_length*/,
   nullptr/*Annot_string_get_ptr*/,
   nullptr/*Annot_int64_get_value*/,
-  nullptr/*Annot_uid_get_value*/
+  nullptr/*Annot_uid_get_value*/,
+  nullptr/*Annot_data_get_size*/,
+  nullptr/*Annot_data_get_ptr*/,
 };
 
 template <typename T>
@@ -235,7 +239,9 @@ VariantFunctions CompactArrayFuncs<T>::Funcs = {
   nullptr/*AnnotArray_string_get_length*/,
   nullptr/*AnnotArray_string_get_ptr*/,
   nullptr/*AnnotArray_int64_get_value*/,
-  nullptr/*AnnotArray_uid_get_value*/
+  nullptr/*AnnotArray_uid_get_value*/,
+  nullptr/*Annot_data_get_size*/,
+  nullptr/*Annot_data_get_ptr*/,
 };
 
 }

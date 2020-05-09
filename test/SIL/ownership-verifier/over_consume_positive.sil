@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -enable-sil-verify-all=0 -module-name Swift -o /dev/null %s 2>&1
+// REQUIRES: asserts
+
+// This file is meant to contain tests that previously the verifier treated
+// incorrectly. This is important to ensure that the verifier does not
+// regress. It should only deal with dataflow over consuming failures.
+
+sil_stage canonical
+
+import Builtin
+
+enum FakeOptional<T> {
+case some(T)
+case none
+}
+
+class Klass {
+}
+
+sil [ossa] @klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+
+sil [ossa] @guaranteed_is_not_owned_use : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = function_ref @klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %1 : $Klass
+  %4 = apply %2(%3) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  destroy_value %3 : $FakeOptional<Klass>
+  %9999 = tuple()
+  return %9999 : $()
+}

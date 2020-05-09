@@ -21,7 +21,6 @@ TYPEREF(Nominal, TypeRef)
 TYPEREF(BoundGeneric, TypeRef)
 TYPEREF(Tuple, TypeRef)
 TYPEREF(Function, TypeRef)
-TYPEREF(Protocol, TypeRef)
 TYPEREF(ProtocolComposition, TypeRef)
 TYPEREF(Metatype, TypeRef)
 TYPEREF(ExistentialMetatype, TypeRef)
@@ -29,10 +28,12 @@ TYPEREF(GenericTypeParameter, TypeRef)
 TYPEREF(DependentMember, TypeRef)
 TYPEREF(ForeignClass, TypeRef)
 TYPEREF(ObjCClass, TypeRef)
+TYPEREF(ObjCProtocol, TypeRef)
 TYPEREF(Opaque, TypeRef)
-TYPEREF(UnownedStorage, TypeRef)
-TYPEREF(UnmanagedStorage, TypeRef)
-TYPEREF(WeakStorage, TypeRef)
+TYPEREF(OpaqueArchetype, TypeRef)
+#define REF_STORAGE(Name, ...) \
+  TYPEREF(Name##Storage, TypeRef)
+#include "swift/AST/ReferenceStorage.def"
 TYPEREF(SILBox, TypeRef)
 
 #undef TYPEREF

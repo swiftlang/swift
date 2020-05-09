@@ -18,7 +18,7 @@ import Darwin
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/recommendedover[Foo3, Foo2]:    FooStruct4[#FooStruct4#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]:    FooStruct5[#FooStruct5#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/recommendedover[ro1, ro2, ro3, ro4]/recommended[r1, r2, r3]/keyword[k1, k2, k3, k4]:    FooStruct6[#FooStruct6#]{{; name=.+$}}
-// CLANG_CTYPES-DAG: Decl[TypeAlias]/OtherModule[ctypes]: FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
+// CLANG_CTYPES-DAG: Decl[TypeAlias]/OtherModule[ctypes]/keyword[Foo2]: FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
 // CLANG_CTYPES: End completions
 
 // CLANG_MACROS: Begin completions
@@ -59,7 +59,8 @@ func testCompleteModuleQualifiedMacros1() {
 func testClangMember1() {
 	var FS = FooStruct1()
 	FS.#^CLANG_MEMBER1^#
-// CLANG_MEMBERS1: Begin completions, 2 items
+// CLANG_MEMBERS1: Begin completions, 3 items
 // CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/keyword[x, Struct1]/recommended[y]: x[#Int32#]{{; name=.+$}}
 // CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/keyword[y, Struct1]/recommendedover[x]: y[#Double#]{{; name=.+$}}
+// CLANG_MEMBERS1-DAG: Keyword[self]/CurrNominal: self[#FooStruct1#]; name=self
 }

@@ -1,55 +1,19 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %s -enable-objc-interop -disable-type-layout -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: objc_interop
 
 import Builtin
 
 // ObjC payloads can be nullable too.
 enum NullableObjCRefcounted {
-  case Ref(Builtin.UnknownObject)
+  case Ref(Builtin.AnyObject)
   case None
 }
-// CHECK-LABEL: define linkonce_odr hidden void @_T039enum_value_semantics_special_cases_objc22NullableObjCRefcountedOwxx(%swift.opaque* noalias %object, %swift.type* %NullableObjCRefcounted) {{.*}} {
+// CHECK-LABEL: define internal void @"$s39enum_value_semantics_special_cases_objc22NullableObjCRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %NullableObjCRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO* %0 to %objc_object**
 // CHECK:   %2 = load %objc_object*, %objc_object** %1, align 8
-// CHECK:   call void @swift_unknownRelease(%objc_object* %2) {{#[0-9]+}}
+// CHECK:   call void @swift_unknownObjectRelease(%objc_object* %2) {{#[0-9]+}}
 // CHECK:   ret void
 // CHECK: }
-
-class C {}
-sil_vtable C {}
-
-sil @_T039enum_value_semantics_special_cases_objc1CCfD : $@convention(method) (C) -> ()
-
-enum AllMixedRefcounted {
-  case Ref(Builtin.NativeObject)
-  case CRef(C)
-  case ORef(Builtin.UnknownObject)
-  case None
-}
-
-// CHECK-LABEL: define linkonce_odr hidden void @_T039enum_value_semantics_special_cases_objc18AllMixedRefcountedOwxx(%swift.opaque* noalias %object, %swift.type* %AllMixedRefcounted) {{.*}} {
-// CHECK: entry:
-// CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO*
-// CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO* %0 to i64*
-// CHECK:   %2 = load i64, i64* %1, align 8
-// --                         0x3fffffffffffffff
-// CHECK:   %3 = and i64 %2, 4611686018427387903
-// CHECK:   %4 = inttoptr i64 %3 to %objc_object*
-// CHECK:   call void @swift_unknownRelease(%objc_object* %4) {{#[0-9]+}}
-// CHECK:   ret void
-// CHECK: }
-
-enum AllMixedRefcountedTwoSimple {
-  case Ref(Builtin.NativeObject)
-  case CRef(C)
-  case ORef(Builtin.UnknownObject)
-  case None
-  case Nothing
-}
-
-// CHECK-LABEL: define linkonce_odr hidden void @_T039enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOwxx
-// CHECK:   call void @_T039enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWy

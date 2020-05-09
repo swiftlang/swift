@@ -1,11 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
-
-import gizmo
-
-// TODO: Generic base classes
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // Test for compilation order independence
 class C : B {
@@ -23,16 +16,15 @@ class C : B {
   func mopsy() {}
 }
 // CHECK: sil_vtable C {
-// CHECK:   #A.foo!1: {{.*}} : _T07vtables1BC3foo{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.bar!1: {{.*}} : _T07vtables1CC3bar{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.bas!1: {{.*}} : _T07vtables1AC3bas{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.qux!1: {{.*}} : _T07vtables1CC3qux{{[_0-9a-zA-Z]*}}F
-// CHECK:   #B.init!allocator.1: {{.*}} : _T07vtables1CC{{[_0-9a-zA-Z]*}}fC
-// CHECK:   #B.init!initializer.1: {{.*}} : _T07vtables1CC{{[_0-9a-zA-Z]*}}fc
-// CHECK:   #B.zim!1: {{.*}} : _T07vtables1BC3zim{{[_0-9a-zA-Z]*}}F
-// CHECK:   #B.zang!1: {{.*}} : _T07vtables1CC4zang{{[_0-9a-zA-Z]*}}F
-// CHECK:   #C.flopsy!1: {{.*}} : _T07vtables1CC6flopsy{{[_0-9a-zA-Z]*}}F
-// CHECK:   #C.mopsy!1: {{.*}} : _T07vtables1CC5mopsy{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.foo: {{.*}} : @$s7vtables1BC3foo{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.bar: {{.*}} : @$s7vtables1CC3bar{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.bas: {{.*}} : @$s7vtables1AC3bas{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.qux: {{.*}} : @$s7vtables1CC3qux{{[_0-9a-zA-Z]*}}F
+// CHECK:   #B.init!allocator: {{.*}} : @$s7vtables1CC{{[_0-9a-zA-Z]*}}fC
+// CHECK:   #B.zim: {{.*}} : @$s7vtables1BC3zim{{[_0-9a-zA-Z]*}}F
+// CHECK:   #B.zang: {{.*}} : @$s7vtables1CC4zang{{[_0-9a-zA-Z]*}}F
+// CHECK:   #C.flopsy: {{.*}} : @$s7vtables1CC6flopsy{{[_0-9a-zA-Z]*}}F
+// CHECK:   #C.mopsy: {{.*}} : @$s7vtables1CC5mopsy{{[_0-9a-zA-Z]*}}F
 // CHECK: }
 
 class A {
@@ -43,11 +35,11 @@ class A {
 }
 
 // CHECK: sil_vtable A {
-// CHECK:   #A.foo!1: {{.*}} : _T07vtables1AC3foo{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.bar!1: {{.*}} : _T07vtables1AC3bar{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.bas!1: {{.*}} : _T07vtables1AC3bas{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.qux!1: {{.*}} : _T07vtables1AC3qux{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.init!initializer.1: {{.*}} : _T07vtables1AC{{[_0-9a-zA-Z]*}}fc
+// CHECK:   #A.foo: {{.*}} : @$s7vtables1AC3foo{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.bar: {{.*}} : @$s7vtables1AC3bar{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.bas: {{.*}} : @$s7vtables1AC3bas{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.qux: {{.*}} : @$s7vtables1AC3qux{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.init!allocator: {{.*}} : @$s7vtables1AC{{[_0-9a-zA-Z]*}}fC
 // CHECK: }
 
 class B : A {
@@ -63,77 +55,18 @@ class B : A {
 }
 
 // CHECK: sil_vtable B {
-// CHECK:   #A.foo!1: {{.*}} : _T07vtables1BC3foo{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.bar!1: {{.*}} : _T07vtables1AC3bar{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.bas!1: {{.*}} : _T07vtables1AC3bas{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.qux!1: {{.*}} : _T07vtables1BC3qux{{[_0-9a-zA-Z]*}}F
-// CHECK:   #B.init!allocator.1: {{.*}} : _T07vtables1BC{{[_0-9a-zA-Z]*}}fC
-// CHECK:   #B.init!initializer.1: {{.*}} : _T07vtables1BC{{[_0-9a-zA-Z]*}}fc
-// CHECK:   #B.zim!1: {{.*}} : _T07vtables1BC3zim{{[_0-9a-zA-Z]*}}F
-// CHECK:   #B.zang!1: {{.*}} : _T07vtables1BC4zang{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.foo: {{.*}} : @$s7vtables1BC3foo{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.bar: {{.*}} : @$s7vtables1AC3bar{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.bas: {{.*}} : @$s7vtables1AC3bas{{[_0-9a-zA-Z]*}}F
+// CHECK:   #A.qux: {{.*}} : @$s7vtables1BC3qux{{[_0-9a-zA-Z]*}}F
+// CHECK:   #B.init!allocator: {{.*}} : @$s7vtables1BC{{[_0-9a-zA-Z]*}}fC
+// CHECK:   #B.zim: {{.*}} : @$s7vtables1BC3zim{{[_0-9a-zA-Z]*}}F
+// CHECK:   #B.zang: {{.*}} : @$s7vtables1BC4zang{{[_0-9a-zA-Z]*}}F
 // CHECK: }
-
-// Test ObjC base class
-
-class Hoozit : Gizmo {
-  // Overrides Gizmo.frob
-  override func frob() {}
-  // Overrides Gizmo.funge
-  override func funge() {}
-
-  func anse() {}
-  func incorrige() {}
-}
-
-// Entries only exist for native Swift methods
-
-// CHECK: sil_vtable Hoozit {
-// CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : _T07vtables6HoozitC4anse{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : _T07vtables6HoozitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : _T07vtables6HoozitCSQyACGycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T07vtables6HoozitCSQyACGSi7bellsOn_tcfc
-// CHECK-NEXT:   #Hoozit.deinit!deallocator: _T07vtables6HoozitCfD
-// CHECK-NEXT: }
-
-class Wotsit : Hoozit {
-  override func funge() {}
-  override func incorrige() {}
-}
-
-// CHECK: sil_vtable Wotsit {
-// CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : _T07vtables6HoozitC4anse{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : _T07vtables6WotsitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit! : _T07vtables6WotsitCSQyACGycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit! : _T07vtables6WotsitCSQyACGSi7bellsOn_tcfc
-// CHECK-NEXT:   #Wotsit.deinit!deallocator: _T07vtables6WotsitCfD
-// CHECK-NEXT: }
-
-// <rdar://problem/15282548>
-// CHECK: sil_vtable Base {
-// CHECK:   #Base.init!initializer.1: {{.*}} : _T07vtables4BaseC{{[_0-9a-zA-Z]*}}fc
-// CHECK: }
-// CHECK: sil_vtable Derived {
-// CHECK:   #Base.init!initializer.1: {{.*}} : _T07vtables7DerivedC{{[_0-9a-zA-Z]*}}fc
-// CHECK: }
-@objc class Base {}
-
-extension Base {
-  // note: does not have a vtable slot, because it is from an extension
-  func identify() -> Int {
-    return 0
-  }
-}
-
-class Derived : Base {
-  override func identify() -> Int {
-    return 1
-  }
-}
 
 // CHECK: sil_vtable RequiredInitDerived {
-// CHECK-NEXT: #SimpleInitBase.init!initializer.1: {{.*}} : _T07vtables19RequiredInitDerivedC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NEXT: #RequiredInitDerived.init!allocator.1: {{.*}} : _T07vtables19RequiredInitDerivedC
-// CHECK-NEXT: #RequiredInitDerived.deinit!deallocator: _T07vtables19RequiredInitDerivedCfD
+// CHECK-NEXT: #SimpleInitBase.init!allocator: {{.*}} : @$s7vtables19RequiredInitDerivedC{{[_0-9a-zA-Z]*}}fC
+// CHECK-NEXT: #RequiredInitDerived.deinit!deallocator: @$s7vtables19RequiredInitDerivedCfD
 // CHECK-NEXT: }
 
 class SimpleInitBase { }
@@ -170,7 +103,7 @@ class DerivedWithoutDefaults : BaseWithDefaults {
 // CHECK:         #Observed.x!setter
 
 // CHECK-LABEL: sil_vtable DerivedWithoutDefaults {
-// CHECK:         #BaseWithDefaults.a!1: {{.*}} : _T07vtables22DerivedWithoutDefaultsC1a{{[_0-9a-zA-Z]*}}F
+// CHECK:         #BaseWithDefaults.a: {{.*}} : @$s7vtables22DerivedWithoutDefaultsC1a{{[_0-9a-zA-Z]*}}F
 
 
 
@@ -182,7 +115,7 @@ class SubscriptAsFunction {
 
 // CHECK-LABEL: sil_vtable SubscriptAsFunction {
 // CHECK-NOT:     #SubscriptAsFunction.subscript
-// CHECK:         #SubscriptAsFunction.`subscript`!1
+// CHECK:         #SubscriptAsFunction.`subscript`:
 
 
 class DeinitAsFunction {
@@ -190,5 +123,5 @@ class DeinitAsFunction {
 }
 
 // CHECK-LABEL: sil_vtable DeinitAsFunction {
-// CHECK:         #DeinitAsFunction.`deinit`!1
+// CHECK:         #DeinitAsFunction.`deinit`:
 // CHECK:         #DeinitAsFunction.deinit!deallocator

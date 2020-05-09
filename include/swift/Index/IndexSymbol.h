@@ -20,6 +20,7 @@
 namespace swift {
 class Decl;
 class ValueDecl;
+class ModuleEntity;
 enum class AccessorKind;
 
 namespace index {
@@ -65,6 +66,7 @@ struct IndexSymbol : IndexRelation {
   SmallVector<IndexRelation, 3> Relations;
   unsigned line = 0;
   unsigned column = 0;
+  Optional<unsigned> offset;
 
   IndexSymbol() = default;
 
@@ -77,6 +79,7 @@ struct IndexSymbol : IndexRelation {
   }
 };
 
+SymbolInfo getSymbolInfoForModule(ModuleEntity Mod);
 SymbolInfo getSymbolInfoForDecl(const Decl *D);
 SymbolSubKind getSubKindForAccessor(AccessorKind AK);
 bool isLocalSymbol(const Decl *D);

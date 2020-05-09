@@ -17,18 +17,6 @@
 
 namespace swift {
 
-enum class InoutAliasingAssumption {
-  /// Assume that an inout indirect parameter may alias other objects.
-  /// This is the safe assumption an optimization should make if it may break
-  /// memory safety in case the inout aliasing rule is violation.
-  Aliasing,
-
-  /// Assume that an inout indirect parameter cannot alias other objects.
-  /// Optimizations should only use this if they can guarantee that they will
-  /// not break memory safety even if the inout aliasing rule is violated.
-  NotAliasing
-};
-
 /// Conventions for apply operands and function-entry arguments in SIL.
 ///
 /// This is simply a union of ParameterConvention and ResultConvention
@@ -87,20 +75,69 @@ struct SILArgumentConvention {
     return Value <= SILArgumentConvention::Indirect_Out;
   }
 
-  /// Returns true if \p Value is a not-aliasing indirect parameter.
-  /// The \p isInoutAliasing specifies what to assume about the inout
-  /// convention.
-  /// See InoutAliasingAssumption.
-  bool isNotAliasedIndirectParameter(InoutAliasingAssumption isInoutAliasing) {
+  bool isInoutConvention() const {
+    switch (Value) {
+      case SILArgumentConvention::Indirect_Inout:
+      case SILArgumentConvention::Indirect_InoutAliasable:
+        return true;
+      case SILArgumentConvention::Indirect_In_Guaranteed:
+      case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_In_Constant:
+      case SILArgumentConvention::Indirect_Out:
+      case SILArgumentConvention::Direct_Unowned:
+      case SILArgumentConvention::Direct_Owned:
+      case SILArgumentConvention::Direct_Deallocating:
+      case SILArgumentConvention::Direct_Guaranteed:
+        return false;
+    }
+    llvm_unreachable("covered switch isn't covered?!");
+  }
+
+  bool isOwnedConvention() const {
+    switch (Value) {
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Direct_Owned:
+      return true;
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Direct_Guaranteed:
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_In_Constant:
+    case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Deallocating:
+      return false;
+    }
+    llvm_unreachable("covered switch isn't covered?!");
+  }
+
+  bool isGuaranteedConvention() const {
+    switch (Value) {
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Direct_Guaranteed:
+      return true;
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+    case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Direct_Deallocating:
+      return false;
+    }
+    llvm_unreachable("covered switch isn't covered?!");
+  }
+
+  /// Returns true if \p Value is a non-aliasing indirect parameter.
+  bool isExclusiveIndirectParameter() {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In_Guaranteed:
-      return true;
-
     case SILArgumentConvention::Indirect_Inout:
-      return isInoutAliasing == InoutAliasingAssumption::NotAliasing;
+      return true;
 
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Direct_Unowned:

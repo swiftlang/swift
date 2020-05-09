@@ -895,7 +895,7 @@ difficult to serialize.
 
 The index translation problem has two aspects:
 
-  1. `String` views cannot consume one anothers' indices without a cumbersome
+  1. `String` views cannot consume one another's indices without a cumbersome
     conversion step.  An index into a `String`'s `characters` must be translated
     before it can be used as a position in its `unicodeScalars`.  Although these
     translations are rarely needed, they add conceptual and API complexity.
@@ -1188,7 +1188,7 @@ typealias Substring = StringFacade<StringStorage.SubSequence>
 This design would allow us to de-emphasize lower-level `String` APIs such as
 access to the specific encoding, by putting them behind a `.unicode` property.
 A similar effect in a facade-less design would require a new top-level
-`StringProtocol` playing the role of the facade with an an `associatedtype
+`StringProtocol` playing the role of the facade with an `associatedtype
 Storage : Unicode`.
 
 An interesting variation on this design is possible if defaulted generic

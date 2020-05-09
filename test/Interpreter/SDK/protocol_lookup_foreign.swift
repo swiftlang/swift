@@ -6,6 +6,7 @@
 
 // rdar://20990451 is tracking the fix for compiling this test optimized.
 // XFAIL: swift_test_mode_optimize
+// XFAIL: swift_test_mode_optimize_size
 // XFAIL: swift_test_mode_optimize_unchecked
 
 import Foundation

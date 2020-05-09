@@ -4,8 +4,8 @@ enum MSV : Error {
   case Foo, Bar, Baz
   case CarriesInt(Int)
 
-  var domain: String { return "" }
-  var code: Int { return 0 }
+  var _domain: String { return "" }
+  var _code: Int { return 0 }
 }
 
 func opaque_error() -> Error { return MSV.Foo }
@@ -55,6 +55,12 @@ func one() {
 #endif
   } catch {    // don't warn, #if code should be scanned.
   }
+  
+  do {
+    throw opaque_error()
+  } catch MSV.Foo, MSV.CarriesInt(let num) { // expected-error {{'num' must be bound in every pattern}}
+  } catch {
+  }
 }
 
 func takesAutoclosure(_ fn : @autoclosure () -> Int) {}
@@ -86,26 +92,11 @@ func testAutoclosures() throws {
   takesThrowingAutoclosure(genNoError())
 }
 
-struct IllegalContext {
-  var x: Int = genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
-
-  func foo(_ x: Int = genError()) {} // expected-error {{call can throw, but errors cannot be thrown out of a default argument}}
-
-  func catcher() throws {
-    do {
-      _ = try genError()
-    } catch MSV.CarriesInt(genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch pattern}}
-    } catch MSV.CarriesInt(let i) where i == genError() { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}}
-    }
-  }
-}
-
 func illformed() throws {
     do {
       _ = try genError()
 
-    // TODO: this recovery is terrible
-    } catch MSV.CarriesInt(let i) where i == genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}} expected-error {{expected '{'}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{58-58=do }}
+    } catch MSV.CarriesInt(let i) where i == genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}} expected-error {{expected '{'}}
     }
 }
 
@@ -140,3 +131,11 @@ func fixitThrow2() throws {
   throw MSV.Foo
   var _: (Int) throw -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{16-21=throws}}
 }
+
+let fn: () -> throws Void  // expected-error{{'throws' may only occur before '->'}} {{12-12=throws }} {{15-22=}}
+
+// SR-11574
+func fixitTry0<T>(a: T) try where T:ExpressibleByStringLiteral {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{25-28=throws}}
+func fixitTry1<T>(a: T) try {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{25-28=throws}}
+func fixitTry2() try {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{18-21=throws}}
+let fixitTry3 : () try -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{20-23=throws}}

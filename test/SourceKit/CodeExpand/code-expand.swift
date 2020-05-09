@@ -37,6 +37,16 @@ dispatch_after(<#T##when: dispatch_time_t##dispatch_time_t#>, <#T##queue: dispat
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
+@_functionBuilder
+struct MyBuilder {}
+func acceptBuilder<Result>(@MyBuilder body: () -> Result) {}
+do {
+  acceptBuilder(body: <#T##() -> Result#>)
+  // CHECK: acceptBuilder {
+  // CHECK-NEXT: <#code#>
+  // CHECK-NEXT: }
+}
+
 foo(x: <#T##Self.SegueIdentifier -> Void#>)
 // CHECK:      foo { (<#Self.SegueIdentifier#>) in
 
@@ -53,27 +63,45 @@ func f() {
 func f1() {
   bar(<#T##d: () -> ()##() -> ()#>)
 }
-// CHECK-NOT: bar { () -> () in
+// CHECK:      bar {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
+
+func f1() {
+  bar(<#T##__skip__: () -> ()##() -> ()#>, <#T##d: () -> ()##() -> ()#>)
+}
+// CHECK:   bar {
+// CHECK-NEXT:	<#code#>
+// CHECK-NEXT:	} _: {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }
 
 func f1() {
   bar(<#T##d: () -> ()##() -> ()#>, <#T##d: () -> ()##() -> ()#>)
 }
-// CHECK:   bar({
-// CHECK-NEXT:	<#code#>
-// CHECK-NEXT:	}, {
-// CHECK-NEXT:	<#code#>
-// CHECK-NEXT:	})
+// CHECK:   bar {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  } _: {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }
 
+func f1() {
+  bar(a : <#T##__skip__: () -> ()##() -> ()#>, b : <#T##d: () -> ()##() -> ()#>)
+}
+// CHECK: bar {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: } b: {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
 
 func f1() {
   bar(a : <#T##d: () -> ()##() -> ()#>, b : <#T##d: () -> ()##() -> ()#>)
 }
-// CHECK: bar(a : {
+// CHECK: bar {
 // CHECK-NEXT: <#code#>
-// CHECK-NEXT: }, b : {
+// CHECK-NEXT: } b: {
 // CHECK-NEXT: <#code#>
-// CHECK-NEXT: })
-
+// CHECK-NEXT: }
 
 func f1() {
   bar(a : {}}, <#T##d: () -> ()##() -> ()#>)
@@ -81,3 +109,136 @@ func f1() {
 // CHECK: bar(a : {}}, <#T##d: () -> ()##() -> ()#>)
 
 foo(withDuration: 1, animations: <#T##() -> Void#>)
+
+if true {
+  withtrail(<#T##() -> ()#>)
+// CHECK:   withtrail {
+// CHECK-NEXT: <#code#>
+}
+}
+
+foo(.foo(<#T##block: () -> Void##() -> Void#>))
+// CHECK: foo(.foo({
+
+braced1(x: {<#T##() -> Void#>})
+// CHECK:   braced1 {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }
+
+braced2(x: {<#T##() -> Void#>}, y: Int)
+// CHECK:   braced2(x: {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }, y: Int)
+
+func returnTrailing() -> Int {
+  return withtrail(<#T##() -> ()#>)
+// CHECK: return withtrail {
+// CHECK-NEXT: <#code#>
+}
+
+var yieldTrailing: Int {
+  _read {
+    yield withtrail(<#T##() -> ()#>)
+  // CHECK: yield withtrail {
+  // CHECK-NEXT: <#code#>
+  }
+}
+
+func caseTrailing() -> Int {
+  switch true {
+    case true: withtrail(<#T##() -> ()#>)
+// CHECK: case true: withtrail {
+// CHECK-NEXT: <#code#>
+    default: withtrail(<#T##() -> ()#>)
+// CHECK: default: withtrail {
+// CHECK-NEXT: <#code#>
+  }
+}
+
+func throwTrailing() -> Int {
+   throw withtrail(<#T##() -> ()#>)
+// CHECK: throw withtrail {
+// CHECK-NEXT: <#code#>
+}
+
+func singleExprTrailing1() -> Int {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}
+var singleExprTrailing2: Int {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}
+var singleExprTrailing3: Int {
+  get {
+    withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+  }
+}
+
+closureTrailingMulti {
+  bah()
+  withtrail(<#T##() -> ()#>)
+// CHECK: bah()
+// CHECK-NEXT: withtrail {
+// CHECK-NEXT: <#code#>
+}
+
+closureIf {
+  if withtrail(<#T##() -> ()#>) {}
+// CHECK: if withtrail({
+// CHECK-NEXT: <#code#>
+}
+
+closureNonTrail {
+  nonTrail(<#T##() -> ()#>, 1)
+// CHECK: nonTrail({
+// CHECK-NEXT: <#code#>
+}
+
+singleExprClosureTrailing {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}
+
+singleExprClosureTrailingParens({
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+})
+
+singleExprClosureMultiArg(1) {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}
+singleExprClosureMultiArg(1) {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}
+
+func active() {
+  foo(<#T##value: Foo##Foo#>)
+  // CHECK: foo(Foo)
+}
+func activeWithTrailing() {
+  forEach(<#T##() -> ()#>)
+  // CHECK: forEach {
+  // CHECK-NEXT: <#code#>
+}
+#if false
+func inactive() {
+  foo(<#T##value: Foo##Foo#>)
+  // CHECK: foo(Foo)
+}
+func inactiveWithTrailing() {
+  forEach(<#T##() -> ()#>)
+  // CHECK: forEach {
+  // CHECK-NEXT: <#code#>
+}
+#endif

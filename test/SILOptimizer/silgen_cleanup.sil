@@ -1,0 +1,170 @@
+// RUN: %target-sil-opt -silgen-cleanup %s | %FileCheck %s
+
+import Builtin
+
+sil_stage raw
+
+import Swift
+import SwiftShims
+
+// CHECK-LABEL: sil [ossa] @struct_extract_load_to_load_struct_element_addr
+// CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
+// CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
+// CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK-NEXT:  [[UINT8:%.*]] = struct $UInt8 ([[LITERAL]] : $Builtin.Int8)
+// CHECK-NEXT:  store [[UINT8]] to [trivial] [[IN]] : $*UInt8
+// CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
+sil [ossa] @struct_extract_load_to_load_struct_element_addr : $@convention(thin) (@inout UInt8) -> (Builtin.Int8) {
+bb0(%0 : $*UInt8):
+  %1 = load [trivial] %0 : $*UInt8
+  %2 = integer_literal $Builtin.Int8, 1
+  %3 = struct_element_addr %0 : $*UInt8, #UInt8._value
+  store %2 to [trivial] %3 : $*Builtin.Int8
+  %5 = struct_extract %1 : $UInt8, #UInt8._value
+  return %5 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_extract_load_to_load_tuple_element_addr
+// CHECK: bb0([[IN:%[0-9]+]] : $*(Builtin.Int8, Builtin.Int8)):
+// CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = tuple_element_addr [[IN]] : $*(Builtin.Int8, Builtin.Int8), 0
+// CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  [[LITERAL:%[0-9]+]] = integer_literal $Builtin.Int8, 1
+// CHECK-NEXT:  [[IN_STORE_GEP:%[0-9]+]] = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
+// CHECK-NEXT:  store [[LITERAL]] to [trivial] [[IN_STORE_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
+sil [ossa] @tuple_extract_load_to_load_tuple_element_addr : $@convention(thin) (@inout (Builtin.Int8, Builtin.Int8)) -> (Builtin.Int8) {
+bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
+  %1 = load [trivial] %0 : $*(Builtin.Int8, Builtin.Int8)
+  %2 = integer_literal $Builtin.Int8, 1
+  %3 = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
+  store %2 to [trivial] %3 : $*Builtin.Int8
+  %5 = tuple_extract %1 : $(Builtin.Int8, Builtin.Int8), 0
+  return %5 : $Builtin.Int8
+}
+
+// Do not perform the optimization of the input load has multiple uses.
+//
+// CHECK-LABEL: sil [ossa] @multiple_use_struct_extract_load_to_load_struct_element_addr
+// CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
+// CHECK-NEXT: load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct
+// CHECK-NEXT: store
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @multiple_use_struct_extract_load_to_load_struct_element_addr : $@convention(thin) (@inout UInt8) -> (UInt8, Builtin.Int8) {
+bb0(%0 : $*UInt8):
+  %1 = load [trivial] %0 : $*UInt8
+  %2 = integer_literal $Builtin.Int8, 1
+  %3 = struct_element_addr %0 : $*UInt8, #UInt8._value
+  store %2 to [trivial] %3 : $*Builtin.Int8
+  %5 = struct_extract %1 : $UInt8, #UInt8._value
+  %6 = tuple (%1 : $UInt8, %5 : $Builtin.Int8)
+  return %6 : $(UInt8, Builtin.Int8)
+}
+
+// Do not perform the optimization of the input load has multiple uses.
+//
+// CHECK-LABEL: sil [ossa] @multiple_use_tuple_extract_load_to_load_tuple_element_addr
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @multiple_use_tuple_extract_load_to_load_tuple_element_addr : $@convention(thin) (@inout (Builtin.Int8, Builtin.Int8)) -> ((Builtin.Int8, Builtin.Int8), Builtin.Int8) {
+bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
+  %1 = load [trivial] %0 : $*(Builtin.Int8, Builtin.Int8)
+  %2 = integer_literal $Builtin.Int8, 1
+  %3 = tuple_element_addr %0 : $*(Builtin.Int8, Builtin.Int8), 0
+  store %2 to [trivial] %3 : $*Builtin.Int8
+  %5 = tuple_extract %1 : $(Builtin.Int8, Builtin.Int8), 0
+  %6 = tuple (%1 : $(Builtin.Int8, Builtin.Int8), %5 : $Builtin.Int8)
+  return %6 : $((Builtin.Int8, Builtin.Int8), Builtin.Int8)
+}
+
+// Handle a combination of trivial and nontrivial elements.
+
+struct X1 {
+  @_hasStorage @_hasInitialValue let a: Int { get }
+  @_hasStorage @_hasInitialValue var obj1: AnyObject { get set }
+  @_hasStorage @_hasInitialValue var obj2: AnyObject { get set }
+  init(a: Int, obj1: AnyObject, obj2: AnyObject)
+}
+
+// CHECK-LABEL: sil private [ossa] @testLoadNontrivial : $@convention(thin) (@inout_aliasable X1) -> (Int, @owned AnyObject, @owned AnyObject) {
+// CHECK-LABEL: bb0(%0 : $*X1):
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*X1
+// CHECK: [[AA:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.a
+// CHECK: load [trivial] [[AA]] : $*Int
+// CHECK: [[OA1:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj1
+// CHECK: [[OV1:%.*]] = load [copy] [[OA1]] : $*AnyObject
+// CHECK: [[OA2:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj2
+// CHECK: [[OV2:%.*]] = load [copy] [[OA2]] : $*AnyObject
+// CHECK: end_access [[ACCESS]] : $*X1
+// CHECK: [[B1:%.*]] = begin_borrow [[OV1]] : $AnyObject
+// CHECK: copy_value [[B1]] : $AnyObject
+// CHECK: end_borrow [[B1]] : $AnyObject
+// CHECK: [[B2:%.*]] = begin_borrow [[OV2]] : $AnyObject
+// CHECK: copy_value [[B2]] : $AnyObject
+// CHECK: end_borrow [[B2]] : $AnyObject
+// CHECK: return
+// CHECK-LABEL: } // end sil function 'testLoadNontrivial'
+sil private [ossa] @testLoadNontrivial : $@convention(thin) (@inout_aliasable X1) -> (Int, @owned AnyObject, @owned AnyObject) {
+bb0(%0 : $*X1):
+  %access = begin_access [read] [unknown] %0 : $*X1
+  %load = load [copy] %access : $*X1
+  end_access %access : $*X1
+
+  %borrowa = begin_borrow %load : $X1
+  %a = struct_extract %borrowa : $X1, #X1.a
+  end_borrow %borrowa : $X1
+
+  %borrow1 = begin_borrow %load : $X1
+  %o1 = struct_extract %borrow1 : $X1, #X1.obj1
+  %copy1 = copy_value %o1 : $AnyObject
+  end_borrow %borrow1 : $X1
+
+  %borrow2 = begin_borrow %load : $X1
+  %o2 = struct_extract %borrow2 : $X1, #X1.obj2
+  %copy2 = copy_value %o2 : $AnyObject
+  end_borrow %borrow2 : $X1
+
+  destroy_value %load : $X1
+
+  %result = tuple (%a : $Int, %copy1 : $AnyObject, %copy2 : $AnyObject)
+  return %result : $(Int, AnyObject, AnyObject)
+}
+
+struct X2 {
+  @_hasStorage @_hasInitialValue var obj: AnyObject { get set }
+}
+
+struct X3 {
+  @_hasStorage @_hasInitialValue var x2: X2 { get set }
+}
+
+// CHECK-LABEL: sil private [ossa] @testStoreNontrivial : $@convention(thin) (@inout X3, @guaranteed AnyObject) -> () {
+// CHECK-LABEL: bb0(%0 : $*X3, %1 : @guaranteed $AnyObject):
+// CHECK: [[CP:%.*]] = copy_value %1 : $AnyObject
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] %0 : $*X3
+// CHECK: [[X2:%.*]] = struct $X2 ([[CP]] : $AnyObject)
+// CHECK: [[X3:%.*]] = struct $X3 ([[X2]] : $X2)
+// CHECK: store [[X3]] to [assign] [[ACCESS]] : $*X3
+// CHECK: end_access [[ACCESS]] : $*X3
+// CHECK-LABEL: } // end sil function 'testStoreNontrivial'
+sil private [ossa] @testStoreNontrivial : $@convention(thin) (@inout X3, @guaranteed AnyObject) -> () {
+bb0(%0 : $*X3, %1 : @guaranteed $AnyObject):
+  %4 = copy_value %1 : $AnyObject
+  %5 = begin_access [modify] [unknown] %0 : $*X3
+  %6 = struct_element_addr %5 : $*X3, #X3.x2
+  %7 = struct_element_addr %6 : $*X2, #X2.obj
+  store %4 to [assign] %7 : $*AnyObject
+  end_access %5 : $*X3
+  %12 = tuple ()
+  return %12 : $()
+}

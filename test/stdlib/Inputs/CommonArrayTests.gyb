@@ -102,18 +102,40 @@ ${Suite}.test("${ArrayType}/Sliceable/Enums") {
 }
 
 ${Suite}.test("${ArrayType}/appendNonUnique")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var x: ${ArrayType}<Int> = []
   x.reserveCapacity(10002)
   let capacity = x.capacity
-  for _ in 1...10000 {
+  for _ in 1...100 {
     let y = x
     x.append(1)
     expectTrue(x.capacity == capacity)
-    let z = x
-    x.remove(at: 0)
+  }
+}
+
+%   if ArrayType != 'ArraySlice':
+${Suite}.test("${ArrayType}/removeNonUnique")
+  .code {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    var x = ${ArrayType}<Int>(repeating: 27, count: 200)
+    x.reserveCapacity(10002)
+    for _ in 1...100 {
+      let y = x
+      x.remove(at: 0)
+      expectTrue(x.capacity < 1000)
+    }
+  }
+}
+%   end
+
+${Suite}.test("${ArrayType}/mutateNonUnique")
+  .code {
+  var x = ${ArrayType}<Int>(repeating: 27, count: 200)
+  x.reserveCapacity(10002)
+  for _ in 1...100 {
+    let y = x
+    x[0] = 0
+    expectTrue(x.capacity < 1000)
   }
 }
 
@@ -269,17 +291,13 @@ let withUnsafeMutableBufferPointerIfSupportedTests = [
 ]
 
 ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   for test in withUnsafeMutableBufferPointerIfSupportedTests {
     var a = getFresh${ArrayType}(test.sequence.map(OpaqueValue.init))
     do {
       // Read.
       var result = a._withUnsafeMutableBufferPointerIfSupported {
-        (baseAddress, count) -> OpaqueValue<[OpaqueValue<Int>]> in
-        let bufferPointer =
-          UnsafeMutableBufferPointer(start: baseAddress, count: count)
+        (bufferPointer) -> OpaqueValue<[OpaqueValue<Int>]> in
         return OpaqueValue(Array(bufferPointer))
       }
       expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
@@ -289,9 +307,7 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
     do {
       // Read and write.
       var result = a._withUnsafeMutableBufferPointerIfSupported {
-        (baseAddress, count) -> OpaqueValue<Array<OpaqueValue<Int>>> in
-        let bufferPointer =
-          UnsafeMutableBufferPointer(start: baseAddress, count: count)
+        (bufferPointer) -> OpaqueValue<Array<OpaqueValue<Int>>> in
         let result = OpaqueValue(Array(bufferPointer))
         for i in bufferPointer.indices {
           bufferPointer[i] = OpaqueValue(bufferPointer[i].value * 10)
@@ -309,12 +325,10 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
 }
 
 ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
-    (baseAddress, count) -> OpaqueValue<Int> in
+    (bufferPointer) -> OpaqueValue<Int> in
     // buffer = UnsafeMutableBufferPointer(start: buffer.baseAddress, count: 0)
     // FIXME: does not trap since the buffer is not passed inout.
     // expectCrashLater()
@@ -323,12 +337,132 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
 }
 
 ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
-    (baseAddress, count) -> OpaqueValue<Int> in
+    (bufferPointer) -> OpaqueValue<Int> in
+    // buffer = UnsafeMutableBufferPointer(start: nil, count: 1)
+    // FIXME: does not trap since the buffer is not passed inout.
+    // expectCrashLater()
+    return OpaqueValue(42)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// withContiguousStorageIfAvailableTests()
+//===----------------------------------------------------------------------===//
+
+struct WithContiguousStorageIfAvailableTest {
+  let sequence: [Int]
+  let loc: SourceLoc
+
+  init(
+    _ sequence: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let withContiguousStorageIfAvailableTests = [
+  WithContiguousStorageIfAvailableTest([]),
+  WithContiguousStorageIfAvailableTest([ 10 ]),
+  WithContiguousStorageIfAvailableTest([ 10, 20, 30, 40, 50 ]),
+]
+
+${Suite}.test("${ArrayType}/withContiguousStorageIfAvailable")
+  .code {
+  for test in withContiguousStorageIfAvailableTests {
+    var a = getFresh${ArrayType}(test.sequence.map(OpaqueValue.init))
+    do {
+      // Read.
+      var result = a.withContiguousStorageIfAvailable {
+        (bufferPointer) -> OpaqueValue<[OpaqueValue<Int>]> in
+        return OpaqueValue(Array(bufferPointer))
+      }
+      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
+      expectEqualSequence(test.sequence, result!.value.map { $0.value })
+      expectEqualSequence(test.sequence, a.map { $0.value })
+    }
+  }
+  // FIXME: tests for arrays bridged from Objective-C.
+}
+
+//===----------------------------------------------------------------------===//
+// withContiguousMutableStorageIfAvailableTests()
+//===----------------------------------------------------------------------===//
+
+struct WithContiguousMutableStorageIfAvailableTest {
+  let sequence: [Int]
+  let loc: SourceLoc
+
+  init(
+    _ sequence: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let withContiguousMutableStorageIfAvailableTests = [
+  WithContiguousMutableStorageIfAvailableTest([]),
+  WithContiguousMutableStorageIfAvailableTest([ 10 ]),
+  WithContiguousMutableStorageIfAvailableTest([ 10, 20, 30, 40, 50 ]),
+]
+
+${Suite}.test("${ArrayType}/withContiguousMutableStorageIfAvailable")
+  .code {
+  for test in withContiguousMutableStorageIfAvailableTests {
+    var a = getFresh${ArrayType}(test.sequence.map(OpaqueValue.init))
+    do {
+      // Read.
+      var result = a.withContiguousMutableStorageIfAvailable {
+        (bufferPointer) -> OpaqueValue<[OpaqueValue<Int>]> in
+        return OpaqueValue(Array(bufferPointer))
+      }
+      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
+      expectEqualSequence(test.sequence, result!.value.map { $0.value })
+      expectEqualSequence(test.sequence, a.map { $0.value })
+    }
+    do {
+      // Read and write.
+      var result = a.withContiguousMutableStorageIfAvailable {
+        (bufferPointer) -> OpaqueValue<Array<OpaqueValue<Int>>> in
+        let result = OpaqueValue(Array(bufferPointer))
+        for i in bufferPointer.indices {
+          bufferPointer[i] = OpaqueValue(bufferPointer[i].value * 10)
+        }
+        return result
+      }
+      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
+      expectEqualSequence(test.sequence, result!.value.map { $0.value })
+      expectEqualSequence(
+        test.sequence.map { $0 * 10 },
+        a.map { $0.value })
+    }
+  }
+  // FIXME: tests for arrays bridged from Objective-C.
+}
+
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1")
+  .code {
+  var a = getFresh${ArrayType}([ OpaqueValue(10) ])
+  var result = a._withUnsafeMutableBufferPointerIfSupported {
+    (bufferPointer) -> OpaqueValue<Int> in
+    // buffer = UnsafeMutableBufferPointer(start: buffer.baseAddress, count: 0)
+    // FIXME: does not trap since the buffer is not passed inout.
+    // expectCrashLater()
+    return OpaqueValue(42)
+  }
+}
+
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2")
+  .code {
+  var a = getFresh${ArrayType}([ OpaqueValue(10) ])
+  var result = a._withUnsafeMutableBufferPointerIfSupported {
+    (bufferPointer) -> OpaqueValue<Int> in
     // buffer = UnsafeMutableBufferPointer(start: nil, count: 1)
     // FIXME: does not trap since the buffer is not passed inout.
     // expectCrashLater()
@@ -342,8 +476,6 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
 
 // Test the uniqueness of the raw buffer.
 ${Suite}.test("${ArrayType}/withUnsafeMutableBytes")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var a = getFresh${ArrayType}([UInt8](repeating: 10, count: 1))
   let b = a
@@ -353,6 +485,130 @@ ${Suite}.test("${ArrayType}/withUnsafeMutableBytes")
   expectEqual(42, a[0])
   expectEqual(10, b[0])
 }
+
+//===----------------------------------------------------------------------===//
+// reserveCapacity semantics
+//===----------------------------------------------------------------------===//
+
+${Suite}.test("${ArrayType}/reserveCapacity") {
+  var a = ${ArrayType}<Int>()
+  for capacity in stride(from: 0, to: 1000, by: 53) {
+    a.reserveCapacity(capacity)
+    expectLE(capacity, a.capacity)
+  }
+}
+
+%if ArrayType in ['Array', 'ContiguousArray']:
+
+//===----------------------------------------------------------------------===//
+// init(unsafeUninitializedCapacity:initializingWith:)
+//===----------------------------------------------------------------------===//
+
+extension Collection {
+  func stablyPartitioned(
+    by belongsInFirstPartition: (Element) -> Bool
+  ) -> ${ArrayType}<Element> {
+    let result = ${ArrayType}<Element>(unsafeUninitializedCapacity: self.count) {
+      buffer, initializedCount in
+      var low = buffer.baseAddress!
+      var high = low + buffer.count
+      for element in self {
+        if belongsInFirstPartition(element) {
+          low.initialize(to: element)
+          low += 1
+        } else {
+          high -= 1
+          high.initialize(to: element)
+        }
+      }
+    
+      let highIndex = high - buffer.baseAddress!
+      buffer[highIndex...].reverse()
+      initializedCount = buffer.count
+    }
+    return result
+  }
+}
+
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)") {
+  var a = ${ArrayType}(0..<300)
+  let p = a.stablyPartitioned(by: { $0 % 2 == 0 })
+  expectEqualSequence(
+    [stride(from: 0, to: 300, by: 2), stride(from: 1, to: 300, by: 2)].joined(),
+    p
+  )
+}
+
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/throwing") {
+  final class InstanceCountedClass {
+    static var instanceCounter = 0
+
+    init() { InstanceCountedClass.instanceCounter += 1 }
+    deinit { InstanceCountedClass.instanceCounter -= 1 }
+  }
+  enum E: Error { case error }
+
+  do {
+    var a = ${ArrayType}<InstanceCountedClass>(unsafeUninitializedCapacity: 10) {
+        buffer, c in
+      let p = buffer.baseAddress!
+      for i in 0..<5 {
+        (p + i).initialize(to: InstanceCountedClass())
+      }
+      c = 5
+    }
+    expectEqual(5, a.count)
+    expectEqual(5, InstanceCountedClass.instanceCounter)
+
+    a = []
+    expectEqual(0, InstanceCountedClass.instanceCounter)
+
+    a = try ${ArrayType}(unsafeUninitializedCapacity: 10) { buffer, c in
+      let p = buffer.baseAddress!
+      for i in 0..<5 {
+        (p + i).initialize(to: InstanceCountedClass())
+      }
+      c = 5
+      throw E.error
+    }
+
+    expectUnreachable()
+  } catch {}
+  expectEqual(0, InstanceCountedClass.instanceCounter)
+}
+
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/noCopy") {
+  var storageAddress: UnsafeMutablePointer<Int>?
+  var array = ${ArrayType}<Int>(unsafeUninitializedCapacity: 20) { buffer, _ in
+    storageAddress = buffer.baseAddress
+  }
+  array.withUnsafeMutableBufferPointer { buffer in
+    expectEqual(storageAddress, buffer.baseAddress)
+  }
+}
+
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/validCount") {
+  expectCrashLater()
+  let array = ${ArrayType}<Int>(unsafeUninitializedCapacity: 10) { buffer, c in
+    for i in 0..<10 { buffer[i] = i }
+    c = 20
+  }
+}
+
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/reassignBuffer") {
+  guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else {
+    // When back-deployed to 5.0, this coding error does not get detected.
+    return
+  }
+
+  expectCrashLater()
+  let otherBuffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 1)
+  let array = ${ArrayType}<Int>(unsafeUninitializedCapacity: 10) { buffer, _ in
+    buffer = otherBuffer
+  }
+}
+
+%end
 
 //===---
 // Check that iterators traverse a snapshot of the collection.
@@ -368,8 +624,6 @@ ${Suite}.test(
 
 ${Suite}.test(
   "${ArrayType}/mutationDoesNotAffectIterator/subscript/append")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
   var iter = arr.makeIterator()
@@ -436,6 +690,5 @@ ${Suite}.test("${ArrayType}/AssociatedTypes") {
     iteratorType: IndexingIterator<Collection>.self,
     subSequenceType: CollectionSlice.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 }

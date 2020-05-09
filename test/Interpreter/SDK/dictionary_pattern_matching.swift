@@ -2,7 +2,6 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
-// UNSUPPORTED: CPU=armv7
 
 import Foundation
 
@@ -12,7 +11,7 @@ struct State {
   let abbrev: String
 }
 
-func stateFromPlistLame(_ plist: Dictionary<String, Any>) -> State? {
+func stateFromPlistVerbose(_ plist: Dictionary<String, Any>) -> State? {
   if let name = plist["name"] as? NSString {
     if let population = plist["population"] as? NSNumber {
       if let abbrev = plist["abbrev"] as? NSString {
@@ -30,7 +29,7 @@ func stateFromPlistLame(_ plist: Dictionary<String, Any>) -> State? {
 func stateFromPlistCool(_ plist: Dictionary<String, Any>) -> State? {
   switch (plist["name"], plist["population"], plist["abbrev"]) {
   case let (name as String, pop as Int, abbr as String)
-  where abbr.characters.count == 2:
+  where abbr.count == 2:
     return State(name: name,
                  population: pop,
                  abbrev: abbr)
@@ -63,22 +62,22 @@ let invalidStatePlist3: Dictionary<String, Any> = [
 // CHECK:         name: "California"
 // CHECK:         population: 38040000
 // CHECK:         abbrev: "CA"
-dump(stateFromPlistLame(goodStatePlist))
+dump(stateFromPlistVerbose(goodStatePlist))
 // CHECK-LABEL: some:
 // CHECK:         name: "California"
 // CHECK:         population: 38040000
 // CHECK:         abbrev: "CA"
 dump(stateFromPlistCool(goodStatePlist))
 // CHECK-LABEL: nil
-dump(stateFromPlistLame(invalidStatePlist1))
+dump(stateFromPlistVerbose(invalidStatePlist1))
 // CHECK-LABEL: nil
 dump(stateFromPlistCool(invalidStatePlist1))
 // CHECK-LABEL: nil
-dump(stateFromPlistLame(invalidStatePlist2))
+dump(stateFromPlistVerbose(invalidStatePlist2))
 // CHECK-LABEL: nil
 dump(stateFromPlistCool(invalidStatePlist2))
 // CHECK-LABEL: nil
-dump(stateFromPlistLame(invalidStatePlist3))
+dump(stateFromPlistVerbose(invalidStatePlist3))
 // CHECK-LABEL: nil
 dump(stateFromPlistCool(invalidStatePlist3))
 
@@ -106,7 +105,7 @@ enum Statistic : CustomReflectable {
 func statisticFromPlist(_ plist: Dictionary<String, Any>) -> Statistic? {
   switch (plist["kind"], plist["name"], plist["population"], plist["abbrev"]) {
   case let ("state" as String, name as String, population as Int, abbrev as String)
-  where abbrev.characters.count == 2:
+  where abbrev.count == 2:
     return Statistic.ForState(State(name: name,
                                     population: population,
                                     abbrev: abbrev))

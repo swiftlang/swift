@@ -51,6 +51,15 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARGUMENT_TYPE_IN_CLOSURE_2 | %FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_1 | %FileCheck %s -check-prefix=CLOSURE_PARAM_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_2 | %FileCheck %s -check-prefix=CLOSURE_PARAM_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_1 | %FileCheck %s -check-prefix=IN_IIFE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_2 | %FileCheck %s -check-prefix=IN_IIFE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_3 | %FileCheck %s -check-prefix=IN_IIFE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_4 | %FileCheck %s -check-prefix=IN_IIFE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ERROR_IN_CLOSURE_IN_INITIALIZER | %FileCheck %s -check-prefix=ERROR_IN_CLOSURE_IN_INITIALIZER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DECL_IN_CLOSURE_IN_TOPLEVEL_INIT | %FileCheck %s -check-prefix=DECL_IN_CLOSURE_IN_TOPLEVEL_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SINGLE_EXPR_CLOSURE_CONTEXT | %FileCheck %s -check-prefix=SINGLE_EXPR_CLOSURE_CONTEXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT | %FileCheck %s -check-prefix=SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT
+
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -64,8 +73,9 @@ struct FooStruct {
 }
 
 // FOO_OBJECT_DOT: Begin completions
+// FOO_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: End completions
 
 // WITH_GLOBAL_DECLS: Begin completions
@@ -320,7 +330,7 @@ func testClosureParam1() {
   }
 }
 // CLOSURE_PARAM_1: Begin completions
-// CLOSURE_PARAM_1-DAG: Decl[LocalVar]/Local:         theValue[#(Int)#]{{; name=.+$}}
+// CLOSURE_PARAM_1-DAG: Decl[LocalVar]/Local:         theValue[#Int#]{{; name=.+$}}
 func testClosureParam2() {
   closureTaker2 { (Value1, Value2) -> () in
     #^CLOSURE_PARAM_2^#
@@ -329,3 +339,95 @@ func testClosureParam2() {
 // CLOSURE_PARAM_2: Begin completions
 // CLOSURE_PARAM_2-DAG: Decl[LocalVar]/Local:         Value1[#Int#]{{; name=.+$}}
 // CLOSURE_PARAM_2-DAG: Decl[LocalVar]/Local:         Value2[#Int#]{{; name=.+$}}
+
+enum SomeEnum {
+  case north, south
+}
+
+struct BarStruct {
+  var enumVal: SomeEnum = .north
+}
+
+var testIIFEVar: BarStruct = {
+  var obj = BarStruct()
+  obj.enumVal = .#^IN_IIFE_1^#
+  return obj
+}()
+testIIFEVar = {
+  var obj = BarStruct()
+  obj.enumVal = .#^IN_IIFE_2^#
+  return obj
+}()
+
+func testIIFE() {
+  var testIIFEVar: FooStruct = {
+    var obj = BarStruct()
+    obj.enumVal = .#^IN_IIFE_3^#
+    return obj
+  }()
+  testIIFEVar = {
+    var obj = BarStruct()
+    obj.enumVal = .#^IN_IIFE_4^#
+    return obj
+  }()
+}
+// IN_IIFE_1: Begin completions
+// IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: north[#SomeEnum#]
+// IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: south[#SomeEnum#]
+
+extension Error {
+  var myErrorNumber: Int { return 0 }
+}
+
+class C {
+  var foo: String = {
+    do {
+    } catch {
+      error.#^ERROR_IN_CLOSURE_IN_INITIALIZER^#
+// ERROR_IN_CLOSURE_IN_INITIALIZER: Begin completions
+// ERROR_IN_CLOSURE_IN_INITIALIZER-DAG: Keyword[self]/CurrNominal:          self[#Error#]; name=self
+// ERROR_IN_CLOSURE_IN_INITIALIZER-DAG: Decl[InstanceVar]/CurrNominal:      myErrorNumber[#Int#]; name=myErrorNumber
+// ERROR_IN_CLOSURE_IN_INITIALIZER: End completions
+    }
+    return ""
+  }()
+}
+
+var foo = {
+  let x = "Siesta:\(3)".#^DECL_IN_CLOSURE_IN_TOPLEVEL_INIT^#
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT: Begin completions
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Keyword[self]/CurrNominal:          self[#String#]; name=self
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal:      unicodeScalars[#String.UnicodeScalarView#]; name=unicodeScalars
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceMethod]/CurrNominal:   hasPrefix({#(prefix): String#})[#Bool#]; name=hasPrefix(prefix: String)
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]; name=utf16
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceMethod]/Super:         dropFirst()[#Substring#]; name=dropFirst()
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT: End completions
+}
+
+func testWithMemoryRebound(_ bar: UnsafePointer<UInt64>) {
+    _ = bar.withMemoryRebound(to: Int64.self, capacity: 3) { ptr in
+        return ptr #^SINGLE_EXPR_CLOSURE_CONTEXT^#
+        // SINGLE_EXPR_CLOSURE_CONTEXT: Begin completions
+        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal:   .deallocate()[#Void#]; name=deallocate()
+        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      .pointee[#Int64#]; name=pointee
+        // SINGLE_EXPR_CLOSURE_CONTEXT: End completions
+    }
+}
+
+func testInsideTernaryClosureReturn(test: Bool) -> [String] {
+    return "hello".map { thing in
+        test ? String(thing #^SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT^#).uppercased() : String(thing).lowercased()
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT: Begin completions
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      .utf8[#Character.UTF8View#]; name=utf8
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      .description[#String#]; name=description
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      .isWhitespace[#Bool#]; name=isWhitespace
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal:   .uppercased()[#String#]; name=uppercased()
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']... {#String.Element#}[#ClosedRange<String.Element>#]; name=... String.Element
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']< {#Character#}[#Bool#]; name=< Character
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']>= {#String.Element#}[#Bool#]; name=>= String.Element
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']== {#Character#}[#Bool#]; name=== Character
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Keyword[self]/CurrNominal:          .self[#String.Element#]; name=self
+        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT: End completions
+    }
+}

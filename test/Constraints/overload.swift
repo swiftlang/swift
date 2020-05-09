@@ -3,7 +3,9 @@
 func markUsed<T>(_ t: T) {}
 
 func f0(_: Float) -> Float {}
+// expected-note@-1 {{candidate expects value of type 'Float' for parameter #1}}
 func f0(_: Int) -> Int {}
+// expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
 
 func f1(_: Int) {}
 
@@ -24,8 +26,7 @@ _ = f0(1)
 f1(f0(1))
 f1(identity(1))
 
-f0(x) // expected-error{{cannot invoke 'f0' with an argument list of type '(X)'}}
-// expected-note @-1 {{overloads for 'f0' exist with these partially matching parameter lists: (Float), (Int)}}
+f0(x) // expected-error{{no exact matches in call to global function 'f0'}}
 
 _ = f + 1
 _ = f2(i)
@@ -81,17 +82,17 @@ struct X2d {
 // Invalid declarations
 // FIXME: Suppress the diagnostic for the call below, because the invalid
 // declaration would have matched.
-func f3(_ x: Intthingy) -> Int { } // expected-error{{use of undeclared type 'Intthingy'}}
+func f3(_ x: Intthingy) -> Int { } // expected-error{{cannot find type 'Intthingy' in scope}}
 
 func f3(_ x: Float) -> Float { }
 f3(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
 
-func f4(_ i: Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
-func f4(_ j: Wibble) { } // expected-error{{use of undeclared type 'Wibble'}}
+func f4(_ i: Wonka) { } // expected-error{{cannot find type 'Wonka' in scope}}
+func f4(_ j: Wibble) { } // expected-error{{cannot find type 'Wibble' in scope}}
 f4(5)
 
 func f1() {
-  var c : Class // expected-error{{use of undeclared type 'Class'}}
+  var c : Class // expected-error{{cannot find type 'Class' in scope}}
   markUsed(c.x) // make sure error does not cascade here
 }
 
@@ -126,16 +127,17 @@ func test20886179(_ handlers: [(Int) -> Void], buttonIndex: Int) {
 
 // The problem here is that the call has a contextual result type incompatible
 // with *all* overload set candidates.  This is not an ambiguity.
-func overloaded_identity(_ a : Int) -> Int {}
-func overloaded_identity(_ b : Float) -> Float {}
+func overloaded_identity(_ a : Int) -> Int {} // expected-note {{found this candidate}}
+func overloaded_identity(_ b : Float) -> Float {} // expected-note {{found this candidate}}
 
 func test_contextual_result_1() {
-  return overloaded_identity()  // expected-error {{cannot invoke 'overloaded_identity' with no arguments}}
-  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these partially matching parameter lists: (Int), (Float)}}
+  return overloaded_identity()  // expected-error {{no exact matches in call to global function 'overloaded_identity'}}
 }
 
 func test_contextual_result_2() {
-  return overloaded_identity(1)  // expected-error {{unexpected non-void return value in void function}}
+  return overloaded_identity(1)
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}
 }
 
 // rdar://problem/24128153
@@ -153,7 +155,9 @@ struct X1 {
 }
 
 let x1 = X1(Int.self)
-let x1check: X1 = x1 // expected-error{{value of optional type 'X1?' not unwrapped; did you mean to use '!' or '?'?}}
+let x1check: X1 = x1 // expected-error{{value of optional type 'X1?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 
 
 struct X2 {
@@ -164,7 +168,9 @@ struct X2 {
 }
 
 let x2 = X2(Int.self)
-let x2check: X2 = x2 // expected-error{{value of optional type 'X2?' not unwrapped; did you mean to use '!' or '?'?}}
+let x2check: X2 = x2 // expected-error{{value of optional type 'X2?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 
 // rdar://problem/28051973
 struct R_28051973 {
@@ -223,3 +229,12 @@ func curry<F, S, T, R>(_ f: @escaping (F, S, T) -> R) -> (F) -> (S) -> (T) -> R 
 let _ = curry(+)(1)
 let _ = [0].reduce(0, +)
 let _ = curry(+)("string vs. pointer")
+
+
+func autoclosure1<T>(_: T, _: @autoclosure () -> X) { }
+
+func autoclosure1<T>(_: [T], _: X) { }
+
+func test_autoclosure1(ia: [Int]) {
+  autoclosure1(ia, X()) // okay: resolves to the second function
+}

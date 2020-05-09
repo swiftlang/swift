@@ -4,7 +4,7 @@
 
 import Foundation
 
-func acceptBridgeableNSError<E : _ObjectiveCBridgeableError>(_ e: E) { }
+func acceptBridgeableNSError<E : _ObjectiveCBridgeableError>(_ e: E) { } // expected-note {{where 'E' = 'E3'}}
 
 @objc enum E2 : Int, Error {
   case A = 1
@@ -18,4 +18,4 @@ acceptBridgeableNSError(E2.A)
 }
 
 acceptBridgeableNSError(E3.A)
-// expected-error@-1{{argument type 'E3' does not conform to expected type '_ObjectiveCBridgeableError'}}
+// expected-error@-1{{global function 'acceptBridgeableNSError' requires that 'E3' conform to '_ObjectiveCBridgeableError'}}

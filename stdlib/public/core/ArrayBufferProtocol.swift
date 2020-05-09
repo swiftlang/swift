@@ -12,14 +12,10 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
-@_versioned
+@usableFromInline
 internal protocol _ArrayBufferProtocol
-  : MutableCollection, RandomAccessCollection {
-
-  associatedtype Indices 
-  // FIXME(ABI) (Revert Where Clauses): Remove this conformance
-  : RandomAccessCollection 
-    = CountableRange<Int>
+  : MutableCollection, RandomAccessCollection 
+where Indices == Range<Int> {
 
   /// Create an empty buffer.
   init()
@@ -27,17 +23,16 @@ internal protocol _ArrayBufferProtocol
   /// Adopt the entire buffer, presenting it at the provided `startIndex`.
   init(_buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
 
+  init(copying buffer: Self)
+
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
   @discardableResult
-  func _copyContents(
+  __consuming func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element>
-
-  /// Get or set the index'th element.
-  subscript(index: Int) -> Element { get nonmutating set }
 
   /// If this buffer is backed by a uniquely-referenced mutable
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the `self`
@@ -75,8 +70,8 @@ internal protocol _ArrayBufferProtocol
   mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
-    elementsOf newValues: C
-  ) where C : Collection, C.Element == Element
+    elementsOf newValues: __owned C
+  ) where C: Collection, C.Element == Element
 
   /// Returns a `_SliceBuffer` containing the elements in `bounds`.
   subscript(bounds: Range<Int>) -> _SliceBuffer<Element> { get }
@@ -97,7 +92,7 @@ internal protocol _ArrayBufferProtocol
   ) rethrows -> R
 
   /// The number of elements the buffer stores.
-  var count: Int { get set }
+  override var count: Int { get set }
 
   /// The number of elements the buffer can store without reallocation.
   var capacity: Int { get }
@@ -122,27 +117,35 @@ internal protocol _ArrayBufferProtocol
   /// buffers address the same elements when they have the same
   /// identity and count.
   var identity: UnsafeRawPointer { get }
-
-  var startIndex: Int { get }
-  var endIndex: Int { get }
 }
 
-extension _ArrayBufferProtocol {
+extension _ArrayBufferProtocol where Indices == Range<Int>{
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
-  @_inlineable
-  @_versioned
+  // Make sure the compiler does not inline _copyBuffer to reduce code size.
+  @inline(never)
+  @inlinable // This code should be specializable such that copying an array is
+             // fast and does not end up in an unspecialized entry point.
+  internal init(copying buffer: Self) {
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
+    buffer._copyContents(
+      subRange: buffer.indices,
+      initializing: newBuffer.firstElementAddress)
+    self = Self( _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
+  }
+
+  @inlinable
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
-    elementsOf newValues: C
-  ) where C : Collection, C.Element == Element {
-    _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
+    elementsOf newValues: __owned C
+  ) where C: Collection, C.Element == Element {
+    _internalInvariant(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count
     let eraseCount = subrange.count
 
@@ -163,7 +166,7 @@ extension _ArrayBufferProtocol {
 
       // Assign over the original subrange
       var i = newValues.startIndex
-      for j in CountableRange(subrange) {
+      for j in subrange {
         elements[j] = newValues[i]
         newValues.formIndex(after: &i)
       }

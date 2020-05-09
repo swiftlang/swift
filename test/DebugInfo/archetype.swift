@@ -10,9 +10,9 @@ protocol RandomAccessIndex : IntegerArithmetic {
 }
 
 // archetype.ExistentialTuple <A : RandomAccessIndex, B>(x : A, y : A) -> B
-// CHECK: !DISubprogram(name: "ExistentialTuple", linkageName: "_T09archetype16ExistentialTuple
+// CHECK: !DISubprogram(name: "ExistentialTuple", linkageName: "$s9archetype16ExistentialTuple
 // CHECK-SAME:          line: [[@LINE+2]]
-// CHECK-SAME:          isDefinition: true
+// CHECK-SAME:          DISPFlagDefinition
 func ExistentialTuple<T: RandomAccessIndex>(_ x: T, y: T) -> T.Distance {
   // (B, Swift.Bool)
   // CHECK: !DILocalVariable(name: "tmp"
@@ -22,5 +22,5 @@ func ExistentialTuple<T: RandomAccessIndex>(_ x: T, y: T) -> T.Distance {
   return _overflowChecked((tmp.0, tmp.1))
 }
 // CHECK: ![[TT]] = !DICompositeType(tag: DW_TAG_structure_type,
-// CHECK-SAME:                       name: "_T09archetype16ExistentialTuple8Distance
+// CHECK-SAME:                       name: "$s8Distance9archetype17RandomAccessIndexPQz_SbtD"
 

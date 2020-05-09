@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -swift-version 4 | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -swift-version 4 | %FileCheck %s -DINT=i%target-ptrsize
 
 protocol P1 {
 	associatedtype AssocP1
@@ -30,21 +30,17 @@ struct Z: P2 {
 	func getAssocP2() -> Y { return Y() }
 }
 
-// CHECK: @_T035witness_table_indirect_conformances1WVAA2P3AAWP = hidden constant [4 x i8*] [i8* bitcast (%swift.type* ()* @_T035witness_table_indirect_conformances1ZVMa to i8*), i8* bitcast (i8** ()* @_T035witness_table_indirect_conformances1ZVAA2P2AAWa to i8*), i8* bitcast (i8** ()* @_T035witness_table_indirect_conformances1YVAA1QAAWa to i8*), i8* bitcast (void (%T35witness_table_indirect_conformances1ZV*, %T35witness_table_indirect_conformances1WV*, %swift.type*, i8**)* @_T035witness_table_indirect_conformances1WVAA2P3A2aDP08getAssocE00gE0QzyFTW to i8*)]
+// CHECK: @"$s35witness_table_indirect_conformances1WVAA2P3AAWP" = hidden global [5 x i8*] [
+// CHECK-SAME: @"$s35witness_table_indirect_conformances1WVAA2P3AAMc"
+// CHECK-SAME: {{(associated conformance 35witness_table_indirect_conformances1WVAA2P3AA05AssocE0AaDP_AA2P2|.ptrauth)}}
+// CHECK-SAME: @"$s35witness_table_indirect_conformances1WVAA2P3A2aDP08getAssocE00gE0QzyFTW{{(\.ptrauth)?}}"
 struct W: P3 {
 	typealias AssocP3 = Z
 
 	func getAssocP3() -> Z { return Z() }
 }
 
-// CHECK-LABEL: define hidden i8** @_T035witness_table_indirect_conformances1YVAA1QAAWa()
+// CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s35witness_table_indirect_conformances1ZVMa"
+// CHECK-SAME:    ([[INT]] %0)
 // CHECK-NEXT: entry:
-// CHECK-NEXT: ret i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_T035witness_table_indirect_conformances1YVAA1QAAWP, i32 0, i32 0)
-
-// CHECK-LABEL: define hidden i8** @_T035witness_table_indirect_conformances1ZVAA2P2AAWa()
-// CHECK-NEXT: entry:
-// CHECK: ret i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @_T035witness_table_indirect_conformances1ZVAA2P2AAWP, i32 0, i32 0)
-
-// CHECK-LABEL: define hidden %swift.type* @_T035witness_table_indirect_conformances1ZVMa()
-// CHECK-NEXT: entry:
-// CHECK-NEXT: ret %swift.type* bitcast {{.*}} @_T035witness_table_indirect_conformances1ZVMf, i32 0, i32 1) to %swift.type*
+// CHECK-NEXT: ret %swift.metadata_response { %swift.type* bitcast {{.*}} @"$s35witness_table_indirect_conformances1ZVMf", i32 0, i32 1) to %swift.type*), [[INT]] 0 }

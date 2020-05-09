@@ -26,13 +26,13 @@ struct SingleRawComment {
     BlockDoc,      ///< \code /** stuff */ \endcode
   };
 
-  const CharSourceRange Range;
-  const StringRef RawText;
+  CharSourceRange Range;
+  StringRef RawText;
 
   unsigned Kind : 8;
   unsigned StartColumn : 16;
   unsigned StartLine;
-  const unsigned EndLine;
+  unsigned EndLine;
 
   SingleRawComment(CharSourceRange Range, const SourceManager &SourceMgr);
   SingleRawComment(StringRef RawText, unsigned StartColumn);
@@ -76,6 +76,20 @@ struct CommentInfo {
   RawComment Raw;
   uint32_t Group;
   uint32_t SourceOrder;
+};
+
+struct LineColumn {
+  uint32_t Line = 0;
+  uint32_t Column = 0;
+  bool isValid() const { return Line && Column; }
+};
+
+struct BasicDeclLocs {
+  StringRef SourceFilePath;
+  SmallVector<std::pair<LineColumn, uint32_t>, 4> DocRanges;
+  LineColumn Loc;
+  LineColumn StartLoc;
+  LineColumn EndLoc;
 };
 
 } // namespace swift

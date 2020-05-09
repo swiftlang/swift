@@ -13,7 +13,7 @@ let table: [UInt8] = [0,0,0, 255,0,0, 0,0,255, 0,255,0,
  255,255,0, 255,0,255, 0,255,255, 255,255,255]
 let space = CGColorSpace(indexedBaseSpace: CGColorSpaceCreateDeviceRGB(),
  last: table.count - 1, colorTable: table)!
-// expectOptionalEqual(table, space.colorTable)
+// expectEqual(table, space.colorTable)
 
 //===----------------------------------------------------------------------===//
 // CGContext

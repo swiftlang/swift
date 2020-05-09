@@ -19,18 +19,18 @@
 
 #define DEBUG_TYPE "sink-instructions"
 
-#include "swift/SIL/Dominance.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
-#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SIL/Dominance.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -48,7 +48,7 @@ public:
   PostOrderFunctionInfo *PO;
   SILLoopInfo *LoopInfo;
 
-  /// \brief returns True if were able to sink the instruction \p II
+  /// returns True if were able to sink the instruction \p II
   /// closer to it's users.
   bool sinkInstruction(SILInstruction *II) {
 
@@ -73,25 +73,27 @@ public:
 
     // TODO: We may want to delete debug instructions to allow us to sink more
     // instructions.
-    for (auto *Operand : II->getUses()) {
-      SILInstruction *User = Operand->getUser();
+    for (auto result : II->getResults()) {
+      for (auto *Operand : result->getUses()) {
+        SILInstruction *User = Operand->getUser();
 
-      // Check if the instruction is already in the user's block.
-      if (User->getParent() == CurrentBlock) return false;
+        // Check if the instruction is already in the user's block.
+        if (User->getParent() == CurrentBlock) return false;
 
-      // Record the block of the first user and move on to
-      // other users.
-      if (!Dest) {
-        Dest = User->getParent();
-        continue;
+        // Record the block of the first user and move on to
+        // other users.
+        if (!Dest) {
+          Dest = User->getParent();
+          continue;
+        }
+
+        // Find a location that dominates all users. If we did not find such
+        // a block or if it is the current block then bail out.
+        Dest = DT->findNearestCommonDominator(Dest, User->getParent());
+
+        if (!Dest || Dest == CurrentBlock)
+          return false;
       }
-
-      // Find a location that dominates all users. If we did not find such
-      // a block or if it is the current block then bail out.
-      Dest = DT->findNearestCommonDominator(Dest, User->getParent());
-
-      if (!Dest || Dest == CurrentBlock)
-        return false;
     }
 
     if (!Dest) return false;

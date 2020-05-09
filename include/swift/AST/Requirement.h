@@ -18,6 +18,8 @@
 #define SWIFT_AST_REQUIREMENT_H
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Debug.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -44,7 +46,7 @@ enum class RequirementKind : unsigned {
   // when adding enumerators.
 };
 
-/// \brief A single requirement placed on the type parameters (or associated
+/// A single requirement placed on the type parameters (or associated
 /// types thereof) of a
 class Requirement {
   llvm::PointerIntPair<Type, 3, RequirementKind> FirstTypeAndKind;
@@ -73,28 +75,28 @@ public:
     assert(second);
   }
 
-  /// \brief Determine the kind of requirement.
+  /// Determine the kind of requirement.
   RequirementKind getKind() const { return FirstTypeAndKind.getInt(); }
 
-  /// \brief Retrieve the first type.
+  /// Retrieve the first type.
   Type getFirstType() const {
     return FirstTypeAndKind.getPointer();
   }
 
-  /// \brief Retrieve the second type.
+  /// Retrieve the second type.
   Type getSecondType() const {
     assert(getKind() != RequirementKind::Layout);
     return SecondType;
   }
 
-  /// \brief Subst the types involved in this requirement.
+  /// Subst the types involved in this requirement.
   ///
   /// The \c args arguments are passed through to Type::subst. This doesn't
   /// touch the superclasses, protocols or layout constraints.
   template <typename... Args>
   Optional<Requirement> subst(Args &&... args) const {
     auto newFirst = getFirstType().subst(std::forward<Args>(args)...);
-    if (!newFirst)
+    if (newFirst->hasError())
       return None;
 
     switch (getKind()) {
@@ -102,7 +104,7 @@ public:
     case RequirementKind::Superclass:
     case RequirementKind::SameType: {
       auto newSecond = getSecondType().subst(std::forward<Args>(args)...);
-      if (!newSecond)
+      if (newSecond->hasError())
         return None;
       return Requirement(getKind(), newFirst, newSecond);
     }
@@ -113,16 +115,66 @@ public:
     llvm_unreachable("Unhandled RequirementKind in switch.");
   }
 
-  /// \brief Retrieve the layout constraint.
+  /// Retrieve the layout constraint.
   LayoutConstraint getLayoutConstraint() const {
     assert(getKind() == RequirementKind::Layout);
     return SecondLayout;
   }
 
-  void dump() const;
+  /// Whether this requirement is in its canonical form.
+  bool isCanonical() const;
+
+  /// Get the canonical form of this requirement.
+  Requirement getCanonical() const;
+
+  SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &out) const;
   void print(raw_ostream &os, const PrintOptions &opts) const;
   void print(ASTPrinter &printer, const PrintOptions &opts) const;
+
+  friend llvm::hash_code hash_value(const Requirement &requirement) {
+    using llvm::hash_value;
+
+    llvm::hash_code first =
+        hash_value(requirement.FirstTypeAndKind.getOpaqueValue());
+    llvm::hash_code second;
+    switch (requirement.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      second = hash_value(requirement.getSecondType());
+      break;
+
+    case RequirementKind::Layout:
+      second = hash_value(requirement.getLayoutConstraint());
+      break;
+    }
+
+    return llvm::hash_combine(first, second);
+  }
+
+  friend bool operator==(const Requirement &lhs, const Requirement &rhs) {
+    if (lhs.FirstTypeAndKind.getOpaqueValue()
+          != rhs.FirstTypeAndKind.getOpaqueValue())
+      return false;
+
+    switch (lhs.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      return lhs.getSecondType().getPointer() ==
+          rhs.getSecondType().getPointer();
+
+    case RequirementKind::Layout:
+      return lhs.getLayoutConstraint() == rhs.getLayoutConstraint();
+    }
+    llvm_unreachable("Unhandled RequirementKind in switch");
+  }
 };
+
+inline void simple_display(llvm::raw_ostream &out, const Requirement &req) {
+  req.print(out, PrintOptions());
+}
 
 } // end namespace swift
 

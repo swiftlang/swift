@@ -1,19 +1,30 @@
-// RUN: %target-swiftc_driver %s -g -sanitize=thread -target %sanitizers-target-triple -o %t_tsan-binary
-// RUN: env %env-TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=1 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
+// RUN: %target-swiftc_driver %s -g -sanitize=thread %import-libdispatch -target %sanitizers-target-triple -o %t_tsan-binary
+// RUN: %target-codesign %t_tsan-binary
+// RUN: env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s --dump-input=fail --implicit-check-not='ThreadSanitizer'
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
 
-// Test that we do not report a race on deinit; the synchronization is guaranteed by runtime.
-import Foundation
+// FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
+// don't support TSan.
+// UNSUPPORTED: remote_run
 
-public class TestDeallocObject : NSObject {
+// Test that we do not report a race on deinit; the synchronization is guaranteed by runtime.
+import Dispatch
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#else
+#error("Unsupported platform")
+#endif
+
+public class TestDeallocObject {
   public var v : Int
-  public override init() {
+  public init() {
     v = 1
   }
 
-  @_semantics("optimize.sil.never")
+  @_optimize(none)
   func unoptimize(_ input : Int) -> Int {
     return input
   }
@@ -28,7 +39,7 @@ public class TestDeallocObject : NSObject {
   }
 }
 
-if (true) {
+do {
   var tdo : TestDeallocObject = TestDeallocObject()
   tdo.accessMember()
 
@@ -47,4 +58,3 @@ if (true) {
 print("Done.")
 
 // CHECK: Done.
-// CHECK-NOT: ThreadSanitizer: data race

@@ -28,20 +28,17 @@ case square(9):
 // 'var' and 'let' patterns.
 case var a:
   a = 1
-case let a: // expected-warning {{case is already handled by previous patterns; consider removing it}}
+case let a:
   a = 1         // expected-error {{cannot assign}}
 case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
-                // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   a += 1
 case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
-                // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   print(a, terminator: "")
 case var (var b): // expected-error {{'var' cannot appear nested inside another 'var'}}
-                  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   b += 1
 
 // 'Any' pattern.
-case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
+case _:
   ()
 
 // patterns are resolved in expression-only positions are errors.
@@ -100,14 +97,15 @@ enum Voluntary<T> : Equatable {
       ()
 
     case .Twain(), // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
-         .Twain(_),
+         .Twain(_), // expected-warning {{enum case 'Twain' has 2 associated values; matching them as a tuple is deprecated}}
+                    // expected-note@-25 {{'Twain' declared here}}
          .Twain(_, _),
          .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
       ()
     }
 
     switch foo {
-    case .Naught: // expected-error{{pattern cannot match values of type 'Foo'}}
+    case .Naught: // expected-error{{type 'Foo' has no member 'Naught'}}
       ()
     case .A, .B, .C:
       ()
@@ -143,7 +141,8 @@ case Voluntary<Int>.Mere,
      .Mere(_):
   ()
 case .Twain,
-     .Twain(_),
+     .Twain(_), // expected-warning {{enum case 'Twain' has 2 associated values; matching them as a tuple is deprecated}}
+                // expected-note@-69 {{'Twain' declared here}}
      .Twain(_, _),
      .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(Int, Int)'}}
   ()
@@ -152,7 +151,7 @@ case .Twain,
 var notAnEnum = 0
 
 switch notAnEnum {
-case .Foo: // expected-error{{pattern cannot match values of type 'Int'}}
+case .Foo: // expected-error{{type 'Int' has no member 'Foo'}}
   ()
 }
 
@@ -280,11 +279,13 @@ case (1, 2, 3):
 
 // patterns in expression-only positions are errors.
 case +++(_, var d, 3):
-// expected-error@-1{{'+++' is not a prefix unary operator}}
+// expected-error@-1{{'_' can only appear in a pattern or on the left side of an assignment}}
   ()
 case (_, var e, 3) +++ (1, 2, 3):
-// expected-error@-1{{'_' can only appear in a pattern}}
-// expected-error@-2{{'var' binding pattern cannot appear in an expression}}
+// expected-error@-1{{'_' can only appear in a pattern or on the left side of an assignment}}
+  ()
+case (let (_, _, _)) + 1:
+// expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   ()
 }
 
@@ -328,5 +329,4 @@ case (_?)?: break // expected-warning {{case is already handled by previous patt
 let (responseObject: Int?) = op1
 // expected-error @-1 {{expected ',' separator}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}
-
-
+// expected-error @-3 {{type of expression is ambiguous without more context}}

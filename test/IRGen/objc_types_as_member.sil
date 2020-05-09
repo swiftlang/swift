@@ -1,0 +1,24 @@
+// RUN: %empty-directory(%t)
+// RUN: %build-irgen-test-overlays
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
+
+// REQUIRES: objc_interop
+
+import gizmo
+
+sil @use_metatype : $@convention(thin) <T> (@thin T.Type) -> ()
+
+// CHECK-LABEL: define swiftcc void @test(%TSo014OuterTypeInnerB0C* swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
+// FIXME:   Metadata realization via demangling is disabled for now
+// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$sSo9OuterTypeCMa"
+// CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response %1, 0
+// CHECK:   call swiftcc void @use_metatype(%swift.type* [[METADATA]])
+// CHECK:   ret void
+
+sil @test : $@convention(witness_method: NSRuncing) (@guaranteed OuterType.InnerType) -> () {
+bb0(%0 : $OuterType.InnerType):
+  %1 = function_ref @use_metatype : $@convention(thin) <τ_0_0> (@thin τ_0_0.Type) -> ()
+  %2 = metatype $@thin OuterType.Type
+  %3 = apply %1<OuterType>(%2) : $@convention(thin) <τ_0_0> (@thin τ_0_0.Type) -> ()
+  return %3 : $()
+}

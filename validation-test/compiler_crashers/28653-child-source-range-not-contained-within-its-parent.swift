@@ -6,4 +6,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
+// REQUIRES: swift_ast_verifier
+
 switch{case.b(u){

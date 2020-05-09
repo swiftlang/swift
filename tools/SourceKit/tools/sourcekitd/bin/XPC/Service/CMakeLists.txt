@@ -1,9 +1,11 @@
 if (NOT SOURCEKIT_INSTALLING_INPROC)
   add_sourcekit_xpc_service(SourceKitService sourcekitd
-    XPCService.cpp XpcTracing.cpp
-    LINK_LIBS SourceKitSwiftLang sourcekitdAPI
-    LLVM_COMPONENT_DEPENDS support coverage
+    XPCService.cpp
+    LLVM_LINK_COMPONENTS support coverage
   )
+  target_link_libraries(SourceKitService PRIVATE
+    SourceKitSwiftLang
+    sourcekitdAPI)
 endif()
 
 if (NOT SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")

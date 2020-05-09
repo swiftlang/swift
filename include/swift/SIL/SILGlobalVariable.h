@@ -17,9 +17,9 @@
 #ifndef SWIFT_SIL_SILGLOBALVARIABLE_H
 #define SWIFT_SIL_SILGLOBALVARIABLE_H
 
-#include <string>
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
@@ -38,8 +38,8 @@ class SILGlobalVariable
     public SILAllocated<SILGlobalVariable>
 {
 private:
-  friend class SILBasicBlock;
   friend class SILModule;
+  friend class SILBuilder;
 
   /// The SIL module that the global variable belongs to.
   SILModule &Module;
@@ -67,14 +67,23 @@ private:
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
 
-  /// The VarDecl associated with this SILGlobalVariable. For debugger purpose.
+  /// The VarDecl associated with this SILGlobalVariable. Must by nonnull for
+  /// language-level global variables.
   VarDecl *VDecl;
 
   /// Whether or not this is a declaration.
   bool IsDeclaration;
 
-  /// The static initializer.
-  SILFunction *InitializerF;
+  /// If this block is not empty, the global variable has a static initializer.
+  ///
+  /// The last instruction of this block is the top-level value of the static
+  /// initializer.
+  ///
+  /// The block is just used as a container for the instructions. So the
+  /// instructions still have a parent SILBasicBlock (but no parent function).
+  /// It would be somehow cleaner to just store an instruction list here and
+  /// make the SILGlobalVariable the parent pointer of the instructions.
+  SILBasicBlock StaticInitializerBlock;
 
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
                     IsSerialized_t IsSerialized,
@@ -96,7 +105,12 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType.castTo<SILFunctionType>();
   }
-    
+  SILType getLoweredTypeInContext(TypeExpansionContext context) const;
+  CanSILFunctionType
+  getLoweredFunctionTypeInContext(TypeExpansionContext context) const {
+    return getLoweredTypeInContext(context).castTo<SILFunctionType>();
+  }
+
   StringRef getName() const { return Name; }
   
   void setDeclaration(bool isD) { IsDeclaration = isD; }
@@ -118,9 +132,6 @@ public:
 
   VarDecl *getDecl() const { return VDecl; }
 
-  SILFunction *getInitializer() const { return InitializerF; }
-  void setInitializer(SILFunction *InitF);
-
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }
 
@@ -137,13 +148,28 @@ public:
     return Location.getValue();
   }
 
-  // Helper functions to analyze the static initializer.
-  static bool canBeStaticInitializer(SILFunction *F);
-  /// Check if a given SILFunction can be a static initializer. If yes, return
-  /// the SILGlobalVariable that it writes to.
-  static SILGlobalVariable *getVariableOfStaticInitializer(SILFunction *F);
-  /// Return the value that is written into the global variable.
-  SILInstruction *getValueOfStaticInitializer();
+  /// Returns the value of the static initializer or null if the global has no
+  /// static initializer.
+  SILInstruction *getStaticInitializerValue();
+
+  /// Returns true if the global is a statically initialized heap object.
+  bool isInitializedObject() {
+    return dyn_cast_or_null<ObjectInst>(getStaticInitializerValue()) != nullptr;
+  }
+
+  /// Returns true if \p I is a valid instruction to be contained in the
+  /// static initializer.
+  static bool isValidStaticInitializerInst(const SILInstruction *I,
+                                           SILModule &M);
+
+  /// Returns the usub_with_overflow builtin if \p TE extracts the result of
+  /// such a subtraction, which is required to have an integer_literal as right
+  /// operand.
+  static BuiltinInst *getOffsetSubtract(const TupleExtractInst *TE, SILModule &M);
+
+  void dropAllReferences() {
+    StaticInitializerBlock.dropAllReferences();
+  }
 
   /// Return whether this variable corresponds to a Clang node.
   bool hasClangNode() const;
@@ -190,15 +216,15 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
-// ilist_traits for SILGLobalVariable
+// ilist_traits for SILGlobalVariable
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILGlobalVariable> :
-public ilist_default_traits<::swift::SILGlobalVariable> {
-  typedef ::swift::SILGlobalVariable SILGlobalVariable;
+public ilist_node_traits<::swift::SILGlobalVariable> {
+  using SILGlobalVariable = ::swift::SILGlobalVariable;
 
 public:
   static void deleteNode(SILGlobalVariable *V) {}
@@ -208,5 +234,39 @@ private:
 };
 
 } // end llvm namespace
+
+//===----------------------------------------------------------------------===//
+// Utilities for verification and optimization.
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// Given an addressor, AddrF, return the global variable being addressed, or
+/// return nullptr if the addressor isn't a recognized pattern.
+SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
+
+/// Return the callee of a once call.
+SILFunction *getCalleeOfOnceCall(BuiltinInst *BI);
+
+/// Helper for getVariableOfGlobalInit(), so GlobalOpts can deeply inspect and
+/// rewrite the initialization pattern.
+///
+/// Given an addressor, AddrF, find the call to the global initializer if
+/// present, otherwise return null. If an initializer is returned, then
+/// `CallToOnce` is initialized to the corresponding builtin "once" call.
+SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
+                             BuiltinInst *&CallToOnce);
+
+/// Helper for getVariableOfGlobalInit(), so GlobalOpts can deeply inspect and
+/// rewrite the initialization pattern.
+///
+/// Given a global initializer, InitFunc, return the GlobalVariable that it
+/// statically initializes or return nullptr if it isn't an obvious static
+/// initializer. If a global variable is returned, InitVal is initialized to the
+/// the instruction producing the global's initial value.
+SILGlobalVariable *getVariableOfStaticInitializer(
+  SILFunction *InitFunc, SingleValueInstruction *&InitVal);
+
+} // namespace swift
 
 #endif

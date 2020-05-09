@@ -1,0 +1,32 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s
+// REQUIRES: asserts,no_asan
+
+struct rdar33511986 {
+  func test(s: String, b: Bool, os: String?, oa: Any?, o: AnyObject) -> [Any] {
+    let a: [Any]
+    a = [
+%for i in range(0, N):
+      [
+	"first": s,
+        "second": b,
+        "third": os,
+        "fourth": oa ?? o
+      ],
+%end
+      [
+	"first": s,
+        "second": b,
+        "third": nil,
+        "fourth": oa ?? o
+      ],
+      [
+	"first": "literal",
+        "second": true,
+        "third": nil,
+        "fourth": nil
+      ]
+    ]
+
+    return a
+  }
+}

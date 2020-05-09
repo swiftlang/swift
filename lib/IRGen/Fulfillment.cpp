@@ -18,11 +18,14 @@
 #include "Fulfillment.h"
 #include "IRGenModule.h"
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/SIL/TypeLowering.h"
 #include "GenericRequirement.h"
+#include "MetadataRequest.h"
 #include "ProtocolInfo.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
 using namespace irgen;
@@ -61,7 +64,10 @@ static bool isLeafTypeMetadata(CanType type) {
     return true;
 
   // Type parameters are statically opaque.
-  case TypeKind::Archetype:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     return true;
@@ -70,12 +76,12 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Tuple:
     return cast<TupleType>(type)->getNumElements() == 0;
 
-  // Nominal types might have parents.
+  // Nominal types might have generic parents.
   case TypeKind::Class:
   case TypeKind::Enum:
   case TypeKind::Protocol:
   case TypeKind::Struct:
-    return !cast<NominalType>(type)->getParent();
+    return !cast<NominalType>(type)->getDecl()->isGenericContext();
 
   // Bound generic types have type arguments.
   case TypeKind::BoundGenericClass:
@@ -107,6 +113,7 @@ static bool isLeafTypeMetadata(CanType type) {
 ///   metadata for the given type, false if it might be a subtype
 bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
                                         IsExact_t isExact,
+                                        MetadataState metadataState,
                                         unsigned source, MetadataPath &&path,
                                         const InterestingKeysCallback &keys) {
 
@@ -116,23 +123,39 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     // If the type isn't a leaf type, also check it as an inexact match.
     bool hadFulfillment = false;
     if (!isLeafTypeMetadata(type)) {
-      hadFulfillment |= searchTypeMetadata(IGM, type, IsInexact, source,
-                                           MetadataPath(path), keys);
+      hadFulfillment |= searchTypeMetadata(IGM, type, IsInexact, metadataState,
+                                           source, MetadataPath(path), keys);
+    }
+
+    // Consider its super class bound.
+    if (metadataState == MetadataState::Complete) {
+      if (auto superclassTy = keys.getSuperclassBound(type)) {
+        hadFulfillment |= searchNominalTypeMetadata(
+            IGM, superclassTy, metadataState, source, std::move(path), keys);
+      }
     }
 
     // Add the fulfillment.
-    hadFulfillment |= addFulfillment({type, nullptr}, source, std::move(path));
+    hadFulfillment |= addFulfillment({type, nullptr},
+                                     source, std::move(path), metadataState);
     return hadFulfillment;
+  }
+
+  // Search the superclass fields.  We can only do this if the metadata
+  // is complete.
+  if (metadataState == MetadataState::Complete &&
+      keys.isInterestingType(type)) {
+    if (auto superclassTy = keys.getSuperclassBound(type)) {
+      return searchNominalTypeMetadata(IGM, superclassTy, metadataState,
+                                       source, std::move(path), keys);
+    }
   }
 
   // Inexact metadata will be a problem if we ever try to use this
   // to remember that we already have the metadata for something.
-  if (auto nomTy = dyn_cast<NominalType>(type)) {
-    return searchNominalTypeMetadata(IGM, nomTy, source, std::move(path), keys);
-  }
-  if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
-    return searchBoundGenericTypeMetadata(IGM, boundTy, source,
-                                          std::move(path), keys);
+  if (isa<NominalType>(type) || isa<BoundGenericType>(type)) {
+    return searchNominalTypeMetadata(IGM, type, metadataState,
+                                     source, std::move(path), keys);
   }
 
   // TODO: tuples
@@ -142,18 +165,38 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
   return false;
 }
 
-/// Given that we have a source for a witness table that the given type
-/// conforms to the given protocol, check to see if it fulfills anything.
+bool FulfillmentMap::searchConformance(
+    IRGenModule &IGM, const ProtocolConformance *conformance,
+    unsigned sourceIndex, MetadataPath &&path,
+    const InterestingKeysCallback &interestingKeys) {
+  bool hadFulfillment = false;
+
+  SILWitnessTable::enumerateWitnessTableConditionalConformances(
+      conformance, [&](unsigned index, CanType type, ProtocolDecl *protocol) {
+        MetadataPath conditionalPath = path;
+        conditionalPath.addConditionalConformanceComponent(index);
+        hadFulfillment |=
+            searchWitnessTable(IGM, type, protocol, sourceIndex,
+                               std::move(conditionalPath), interestingKeys);
+
+        return /*finished?*/ false;
+      });
+
+  return hadFulfillment;
+}
+
 bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
                                         CanType type, ProtocolDecl *protocol,
                                         unsigned source, MetadataPath &&path,
                                         const InterestingKeysCallback &keys) {
+  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol));
+
   llvm::SmallPtrSet<ProtocolDecl*, 4> interestingConformancesBuffer;
-  llvm::SmallPtrSetImpl<ProtocolDecl*> *interestingConformances = nullptr;
+  llvm::SmallPtrSetImpl<ProtocolDecl *> *interestingConformances = nullptr;
 
   // If the interesting-keys set is limiting the set of interesting
   // conformances, collect that filter.
-  if (keys.isInterestingType(type) &&
+  if (keys.hasInterestingType(type) &&
       keys.hasLimitedInterestingConformances(type)) {
     // Bail out immediately if the set is empty.
     // This only makes sense because we're not trying to fulfill
@@ -170,17 +213,15 @@ bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
                             interestingConformances);
 }
 
-bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
-                                        CanType type, ProtocolDecl *protocol,
-                                        unsigned source, MetadataPath &&path,
-                                        const InterestingKeysCallback &keys,
-                                  const llvm::SmallPtrSetImpl<ProtocolDecl*> *
-                                          interestingConformances) {
-  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol));
+bool FulfillmentMap::searchWitnessTable(
+    IRGenModule &IGM, CanType type, ProtocolDecl *protocol, unsigned source,
+    MetadataPath &&path, const InterestingKeysCallback &keys,
+    llvm::SmallPtrSetImpl<ProtocolDecl *> *interestingConformances) {
 
   bool hadFulfillment = false;
 
-  auto &pi = IGM.getProtocolInfo(protocol);
+  auto &pi = IGM.getProtocolInfo(protocol,
+                                 ProtocolInfoKind::RequirementSignature);
 
   for (auto &entry : pi.getWitnessEntries()) {
     if (!entry.isBase()) continue;
@@ -196,116 +237,89 @@ bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
   // If we're not limiting the set of interesting conformances, or if
   // this is an interesting conformance, record it.
   if (!interestingConformances || interestingConformances->count(protocol)) {
-    hadFulfillment |= addFulfillment({type, protocol}, source, std::move(path));
+    hadFulfillment |= addFulfillment({type, protocol}, source,
+                                     std::move(path), MetadataState::Complete);
   }
 
   return hadFulfillment;
 }
 
 
-bool FulfillmentMap::searchParentTypeMetadata(IRGenModule &IGM,
-                                              NominalTypeDecl *decl,
-                                              CanType parent,
-                                              unsigned source,
-                                              MetadataPath &&path,
-                                        const InterestingKeysCallback &keys) {
-  // We might not have a parent type.
-  if (!parent) return false;
-
-  // If we do, it has to be nominal one way or another.
-  path.addNominalParentComponent();
-  return searchTypeMetadata(IGM, parent, IsExact, source, std::move(path),keys);
-}
-
 bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
-                                               CanNominalType type,
+                                               CanType type,
+                                               MetadataState metadataState,
                                                unsigned source,
                                                MetadataPath &&path,
                                          const InterestingKeysCallback &keys) {
-  // Nominal types add no generic arguments themselves, but they
-  // may have the arguments of their parents.
-  return searchParentTypeMetadata(IGM, type->getDecl(), type.getParent(),
-                                  source, std::move(path), keys);
-}
-
-bool FulfillmentMap::searchBoundGenericTypeMetadata(IRGenModule &IGM,
-                                                    CanBoundGenericType type,
-                                                    unsigned source,
-                                                    MetadataPath &&path,
-                                         const InterestingKeysCallback &keys) {
   // Objective-C generics don't preserve their generic parameters at runtime,
   // so they aren't able to fulfill type metadata requirements.
-  if (type->getDecl()->hasClangNode()) {
+  if (type.getAnyNominal()->hasClangNode()) {
     return false;
   }
   
+  auto *nominal = type.getAnyNominal();
+  if (!nominal->isGenericContext() || isa<ProtocolDecl>(nominal)) {
+    return false;
+  }
+
   bool hadFulfillment = false;
 
-  GenericTypeRequirements requirements(IGM, type->getDecl());
+  GenericTypeRequirements requirements(IGM, nominal);
   requirements.enumerateFulfillments(
-      IGM, type->getContextSubstitutionMap(IGM.getSwiftModule(), type->getDecl()),
-      [&](unsigned reqtIndex, CanType arg,
-          Optional<ProtocolConformanceRef> conf) {
-    // Skip uninteresting type arguments.
-    if (!keys.hasInterestingType(arg))
-      return;
+      IGM, type->getContextSubstitutionMap(IGM.getSwiftModule(), nominal),
+      [&](unsigned reqtIndex, CanType arg, ProtocolConformanceRef conf) {
+        // Skip uninteresting type arguments.
+        if (!keys.hasInterestingType(arg))
+          return;
 
-    // If the fulfilled value is type metadata, refine the path.
-    if (!conf) {
-      MetadataPath argPath = path;
-      argPath.addNominalTypeArgumentComponent(reqtIndex);
-      hadFulfillment |=
-        searchTypeMetadata(IGM, arg, IsExact, source, std::move(argPath), keys);
-      return;
-    }
+        // If the fulfilled value is type metadata, refine the path.
+        if (conf.isInvalid()) {
+          auto argState =
+              getPresumedMetadataStateForTypeArgument(metadataState);
+          MetadataPath argPath = path;
+          argPath.addNominalTypeArgumentComponent(reqtIndex);
+          hadFulfillment |= searchTypeMetadata(
+              IGM, arg, IsExact, argState, source, std::move(argPath), keys);
+          return;
+        }
 
-    // Otherwise, it's a conformance.
+        // Otherwise, it's a conformance.
 
-    // Ignore it unless the type itself is interesting.
-    if (!keys.isInterestingType(arg))
-      return;
+        // Ignore it unless the type itself is interesting.
+        if (!keys.isInterestingType(arg))
+          return;
 
-    // Refine the path.
-    MetadataPath argPath = path;
-    argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
+        // Refine the path.
+        MetadataPath argPath = path;
+        argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
 
-    llvm::SmallPtrSet<ProtocolDecl*, 4> interestingConformancesBuffer;
-    llvm::SmallPtrSetImpl<ProtocolDecl*> *interestingConformances = nullptr;
+        hadFulfillment |= searchWitnessTable(IGM, arg, conf.getRequirement(),
+                                             source, std::move(argPath), keys);
+      });
 
-    // If the interesting-keys set is limiting the set of interesting
-    // conformances, collect that filter.
-    if (keys.hasLimitedInterestingConformances(arg)) {
-      // Bail out immediately if the set is empty.
-      auto requiredConformances = keys.getInterestingConformances(arg);
-      if (requiredConformances.empty()) return;
-
-      interestingConformancesBuffer.insert(requiredConformances.begin(),
-                                           requiredConformances.end());
-      interestingConformances = &interestingConformancesBuffer;
-    }
-
-    hadFulfillment |=
-      searchWitnessTable(IGM, arg, conf->getRequirement(), source,
-                         std::move(argPath), keys, interestingConformances);
-  });
-
-  // Also match against the parent.  The polymorphic type
-  // will start with any arguments from the parent.
-  hadFulfillment |= searchParentTypeMetadata(IGM, type->getDecl(),
-                                             type.getParent(),
-                                             source, std::move(path), keys);
   return hadFulfillment;
 }
 
 /// Testify that there's a fulfillment at the given path.
 bool FulfillmentMap::addFulfillment(FulfillmentKey key,
-                                    unsigned source, MetadataPath &&path) {
+                                    unsigned source,
+                                    MetadataPath &&path,
+                                    MetadataState metadataState) {
   // Only add a fulfillment if we don't have any previous
   // fulfillment for that value or if it 's cheaper than the existing
   // fulfillment.
   auto it = Fulfillments.find(key);
   if (it != Fulfillments.end()) {
-    if (path.cost() >= it->second.Path.cost()) {
+    // If the new fulfillment is worse than the existing one, ignore it.
+    auto existingState = it->second.getState();
+    if (!isAtLeast(metadataState, existingState)) {
+      return false;
+    }
+
+    // Consider cost only if the fulfillments are equivalent in state.
+    // TODO: this is potentially suboptimal, but it generally won't matter.
+    if (metadataState == existingState && 
+        path.cost() >= it->second.Path.cost()) {
       return false;
     }
 
@@ -313,24 +327,20 @@ bool FulfillmentMap::addFulfillment(FulfillmentKey key,
     it->second.Path = std::move(path);
     return true;
   } else {
-    Fulfillments.insert({ key, Fulfillment(source, std::move(path)) });
+    Fulfillments.insert({ key, Fulfillment(source, std::move(path),
+                                           metadataState) });
     return true;
   }
 }
 
-bool FulfillmentMap::Everything::isInterestingType(CanType type) const {
-  return true;
-}
-bool FulfillmentMap::Everything::hasInterestingType(CanType type) const {
-  return true;
-}
-bool FulfillmentMap::Everything
-                   ::hasLimitedInterestingConformances(CanType type) const {
-  return false;
-}
-GenericSignature::ConformsToArray
-FulfillmentMap::Everything::getInterestingConformances(CanType type) const{
-  return {};
+static StringRef getStateName(MetadataState state) {
+  switch (state) {
+  case MetadataState::Complete: return "complete";
+  case MetadataState::NonTransitiveComplete: return "non-transitive-complete";
+  case MetadataState::LayoutComplete: return "layout-complete";
+  case MetadataState::Abstract: return "abstract";
+  }
+  llvm_unreachable("unhandled state");
 }
 
 void FulfillmentMap::dump() const {
@@ -340,7 +350,8 @@ void FulfillmentMap::dump() const {
     if (auto proto = entry.first.second) {
       out << ", " << proto->getNameStr();
     }
-    out << ") => sources[" << entry.second.SourceIndex
+    out << ") => " << getStateName(entry.second.getState())
+        << " at sources[" << entry.second.SourceIndex
         << "]." << entry.second.Path << "\n";
   }
 }

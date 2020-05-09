@@ -1,0 +1,20 @@
+// RUN: %scale-test --begin 2 --end 7 --step 1 --select NumLeafScopes %s
+// REQUIRES: asserts,no_asan
+
+class C {
+%for i in range(0, N):
+  var m${i}: String!
+%end
+
+  func fn(_ a: Any?) -> String {
+    return a as? String ?? ""
+  }
+
+  func rdar30389602() -> [String : Any] {
+    return [
+%for i in range(0, N):
+      "${i}" : fn(m${i}),
+%end
+    ]
+  }
+}

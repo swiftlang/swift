@@ -12,7 +12,6 @@
 
 #include "swift/Runtime/Config.h"
 
-SWIFT_CC(swift)
-extern "C"
-void *swift_stdlib_getPointer(void *x) { return x; }
+SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
+void *getPointer(void *x) { return x; }
 

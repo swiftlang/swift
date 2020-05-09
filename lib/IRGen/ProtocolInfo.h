@@ -29,12 +29,9 @@
 
 namespace swift {
   class CanType;
-  class Decl;
   class ProtocolConformance;
-  class ProtocolDecl;
 
 namespace irgen {
-  class ConformanceInfo; // private to GenProto.cpp
   class IRGenModule;
   class TypeInfo;
 
@@ -42,27 +39,59 @@ namespace irgen {
 /// ProtocolTypeInfo stores one of these for each requirement
 /// introduced by the protocol.
 class WitnessTableEntry {
-public:
-  void *MemberOrAssociatedType;
-  ProtocolDecl *Protocol;
+  enum WitnessKind {
+    PlaceholderKind,
+    OutOfLineBaseKind,
+    MethodKind,
+    AssociatedTypeKind,
+    AssociatedConformanceKind
+  };
 
-  WitnessTableEntry(void *member, ProtocolDecl *protocol)
-    : MemberOrAssociatedType(member), Protocol(protocol) {}
+  struct OutOfLineBaseWitness {
+    ProtocolDecl *Protocol;
+  };
+
+  struct MethodWitness {
+    SILDeclRef Witness;
+  };
+
+  struct AssociatedTypeWitness {
+    AssociatedTypeDecl *Association;
+  };
+
+  struct AssociatedConformanceWitness {
+    TypeBase *AssociatedType;
+    ProtocolDecl *Protocol;
+  };
+
+  WitnessKind Kind;
+  union {
+    OutOfLineBaseWitness OutOfLineBaseEntry;
+    MethodWitness MethodEntry;
+    AssociatedTypeWitness AssociatedTypeEntry;
+    AssociatedConformanceWitness AssociatedConformanceEntry;
+  };
+
+  WitnessTableEntry(WitnessKind Kind) : Kind(Kind) {}
 
 public:
-  WitnessTableEntry() = default;
+  static WitnessTableEntry forPlaceholder() {
+    return WitnessTableEntry(WitnessKind::PlaceholderKind);
+  }
 
   static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto) {
     assert(proto != nullptr);
-    return WitnessTableEntry(nullptr, proto);
+    WitnessTableEntry entry(WitnessKind::OutOfLineBaseKind);
+    entry.OutOfLineBaseEntry = {proto};
+    return entry;
   }
 
   /// Is this a base-protocol entry?
-  bool isBase() const { return MemberOrAssociatedType == nullptr; }
+  bool isBase() const { return Kind == WitnessKind::OutOfLineBaseKind; }
 
   bool matchesBase(ProtocolDecl *proto) const {
     assert(proto != nullptr);
-    return MemberOrAssociatedType == nullptr && Protocol == proto;
+    return isBase() && OutOfLineBaseEntry.Protocol == proto;
   }
 
   /// Given that this is a base-protocol entry, is the table
@@ -74,108 +103,138 @@ public:
 
   ProtocolDecl *getBase() const {
     assert(isBase());
-    return Protocol;
+    return OutOfLineBaseEntry.Protocol;
   }
 
-  static WitnessTableEntry forFunction(AbstractFunctionDecl *func) {
-    assert(func != nullptr);
-    return WitnessTableEntry(func, nullptr);
-  }
-  
-  bool isFunction() const {
-    return Protocol == nullptr &&
-           isa<AbstractFunctionDecl>(
-             static_cast<Decl*>(MemberOrAssociatedType));
+  static WitnessTableEntry forFunction(SILDeclRef declRef) {
+    assert(!declRef.isNull());
+    WitnessTableEntry entry(WitnessKind::MethodKind);
+    entry.MethodEntry = {declRef};
+    return entry;
   }
 
-  bool matchesFunction(AbstractFunctionDecl *func) const {
-    assert(func != nullptr);
-    return MemberOrAssociatedType == func && Protocol == nullptr;
+  bool isFunction() const { return Kind == WitnessKind::MethodKind; }
+
+  bool matchesFunction(SILDeclRef declRef) const {
+    return isFunction() && MethodEntry.Witness == declRef;
   }
 
-  AbstractFunctionDecl *getFunction() const {
+  SILDeclRef getFunction() const {
     assert(isFunction());
-    return static_cast<AbstractFunctionDecl*>(MemberOrAssociatedType);
+    return MethodEntry.Witness;
   }
 
   static WitnessTableEntry forAssociatedType(AssociatedType ty) {
-    return WitnessTableEntry(ty.getAssociation(), nullptr);
+    WitnessTableEntry entry(WitnessKind::AssociatedTypeKind);
+    entry.AssociatedTypeEntry = {ty.getAssociation()};
+    return entry;
   }
   
   bool isAssociatedType() const {
-    return Protocol == nullptr &&
-           isa<AssociatedTypeDecl>(
-             static_cast<Decl*>(MemberOrAssociatedType));
+    return Kind == WitnessKind::AssociatedTypeKind;
   }
 
   bool matchesAssociatedType(AssociatedType assocType) const {
-    return MemberOrAssociatedType == assocType.getAssociation() &&
-           Protocol == nullptr;
+    return isAssociatedType() &&
+           AssociatedTypeEntry.Association == assocType.getAssociation();
   }
 
   AssociatedTypeDecl *getAssociatedType() const {
     assert(isAssociatedType());
-    return static_cast<AssociatedTypeDecl*>(MemberOrAssociatedType);
+    return AssociatedTypeEntry.Association;
   }
 
-  static WitnessTableEntry forAssociatedConformance(AssociatedConformance conf){
-    return WitnessTableEntry(conf.getAssociation().getPointer(),
-                             conf.getAssociatedRequirement());
+  static WitnessTableEntry
+  forAssociatedConformance(AssociatedConformance conf) {
+    WitnessTableEntry entry(WitnessKind::AssociatedConformanceKind);
+    entry.AssociatedConformanceEntry = {conf.getAssociation().getPointer(),
+                                        conf.getAssociatedRequirement()};
+    return entry;
   }
 
   bool isAssociatedConformance() const {
-    return Protocol != nullptr && MemberOrAssociatedType != nullptr;
+    return Kind == WitnessKind::AssociatedConformanceKind;
   }
 
   bool matchesAssociatedConformance(const AssociatedConformance &conf) const {
-    return MemberOrAssociatedType == conf.getAssociation().getPointer() &&
-           Protocol == conf.getAssociatedRequirement();
+    return isAssociatedConformance() &&
+           AssociatedConformanceEntry.AssociatedType ==
+               conf.getAssociation().getPointer() &&
+           AssociatedConformanceEntry.Protocol ==
+               conf.getAssociatedRequirement();
   }
 
   CanType getAssociatedConformancePath() const {
     assert(isAssociatedConformance());
-    return CanType(static_cast<TypeBase *>(MemberOrAssociatedType));
+    return CanType(AssociatedConformanceEntry.AssociatedType);
   }
 
   ProtocolDecl *getAssociatedConformanceRequirement() const {
     assert(isAssociatedConformance());
-    return Protocol;
+    return AssociatedConformanceEntry.Protocol;
   }
+
+  friend bool operator==(WitnessTableEntry left, WitnessTableEntry right) {
+    if (left.Kind != right.Kind)
+      return false;
+    switch (left.Kind) {
+    case WitnessKind::PlaceholderKind:
+      return true;
+    case WitnessKind::OutOfLineBaseKind:
+      return left.OutOfLineBaseEntry.Protocol ==
+             right.OutOfLineBaseEntry.Protocol;
+    case WitnessKind::MethodKind:
+      return left.MethodEntry.Witness == right.MethodEntry.Witness;
+    case WitnessKind::AssociatedTypeKind:
+      return left.AssociatedTypeEntry.Association ==
+             right.AssociatedTypeEntry.Association;
+    case WitnessKind::AssociatedConformanceKind:
+      return left.AssociatedConformanceEntry.AssociatedType ==
+                 right.AssociatedConformanceEntry.AssociatedType &&
+             left.AssociatedConformanceEntry.Protocol ==
+                 right.AssociatedConformanceEntry.Protocol;
+    }
+    llvm_unreachable("invalid witness kind");
+  }
+};
+
+/// Describes the information available in a ProtocolInfo.
+///
+/// Each kind includes the information of the kinds before it.
+enum class ProtocolInfoKind : uint8_t {
+  RequirementSignature,
+  Full
 };
 
 /// An abstract description of a protocol.
 class ProtocolInfo final :
     private llvm::TrailingObjects<ProtocolInfo, WitnessTableEntry> {
   friend TrailingObjects;
-
-  /// A singly-linked-list of all the protocols that have been laid out.
-  const ProtocolInfo *NextConverted;
   friend class TypeConverter;
 
   /// The number of table entries in this protocol layout.
   unsigned NumTableEntries;
 
-  /// A table of all the conformances we've needed so far for this
-  /// protocol.  We expect this to be quite small for most protocols.
-  mutable llvm::SmallDenseMap<const ProtocolConformance*, ConformanceInfo*, 2>
-    Conformances;
+  ProtocolInfoKind Kind;
 
-  ProtocolInfo(ArrayRef<WitnessTableEntry> table)
-      : NumTableEntries(table.size()) {
+  ProtocolInfoKind getKind() const {
+    return Kind;
+  }
+
+  ProtocolInfo(ArrayRef<WitnessTableEntry> table, ProtocolInfoKind kind)
+      : NumTableEntries(table.size()), Kind(kind) {
     std::uninitialized_copy(table.begin(), table.end(),
                             getTrailingObjects<WitnessTableEntry>());
   }
 
-  static ProtocolInfo *create(ArrayRef<WitnessTableEntry> table);
+  static std::unique_ptr<ProtocolInfo> create(ArrayRef<WitnessTableEntry> table,
+                                              ProtocolInfoKind kind);
 
 public:
-  const ConformanceInfo &getConformance(IRGenModule &IGM,
-                                        ProtocolDecl *protocol,
-                                        const ProtocolConformance *conf) const;
-
   /// The number of witness slots in a conformance to this protocol;
   /// in other words, the size of the table in words.
   unsigned getNumWitnesses() const {
+    assert(getKind() == ProtocolInfoKind::Full);
     return NumTableEntries;
   }
 
@@ -222,9 +281,10 @@ public:
 
   /// Return the witness index for the witness function for the given
   /// function requirement.
-  WitnessIndex getFunctionIndex(AbstractFunctionDecl *function) const {
+  WitnessIndex getFunctionIndex(SILDeclRef declRef) const {
+    assert(getKind() >= ProtocolInfoKind::Full);
     for (auto &witness : getWitnessEntries()) {
-      if (witness.matchesFunction(function))
+      if (witness.matchesFunction(declRef))
         return getNonBaseWitnessIndex(&witness);
     }
     llvm_unreachable("didn't find entry for function");
@@ -232,13 +292,8 @@ public:
 
   /// Return the witness index for the type metadata access function
   /// for the given associated type.
-  WitnessIndex getAssociatedTypeIndex(AssociatedType assocType) const {
-    for (auto &witness : getWitnessEntries()) {
-      if (witness.matchesAssociatedType(assocType))
-        return getNonBaseWitnessIndex(&witness);
-    }
-    llvm_unreachable("didn't find entry for associated type");
-  }
+  WitnessIndex getAssociatedTypeIndex(IRGenModule &IGM,
+                                      AssociatedType assocType) const;
 
   /// Return the witness index for the protocol witness table access
   /// function for the given associated protocol conformance.
@@ -250,8 +305,19 @@ public:
     }
     llvm_unreachable("didn't find entry for associated conformance");
   }
+};
 
-  ~ProtocolInfo();
+/// Detail about how an object conforms to a protocol.
+class ConformanceInfo {
+  virtual void anchor();
+public:
+  virtual ~ConformanceInfo() = default;
+  virtual llvm::Value *getTable(IRGenFunction &IGF,
+                               llvm::Value **conformingMetadataCache) const = 0;
+  /// Try to get this table as a constant pointer.  This might just
+  /// not be supportable at all.
+  virtual llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
+                                              CanType conformingType) const = 0;
 };
 
 } // end namespace irgen

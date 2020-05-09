@@ -11,6 +11,12 @@ float cfunc4();
 void exit(int);
 
 double pow(double x, double y);
+long double powl(long double x, long double y);
+
+void f16ptrfunc(__fp16 *);
+#if defined __arm__ || defined __arm64__ || defined __aarch64__
+_Float16 f16func(_Float16);
+#endif
 
 int puts(const char *);
 

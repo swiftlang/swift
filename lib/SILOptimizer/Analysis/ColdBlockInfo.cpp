@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/AST/SemanticAttrs.h"
 
 using namespace swift;
 
@@ -44,7 +45,7 @@ ColdBlockInfo::BranchHint ColdBlockInfo::getBranchHint(SILValue Cond,
 
   if (auto *Arg = dyn_cast<SILArgument>(Cond)) {
     llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> InValues;
-    if (!Arg->getIncomingValues(InValues))
+    if (!Arg->getIncomingPhiValues(InValues))
       return BranchHint::None;
 
     if (recursionDepth > RecursionDepthLimit)
@@ -74,32 +75,18 @@ ColdBlockInfo::BranchHint ColdBlockInfo::getBranchHint(SILValue Cond,
     return Hint;
   }
   
-  // Handle the @semantic function used for branch hints. The generic
-  // fast/slowPath calls are frequently only inlined one level down to
-  // _branchHint before inlining the call sites that they guard.
+  // Handle the @semantic functions used for branch hints.
   auto AI = dyn_cast<ApplyInst>(Cond);
   if (!AI)
     return BranchHint::None;
 
-  if (auto *F = AI->getReferencedFunction()) {
+  if (auto *F = AI->getReferencedFunctionOrNull()) {
     if (F->hasSemanticsAttrs()) {
-      if (F->hasSemanticsAttr("branchhint")) {
-        // A "branchint" model takes a Bool expected value as the second
-        // argument.
-        if (auto *SI = dyn_cast<StructInst>(AI->getArgument(1))) {
-          assert(SI->getElements().size() == 1 && "Need Bool.value");
-          if (auto *Literal =
-              dyn_cast<IntegerLiteralInst>(SI->getElements()[0])) {
-            return (Literal->getValue() == 0)
-              ? BranchHint::LikelyFalse : BranchHint::LikelyTrue;
-          }
-        }
-      }
       // fastpath/slowpath attrs are untested because the inliner luckily
       // inlines them before the downstream calls.
-      else if (F->hasSemanticsAttr("slowpath"))
+      if (F->hasSemanticsAttr(semantics::SLOWPATH))
         return BranchHint::LikelyFalse;
-      else if (F->hasSemanticsAttr("fastpath"))
+      else if (F->hasSemanticsAttr(semantics::FASTPATH))
         return BranchHint::LikelyTrue;
     }
   }

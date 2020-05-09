@@ -120,8 +120,8 @@ func <+><T,U,V> (lhs: T?, rhs: @escaping (T) -> (U) -> V) -> (U) -> V? {
 
 let a : Int? = 23
 let b : Int? = 42
-print((b <+> pair)(a!)) // CHECK-NEXT: (42, 23)
-print((b <+> pair_)(a!)) // CHECK-NEXT: (42, 23)
+print((b <+> pair)(a!) as Any) // CHECK-NEXT: (42, 23)
+print((b <+> pair_)(a!) as Any) // CHECK-NEXT: (42, 23)
 
 //
 // rdar://problem/20475584
@@ -172,12 +172,12 @@ func set<S, A>(_ lens: @escaping (@escaping (A) -> Identity<A>) -> (S) -> (@esca
 	return { x in { y in over(lens)(const(x))(y) } }
 }
 
-func _1<A, B, C, D>(_ f: @escaping (A) -> C) -> (A, B) -> (@escaping (@escaping (A) -> (A, B)) -> (C) -> D) -> D {
-	return { (x, y) in { fmap in fmap({ ($0, y) })(f(x)) } }
+func _1<A, B, C, D>(_ f: @escaping (A) -> C) -> ((A, B)) -> (@escaping (@escaping (A) -> (A, B)) -> (C) -> D) -> D {
+	return { pair in { fmap in fmap({ ($0, pair.1) })(f(pair.0)) } }
 }
 
-func _2<A, B, C, D>(_ f: @escaping (B) -> C) -> (A, B) -> (@escaping (@escaping (B) -> (A, B)) -> (C) -> D) -> D {
-    return { (x, y) in { fmap in fmap({ (x, $0) })(f(y)) } }
+func _2<A, B, C, D>(_ f: @escaping (B) -> C) -> ((A, B)) -> (@escaping (@escaping (B) -> (A, B)) -> (C) -> D) -> D {
+    return { pair in { fmap in fmap({ (pair.0, $0) })(f(pair.1)) } }
 }
 
 
@@ -199,6 +199,6 @@ let pt2 = over(_1)({ $0 * 4 })((1, 2))
 print(pt2) // CHECK-NEXT: (4, 2)
 let pt3 = set(_1)(3)((1, 2))
 print(pt3) // CHECK-NEXT: (3, 2)
-let pt4 = view(_2)("hello", 5)
+let pt4 = view(_2)(("hello", 5))
 print(pt4) // CHECK-NEXT: 5
 

@@ -1,9 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -module-name MangleTest %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+
+// rdar://problem/56959761
+// UNSUPPORTED: OS=watchos
+// UNSUPPORTED: OS=tvos
 
 import Foundation
 
@@ -21,7 +26,7 @@ func checkClassName(_ cls: AnyClass, _ name: String, _ mangled: String)
 {
   // Class's name should appear unmangled.
   assert(NSStringFromClass(cls) == name)
-  assert(NSStringFromClass(object_getClass(cls)) == name)
+  assert(NSStringFromClass(object_getClass(cls)!) == name)
 
   // Look up by unmangled name should work.
   // Look up by mangled name should also work.
@@ -47,7 +52,7 @@ func checkProtocolName(_ proto: Protocol, _ name: String, _ mangled: String)
 
 func checkIvarName(_ cls: AnyClass, _ name: String)
 {
-  let ivarName = ivar_getName(class_getInstanceVariable(cls, name))
+  let ivarName = ivar_getName(class_getInstanceVariable(cls, name)!)
   let s = ivarName != nil ? String(cString: ivarName!) : Optional.none
   assert(name == s)
 }

@@ -19,10 +19,17 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "swift/AST/ModuleDependencies.h"
+
+namespace llvm {
+class FileCollector;
+}
 
 namespace clang {
 class DependencyCollector;
@@ -31,20 +38,37 @@ class DependencyCollector;
 namespace swift {
 
 class AbstractFunctionDecl;
+struct AutoDiffConfig;
 class ClangImporterOptions;
 class ClassDecl;
+class FileUnit;
 class ModuleDecl;
+class ModuleDependencies;
+class ModuleDependenciesCache;
 class NominalTypeDecl;
+class SourceFile;
+class TypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
+
+enum class Bridgeability : unsigned {
+  /// This context does not permit bridging at all.  For example, the
+  /// target of a C pointer.
+  None,
+
+  /// This context permits all kinds of bridging.  For example, the
+  /// imported result of a method declaration.
+  Full
+};
 
 /// Records dependencies on files outside of the current module;
 /// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
-
-  DependencyTracker();
+  explicit DependencyTracker(
+      bool TrackSystemDeps,
+      std::shared_ptr<llvm::FileCollector> FileCollector = {});
 
   /// Adds a file as a dependency.
   ///
@@ -61,30 +85,41 @@ public:
   std::shared_ptr<clang::DependencyCollector> getClangCollector();
 };
 
-/// \brief Abstract interface that loads named modules into the AST.
+/// Abstract interface to run an action in a sub ASTContext.
+struct SubASTContextDelegate {
+  virtual bool runInSubContext(ASTContext &ctx, StringRef interfacePath,
+    llvm::function_ref<bool(ASTContext&)> action) {
+    llvm_unreachable("function should be overriden");
+  }
+  virtual ~SubASTContextDelegate() = default;
+};
+
+/// Abstract interface that loads named modules into the AST.
 class ModuleLoader {
-  DependencyTracker * const dependencyTracker;
   virtual void anchor();
 
 protected:
+  DependencyTracker * const dependencyTracker;
   ModuleLoader(DependencyTracker *tracker) : dependencyTracker(tracker) {}
-
-  void addDependency(StringRef file, bool IsSystem=false) {
-    if (dependencyTracker)
-      dependencyTracker->addDependency(file, IsSystem);
-  }
 
 public:
   virtual ~ModuleLoader() = default;
 
-  /// \brief Check whether the module with a given name can be imported without
+  /// Collect visible module names.
+  ///
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  virtual void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const = 0;
+
+  /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) = 0;
+  virtual bool canImportModule(Located<Identifier> named) = 0;
 
-  /// \brief Import a module with the given module path.
+  /// Import a module with the given module path.
   ///
   /// \param importLoc The location of the 'import' keyword.
   ///
@@ -95,9 +130,9 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual
   ModuleDecl *loadModule(SourceLoc importLoc,
-                         ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
+                         ArrayRef<Located<Identifier>> path) = 0;
 
-  /// \brief Load extensions to the given nominal type.
+  /// Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.
   ///
@@ -107,7 +142,7 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) { }
 
-  /// \brief Load the methods within the given class that produce
+  /// Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
   /// \param classDecl The class in which we are searching for @objc methods.
@@ -133,8 +168,35 @@ public:
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) = 0;
 
-  /// \brief Verify all modules loaded by this loader.
+  /// Load derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  ///
+  /// \param originalAFD The declaration whose derivative function
+  /// configurations should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains derivative function configurations loaded from any generation up
+  /// to and including this one.
+  ///
+  /// \param results The result list of derivative function configurations.
+  /// This list will be extended with any methods found in subsequent
+  /// generations.
+  virtual void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results) {};
+
+  /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }
+
+  /// Discover overlays declared alongside this file and add infomation about
+  /// them to it.
+  void findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module, FileUnit *file);
+
+  /// Retrieve the dependencies for the given, named module, or \c None
+  /// if no such module exists.
+  virtual Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName,
+      ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) = 0;
 };
 
 } // namespace swift

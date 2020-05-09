@@ -48,10 +48,21 @@
 #define LITERAL_EXPR(Id, Parent) EXPR(Id, Parent)
 #endif
 
+/// A expression node with a DeclContext. For example: closures.
+///
+/// By default, these are treated like any other expression.
+#ifndef CONTEXT_EXPR
+#define CONTEXT_EXPR(Id, Parent) EXPR(Id, Parent)
+#endif
+
 /// A convenience for determining the range of expressions.  These will always
 /// appear immediately after the last member.
 #ifndef EXPR_RANGE
 #define EXPR_RANGE(Id, First, Last)
+#endif
+
+#ifndef LAST_EXPR
+#define LAST_EXPR(Id)
 #endif
 
 EXPR(Error, Expr)
@@ -77,11 +88,14 @@ ABSTRACT_EXPR(OverloadSetRef, Expr)
   UNCHECKED_EXPR(OverloadedDeclRef, OverloadSetRefExpr)
   EXPR_RANGE(OverloadSetRef, OverloadedDeclRef, OverloadedDeclRef)
 UNCHECKED_EXPR(UnresolvedDeclRef, Expr)
-EXPR(MemberRef, Expr)
-ABSTRACT_EXPR(DynamicLookup, Expr)
-  EXPR(DynamicMemberRef, DynamicLookupExpr)
-  EXPR(DynamicSubscript, DynamicLookupExpr)
-  EXPR_RANGE(DynamicLookup, DynamicMemberRef, DynamicSubscript)
+ABSTRACT_EXPR(Lookup, Expr)
+  EXPR(MemberRef, LookupExpr)
+  EXPR(Subscript, LookupExpr)
+  ABSTRACT_EXPR(DynamicLookup, LookupExpr)
+    EXPR(DynamicMemberRef, DynamicLookupExpr)
+    EXPR(DynamicSubscript, DynamicLookupExpr)
+    EXPR_RANGE(DynamicLookup, DynamicMemberRef, DynamicSubscript)
+  EXPR_RANGE(Lookup, MemberRef, DynamicSubscript)
 UNCHECKED_EXPR(UnresolvedSpecialize, Expr)
 UNCHECKED_EXPR(UnresolvedMember, Expr)
 UNCHECKED_EXPR(UnresolvedDot, Expr)
@@ -100,18 +114,20 @@ ABSTRACT_EXPR(Collection, Expr)
   EXPR(Array, CollectionExpr)
   EXPR(Dictionary, CollectionExpr)
   EXPR_RANGE(Collection, Array, Dictionary)
-EXPR(Subscript, Expr)
 EXPR(KeyPathApplication, Expr)
 EXPR(TupleElement, Expr)
 EXPR(CaptureList, Expr)
 ABSTRACT_EXPR(AbstractClosure, Expr)
-  EXPR(Closure, AbstractClosureExpr)
-  EXPR(AutoClosure, AbstractClosureExpr)
+  CONTEXT_EXPR(Closure, AbstractClosureExpr)
+  CONTEXT_EXPR(AutoClosure, AbstractClosureExpr)
   EXPR_RANGE(AbstractClosure, Closure, AutoClosure)
 EXPR(InOut, Expr)
+EXPR(VarargExpansion, Expr)
 EXPR(DynamicType, Expr)
 EXPR(RebindSelfInConstructor, Expr)
 EXPR(OpaqueValue, Expr)
+EXPR(PropertyWrapperValuePlaceholder, Expr)
+EXPR(DefaultArgument, Expr)
 EXPR(BindOptional, Expr)
 EXPR(OptionalEvaluation, Expr)
 EXPR(ForceValue, Expr)
@@ -129,11 +145,12 @@ ABSTRACT_EXPR(Apply, Expr)
   EXPR_RANGE(Apply, Call, ConstructorRefCall)
 ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(Load, ImplicitConversionExpr)
-  EXPR(TupleShuffle, ImplicitConversionExpr)
+  EXPR(DestructureTuple, ImplicitConversionExpr)
   EXPR(UnresolvedTypeConversion, ImplicitConversionExpr)
   EXPR(FunctionConversion, ImplicitConversionExpr)
   EXPR(CovariantFunctionConversion, ImplicitConversionExpr)
   EXPR(CovariantReturnConversion, ImplicitConversionExpr)
+  EXPR(ImplicitlyUnwrappedFunctionConversion, ImplicitConversionExpr)
   EXPR(MetatypeConversion, ImplicitConversionExpr)
   EXPR(CollectionUpcastConversion, ImplicitConversionExpr)
   EXPR(Erasure, ImplicitConversionExpr)
@@ -153,7 +170,13 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(PointerToPointer, ImplicitConversionExpr)
   EXPR(ForeignObjectConversion, ImplicitConversionExpr)
   EXPR(UnevaluatedInstance, ImplicitConversionExpr)
-  EXPR_RANGE(ImplicitConversion, Load, UnevaluatedInstance)
+  EXPR(UnderlyingToOpaque, ImplicitConversionExpr)
+  EXPR(DifferentiableFunction, ImplicitConversionExpr)
+  EXPR(LinearFunction, ImplicitConversionExpr)
+  EXPR(DifferentiableFunctionExtractOriginal, ImplicitConversionExpr)
+  EXPR(LinearFunctionExtractOriginal, ImplicitConversionExpr)
+  EXPR(LinearToDifferentiableFunction, ImplicitConversionExpr)
+  EXPR_RANGE(ImplicitConversion, Load, LinearToDifferentiableFunction)
 ABSTRACT_EXPR(ExplicitCast, Expr)
   ABSTRACT_EXPR(CheckedCast, ExplicitCastExpr)
     EXPR(ForcedCheckedCast, CheckedCastExpr)
@@ -168,13 +191,19 @@ EXPR(EnumIsCase, Expr)
 EXPR(Assign, Expr)
 EXPR(CodeCompletion, Expr)
 UNCHECKED_EXPR(UnresolvedPattern, Expr)
+EXPR(LazyInitializer, Expr)
 EXPR(EditorPlaceholder, Expr)
 EXPR(ObjCSelector, Expr)
 EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
+UNCHECKED_EXPR(OneWay, Expr)
+EXPR(Tap, Expr)
+LAST_EXPR(Tap)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR
 #undef UNCHECKED_EXPR
 #undef ABSTRACT_EXPR
+#undef CONTEXT_EXPR
 #undef EXPR
+#undef LAST_EXPR

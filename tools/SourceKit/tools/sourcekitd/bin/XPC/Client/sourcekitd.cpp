@@ -12,12 +12,10 @@
 
 #include "sourcekitd/Internal-XPC.h"
 #include "SourceKit/Support/Logging.h"
-#include "SourceKit/Support/Tracing.h"
 #include "SourceKit/Support/UIdent.h"
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/TargetSelect.h"
 #include <chrono>
 #include <xpc/xpc.h>
 #include <dispatch/dispatch.h>
@@ -30,11 +28,6 @@ using namespace sourcekitd;
 static UIdent gKeyNotification("key.notification");
 static UIdent gKeyDuration("key.duration");
 static UIdent gSemaDisableNotificationUID("source.notification.sema_disabled");
-
-void handleTraceMessageRequest(uint64_t Session, xpc_object_t Msg);
-void initializeTracing();
-void persistTracingData();
-bool isTracingEnabled();
 
 static llvm::sys::Mutex GlobalHandlersMtx;
 static sourcekitd_uid_handler_t UidMappingHandler;
@@ -219,7 +212,6 @@ static void handleInternalInitRequest(xpc_object_t reply) {
   size_t Delay = SemanticEditorDelaySecondsNum;
   if (Delay != 0)
     xpc_dictionary_set_uint64(reply, xpc::KeySemaEditorDelay, Delay);
-  xpc_dictionary_set_uint64(reply, xpc::KeyTracingEnabled, isTracingEnabled());
 }
 
 static void handleInternalUIDRequest(xpc_object_t XVal,
@@ -249,13 +241,6 @@ static void handleInternalUIDRequest(xpc_object_t XVal,
 static void handleInterruptedConnection(xpc_object_t event, xpc_connection_t conn);
 
 void sourcekitd::initialize() {
-  initializeTracing();
-
-  llvm::InitializeAllTargets();
-  llvm::InitializeAllTargetMCs();
-  llvm::InitializeAllAsmPrinters();
-  llvm::InitializeAllAsmParsers();
-
   assert(!GlobalConn);
   GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, nullptr);
 
@@ -313,15 +298,6 @@ void sourcekitd::initialize() {
       case xpc::Message::UIDSynchronization: {
         xpc_object_t reply = xpc_dictionary_create_reply(event);
         handleInternalUIDRequest(xpc_array_get_value(contents, 1), reply);
-        xpc_connection_send_message(GlobalConn, reply);
-        xpc_release(reply);
-        break;
-      }
-
-      case xpc::Message::TraceMessage: {
-        xpc_object_t reply = xpc_dictionary_create_reply(event);
-        handleTraceMessageRequest(xpc_array_get_uint64(contents, 1),
-                                  xpc_array_get_value(contents, 2));
         xpc_connection_send_message(GlobalConn, reply);
         xpc_release(reply);
         break;
@@ -415,6 +391,10 @@ static void updateSemanticEditorDelay() {
   using namespace std::chrono;
   using TimePoint = time_point<system_clock, nanoseconds>;
 
+  // This minimum is chosen to keep us from being throttled by XPC.
+  static const size_t MinDelaySeconds = 10;
+  static const size_t MaxDelaySeconds = 20;
+
   // Clear any previous setting.
   SemanticEditorDelaySecondsNum = 0;
 
@@ -423,16 +403,13 @@ static void updateSemanticEditorDelay() {
   TimePoint PrevTime = gPrevCrashTime;
   TimePoint CurrTime = system_clock::now();
   gPrevCrashTime = CurrTime;
-  if (PrevTime == TimePoint()) {
-    // First time that it crashed.
-    return;
-  }
 
   auto Diff = duration_cast<seconds>(CurrTime - PrevTime);
+  size_t Delay = Diff.count()*2 + 1;
   if (Diff.count() > 30)
-    return; // treat this as more likely unrelated to the previous crash.
+    Delay = 0; // Treat this as more likely unrelated to the previous crash.
+  Delay = std::min(std::max(Delay, MinDelaySeconds), MaxDelaySeconds);
 
-  size_t Delay = std::min(size_t(20), size_t(Diff.count()*2 + 1));
   LOG_WARN_FUNC("disabling semantic editor for " << Delay << " seconds");
   SemanticEditorDelaySecondsNum = Delay;
 
@@ -449,7 +426,6 @@ static void updateSemanticEditorDelay() {
 static void handleInterruptedConnection(xpc_object_t event, xpc_connection_t conn) {
   ConnectionInterrupted = true;
 
-  persistTracingData();
   updateSemanticEditorDelay();
 
   // FIXME: InterruptedConnectionHandler will go away.

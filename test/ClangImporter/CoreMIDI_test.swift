@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk
-
-// REQUIRES: objc_interop
+// RUN: %target-typecheck-verify-swift %clang-importer-sdk -enable-objc-interop
 
 import CoreMIDI
 

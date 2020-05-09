@@ -29,10 +29,10 @@ CF_INLINE CFHashCode __CFHashDouble(double d) {
     return (CFHashCode)(integralHash + (CFHashCode)((d - dInt) * ULONG_MAX));
 }
 
-CF_EXPORT CFHashCode CFHashBytes(uint8_t *_Nullable bytes, long len);
+CF_EXPORT CFHashCode CFHashBytes(uint8_t *_Nullable bytes, CFIndex len);
 
 
-CF_INLINE CFHashCode __CFHashBytes(uint8_t *_Nullable bytes, long len) {
+CF_INLINE CFHashCode __CFHashBytes(uint8_t *_Nullable bytes, CFIndex len) {
     return CFHashBytes(bytes, len);
 }
 

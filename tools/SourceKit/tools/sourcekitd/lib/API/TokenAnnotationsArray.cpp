@@ -55,7 +55,7 @@ bool TokenAnnotationsArrayBuilder::empty() const {
 
 std::unique_ptr<llvm::MemoryBuffer>
 TokenAnnotationsArrayBuilder::createBuffer() {
-  return Impl.Builder.createBuffer();
+  return Impl.Builder.createBuffer(CustomBufferKind::TokenAnnotationsArray);
 }
 
 namespace {
@@ -218,7 +218,9 @@ VariantFunctions CompactVariantFuncs<TokenAnnotationsArray>::Funcs = {
   nullptr/*Annot_string_get_length*/,
   nullptr/*Annot_string_get_ptr*/,
   nullptr/*Annot_int64_get_value*/,
-  nullptr/*Annot_uid_get_value*/
+  nullptr/*Annot_uid_get_value*/,
+  nullptr/*Annot_data_get_size*/,
+  nullptr/*Annot_data_get_ptr*/,
 };
 
 } // namespace sourcekitd

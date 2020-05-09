@@ -26,20 +26,20 @@ extension Set {
 }
 
 func foo() {
-  _  = NSStringToNSString as (String!) -> String?
+  _  = NSStringToNSString as (String?) -> String?
   _ = DummyClass().nsstringProperty.onlyOnString() as String
 
   _  = BOOLtoBOOL as (Bool) -> Bool
   _  = DummyClass().boolProperty.onlyOnBool() as Bool
 
-  _  = arrayToArray as (Array<Any>!) -> (Array<Any>!)
+  _  = arrayToArray as (Array<Any>?) -> (Array<Any>?)
   DummyClass().arrayProperty.onlyOnArray()
 
-  _ = dictToDict as (Dictionary<AnyHashable, Any>!) -> Dictionary<AnyHashable, Any>!
+  _ = dictToDict as (Dictionary<AnyHashable, Any>?) -> Dictionary<AnyHashable, Any>?
 
   DummyClass().dictProperty.onlyOnDictionary()
 
-  _ = setToSet as (Set<AnyHashable>!) -> Set<AnyHashable>!
+  _ = setToSet as (Set<AnyHashable>?) -> Set<AnyHashable>?
   DummyClass().setProperty.onlyOnSet()
 }
 
@@ -62,4 +62,11 @@ func objcStructs(_ s: StructOfNSStrings, sb: StructOfBlocks) {
   // FIXME: Blocks should also be Unmanaged.
   _ = sb.block as Bool // expected-error {{cannot convert value of type '@convention(block) () -> Void' to type 'Bool' in coercion}}
   sb.block() // okay
+}
+
+func test_repair_does_not_interfere_with_conversions() {
+  func foo(_: Any, _: AnyHashable) {}
+  func bar(_ a: AnyObject, _ b: AnyObject) {
+    foo(a, b as! NSObject) // Ok
+  }
 }

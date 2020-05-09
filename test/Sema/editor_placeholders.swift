@@ -10,7 +10,7 @@ if (true) {
   <#code#> // expected-error {{editor placeholder}}
 }
 
-foo(<#T##x: Undeclared##Undeclared#>) // expected-error {{editor placeholder}} expected-error {{use of undeclared type 'Undeclared'}}
+foo(<#T##x: Undeclared##Undeclared#>) // expected-error {{editor placeholder}} expected-error {{cannot find type 'Undeclared' in scope}}
 
 func f(_ n: Int) {}
 let a1 = <#T#> // expected-error{{editor placeholder in source file}}
@@ -26,5 +26,13 @@ f(<#T#> + 1) // expected-error{{editor placeholder in source file}}
 f(<#T##Int#>) // expected-error{{editor placeholder in source file}}
 f(<#T##String#>) // expected-error{{editor placeholder in source file}} expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 
-for x in <#T#> { // expected-error{{editor placeholder in source file}} expected-error{{type '()' does not conform to protocol 'Sequence'}}
+for x in <#T#> { // expected-error{{editor placeholder in source file}} expected-error{{for-in loop requires '()' to conform to 'Sequence'}}
+
+}
+
+// rdar://problem/49712598 - crash while trying to rank solutions with different kinds of overloads
+func test_ambiguity_with_placeholders(pairs: [(rank: Int, count: Int)]) -> Bool {
+  return pairs[<#^ARG^#>].count == 2
+  // expected-error@-1 {{editor placeholder in source file}}
+  // expected-error@-2 {{ambiguous use of 'subscript(_:)'}}
 }

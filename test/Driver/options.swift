@@ -1,35 +1,6 @@
-// rdar://13723332 Crash on -emit-sil with no input files
-// RUN: not %target-swift-frontend -emit-sil 2>&1 | %FileCheck -check-prefix=NO_FILES %s
-// RUN: not %target-swift-frontend -emit-sil -parse-as-library 2>&1 | %FileCheck -check-prefix=NO_FILES %s
-// NO_FILES: this mode requires at least one input file
-
-// RUN: not %target-swift-frontend -parse-sil -emit-sil 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
-// RUN: not %target-swift-frontend -parse-sil -emit-sil %s %s 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
-// SIL_FILES: this mode requires a single input file
-
-// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_NAME %s
-// INVALID_MODULE_NAME: error: module name "invalid-module-name" is not a valid identifier; use -module-name flag to specify an alternate name
-
-// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid.module.name.swift 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_NAME2 %s
-// INVALID_MODULE_NAME2: error: module name "invalid.module.name" is not a valid identifier; use -module-name flag to specify an alternate name
-
-// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name still-invalid 2>&1 | %FileCheck -check-prefix=STILL_INVALID %s
-// STILL_INVALID: error: module name "still-invalid" is not a valid identifier{{$}}
-
-// RUN: not %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | %FileCheck -check-prefix=STDLIB_MODULE %s
+// RUN: not %swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | %FileCheck -check-prefix=STDLIB_MODULE %s
 // RUN: %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" -parse-stdlib -###
 // STDLIB_MODULE: error: module name "Swift" is reserved for the standard library{{$}}
-
-// RUN: not %target-swift-frontend -typecheck -emit-module %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_MODULE %s
-// PARSE_NO_MODULE: error: this mode does not support emitting modules{{$}}
-
-// RUN: not %target-swift-frontend -dump-ast -emit-dependencies %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_DEPS %s
-// DUMP_NO_DEPS: error: this mode does not support emitting dependency files{{$}}
-
-// Should not fail with non-zero exit code.
-// RUN: %target-swift-frontend -emit-silgen %S/Inputs/invalid-module-name.swift > /dev/null
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo > /dev/null
-// RUN: %target-swift-frontend -typecheck -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo
 
 // RUN: not %swiftc_driver -crazy-option-that-does-not-exist %s 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
 // RUN: not %swift_driver -crazy-option-that-does-not-exist 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
@@ -54,13 +25,17 @@
 // RUN: not %swiftc_driver -import-objc-header fake.h -import-underlying-module -c %s 2>&1 | %FileCheck -check-prefix=FRAMEWORK_BRIDGING_HEADER %s
 // FRAMEWORK_BRIDGING_HEADER: error: using bridging headers with framework targets is unsupported
 
+// RUN: not %swiftc_driver -import-objc-header fake.h -emit-module-interface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
+// RUN: not %swiftc_driver -import-objc-header fake.h -emit-module-interface-path fake.swiftinterface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
+// BRIDGING_HEADER_SWIFTINTERFACE: error: using bridging headers with module interfaces is unsupported
+
 // RUN: %swift_driver -### | %FileCheck -check-prefix=DEFAULT_REPL %s
 // DEFAULT_REPL: -repl
 // RUN: not %swiftc_driver 2>&1 | %FileCheck -check-prefix=DEFAULT_EXEC_ERR  %s
 // DEFAULT_EXEC_ERR: error: no input files
 // RUN: %swiftc_driver %s -### 2>&1 | %FileCheck -check-prefix=DEFAULT_EXEC  %s
 // DEFAULT_EXEC: -c
-// DEFAULT_EXEC: ld
+// DEFAULT_EXEC: {{ld|clang\+\+}}
 
 // RUN: %swift_driver -repl -### 2>&1 | %FileCheck -check-prefix=REPL %s
 // REPL: warning: unnecessary option '-repl'
@@ -85,20 +60,20 @@
 // I_MODE: error: the flag '-i' is no longer required and has been removed; use 'swift input-filename'
 
 // RUN: not %swift_driver -### -c %s 2>&1 | %FileCheck -check-prefix=C_MODE %s
-// C_MODE: error: unsupported option '-c'
+// C_MODE: error: option '-c' is not supported by 'swift'; did you mean to use 'swiftc'?
 // RUN: not %swift_driver -### -emit-object %s 2>&1 | %FileCheck -check-prefix=OBJ_MODE %s
-// OBJ_MODE: error: unsupported option '-emit-object'
+// OBJ_MODE: error: option '-emit-object' is not supported by 'swift'; did you mean to use 'swiftc'?
 // RUN: not %swift_driver -### -emit-executable %s 2>&1 | %FileCheck -check-prefix=EXEC_MODE %s
-// EXEC_MODE: error: unsupported option '-emit-executable'
+// EXEC_MODE: error: option '-emit-executable' is not supported by 'swift'; did you mean to use 'swiftc'?
 // RUN: not %swift_driver -### -o %t %s 2>&1 | %FileCheck -check-prefix=ARG_o %s
-// ARG_o: error: unsupported option '-o'
+// ARG_o: error: option '-o' is not supported by 'swift'; did you mean to use 'swiftc'?
 
 // RUN: not %swiftc_driver -### -repl 2>&1 | %FileCheck -check-prefix=REPL_MODE_SWIFTC %s
-// REPL_MODE_SWIFTC: error: unsupported option '-repl'
+// REPL_MODE_SWIFTC: error: option '-repl' is not supported by 'swiftc'; did you mean to use 'swift'?
 // RUN: not %swiftc_driver -### -lldb-repl 2>&1 | %FileCheck -check-prefix=LLDB_REPL_MODE_SWIFTC %s
-// LLDB_REPL_MODE_SWIFTC: error: unsupported option '-lldb-repl'
+// LLDB_REPL_MODE_SWIFTC: error: option '-lldb-repl' is not supported by 'swiftc'; did you mean to use 'swift'?
 // RUN: not %swiftc_driver -### -deprecated-integrated-repl 2>&1 | %FileCheck -check-prefix=INT_REPL_MODE_SWIFTC %s
-// INT_REPL_MODE_SWIFTC: error: unsupported option '-deprecated-integrated-repl'
+// INT_REPL_MODE_SWIFTC: error: option '-deprecated-integrated-repl' is not supported by 'swiftc'; did you mean to use 'swift'?
 
 // RUN: %swift_driver -g -### %s 2>&1 | %FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
 // OPTIONS_BEFORE_FILE: -g
@@ -108,12 +83,49 @@
 
 // RUN: %swiftc_driver -incremental %s -### 2>&1 | %FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM %s
 // INCREMENTAL_WITHOUT_OFM: warning: ignoring -incremental (currently requires an output file map)
-// INCREMENTAL_WITHOUT_OFM: swift -frontend
+// INCREMENTAL_WITHOUT_OFM: swift{{c?(\.exe)?"?}} -frontend
 
 // RUN: %swiftc_driver -incremental -output-file-map %S/Inputs/empty-ofm.json %s -### 2>&1 | %FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM_ENTRY %s
 // INCREMENTAL_WITHOUT_OFM_ENTRY: ignoring -incremental; output file map has no master dependencies entry ("swift-dependencies" under "")
-// INCREMENTAL_WITHOUT_OFM_ENTRY: swift -frontend
+// INCREMENTAL_WITHOUT_OFM_ENTRY: swift{{c?(\.exe)?"?}} -frontend
 
 // RUN: %swiftc_driver -driver-print-jobs -enforce-exclusivity=checked %s | %FileCheck -check-prefix=EXCLUSIVITY_CHECKED %s
 // EXCLUSIVITY_CHECKED: swift
 // EXCLUSIVITY_CHECKED: -enforce-exclusivity=checked
+
+// RUN: %swiftc_driver -driver-print-jobs -remove-runtime-asserts %s | %FileCheck -check-prefix=REMOVE_RUNTIME_ASSERTS %s
+// REMOVE_RUNTIME_ASSERTS: swift
+// REMOVE_RUNTIME_ASSERTS: -frontend {{.*}} -remove-runtime-asserts
+
+// RUN: %swiftc_driver -driver-print-jobs -assume-single-threaded %s | %FileCheck -check-prefix=ASSUME_SINGLE_THREADED %s
+// ASSUME_SINGLE_THREADED: swift
+// ASSUME_SINGLE_THREADED: -frontend {{.*}} -assume-single-threaded
+
+// RUN: %swift_driver -### -g -debug-info-format=codeview %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_CODEVIEW %s
+// RUN: %swift_driver -### -g -debug-info-format=dwarf %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_DWARF %s
+// RUN: %swiftc_driver -### -g -debug-info-format=codeview %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_CODEVIEW %s
+// RUN: %swiftc_driver -### -g -debug-info-format=dwarf %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_DWARF %s
+// DEBUG_INFO_FORMAT_CODEVIEW: -debug-info-format=codeview
+// DEBUG_INFO_FORMAT_DWARF: -debug-info-format=dwarf
+
+// RUN: not %swift_driver -debug-info-format=dwarf %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// RUN: not %swift_driver -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// RUN: not %swiftc_driver -debug-info-format=dwarf %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// RUN: not %swiftc_driver -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// MISSING_OPTION_G_ERROR: error: option '-debug-info-format={{.*}}' is missing a required argument (-g)
+
+// RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// RUN: not %swiftc_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// BAD_DEBUG_LEVEL_ERROR: error: argument '-debug-info-format=codeview' is not allowed with '{{.*}}'
+
+// RUN: %swift_driver -F %t/test.framework %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swiftc_driver -F %t/test.framework %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swift_driver -Fsystem %t/test.framework %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swiftc_driver -Fsystem %t/test.framework %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swift_driver -F %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swiftc_driver -F %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swift_driver -Fsystem %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swiftc_driver -Fsystem %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION: warning: framework search path ends in ".framework"

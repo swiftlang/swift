@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-emit-sil %s -o /dev/null -verify
 
 func testUnreachableAfterReturn() -> Int {
   var x: Int = 3
@@ -111,6 +111,15 @@ func testUnreachableCase5(a : Tree) {
   }
 }
 
+func testOptionalEvaluationBreak(a : Tree) {
+  class SR5763 { func foo() {} }
+  func createOptional() -> SR5763? { return SR5763() }
+  switch a {
+  case _:
+    break
+    createOptional()?.foo() // expected-warning {{code after 'break' will never be executed}}
+  }
+}
 
 func testUnreachableAfterThrow(e: Error) throws {
   throw e
@@ -121,4 +130,10 @@ class TestThrowInInit {
   required init(e: Error) throws {
     throw e  // no unreachable code diagnostic for the implicit return.
   }
+}
+
+func sr6141() {
+  var bar: String? = ""
+  return;
+  bar?.append("x")  // expected-warning{{code after 'return' will never be executed}}
 }

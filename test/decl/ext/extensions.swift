@@ -1,24 +1,25 @@
 // RUN: %target-typecheck-verify-swift
 
-extension extension_for_invalid_type_1 { // expected-error {{use of undeclared type 'extension_for_invalid_type_1'}}
+extension extension_for_invalid_type_1 { // expected-error {{cannot find type 'extension_for_invalid_type_1' in scope}}
   func f() { }
 }
-extension extension_for_invalid_type_2 { // expected-error {{use of undeclared type 'extension_for_invalid_type_2'}}
+extension extension_for_invalid_type_2 { // expected-error {{cannot find type 'extension_for_invalid_type_2' in scope}}
   static func f() { }
 }
-extension extension_for_invalid_type_3 { // expected-error {{use of undeclared type 'extension_for_invalid_type_3'}}
+extension extension_for_invalid_type_3 { // expected-error {{cannot find type 'extension_for_invalid_type_3' in scope}}
   init() {}
 }
-extension extension_for_invalid_type_4 { // expected-error {{use of undeclared type 'extension_for_invalid_type_4'}}
+extension extension_for_invalid_type_4 { // expected-error {{cannot find type 'extension_for_invalid_type_4' in scope}}
   deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
-extension extension_for_invalid_type_5 { // expected-error {{use of undeclared type 'extension_for_invalid_type_5'}}
+extension extension_for_invalid_type_5 { // expected-error {{cannot find type 'extension_for_invalid_type_5' in scope}}
   typealias X = Int
 }
 
 //===--- Test that we only allow extensions at file scope.
+struct Foo { }
 
-extension NestingTest1 { // expected-error {{use of undeclared type 'NestingTest1'}}
+extension NestingTest1 { // expected-error {{cannot find type 'NestingTest1' in scope}}
   extension Foo {} // expected-error {{declaration is only valid at file scope}}
 }
 struct NestingTest2 {
@@ -47,9 +48,7 @@ extension S1.Type {} // expected-error {{cannot extend a metatype 'S1.Type'}}
 extension S1.NestedStruct {} // no-error
 
 struct S1_2 {
-  // expected-error @+4 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
-  // expected-error @+3 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}
-  // expected-note @+2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
+  // expected-error @+2 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
   // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
   enum Type {}
 }
@@ -82,10 +81,10 @@ protocol P1 {}
 
 protocol P2 {}
 
-extension () {} // expected-error {{non-nominal type '()' cannot be extended}}
+extension () {} // expected-error {{non-nominal type '()' cannot be extended}} {{educational-notes=nominal-types}}
 
 typealias TupleAlias = (x: Int, y: Int)
-extension TupleAlias {} // expected-error{{non-nominal type 'TupleAlias' (aka '(x: Int, y: Int)') cannot be extended}}
+extension TupleAlias {} // expected-error{{non-nominal type 'TupleAlias' (aka '(x: Int, y: Int)') cannot be extended}} {{educational-notes=nominal-types}}
 
 // Test property accessors in extended types
 class C {}
@@ -107,7 +106,7 @@ protocol P3 {
 struct X3 : P3 {
 }
 
-extension X3.Assoc { // expected-error{{'Assoc' is not a member type of 'X3'}}
+extension X3.Assoc {
 }
 
 extension X3 {
@@ -122,6 +121,231 @@ extension C1.NestedStruct {
 }
 struct WrapperContext {
   extension C1.NestedStruct { // expected-error {{declaration is only valid at file scope}}
-    static let propUsingMember = originalValue // expected-error {{use of unresolved identifier 'originalValue'}}
+    static let propUsingMember = originalValue
   }
+}
+
+// Class-constrained extension where protocol does not impose class requirement
+// SR-11298
+
+protocol DoesNotImposeClassReq_1 {}
+
+class JustAClass: DoesNotImposeClassReq_1 {
+  var property: String = ""
+}
+
+extension DoesNotImposeClassReq_1 where Self: JustAClass {
+  var wrappingProperty1: String {
+    get { return property }
+    set { property = newValue } // Okay
+  }
+  
+  var wrappingProperty2: String {
+    get { return property }
+    nonmutating set { property = newValue } // Okay
+  }
+  
+  var wrappingProperty3: String {
+    get { return property }
+    mutating set { property = newValue } // Okay
+  }
+  
+  mutating func foo() {
+    property = "" // Okay
+    wrappingProperty1 = "" // Okay
+    wrappingProperty2 = "" // Okay
+    wrappingProperty3 = "" // Okay
+  }
+  
+  func bar() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
+    property = "" // Okay
+    wrappingProperty1 = "" // Okay
+    wrappingProperty2 = "" // Okay
+    wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+  
+  nonmutating func baz() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}
+    property = "" // Okay
+    wrappingProperty1 = "" // Okay
+    wrappingProperty2 = "" // Okay
+    wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+}
+
+let instanceOfJustAClass1 = JustAClass() // expected-note 2{{change 'let' to 'var' to make it mutable}}
+instanceOfJustAClass1.wrappingProperty1 = "" // Okay
+instanceOfJustAClass1.wrappingProperty2 = "" // Okay
+instanceOfJustAClass1.wrappingProperty3 = "" // expected-error {{cannot assign to property: 'instanceOfJustAClass1' is a 'let' constant}}
+instanceOfJustAClass1.foo() // expected-error {{cannot use mutating member on immutable value: 'instanceOfJustAClass1' is a 'let' constant}}
+instanceOfJustAClass1.bar() // Okay
+instanceOfJustAClass1.baz() // Okay
+
+var instanceOfJustAClass2 = JustAClass()
+instanceOfJustAClass2.foo() // Okay
+
+protocol DoesNotImposeClassReq_2 {
+  var property: String { get set }
+}
+
+extension DoesNotImposeClassReq_2 where Self : AnyObject {
+  var wrappingProperty1: String {
+    get { property }
+    set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
+    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-5=mutating }}
+  }
+  
+  var wrappingProperty2: String {
+    get { property }
+    nonmutating set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
+    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
+  }
+  
+  var wrappingProperty3: String {
+    get { property }
+    mutating set { property = newValue } // Okay
+  }
+  
+  mutating func foo() {
+    property = "" // Okay
+    wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty3 = "" // Okay
+  }
+  
+  func bar() { // expected-note 2{{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
+    property = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+    wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+  
+  nonmutating func baz() { // expected-note 2{{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}
+    property = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+    wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+}
+
+protocol DoesNotImposeClassReq_3 {
+  var someProperty: Int { get set }
+}
+
+class JustAClass1: DoesNotImposeClassReq_3 {
+  var someProperty = 0
+}
+
+extension DoesNotImposeClassReq_3 where Self: JustAClass1 {
+  var anotherProperty1: Int {
+    get { return someProperty }
+    set { someProperty = newValue } // Okay
+  }
+
+  var anotherProperty2: Int {
+    get { return someProperty }
+    mutating set { someProperty = newValue } // Okay
+  }
+}
+
+let justAClass1 = JustAClass1() // expected-note {{change 'let' to 'var' to make it mutable}}
+justAClass1.anotherProperty1 = 1234 // Okay
+justAClass1.anotherProperty2 = 4321 // expected-error {{cannot assign to property: 'justAClass1' is a 'let' constant}}
+
+protocol ImposeClassReq1: AnyObject {
+  var someProperty: Int { get set }
+}
+
+class JustAClass2: ImposeClassReq1 {
+  var someProperty = 0
+}
+
+extension ImposeClassReq1 where Self: AnyObject {
+  var wrappingProperty1: Int {
+    get { return someProperty }
+    set { someProperty = newValue }
+  }
+
+  var wrappingProperty2: Int {
+    get { return someProperty }
+    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+  }
+
+  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 1
+  }
+
+  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 2
+  }
+
+  func baz() { // Okay
+    someProperty = 3
+  }
+}
+
+extension ImposeClassReq1 {
+  var wrappingProperty3: Int {
+    get { return someProperty }
+    set { someProperty = newValue }
+  }
+}
+
+let justAClass2 = JustAClass2() // expected-note {{change 'let' to 'var' to make it mutable}}
+justAClass2.wrappingProperty1 = 9876 // Okay
+justAClass2.wrappingProperty3 = 0987 // Okay
+justAClass2.foo() // expected-error {{cannot use mutating member on immutable value: 'justAClass2' is a 'let' constant}}
+justAClass2.bar() // Okay as well (complains about explicit nonmutating on decl)
+justAClass2.baz() // Okay
+
+protocol ImposeClassReq2: AnyObject {
+  var someProperty: Int { get set }
+}
+
+extension ImposeClassReq2 {
+  var wrappingProperty1: Int {
+    get { return someProperty }
+    set { someProperty = newValue }
+  }
+
+  var wrappingProperty2: Int {
+    get { return someProperty }
+    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+  }
+
+  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 1
+  }
+
+  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 2
+  }
+
+  func baz() { // Okay
+    someProperty = 3
+  }
+}
+
+// Reject extension of nominal type via parameterized typealias
+
+struct Nest<Egg> { typealias Contents = Egg }
+struct Tree { 
+  typealias LimbContent = Nest<Int> 
+  typealias BoughPayload = Nest<Nest<Int>>
+}
+
+extension Tree.LimbContent.Contents {
+  // expected-error@-1 {{extension of type 'Tree.LimbContent.Contents' (aka 'Int') must be declared as an extension of 'Int'}}
+  // expected-note@-2 {{did you mean to extend 'Int' instead?}} {{11-36=Int}}
+}
+
+extension Tree.BoughPayload.Contents {
+ // expected-error@-1 {{constrained extension must be declared on the unspecialized generic type 'Nest'}}
+}
+
+// SR-10466 Check 'where' clause when referencing type defined inside extension
+struct SR_10466<T> {
+  var a : A // expected-error {{'SR_10466<T>.A' (aka 'Int') requires the types 'T' and 'Never' be equivalent}}
+}
+extension SR_10466 where T == Never { // expected-note {{requirement specified as 'T' == 'Never' [with T = T]}}
+  typealias A = Int
 }

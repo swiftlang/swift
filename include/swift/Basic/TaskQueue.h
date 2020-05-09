@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_TASKQUEUE_H
 #define SWIFT_BASIC_TASKQUEUE_H
 
+#include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Config/config.h"
@@ -22,14 +23,19 @@
 #include <memory>
 #include <queue>
 
+#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+struct rusage;
+#endif
+
 namespace swift {
+class UnifiedStatsReporter;
 namespace sys {
 
 class Task; // forward declared to allow for platform-specific implementations
 
-typedef llvm::sys::ProcessInfo::ProcessId ProcessId;
+using ProcessId = llvm::sys::procid_t;
 
-/// \brief Indicates how a TaskQueue should respond to the task finished event.
+/// Indicates how a TaskQueue should respond to the task finished event.
 enum class TaskFinishedResponse {
   /// Indicates that execution should continue.
   ContinueExecution,
@@ -38,7 +44,64 @@ enum class TaskFinishedResponse {
   StopExecution,
 };
 
-/// \brief A class encapsulating the execution of multiple tasks in parallel.
+/// TaskProcessInformation is bound to a task and contains information about the
+/// process that ran this task. This is especially useful to find out which
+/// tasks ran in the same process (in multifile-mode or when WMO is activated
+/// e.g.). If available, it also contains information about the usage of
+/// resources like CPU time or memory the process used in the system. How ever,
+/// this could differ from platform to platform and is therefore optional.
+
+/// One process could handle multiple tasks in some modes of the Swift compiler
+/// (multifile, WMO). To not break existing tools, the driver does use unique
+/// identifiers for the tasks that are not the process identifier. To still be
+/// able to reason about tasks that ran in the same process the
+/// TaskProcessInformation struct contains information about the actual process
+/// of the operating system. The OSPid is the actual process identifier and is
+/// therefore not guaranteed to be unique over all tasks. The ProcessUsage
+/// contains optional usage information about the operating system process. It
+/// could be used by tools that take those information as input for analyzing
+/// the Swift compiler on a process-level. It will be `None` if the execution
+/// has been skipped or one of the following symbols are not available on the
+/// system: `rusage`, `wait4`.
+struct TaskProcessInformation {
+
+  struct ResourceUsage {
+    // user time in µs
+    uint64_t Utime;
+    // system time in µs
+    uint64_t Stime;
+    // maximum resident set size in Bytes
+    uint64_t Maxrss;
+
+    ResourceUsage(uint64_t Utime, uint64_t Stime, uint64_t Maxrss)
+        : Utime(Utime), Stime(Stime), Maxrss(Maxrss) {}
+
+    virtual ~ResourceUsage() = default;
+    virtual void provideMapping(json::Output &out);
+  };
+
+private:
+  // the process identifier of the operating system
+  ProcessId OSPid;
+  // usage information about the process, if available
+  Optional<ResourceUsage> ProcessUsage;
+
+public:
+  TaskProcessInformation(ProcessId Pid, uint64_t utime, uint64_t stime,
+                         uint64_t maxrss)
+      : OSPid(Pid), ProcessUsage(ResourceUsage(utime, stime, maxrss)) {}
+
+  TaskProcessInformation(ProcessId Pid) : OSPid(Pid), ProcessUsage(None) {}
+
+#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+  TaskProcessInformation(ProcessId Pid, struct rusage Usage);
+#endif // defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+  Optional<ResourceUsage> getResourceUsage() { return ProcessUsage; }
+  virtual ~TaskProcessInformation() = default;
+  virtual void provideMapping(json::Output &out);
+};
+
+/// A class encapsulating the execution of multiple tasks in parallel.
 class TaskQueue {
   /// Tasks which have not begun execution.
   std::queue<std::unique_ptr<Task>> QueuedTasks;
@@ -46,26 +109,31 @@ class TaskQueue {
   /// The number of tasks to execute in parallel.
   unsigned NumberOfParallelTasks;
 
+  /// Optional place to count I/O and subprocess events.
+  UnifiedStatsReporter *Stats;
+
 public:
-  /// \brief Create a new TaskQueue instance.
+  /// Create a new TaskQueue instance.
   ///
   /// \param NumberOfParallelTasks indicates the number of tasks which should
   /// be run in parallel. If 0, the TaskQueue will choose the most appropriate
   /// number of parallel tasks for the current system.
-  TaskQueue(unsigned NumberOfParallelTasks = 0);
+  /// \param USR Optional stats reporter to count I/O and subprocess events.
+  TaskQueue(unsigned NumberOfParallelTasks = 0,
+            UnifiedStatsReporter *USR = nullptr);
   virtual ~TaskQueue();
 
   // TODO: remove once -Wdocumentation stops warning for \param, \returns on
   // std::function (<rdar://problem/15665132>).
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
-  /// \brief A callback which will be executed when each task begins execution
+  /// A callback which will be executed when each task begins execution
   ///
   /// \param Pid the ProcessId of the task which just began execution.
   /// \param Context the context which was passed when the task was added
-  typedef std::function<void(ProcessId Pid, void *Context)> TaskBeganCallback;
+  using TaskBeganCallback = std::function<void(ProcessId Pid, void *Context)>;
 
-  /// \brief A callback which will be executed after each task finishes
+  /// A callback which will be executed after each task finishes
   /// execution.
   ///
   /// \param Pid the ProcessId of the task which finished execution.
@@ -75,15 +143,17 @@ public:
   /// \param Errors the errors from the task which finished execution, if
   /// available and SeparateErrors was true.  (This may not be available on all
   /// platforms.)
+  /// \param ProcInfo contains information like the operating process identifier
+  /// and resource usage if available
   /// \param Context the context which was passed when the task was added
   ///
   /// \returns true if further execution of tasks should stop,
   /// false if execution should continue
-  typedef std::function<TaskFinishedResponse(ProcessId Pid, int ReturnCode,
-                                             StringRef Output, StringRef Errors, void *Context)>
-    TaskFinishedCallback;
+  using TaskFinishedCallback = std::function<TaskFinishedResponse(
+      ProcessId Pid, int ReturnCode, StringRef Output, StringRef Errors,
+      TaskProcessInformation ProcInfo, void *Context)>;
 
-  /// \brief A callback which will be executed if a task exited abnormally due
+  /// A callback which will be executed if a task exited abnormally due
   /// to a signal.
   ///
   /// \param Pid the ProcessId of the task which exited abnormally.
@@ -94,20 +164,21 @@ public:
   /// \param Errors the errors from the task which exited abnormally, if
   /// available and SeparateErrors was true.  (This may not be available on all
   /// platforms.)
+  /// \param ProcInfo contains information like the operating process identifier
+  /// and resource usage if available
   /// \param Context the context which was passed when the task was added
-  /// \param Signal the terminating signal number, if available.
-  /// This may not be available on all platforms. If it is ever provided,
-  /// it should not be removed in future versions of the compiler.
+  /// \param Signal the terminating signal number, if available. This may not be
+  /// available on all platforms. If it is ever provided, it should not be
+  /// removed in future versions of the compiler.
   ///
   /// \returns a TaskFinishedResponse indicating whether or not execution
   /// should proceed
-  typedef std::function<TaskFinishedResponse(ProcessId Pid, StringRef ErrorMsg,
-                                             StringRef Output, StringRef Errors,
-                                             void *Context, Optional<int> Signal)>
-    TaskSignalledCallback;
+  using TaskSignalledCallback = std::function<TaskFinishedResponse(
+      ProcessId Pid, StringRef ErrorMsg, StringRef Output, StringRef Errors,
+      void *Context, Optional<int> Signal, TaskProcessInformation ProcInfo)>;
 #pragma clang diagnostic pop
 
-  /// \brief Indicates whether TaskQueue supports buffering output on the
+  /// Indicates whether TaskQueue supports buffering output on the
   /// current system.
   ///
   /// \note If this returns false, the TaskFinishedCallback passed
@@ -115,7 +186,7 @@ public:
   /// if the task actually generated output.
   static bool supportsBufferingOutput();
 
-  /// \brief Indicates whether TaskQueue supports parallel execution on the
+  /// Indicates whether TaskQueue supports parallel execution on the
   /// current system.
   static bool supportsParallelExecution();
 
@@ -123,7 +194,7 @@ public:
   /// parallel
   unsigned getNumberOfParallelTasks() const;
 
-  /// \brief Adds a task to the TaskQueue.
+  /// Adds a task to the TaskQueue.
   ///
   /// \param ExecPath the path to the executable which the task should execute
   /// \param Args the arguments which should be passed to the task
@@ -135,7 +206,7 @@ public:
                        ArrayRef<const char *> Env = llvm::None,
                        void *Context = nullptr, bool SeparateErrors = false);
 
-  /// \brief Synchronously executes the tasks in the TaskQueue.
+  /// Synchronously executes the tasks in the TaskQueue.
   ///
   /// \param Began a callback which will be called when a task begins
   /// \param Finished a callback which will be called when a task finishes
@@ -150,12 +221,12 @@ public:
 
   /// Returns true if there are any tasks that have been queued but have not
   /// yet been executed.
-  bool hasRemainingTasks() {
+  virtual bool hasRemainingTasks() {
     return !QueuedTasks.empty();
   }
 };
 
-/// \brief A class which simulates execution of tasks with behavior similar to
+/// A class which simulates execution of tasks with behavior similar to
 /// TaskQueue.
 class DummyTaskQueue : public TaskQueue {
   class DummyTask {
@@ -176,21 +247,43 @@ class DummyTaskQueue : public TaskQueue {
   std::queue<std::unique_ptr<DummyTask>> QueuedTasks;
 
 public:
-  /// \brief Create a new DummyTaskQueue instance.
+  /// Create a new DummyTaskQueue instance.
   DummyTaskQueue(unsigned NumberOfParallelTasks = 0);
   virtual ~DummyTaskQueue();
 
-  virtual void addTask(const char *ExecPath, ArrayRef<const char *> Args,
-                       ArrayRef<const char *> Env = llvm::None,
-                       void *Context = nullptr, bool SeparateErrors = false);
+  void addTask(const char *ExecPath, ArrayRef<const char *> Args,
+               ArrayRef<const char *> Env = llvm::None,
+               void *Context = nullptr, bool SeparateErrors = false) override;
 
-  virtual bool
+  bool
   execute(TaskBeganCallback Began = TaskBeganCallback(),
           TaskFinishedCallback Finished = TaskFinishedCallback(),
-          TaskSignalledCallback Signalled = TaskSignalledCallback());
+          TaskSignalledCallback Signalled = TaskSignalledCallback()) override;
+
+  bool hasRemainingTasks() override {
+    // Need to override here because QueuedTasks is redeclared.
+    return !QueuedTasks.empty();
+  }
+
 };
 
 } // end namespace sys
+
+namespace json {
+template <> struct ObjectTraits<sys::TaskProcessInformation> {
+  static void mapping(Output &out, sys::TaskProcessInformation &value) {
+    value.provideMapping(out);
+  }
+};
+
+template <> struct ObjectTraits<sys::TaskProcessInformation::ResourceUsage> {
+  static void mapping(Output &out,
+                      sys::TaskProcessInformation::ResourceUsage &value) {
+    value.provideMapping(out);
+  }
+};
+} // end namespace json
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_TASKQUEUE_H

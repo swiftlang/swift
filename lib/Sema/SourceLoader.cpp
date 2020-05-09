@@ -11,14 +11,16 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief A simple module loader that loads .swift source files.
+/// A simple module loader that loads .swift source files.
 ///
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
@@ -41,7 +43,7 @@ static FileOrError findModule(ASTContext &ctx, StringRef moduleID,
     llvm::sys::path::append(inputFilename, moduleID);
     inputFilename.append(".swift");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFile(inputFilename.str());
+      ctx.SourceMgr.getFileSystem()->getBufferForFile(inputFilename.str());
 
     // Return if we loaded a file
     if (FileBufOrErr)
@@ -55,29 +57,20 @@ static FileOrError findModule(ASTContext &ctx, StringRef moduleID,
   return make_error_code(std::errc::no_such_file_or_directory);
 }
 
-namespace {
+void SourceLoader::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {
+  // TODO: Implement?
+}
 
-/// Don't parse any function bodies except those that are transparent.
-class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
-  bool shouldDelayFunctionBodyParsing(Parser &TheParser,
-                                      AbstractFunctionDecl *AFD,
-                                      const DeclAttributes &Attrs,
-                                      SourceRange BodyRange) override {
-    return Attrs.hasAttribute<TransparentAttr>();
-  }
-};
-
-} // unnamed namespace
-
-bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
+bool SourceLoader::canImportModule(Located<Identifier> ID) {
   // Search the memory buffers to see if we can find this file on disk.
-  FileOrError inputFileOrError = findModule(Ctx, ID.first.str(),
-                                            ID.second);
+  FileOrError inputFileOrError = findModule(Ctx, ID.Item.str(),
+                                            ID.Loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();
     if (err != std::errc::no_such_file_or_directory) {
-      Ctx.Diags.diagnose(ID.second, diag::sema_opening_import,
-                         ID.first, err.message());
+      Ctx.Diags.diagnose(ID.Loc, diag::sema_opening_import,
+                         ID.Item, err.message());
     }
 
     return false;
@@ -86,21 +79,20 @@ bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
 }
 
 ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
-                                     ArrayRef<std::pair<Identifier,
-                                     SourceLoc>> path) {
+                                     ArrayRef<Located<Identifier>> path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
 
   auto moduleID = path[0];
 
-  FileOrError inputFileOrError = findModule(Ctx, moduleID.first.str(),
-                                            moduleID.second);
+  FileOrError inputFileOrError = findModule(Ctx, moduleID.Item.str(),
+                                            moduleID.Loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();
     if (err != std::errc::no_such_file_or_directory) {
-      Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
-                         moduleID.first, err.message());
+      Ctx.Diags.diagnose(moduleID.Loc, diag::sema_opening_import,
+                         moduleID.Item, err.message());
     }
 
     return nullptr;
@@ -108,11 +100,13 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   std::unique_ptr<llvm::MemoryBuffer> inputFile =
     std::move(inputFileOrError.get());
 
-  addDependency(inputFile->getBufferIdentifier());
+  if (dependencyTracker)
+    dependencyTracker->addDependency(inputFile->getBufferIdentifier(),
+                                     /*isSystem=*/false);
 
   // Turn off debugging while parsing other modules.
-  llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
-                                          false);
+  llvm::SaveAndRestore<bool>
+      turnOffDebug(Ctx.TypeCheckerOpts.DebugConstraintSolver, false);
 
   unsigned bufferID;
   if (auto BufID =
@@ -121,37 +115,23 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
-  auto *importMod = ModuleDecl::create(moduleID.first, Ctx);
-  if (EnableResilience)
-    importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
-  Ctx.LoadedModules[moduleID.first] = importMod;
+  ImplicitImportInfo importInfo;
+  importInfo.StdlibKind = Ctx.getStdlibModule() ? ImplicitStdlibKind::Stdlib
+                                                : ImplicitStdlibKind::None;
 
-  auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;
-  if (!Ctx.getStdlibModule())
-    implicitImportKind = SourceFile::ImplicitModuleImportKind::None;
+  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx, importInfo);
+  if (EnableLibraryEvolution)
+    importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
+  Ctx.LoadedModules[moduleID.Item] = importMod;
 
   auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,
-                                          bufferID, implicitImportKind);
+                                          bufferID,
+                                          Ctx.LangOpts.CollectParsedToken,
+                                          Ctx.LangOpts.BuildSyntaxTree);
   importMod->addFile(*importFile);
-
-  bool done;
-  PersistentParserState persistentState;
-  SkipNonTransparentFunctions delayCallbacks;
-  parseIntoSourceFile(*importFile, bufferID, &done, nullptr, &persistentState,
-                      SkipBodies ? &delayCallbacks : nullptr);
-  assert(done && "Parser returned early?");
-  (void)done;
-
-  if (SkipBodies)
-    performDelayedParsing(importMod, persistentState, nullptr);
-
-  // FIXME: Support recursive definitions in immediate modes by making type
-  // checking even lazier.
-  if (SkipBodies)
-    performNameBinding(*importFile);
-  else
-    performTypeChecking(*importFile, persistentState.getTopLevelContext(),
-                        None);
+  performImportResolution(*importFile);
+  importMod->setHasResolvedImports();
+  bindExtensions(*importMod);
   return importMod;
 }
 

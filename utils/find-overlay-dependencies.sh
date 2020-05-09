@@ -32,7 +32,7 @@ case $# in
   usage ;;
 esac
 
-OVERLAYS_PATH=$(dirname "$0")/../stdlib/public/SDK/
+OVERLAYS_PATH=$(dirname "$0")/../stdlib/public/Darwin/
 CMAKE_PATH=$OVERLAYS_PATH/$1/CMakeLists.txt
 
 # Add both directions to associative array
@@ -74,7 +74,7 @@ for sdk in $SDKS_ORDERED; do
     # Clear the cmake file of this unsupported platform and loop
     echo "unsupported"
     # Disable the unsupported platform and leave a note
-    sed -i "" -E -e "s/^([ \t]*)($CMAKE_DEPENDS_NAME[$sdk]).*$/\1# \2 # unsupported platform/" "$CMAKE_PATH"
+    sed -i "" -E -e "s/^([ \t]*)($CMAKE_DEPENDS_NAME[$sdk]) .*$/\1# \2 # unsupported platform/" "$CMAKE_PATH"
     continue
   fi
 
@@ -93,16 +93,17 @@ for sdk in $SDKS_ORDERED; do
     DEPENDS_ON=("${(@)DEPENDS_ON:#XPC}")
   fi
 
-  # Foundation depends on CoreGraphics in the .swift code.
-  # Hardcode the dependency.
-  if [[ "$1" == "Foundation" ]]; then
-    DEPENDS_ON+="CoreGraphics"
-  fi
-
-
   echo "$DEPENDS_ON"
   if [[ $UPDATE_CMAKE == 1 ]]; then
-    sed -i "" -E -e "s/^([ \t]*$CMAKE_DEPENDS_NAME[$sdk]).*$/\1 $DEPENDS_ON # auto-updated/" "$CMAKE_PATH"
+    # Get existing list; only update if there is a difference.
+    orig="$(sed -E -n -e "s/^([ \t]*$CMAKE_DEPENDS_NAME[$sdk]) ([^#]*)(#.*)?$/\2/p" "$CMAKE_PATH" | sed 's/ *$//')"
+    if [ -z "$orig" ]; then
+      echo "\twarning: Cannot find $CMAKE_DEPENDS_NAME[$sdk] declaration"
+    fi
+    diff="$(echo "$orig" "$DEPENDS_ON" | tr ' ' '\n' | sort | uniq -u)"
+    if [ -n "$diff" ]; then
+      sed -i "" -E -e "s/^([ \t]*$CMAKE_DEPENDS_NAME[$sdk]) .*$/\1 $DEPENDS_ON # auto-updated/" "$CMAKE_PATH"
+    fi
   fi
 done
 echo # newline

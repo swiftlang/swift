@@ -1,15 +1,6 @@
 # This file contains cmake configuration specifically related to support for the
 # Xcode generator in CMake.
 
-function(get_effective_platform_for_triple triple output)
-  string(FIND "${triple}" "macos" IS_MACOS)
-  if (NOT IS_MACOS EQUAL -1)
-    set(${output} "" PARENT_SCOPE)
-    return()
-  endif()
-  message(FATAL_ERROR "Can not create an effective platform name for triple: ${triple}")
-endfunction()
-
 function(escape_path_for_xcode config path result_var_name)
   # If we are not using the Xcode generator, be defensive and early exit.
   if (NOT XCODE)
@@ -17,11 +8,10 @@ function(escape_path_for_xcode config path result_var_name)
     return()
   endif()
 
-  get_effective_platform_for_triple("${SWIFT_HOST_TRIPLE}" SWIFT_EFFECTIVE_PLATFORM_NAME)
   # Hack to deal with the fact that paths contain the build-time
   # variables. Note that this fix is Xcode-specific.
   string(REPLACE "$(CONFIGURATION)" "${config}" result "${path}")
-  string(REPLACE "$(EFFECTIVE_PLATFORM_NAME)" "${SWIFT_EFFECTIVE_PLATFORM_NAME}" result "${result}")
+  string(REPLACE "$(EFFECTIVE_PLATFORM_NAME)" "" result "${result}")
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -110,8 +100,8 @@ macro(swift_common_xcode_cxx_config)
   # Force usage of Clang.
   set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0"
       CACHE STRING "Xcode Compiler")
-  # Use C++'11.
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++11"
+  # Use C++'14.
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++14"
       CACHE STRING "Xcode C++ Language Standard")
   # Use libc++.
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++"

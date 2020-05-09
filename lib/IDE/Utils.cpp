@@ -19,6 +19,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
@@ -99,20 +100,14 @@ static const char *skipStringInCode(const char *p, const char *End) {
 }
 
 SourceCompleteResult
-ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
+ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
+                           SourceFileKind SFKind) {
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
-  ParserUnit Parse(SM, BufferID);
-  Parser &P = Parse.getParser();
-
-  bool Done;
-  do {
-    P.parseTopLevel();
-    Done = P.Tok.is(tok::eof);
-  } while (!Done);
-
+  ParserUnit Parse(SM, SFKind, BufferID);
+  Parse.parse();
   SourceCompleteResult SCR;
-  SCR.IsComplete = !P.isInputIncomplete();
+  SCR.IsComplete = !Parse.getParser().isInputIncomplete();
 
   // Use the same code that was in the REPL code to track the indent level
   // for now. In the future we should get this from the Parser if possible.
@@ -187,8 +182,10 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
   return SCR;
 }
 
-SourceCompleteResult ide::isSourceInputComplete(StringRef Text) {
-  return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text));
+SourceCompleteResult
+ide::isSourceInputComplete(StringRef Text,SourceFileKind SFKind) {
+  return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text),
+                                    SFKind);
 }
 
 // Adjust the cc1 triple string we got from clang, to make sure it will be
@@ -223,7 +220,8 @@ static std::string adjustClangTriple(StringRef TripleStr) {
     }
     break;
   }
-  OS << '-' << Triple.getVendorName() << '-' << Triple.getOSName();
+  OS << '-' << Triple.getVendorName() << '-' <<
+      Triple.getOSAndEnvironmentName();
   OS.flush();
   return Result;
 }
@@ -348,7 +346,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     llvm::SmallString<64> Str;
     Str += "-fmodule-name=";
     Str += ClangInvok->getLangOpts()->CurrentModule;
-    CCArgs.push_back(Str.str());
+    CCArgs.push_back(std::string(Str.str()));
   }
 
   if (PPOpts.DetailedRecord) {
@@ -357,7 +355,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
 
   if (!ClangInvok->getFrontendOpts().Inputs.empty()) {
     Invok.getFrontendOptions().ImplicitObjCHeaderPath =
-      ClangInvok->getFrontendOpts().Inputs[0].getFile();
+        ClangInvok->getFrontendOpts().Inputs[0].getFile().str();
   }
 
   return false;
@@ -375,7 +373,7 @@ static void walkOverriddenClangDecls(const clang::NamedDecl *D, const FnTy &Fn){
 
 void
 ide::walkOverriddenDecls(const ValueDecl *VD,
-                         std::function<void(llvm::PointerUnion<
+                         llvm::function_ref<void(llvm::PointerUnion<
                              const ValueDecl*, const clang::NamedDecl*>)> Fn) {
   for (auto CurrOver = VD; CurrOver; CurrOver = CurrOver->getOverriddenDecl()) {
     if (CurrOver != VD)
@@ -449,7 +447,7 @@ ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
     assert(Id.size() == Occur.FullPlaceholder.size());
 
     unsigned Offset = Occur.FullPlaceholder.data() - InputBuf->getBufferStart();
-    char *Ptr = (char*)NewBuf->getBufferStart() + Offset;
+    char *Ptr = const_cast<char *>(NewBuf->getBufferStart()) + Offset;
     std::copy(Id.begin(), Id.end(), Ptr);
 
     Occur.IdentifierReplacement = Id.str();
@@ -484,7 +482,7 @@ ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
 static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
   auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
   if (!BufOrErr) {
-    llvm::errs() << BufOrErr.getError().message() << '\n';
+    llvm::errs() << "could not open '" << Path << "': " << BufOrErr.getError().message() << '\n';
     return {};
   }
 
@@ -500,7 +498,7 @@ static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
       std::tie(CurLine, Lines) = Lines.split('\n');
       unsigned Begin = CurLine.find("<string>") + strlen("<string>");
       unsigned End = CurLine.find("</string>");
-      return CurLine.substr(Begin, End-Begin);
+      return CurLine.substr(Begin, End - Begin).str();
     }
   }
 
@@ -511,7 +509,7 @@ std::string ide::getSDKName(StringRef Path) {
   std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
                                    "CanonicalName");
   if (Name.empty() && Path.endswith(".sdk")) {
-    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk"));
+    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk")).str();
   }
   return Name;
 }
@@ -839,6 +837,11 @@ insertAfter(SourceManager &SM, SourceLoc Loc, StringRef Text,
   accept(SM, Lexer::getLocForEndOfToken(SM, Loc), Text, SubRegions);
 }
 
+void swift::ide::SourceEditConsumer::
+remove(SourceManager &SM, CharSourceRange Range) {
+  accept(SM, Range, "");
+}
+
 struct swift::ide::SourceEditJsonConsumer::Implementation {
   llvm::raw_ostream &OS;
   std::vector<SingleEdit> AllEdits;
@@ -848,7 +851,7 @@ struct swift::ide::SourceEditJsonConsumer::Implementation {
   }
   void accept(SourceManager &SM, CharSourceRange Range,
               llvm::StringRef Text) {
-    AllEdits.push_back({SM, Range, Text});
+    AllEdits.push_back({SM, Range, Text.str()});
   }
 };
 
@@ -899,13 +902,14 @@ public:
   }
 
   void replaceText(SourceManager &SM, CharSourceRange Range, StringRef Text) {
-    auto BufferId = SM.getIDForBufferIdentifier(SM.
-      getBufferIdentifierForLoc(Range.getStart())).getValue();
+    auto BufferId = SM.findBufferContainingLoc(Range.getStart());
     if (BufferId == InterestedId) {
       HasChange = true;
-      RewriteBuf.ReplaceText(
-                             SM.getLocOffsetInBuffer(Range.getStart(), BufferId),
-                             Range.str().size(), Text);
+      auto StartLoc = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);
+      if (!Range.getByteLength())
+          RewriteBuf.InsertText(StartLoc, Text);
+      else
+          RewriteBuf.ReplaceText(StartLoc, Range.str().size(), Text);
     }
   }
 
@@ -933,7 +937,76 @@ swift::ide::SourceEditOutputConsumer::~SourceEditOutputConsumer() { delete &Impl
 void swift::ide::SourceEditOutputConsumer::
 accept(SourceManager &SM, RegionType RegionType,
        ArrayRef<Replacement> Replacements) {
+  // ignore mismatched or
+  if (RegionType == RegionType::Unmatched || RegionType == RegionType::Mismatch)
+    return;
+
   for (const auto &Replacement : Replacements) {
     Impl.accept(SM, Replacement.Range, Replacement.Text);
   }
+}
+
+bool swift::ide::isFromClang(const Decl *D) {
+  if (getEffectiveClangNode(D))
+    return true;
+  if (auto *Ext = dyn_cast<ExtensionDecl>(D))
+    return static_cast<bool>(extensionGetClangNode(Ext));
+  return false;
+}
+
+ClangNode swift::ide::getEffectiveClangNode(const Decl *decl) {
+  auto &ctx = decl->getASTContext();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  return importer->getEffectiveClangNode(decl);
+}
+
+/// Retrieve the Clang node for the given extension, if it has one.
+ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
+  // If it has a Clang node (directly),
+  if (ext->hasClangNode()) return ext->getClangNode();
+
+  // Check whether it was syntheszed into a module-scope context.
+  if (!isa<ClangModuleUnit>(ext->getModuleScopeContext()))
+    return ClangNode();
+
+  // It may have a global imported as a member.
+  for (auto member : ext->getMembers()) {
+    if (auto clangNode = getEffectiveClangNode(member))
+      return clangNode;
+  }
+
+  return ClangNode();
+}
+
+std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
+  auto exprTy = expr->getType();
+
+  // Look through unbound instance member accesses.
+  if (auto *dotSyntaxExpr = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr))
+    expr = dotSyntaxExpr->getRHS();
+
+  // Look through the 'self' application.
+  if (auto *selfApplyExpr = dyn_cast<SelfApplyExpr>(expr))
+    expr = selfApplyExpr->getFn();
+
+  // Look through curry thunks.
+  if (auto *closure = dyn_cast<AutoClosureExpr>(expr))
+    if (auto *unwrappedThunk = closure->getUnwrappedCurryThunkExpr())
+      expr = unwrappedThunk;
+
+  // If this is an IUO result, unwrap the optional type.
+  auto refDecl = expr->getReferencedDecl();
+  if (!refDecl) {
+    if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
+      auto fnDecl = applyExpr->getFn()->getReferencedDecl();
+      if (auto *func = fnDecl.getDecl()) {
+        if (func->isImplicitlyUnwrappedOptional()) {
+          if (auto objectTy = exprTy->getOptionalObjectType())
+            exprTy = objectTy;
+        }
+      }
+    }
+  }
+
+  return std::make_pair(exprTy, refDecl);
 }

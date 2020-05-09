@@ -21,7 +21,7 @@ default:
 }
 
 switch (1, 2) {
-case (var a, a): // expected-error {{use of unresolved identifier 'a'}}
+case (var a, a): // expected-error {{cannot find 'a' in scope}}
   ()
 }
 
@@ -87,7 +87,7 @@ default:
 }
 
 // Raise an error if pattern productions are used in expressions.
-var b = var a // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}} expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
+var b = var x // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}} expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
 var c = is Int // expected-error{{expected initial value after '='}} expected-error {{expected expression}}  expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
 
 // TODO: Bad recovery in these cases. Although patterns are never valid
@@ -120,10 +120,9 @@ case iPadHair<E>.HairForceOne:
   ()
 case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'HairType'}}
   ()
-case Watch.Edition: // TODO: should warn that cast can't succeed with currently known conformances
+case Watch.Edition: // expected-warning {{cast from 'HairType' to unrelated type 'Watch' always fails}}
   ()
-// TODO: Bad error message
-case .HairForceOne: // expected-error{{cannot convert}}
+case .HairForceOne: // expected-error{{type 'HairType' has no member 'HairForceOne'}}
   ()
 default:
   break
@@ -163,9 +162,8 @@ case nil?: break // expected-warning {{case is already handled by previous patte
 default: break
 }
 
-// <rdar://problem/21995744> QoI: Binary operator '~=' cannot be applied to operands of type 'String' and 'String?'
 switch ("foo" as String?) {
-case "what": break // expected-error{{expression pattern of type 'String' cannot match values of type 'String?'}} {{12-12=?}}
+case "what": break
 default: break
 }
 
@@ -232,14 +230,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
     switch $0 {
     case .A:
       return 1
@@ -256,13 +254,13 @@ enum SR2057 {
 }
 
 let sr2057: SR2057?
-if case .foo = sr2057 { } // expected-error{{enum case 'foo' not found in type 'SR2057?'}}
+if case .foo = sr2057 { } // Ok
 
 
 // Invalid 'is' pattern
 class SomeClass {}
 if case let doesNotExist as SomeClass:AlsoDoesNotExist {}
-// expected-error@-1 {{use of undeclared type 'AlsoDoesNotExist'}}
+// expected-error@-1 {{cannot find type 'AlsoDoesNotExist' in scope}}
 // expected-error@-2 {{variable binding in a condition requires an initializer}}
 
 // `.foo` and `.bar(...)` pattern syntax should also be able to match
@@ -276,7 +274,9 @@ struct StaticMembers: Equatable {
   static var optProp: Optional = StaticMembers()
 
   static func method(_: Int) -> StaticMembers { return prop }
+  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func method(withLabel: Int) -> StaticMembers { return prop }
+  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func optMethod(_: Int) -> StaticMembers? { return optProp }
 
   static func ==(x: StaticMembers, y: StaticMembers) -> Bool { return true }
@@ -286,31 +286,36 @@ let staticMembers = StaticMembers()
 let optStaticMembers: Optional = StaticMembers()
 
 switch staticMembers {
-  case .init: break // expected-error{{cannot match values of type 'StaticMembers'}}
-  case .init(opt:): break // expected-error{{cannot match values of type 'StaticMembers'}}
+  case .init: break // expected-error{{member 'init(opt:)' expects argument of type 'Int'}}
+  case .init(opt:): break // expected-error{{member 'init(opt:)' expects argument of type 'Int'}}
   case .init(): break
 
   case .init(0): break
   case .init(_): break // expected-error{{'_' can only appear in a pattern}}
   case .init(let x): break // expected-error{{cannot appear in an expression}}
-  case .init(opt: 0): break // expected-error{{not unwrapped}}
+  case .init(opt: 0): break // expected-error{{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
 
   case .prop: break
   // TODO: repeated error message
   case .optProp: break // expected-error* {{not unwrapped}}
 
-  case .method: break // expected-error{{cannot match}}
+  case .method: break // expected-error{{no exact matches in reference to static method 'method'}}
   case .method(0): break
   case .method(_): break // expected-error{{'_' can only appear in a pattern}}
   case .method(let x): break // expected-error{{cannot appear in an expression}}
 
-  case .method(withLabel:): break // expected-error{{cannot match}}
+  case .method(withLabel:): break // expected-error{{member 'method(withLabel:)' expects argument of type 'Int'}}
   case .method(withLabel: 0): break
   case .method(withLabel: _): break // expected-error{{'_' can only appear in a pattern}}
   case .method(withLabel: let x): break // expected-error{{cannot appear in an expression}}
 
-  case .optMethod: break // expected-error{{cannot match}}
-  case .optMethod(0): break // expected-error{{not unwrapped}}
+  case .optMethod: break // expected-error{{member 'optMethod' expects argument of type 'Int'}}
+  case .optMethod(0): break
+  // expected-error@-1 {{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
+  // expected-note@-2 {{coalesce}}
+  // expected-note@-3 {{force-unwrap}}
 }
 
 _ = 0
@@ -329,10 +334,147 @@ struct S_32241441 {
 func rdar32241441() {
   let s: S_32241441? = S_32241441()
 
-  switch s?.type {
-  case .foo: // expected-error {{enum case 'foo' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+  switch s?.type { // expected-error {{switch must be exhaustive}} expected-note {{add missing case: '.none'}}
+  case .foo: // Ok
     break;
-  case .bar: // expected-error {{enum case 'bar' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+  case .bar: // Ok
     break;
+  }
+}
+
+
+// SR-6100
+struct One<Two> { // expected-note{{'Two' declared as parameter to type 'One'}}
+    public enum E: Error {
+        // if you remove associated value, everything works
+        case SomeError(String)
+    }
+}
+
+func testOne() {
+  do {
+  } catch let error { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
+    if case One.E.SomeError = error {} // expected-error{{generic parameter 'Two' could not be inferred}}
+  }
+}
+
+// SR-8347
+// constrain initializer expressions of optional some pattern bindings to be optional
+func test8347() -> String {
+  struct C {
+    subscript (s: String) -> String? {
+      return ""
+    }
+    subscript (s: String) -> [String] {
+      return [""]
+    }
+
+    func f() -> String? {
+      return ""
+    }
+    func f() -> Int {
+      return 3
+    }
+
+    func g() -> String {
+      return ""
+    }
+
+    func h() -> String {
+      return ""
+    }
+    func h() -> Double {
+      return 3.0
+    }
+    func h() -> Int? { //expected-note{{found this candidate}}
+      return 2
+    }
+    func h() -> Float? { //expected-note{{found this candidate}}
+      return nil
+    }
+
+  }
+
+  let c = C()
+  if let s = c[""] {
+    return s
+  }
+  if let s = c.f() {
+    return s
+  }
+  if let s = c.g() { //expected-error{{initializer for conditional binding must have Optional type, not 'String'}}
+    return s
+  }
+  if let s = c.h() { //expected-error{{ambiguous use of 'h()'}}
+    return s
+  }
+}
+
+enum SR_7799 {
+ case baz
+ case bar
+}
+
+let sr7799: SR_7799? = .bar
+
+switch sr7799 {
+ case .bar?: break // Ok
+ case .baz: break // Ok
+ default: break
+}
+
+let sr7799_1: SR_7799?? = .baz
+
+switch sr7799_1 {
+ case .bar?: break // Ok
+ case .baz: break // Ok
+ default: break
+}
+
+if case .baz = sr7799_1 {} // Ok
+if case .bar? = sr7799_1 {} // Ok
+
+// rdar://problem/60048356 - `if case` fails when `_` pattern doesn't have a label
+func rdar_60048356() {
+  typealias Info = (code: ErrorCode, reason: String)
+
+  enum ErrorCode {
+    case normalClosure
+  }
+
+  enum Failure {
+    case closed(Info) // expected-note {{'closed' declared here}}
+  }
+
+  enum Reason {
+    case close(Failure)
+  }
+
+  func test(_ reason: Reason) {
+    if case .close(.closed((code: .normalClosure, _))) = reason { // Ok
+    }
+  }
+
+  // rdar://problem/60061646
+  func test(e: Failure) {
+    if case .closed(code: .normalClosure, _) = e { // Ok
+    // expected-warning@-1 {{enum case 'closed' has one associated value that is a tuple of 2 elements}}
+    }
+  }
+
+  enum E {
+    case foo((x: Int, y: Int)) // expected-note {{declared here}}
+    case bar(x: Int, y: Int)   // expected-note {{declared here}}
+  }
+
+  func test_destructing(e: E) {
+    if case .foo(let x, let y) = e { // Ok (destructring)
+    // expected-warning@-1 {{enum case 'foo' has one associated value that is a tuple of 2 elements}}
+      _ = x == y
+    }
+    if case .bar(let tuple) = e { // Ok (matching via tuple)
+    // expected-warning@-1 {{enum case 'bar' has 2 associated values; matching them as a tuple is deprecated}}
+      _ = tuple.0 == tuple.1
+    }
   }
 }

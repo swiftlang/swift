@@ -260,9 +260,15 @@ struct Chimera {
 
 func mustThrow<T>(_ f: () throws -> T) {
   do {
-    try f()
+    _ = try f()
     preconditionFailure("Didn't throw")
   } catch {}
+}
+
+ThrowingInitTestSuite.test("DesignatedInitSuccess_Root") {
+  _ = try! Bear(n: 0, before: false)
+  _ = try! Bear(n: 0, after: false)
+  _ = try! Bear(n: 0, before: false, after: false)
 }
 
 ThrowingInitTestSuite.test("DesignatedInitFailure_Root") {
@@ -270,6 +276,15 @@ ThrowingInitTestSuite.test("DesignatedInitFailure_Root") {
   mustThrow { try Bear(n: 0, after: true) }
   mustThrow { try Bear(n: 0, before: true, after: false) }
   mustThrow { try Bear(n: 0, before: false, after: true) }
+}
+
+ThrowingInitTestSuite.test("DesignatedInitSuccess_Derived") {
+  _ = try! PolarBear(n: 0, before: false)
+  _ = try! PolarBear(n: 0, during: false)
+  _ = try! PolarBear(n: 0, before: false, during: false)
+  _ = try! PolarBear(n: 0, during: false, after: false)
+  _ = try! PolarBear(n: 0, before: false, after: false)
+  _ = try! PolarBear(n: 0, before: false, during: false, after: false)
 }
 
 ThrowingInitTestSuite.test("DesignatedInitFailure_Derived") {
@@ -287,8 +302,25 @@ ThrowingInitTestSuite.test("DesignatedInitFailure_Derived") {
   mustThrow { try PolarBear(n: 0, before: false, during: false, after: true) }
 }
 
+ThrowingInitTestSuite.test("DesignatedInitSuccess_DerivedGeneric") {
+  _ = try! GuineaPig(t: LifetimeTracked(0), during: false)
+}
+
 ThrowingInitTestSuite.test("DesignatedInitFailure_DerivedGeneric") {
   mustThrow { try GuineaPig(t: LifetimeTracked(0), during: true) }
+}
+
+ThrowingInitTestSuite.test("ConvenienceInitSuccess_Root") {
+  _ = try! Bear(before: false)
+  _ = try! Bear(before2: false)
+  _ = try! Bear(before: false, before2: false)
+  _ = try! Bear(during: false)
+  _ = try! Bear(before: false, during: false)
+  _ = try! Bear(after: false)
+  _ = try! Bear(before: false, after: false)
+  _ = try! Bear(during: false, after: false)
+  _ = try! Bear(before: false, during: false, after: false)
+  _ = try! Bear(before: false, before2: false, during: false, after: false)
 }
 
 ThrowingInitTestSuite.test("ConvenienceInitFailure_Root") {
@@ -313,6 +345,19 @@ ThrowingInitTestSuite.test("ConvenienceInitFailure_Root") {
   mustThrow { try Bear(before: false, before2: false, during: false, after: true) }
 }
 
+ThrowingInitTestSuite.test("ConvenienceInitSuccess_Derived") {
+  _ = try! PolarBear(before: false)
+  _ = try! PolarBear(before2: false)
+  _ = try! PolarBear(before: false, before2: false)
+  _ = try! PolarBear(during: false)
+  _ = try! PolarBear(before: false, during: false)
+  _ = try! PolarBear(after: false)
+  _ = try! PolarBear(before: false, after: false)
+  _ = try! PolarBear(during: false, after: false)
+  _ = try! PolarBear(before: false, during: false, after: false)
+  _ = try! PolarBear(before: false, before2: false, during: false, after: false)
+}
+
 ThrowingInitTestSuite.test("ConvenienceInitFailure_Derived") {
   mustThrow { try PolarBear(before: true) }
   mustThrow { try PolarBear(before2: true) }
@@ -335,6 +380,16 @@ ThrowingInitTestSuite.test("ConvenienceInitFailure_Derived") {
   mustThrow { try PolarBear(before: false, before2: false, during: false, after: true) }
 }
 
+ThrowingInitTestSuite.test("InitSuccess_Struct") {
+  _ = try! Chimera(before: false)
+  _ = try! Chimera(during: false)
+  _ = try! Chimera(before: false, during: false)
+  _ = try! Chimera(after: false)
+  _ = try! Chimera(before: false, after: false)
+  _ = try! Chimera(during: false, after: false)
+  _ = try! Chimera(before: false, during: false, after: false)
+}
+
 ThrowingInitTestSuite.test("InitFailure_Struct") {
   mustThrow { try Chimera(before: true) }
   mustThrow { try Chimera(during: true) }
@@ -349,5 +404,37 @@ ThrowingInitTestSuite.test("InitFailure_Struct") {
   mustThrow { try Chimera(before: false, during: true, after: false) }
   mustThrow { try Chimera(before: false, during: false, after: true) }
 }
+
+// Specific regression tests:
+
+// <https://bugs.swift.org/browse/SR-1714> - try? self.init(...)` in init? causes overrelease
+class ThrowAndFailRoot {
+  let x = LifetimeTracked(0)
+}
+
+class ThrowAndFailDerived: ThrowAndFailRoot {
+  let name: String
+  let y = LifetimeTracked(0)
+
+  init(name: String) throws {
+    self.name = name
+    super.init()
+    if name.isEmpty {
+      struct EmptyError: Error {}
+      throw EmptyError()
+    }
+  }
+
+  convenience init?(b: Bool) {
+    try? self.init(name: b ? "Bob" : "")
+  }
+}
+
+ThrowingInitTestSuite.test("ThrowsAndFailableTest") {
+  _ = ThrowAndFailDerived(b: true)!
+  if let x = ThrowAndFailDerived(b: false) { preconditionFailure() }
+}
+
+// <https://bugs.swift.org/browse/SR-3132> - Invalid pointer dequeued from free list. Runtime crash on some weird code
 
 runAllTests()

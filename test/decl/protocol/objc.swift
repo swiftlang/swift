@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 // Test requirements and conformance for Objective-C protocols.
 
@@ -144,7 +144,7 @@ class C4_5a : P4, P5 {
 }
 
 class C6a : P6 {
-  func doSomething(sender: AnyObject?) { } // expected-error{{method 'doSomething(sender:)' has different argument names from those required by protocol 'P6' ('doSomething')}}{{20-20=_ }}{{none}}
+  func doSomething(sender: AnyObject?) { } // expected-error{{method 'doSomething(sender:)' has different argument labels from those required by protocol 'P6' ('doSomething')}}{{20-20=_ }}{{none}}
 }
 
 

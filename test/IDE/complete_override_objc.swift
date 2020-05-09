@@ -10,13 +10,21 @@ class Sub : FooClassBase {
   #^PA^#
 }
 
-// CHECK1: Begin completions, 8 items
+// CHECK1: Begin completions, 16 items
+// CHECK1: Decl[StaticMethod]/Super:           override class func fooBaseInstanceFunc0() {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func fooBaseInstanceFunc0() {|}
+// CHECK1: Decl[StaticMethod]/Super:           override class func fooBaseInstanceFunc1(_ anObject: Any!) -> FooClassBase! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func fooBaseInstanceFunc1(_ anObject: Any!) -> FooClassBase! {|}
+// CHECK1: Decl[StaticMethod]/Super:           override class func fooBaseInstanceFuncOverridden() {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func fooBaseInstanceFuncOverridden() {|}
+// CHECK1: Decl[StaticMethod]/Super:           override class func fooBaseClassFunc0() {|}
+// CHECK1: Decl[StaticMethod]/Super:           override class func _internalMeth3() -> Any! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth3() -> Any! {|}
+// CHECK1: Decl[StaticMethod]/Super:           override class func _internalMeth2() -> Any! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth2() -> Any! {|}
+// CHECK1: Decl[StaticMethod]/Super:           override class func nonInternalMeth() -> Any! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func nonInternalMeth() -> Any! {|}
+// CHECK1: Decl[StaticMethod]/Super:           override class func _internalMeth1() -> Any! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth1() -> Any! {|}
 // CHECK1: Decl[Constructor]/Super:            override init!() {|}
 // CHECK1: End completions
@@ -25,7 +33,7 @@ class Sub : FooClassDerived {
   var #^PROPERTY^#
 }
 // PROPERTY: Begin completions
-// PROPERTY-DAG: Decl[InstanceVar]/Super:            fooProperty1: Int32
-// PROPERTY-DAG: Decl[InstanceVar]/Super:            fooProperty2: Int32
-// PROPERTY-DAG: Decl[InstanceVar]/Super:            fooProperty3: Int32
+// PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty1: Int32;
+// PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty2: Int32;
+// PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty3: Int32;
 // PROPERTY: End completions

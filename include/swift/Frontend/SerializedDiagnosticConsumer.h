@@ -29,13 +29,14 @@ namespace swift {
   class DiagnosticConsumer;
 
   namespace serialized_diagnostics {
-    /// \brief Create a DiagnosticConsumer that serializes diagnostics to a
-    ///        file.
+    /// Create a DiagnosticConsumer that serializes diagnostics to a file, using
+    /// Clang's serialized diagnostics format.
     ///
-    /// \param serializedDiagnosticsPath the file path to write the diagnostics.
+    /// \param outputPath the file path to write the diagnostics to.
     ///
     /// \returns A new diagnostic consumer that serializes diagnostics.
-    DiagnosticConsumer *createConsumer(llvm::StringRef serializedDiagnosticsPath);
+    std::unique_ptr<DiagnosticConsumer>
+    createConsumer(llvm::StringRef outputPath);
   }
 }
 

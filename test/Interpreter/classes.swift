@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
-// UNSUPPORTED: CPU=armv7
 
 class Interval {
   var lo, hi : Int

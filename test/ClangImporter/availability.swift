@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules %s -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -25,8 +25,94 @@ func test_unavailable_func(_ x : NSObject) {
   NSDeallocateObject(x) // expected-error {{'NSDeallocateObject' is unavailable}}
 }
 
-func test_deprecated_imported_as_unavailable(_ s:UnsafeMutablePointer<CChar>) {
+func test_unavailable_accessors(_ obj: UnavailableAccessors,
+    _ sub: UnavailableSubscript,
+    _ subGetter: UnavailableGetterSubscript,
+    _ subSetter: UnavailableSetterSubscript,
+    _ subReadOnly: UnavailableReadOnlySubscript) {
+  _ = obj.fullyUnavailable // expected-error {{'fullyUnavailable' is unavailable}}
+  obj.fullyUnavailable = 0 // expected-error {{'fullyUnavailable' is unavailable}}
+  obj.fullyUnavailable += 1 // expected-error {{'fullyUnavailable' is unavailable}}
+
+  _ = obj.fullyUnavailableOnAccessors // expected-error {{getter for 'fullyUnavailableOnAccessors' is unavailable}}
+  obj.fullyUnavailableOnAccessors = 0 // expected-error {{setter for 'fullyUnavailableOnAccessors' is unavailable}}
+  obj.fullyUnavailableOnAccessors += 1 // expected-error {{getter for 'fullyUnavailableOnAccessors' is unavailable}} expected-error {{setter for 'fullyUnavailableOnAccessors' is unavailable}}
+
+  _ = obj.getterUnavailable // expected-error {{getter for 'getterUnavailable' is unavailable}}
+  obj.getterUnavailable = 0
+  obj.getterUnavailable += 1 // expected-error {{getter for 'getterUnavailable' is unavailable}}
+
+  _ = UnavailableAccessors.getterUnavailableClass // expected-error {{getter for 'getterUnavailableClass' is unavailable}}
+  UnavailableAccessors.getterUnavailableClass = 0
+  UnavailableAccessors.getterUnavailableClass += 1 // expected-error {{getter for 'getterUnavailableClass' is unavailable}}
+
+  _ = obj.setterUnavailable
+  obj.setterUnavailable = 0 // expected-error {{setter for 'setterUnavailable' is unavailable}}
+  obj.setterUnavailable += 1 // expected-error {{setter for 'setterUnavailable' is unavailable}}
+
+  _ = UnavailableAccessors.setterUnavailableClass
+  UnavailableAccessors.setterUnavailableClass = 0 // expected-error {{setter for 'setterUnavailableClass' is unavailable}}
+  UnavailableAccessors.setterUnavailableClass += 1 // expected-error {{setter for 'setterUnavailableClass' is unavailable}}
+
+  _ = sub[0] // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}}
+  sub[0] = "" // expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}}
+  sub[0] += "" // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}} expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}}
+
+  _ = subGetter[0] // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}}
+  subGetter[0] = ""
+  subGetter[0] += "" // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}}
+
+  _ = subSetter[0]
+  subSetter[0] = "" // expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}}
+  subSetter[0] += "" // expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}}
+
+  _ = subReadOnly[0] // expected-error {{getter for 'subscript(_:)' is unavailable}}
+}
+
+func test_deprecated(_ s:UnsafeMutablePointer<CChar>, _ obj: AccessorDeprecations,
+    _ sub: DeprecatedSubscript,
+    _ subGetter: DeprecatedGetterSubscript,
+    _ subSetter: DeprecatedSetterSubscript,
+    _ subReadOnly: DeprecatedReadOnlySubscript) {
   _ = tmpnam(s) // expected-warning {{'tmpnam' is deprecated: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
+
+  _ = obj.fullyDeprecated // expected-warning {{'fullyDeprecated' is deprecated}}
+  obj.fullyDeprecated = 0 // expected-warning {{'fullyDeprecated' is deprecated}}
+  obj.fullyDeprecated += 1 // expected-warning {{'fullyDeprecated' is deprecated}}
+
+  _ = obj.fullyDeprecatedOnAccessors // expected-warning {{getter for 'fullyDeprecatedOnAccessors' is deprecated}}
+  obj.fullyDeprecatedOnAccessors = 0 // expected-warning {{setter for 'fullyDeprecatedOnAccessors' is deprecated}}
+  obj.fullyDeprecatedOnAccessors += 1 // expected-warning {{getter for 'fullyDeprecatedOnAccessors' is deprecated}} expected-warning {{setter for 'fullyDeprecatedOnAccessors' is deprecated}}
+
+  _ = obj.getterDeprecated // expected-warning {{getter for 'getterDeprecated' is deprecated}}
+  obj.getterDeprecated = 0
+  obj.getterDeprecated += 1 // expected-warning {{getter for 'getterDeprecated' is deprecated}}
+
+  _ = AccessorDeprecations.getterDeprecatedClass // expected-warning {{getter for 'getterDeprecatedClass' is deprecated}}
+  AccessorDeprecations.getterDeprecatedClass = 0
+  AccessorDeprecations.getterDeprecatedClass += 1 // expected-warning {{getter for 'getterDeprecatedClass' is deprecated}}
+
+  _ = obj.setterDeprecated
+  obj.setterDeprecated = 0 // expected-warning {{setter for 'setterDeprecated' is deprecated}}
+  obj.setterDeprecated += 1 // expected-warning {{setter for 'setterDeprecated' is deprecated}}
+
+  _ = AccessorDeprecations.setterDeprecatedClass
+  AccessorDeprecations.setterDeprecatedClass = 0 // expected-warning {{setter for 'setterDeprecatedClass' is deprecated}}
+  AccessorDeprecations.setterDeprecatedClass += 1 // expected-warning {{setter for 'setterDeprecatedClass' is deprecated}}
+
+  _ = sub[0] // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}}
+  sub[0] = "" // expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}}
+  sub[0] += "" // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}} expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}}
+
+  _ = subGetter[0] // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}}
+  subGetter[0] = ""
+  subGetter[0] += "" // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}}
+
+  _ = subSetter[0]
+  subSetter[0] = "" // expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}}
+  subSetter[0] += "" // expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}}
+
+  _ = subReadOnly[0] // expected-warning {{getter for 'subscript(_:)' is deprecated}}
 }
 
 func test_NSInvocation(_ x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}

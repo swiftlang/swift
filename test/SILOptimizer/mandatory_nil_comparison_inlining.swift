@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -module-name=test -emit-sil -o - -verify | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -primary-file %s -module-name=test -emit-sil -o - -verify | %FileCheck %s
 
 
 // CHECK-LABEL: sil {{.*}} @{{.*}}generic_func

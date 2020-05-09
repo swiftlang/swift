@@ -20,8 +20,7 @@ class D : B {
   }
 
   init(g:Int) {
-    super.init("aoeu") // expected-error{{argument labels '(_:)' do not match any available overloads}}
-    // expected-note @-1 {{overloads for 'B.init' exist with these partially matching parameter lists: (x: Int), (a: UnicodeScalar), (b: UnicodeScalar), (z: Float)}}
+    super.init("aoeu") // expected-error{{no exact matches in call to initializer}}
   }
 
   init(h:Int) {
@@ -40,27 +39,35 @@ class B {
   init() {
   }
 
-  init(x:Int) {
+  init(x:Int) { // expected-note{{candidate has partially matching parameter list (x: Int)}}
   }
 
-  init(a:UnicodeScalar) {
+  init(a:UnicodeScalar) { // expected-note {{candidate has partially matching parameter list (a: UnicodeScalar)}}
   }
-  init(b:UnicodeScalar) {
+  init(b:UnicodeScalar) { // expected-note{{candidate has partially matching parameter list (b: UnicodeScalar)}}
   }
 
-  init(z:Float) {
+  init(z:Float) { // expected-note{{candidate has partially matching parameter list (z: Float)}}
     super.init() // expected-error{{'super' members cannot be referenced in a root class}}
   }
 }
 
 // SR-2484: Bad diagnostic for incorrectly calling private init
 class SR_2484 {
-  private init() {} // expected-note {{'init' declared here}}
-  private init(a: Int) {} // expected-note {{'init' declared here}}
+  private init() {} // expected-note {{'init()' declared here}}
+  private init(a: Int) {}
 }
 
 class Impl_2484 : SR_2484 {
   init() {
-    super.init() // expected-error {{'init' is inaccessible due to 'private' protection level}}
+    super.init() // expected-error {{'SR_2484' initializer is inaccessible due to 'private' protection level}}
   }
+}
+
+class A_Priv<T> {
+  private init(_ foo: T) {}
+}
+
+class B_Override<U> : A_Priv<[U]> {
+  init(_ foo: [U]) { fatalError() } // Ok, because effectively overrides init from parent which is invisible
 }

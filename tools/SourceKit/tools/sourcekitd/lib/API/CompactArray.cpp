@@ -70,11 +70,14 @@ unsigned CompactArrayBuilderImpl::getOffsetForString(StringRef Str) {
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
-CompactArrayBuilderImpl::createBuffer() const {
-  std::unique_ptr<llvm::MemoryBuffer> Buf;
-  Buf = llvm::MemoryBuffer::getNewUninitMemBuffer(sizeInBytes());
-  copyInto(const_cast<char *>(Buf->getBufferStart()), Buf->getBufferSize());
-  return Buf;
+CompactArrayBuilderImpl::createBuffer(CustomBufferKind Kind) const {
+  auto bodySize = sizeInBytes();
+  std::unique_ptr<llvm::WritableMemoryBuffer> Buf;
+  Buf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
+      sizeof(uint64_t) + bodySize);
+  *reinterpret_cast<uint64_t*>(Buf->getBufferStart()) = (uint64_t)Kind;
+  copyInto(Buf->getBufferStart() + sizeof(uint64_t), bodySize);
+  return std::move(Buf);
 }
 
 void CompactArrayBuilderImpl::appendTo(SmallVectorImpl<char> &Buf) const {
@@ -92,6 +95,12 @@ void CompactArrayBuilderImpl::copyInto(char *BufPtr, size_t Length) const {
   memcpy(BufPtr, EntriesBuffer.data(), EntriesBufSize);
   BufPtr += EntriesBufSize;
   memcpy(BufPtr, StringBuffer.data(), StringBuffer.size());
+}
+
+unsigned CompactArrayBuilderImpl::copyInto(char *BufPtr) const {
+  size_t Length = sizeInBytes();
+  copyInto(BufPtr, Length);
+  return Length;
 }
 
 bool CompactArrayBuilderImpl::empty() const {

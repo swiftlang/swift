@@ -25,6 +25,9 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/Debug.h"
+#include "swift/Basic/Located.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -33,54 +36,77 @@ namespace swift {
   class DeclContext;
   class GenericEnvironment;
   class IdentTypeRepr;
+  class TupleTypeRepr;
   class TypeDecl;
 
 enum class TypeReprKind : uint8_t {
 #define TYPEREPR(ID, PARENT) ID,
+#define LAST_TYPEREPR(ID) Last_TypeRepr = ID,
 #include "TypeReprNodes.def"
 };
+enum : unsigned { NumTypeReprKindBits =
+  countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
-/// \brief Representation of a type as written in source.
+/// Representation of a type as written in source.
 class alignas(8) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
-  class TypeReprBitfields {
-    friend class TypeRepr;
+protected:
+  union { uint64_t OpaqueBits;
+
+  SWIFT_INLINE_BITFIELD_BASE(TypeRepr, bitmax(NumTypeReprKindBits,8)+1+1,
     /// The subclass of TypeRepr that this is.
-    unsigned Kind : 6;
+    Kind : bitmax(NumTypeReprKindBits,8),
 
     /// Whether this type representation is known to contain an invalid
     /// type.
-    unsigned Invalid : 1;
+    Invalid : 1,
 
     /// Whether this type representation had a warning emitted related to it.
     /// This is a hack related to how we resolve type exprs multiple times in
     /// generic contexts.
-    unsigned Warned : 1;
-  };
-  enum { NumTypeReprBits = 8 };
-  class TupleTypeReprBitfields {
-    friend class TupleTypeRepr;
-    unsigned : NumTypeReprBits;
+    Warned : 1
+  );
 
-    /// The number of elements contained.
-    unsigned NumElements : 16;
-
+  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 1+32,
     /// Whether this tuple has '...' and its position.
-    unsigned HasEllipsis : 1;
-  };
+    HasEllipsis : 1,
+    : NumPadBits,
+    /// The number of elements contained.
+    NumElements : 32
+  );
 
-protected:
-  union {
-    TypeReprBitfields TypeReprBits;
-    TupleTypeReprBitfields TupleTypeReprBits;
-  };
+  SWIFT_INLINE_BITFIELD_EMPTY(IdentTypeRepr, TypeRepr);
+  SWIFT_INLINE_BITFIELD_EMPTY(ComponentIdentTypeRepr, IdentTypeRepr);
+
+  SWIFT_INLINE_BITFIELD_FULL(GenericIdentTypeRepr, ComponentIdentTypeRepr, 32,
+    : NumPadBits,
+    NumGenericArgs : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(CompoundIdentTypeRepr, IdentTypeRepr, 32,
+    : NumPadBits,
+    NumComponents : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
+    : NumPadBits,
+    NumTypes : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(SILBoxTypeRepr, TypeRepr, 32,
+    NumGenericArgs : NumPadBits,
+    NumFields : 32
+  );
+
+  } Bits;
 
   TypeRepr(TypeReprKind K) {
-    TypeReprBits.Kind = static_cast<unsigned>(K);
-    TypeReprBits.Invalid = false;
-    TypeReprBits.Warned = false;
+    Bits.OpaqueBits = 0;
+    Bits.TypeRepr.Kind = static_cast<unsigned>(K);
+    Bits.TypeRepr.Invalid = false;
+    Bits.TypeRepr.Warned = false;
   }
 
 private:
@@ -88,19 +114,19 @@ private:
 
 public:
   TypeReprKind getKind() const {
-    return static_cast<TypeReprKind>(TypeReprBits.Kind);
+    return static_cast<TypeReprKind>(Bits.TypeRepr.Kind);
   }
 
   /// Is this type representation known to be invalid?
-  bool isInvalid() const { return TypeReprBits.Invalid; }
+  bool isInvalid() const { return Bits.TypeRepr.Invalid; }
 
   /// Note that this type representation describes an invalid type.
-  void setInvalid() { TypeReprBits.Invalid = true; }
+  void setInvalid() { Bits.TypeRepr.Invalid = true; }
 
   /// If a warning is produced about this type repr, keep track of that so we
   /// don't emit another one upon further reanalysis.
-  bool isWarnedAbout() const { return TypeReprBits.Warned; }
-  void setWarned() { TypeReprBits.Warned = true; }
+  bool isWarnedAbout() const { return Bits.TypeRepr.Warned; }
+  void setWarned() { Bits.TypeRepr.Warned = true; }
   
   /// Get the representative location for pointing at this type.
   SourceLoc getLoc() const;
@@ -136,20 +162,13 @@ public:
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 
   /// Clone the given type representation.
   TypeRepr *clone(const ASTContext &ctx) const;
-
-  /// Visit the top-level types in the given type representation,
-  /// which includes the types referenced by \c IdentTypeReprs either
-  /// directly or within a protocol composition type.
-  ///
-  /// \param visitor Each top-level type representation is passed to the visitor.
-  void visitTopLevelTypeReprs(llvm::function_ref<void(IdentTypeRepr *)> visitor);
 };
 
-/// \brief A TypeRepr for a type with a syntax error.  Can be used both as a
+/// A TypeRepr for a type with a syntax error.  Can be used both as a
 /// top-level TypeRepr and as a part of other TypeRepr.
 ///
 /// The client should make sure to emit a diagnostic at the construction time
@@ -176,7 +195,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A type with attributes.
+/// A type with attributes.
 /// \code
 ///   @convention(thin) Foo
 /// \endcode
@@ -212,7 +231,7 @@ private:
 
 class ComponentIdentTypeRepr;
 
-/// \brief This is the abstract base class for types with identifier components.
+/// This is the abstract base class for types with identifier components.
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
@@ -238,32 +257,33 @@ public:
 };
 
 class ComponentIdentTypeRepr : public IdentTypeRepr {
-  SourceLoc Loc;
+  DeclNameLoc Loc;
 
   /// Either the identifier or declaration that describes this
   /// component.
   ///
   /// The initial parsed representation is always an identifier, and
-  /// name binding will resolve this to a specific declaration.
-  llvm::PointerUnion<Identifier, TypeDecl *> IdOrDecl;
+  /// name lookup will resolve this to a specific declaration.
+  llvm::PointerUnion<DeclNameRef, TypeDecl *> IdOrDecl;
 
   /// The declaration context from which the bound declaration was
   /// found. only valid if IdOrDecl is a TypeDecl.
   DeclContext *DC;
 
 protected:
-  ComponentIdentTypeRepr(TypeReprKind K, SourceLoc Loc, Identifier Id)
+  ComponentIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
     : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
 
 public:
-  SourceLoc getIdLoc() const { return Loc; }
-  Identifier getIdentifier() const;
+  DeclNameLoc getNameLoc() const { return Loc; }
+  DeclNameRef getNameRef() const;
 
   /// Replace the identifier with a new identifier, e.g., due to typo
   /// correction.
-  void overwriteIdentifier(Identifier newId) { IdOrDecl = newId; }
+  void overwriteNameRef(DeclNameRef newId) { IdOrDecl = newId; }
 
-  /// Return true if this has been name-bound already.
+  /// Return true if this name has been resolved to a type decl. This happens
+  /// during type resolution.
   bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
 
   TypeDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<TypeDecl*>(); }
@@ -287,20 +307,20 @@ public:
 protected:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
-  SourceLoc getLocImpl() const { return Loc; }
+  SourceLoc getLocImpl() const { return Loc.getBaseNameLoc(); }
   friend class TypeRepr;
 };
 
-/// \brief A simple identifier type like "Int".
+/// A simple identifier type like "Int".
 class SimpleIdentTypeRepr : public ComponentIdentTypeRepr {
 public:
-  SimpleIdentTypeRepr(SourceLoc Loc, Identifier Id)
+  SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
     : ComponentIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
 
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
   SimpleIdentTypeRepr(const SimpleIdentTypeRepr &repr)
-      : SimpleIdentTypeRepr(repr.getLoc(), repr.getIdentifier()) {
+      : SimpleIdentTypeRepr(repr.getNameLoc(), repr.getNameRef()) {
     llvm_unreachable("should not be called dynamically");
   }
 
@@ -310,33 +330,50 @@ public:
   static bool classof(const SimpleIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return getIdLoc(); }
-  SourceLoc getEndLocImpl() const { return getIdLoc(); }
+  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return getNameLoc().getEndLoc(); }
   friend class TypeRepr;
 };
 
-/// \brief An identifier type with generic arguments.
+/// An identifier type with generic arguments.
 /// \code
 ///   Bar<Gen>
 /// \endcode
-class GenericIdentTypeRepr : public ComponentIdentTypeRepr {
-  ArrayRef<TypeRepr*> GenericArgs;
+class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
+    private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
+  friend TrailingObjects;
   SourceRange AngleBrackets;
 
-public:
-  GenericIdentTypeRepr(SourceLoc Loc, Identifier Id,
+  GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
                        ArrayRef<TypeRepr*> GenericArgs,
                        SourceRange AngleBrackets)
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
-      GenericArgs(GenericArgs), AngleBrackets(AngleBrackets) {
+      AngleBrackets(AngleBrackets) {
+    Bits.GenericIdentTypeRepr.NumGenericArgs = GenericArgs.size();
     assert(!GenericArgs.empty());
 #ifndef NDEBUG
     for (auto arg : GenericArgs)
       assert(arg != nullptr);
 #endif
+    std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
+                            getTrailingObjects<TypeRepr*>());
   }
 
-  ArrayRef<TypeRepr*> getGenericArgs() const { return GenericArgs; }
+public:
+  static GenericIdentTypeRepr *create(const ASTContext &C,
+                                      DeclNameLoc Loc,
+                                      DeclNameRef Id,
+                                      ArrayRef<TypeRepr*> GenericArgs,
+                                      SourceRange AngleBrackets);
+
+  unsigned getNumGenericArgs() const {
+    return Bits.GenericIdentTypeRepr.NumGenericArgs;
+  }
+
+  ArrayRef<TypeRepr*> getGenericArgs() const {
+    return {getTrailingObjects<TypeRepr*>(),
+            Bits.GenericIdentTypeRepr.NumGenericArgs};
+  }
   SourceRange getAngleBrackets() const { return AngleBrackets; }
 
   static bool classof(const TypeRepr *T) {
@@ -345,24 +382,36 @@ public:
   static bool classof(const GenericIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return getIdLoc(); }
+  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
   SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
   friend class TypeRepr;
 };
 
-/// \brief A type with identifier components.
+/// A type with identifier components.
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
-class CompoundIdentTypeRepr : public IdentTypeRepr {
-public:
-  const ArrayRef<ComponentIdentTypeRepr *> Components;
+class CompoundIdentTypeRepr final : public IdentTypeRepr,
+    private llvm::TrailingObjects<CompoundIdentTypeRepr,
+                                  ComponentIdentTypeRepr *> {
+  friend TrailingObjects;
 
-  explicit CompoundIdentTypeRepr(ArrayRef<ComponentIdentTypeRepr *> Components)
-    : IdentTypeRepr(TypeReprKind::CompoundIdent),
-      Components(Components) {
+  CompoundIdentTypeRepr(ArrayRef<ComponentIdentTypeRepr *> Components)
+      : IdentTypeRepr(TypeReprKind::CompoundIdent) {
+    Bits.CompoundIdentTypeRepr.NumComponents = Components.size();
     assert(Components.size() > 1 &&
            "should have just used the single ComponentIdentTypeRepr directly");
+    std::uninitialized_copy(Components.begin(), Components.end(),
+                            getTrailingObjects<ComponentIdentTypeRepr*>());
+  }
+
+public:
+  static CompoundIdentTypeRepr *create(const ASTContext &Ctx,
+                                  ArrayRef<ComponentIdentTypeRepr*> Components);
+
+  ArrayRef<ComponentIdentTypeRepr*> getComponents() const {
+    return {getTrailingObjects<ComponentIdentTypeRepr*>(),
+            Bits.CompoundIdentTypeRepr.NumComponents};
   }
 
   static bool classof(const TypeRepr *T) {
@@ -371,9 +420,15 @@ public:
   static bool classof(const CompoundIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Components.front()->getStartLoc();}
-  SourceLoc getEndLocImpl() const { return Components.back()->getEndLoc(); }
-  SourceLoc getLocImpl() const { return Components.back()->getLoc(); }
+  SourceLoc getStartLocImpl() const {
+    return getComponents().front()->getStartLoc();
+  }
+  SourceLoc getEndLocImpl() const {
+    return getComponents().back()->getEndLoc();
+  }
+  SourceLoc getLocImpl() const {
+    return getComponents().back()->getLoc();
+  }
 
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
@@ -392,13 +447,13 @@ public:
   iterator begin() const {
     if (isa<ComponentIdentTypeRepr>(IdT))
       return reinterpret_cast<iterator>(&IdT);
-    return cast<CompoundIdentTypeRepr>(IdT)->Components.begin();
+    return cast<CompoundIdentTypeRepr>(IdT)->getComponents().begin();
   }
 
   iterator end() const {
     if (isa<ComponentIdentTypeRepr>(IdT))
       return reinterpret_cast<iterator>(&IdT) + 1;
-    return cast<CompoundIdentTypeRepr>(IdT)->Components.end();
+    return cast<CompoundIdentTypeRepr>(IdT)->getComponents().end();
   }
 
   bool empty() const { return begin() == end(); }
@@ -411,27 +466,39 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
   return ComponentRange(this);
 }
 
-/// \brief A function type.
+/// A function type.
 /// \code
-///   Foo -> Bar
+///   (Foo) -> Bar
+///   (Foo, Bar) -> Baz
+///   (x: Foo, y: Bar) -> Baz
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
-  // These three are only used in SIL mode, which is the only time
-  // we can have polymorphic function values.
+  // The generic params / environment / substitutions fields are only used
+  // in SIL mode, which is the only time we can have polymorphic and
+  // substituted function values.
   GenericParamList *GenericParams;
   GenericEnvironment *GenericEnv;
+  ArrayRef<TypeRepr *> InvocationSubs;
+  GenericParamList *PatternGenericParams;
+  GenericEnvironment *PatternGenericEnv;
+  ArrayRef<TypeRepr *> PatternSubs;
 
-  TypeRepr *ArgsTy;
+  TupleTypeRepr *ArgsTy;
   TypeRepr *RetTy;
   SourceLoc ArrowLoc;
   SourceLoc ThrowsLoc;
 
 public:
-  FunctionTypeRepr(GenericParamList *genericParams, TypeRepr *argsTy,
-                   SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
+  FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
+                   SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy,
+                   GenericParamList *patternGenericParams = nullptr,
+                   ArrayRef<TypeRepr *> patternSubs = {},
+                   ArrayRef<TypeRepr *> invocationSubs = {})
     : TypeRepr(TypeReprKind::Function),
-      GenericParams(genericParams),
-      GenericEnv(nullptr),
+      GenericParams(genericParams), GenericEnv(nullptr),
+      InvocationSubs(invocationSubs),
+      PatternGenericParams(patternGenericParams), PatternGenericEnv(nullptr),
+      PatternSubs(patternSubs),
       ArgsTy(argsTy), RetTy(retTy),
       ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
   }
@@ -439,12 +506,29 @@ public:
   GenericParamList *getGenericParams() const { return GenericParams; }
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
 
+  GenericParamList *getPatternGenericParams() const {
+    return PatternGenericParams;
+  }
+  GenericEnvironment *getPatternGenericEnvironment() const {
+    return PatternGenericEnv;
+  }
+
+  ArrayRef<TypeRepr*> getPatternSubstitutions() const { return PatternSubs; }
+  ArrayRef<TypeRepr*> getInvocationSubstitutions() const {
+    return InvocationSubs;
+  }
+
+  void setPatternGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert(PatternGenericEnv == nullptr);
+    PatternGenericEnv = genericEnv;
+  }
+
   void setGenericEnvironment(GenericEnvironment *genericEnv) {
     assert(GenericEnv == nullptr);
     GenericEnv = genericEnv;
   }
 
-  TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
+  TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool throws() const { return ThrowsLoc.isValid(); }
 
@@ -457,7 +541,7 @@ public:
   static bool classof(const FunctionTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return ArgsTy->getStartLoc(); }
+  SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const { return RetTy->getEndLoc(); }
   SourceLoc getLocImpl() const { return ArrowLoc; }
 
@@ -465,7 +549,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An array type.
+/// An array type.
 /// \code
 ///   [Foo]
 /// \endcode
@@ -492,7 +576,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A dictionary type.
+/// A dictionary type.
 /// \code
 ///   [K : V]
 /// \endcode
@@ -525,7 +609,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An optional type.
+/// An optional type.
 /// \code
 ///   Foo?
 /// \endcode
@@ -557,7 +641,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An implicitly unwrapped optional type.
+/// An implicitly unwrapped optional type.
 /// \code
 ///   Foo!
 /// \endcode
@@ -586,7 +670,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A parsed element within a tuple type.
+/// A parsed element within a tuple type.
 struct TupleTypeReprElement {
   Identifier Name;
   SourceLoc NameLoc;
@@ -594,15 +678,14 @@ struct TupleTypeReprElement {
   SourceLoc SecondNameLoc;
   SourceLoc UnderscoreLoc;
   SourceLoc ColonLoc;
-  SourceLoc InOutLoc;
   TypeRepr *Type;
   SourceLoc TrailingCommaLoc;
 
-  TupleTypeReprElement() {}
+  TupleTypeReprElement(): Type(nullptr) {}
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
-/// \brief A tuple type.
+/// A tuple type.
 /// \code
 ///   (Foo, Bar)
 ///   (x: Foo)
@@ -610,21 +693,21 @@ struct TupleTypeReprElement {
 /// \endcode
 class TupleTypeRepr final : public TypeRepr,
     private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement,
-                                  std::pair<SourceLoc, unsigned>> {
+                                  Located<unsigned>> {
   friend TrailingObjects;
-  typedef std::pair<SourceLoc, unsigned> SourceLocAndIdx;
+  typedef Located<unsigned> SourceLocAndIdx;
 
   SourceRange Parens;
   
   size_t numTrailingObjects(OverloadToken<TupleTypeReprElement>) const {
-    return TupleTypeReprBits.NumElements;
+    return Bits.TupleTypeRepr.NumElements;
   }
 
   TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
                 SourceRange Parens, SourceLoc Ellipsis, unsigned EllipsisIdx);
 
 public:
-  unsigned getNumElements() const { return TupleTypeReprBits.NumElements; }
+  unsigned getNumElements() const { return Bits.TupleTypeRepr.NumElements; }
   bool hasElementNames() const {
     for (auto &Element : getElements()) {
       if (Element.NameLoc.isValid()) {
@@ -636,7 +719,7 @@ public:
 
   ArrayRef<TupleTypeReprElement> getElements() const {
     return { getTrailingObjects<TupleTypeReprElement>(),
-             TupleTypeReprBits.NumElements };
+             Bits.TupleTypeRepr.NumElements };
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -678,32 +761,32 @@ public:
   SourceRange getParens() const { return Parens; }
 
   bool hasEllipsis() const {
-    return TupleTypeReprBits.HasEllipsis;
+    return Bits.TupleTypeRepr.HasEllipsis;
   }
 
   SourceLoc getEllipsisLoc() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].first : SourceLoc();
+      getTrailingObjects<SourceLocAndIdx>()[0].Loc : SourceLoc();
   }
 
   unsigned getEllipsisIndex() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].second :
-        TupleTypeReprBits.NumElements;
+      getTrailingObjects<SourceLocAndIdx>()[0].Item :
+        Bits.TupleTypeRepr.NumElements;
   }
 
   void removeEllipsis() {
     if (hasEllipsis()) {
-      TupleTypeReprBits.HasEllipsis = false;
+      Bits.TupleTypeRepr.HasEllipsis = false;
       getTrailingObjects<SourceLocAndIdx>()[0] = {
-        SourceLoc(),
-        getNumElements()
+        getNumElements(),
+        SourceLoc()
       };
     }
   }
 
   bool isParenType() const {
-    return TupleTypeReprBits.NumElements == 1 &&
+    return Bits.TupleTypeRepr.NumElements == 1 &&
            getElementNameLoc(0).isInvalid() &&
            !hasEllipsis();
   }
@@ -732,28 +815,34 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A type composite type.
+/// A type composite type.
 /// \code
 ///   Foo & Bar
 /// \endcode
-class CompositionTypeRepr : public TypeRepr {
-  ArrayRef<TypeRepr *> Types;
+class CompositionTypeRepr final : public TypeRepr,
+    private llvm::TrailingObjects<CompositionTypeRepr, TypeRepr*> {
+  friend TrailingObjects;
   SourceLoc FirstTypeLoc;
   SourceRange CompositionRange;
 
-public:
   CompositionTypeRepr(ArrayRef<TypeRepr *> Types,
                       SourceLoc FirstTypeLoc,
                       SourceRange CompositionRange)
-    : TypeRepr(TypeReprKind::Composition), Types(Types),
-    FirstTypeLoc(FirstTypeLoc), CompositionRange(CompositionRange) {
+      : TypeRepr(TypeReprKind::Composition), FirstTypeLoc(FirstTypeLoc),
+        CompositionRange(CompositionRange) {
+    Bits.CompositionTypeRepr.NumTypes = Types.size();
+    std::uninitialized_copy(Types.begin(), Types.end(),
+                            getTrailingObjects<TypeRepr*>());
   }
 
-  ArrayRef<TypeRepr *> getTypes() const { return Types; }
+public:
+  ArrayRef<TypeRepr *> getTypes() const {
+    return {getTrailingObjects<TypeRepr*>(), Bits.CompositionTypeRepr.NumTypes};
+  }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
 
-  static CompositionTypeRepr *create(ASTContext &C,
+  static CompositionTypeRepr *create(const ASTContext &C,
                                      ArrayRef<TypeRepr*> Protocols,
                                      SourceLoc FirstTypeLoc,
                                      SourceRange CompositionRange);
@@ -776,7 +865,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A 'metatype' type.
+/// A 'metatype' type.
 /// \code
 ///   Foo.Type
 /// \endcode
@@ -805,7 +894,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A 'protocol' type.
+/// A 'protocol' type.
 /// \code
 ///   Foo.Protocol
 /// \endcode
@@ -847,8 +936,9 @@ public:
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
   
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::InOut
-        || T->getKind() == TypeReprKind::Shared;
+    return T->getKind() == TypeReprKind::InOut ||
+           T->getKind() == TypeReprKind::Shared ||
+           T->getKind() == TypeReprKind::Owned;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -859,7 +949,7 @@ private:
   friend class TypeRepr;
 };
   
-/// \brief An 'inout' type.
+/// An 'inout' type.
 /// \code
 ///   x : inout Int
 /// \endcode
@@ -874,7 +964,7 @@ public:
   static bool classof(const InOutTypeRepr *T) { return true; }
 };
   
-/// \brief A 'shared' type.
+/// A 'shared' type.
 /// \code
 ///   x : shared Int
 /// \endcode
@@ -889,8 +979,22 @@ public:
   static bool classof(const SharedTypeRepr *T) { return true; }
 };
 
+/// A 'owned' type.
+/// \code
+///   x : owned Int
+/// \endcode
+class OwnedTypeRepr : public SpecifierTypeRepr {
+public:
+  OwnedTypeRepr(TypeRepr *Base, SourceLoc OwnedLoc)
+      : SpecifierTypeRepr(TypeReprKind::Owned, Base, OwnedLoc) {}
 
-/// \brief A TypeRepr for a known, fixed type.
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Owned;
+  }
+  static bool classof(const OwnedTypeRepr *T) { return true; }
+};
+
+/// A TypeRepr for a known, fixed type.
 ///
 /// Fixed type representations should be used sparingly, in places
 /// where we need to specify some type (usually some built-in type)
@@ -927,29 +1031,83 @@ private:
   friend class TypeRepr;
 };
 
+class SILBoxTypeReprField {
+  SourceLoc VarOrLetLoc;
+  llvm::PointerIntPair<TypeRepr*, 1, bool> FieldTypeAndMutable;
+
+public:
+  SILBoxTypeReprField(SourceLoc loc, bool isMutable, TypeRepr *fieldType)
+     : VarOrLetLoc(loc), FieldTypeAndMutable(fieldType, isMutable) {
+  }
+
+  SourceLoc getLoc() const { return VarOrLetLoc; }
+  TypeRepr *getFieldType() const { return FieldTypeAndMutable.getPointer(); }
+  bool isMutable() const { return FieldTypeAndMutable.getInt(); }
+};
+  
+/// TypeRepr for opaque return types.
+///
+/// This can occur in the return position of a function declaration, or the
+/// top-level type of a property, to specify that the concrete return type
+/// should be abstracted from callers, given a set of generic constraints that
+/// the concrete return type satisfies:
+///
+/// func foo() -> some Collection { return [1,2,3] }
+/// var bar: some SignedInteger = 1
+///
+/// It is currently illegal for this to appear in any other position.
+class OpaqueReturnTypeRepr : public TypeRepr {
+  /// The type repr for the immediate constraints on the opaque type.
+  /// In valid code this must resolve to a class, protocol, or composition type.
+  TypeRepr *Constraint;
+  SourceLoc OpaqueLoc;
+  
+public:
+  OpaqueReturnTypeRepr(SourceLoc opaqueLoc, TypeRepr *constraint)
+    : TypeRepr(TypeReprKind::OpaqueReturn), Constraint(constraint),
+      OpaqueLoc(opaqueLoc)
+  {}
+  
+  TypeRepr *getConstraint() const { return Constraint; }
+  SourceLoc getOpaqueLoc() const { return OpaqueLoc; }
+  
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::OpaqueReturn;
+  }
+  static bool classof(const OpaqueReturnTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return OpaqueLoc; }
+  SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
+  SourceLoc getLocImpl() const { return OpaqueLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// SIL-only TypeRepr for box types.
 ///
 /// Boxes are either concrete: { var Int, let String }
 /// or generic:                <T: Runcible> { var T, let String } <Int>
-class SILBoxTypeRepr : public TypeRepr {
+class SILBoxTypeRepr final : public TypeRepr,
+    private llvm::TrailingObjects<SILBoxTypeRepr,
+                                  SILBoxTypeReprField, TypeRepr *> {
+  friend TrailingObjects;
   GenericParamList *GenericParams;
   GenericEnvironment *GenericEnv = nullptr;
 
   SourceLoc LBraceLoc, RBraceLoc;
   SourceLoc ArgLAngleLoc, ArgRAngleLoc;
+
+  size_t numTrailingObjects(OverloadToken<SILBoxTypeReprField>) const {
+    return Bits.SILBoxTypeRepr.NumFields;
+  }
+  size_t numTrailingObjects(OverloadToken<TypeRepr*>) const {
+    return Bits.SILBoxTypeRepr.NumGenericArgs;
+  }
   
 public:
-  struct Field {
-    SourceLoc VarOrLetLoc;
-    bool Mutable;
-    TypeRepr *FieldType;
-  };
-  
-private:
-  ArrayRef<Field> Fields;
-  ArrayRef<TypeRepr *> GenericArgs;
-  
-public:
+  using Field = SILBoxTypeReprField;
+
   SILBoxTypeRepr(GenericParamList *GenericParams,
                  SourceLoc LBraceLoc, ArrayRef<Field> Fields,
                  SourceLoc RBraceLoc,
@@ -957,9 +1115,17 @@ public:
                  SourceLoc ArgRAngleLoc)
     : TypeRepr(TypeReprKind::SILBox),
       GenericParams(GenericParams), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
-      ArgLAngleLoc(ArgLAngleLoc), ArgRAngleLoc(ArgRAngleLoc),
-      Fields(Fields), GenericArgs(GenericArgs)
-  {}  
+      ArgLAngleLoc(ArgLAngleLoc), ArgRAngleLoc(ArgRAngleLoc)
+  {
+    Bits.SILBoxTypeRepr.NumFields = Fields.size();
+    Bits.SILBoxTypeRepr.NumGenericArgs = GenericArgs.size();
+
+    std::uninitialized_copy(Fields.begin(), Fields.end(),
+                            getTrailingObjects<SILBoxTypeReprField>());
+
+    std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
+                            getTrailingObjects<TypeRepr*>());
+  }
   
   static SILBoxTypeRepr *create(ASTContext &C,
                       GenericParamList *GenericParams,
@@ -974,10 +1140,12 @@ public:
   }
   
   ArrayRef<Field> getFields() const {
-    return Fields;
+    return {getTrailingObjects<Field>(),
+            Bits.SILBoxTypeRepr.NumFields};
   }
   ArrayRef<TypeRepr *> getGenericArguments() const {
-    return GenericArgs;
+    return {getTrailingObjects<TypeRepr*>(),
+            static_cast<size_t>(Bits.SILBoxTypeRepr.NumGenericArgs)};
   }
   
   GenericParamList *getGenericParams() const {
@@ -1006,12 +1174,14 @@ private:
 };
 
 inline bool TypeRepr::isSimple() const {
+  // NOTE: Please keep this logic in sync with TypeBase::hasSimpleTypeRepr().
   switch (getKind()) {
   case TypeReprKind::Attributed:
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
   case TypeReprKind::Composition:
+  case TypeReprKind::OpaqueReturn:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -1026,6 +1196,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Array:
   case TypeReprKind::SILBox:
   case TypeReprKind::Shared:
+  case TypeReprKind::Owned:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

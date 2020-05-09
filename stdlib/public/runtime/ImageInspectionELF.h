@@ -19,22 +19,52 @@
 #ifndef SWIFT_RUNTIME_IMAGEINSPECTIONELF_H
 #define SWIFT_RUNTIME_IMAGEINSPECTIONELF_H
 
-#if defined(__ELF__) || defined(__ANDROID__)
+#define SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING "swift_reflection_metadata_magic_string"
+
+#if defined(__ELF__)
 
 #include "../SwiftShims/Visibility.h"
 #include <cstdint>
+#include <cstddef>
 
 namespace swift {
-  struct SectionInfo {
-    uint64_t size;
-    const char *data;
+struct SectionInfo {
+  uint64_t size;
+  const char *data;
+};
+
+static constexpr const uintptr_t CurrentSectionMetadataVersion = 1;
+
+struct MetadataSections {
+  uintptr_t version;
+  uintptr_t reserved;
+
+  mutable const MetadataSections *next;
+  mutable const MetadataSections *prev;
+
+  struct Range {
+    uintptr_t start;
+    size_t length;
   };
-}
+
+  Range swift5_protocols;
+  Range swift5_protocol_conformances;
+  Range swift5_type_metadata;
+  Range swift5_typeref;
+  Range swift5_reflstr;
+  Range swift5_fieldmd;
+  Range swift5_assocty;
+  Range swift5_replace;
+  Range swift5_replac2;
+  Range swift5_builtin;
+  Range swift5_capture;
+};
+} // namespace swift
 
 // Called by injected constructors when a dynamic library is loaded.
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr);
 
-#endif // defined(__ELF__) || defined(__ANDROID__)
+#endif // defined(__ELF__)
 
 #endif // SWIFT_RUNTIME_IMAGE_INSPECTION_ELF_H

@@ -19,6 +19,7 @@
 #define SWIFT_TYPECHECKING_CODESYNTHESIS_H
 
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
 
@@ -32,81 +33,47 @@ class ConstructorDecl;
 class FuncDecl;
 class GenericParamList;
 class NominalTypeDecl;
+class ObjCReason;
+class ParamDecl;
 class Type;
 class ValueDecl;
 class VarDecl;
 
-class TypeChecker;
+enum class SelfAccessorKind {
+  /// We're building a derived accessor on top of whatever this
+  /// class provides.
+  Peer,
 
-enum class ObjCReason;
-
-// These are implemented in TypeCheckDecl.cpp.
-void makeFinal(ASTContext &ctx, ValueDecl *D);
-void makeDynamic(ASTContext &ctx, ValueDecl *D);
-void markAsObjC(TypeChecker &TC, ValueDecl *D,
-                Optional<ObjCReason> isObjC,
-                Optional<ForeignErrorConvention> errorConvention = None);
-bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
-
-// These are implemented in CodeSynthesis.cpp.
-void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC);
-void synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
-                                                TypeChecker &TC);
-void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
-                               TypeChecker &TC);
-void maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC);
-
-/// \brief Describes the kind of implicit constructor that will be
-/// generated.
-enum class ImplicitConstructorKind {
-  /// \brief The default constructor, which default-initializes each
-  /// of the instance variables.
-  Default,
-  /// \brief The memberwise constructor, which initializes each of
-  /// the instance variables from a parameter of the same type and
-  /// name.
-  Memberwise
+  /// We're building a setter or something around an underlying
+  /// implementation, which might be storage or inherited from a
+  /// superclass.
+  Super,
 };
 
-/// \brief Create an implicit struct or class constructor.
+/// Builds a reference to the \c self decl in a function.
 ///
-/// \param decl The struct or class for which a constructor will be created.
-/// \param ICK The kind of implicit constructor to create.
-///
-/// \returns The newly-created constructor, which has already been type-checked
-/// (but has not been added to the containing struct or class).
-ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
-                                           NominalTypeDecl *decl,
-                                           ImplicitConstructorKind ICK);
+/// \param selfDecl The self decl to reference.
+/// \param selfAccessorKind The kind of access being performed.
+/// \param isLValue Whether the resulting expression is an lvalue.
+/// \param convertTy The type of the resulting expression. For a reference to
+/// super, this can be a superclass type to upcast to.
+Expr *buildSelfReference(VarDecl *selfDecl, SelfAccessorKind selfAccessorKind,
+                         bool isLValue, Type convertTy = Type());
 
-/// The kind of designated initializer to synthesize.
-enum class DesignatedInitKind {
-  /// A stub initializer, which is not visible to name lookup and
-  /// merely aborts at runtime.
-  Stub,
+/// Build an expression that evaluates the specified parameter list as a tuple
+/// or paren expr, suitable for use in an apply expr.
+Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
+                                  ASTContext &ctx);
 
-  /// An initializer that simply chains to the corresponding
-  /// superclass initializer.
-  Chaining
-};
+/// Returns the protocol requirement with the specified name.
+ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
 
-/// Create a new initializer that overrides the given designated
-/// initializer.
-///
-/// \param classDecl The subclass in which the new initializer will
-/// be declared.
-///
-/// \param superclassCtor The superclass initializer for which this
-/// routine will create an override.
-///
-/// \param kind The kind of initializer to synthesize.
-///
-/// \returns the newly-created initializer that overrides \p
-/// superclassCtor.
-ConstructorDecl *createDesignatedInitOverride(TypeChecker &TC,
-                                              ClassDecl *classDecl,
-                                              ConstructorDecl *superclassCtor,
-                                              DesignatedInitKind kind);
+// Returns true if given nominal type declaration has a `let` stored property
+// with an initial value.
+bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
+
+/// Add `@_fixed_layout` attribute to the nominal type, if possible.
+void addFixedLayoutAttr(NominalTypeDecl *nominal);
 
 } // end namespace swift
 

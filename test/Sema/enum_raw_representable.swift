@@ -77,9 +77,9 @@ class Outer {
   // scenario too.
   let a: Int = E.a // expected-error {{cannot convert value of type 'Outer.E' to specified type 'Int'}}
 
-  enum E : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
-  // expected-error@-1 {{'Outer.E' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}}
-  // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'Array<Int>' is not Equatable}}
+  enum E : Array<Int> {
+  // expected-error@-1 {{raw type 'Array<Int>' is not expressible by a string, integer, or floating-point literal}}
+  // expected-error@-2 {{'Outer.E' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}}
     case a
   }
 }
@@ -108,7 +108,7 @@ func rdar32431736() {
 
 enum E_32431165 : String {
   case foo = "foo"
-  case bar = "bar" // expected-note {{did you mean 'bar'?}}
+  case bar = "bar" // expected-note {{'bar' declared here}}
 }
 
 func rdar32431165_1(_: E_32431165) {}
@@ -116,13 +116,13 @@ func rdar32431165_1(_: Int) {}
 func rdar32431165_1(_: Int, _: E_32431165) {}
 
 rdar32431165_1(E_32431165.baz)
-// expected-error@-1 {{type 'E_32431165' has no member 'baz'}}
+// expected-error@-1 {{type 'E_32431165' has no member 'baz'; did you mean 'bar'?}}
 
-rdar32431165_1(.baz) // FIXME: the error should be {{reference to member 'baz' cannot be resolved without a contextual type}}
-// expected-error@-1 {{expression type '()' is ambiguous without more context}}
+rdar32431165_1(.baz)
+// expected-error@-1 {{reference to member 'baz' cannot be resolved without a contextual type}}
 
 rdar32431165_1("")
-// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{15-15=E_32431165(rawValue: }} {{19-19=)}}
+// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{16-16=E_32431165(rawValue: }} {{18-18=)}}
 rdar32431165_1(42, "")
 // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{20-20=E_32431165(rawValue: }} {{22-22=)}}
 
@@ -131,7 +131,7 @@ func rdar32431165_2(_: Int) {}
 func rdar32431165_2(_: Int, _: String) {}
 
 rdar32431165_2(E_32431165.bar)
-// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{15-15=}} {{31-31=.rawValue}}
+// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{16-16=}} {{30-30=.rawValue}}
 rdar32431165_2(42, E_32431165.bar)
 // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{20-20=}} {{34-34=.rawValue}}
 
@@ -146,3 +146,130 @@ func rdar32432253(_ condition: Bool = false) {
   let _ = choice == "bar"
   // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{11-11=}} {{17-17=.rawValue}}
 }
+
+func sr8150_helper1(_: Int) {}
+func sr8150_helper1(_: Double) {}
+
+func sr8150_helper2(_: Double) {}
+func sr8150_helper2(_: Int) {}
+
+func sr8150_helper3(_: Foo) {}
+func sr8150_helper3(_: Bar) {}
+
+func sr8150_helper4(_: Bar) {}
+func sr8150_helper4(_: Foo) {}
+
+func sr8150(bar: Bar) {
+  sr8150_helper1(bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+  sr8150_helper2(bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+  sr8150_helper3(0.0)
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=)}}
+  sr8150_helper4(0.0)
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=)}}
+}
+
+class SR8150Box {
+  var bar: Bar
+  init(bar: Bar) { self.bar = bar }
+}
+// Bonus problem with mutable values being passed.
+func sr8150_mutable(obj: SR8150Box) {
+  sr8150_helper1(obj.bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{25-25=.rawValue}}
+
+  var bar = obj.bar
+  sr8150_helper1(bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+}
+
+struct NotEquatable { }
+
+enum ArrayOfNewEquatable : Array<NotEquatable> { }
+// expected-error@-1{{raw type 'Array<NotEquatable>' is not expressible by a string, integer, or floating-point literal}}
+// expected-error@-2{{'ArrayOfNewEquatable' declares raw type 'Array<NotEquatable>', but does not conform to RawRepresentable and conformance could not be synthesized}}
+// expected-error@-3{{RawRepresentable conformance cannot be synthesized because raw type 'Array<NotEquatable>' is not Equatable}}
+// expected-error@-4{{an enum with no cases cannot declare a raw type}}
+
+// rdar://58127114
+struct NotEquatableInteger : ExpressibleByIntegerLiteral {
+  typealias IntegerLiteralType = Int
+
+  init(integerLiteral: Int) {}
+}
+
+enum NotEquatableRawType1 : NotEquatableInteger {
+// expected-error@-1 {{'NotEquatableRawType1' declares raw type 'NotEquatableInteger', but does not conform to RawRepresentable and conformance could not be synthesized}}
+// expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'NotEquatableInteger' is not Equatable}}
+  case a = 123
+}
+
+
+enum NotEquatableRawType2 : NotEquatableInteger {
+// expected-error@-1 {{'NotEquatableRawType2' declares raw type 'NotEquatableInteger', but does not conform to RawRepresentable and conformance could not be synthesized}}
+// expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'NotEquatableInteger' is not Equatable}}
+  typealias RawValue = NotEquatableInteger
+
+  case a = 123
+}
+
+struct NotEquatableString : ExpressibleByStringLiteral {
+  init(stringLiteral: String) {}
+}
+
+// FIXME: This could be diagnosed a bit better. The notes are disembodied
+enum NotEquatableRawType3: NotEquatableString {
+// expected-error@-1 {{RawRepresentable conformance cannot be synthesized because raw type 'NotEquatableString' is not Equatable}}
+// expected-error@-2 {{'NotEquatableRawType3' declares raw type 'NotEquatableString', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  case a
+  typealias RawValue = NotEquatableString
+  init?(rawValue: Int) { self = .a }
+  // expected-note@-1 {{candidate has non-matching type '(rawValue: Int)'}}
+  var rawValue: Int { 0 }
+  // expected-note@-1 {{candidate has non-matching type 'Int'}}
+}
+
+enum MismatchedRawValues {
+  enum ExistentialBound: Any? {
+    // expected-error@-1 {{raw type 'Any?' is not expressible}}
+    // expected-error@-2 {{'MismatchedRawValues.ExistentialBound' declares raw type 'Any?'}}
+    // expected-error@-3 {{RawRepresentable conformance cannot be synthesized }}
+    case test = nil
+  }
+
+  public enum StringViaStaticString: StaticString {
+    // expected-error@-1 {{'MismatchedRawValues.StringViaStaticString' declares raw type 'StaticString', but does not conform to RawRepresentable}}
+    // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because}}
+    public typealias RawValue = String
+
+    case TRUE = "TRUE"
+    case FALSE = "FALSE"
+  }
+
+  public enum IntViaString: String {
+    // expected-error@-1 {{'MismatchedRawValues.IntViaString' declares raw type 'String', but does not conform to RawRepresentable}}
+    public typealias RawValue = Int
+
+    case TRUE = "TRUE"
+    case FALSE = "FALSE"
+  }
+
+  public enum ViaNested: String {
+    // expected-error@-1 {{'MismatchedRawValues.ViaNested' declares raw type 'String', but does not conform to RawRepresentable}}
+    struct RawValue: Equatable {
+      let x: String
+    }
+
+    case TRUE = "TRUE"
+    case FALSE = "FALSE"
+  }
+
+  public enum ViaGenericBound<RawValue: Equatable>: String {
+    // expected-error@-1 {{'MismatchedRawValues.ViaGenericBound<RawValue>' declares raw type 'String'}}
+    typealias RawValue = RawValue
+    case TRUE = "TRUE"
+    case FALSE = "FALSE"
+  }
+}
+

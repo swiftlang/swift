@@ -16,6 +16,11 @@
 
 import TestsUtils
 
+public let StaticArrayTest = BenchmarkInfo(
+  name: "StaticArray",
+  runFunction: run_StaticArray,
+  tags: [.validation, .api, .Array])
+
 protocol StaticArrayProtocol {
   associatedtype ElemTy
   init(_ defaultValue : ElemTy)
@@ -43,9 +48,7 @@ struct A2X<T : StaticArrayProtocol> : StaticArrayProtocol {
 
 struct StaticArray<
   T : StaticArrayProtocol
-> : StaticArrayProtocol, RandomAccessCollection, MutableCollection {
-  typealias Indices = CountableRange<Int>
-  
+> : StaticArrayProtocol, RandomAccessCollection, MutableCollection {  
   init(_ defaultValue : T.ElemTy) { values = T(defaultValue) }
   var values : T
   func get(_ idx: Int) -> T.ElemTy { return values.get(idx) }
@@ -53,7 +56,6 @@ struct StaticArray<
   func count() -> Int { return values.count() }
 
   typealias Index = Int
-  typealias IndexDistance = Int
   let startIndex: Int = 0
   var endIndex: Int { return count()}
 

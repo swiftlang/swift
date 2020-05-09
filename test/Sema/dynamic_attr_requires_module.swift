@@ -1,7 +1,7 @@
-// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
-// RUN: %target-build-swift -typecheck -parse-as-library %s -Xfrontend -verify
-// REQUIRES: executable_test
+// RUN: %target-swift-frontend -typecheck -verify -enable-objc-interop %s
+// RUN: %target-swift-frontend -typecheck -verify -enable-objc-interop %s -parse-as-library
 
 class Oof {
-  dynamic func impliesObjC() { } // expected-error {{'dynamic' attribute used without importing module 'Foundation'}}
+  @objc dynamic func impliesObjC() { }
+  // expected-error@-1 {{@objc attribute used without importing module 'Foundation'}}
 }

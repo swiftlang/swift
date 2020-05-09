@@ -14,14 +14,31 @@
 // upcast the instance to the type that introduces the Hashable
 // conformance.
 
+import TestsUtils
+
+// 23% _swift_dynamicCast
+// 23% _swift_release_
+// 18% _swift_stdlib_makeAnyHashableUsingDefaultRepresentation
+// 11% _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType
+// 16% _swift_retain_[n]
+//  5% swift_conformsToProtocol
+public let AnyHashableWithAClass = BenchmarkInfo(
+  name: "AnyHashableWithAClass",
+  runFunction: run_AnyHashableWithAClass,
+  tags: [.abstraction, .runtime, .cpubench],
+  legacyFactor: 500
+)
+
 class TestHashableBase : Hashable {
   var value: Int
   init(_ value: Int) {
     self.value = value
   }
-  var hashValue: Int {
-    return value
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
+
   static func == (
     lhs: TestHashableBase,
     rhs: TestHashableBase
@@ -39,8 +56,7 @@ class TestHashableDerived5 : TestHashableDerived4 {}
 @inline(never)
 public func run_AnyHashableWithAClass(_ N: Int) {
   let c = TestHashableDerived5(10)
-  for _ in 0...(N*500000) {
+  for _ in 0...(N*1000) {
     _ = AnyHashable(c)
   }
 }
-

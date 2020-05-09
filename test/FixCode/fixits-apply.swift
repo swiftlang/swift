@@ -30,6 +30,8 @@ struct MyMask : OptionSet {
   static var Bingo: MyMask { return MyMask(1) }
 }
 
+let _: MyMask = 0
+
 func supported() -> MyMask {
   return Int(MyMask.Bingo.rawValue)
 }
@@ -244,6 +246,7 @@ protocol NonObjCProtocol {}
   @IBOutlet private var ibout6: [String: String]!
   @IBInspectable static private var ibinspect1: IBIssues!
   @IBAction static func ibact() {}
+  @IBSegueAction static func ibsegact(_: String, _: IBIssues) -> IBIssues { return self }
 }
 
 @IBDesignable extension SomeProt {}

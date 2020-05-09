@@ -12,22 +12,33 @@
 
 #include "sourcekitd/sourcekitd.h"
 
-#include "TestOptions.h"
 #include "SourceKit/Support/Concurrency.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "TestOptions.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Regex.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/Signals.h"
+#include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/Program.h"
+#include "llvm/Support/Regex.h"
+#include "llvm/Support/Signals.h"
+#include "llvm/Support/Threading.h"
+#include "llvm/Support/raw_ostream.h"
 #include <fstream>
-#include <unistd.h>
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <sys/param.h>
+#include <unistd.h>
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
 
 // FIXME: Platform compatibility.
 #include <dispatch/dispatch.h>
@@ -36,20 +47,31 @@ using namespace llvm;
 
 using namespace sourcekitd_test;
 
-static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts);
+#if defined(_WIN32)
+namespace {
+int STDOUT_FILENO = _fileno(stdout);
+}
+#endif
+
+static bool sendGlobalConfigRequest();
+static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts,
+                                bool IsFirstInvocation);
 static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            const std::string &SourceFile,
                            std::unique_ptr<llvm::MemoryBuffer> SourceBuf,
                            TestOptions *InitOpts);
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef Filename,
+                            const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS);
 static void printNameTranslationInfo(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
                            llvm::raw_ostream &OS);
+static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII);
 static void printSemanticInfo();
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                                llvm::raw_ostream &OS);
 static void printFoundInterface(sourcekitd_variant_t Info,
                                 llvm::raw_ostream &OS);
@@ -62,25 +84,32 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
 
 static void printModuleGroupNames(sourcekitd_variant_t Info,
                                   llvm::raw_ostream &OS);
-
+static void printSyntacticRenameEdits(sourcekitd_variant_t Info,
+                                      llvm::raw_ostream &OS);
+static void printRenameRanges(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void prepareDemangleRequest(sourcekitd_object_t Req,
                                    const TestOptions &Opts);
 static void printDemangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
 static void prepareMangleRequest(sourcekitd_object_t Req,
                                  const TestOptions &Opts);
 static void printMangleResults(sourcekitd_variant_t Info, raw_ostream &OS);
+static void printStatistics(sourcekitd_variant_t Info, raw_ostream &OS);
 
-static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
-                                   StringRef Filename);
+static unsigned
+resolveFromLineCol(unsigned Line, unsigned Col, StringRef Filename,
+                   const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
                                    llvm::MemoryBuffer *InputBuf);
-static std::pair<unsigned, unsigned> resolveToLineCol(unsigned Offset,
-                                                      StringRef Filename);
+static std::pair<unsigned, unsigned>
+resolveToLineCol(unsigned Offset, StringRef Filename,
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 static std::pair<unsigned, unsigned> resolveToLineCol(unsigned Offset,
                                                   llvm::MemoryBuffer *InputBuf);
 static std::pair<unsigned, unsigned> resolveToLineColFromBuf(unsigned Offset,
                                                       const char *Buf);
-static llvm::MemoryBuffer *getBufferForFilename(StringRef Filename);
+static llvm::MemoryBuffer *
+getBufferForFilename(StringRef Filename,
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 
 static void notification_receiver(sourcekitd_response_t resp);
 
@@ -91,13 +120,18 @@ static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 #define KIND(NAME, CONTENT) static sourcekitd_uid_t Kind##NAME;
 #include "SourceKit/Core/ProtocolUIDs.def"
 
+#define REFACTORING(KIND, NAME, ID) static sourcekitd_uid_t Kind##Refactoring##KIND;
+#include "swift/IDE/RefactoringKinds.def"
+
 static sourcekitd_uid_t SemaDiagnosticStage;
 
 static sourcekitd_uid_t NoteDocUpdate;
-
 static SourceKit::Semaphore semaSemaphore(0);
 static sourcekitd_response_t semaResponse;
 static const char *semaName;
+
+static sourcekitd_uid_t NoteTest;
+static SourceKit::Semaphore noteSyncSemaphore(0);
 
 namespace {
 struct AsyncResponseInfo {
@@ -111,18 +145,74 @@ struct AsyncResponseInfo {
 
 static std::vector<AsyncResponseInfo> asyncResponses;
 
-static int skt_main(int argc, const char **argv);
+struct NotificationBuffer {
+  std::vector<sourcekitd_response_t> notes;
+  /// Add a notification to the buffer, taking ownership of it. Must be called
+  /// from the main queue.
+  void add(sourcekitd_response_t note) {
+    notes.push_back(note);
+  }
+  /// Call the given handler for all notifications currently buffered.
+  void handleNotifications(llvm::function_ref<void(sourcekitd_response_t)> f) {
+    // Notifications are handled on the main queue.
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      for (auto note : notes) {
+        f(note);
+        sourcekitd_response_dispose(note);
+      }
+      notes.clear();
+    });
+  }
+};
+static NotificationBuffer notificationBuffer;
+
+static void syncNotificationsWithService() {
+  // Send TestNotification request, then wait for the notification. This ensures
+  // that all notifications previously posted on the service side have been
+  // passed to our notification handler.
+  sourcekitd_object_t req = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(req, KeyRequest, RequestTestNotification);
+  auto resp = sourcekitd_send_request_sync(req);
+  if (sourcekitd_response_is_error(resp)) {
+    sourcekitd_response_description_dump(resp);
+    exit(1);
+  }
+  sourcekitd_response_dispose(resp);
+  sourcekitd_request_release(req);
+  if (noteSyncSemaphore.wait(60 * 1000)) {
+    llvm::report_fatal_error("Test notification not received");
+  }
+}
+
+static void printBufferedNotifications(bool syncWithService = true) {
+  if (syncWithService) {
+    syncNotificationsWithService();
+  }
+  notificationBuffer.handleNotifications([](sourcekitd_response_t note) {
+    sourcekitd_response_description_dump_filedesc(note, STDOUT_FILENO);
+  });
+}
+
+struct skt_args {
+  int argc;
+  const char **argv;
+  int ret;
+};
+static void skt_main(skt_args *args);
 
 int main(int argc, const char **argv) {
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-    int ret = skt_main(argc, argv);
-    exit(ret);
+    skt_args args = {argc, argv, 0};
+    llvm::llvm_execute_on_thread((void (*)(void *))skt_main, &args);
+    exit(args.ret);
   });
 
   dispatch_main();
 }
 
-static int skt_main(int argc, const char **argv) {
+static void skt_main(skt_args *args) {
+  int argc = args->argc;
+  const char **argv = args->argv;
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   sourcekitd_initialize();
@@ -137,15 +227,20 @@ static int skt_main(int argc, const char **argv) {
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
   NoteDocUpdate = sourcekitd_uid_get_from_cstr("source.notification.editor.documentupdate");
+  NoteTest = sourcekitd_uid_get_from_cstr("source.notification.test");
 
 #define REQUEST(NAME, CONTENT) Request##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
 #define KIND(NAME, CONTENT) Kind##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
 
+#define REFACTORING(KIND, NAME, ID) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
+#include "swift/IDE/RefactoringKinds.def"
+
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
   TestOptions InitOpts;
   auto Args = llvm::makeArrayRef(argv+1, argc-1);
+  bool firstInvocation = true;
   while (1) {
     unsigned i = 0;
     for (auto Arg: Args) {
@@ -155,16 +250,20 @@ static int skt_main(int argc, const char **argv) {
     }
     if (i == Args.size())
       break;
-    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts)) {
+    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts,
+                                       firstInvocation)) {
       sourcekitd_shutdown();
-      return ret;
+      args->ret = ret;
+      return;
     }
-    Args = Args.slice(i+1);
+    Args = Args.slice(i + 1);
+    firstInvocation = false;
   }
 
-  if (int ret = handleTestInvocation(Args, InitOpts)) {
+  if (int ret = handleTestInvocation(Args, InitOpts, firstInvocation)) {
     sourcekitd_shutdown();
-    return ret;
+    args->ret = ret;
+    return;
   }
 
   for (auto &info : asyncResponses) {
@@ -175,18 +274,23 @@ static int skt_main(int argc, const char **argv) {
     if (handleResponse(info.response, info.options, info.sourceFilename,
                        std::move(info.sourceBuffer), nullptr)) {
       sourcekitd_shutdown();
-      return 1;
+      args->ret = 1;
+      return;
     }
   }
+  printBufferedNotifications();
 
   sourcekitd_shutdown();
-  return 0;
+  args->ret = 0;
+  return;
 }
 
-static inline const char *getInterfaceGenDocumentName() {
-  // Absolute "path" so that handleTestInvocation doesn't try to make it
-  // absolute.
-  return "/<interface-gen>";
+static inline std::string getInterfaceGenDocumentName() {
+  // "Absolute path" on all platforms since handleTestInvocation will attempt to make this absolute
+  llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
+  llvm::sys::fs::make_absolute(path);
+  llvm::sys::path::native(path);
+  return std::string(path.str());
 }
 
 static int printAnnotations();
@@ -201,7 +305,7 @@ static void addCodeCompleteOptions(sourcekitd_object_t Req, TestOptions &Opts) {
     for (auto &Opt : Opts.RequestOptions) {
       auto KeyValue = StringRef(Opt).split('=');
       std::string KeyStr("key.codecomplete.");
-      KeyStr.append(KeyValue.first);
+      KeyStr.append(KeyValue.first.str());
       sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
 
       // FIXME: more robust way to determine the option type.
@@ -222,7 +326,7 @@ static void addCodeCompleteOptions(sourcekitd_object_t Req, TestOptions &Opts) {
 
 static bool readPopularAPIList(StringRef filename,
                                std::vector<std::string> &result) {
-  std::ifstream in(filename);
+  std::ifstream in(filename.str());
   if (!in.is_open()) {
     llvm::errs() << "error opening '" << filename << "'\n";
     return true;
@@ -236,8 +340,36 @@ static bool readPopularAPIList(StringRef filename,
   return false;
 }
 
-static int handleJsonRequestPath(StringRef QueryPath) {
-  auto Buffer = getBufferForFilename(QueryPath)->getBuffer();
+namespace {
+class PrintingTimer {
+  std::string desc;
+  llvm::sys::TimePoint<> start;
+  llvm::raw_ostream &OS;
+public:
+  PrintingTimer(std::string desc, llvm::raw_ostream &OS = llvm::errs())
+      : desc(std::move(desc)), start(std::chrono::system_clock::now()), OS(OS) {
+  }
+  ~PrintingTimer() {
+    std::chrono::duration<float, std::milli> delta(
+        std::chrono::system_clock::now() - start);
+    OS << desc << ": " << llvm::formatv("{0:ms+f3}", delta) << "\n";
+  }
+};
+}
+
+/// Wrapper for sourcekitd_send_request_sync that handles printing options.
+static sourcekitd_response_t sendRequestSync(sourcekitd_object_t req,
+                                             const TestOptions &opts) {
+  if (opts.PrintRequest)
+    sourcekitd_request_description_dump(req);
+  Optional<PrintingTimer> timer;
+  if (opts.timeRequest)
+    timer.emplace("request time");
+  return sourcekitd_send_request_sync(req);
+}
+
+static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
+  auto Buffer = getBufferForFilename(QueryPath, Opts.VFSFiles)->getBuffer();
   char *Err = nullptr;
   auto Req = sourcekitd_request_create_from_yaml(Buffer.data(), &Err);
   if (!Req) {
@@ -246,15 +378,29 @@ static int handleJsonRequestPath(StringRef QueryPath) {
     free(Err);
     return 1;
   }
-  sourcekitd_request_description_dump(Req);
-  sourcekitd_response_t Resp = sourcekitd_send_request_sync(Req);
+
+  sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
   auto Error = sourcekitd_response_is_error(Resp);
-  sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+  if (Opts.PrintResponse) {
+    sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+  }
   return Error ? 1 : 0;
 }
 
+static int performShellExecution(ArrayRef<const char *> Args) {
+  auto Program = llvm::sys::findProgramByName(Args[0]);
+  if (std::error_code ec = Program.getError()) {
+    llvm::errs() << "command not found: " << Args[0] << "\n";
+    return ec.value();
+  }
+  SmallVector<StringRef, 8> execArgs(Args.begin(), Args.end());
+  return llvm::sys::ExecuteAndWait(*Program, execArgs);
+}
+
+static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts);
+
 static int handleTestInvocation(ArrayRef<const char *> Args,
-                                TestOptions &InitOpts) {
+                                TestOptions &InitOpts, bool firstInvocation) {
 
   unsigned Optargc = 0;
   for (auto Arg: Args) {
@@ -267,11 +413,84 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Opts.parseArgs(Args.slice(0, Optargc)))
     return 1;
 
-  if (!Opts.JsonRequestPath.empty())
-    return handleJsonRequestPath(Opts.JsonRequestPath);
+  if (!Opts.ModuleCachePath.empty())
+    InitOpts.ModuleCachePath = Opts.ModuleCachePath;
 
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
+
+  if (firstInvocation && Opts.Request != SourceKitRequest::GlobalConfiguration &&
+      !Opts.SuppressDefaultConfigRequest) {
+    // We don't fail if this request fails for now so that sourcekitd-test is
+    // still usable with older versions of sourcekitd that don't have the
+    // global-configuration request.
+    if (sendGlobalConfigRequest()) {
+      llvm::outs() << "warning: global configuration request failed\n";
+    }
+  }
+
+  if (Opts.ShellExecution)
+    return performShellExecution(Opts.CompilerArgs);
+
+  assert(Opts.repeatRequest >= 1);
+  for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
+    if (int ret = handleTestInvocation(Opts, InitOpts)) {
+      printBufferedNotifications(/*syncWithService=*/true);
+      return ret;
+    }
+    // We will sync with the service before exiting; don't do so here.
+    printBufferedNotifications(/*syncWithService=*/false);
+  }
+  return 0;
+}
+
+static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
+                            sourcekitd_object_t Req) {
+  for (auto &Opt : Opts.RequestOptions) {
+    auto KeyValue = StringRef(Opt).split('=');
+    if (KeyValue.first == "expectedtypes") {
+      SmallVector<StringRef, 4> expectedTypeNames;
+      KeyValue.second.split(expectedTypeNames, ';');
+
+      auto typenames = sourcekitd_request_array_create(nullptr, 0);
+      for (auto &name : expectedTypeNames) {
+        std::string n = name.str();
+        sourcekitd_request_array_set_string(typenames, SOURCEKITD_ARRAY_APPEND, n.c_str());
+      }
+      sourcekitd_request_dictionary_set_value(Req, KeyExpectedTypes, typenames);
+    } else {
+      llvm::errs() << "invalid key '" << KeyValue.first << "' in -req-opts\n";
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static bool sendGlobalConfigRequest() {
+  TestOptions Opts;
+  sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
+                                                                 nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
+
+  // For test invocations we default to setting OptimizeForIDE to true. This
+  // matches the use case of the most popular clients of sourcekitd (editors)
+  // and also disables loading locations from .swiftsourceinfo files. This is
+  // desirable for testing because the .swiftsourceinfo for the stdlib is
+  // available when sourcekitd is tested, and can make some stdlib-dependent
+  // sourcekitd tests unstable due to changing source locations from the stdlib
+  // module.
+  sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(true));
+  sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
+  bool IsError = sourcekitd_response_is_error(Resp);
+  if (IsError)
+    sourcekitd_response_description_dump(Resp);
+  sourcekitd_request_release(Req);
+  return IsError;
+}
+
+static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
+  if (!Opts.JsonRequestPath.empty())
+    return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
 
   if (Opts.Request == SourceKitRequest::DemangleNames ||
       Opts.Request == SourceKitRequest::MangleSimpleClasses)
@@ -282,12 +501,14 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     llvm::SmallString<64> AbsSourceFile;
     AbsSourceFile += SourceFile;
     llvm::sys::fs::make_absolute(AbsSourceFile);
-    SourceFile = AbsSourceFile.str();
+    llvm::sys::path::native(AbsSourceFile);
+    SourceFile = std::string(AbsSourceFile.str());
   }
+  std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
 
   if (!Opts.TextInputFile.empty()) {
-    auto Buf = getBufferForFilename(Opts.TextInputFile);
-    Opts.SourceText = Buf->getBuffer();
+    auto Buf = getBufferForFilename(Opts.TextInputFile, Opts.VFSFiles);
+    Opts.SourceText = Buf->getBuffer().str();
   }
 
   std::unique_ptr<llvm::MemoryBuffer> SourceBuf;
@@ -295,7 +516,8 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(*Opts.SourceText, Opts.SourceFile);
   } else if (!SourceFile.empty()) {
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(
-          getBufferForFilename(SourceFile)->getBuffer(), SourceFile);
+        getBufferForFilename(SourceFile, Opts.VFSFiles)->getBuffer(),
+        SourceFile);
   }
 
   // FIXME: we should detect if offset is required but not set.
@@ -303,6 +525,13 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Opts.Line != 0) {
     ByteOffset = resolveFromLineCol(Opts.Line, Opts.Col, SourceBuf.get());
   }
+
+  if (Opts.EndLine != 0) {
+    Opts.Length = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceBuf.get()) -
+      ByteOffset;
+  }
+
+  bool compilerArgsAreClang = false;
 
   sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
                                                                  nullptr, 0);
@@ -315,8 +544,25 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     //        with a zero (successful) exit code.
     return 1;
 
+  case SourceKitRequest::GlobalConfiguration:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
+    if (Opts.OptimizeForIde.hasValue())
+      sourcekitd_request_dictionary_set_int64(
+          Req, KeyOptimizeForIDE,
+          static_cast<int64_t>(Opts.OptimizeForIde.getValue()));
+    if (Opts.CompletionCheckDependencyInterval.hasValue())
+      sourcekitd_request_dictionary_set_int64(
+          Req, KeyCompletionCheckDependencyInterval,
+          static_cast<int64_t>(
+              Opts.CompletionCheckDependencyInterval.getValue()));
+    break;
+
   case SourceKitRequest::ProtocolVersion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestProtocolVersion);
+    break;
+  
+  case SourceKitRequest::CompilerVersion:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCompilerVersion);
     break;
 
   case SourceKitRequest::DemangleNames:
@@ -327,6 +573,24 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     prepareMangleRequest(Req, Opts);
     break;
 
+  case SourceKitRequest::EnableCompileNotifications: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestEnableCompileNotifications);
+    int64_t value = 1;
+    for (auto &Opt : Opts.RequestOptions) {
+      auto KeyValue = StringRef(Opt).split('=');
+      if (KeyValue.first == "value") {
+        KeyValue.second.getAsInteger(0, value);
+      } else {
+        llvm::errs() << "unknown parameter '" << KeyValue.first
+                     << "' in -req-opts";
+        return 1;
+      }
+    }
+    sourcekitd_request_dictionary_set_int64(Req, KeyValue, value);
+    break;
+  }
+
   case SourceKitRequest::Index:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestIndex);
     break;
@@ -334,13 +598,17 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   case SourceKitRequest::CodeComplete:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCodeComplete);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    // Default to sort by name.
+    Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
+    addCodeCompleteOptions(Req, Opts);
     break;
 
   case SourceKitRequest::CodeCompleteOpen:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestCodeCompleteOpen);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     addCodeCompleteOptions(Req, Opts);
     break;
 
@@ -348,14 +616,14 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestCodeCompleteClose);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     break;
 
   case SourceKitRequest::CodeCompleteUpdate:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestCodeCompleteUpdate);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     addCodeCompleteOptions(Req, Opts);
     break;
 
@@ -401,8 +669,27 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     break;
   }
 
+  case SourceKitRequest::TypeContextInfo:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestTypeContextInfo);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    break;
+
+  case SourceKitRequest::ConformingMethodList:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestConformingMethodList);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    setExpectedTypes(Opts, Req);
+    break;
+
   case SourceKitRequest::CursorInfo:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCursorInfo);
+    if (Opts.CollectActionables) {
+      sourcekitd_request_dictionary_set_int64(Req, KeyRetrieveRefactorActions, 1);
+    }
+    if (Opts.Length) {
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    }
     if (!Opts.USR.empty()) {
       sourcekitd_request_dictionary_set_string(Req, KeyUSR, Opts.USR.c_str());
     } else {
@@ -414,12 +701,32 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     auto Length = Opts.Length;
     if (Opts.Length == 0 && Opts.EndLine > 0) {
-      auto EndOff = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceFile);
+      auto EndOff = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceFile,
+                                       Opts.VFSFiles);
       Length = EndOff - ByteOffset;
     }
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Length);
     break;
   }
+
+  case SourceKitRequest::CollectExpresstionType: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCollectExpressionType);
+    setExpectedTypes(Opts, Req);
+    break;
+  }
+
+#define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:                 \
+    {                                                                                     \
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSemanticRefactoring); \
+      sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, KindRefactoring##KIND);    \
+      sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());          \
+      sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);                   \
+      sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);                  \
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);               \
+      break;                                                                              \
+    }
+#include "swift/IDE/RefactoringKinds.def"
+
   case SourceKitRequest::MarkupToXML: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestMarkupToXML);
     break;
@@ -446,7 +753,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
         }
         StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
         AllArgs.split(ArgPieces, ':');
-        if (!Args.empty()) {
+        if (!ArgPieces.empty()) {
           if (!ArgPieces.back().empty()) {
             llvm::errs() << "Swift name is malformed.\n";
             return 1;
@@ -470,13 +777,13 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       return 1;
     }
     if (!BaseName.empty()) {
-      std::string S = BaseName;
+      std::string S = BaseName.str();
       sourcekitd_request_dictionary_set_string(Req, KeyBaseName, S.c_str());
     }
     if (!ArgPieces.empty()) {
       sourcekitd_object_t Arr = sourcekitd_request_array_create(nullptr, 0);
       for (StringRef A : ArgPieces) {
-        std::string S = A;
+        std::string S = A.str();
         sourcekitd_request_array_set_string(Arr, SOURCEKITD_ARRAY_APPEND,
                                             S.c_str());
       }
@@ -492,34 +799,50 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   case SourceKitRequest::SyntaxMap:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, true);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
+    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
+                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
   case SourceKitRequest::Structure:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, true);
+    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
+                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
   case SourceKitRequest::Format:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
+    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
+                                          KindSyntaxTreeOff);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
   case SourceKitRequest::ExpandPlaceholder:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
+    break;
+
+  case SourceKitRequest::SyntaxTree:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
+    sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
+    sourcekitd_request_dictionary_set_uid(Req, KeySyntaxTreeTransferMode,
+                                          KindSyntaxTreeFull);
+    sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, true);
     break;
 
   case SourceKitRequest::DocInfo:
@@ -529,18 +852,23 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   case SourceKitRequest::SemanticInfo:
     InitOpts.UsedSema = true;
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     break;
 
   case SourceKitRequest::Open:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    break;
+
+  case SourceKitRequest::Close:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorClose);
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     break;
 
   case SourceKitRequest::Edit:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestEditorReplaceText);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
@@ -582,11 +910,13 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     } else {
       if (Opts.UsingSwiftArgs)
           sourcekitd_request_dictionary_set_int64(Req, KeyUsingSwiftArgs, true);
+      else
+        compilerArgsAreClang = true;
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenHeaderInterface);
     }
 
-    sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName().c_str());
     if (!Opts.ModuleGroupName.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyGroupName,
                                                Opts.ModuleGroupName.c_str());
@@ -621,11 +951,46 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     }
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestModuleGroups);
     break;
+
+  case SourceKitRequest::FindLocalRenameRanges:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestFindLocalRenameRanges);
+    sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);
+    sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);
+    sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    break;
+
+  case SourceKitRequest::SyntacticRename:
+  case SourceKitRequest::FindRenameRanges: {
+    if (Opts.Request == SourceKitRequest::SyntacticRename) {
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSyntacticRename);
+    } else {
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestFindRenameRanges);
+    }
+    if (Opts.RenameSpecPath.empty()) {
+      llvm::errs() << "Missing '-rename-spec <file path>'\n";
+      return 1;
+    }
+    auto Buffer =
+        getBufferForFilename(Opts.RenameSpecPath, Opts.VFSFiles)->getBuffer();
+    char *Err = nullptr;
+    auto RenameSpec = sourcekitd_request_create_from_yaml(Buffer.data(), &Err);
+    if (!RenameSpec) {
+      assert(Err);
+      llvm::errs() << Err;
+      free(Err);
+      return 1;
+    }
+    sourcekitd_request_dictionary_set_value(Req, KeyRenameLocations, RenameSpec);
+    break;
+  }
+  case SourceKitRequest::Statistics:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestStatistics);
+    break;
   }
 
   if (!SourceFile.empty()) {
     if (Opts.PassAsSourceText) {
-      auto Buf = getBufferForFilename(SourceFile);
+      auto Buf = getBufferForFilename(SourceFile, Opts.VFSFiles);
       sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                                Buf->getBufferStart());
     }
@@ -636,10 +1001,28 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Opts.SourceText) {
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                              Opts.SourceText->c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeySourceFile,
+                                             SemaName.c_str());
   }
 
   if (!Opts.CompilerArgs.empty()) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
+    if (!Opts.ModuleCachePath.empty()) {
+      if (compilerArgsAreClang) {
+        // We need -fmodules or else the clang argument parsing does not honour
+        // -fmodules-cache-path. In reality, the swift ClangImporter will always
+        // enable modules when importing, so this should only impact the
+        // clang argument parsing. This is needed even if the header doesn't
+        // use modules, since Swift itself will import its shims module, and
+        // that needs to honour the -module-cache-path option when testing.
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, "-fmodules");
+        std::string opt = "-fmodules-cache-path=" + Opts.ModuleCachePath;
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, opt.c_str());
+      } else {
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, "-module-cache-path");
+        sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Opts.ModuleCachePath.c_str());
+      }
+    }
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
     sourcekitd_request_dictionary_set_value(Req, KeyCompilerArgs, Args);
@@ -659,18 +1042,48 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
                                             *Opts.CancelOnSubsequentRequest);
   }
 
-  if (Opts.SwiftVersion.hasValue()) {
-    sourcekitd_request_dictionary_set_int64(Req, KeySwiftVersion,
-                                             Opts.SwiftVersion.getValue());
+  if (!Opts.SwiftVersion.empty()) {
+    if (Opts.PassVersionAsString) {
+      sourcekitd_request_dictionary_set_string(Req, KeySwiftVersion,
+                                               Opts.SwiftVersion.c_str());
+    } else {
+      unsigned ver;
+      if (StringRef(Opts.SwiftVersion).getAsInteger(10, ver)) {
+        llvm::errs() << "error: expected integer for 'swift-version'\n";
+        return true;
+      }
+      sourcekitd_request_dictionary_set_int64(Req, KeySwiftVersion, ver);
+    }
   }
 
-  if (Opts.PrintRequest)
-    sourcekitd_request_description_dump(Req);
+  if (Opts.VFSName) {
+    sourcekitd_request_dictionary_set_string(Req, KeyVFSName, Opts.VFSName->c_str());
+  }
+  if (!Opts.VFSFiles.empty()) {
+    sourcekitd_object_t files = sourcekitd_request_array_create(nullptr, 0);
+    for (auto &NameAndTarget : Opts.VFSFiles) {
+      sourcekitd_object_t file = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+      sourcekitd_request_dictionary_set_string(file, KeyName, NameAndTarget.first().data());
+
+      if (NameAndTarget.second.passAsSourceText) {
+        auto content = getBufferForFilename(NameAndTarget.first(), Opts.VFSFiles);
+        sourcekitd_request_dictionary_set_string(file, KeySourceText,  content->getBufferStart());
+      } else {
+        sourcekitd_request_dictionary_set_string(file, KeySourceFile,  NameAndTarget.second.path.c_str());
+      }
+      sourcekitd_request_array_set_value(files, SOURCEKITD_ARRAY_APPEND, file);
+    }
+    sourcekitd_object_t vfsOpts = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+    sourcekitd_request_dictionary_set_value(vfsOpts, KeyFiles, files);
+    sourcekitd_request_dictionary_set_value(Req, KeyVFSOptions, vfsOpts);
+    sourcekitd_request_release(vfsOpts);
+    sourcekitd_request_release(files);
+  }
 
   if (!Opts.isAsyncRequest) {
-    sourcekitd_response_t Resp = sourcekitd_send_request_sync(Req);
+    sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
     sourcekitd_request_release(Req);
-    return handleResponse(Resp, Opts, SourceFile, std::move(SourceBuf),
+    return handleResponse(Resp, Opts, SemaName, std::move(SourceBuf),
                           &InitOpts)
                ? 1
                : 0;
@@ -678,10 +1091,13 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 #if SOURCEKITD_HAS_BLOCKS
     AsyncResponseInfo info;
     info.options = Opts;
-    info.sourceFilename = std::move(SourceFile);
+    info.sourceFilename = std::move(SemaName);
     info.sourceBuffer = std::move(SourceBuf);
     unsigned respIndex = asyncResponses.size();
     asyncResponses.push_back(std::move(info));
+
+    if (Opts.PrintRequest)
+      sourcekitd_request_description_dump(Req);
 
     sourcekitd_send_request(Req, nullptr, ^(sourcekitd_response_t resp) {
       auto &info = asyncResponses[respIndex];
@@ -708,6 +1124,8 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
   if (IsError) {
     sourcekitd_response_description_dump(Resp);
 
+  } else if (!Opts.PrintResponse) {
+    // Nothing.
   } else if (Opts.PrintResponseAsJSON) {
     sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
     char *json = sourcekitd_variant_json_description_copy(Info);
@@ -726,10 +1144,23 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::PrintDiags:
       llvm_unreachable("print-annotations/print-diags is handled elsewhere");
 
+    case SourceKitRequest::EnableCompileNotifications:
+      // Ignore the response.  If it was an error it is handled above.
+      break;
+
     case SourceKitRequest::Open:
-    case SourceKitRequest::Edit:
       getSemanticInfo(Info, SourceFile);
       KeepResponseAlive = true;
+      break;
+
+    case SourceKitRequest::Edit:
+      if (Opts.Length == 0 && Opts.ReplaceText->empty()) {
+        // Length=0, replace="" is a nop and will not trigger sema.
+        sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+      } else {
+        getSemanticInfo(Info, SourceFile);
+        KeepResponseAlive = true;
+      }
       break;
 
     case SourceKitRequest::DemangleNames:
@@ -740,7 +1171,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printMangleResults(sourcekitd_response_get_value(Resp), outs());
       break;
 
+    case SourceKitRequest::GlobalConfiguration:
     case SourceKitRequest::ProtocolVersion:
+    case SourceKitRequest::CompilerVersion:
+    case SourceKitRequest::Close:
     case SourceKitRequest::Index:
     case SourceKitRequest::CodeComplete:
     case SourceKitRequest::CodeCompleteOpen:
@@ -748,15 +1182,17 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteUpdate:
     case SourceKitRequest::CodeCompleteCacheOnDisk:
     case SourceKitRequest::CodeCompleteSetPopularAPI:
+    case SourceKitRequest::TypeContextInfo:
+    case SourceKitRequest::ConformingMethodList:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       break;
 
     case SourceKitRequest::RelatedIdents:
-      printRelatedIdents(Info, SourceFile, llvm::outs());
+      printRelatedIdents(Info, SourceFile, Opts.VFSFiles, llvm::outs());
       break;
 
     case SourceKitRequest::CursorInfo:
-      printCursorInfo(Info, SourceFile, llvm::outs());
+      printCursorInfo(Info, SourceFile, Opts.VFSFiles, llvm::outs());
       break;
 
     case SourceKitRequest::NameTranslation:
@@ -765,6 +1201,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
     case SourceKitRequest::RangeInfo:
       printRangeInfo(Info, SourceFile, llvm::outs());
+      break;
+
+    case SourceKitRequest::CollectExpresstionType:
+      printExpressionType(Info, llvm::outs());
       break;
 
     case SourceKitRequest::DocInfo:
@@ -802,11 +1242,19 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printFoundUSR(Info, SourceBuf.get(), llvm::outs());
       break;
 
+    case SourceKitRequest::SyntaxTree: {
+      // Print only the serialized syntax tree.
+      llvm::outs() << sourcekitd_variant_dictionary_get_string(
+        sourcekitd_response_get_value(Resp), KeySerializedSyntaxTree);
+      llvm::outs() << '\n';
+      break;
+    }
     case SourceKitRequest::SyntaxMap:
     case SourceKitRequest::Structure:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       if (Opts.ReplaceText.hasValue()) {
-        unsigned Offset = resolveFromLineCol(Opts.Line, Opts.Col, SourceFile);
+        unsigned Offset =
+            resolveFromLineCol(Opts.Line, Opts.Col, SourceFile, Opts.VFSFiles);
         unsigned Length = Opts.Length;
         sourcekitd_object_t EdReq = sourcekitd_request_dictionary_create(nullptr,
                                                                     nullptr, 0);
@@ -824,9 +1272,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                                                 EnableSyntaxMax);
         sourcekitd_request_dictionary_set_int64(EdReq, KeyEnableStructure,
                                                 EnableSubStructure);
-        sourcekitd_request_dictionary_set_int64(EdReq, KeySyntacticOnly, !Opts.UsedSema);
+        sourcekitd_request_dictionary_set_int64(EdReq, KeySyntacticOnly,
+                                                !Opts.UsedSema);
 
-        sourcekitd_response_t EdResp = sourcekitd_send_request_sync(EdReq);
+        sourcekitd_response_t EdResp = sendRequestSync(EdReq, Opts);
         sourcekitd_response_description_dump_filedesc(EdResp, STDOUT_FILENO);
         sourcekitd_response_dispose(EdResp);
         sourcekitd_request_release(EdReq);
@@ -851,7 +1300,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
           for (auto &FmtOpt : Opts.RequestOptions) {
             auto KeyValue = StringRef(FmtOpt).split('=');
             std::string KeyStr("key.editor.format.");
-            KeyStr.append(KeyValue.first);
+            KeyStr.append(KeyValue.first.str());
             sourcekitd_uid_t Key = sourcekitd_uid_get_from_cstr(KeyStr.c_str());
             int64_t Value = 0;
             KeyValue.second.getAsInteger(0, Value);
@@ -861,7 +1310,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
           sourcekitd_request_release(FO);
         }
 
-        sourcekitd_response_t FmtResp = sourcekitd_send_request_sync(Fmt);
+        sourcekitd_response_t FmtResp = sendRequestSync(Fmt, Opts);
         sourcekitd_response_description_dump_filedesc(FmtResp, STDOUT_FILENO);
         sourcekitd_response_dispose(FmtResp);
         sourcekitd_request_release(Fmt);
@@ -874,6 +1323,17 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       case SourceKitRequest::ModuleGroups:
         printModuleGroupNames(Info, llvm::outs());
         break;
+#define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:
+#include "swift/IDE/RefactoringKinds.def"
+      case SourceKitRequest::SyntacticRename:
+        printSyntacticRenameEdits(Info, llvm::outs());
+        break;
+      case SourceKitRequest::FindRenameRanges:
+      case SourceKitRequest::FindLocalRenameRanges:
+        printRenameRanges(Info, llvm::outs());
+        break;
+      case SourceKitRequest::Statistics:
+        printStatistics(Info, llvm::outs());
     }
   }
 
@@ -935,9 +1395,10 @@ static void notification_receiver(sourcekitd_response_t resp) {
   sourcekitd_variant_t payload = sourcekitd_response_get_value(resp);
   sourcekitd_uid_t note =
       sourcekitd_variant_dictionary_get_uid(payload, KeyNotification);
-  semaName = sourcekitd_variant_dictionary_get_string(payload, KeyName);
 
   if (note == NoteDocUpdate) {
+    semaName = sourcekitd_variant_dictionary_get_string(payload, KeyName);
+
     sourcekitd_object_t edReq = sourcekitd_request_dictionary_create(nullptr,
                                                                 nullptr, 0);
     sourcekitd_request_dictionary_set_uid(edReq, KeyRequest,
@@ -947,11 +1408,22 @@ static void notification_receiver(sourcekitd_response_t resp) {
     semaResponse = sourcekitd_send_request_sync(edReq);
     sourcekitd_request_release(edReq);
     semaSemaphore.signal();
+  } else if (note == NoteTest) {
+    noteSyncSemaphore.signal();
+  } else {
+    notificationBuffer.add(resp);
   }
 }
 
 static void printNameTranslationInfo(sourcekitd_variant_t Info,
                                      llvm::raw_ostream &OS) {
+  const char *InternalDiagnostic =
+      sourcekitd_variant_dictionary_get_string(Info, KeyInternalDiagnostic);
+  if (InternalDiagnostic) {
+    OS << "<empty name translation info; internal diagnostic: \""
+       << InternalDiagnostic << "\">\n";
+    return;
+  }
   sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,
                                                                    KeyNameKind);
   if (KindUID == nullptr) {
@@ -1010,7 +1482,15 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
 }
 
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
+                            const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS) {
+  const char *InternalDiagnostic =
+      sourcekitd_variant_dictionary_get_string(Info, KeyInternalDiagnostic);
+  if (InternalDiagnostic) {
+    OS << "<empty cursor info; internal diagnostic: \""
+       << InternalDiagnostic << "\">\n";
+    return;
+  }
   sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,
                                       sourcekitd_uid_get_from_cstr("key.kind"));
   if (KindUID == nullptr) {
@@ -1018,10 +1498,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     return;
   }
 
-  std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  std::string Filename = FilenameIn.str();
+  llvm::SmallString<256> output;
+  if (!llvm::sys::fs::real_path(Filename, output))
+    Filename = std::string(output.str());
 
   const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
   const char *USR = sourcekitd_variant_dictionary_get_string(Info, KeyUSR);
@@ -1091,15 +1571,24 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                              KeyAnnotatedDecl));
   }
 
-  std::vector<const char *> AvailableActions;
+  struct ActionInfo {
+    const char* KindUID;
+    const char* KindName;
+    const char* UnavailReason;
+  };
+  std::vector<ActionInfo> AvailableActions;
   sourcekitd_variant_t ActionsObj =
-  sourcekitd_variant_dictionary_get_value(Info, KeyActionable);
+  sourcekitd_variant_dictionary_get_value(Info, KeyRefactorActions);
   for (unsigned i = 0, e = sourcekitd_variant_array_get_count(ActionsObj);
        i != e; ++i) {
     sourcekitd_variant_t Entry =
     sourcekitd_variant_array_get_value(ActionsObj, i);
-    AvailableActions.push_back(sourcekitd_variant_dictionary_get_string(Entry,
-                                                                KeyActionName));
+    AvailableActions.push_back({
+      sourcekitd_uid_get_string_ptr(sourcekitd_variant_dictionary_get_uid(Entry,
+                                                                KeyActionUID)),
+      sourcekitd_variant_dictionary_get_string(Entry, KeyActionName),
+      sourcekitd_variant_dictionary_get_string(Entry, KeyActionUnavailableReason)
+    });
   }
 
   uint64_t ParentOffset =
@@ -1109,9 +1598,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   if (Offset.hasValue()) {
     if (Filename != FilePath)
       OS << FilePath << ":";
-    auto LineCol = resolveToLineCol(Offset.getValue(), FilePath);
+    auto LineCol = resolveToLineCol(Offset.getValue(), FilePath, VFSFiles);
     OS << LineCol.first << ':' << LineCol.second;
-    auto EndLineCol = resolveToLineCol(Offset.getValue()+Length, FilePath);
+    auto EndLineCol =
+        resolveToLineCol(Offset.getValue() + Length, FilePath, VFSFiles);
     OS << '-' << EndLineCol.first << ':' << EndLineCol.second;
   }
   OS << ")\n";
@@ -1158,8 +1648,13 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OS << Group << '\n';
   OS << "MODULE GROUPS END\n";
   OS << "ACTIONS BEGIN\n";
-  for (auto Action : AvailableActions)
-    OS << Action << '\n';
+  for (auto Action : AvailableActions) {
+    OS << Action.KindUID << '\n';
+    OS << Action.KindName << '\n';
+    if (Action.UnavailReason) {
+      OS << Action.UnavailReason << '\n';
+    }
+  }
   OS << "ACTIONS END\n";
   if (ParentOffset) {
     OS << "PARENT OFFSET: " << ParentOffset << "\n";
@@ -1175,10 +1670,10 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     return;
   }
 
-  std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  std::string Filename = FilenameIn.str();
+  llvm::SmallString<256> output;
+  if (llvm::sys::fs::real_path(Filename, output))
+    Filename = std::string(output.str());
 
   sourcekitd_variant_t OffsetObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
@@ -1197,6 +1692,31 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   if (Typename)
     OS << "<type>" <<Typename << "</type>\n";
 }
+
+static void printExpressionType(sourcekitd_variant_t Info, llvm::raw_ostream &OS) {
+  auto TypeBuffer = sourcekitd_variant_dictionary_get_value(Info, KeyExpressionTypeList);
+  unsigned Count = sourcekitd_variant_array_get_count(TypeBuffer);
+  if (!Count) {
+    OS << "cannot find expression types in the file\n";
+    return;
+  }
+  OS << "<ExpressionTypes>\n";
+  for (unsigned i = 0; i != Count; ++i) {
+    sourcekitd_variant_t Item = sourcekitd_variant_array_get_value(TypeBuffer, i);
+    unsigned Offset = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionOffset);
+    unsigned Length = sourcekitd_variant_dictionary_get_int64(Item, KeyExpressionLength);
+    OS << "(" << Offset << ", " << Offset + Length << "): " <<
+      sourcekitd_variant_dictionary_get_string(Item, KeyExpressionType) << "\n";
+    sourcekitd_variant_t protocols = sourcekitd_variant_dictionary_get_value(Item,
+      KeyExpectedTypes);
+    unsigned Count = sourcekitd_variant_array_get_count(protocols);
+    for (unsigned i = 0; i != Count; i ++) {
+      OS << "conforming to: " << sourcekitd_variant_array_get_string(protocols, i) << "\n";
+    }
+  }
+  OS << "</ExpressionTypes>\n";
+}
+
 static void printFoundInterface(sourcekitd_variant_t Info,
                                 llvm::raw_ostream &OS) {
   const char *Name = sourcekitd_variant_dictionary_get_string(Info,
@@ -1298,6 +1818,120 @@ static void printModuleGroupNames(sourcekitd_variant_t Info,
   OS << "<\\GROUPS>\n";
 }
 
+static StringRef getLineColRange(StringRef Text, int64_t StartLine,
+                                 int64_t StartCol, int64_t EndLine,
+                                 int64_t EndCol) {
+  unsigned Line = 1;
+  size_t Length = 0;
+
+  while (Line < StartLine) {
+    Text = Text.split('\n').second;
+    ++Line;
+  }
+  Text = Text.drop_front(StartCol - 1);
+  if (StartLine == EndLine)
+    return Text.substr(0, EndCol - StartCol);
+
+  while(Line < EndLine) {
+    Length = Text.find('\n', Length) + 1;
+    ++Line;
+  }
+  Length += EndCol - 1;
+
+  return Text.substr(0, Length);
+}
+
+static void printSyntacticRenameEdits(sourcekitd_variant_t Info,
+                                      llvm::raw_ostream &OS) {
+  sourcekitd_variant_t CategorizedEdits =
+    sourcekitd_variant_dictionary_get_value(Info, KeyCategorizedEdits);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(CategorizedEdits);
+       i != e; ++i) {
+    sourcekitd_variant_t
+    Categorized = sourcekitd_variant_array_get_value(CategorizedEdits, i);
+    sourcekitd_uid_t
+    Category = sourcekitd_variant_dictionary_get_uid(Categorized, KeyCategory);
+    OS << sourcekitd_uid_get_string_ptr(Category) << ":\n";
+
+    sourcekitd_variant_t Edits =
+    sourcekitd_variant_dictionary_get_value(Categorized, KeyEdits);
+    for(unsigned j = 0, je = sourcekitd_variant_array_get_count(Edits);
+        j != je; ++j) {
+      OS << "  "; // indent
+      sourcekitd_variant_t Edit = sourcekitd_variant_array_get_value(Edits, j);
+      int64_t Line = sourcekitd_variant_dictionary_get_int64(Edit, KeyLine);
+      int64_t Column = sourcekitd_variant_dictionary_get_int64(Edit, KeyColumn);
+      int64_t EndLine = sourcekitd_variant_dictionary_get_int64(Edit, KeyEndLine);
+      int64_t EndColumn = sourcekitd_variant_dictionary_get_int64(Edit, KeyEndColumn);
+      OS << Line << ':' << Column << '-' << EndLine << ':' << EndColumn << " \"";
+      StringRef Text(sourcekitd_variant_dictionary_get_string(Edit, KeyText));
+      OS << Text << "\"\n";
+      sourcekitd_variant_t NoteRanges =
+        sourcekitd_variant_dictionary_get_value(Edit, KeyRangesWorthNote);
+      if (unsigned e = sourcekitd_variant_array_get_count(NoteRanges)) {
+        for (unsigned i = 0; i != e; ++i) {
+          OS << "  <note>";
+          sourcekitd_variant_t Note =
+            sourcekitd_variant_array_get_value(NoteRanges, i);
+          int64_t Line = sourcekitd_variant_dictionary_get_int64(Note, KeyLine);
+          int64_t Column = sourcekitd_variant_dictionary_get_int64(Note, KeyColumn);
+          int64_t EndLine = sourcekitd_variant_dictionary_get_int64(Note, KeyEndLine);
+          int64_t EndColumn = sourcekitd_variant_dictionary_get_int64(Note, KeyEndColumn);
+          auto index = sourcekitd_variant_dictionary_get_value(Note, KeyArgIndex);
+          sourcekitd_uid_t Kind = sourcekitd_variant_dictionary_get_uid(Note,
+                                                              KeyKind);
+          StringRef NoteText = getLineColRange(Text, Line, Column, EndLine, EndColumn);
+          OS << sourcekitd_uid_get_string_ptr(Kind) << " ";
+          OS << Line << ":" << Column << "-" << EndLine << ":" << EndColumn;
+          if (sourcekitd_variant_get_type(index) != SOURCEKITD_VARIANT_TYPE_NULL) {
+            OS << " arg-index=" << sourcekitd_variant_int64_get_value(index);
+          }
+          OS << " \"" << NoteText << "\"";
+          OS << "</note>\n";
+        }
+      }
+    }
+  }
+}
+
+static void printRenameRanges(sourcekitd_variant_t Info,
+                              llvm::raw_ostream &OS) {
+  sourcekitd_variant_t CategorizedRanges =
+      sourcekitd_variant_dictionary_get_value(Info, KeyCategorizedRanges);
+  sourcekitd_variant_array_apply(CategorizedRanges, ^bool(
+                                     size_t i,
+                                     sourcekitd_variant_t Categorized) {
+    sourcekitd_uid_t Category =
+        sourcekitd_variant_dictionary_get_uid(Categorized, KeyCategory);
+    OS << sourcekitd_uid_get_string_ptr(Category) << ":\n";
+
+    sourcekitd_variant_t Ranges =
+        sourcekitd_variant_dictionary_get_value(Categorized, KeyRanges);
+    sourcekitd_variant_array_apply(Ranges, ^bool(size_t j,
+                                                 sourcekitd_variant_t Range) {
+
+      OS << "  "; // indent
+      int64_t Line = sourcekitd_variant_dictionary_get_int64(Range, KeyLine);
+      int64_t Column =
+          sourcekitd_variant_dictionary_get_int64(Range, KeyColumn);
+      int64_t EndLine =
+          sourcekitd_variant_dictionary_get_int64(Range, KeyEndLine);
+      int64_t EndColumn =
+          sourcekitd_variant_dictionary_get_int64(Range, KeyEndColumn);
+      OS << Line << ':' << Column << '-' << EndLine << ':' << EndColumn << " ";
+      auto Kind = sourcekitd_variant_dictionary_get_uid(Range, KeyKind);
+      OS << sourcekitd_uid_get_string_ptr(Kind);
+      auto index = sourcekitd_variant_dictionary_get_value(Range, KeyArgIndex);
+      if (sourcekitd_variant_get_type(index) != SOURCEKITD_VARIANT_TYPE_NULL) {
+        OS << " arg-index=" << sourcekitd_variant_int64_get_value(index);
+      }
+      OS << "\n";
+      return true;
+    });
+    return true;
+  });
+}
+
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
   const char *text =
       sourcekitd_variant_dictionary_get_string(Info, KeySourceText);
@@ -1323,6 +1957,7 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
 }
 
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                                llvm::raw_ostream &OS) {
   OS << "START RANGES\n";
   sourcekitd_variant_t Res =
@@ -1331,7 +1966,7 @@ static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
     sourcekitd_variant_t Range = sourcekitd_variant_array_get_value(Res, i);
     int64_t Offset = sourcekitd_variant_dictionary_get_int64(Range, KeyOffset);
     int64_t Length = sourcekitd_variant_dictionary_get_int64(Range, KeyLength);
-    auto LineCol = resolveToLineCol(Offset, Filename);
+    auto LineCol = resolveToLineCol(Offset, Filename, VFSFiles);
     OS << LineCol.first << ':' << LineCol.second << " - " << Length << '\n';
   }
   OS << "END RANGES\n";
@@ -1359,10 +1994,13 @@ static void prepareDemangleRequest(sourcekitd_object_t Req,
     llvm::StringRef inputContents = input.get()->getBuffer();
 
     // This doesn't handle Unicode symbols, but maybe that's okay.
-    llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
+    // Also accept the future mangling prefix.
+    llvm::Regex maybeSymbol("(_T|_?\\$[Ss])[_a-zA-Z0-9$.]+");
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       addName(matches.front());
+      auto offset = matches.front().data() - inputContents.data();
+      inputContents = inputContents.substr(offset + matches.front().size());
     }
 
   } else {
@@ -1437,53 +2075,97 @@ static void printMangleResults(sourcekitd_variant_t Info, raw_ostream &OS) {
   OS << "END MANGLE\n";
 }
 
-static void initializeRewriteBuffer(StringRef Input,
-                                    clang::RewriteBuffer &RewriteBuf) {
-  RewriteBuf.Initialize(Input);
-  StringRef CheckStr = "CHECK";
-  size_t Pos = 0;
-  while (true) {
-    Pos = Input.find(CheckStr, Pos);
-    if (Pos == StringRef::npos)
-      break;
-    Pos = Input.substr(0, Pos).rfind("//");
-    assert(Pos != StringRef::npos);
-    size_t EndLine = Input.find('\n', Pos);
-    assert(EndLine != StringRef::npos);
-    ++EndLine;
-    RewriteBuf.RemoveText(Pos, EndLine-Pos);
-    Pos = EndLine;
-  }
+static void printStatistics(sourcekitd_variant_t Info, raw_ostream &OS) {
+  sourcekitd_variant_t results =
+    sourcekitd_variant_dictionary_get_value(Info, KeyResults);
+  sourcekitd_variant_array_apply(results, ^bool(size_t index, sourcekitd_variant_t value) {
+    auto uid = sourcekitd_variant_dictionary_get_uid(value, KeyKind);
+    auto desc = sourcekitd_variant_dictionary_get_string(value, KeyDescription);
+    auto statValue = sourcekitd_variant_dictionary_get_int64(value, KeyValue);
+    OS << statValue << "\t" << desc << "\t- " << sourcekitd_uid_get_string_ptr(uid) << "\n";
+    return true;
+  });
 }
 
-static std::vector<std::pair<unsigned, unsigned>>
-getPlaceholderRanges(StringRef Source) {
+static std::string initializeSource(StringRef Input) {
+  std::string result;
+  {
+    llvm::raw_string_ostream OS(result);
+    StringRef CheckStr = "CHECK";
+    size_t Pos = 0;
+    while (true) {
+      auto checkPos = Input.find(CheckStr, Pos);
+      if (checkPos == StringRef::npos)
+        break;
+      checkPos = Input.substr(0, checkPos).rfind("//");
+      assert(checkPos != StringRef::npos);
+      size_t EndLine = Input.find('\n', checkPos);
+      assert(EndLine != StringRef::npos);
+      ++EndLine;
+      OS << Input.slice(Pos, checkPos);
+      Pos = EndLine;
+    }
+
+    OS << Input.slice(Pos, StringRef::npos);
+  }
+  return result;
+}
+
+static Optional<std::pair<unsigned, unsigned>>
+firstPlaceholderRange(StringRef Source, unsigned from) {
   const char *StartPtr = Source.data();
-  std::vector<std::pair<unsigned, unsigned>> Ranges;
+  Source = Source.drop_front(from);
+
   while (true) {
     size_t Pos = Source.find("<#");
     if (Pos == StringRef::npos)
       break;
     unsigned OffsetStart = Source.data() + Pos - StartPtr;
     Source = Source.substr(Pos+2);
+    if (Source.startswith("__skip__") || Source.startswith("T##__skip__"))
+      continue;
     Pos = Source.find("#>");
     if (Pos == StringRef::npos)
       break;
     unsigned OffsetEnd = Source.data() + Pos + 2 - StartPtr;
     Source = Source.substr(Pos+2);
-    Ranges.emplace_back(OffsetStart, OffsetEnd-OffsetStart);
+    return std::make_pair(OffsetStart, OffsetEnd-OffsetStart);
   }
-  return Ranges;
+  return llvm::None;
 }
 
 static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
                                llvm::raw_ostream &OS) {
-  clang::RewriteBuffer RewriteBuf;
-  initializeRewriteBuffer(SourceBuf->getBuffer(), RewriteBuf);
-  auto Ranges = getPlaceholderRanges(SourceBuf->getBuffer());
-  for (auto Range : Ranges) {
-    unsigned Offset = Range.first;
-    unsigned Length = Range.second;
+  auto syncEdit = [=](unsigned offset, unsigned length, const char *text) {
+    auto SourceBufID = SourceBuf->getBufferIdentifier();
+    auto req = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+    sourcekitd_request_dictionary_set_uid(req, KeyRequest,
+                                          RequestEditorReplaceText);
+    sourcekitd_request_dictionary_set_stringbuf(req, KeyName,
+                                                SourceBufID.data(),
+                                                SourceBufID.size());
+    sourcekitd_request_dictionary_set_int64(req, KeyOffset, offset);
+    sourcekitd_request_dictionary_set_int64(req, KeyLength, length);
+    sourcekitd_request_dictionary_set_string(req, KeySourceText, text);
+
+    sourcekitd_response_t resp = sourcekitd_send_request_sync(req);
+    if (sourcekitd_response_is_error(resp)) {
+      sourcekitd_response_description_dump(resp);
+      exit(1);
+    }
+    sourcekitd_request_release(req);
+    sourcekitd_response_dispose(resp);
+  };
+
+  std::string source = initializeSource(SourceBuf->getBuffer());
+  // Sync contents with modified source.
+  syncEdit(0, SourceBuf->getBuffer().size(), source.c_str());
+
+  unsigned cursor = 0;
+
+  while (auto Range = firstPlaceholderRange(source, cursor)) {
+    unsigned Offset = Range->first;
+    unsigned Length = Range->second;
     sourcekitd_object_t Exp = sourcekitd_request_dictionary_create(nullptr,
                                                                    nullptr, 0);
     sourcekitd_request_dictionary_set_uid(Exp, KeyRequest,
@@ -1505,21 +2187,31 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
     sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
     const char *Text = sourcekitd_variant_dictionary_get_string(Info, KeySourceText);
     if (!Text) {
+      cursor = Offset + Length;
       sourcekitd_response_dispose(Resp);
       continue;
     }
     unsigned EditOffset = sourcekitd_variant_dictionary_get_int64(Info, KeyOffset);
     unsigned EditLength = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
-    RewriteBuf.ReplaceText(EditOffset, EditLength, Text);
+
+    // Apply edit locally.
+    source.replace(EditOffset, EditLength, Text);
+
+    // Apply edit on server.
+    syncEdit(EditOffset, EditLength, Text);
+
+    // Adjust cursor to after the edit (we do not expand recursively).
+    cursor = EditOffset + strlen(Text);
     sourcekitd_response_dispose(Resp);
   }
 
-  RewriteBuf.write(OS);
+  OS << source;
 }
 
 static std::pair<unsigned, unsigned>
-resolveToLineCol(unsigned Offset, StringRef Filename) {
-  return resolveToLineCol(Offset, getBufferForFilename(Filename));
+resolveToLineCol(unsigned Offset, StringRef Filename,
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
+  return resolveToLineCol(Offset, getBufferForFilename(Filename, VFSFiles));
 }
 
 static std::pair<unsigned, unsigned>
@@ -1549,9 +2241,11 @@ resolveToLineColFromBuf(unsigned Offset, const char *Ptr) {
   return { Line, Col };
 }
 
-static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
-                                   StringRef Filename) {
-  return resolveFromLineCol(Line, Col, getBufferForFilename(Filename));
+static unsigned
+resolveFromLineCol(unsigned Line, unsigned Col, StringRef Filename,
+                   const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
+  return resolveFromLineCol(Line, Col,
+                            getBufferForFilename(Filename, VFSFiles));
 }
 
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
@@ -1564,11 +2258,10 @@ static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
   const char *Ptr = InputBuf->getBufferStart();
   const char *End = InputBuf->getBufferEnd();
   const char *LineStart = Ptr;
-  for (; Ptr < End; ++Ptr) {
+  --Line;
+  for (; Line && (Ptr < End); ++Ptr) {
     if (*Ptr == '\n') {
       --Line;
-      if (Line == 0)
-        break;
       LineStart = Ptr+1;
     }
   }
@@ -1577,7 +2270,7 @@ static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
     exit(1);
   }
   Ptr = LineStart;
-  for (; Ptr < End; ++Ptr) {
+  for (; Ptr <= End; ++Ptr) {
     --Col;
     if (Col == 0)
       return Ptr - InputBuf->getBufferStart();
@@ -1591,18 +2284,23 @@ static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
 
 static llvm::StringMap<llvm::MemoryBuffer*> Buffers;
 
-static llvm::MemoryBuffer *getBufferForFilename(StringRef Filename) {
-  auto It = Buffers.find(Filename);
+static llvm::MemoryBuffer *
+getBufferForFilename(StringRef Filename,
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
+  auto VFSFileIt = VFSFiles.find(Filename);
+  auto MappedFilename =
+      VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second.path);
+
+  auto It = Buffers.find(MappedFilename);
   if (It != Buffers.end())
     return It->second;
 
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFile(Filename);
+  auto FileBufOrErr = llvm::MemoryBuffer::getFile(MappedFilename);
   if (!FileBufOrErr) {
-    llvm::errs() << "error opening input file '" << Filename << "' ("
+    llvm::errs() << "error opening input file '" << MappedFilename << "' ("
                  << FileBufOrErr.getError().message() << ")\n";
     exit(1);
   }
 
-  return Buffers[Filename] = FileBufOrErr.get().release();
+  return Buffers[MappedFilename] = FileBufOrErr.get().release();
 }

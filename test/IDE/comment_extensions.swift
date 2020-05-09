@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-comments -source-filename %S/Inputs/comment_extensions.swift -comments-xml-schema %S/../../bindings/xml/comment-xml-schema.rng | %FileCheck %s
+// REQUIRES: libxml2
 
 // Content is in separate file in ./Inputs due to the "requires" keyword getting
 // recognized by lit.
@@ -25,11 +26,11 @@
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>note()</Name><USR>s:14swift_ide_test4noteyyF</USR><Declaration>func note()</Declaration><CommentParts><Discussion><Note><Para>This function is very hip and exciting.</Para></Note></Discussion></CommentParts></Function>]
 
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>postcondition(_:)</Name><USR>s:14swift_ide_test13postconditionySizF</USR><Declaration>func postcondition(_ x: inout Int)</Declaration><CommentParts><Discussion><Postcondition><Para>x is unchanged</Para></Postcondition></Discussion></CommentParts></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>postcondition(_:)</Name><USR>s:14swift_ide_test13postconditionyySizF</USR><Declaration>func postcondition(_ x: inout Int)</Declaration><CommentParts><Discussion><Postcondition><Para>x is unchanged</Para></Postcondition></Discussion></CommentParts></Function>]
 
 // CHECK: {{.*}}DocCommentAsXML=none
 
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>precondition(_:)</Name><USR>s:14swift_ide_test12preconditionySiF</USR><Declaration>func precondition(_ x: Int)</Declaration><CommentParts><Discussion><Precondition><Para><codeVoice>x &lt; 100</codeVoice></Para></Precondition></Discussion></CommentParts></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>precondition(_:)</Name><USR>s:14swift_ide_test12preconditionyySiF</USR><Declaration>func precondition(_ x: Int)</Declaration><CommentParts><Discussion><Precondition><Para><codeVoice>x &lt; 100</codeVoice></Para></Precondition></Discussion></CommentParts></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>remark()</Name><USR>s:14swift_ide_test6remarkyyF</USR><Declaration>func remark()</Declaration><CommentParts><Discussion><Remark><Para>Always, no, never forget to check your references.</Para></Remark></Discussion></CommentParts></Function>]

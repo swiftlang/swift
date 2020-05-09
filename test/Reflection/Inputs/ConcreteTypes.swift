@@ -14,6 +14,10 @@ public class C {
   public let aMetatype: C.Type
   public let aFunction: (C, S, E, Int) -> (Int)
   public let aFunctionWithVarArgs: (C, S...) -> ()
+  public let aFunctionWithInout1: (inout C) -> Void = { _ in }
+  public let aFunctionWithInout2: (C, inout Int) -> Void = { _,_ in }
+  public let aFunctionWithInout3: (inout C, inout Int) -> Void = { _,_ in }
+  public let aFunctionWithShared: (__shared C) -> Void = { _ in }
   public init(aClass: C, aStruct: S, anEnum: E, aTuple: (C, S, E, Int), aTupleWithLabels: (a: C, s: S, e: E), aMetatype: C.Type, aFunction: @escaping (C, S, E, Int) -> Int, aFunctionWithVarArgs: @escaping (C, S...) -> ()) {
     self.aClass = aClass
     self.aStruct = aStruct
@@ -58,4 +62,12 @@ public struct References {
   public weak var weakRef: C?
   public unowned var unownedRef: C
   public unowned(unsafe) var unownedUnsafeRef: C
+}
+
+private struct PrivateStructField {
+  var x: Int16
+}
+
+public struct HasArrayOfPrivateStructField {
+  private var x: [PrivateStructField]
 }

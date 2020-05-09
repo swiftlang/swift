@@ -14,9 +14,15 @@
 #
 # ----------------------------------------------------------------------------
 
-from __future__ import absolute_import
 
+from __future__ import absolute_import, unicode_literals
+
+import os
+import platform
+import re
 from numbers import Number
+
+import six
 
 from . import shell
 
@@ -25,8 +31,10 @@ class CMakeOptions(object):
     """List like object used to define cmake options
     """
 
-    def __init__(self):
+    def __init__(self, initial_options=None):
         self._options = []
+        if initial_options is not None:
+            self.extend(initial_options)
 
     def define(self, var, value):
         """Utility to define cmake options in this object.
@@ -34,13 +42,21 @@ class CMakeOptions(object):
         opts.define("FOO", "BAR")       # -> -DFOO=BAR
         opts.define("FLAG:BOOL", True)  # -> -FLAG:BOOL=TRUE
         """
-        if var.endswith(':BOOL'):
+        if var.endswith(':BOOL') or isinstance(value, bool):
             value = self.true_false(value)
         if value is None:
             value = ""
-        elif not isinstance(value, (str, Number)):
-            raise ValueError('define: invalid value: %s' % value)
+        elif not isinstance(value, six.string_types + (Number,)):
+            raise ValueError('define: invalid value for key %s: %s (%s)' %
+                             (var, value, type(value)))
         self._options.append('-D%s=%s' % (var, value))
+
+    def extend(self, tuples_or_options):
+        if isinstance(tuples_or_options, CMakeOptions):
+            self += tuples_or_options
+        else:
+            for (variable, value) in tuples_or_options:
+                self.define(variable, value)
 
     @staticmethod
     def true_false(value):
@@ -57,6 +73,9 @@ class CMakeOptions(object):
 
     def __iter__(self):
         return self._options.__iter__()
+
+    def __contains__(self, item):
+        return self._options.__contains__(item)
 
     def __add__(self, other):
         ret = CMakeOptions()
@@ -97,24 +116,32 @@ class CMake(object):
         if sanitizers:
             define("LLVM_USE_SANITIZER", ";".join(sanitizers))
 
+        if args.enable_sanitize_coverage:
+            define("LLVM_USE_SANITIZE_COVERAGE", "ON")
+
         if args.export_compile_commands:
             define("CMAKE_EXPORT_COMPILE_COMMANDS", "ON")
 
         if args.distcc:
-            define("CMAKE_C_COMPILER:PATH", toolchain.distcc)
-            define("CMAKE_C_COMPILER_ARG1", toolchain.cc)
-            define("CMAKE_CXX_COMPILER:PATH", toolchain.distcc)
-            define("CMAKE_CXX_COMPILER_ARG1", toolchain.cxx)
-        else:
-            define("CMAKE_C_COMPILER:PATH", toolchain.cc)
-            define("CMAKE_CXX_COMPILER:PATH", toolchain.cxx)
+            define("CMAKE_C_COMPILER_LAUNCHER:PATH", toolchain.distcc)
+            define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", toolchain.distcc)
+
+        if args.cmake_c_launcher:
+            define("CMAKE_C_COMPILER_LAUNCHER:PATH", args.cmake_c_launcher)
+        if args.cmake_cxx_launcher:
+            define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", args.cmake_cxx_launcher)
+
+        define("CMAKE_C_COMPILER:PATH", toolchain.cc)
+        define("CMAKE_CXX_COMPILER:PATH", toolchain.cxx)
+        define("CMAKE_LIBTOOL:PATH", toolchain.libtool)
 
         if args.cmake_generator == 'Xcode':
             define("CMAKE_CONFIGURATION_TYPES",
                    "Debug;Release;MinSizeRel;RelWithDebInfo")
 
         if args.clang_user_visible_version:
-            major, minor, patch, _ = args.clang_user_visible_version.components
+            major, minor, patch = \
+                args.clang_user_visible_version.components[0:3]
             define("LLVM_VERSION_MAJOR:STRING", major)
             define("LLVM_VERSION_MINOR:STRING", minor)
             define("LLVM_VERSION_PATCH:STRING", patch)
@@ -153,6 +180,100 @@ class CMake(object):
 
         elif args.cmake_generator == 'Xcode':
             build_args += ['-parallelizeTargets',
-                           '-jobs', str(jobs)]
+                           '-jobs', six.text_type(jobs)]
 
         return build_args
+
+    # Determine the version of the installed CMake binary.
+    def installed_cmake_version(self, cmake_binary):
+        version = shell.capture([cmake_binary, '--version'], dry_run=False,
+                                echo=True, optional=True)
+        (c_major, c_minor, c_patch) = (0, 0, 0)
+        if version is not None:
+            x = re.findall(r'cmake version (\d+)\.(\d+)\.(\d+)',
+                           version.rstrip())
+            if len(x) == 1:
+                (c_major, c_minor, c_patch) = map(int, x[0])
+
+        return (c_major, c_minor, c_patch)
+
+    # Determine the version of the checked out CMake source.
+    def cmake_source_version(self, cmake_source_dir):
+        cmake_version_file = os.path.join(cmake_source_dir, 'Source',
+                                          'CMakeVersion.cmake')
+        major = -1
+        minor = -1
+        patch = -1
+
+        file = open(cmake_version_file, "r")
+        for line in file.readlines():
+            m = re.findall(r'set\(CMake_VERSION_MAJOR (\d+)\)', line)
+            if len(m) == 1:
+                major = int(m[0])
+                continue
+
+            m = re.findall(r'set\(CMake_VERSION_MINOR (\d+)\)', line)
+            if len(m) == 1:
+                minor = int(m[0])
+                continue
+
+            m = re.findall(r'set\(CMake_VERSION_PATCH (\d+)\)', line)
+            if len(m) == 1:
+                patch = int(m[0])
+                continue
+
+        if major == -1 or minor == -1 or patch == -1:
+            raise RuntimeError("Cant determine CMake version from %s"
+                               % cmake_version_file)
+
+        return (major, minor, patch)
+
+    # Build CMake from source.
+    def build_cmake(self, source_root, build_root):
+        cmake_bootstrap = os.path.join(source_root, 'cmake', 'bootstrap')
+
+        if hasattr(self.args, 'build_script_impl_args'):
+            for opt in self.args.build_script_impl_args:
+                m = re.findall('--build-dir=(.*)', opt)
+                if len(m) == 1:
+                    build_root = m[0]
+
+        cmake_build_dir = os.path.join(build_root, 'cmake-%s' %
+                                       self.args.host_target)
+        if not os.path.isdir(cmake_build_dir):
+            os.makedirs(cmake_build_dir)
+
+        cwd = os.getcwd()
+        os.chdir(cmake_build_dir)
+        shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui', '--',
+                                    '-DCMAKE_USE_OPENSSL=OFF'], echo=True)
+        shell.call_without_sleeping(['make', '-j%s' % self.args.build_jobs],
+                                    echo=True)
+        os.chdir(cwd)
+        return os.path.join(cmake_build_dir, 'bin', 'cmake')
+
+    # For Linux only, determine the version of the installed CMake compared to
+    # the source and build the source if necessary. Returns the path to the
+    # cmake binary.
+    def check_cmake_version(self, source_root, build_root):
+        if platform.system() != 'Linux':
+            return
+
+        cmake_source_dir = os.path.join(source_root, 'cmake')
+        # If the source is not checked out then don't attempt to build cmake.
+        if not os.path.isdir(cmake_source_dir):
+            return
+
+        cmake_binary = 'cmake'
+        try:
+            if self.args.cmake is not None:
+                cmake_binary = self.args.cmake
+        except AttributeError:
+            cmake_binary = 'cmake'
+
+        installed_ver = self.installed_cmake_version(cmake_binary)
+        if installed_ver > self.cmake_source_version(cmake_source_dir):
+            return
+        else:
+            # Build CMake from source and return the path to the executable.
+            return self.build_cmake(source_root, build_root)

@@ -13,6 +13,12 @@
 // <rdar://problem/17838787>
 import TestsUtils
 
+public let NopDeinit = BenchmarkInfo(
+  name: "NopDeinit",
+  runFunction: run_NopDeinit,
+  tags: [.regression],
+  legacyFactor: 100)
+
 class X<T : Comparable> {
   let deinitIters = 10000
   var elem: T
@@ -27,7 +33,7 @@ class X<T : Comparable> {
 public func run_NopDeinit(_ N: Int) {
   for _ in 1...N {
     var arr :[X<Int>] = []
-    let size = 500
+    let size = 5
     for i in 1...size { arr.append(X(i)) }
     arr.removeAll()
     CheckResults(arr.count == 0)

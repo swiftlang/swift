@@ -35,11 +35,14 @@ namespace importer {
 /// into Swift. All of the possibilities have the same storage
 /// representation, but can be used in different ways.
 enum class EnumKind {
-  /// The enumeration type should map to an enum, which means that
-  /// all of the cases are independent.
-  Enum,
-  /// The enumeration type should map to an option set, which means
-  /// that
+  /// The enumeration type should map to a frozen enum, which means that
+  /// all of the cases are independent and there are no private cases.
+  FrozenEnum,
+  /// The enumeration type should map to a non-frozen enum, which means that
+  /// all of the cases are independent, but there may be values not represented
+  /// in the listed cases.
+  NonFrozenEnum,
+  /// The enumeration type should map to an option set, which means that
   /// the constants represent combinations of independent flags.
   Options,
   /// The enumeration type should map to a distinct type, but we don't
@@ -65,12 +68,9 @@ class EnumInfo {
 public:
   EnumInfo() = default;
 
-  // TODO: wean ourselves off of the ASTContext, we just want a slab that will
-  // outlive us to store our strings on.
-  EnumInfo(ASTContext &ctx, const clang::EnumDecl *decl,
-           clang::Preprocessor &pp) {
-    classifyEnum(ctx, decl, pp);
-    determineConstantNamePrefix(ctx, decl);
+  EnumInfo(const clang::EnumDecl *decl, clang::Preprocessor &pp) {
+    classifyEnum(decl, pp);
+    determineConstantNamePrefix(decl);
   }
 
   EnumKind getKind() const { return kind; }
@@ -79,7 +79,16 @@ public:
 
   /// Whether this maps to an enum who also provides an error domain
   bool isErrorEnum() const {
-    return getKind() == EnumKind::Enum && !nsErrorDomain.empty();
+    switch (getKind()) {
+    case EnumKind::FrozenEnum:
+    case EnumKind::NonFrozenEnum:
+      return !nsErrorDomain.empty();
+    case EnumKind::Options:
+    case EnumKind::Unknown:
+    case EnumKind::Constants:
+      return false;
+    }
+    llvm_unreachable("unhandled kind");
   }
 
   /// For this error enum, extract the name of the error domain constant
@@ -89,15 +98,13 @@ public:
   }
 
 private:
-  void determineConstantNamePrefix(ASTContext &ctx, const clang::EnumDecl *);
-  void classifyEnum(ASTContext &ctx, const clang::EnumDecl *,
-                    clang::Preprocessor &);
+  void determineConstantNamePrefix(const clang::EnumDecl *);
+  void classifyEnum(const clang::EnumDecl *, clang::Preprocessor &);
 };
 
 /// Provide a cache of enum infos, so that we don't have to re-calculate their
 /// information.
 class EnumInfoCache {
-  ASTContext &swiftCtx;
   clang::Preprocessor &clangPP;
 
   llvm::DenseMap<const clang::EnumDecl *, EnumInfo> enumInfos;
@@ -107,8 +114,7 @@ class EnumInfoCache {
   EnumInfoCache &operator = (const EnumInfoCache &) = delete;
 
 public:
-  EnumInfoCache(ASTContext &swiftContext, clang::Preprocessor &cpp)
-      : swiftCtx(swiftContext), clangPP(cpp) {}
+  explicit EnumInfoCache(clang::Preprocessor &cpp) : clangPP(cpp) {}
 
   EnumInfo getEnumInfo(const clang::EnumDecl *decl);
 

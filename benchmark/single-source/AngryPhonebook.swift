@@ -13,22 +13,67 @@
 // This test is based on single-source/Phonebook, with
 // to test uppercase and lowercase ASCII string fast paths.
 import TestsUtils
-import Foundation
 
-var words = [
+let t: [BenchmarkCategory] = [.validation, .api, .String]
+
+public let AngryPhonebook = [
+  BenchmarkInfo(
+    name: "AngryPhonebook",
+    runFunction: run_AngryPhonebook,
+    tags: t,
+    legacyFactor: 7),
+
+  // Small String Workloads
+  BenchmarkInfo(
+    name: "AngryPhonebook.ASCII2.Small",
+    runFunction: { angryPhonebook($0*10, ascii) },
+    tags: t,
+    setUpFunction: { blackHole(ascii) }),
+  BenchmarkInfo(
+    name: "AngryPhonebook.Strasse.Small",
+    runFunction: { angryPhonebook($0, strasse) },
+    tags: t,
+    setUpFunction: { blackHole(strasse) }),
+  BenchmarkInfo(
+    name: "AngryPhonebook.Armenian.Small",
+    runFunction: { angryPhonebook($0, armenian) },
+    tags: t,
+    setUpFunction: { blackHole(armenian) }),
+  BenchmarkInfo(
+    name: "AngryPhonebook.Cyrillic.Small",
+    runFunction: { angryPhonebook($0, cyrillic) },
+    tags: t,
+    setUpFunction: { blackHole(cyrillic) }),
+
+  // Regular String Workloads
+  BenchmarkInfo(
+    name: "AngryPhonebook.ASCII2",
+    runFunction: { angryPhonebook($0*10, precomposed: longASCII) },
+    tags: t,
+    setUpFunction: { blackHole(longASCII) }),
+  BenchmarkInfo(
+    name: "AngryPhonebook.Strasse",
+    runFunction: { angryPhonebook($0, precomposed: longStrasse) },
+    tags: t,
+    setUpFunction: { blackHole(longStrasse) }),
+  BenchmarkInfo(
+    name: "AngryPhonebook.Armenian",
+    runFunction: { angryPhonebook($0, precomposed: longArmenian) },
+    tags: t,
+    setUpFunction: { blackHole(longArmenian) }),
+  BenchmarkInfo(
+    name: "AngryPhonebook.Cyrillic",
+    runFunction: { angryPhonebook($0, precomposed: longCyrillic) },
+    tags: t,
+    setUpFunction: { blackHole(longCyrillic) })
+]
+
+let words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
   "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
   "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
   "Joshua", "Kevin", "Ronald", "Timothy", "Jason", "Jeffrey", "Gary", "Ryan",
-  "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank", "Jonathan", "Scott",
-  "Justin", "Raymond", "Brandon", "Gregory", "Samuel", "Patrick", "Benjamin",
-  "Jack", "Dennis", "Jerry", "Alexander", "Tyler", "Douglas", "Henry", "Peter",
-  "Walter", "Aaron", "Jose", "Adam", "Harold", "Zachary", "Nathan", "Carl",
-  "Kyle", "Arthur", "Gerald", "Lawrence", "Roger", "Albert", "Keith", "Jeremy",
-  "Terry", "Joe", "Sean", "Willie", "Jesse", "Ralph", "Billy", "Austin", "Bruce",
-  "Christian", "Roy", "Bryan", "Eugene", "Louis", "Harry", "Wayne", "Ethan",
-  "Jordan", "Russell", "Alan", "Philip", "Randy", "Juan", "Howard", "Vincent",
-  "Bobby", "Dylan", "Johnny", "Phillip", "Craig"]
+  "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
 
 @inline(never)
 public func run_AngryPhonebook(_ N: Int) {
@@ -39,5 +84,69 @@ public func run_AngryPhonebook(_ N: Int) {
         _ = (firstname.uppercased(), lastname.lowercased())
       }
     }
+  }
+}
+
+// Workloads for various scripts. Always 20 names for 400 pairings.
+// To keep the performance of various scripts roughly comparable, aim for
+// a total length of approximately 120 characters.
+// E.g.: `ascii.joined(separator: "").count == 124`
+// Every name should fit in 15-bytes UTF-8 encoded, to excercise the small
+// string optimization.
+// E.g.: `armenian.allSatisfy { $0._guts.isSmall } == true`
+
+// Workload Size Statistics
+//   SMALL  | UTF-8 | UTF-16 |    REGULAR   |  UTF-8  | UTF-16
+// ---------|-------|--------|--------------|---------|--------
+//    ascii | 124 B |  248 B |    longASCII |  6158 B | 12316 B
+//  strasse | 140 B |  240 B |  longStrasse |  6798 B | 11996 B
+// armenian | 232 B |  232 B | longArmenian | 10478 B | 11676 B
+// cyrillic | 238 B |  238 B | longCyrillic | 10718 B | 11916 B
+
+let ascii = Array(words.prefix(20))
+// Pathological case, uppercase: ß -> SS
+let strasse = Array(repeating: "Straße", count: 20)
+
+let armenian = [
+  "Արմեն", "Աննա", "Հարութ", "Միքայել", "Մարիա", "Դավիթ", "Վարդան",
+  "Նարինե", "Տիգրան", "Տաթևիկ", "Թագուհի", "Թամարա", "Ազնաուր", "Գրիգոր",
+  "Կոմիտաս", "Հայկ", "Գառնիկ", "Վահրամ", "Վահագն", "Գևորգ"]
+
+let cyrillic = [
+  "Ульяна", "Аркадий", "Аня", "Даниил", "Дмитрий", "Эдуард", "Юрій", "Давид",
+  "Анна", "Дмитрий", "Евгений", "Борис", "Ксения", "Артур", "Аполлон",
+  "Соломон", "Николай", "Кристи", "Надежда", "Спартак"]
+
+/// Precompose the phonebook into one large string of comma separated names.
+func phonebook(_ names: [String]) -> String {
+  names.map { firstName in
+    names.map { lastName in
+      firstName + " " + lastName
+    }.joined(separator: ", ")
+  }.joined(separator: ", ")
+}
+
+let longASCII = phonebook(ascii)
+let longStrasse = phonebook(strasse)
+let longArmenian = phonebook(armenian)
+let longCyrillic = phonebook(cyrillic)
+
+@inline(never)
+public func angryPhonebook(_ N: Int, _ names: [String]) {
+  assert(names.count == 20)
+  // Permute the names.
+  for _ in 1...N {
+    for firstname in names {
+      for lastname in names {
+        blackHole((firstname.uppercased(), lastname.lowercased()))
+      }
+    }
+  }
+}
+
+@inline(never)
+public func angryPhonebook(_ N: Int, precomposed names: String) {
+  for _ in 1...N {
+    blackHole((names.uppercased(), names.lowercased()))
   }
 }
