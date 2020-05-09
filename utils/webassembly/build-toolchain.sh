@@ -9,11 +9,11 @@ WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
 case $(uname -s) in
   Darwin)
     OS_SUFFIX=osx
-    PRESET_NAME=webassembly-macos
+    PRESET_NAME=webassembly-macos-installable
   ;;
   Linux)
     OS_SUFFIX=linux
-    PRESET_NAME=webassembly-linux
+    PRESET_NAME=webassembly-linux-installable
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
