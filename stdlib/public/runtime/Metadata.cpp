@@ -16,7 +16,6 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "MetadataCache.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"

@@ -40,7 +40,6 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 
 #if defined(_MSC_VER)
@@ -150,7 +149,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // library name here. Avoid using StringRef::rsplit because its definition
   // is not provided in the header so that it requires linking with
   // libSupport.a.
-  StringRef libraryName = StringRef(syminfo.fileName);
+  llvm::StringRef libraryName{syminfo.fileName};
   libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.
