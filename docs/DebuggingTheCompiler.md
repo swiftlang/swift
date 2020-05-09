@@ -7,8 +7,8 @@ This document contains some useful information for debugging:
 * Intermediate output of the Swift Compiler.
 * Swift applications at runtime.
 
-Please feel free add any useful tips that one finds to this document for the
-benefit of all swift developers.
+Please feel free to add any useful tips that one finds to this document for the
+benefit of all Swift developers.
 
 **Table of Contents**
 
@@ -33,7 +33,7 @@ benefit of all swift developers.
     - [Bisecting Compiler Errors](#bisecting-compiler-errors)
         - [Bisecting on SIL optimizer pass counts to identify optimizer bugs](#bisecting-on-sil-optimizer-pass-counts-to-identify-optimizer-bugs)
         - [Using git-bisect in the presence of branch forwarding/feature branches](#using-git-bisect-in-the-presence-of-branch-forwardingfeature-branches)
-        - [Reducing SIL test cases using bug_reducer](#reducing-sil-test-cases-using-bugreducer)
+        - [Reducing SIL test cases using bug_reducer](#reducing-sil-test-cases-using-bug_reducer)
 - [Debugging Swift Executables](#debugging-swift-executables)
     - [Determining the mangled name of a function in LLDB](#determining-the-mangled-name-of-a-function-in-lldb)
     - [Manually symbolication using LLDB](#manually-symbolication-using-lldb)
@@ -60,19 +60,19 @@ The most important thing when debugging the compiler is to examine the IR.
 Here is how to dump the IR after the main phases of the Swift compiler
 (assuming you are compiling with optimizations enabled):
 
-* **Parser** To print the AST after parsing::
+* **Parser** To print the AST after parsing:
 
 ```bash
 swiftc -dump-ast -O file.swift
 ```
 
-* **SILGen** To print the SIL immediately after SILGen::
+* **SILGen** To print the SIL immediately after SILGen:
 
 ```bash
 swiftc -emit-silgen -O file.swift
 ```
 
-* **Mandatory SIL passes** To print the SIL after the mandatory passes::
+* **Mandatory SIL passes** To print the SIL after the mandatory passes:
 
 ```bash
 swiftc -emit-sil -Onone file.swift
@@ -83,25 +83,25 @@ swiftc -emit-sil -Onone file.swift
   get what you want to see.
 
 * **Performance SIL passes** To print the SIL after the complete SIL
-   optimization pipeline::
+   optimization pipeline:
 
 ```bash
 swiftc -emit-sil -O file.swift
 ```
 
-* **IRGen** To print the LLVM IR after IR generation::
+* **IRGen** To print the LLVM IR after IR generation:
 
 ```bash
 swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
 ```
 
-* **LLVM passes** To print the LLVM IR after LLVM passes::
+* **LLVM passes** To print the LLVM IR after LLVM passes:
 
 ```bash
 swiftc -emit-ir -O file.swift
 ```
 
-* **Code generation** To print the final generated code::
+* **Code generation** To print the final generated code:
 
 ```bash
 swiftc -S -O file.swift
@@ -380,18 +380,18 @@ and check for the function name in the breakpoint condition:
 
 Sometimes you may want to know which optimization inserts, removes or moves a
 certain instruction. To find out, set a breakpoint in
-`ilist_traits<SILInstruction>:addNodeToList` or
-`ilist_traits<SILInstruction>:removeNodeFromList`, which are defined in
+`ilist_traits<SILInstruction>::addNodeToList` or
+`ilist_traits<SILInstruction>::removeNodeFromList`, which are defined in
 `SILInstruction.cpp`.
 The following command sets a breakpoint which stops if a `strong_retain`
 instruction is removed:
 
-    (lldb) br set -c 'I->getKind() == ValueKind:StrongRetainInst' -f SILInstruction.cpp -l 63
+    (lldb) br set -c 'I->getKind() == ValueKind::StrongRetainInst' -f SILInstruction.cpp -l 63
 
 The condition can be made more precise e.g. by also testing in which function
 this happens:
 
-    (lldb) br set -c 'I->getKind() == ValueKind:StrongRetainInst &&
+    (lldb) br set -c 'I->getKind() == ValueKind::StrongRetainInst &&
                I->getFunction()->hasName("_TFC3nix1Xd")'
                -f SILInstruction.cpp -l 63
 
@@ -402,7 +402,7 @@ function.
 
 To achieve this, set another breakpoint and add breakpoint commands:
 
-    (lldb) br set -n GlobalARCOpts:run
+    (lldb) br set -n GlobalARCOpts::run
     Breakpoint 2
     (lldb) br com add 2
     > p int $n = $n + 1
@@ -419,26 +419,26 @@ Now remove the breakpoint commands from the second breakpoint (or create a new
 one) and set the ignore count to $n minus one:
 
     (lldb) br delete 2
-    (lldb) br set -i 4 -n GlobalARCOpts:run
+    (lldb) br set -i 4 -n GlobalARCOpts::run
 
 Run your program again and the breakpoint hits just before the first breakpoint.
 
 Another method for accomplishing the same task is to set the ignore count of the
 breakpoint to a large number, i.e.:
 
-    (lldb) br set -i 9999999 -n GlobalARCOpts:run
+    (lldb) br set -i 9999999 -n GlobalARCOpts::run
 
 Then whenever the debugger stops next time (due to hitting another
 breakpoint/crash/assert) you can list the current breakpoints:
 
     (lldb) br list
-    1: name = 'GlobalARCOpts:run', locations = 1, resolved = 1, hit count = 85 Options: ignore: 1 enabled
+    1: name = 'GlobalARCOpts::run', locations = 1, resolved = 1, hit count = 85 Options: ignore: 1 enabled
 
 which will then show you the number of times that each breakpoint was hit. In
-this case, we know that `GlobalARCOpts:run` was hit 85 times. So, now
+this case, we know that `GlobalARCOpts::run` was hit 85 times. So, now
 we know to ignore swift_getGenericMetadata 84 times, i.e.:
 
-    (lldb) br set -i 84 -n GlobalARCOpts:run
+    (lldb) br set -i 84 -n GlobalARCOpts::run
 
 A final trick is that one can use the -R option to stop at a relative assembly
 address in lldb. Specifically, lldb resolves the breakpoint normally and then
