@@ -126,8 +126,8 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   auto originalFnTy = original->getLoweredFunctionType();
   auto numResults = originalFnTy->getNumResults() +
                     originalFnTy->getNumIndirectMutatingParameters();
-  auto *resultIndices = IndexSubset::get(
-      original->getASTContext(), numResults, indices.source);
+  auto *resultIndices =
+      IndexSubset::get(original->getASTContext(), numResults, indices.source);
   auto *parameterIndices = indices.parameters;
   AutoDiffConfig config(parameterIndices, resultIndices, genericSig);
   auto enumName = mangler.mangleAutoDiffGeneratedDeclaration(
@@ -199,8 +199,8 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   auto originalFnTy = original->getLoweredFunctionType();
   auto numResults = originalFnTy->getNumResults() +
                     originalFnTy->getNumIndirectMutatingParameters();
-  auto *resultIndices = IndexSubset::get(
-      original->getASTContext(), numResults, indices.source);
+  auto *resultIndices =
+      IndexSubset::get(original->getASTContext(), numResults, indices.source);
   auto *parameterIndices = indices.parameters;
   AutoDiffConfig config(parameterIndices, resultIndices, genericSig);
   auto structName = mangler.mangleAutoDiffGeneratedDeclaration(

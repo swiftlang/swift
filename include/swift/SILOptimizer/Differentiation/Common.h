@@ -211,18 +211,15 @@ inline void createEntryArguments(SILFunction *f) {
     decl->setSpecifier(ParamDecl::Specifier::Default);
     entry->createFunctionArgument(type, decl);
   };
-  // f->getLoweredFunctionType()->remap
   for (auto indResTy : conv.getIndirectSILResultTypes()) {
     if (indResTy.hasArchetype())
       indResTy = indResTy.mapTypeOutOfContext();
     createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
-    // createFunctionArgument(indResTy.getAddressType());
   }
   for (auto paramTy : conv.getParameterSILTypes()) {
     if (paramTy.hasArchetype())
       paramTy = paramTy.mapTypeOutOfContext();
     createFunctionArgument(f->mapTypeIntoContext(paramTy));
-    // createFunctionArgument(paramTy);
   }
 }
 

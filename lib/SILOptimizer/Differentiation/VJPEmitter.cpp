@@ -174,7 +174,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     SILParameterInfo inoutParamTanParam(
         origResult.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()->getCanonicalType(witnessCanGenSig),
+            ->getType()
+            ->getCanonicalType(witnessCanGenSig),
         inoutParamTanConvention);
     pbParams.push_back(inoutParamTanParam);
   } else {
@@ -184,7 +185,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     pbParams.push_back(getTangentParameterInfoForOriginalResult(
         origResult.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()->getCanonicalType(witnessCanGenSig),
+            ->getType()
+            ->getCanonicalType(witnessCanGenSig),
         origResult.getConvention()));
   }
 
@@ -192,7 +194,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // returned pullback's closure context.
   auto *origExit = &*original->findReturnBB();
   auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
-  auto pbStructType = pbStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
+  auto pbStructType =
+      pbStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
   pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
 
   // Add pullback results for the requested wrt parameters.
@@ -205,7 +208,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     adjResults.push_back(getTangentResultInfoForOriginalParameter(
         origParam.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()->getCanonicalType(witnessCanGenSig),
+            ->getType()
+            ->getCanonicalType(witnessCanGenSig),
         origParam.getConvention()));
   }
 
@@ -275,8 +279,8 @@ void VJPEmitter::visitSILInstruction(SILInstruction *inst) {
 
 SILType VJPEmitter::getLoweredType(Type type) {
   auto vjpGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
-  Lowering::AbstractionPattern pattern(
-      vjpGenSig, type->getCanonicalType(vjpGenSig));
+  Lowering::AbstractionPattern pattern(vjpGenSig,
+                                       type->getCanonicalType(vjpGenSig));
   return vjp->getLoweredType(pattern, type);
 }
 
@@ -490,9 +494,8 @@ void VJPEmitter::visitSwitchEnumInstBase(SwitchEnumInstBase *sei) {
                                   newDefaultBB, caseBBs);
     break;
   case SILInstructionKind::SwitchEnumAddrInst:
-    getBuilder().createSwitchEnumAddr(sei->getLoc(),
-                                      getOpValue(sei->getOperand()),
-                                      newDefaultBB, caseBBs);
+    getBuilder().createSwitchEnumAddr(
+        sei->getLoc(), getOpValue(sei->getOperand()), newDefaultBB, caseBBs);
     break;
   default:
     llvm_unreachable("Expected `switch_enum` or `switch_enum_addr`");
