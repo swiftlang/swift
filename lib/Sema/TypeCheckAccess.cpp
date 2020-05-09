@@ -1466,11 +1466,14 @@ public:
   }
 };
 
+// Diagnose public APIs exposing types that are either imported as
+// implementation-only or declared as SPI.
 class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
   class Diagnoser;
 
   void checkTypeImpl(
       Type type, const TypeRepr *typeRepr, const SourceFile &SF,
+      const Decl *context,
       const Diagnoser &diagnoser) {
     // Don't bother checking errors.
     if (type && type->hasError())
@@ -1483,14 +1486,15 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
     if (typeRepr) {
       const_cast<TypeRepr *>(typeRepr)->walk(TypeReprIdentFinder(
           [&](const ComponentIdentTypeRepr *component) {
-        ModuleDecl *M = component->getBoundDecl()->getModuleContext();
-        if (!SF.isImportedImplementationOnly(M) &&
-            !SF.isImportedAsSPI(component->getBoundDecl()))
-          return true;
+        TypeDecl *typeDecl = component->getBoundDecl();
+        ModuleDecl *M = typeDecl->getModuleContext();
+        bool isImplementationOnly = SF.isImportedImplementationOnly(M);
+        if (isImplementationOnly ||
+            (SF.isImportedAsSPI(typeDecl) && !context->isSPI())) {
+          diagnoser.diagnoseType(typeDecl, component, isImplementationOnly);
+          foundAnyIssues = true;
+        }
 
-        diagnoser.diagnoseType(component->getBoundDecl(), component,
-                               SF.isImportedImplementationOnly(M));
-        foundAnyIssues = true;
         // We still continue even in the diagnostic case to report multiple
         // violations.
         return true;
@@ -1508,19 +1512,19 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
     class ProblematicTypeFinder : public TypeDeclFinder {
       const SourceFile &SF;
+      const Decl *context;
       const Diagnoser &diagnoser;
     public:
-      ProblematicTypeFinder(const SourceFile &SF, const Diagnoser &diagnoser)
-        : SF(SF), diagnoser(diagnoser) {}
+      ProblematicTypeFinder(const SourceFile &SF, const Decl *context, const Diagnoser &diagnoser)
+        : SF(SF), context(context), diagnoser(diagnoser) {}
 
       void visitTypeDecl(const TypeDecl *typeDecl) {
         ModuleDecl *M = typeDecl->getModuleContext();
-        if (!SF.isImportedImplementationOnly(M) &&
-            !SF.isImportedAsSPI(typeDecl))
-          return;
-
-        diagnoser.diagnoseType(typeDecl, /*typeRepr*/nullptr,
-                               SF.isImportedImplementationOnly(M));
+        bool isImplementationOnly = SF.isImportedImplementationOnly(M);
+        if (isImplementationOnly ||
+            (SF.isImportedAsSPI(typeDecl) && !context->isSPI()))
+          diagnoser.diagnoseType(typeDecl, /*typeRepr*/nullptr,
+                                 isImplementationOnly);
       }
 
       void visitSubstitutionMap(SubstitutionMap subs) {
@@ -1580,7 +1584,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       }
     };
 
-    type.walk(ProblematicTypeFinder(SF, diagnoser));
+    type.walk(ProblematicTypeFinder(SF, context, diagnoser));
   }
 
   void checkType(
@@ -1588,7 +1592,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       const Diagnoser &diagnoser) {
     auto *SF = context->getDeclContext()->getParentSourceFile();
     assert(SF && "checking a non-source declaration?");
-    return checkTypeImpl(type, typeRepr, *SF, diagnoser);
+    return checkTypeImpl(type, typeRepr, *SF, context, diagnoser);
   }
 
   void checkType(
@@ -1685,7 +1689,7 @@ public:
     AccessScope accessScope =
         VD->getFormalAccessScope(nullptr,
                                  /*treatUsableFromInlineAsPublic*/true);
-    if (accessScope.isPublic() && !accessScope.isSPI())
+    if (accessScope.isPublic())
       return false;
 
     // Is this a stored property in a non-resilient struct or class?
