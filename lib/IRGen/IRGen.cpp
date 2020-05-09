@@ -202,6 +202,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PMBuilder.SLPVectorize = true;
     PMBuilder.LoopVectorize = true;
     PMBuilder.MergeFunctions = true;
+    PMBuilder.SplitColdCode = true;
   } else {
     PMBuilder.OptLevel = 0;
     if (!Opts.DisableLLVMOptzns)

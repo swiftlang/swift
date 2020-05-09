@@ -10,9 +10,9 @@ func f(_ x : Int64) -> Int64 {
     Builtin.int_trap()
   }
   if x > 42 {
-    // CHECK-DAG: ![[LOC2:.*]] = !DILocation(line: [[@LINE+1]],
+    // CHECK-DAG: call void @llvm.trap(), !dbg ![[LOC2:.*]]
+    // CHECK-DAG: ![[LOC2]] = !DILocation(line: [[@LINE+1]],
     Builtin.int_trap()
-    // CHECK-DAG: call void @llvm.trap(), !dbg ![[LOC2]]
   }
   return x
 }
