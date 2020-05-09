@@ -449,8 +449,7 @@ extension RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
-    let approximateCapacity = self.count +
-      numericCast(newElements.underestimatedCount)
+    let approximateCapacity = self.count + newElements.underestimatedCount
     self.reserveCapacity(approximateCapacity)
     for element in newElements {
       append(element)
@@ -800,7 +799,7 @@ extension RangeReplaceableCollection
 
   @inlinable
   public mutating func _customRemoveLast(_ n: Int) -> Bool {
-    self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
+    self = self[startIndex..<index(endIndex, offsetBy: -n)]
     return true
   }
 }
@@ -998,7 +997,7 @@ extension RangeReplaceableCollection {
   >(lhs: Other, rhs: Self) -> Self
   where Element == Other.Element {
     var result = Self()
-    result.reserveCapacity(rhs.count + numericCast(lhs.underestimatedCount))
+    result.reserveCapacity(rhs.count + lhs.underestimatedCount)
     result.append(contentsOf: lhs)
     result.append(contentsOf: rhs)
     return result
