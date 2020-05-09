@@ -151,8 +151,8 @@ void PullbackEmitter::cleanUpTemporariesForBlock(SILBasicBlock *bb,
 const Lowering::TypeLowering &PullbackEmitter::getTypeLowering(Type type) {
   auto pbGenSig =
       getPullback().getLoweredFunctionType()->getSubstGenericSignature();
-  Lowering::AbstractionPattern pattern(
-      pbGenSig, type->getCanonicalType(pbGenSig));
+  Lowering::AbstractionPattern pattern(pbGenSig,
+                                       type->getCanonicalType(pbGenSig));
   return getPullback().getTypeLowering(pattern, type);
 }
 
@@ -2083,8 +2083,8 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
   auto type = lhsDestAccess->getType();
   auto astType = type.getASTType();
   auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = astType->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(swiftMod));
+  auto tangentSpace =
+      astType->getAutoDiffTangentSpace(LookUpConformanceInModule(swiftMod));
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
   case TangentSpace::Kind::TangentVector: {
