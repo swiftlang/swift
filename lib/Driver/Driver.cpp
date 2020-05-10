@@ -1466,9 +1466,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       break;
 
     case options::OPT_emit_library:
-      OI.LinkAction = Args.hasArg(options::OPT_static) ?
-                      LinkKind::StaticLibrary :
-                      LinkKind::DynamicLibrary;
+      // WebAssembly only supports static libraries
+      if (TC.getTriple().isOSBinFormatWasm()) {
+        OI.LinkAction = LinkKind::StaticLibrary;
+      } else {
+        OI.LinkAction = Args.hasArg(options::OPT_static) ?
+                        LinkKind::StaticLibrary :
+                        LinkKind::DynamicLibrary;
+      }
       OI.CompilerOutputType = file_types::TY_Object;
       break;
 
