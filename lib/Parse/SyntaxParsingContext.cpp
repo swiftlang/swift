@@ -46,6 +46,17 @@ SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
   getStorage().reserve(128);
 }
 
+void SyntaxParsingContext::cancelBacktrack() {
+  SyntaxParsingContext *curr = CtxtHolder;
+  while (true) {
+    curr->IsBacktracking = false;
+    if (curr == this) {
+      break;
+    }
+    curr = curr->getParent();
+  }
+}
+
 size_t SyntaxParsingContext::lookupNode(size_t LexerOffset, SourceLoc Loc) {
   if (!Enabled)
     return 0;

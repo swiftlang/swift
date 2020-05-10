@@ -5535,7 +5535,14 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
       parseImplicitGetter();
       return makeParserSuccess();
     }
-    IsFirstAccessor = false;
+    if (IsFirstAccessor) {
+      // Continue parsing without backtracking so we can re-use previously
+      // parsed nodes for incremental re-parsing, but avoid destructing
+      // `backtrack` because its syntax context isn't at the top of the stack at
+      // this point.
+      backtrack->cancelBacktrack();
+      IsFirstAccessor = false;
+    }
 
     // For now, immediately reject illegal accessors in protocols just to
     // avoid having to deal with them everywhere.
