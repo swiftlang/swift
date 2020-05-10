@@ -94,6 +94,7 @@ public:
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
+  IGNORED_ATTR(Package)
   IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(HasMissingDesignatedInitializers)

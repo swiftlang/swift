@@ -578,6 +578,11 @@ SIMPLE_DECL_ATTR(actorIndependent, ActorIndependent,
   APIStableToAdd | APIBreakingToRemove,
   103)
 
+DECL_ATTR(_package, Package,
+  OnImport |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove |
+  NotSerialized, 104)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

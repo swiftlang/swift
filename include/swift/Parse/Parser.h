@@ -1021,6 +1021,10 @@ public:
   ParserResult<ImplementsAttr> parseImplementsAttribute(SourceLoc AtLoc,
                                                         SourceLoc Loc);
 
+  /// Parse the @_package attribute.
+  ParserResult<PackageAttr> parsePackageAttribute(SourceLoc AtLoc,
+                                                  SourceLoc Loc);
+
   /// Parse the @differentiable attribute.
   ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
                                                                 SourceLoc Loc);

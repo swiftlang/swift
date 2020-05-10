@@ -805,6 +805,33 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
                            MemberNameLoc));
 }
 
+ParserResult<PackageAttr>
+Parser::parsePackageAttribute(SourceLoc AtLoc, SourceLoc Loc) {
+  SourceLoc lParenLoc;
+  SourceLoc rParenLoc;
+  SmallVector<Expr *, 2> args;
+  SmallVector<Identifier, 2> argLabels;
+  SmallVector<SourceLoc, 2> argLabelLocs;
+  SmallVector<TrailingClosure, 0> trailingClosures;
+  ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
+                                      /*isPostfix=*/true, /*isExprBasic*/true,
+                                      lParenLoc, args, argLabels,
+                                      argLabelLocs, rParenLoc, trailingClosures,
+                                      SyntaxKind::TupleExprElementList);
+  assert(trailingClosures.size() == 0 &&
+         "@_package attr parsing should reject trailing closures");
+
+  if (status.isError()) {
+    return status;
+  }
+
+  // The contents of the packae attribute should parse as a valid argument list, but it's captured in the AST as a string and no semantic validation is performed. This is to avoid duplicating the relevant parts of the SwiftPM manifest API.
+  StringRef description = SourceMgr.extractText(Lexer::getCharSourceRangeFromSourceRange(SourceMgr, SourceRange(lParenLoc, rParenLoc)));
+
+  return ParserResult<PackageAttr>(
+    new (Context) PackageAttr(AtLoc, SourceRange(Loc, rParenLoc), description, /*implicit*/false));
+}
+
 /// Parse a `@differentiable` attribute, returning true on error.
 ///
 /// \verbatim
@@ -2364,6 +2391,13 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     Attributes.add(new (Context) ProjectedValuePropertyAttr(
         name, AtLoc, range, /*implicit*/ false));
+    break;
+  }
+  case DAK_Package: {
+    ParserResult<PackageAttr> Attr = parsePackageAttribute(AtLoc, Loc);
+    if (Attr.isNonNull()) {
+      Attributes.add(Attr.get());
+    }
     break;
   }
   }

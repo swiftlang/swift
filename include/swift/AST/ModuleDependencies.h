@@ -23,6 +23,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSet.h"
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace swift {
@@ -58,6 +59,8 @@ enum class ModuleDependenciesKind : int8_t {
   // with `actual` dependencies in a post-processing step once dependency graphs
   // of all targets, individually, have been computed.
   SwiftPlaceholder,
+  // A SwiftPM package product dependency.
+  SwiftPackageProduct,
   Clang,
 };
 
@@ -112,6 +115,9 @@ public:
 
   /// Bridging header file, if there is one.
   Optional<std::string> bridgingHeaderFile;
+
+  /// Package dependencies from @package attr, if any.
+  std::unordered_multimap<std::string, std::string> packageProductDependencies;
 
   /// Swift source files that are part of the Swift module, when known.
   std::vector<std::string> sourceFiles;
@@ -215,6 +221,29 @@ public:
   }
 };
 
+/// Describes a dependency on a SwiftPM package product.
+///
+/// This class is mostly an implementation detail for \c ModuleDependencies.
+class SwiftPackageProductModuleDependencyStorage : public ModuleDependenciesStorageBase {
+public:
+  SwiftPackageProductModuleDependencyStorage(const std::string &packageProductDescription)
+      : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftPackageProduct,
+                                      /*compiledModulePath*/ ""),
+        packageProductDescription(packageProductDescription) {}
+
+  ModuleDependenciesStorageBase *clone() const override {
+    return new SwiftPackageProductModuleDependencyStorage(*this);
+  }
+
+  /// The contents of an @_package attribute.
+  const std::string packageProductDescription;
+
+  static bool classof(const ModuleDependenciesStorageBase *base) {
+    return base->dependencyKind == ModuleDependenciesKind::SwiftPackageProduct;
+  }
+};
+
+
 /// Describes the dependencies of a given module.
 ///
 /// The dependencies of a module include all of the source files that go
@@ -297,6 +326,15 @@ public:
           compiledModulePath, moduleDocPath, sourceInfoPath));
   }
 
+  /// Describe a SwiftPM package product dependency.
+  static ModuleDependencies forSwiftPackageProduct(
+      const std::string &compiledModulePath,
+      const std::string &packageProductDescription) {
+    return ModuleDependencies(
+        std::make_unique<SwiftPackageProductModuleDependencyStorage>(packageProductDescription));
+  }
+
+
   /// Retrieve the path to the compiled module.
   const std::string getCompiledModulePath() const {
     return storage->compiledModulePath;
@@ -313,6 +351,9 @@ public:
   /// Whether this represents a placeholder module stub
   bool isPlaceholderSwiftModule() const;
 
+  /// Whether this is a SwiftPM package product.
+  bool isSwiftPackageProductModule() const;
+
   ModuleDependenciesKind getKind() const {
     return storage->dependencyKind;
   }
@@ -326,9 +367,17 @@ public:
   const PlaceholderSwiftModuleDependencyStorage *
   getAsPlaceholderDependencyModule() const;
 
+  /// Retrieve the dependencies for a SwiftPM package product module.
+  const SwiftPackageProductModuleDependencyStorage *
+  getAsSwiftPackageProductDependencyModule() const;
+
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleDependency(StringRef module,
                            llvm::StringSet<> *alreadyAddedModules = nullptr);
+
+  Optional<std::string> getPackageProductDependencyDescriptionForModule(StringRef module);
+
+  void addPackageProductDependencyDescription(StringRef packageDependencyDescription, StringRef module);
 
   /// Add all of the module dependencies for the imports in the given source
   /// file to the set of module dependencies.
@@ -368,6 +417,9 @@ class ModuleDependenciesCache {
 
   /// Dependencies for Swift placeholder dependency modules.
   llvm::StringMap<ModuleDependencies> PlaceholderSwiftModuleDependencies;
+
+  /// Dependencies for Swift package product dependency modules.
+  llvm::StringMap<ModuleDependencies> SwiftPackageProductModuleDependencies;
 
   /// Dependencies for Clang modules that have already been computed.
   llvm::StringMap<ModuleDependencies> ClangModuleDependencies;

@@ -163,6 +163,17 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
+    // Package product dependencies don't require any resolution.
+    if (auto description = knownDependencies.getPackageProductDependencyDescriptionForModule(dependsOn)) {
+      if (!cache.hasDependencies(dependsOn, ModuleDependenciesKind::SwiftPackageProduct))
+        cache.recordDependencies(dependsOn,
+                                 ModuleDependencies::forSwiftPackageProduct("", *description),
+                                 ModuleDependenciesKind::SwiftPackageProduct);
+
+      result.push_back({dependsOn, ModuleDependenciesKind::SwiftPackageProduct});
+      continue;
+    }
+
     // Figure out what kind of module we need.
     bool onlyClangModule = !isSwift || module.first == dependsOn;
 
@@ -325,6 +336,8 @@ namespace {
       moduleKind = "swift";
     else if (module.second == ModuleDependenciesKind::SwiftPlaceholder)
       moduleKind = "swiftPlaceholder";
+    else if (module.second == ModuleDependenciesKind::SwiftPackageProduct)
+      moduleKind = "swiftPackageProduct";
     else
       moduleKind = "clang";
 
@@ -436,15 +449,26 @@ static void writeJSON(llvm::raw_ostream &out,
 
     auto externalSwiftDep = moduleDeps.getAsPlaceholderDependencyModule();
     auto swiftDeps = moduleDeps.getAsSwiftModule();
+    auto packageProductSwiftDeps = moduleDeps.getAsSwiftPackageProductDependencyModule();
     auto clangDeps = moduleDeps.getAsClangModule();
 
     // Module path.
-    const char *modulePathSuffix =
-        moduleDeps.isSwiftModule() ? ".swiftmodule" : ".pcm";
+    std::string modulePath;
+    switch (moduleDeps.getKind()) {
+      case swift::ModuleDependenciesKind::Swift:
+        modulePath = module.first + ".swiftmodule";
+        break;
+      case swift::ModuleDependenciesKind::SwiftPlaceholder:
+        modulePath = externalSwiftDep->compiledModulePath;
+        break;
+      case swift::ModuleDependenciesKind::SwiftPackageProduct:
+        modulePath = "";
+        break;
+      case swift::ModuleDependenciesKind::Clang:
+        modulePath = module.first + ".pcm";
+        break;
+    }
 
-    std::string modulePath = externalSwiftDep
-                                 ? externalSwiftDep->compiledModulePath
-                                 : module.first + modulePathSuffix;
     writeJSONSingleField(out, "modulePath", modulePath, /*indentLevel=*/3,
                          /*trailingComma=*/true);
 
@@ -556,6 +580,13 @@ static void writeJSON(llvm::raw_ostream &out,
                              externalSwiftDep->sourceInfoPath,
                              /*indentLevel=*/5,
                              /*trailingComma=*/true);
+    } else if (packageProductSwiftDeps) {
+      out << "\"swiftPackageProduct\": {\n";
+
+      // Module map file.
+      writeJSONSingleField(out, "productDescription",
+                           packageProductSwiftDeps->packageProductDescription,
+                           5, /*trailingComma=*/false);
     } else {
       out << "\"clang\": {\n";
 

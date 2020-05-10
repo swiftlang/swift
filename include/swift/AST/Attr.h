@@ -1722,6 +1722,28 @@ public:
   }
 };
 
+/// Describe a package import.
+/// \code
+/// @_package(url: ".../Foo.git", .exact("1.0.0")) import Foo
+/// \endcode
+class PackageAttr: public DeclAttribute {
+public:
+  PackageAttr(SourceLoc AtLoc, SourceRange Range,
+              StringRef PackageDependencyDescription, bool Implicit)
+    : DeclAttribute(DAK_Package, AtLoc, Range, Implicit),
+      PackageDependencyDescription(PackageDependencyDescription) {}
+
+  const StringRef PackageDependencyDescription;
+
+  const StringRef getPackageDependencyDescription() {
+    return PackageDependencyDescription;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Package;
+  }
+};
+
 /// Attribute that marks a function as differentiable.
 ///
 /// Examples:

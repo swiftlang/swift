@@ -1185,6 +1185,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "derivative";
   case DAK_Transpose:
     return "transpose";
+  case DAK_Package:
+      return "_package";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

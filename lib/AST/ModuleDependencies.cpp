@@ -28,6 +28,10 @@ bool ModuleDependencies::isPlaceholderSwiftModule() const {
   return isa<PlaceholderSwiftModuleDependencyStorage>(storage.get());
 }
 
+bool ModuleDependencies::isSwiftPackageProductModule() const {
+  return isa<SwiftPackageProductModuleDependencyStorage>(storage.get());
+}
+
 /// Retrieve the dependencies for a Swift module.
 const SwiftModuleDependenciesStorage *
 ModuleDependencies::getAsSwiftModule() const {
@@ -46,10 +50,31 @@ ModuleDependencies::getAsPlaceholderDependencyModule() const {
   return dyn_cast<PlaceholderSwiftModuleDependencyStorage>(storage.get());
 }
 
+/// Retrieve the dependencies for a placeholder dependency module stub.
+const SwiftPackageProductModuleDependencyStorage *
+ModuleDependencies::getAsSwiftPackageProductDependencyModule() const {
+  return dyn_cast<SwiftPackageProductModuleDependencyStorage>(storage.get());
+}
+
 void ModuleDependencies::addModuleDependency(
     StringRef module, llvm::StringSet<> *alreadyAddedModules) {
   if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
     storage->moduleDependencies.push_back(module.str());
+}
+
+Optional<std::string> ModuleDependencies::getPackageProductDependencyDescriptionForModule(StringRef module) {
+  if (auto swiftStorage = getAsSwiftModule()) {
+    auto packageProductDependencyDescription = swiftStorage->packageProductDependencies.find(module.str());
+    if (packageProductDependencyDescription != swiftStorage->packageProductDependencies.end())
+      return packageProductDependencyDescription->second;
+  }
+
+  return None;
+}
+
+void ModuleDependencies::addPackageProductDependencyDescription(StringRef packageDependencyDescription, StringRef module) {
+  auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
+  swiftStorage->packageProductDependencies.insert({module.str(), packageDependencyDescription.str()});
 }
 
 void ModuleDependencies::addModuleDependencies(
@@ -62,8 +87,11 @@ void ModuleDependencies::addModuleDependencies(
     if (!importDecl)
       continue;
 
-    addModuleDependency(importDecl->getModulePath().front().Item.str(),
-                        &alreadyAddedModules);
+    StringRef module = importDecl->getModulePath().front().Item.str();
+    if (auto packageAttr = importDecl->getAttrs().getAttribute<PackageAttr>())
+      addPackageProductDependencyDescription(packageAttr->getPackageDependencyDescription(), module);
+
+    addModuleDependency(module, &alreadyAddedModules);
   }
 
   auto fileName = sf.getFilename();
@@ -114,6 +142,8 @@ ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) {
     return SwiftModuleDependencies;
   case ModuleDependenciesKind::SwiftPlaceholder:
     return PlaceholderSwiftModuleDependencies;
+  case ModuleDependenciesKind::SwiftPackageProduct:
+    return SwiftPackageProductModuleDependencies;
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
@@ -127,6 +157,8 @@ ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) const {
     return SwiftModuleDependencies;
   case ModuleDependenciesKind::SwiftPlaceholder:
     return PlaceholderSwiftModuleDependencies;
+  case ModuleDependenciesKind::SwiftPackageProduct:
+    return SwiftPackageProductModuleDependencies;
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
@@ -139,6 +171,7 @@ bool ModuleDependenciesCache::hasDependencies(
   if (!kind) {
     return hasDependencies(moduleName, ModuleDependenciesKind::Swift) ||
         hasDependencies(moduleName, ModuleDependenciesKind::SwiftPlaceholder) ||
+        hasDependencies(moduleName, ModuleDependenciesKind::SwiftPackageProduct) ||
         hasDependencies(moduleName, ModuleDependenciesKind::Clang);
   }
 
@@ -156,6 +189,9 @@ Optional<ModuleDependencies> ModuleDependenciesCache::findDependencies(
     else if (auto swiftPlaceholderDep = findDependencies(
             moduleName, ModuleDependenciesKind::SwiftPlaceholder))
       return swiftPlaceholderDep;
+    else if (auto swiftPackageProductDep = findDependencies(
+            moduleName, ModuleDependenciesKind::SwiftPackageProduct))
+      return swiftPackageProductDep;
     else
       return findDependencies(moduleName, ModuleDependenciesKind::Clang);
   }
