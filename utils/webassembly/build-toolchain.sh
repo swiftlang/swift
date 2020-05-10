@@ -9,11 +9,11 @@ WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
 case $(uname -s) in
   Darwin)
     OS_SUFFIX=osx
-    BUILD_SCRIPT=$UTILS_PATH/build-mac.sh
+    PRESET_NAME=webassembly-macos-installable
   ;;
   Linux)
     OS_SUFFIX=linux
-    BUILD_SCRIPT=$UTILS_PATH/build-linux.sh
+    PRESET_NAME=webassembly-linux-installable
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
@@ -35,20 +35,15 @@ BUNDLE_IDENTIFIER="swiftwasm.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Swift for WebAssembly Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 
-$BUILD_SCRIPT \
-  --install_destdir="$SOURCE_PATH/install" \
-  --installable_package="$INSTALLABLE_PACKAGE" \
-  --install-prefix=/$TOOLCHAIN_NAME/usr \
-  --swift-install-components "autolink-driver;compiler;clang-builtin-headers;stdlib;sdk-overlay;parser-lib;editor-integration;tools;testsuite-tools;toolchain-tools;license;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers;clang-resource-dir-symlink" \
-  --llvm-install-components "clang" \
-  --install-swift \
-  --darwin-toolchain-bundle-identifier="${BUNDLE_IDENTIFIER}" \
-  --darwin-toolchain-display-name="${DISPLAY_NAME}" \
-  --darwin-toolchain-display-name-short="${DISPLAY_NAME_SHORT}" \
-  --darwin-toolchain-name="${TOOLCHAIN_NAME}" \
-  --darwin-toolchain-version="${TOOLCHAIN_VERSION}" \
-  --darwin-toolchain-alias="swift" \
-  "$@"
+$SOURCE_PATH/swift/utils/build-script --preset=$PRESET_NAME \
+  SOURCE_PATH="$SOURCE_PATH" \
+  INSTALLABLE_PACKAGE="$INSTALLABLE_PACKAGE" \
+  BUNDLE_IDENTIFIER="${BUNDLE_IDENTIFIER}" \
+  DISPLAY_NAME="${DISPLAY_NAME}" \
+  DISPLAY_NAME_SHORT="${DISPLAY_NAME_SHORT}" \
+  TOOLCHAIN_NAME="${TOOLCHAIN_NAME}" \
+  TOOLCHAIN_VERSION="${TOOLCHAIN_VERSION}" \
+  C_CXX_LAUNCHER="$(which sccache)"
 
 
 NIGHTLY_TOOLCHAIN=$SOURCE_PATH/swift-nightly-toolchain
