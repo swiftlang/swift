@@ -895,7 +895,7 @@ if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WASI")
   set(WASI_ICU_URL "" CACHE STRING
     "Download URL for the WASI ICU distribution")
   set(WASI_ICU_MD5 "" CACHE STRING
-    "The expected has of the WASI ICU distribution archive")
+    "The expected MD5 hash of the WASI ICU distribution archive")
 
   file(DOWNLOAD "${WASI_ICU_URL}" "${SWIFT_SOURCE_DIR}/../icu.tar.xz"
     EXPECTED_HASH MD5=${WASI_ICU_MD5})
