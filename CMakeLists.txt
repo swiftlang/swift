@@ -897,6 +897,16 @@ endfunction()
 # need to be defined when cross-compiling.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
+    if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WASI")
+      file(DOWNLOAD 
+        "https://github.com/swiftwasm/icu4c-wasi/releases/download/0.5.0/icu4c-wasi.tar.xz"
+        icu.tar.xz
+        EXPECTED_HASH MD5=25943864ebbfff15cf5aee8d9d5cc4d7)
+
+      add_custom_target(wasi_icu_binaries ALL 
+        COMMAND ${CMAKE_COMMAND} -E tar xfv icu.tar.xz "${SWIFT_SOURCE_DIR}/..")
+    endif()
+
     swift_icu_variables_set("${SWIFT_PRIMARY_VARIANT_SDK}"
                             "${SWIFT_PRIMARY_VARIANT_ARCH}"
                             ICU_CONFIGURED)
