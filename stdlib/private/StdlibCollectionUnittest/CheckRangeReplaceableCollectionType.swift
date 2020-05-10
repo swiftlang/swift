@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -971,7 +971,7 @@ self.test("\(testNamePrefix).reserveCapacity()/semantics") {
 
   for test in tests {
     var c = makeWrappedCollection(test.collection)
-    c.reserveCapacity(numericCast(test.requestedCapacity))
+    c.reserveCapacity(test.requestedCapacity)
     expectEqualSequence(
       test.collection.map { $0.value },
       c.map { extractValue($0).value },
