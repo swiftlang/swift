@@ -520,3 +520,21 @@ func useDefaultInits() {
   // CHECK: [[@LINE-1]]:15 | instance-property/Swift | y | s:14swift_ide_test7BStructV1ySbvp | Ref,RelCont
   // CHECK: [[@LINE-2]]:7 | constructor/Swift | init(x:y:z:) | s:14swift_ide_test7BStructV1x1y1zACSi_SbSStcfc | Ref,Call,RelCall,RelCont | rel: 1
 }
+
+internal protocol FromInt {
+    init(_ uint64: Int)
+}
+extension Int: FromInt { }
+func test<M>(_: M, value: Int?) {
+    if let idType = M.self as? FromInt.Type {
+        _ = value.flatMap(idType.init) as? M
+// CHECK: [[@LINE-1]]:34 | constructor/Swift | init(_:) | s:14swift_ide_test7FromIntPyxSicfc | Ref,RelCont | rel: 1
+    }
+}
+
+func `escapedName`(`x`: Int) {}
+// CHECK: [[@LINE-1]]:6 | function/Swift | escapedName(x:) | {{.*}} | Def | rel: 0
+`escapedName`(`x`: 2)
+// CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref,Call | rel: 0
+`escapedName`(`x`:)
+// CHECK: [[@LINE-1]]:1 | function/Swift | escapedName(x:) | {{.*}} | Ref | rel: 0

@@ -18,8 +18,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/IRGenRequests.h"
 #include "swift/AST/SILOptions.h"
-#include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
@@ -184,26 +184,28 @@ int main(int argc, char **argv) {
   if (CI.getASTContext().hadError())
     return 1;
 
-  // Load the SIL if we have a module. We have to do this after SILParse
-  // creating the unfortunate double if statement.
-  if (Invocation.hasSerializedAST()) {
-    assert(!CI.hasSILModule() &&
-           "performSema() should not create a SILModule.");
-    CI.createSILModule();
-    std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
-        CI.getASTContext(), CI.getSILModule(), nullptr);
+  auto *mod = CI.getMainModule();
+  assert(mod->getFiles().size() == 1);
 
-    if (extendedInfo.isSIB())
-      SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
-    else
-      SL->getAll();
+  std::unique_ptr<SILModule> SILMod;
+  if (PerformWMO) {
+    SILMod = performSILGeneration(mod, CI.getSILTypes(), CI.getSILOptions());
+  } else {
+    SILMod = performSILGeneration(*mod->getFiles()[0], CI.getSILTypes(),
+                                  CI.getSILOptions());
+  }
+
+  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
+  // us.
+  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
+    auto SL = SerializedSILLoader::create(
+        CI.getASTContext(), SILMod.get(), nullptr);
+    SL->getAll();
   }
 
   const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
-  std::unique_ptr<llvm::Module> Mod =
-      performIRGeneration(Opts, CI.getMainModule(), CI.takeSILModule(),
-                          CI.getMainModule()->getName().str(),
-                          PSPs,
-                          getGlobalLLVMContext(), ArrayRef<std::string>());
+  auto Mod = performIRGeneration(Opts, CI.getMainModule(), std::move(SILMod),
+                                 CI.getMainModule()->getName().str(), PSPs,
+                                 ArrayRef<std::string>());
   return CI.getASTContext().hadError();
 }

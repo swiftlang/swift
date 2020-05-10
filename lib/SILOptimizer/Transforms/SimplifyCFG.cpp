@@ -2392,7 +2392,8 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     auto CalleeFnTy = CalleeType.castTo<SILFunctionType>();
     SILFunctionConventions calleeConv(CalleeFnTy, TAI->getModule());
-    auto ResultTy = calleeConv.getSILResultType();
+    auto ResultTy = calleeConv.getSILResultType(
+        TAI->getFunction()->getTypeExpansionContext());
     auto OrigResultTy = TAI->getNormalBB()->getArgument(0)->getType();
 
     SILBuilderWithScope Builder(TAI);
@@ -2412,15 +2413,15 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
                                             Builder.getTypeExpansionContext());
     }
     SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
-
+    auto context = TAI->getFunction()->getTypeExpansionContext();
     SmallVector<SILValue, 8> Args;
     unsigned numArgs = TAI->getNumArguments();
     for (unsigned i = 0; i < numArgs; ++i) {
       auto Arg = TAI->getArgument(i);
       // Cast argument if required.
-      Arg = castValueToABICompatibleType(&Builder, TAI->getLoc(), Arg,
-                                         origConv.getSILArgumentType(i),
-                                         targetConv.getSILArgumentType(i));
+      std::tie(Arg, std::ignore) = castValueToABICompatibleType(
+          &Builder, TAI->getLoc(), Arg, origConv.getSILArgumentType(i, context),
+          targetConv.getSILArgumentType(i, context));
       Args.push_back(Arg);
     }
 
@@ -2435,8 +2436,9 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto Loc = TAI->getLoc();
     auto *NormalBB = TAI->getNormalBB();
 
-    auto CastedResult = castValueToABICompatibleType(&Builder, Loc, NewAI,
-                                                     ResultTy, OrigResultTy);
+    SILValue CastedResult;
+    std::tie(CastedResult, std::ignore) = castValueToABICompatibleType(
+        &Builder, Loc, NewAI, ResultTy, OrigResultTy);
 
     Builder.createBranch(Loc, NormalBB, { CastedResult });
     TAI->eraseFromParent();

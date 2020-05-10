@@ -1471,8 +1471,8 @@ let sr4738 = (1, (2, 3))
 [sr4738].map { (x, (y, z)) -> Int in x + y + z }
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{20-26=arg1}} {{38-38=let (y, z) = arg1; }}
 // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{20-20=_: }}
-// expected-error@-3 {{use of undeclared type 'y'}}
-// expected-error@-4 {{use of undeclared type 'z'}}
+// expected-error@-3 {{cannot find type 'y' in scope}}
+// expected-error@-4 {{cannot find type 'z' in scope}}
 
 // rdar://problem/31892961
 let r31892961_1 = [1: 1, 2: 2]
@@ -1482,8 +1482,8 @@ let r31892961_2 = [1, 2, 3]
 let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
   // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{3-3=\n  let (index, val) = arg0\n  }}
   // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{48-48=_: }}
-  // expected-error@-3 {{use of undeclared type 'index'}}
-  // expected-error@-4 {{use of undeclared type 'val'}}
+  // expected-error@-3 {{cannot find type 'index' in scope}}
+  // expected-error@-4 {{cannot find type 'val' in scope}}
   val + 1
 }
 
@@ -1499,13 +1499,13 @@ let r31892961_5 = (x: 1, (y: 2, (w: 3, z: 4)))
 [r31892961_5].map { (x: Int, (y: Int, (w: Int, z: Int))) in x + y } // expected-note {{'x' declared here}}
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-56=arg1}} {{61-61=let (y, (w, z)) = arg1; }}
 // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{30-30=_: }}
-// expected-error@-3{{use of unresolved identifier 'y'; did you mean 'x'?}}
+// expected-error@-3{{cannot find 'y' in scope; did you mean 'x'?}}
 
 let r31892961_6 = (x: 1, (y: 2, z: 4))
 [r31892961_6].map { (x: Int, (y: Int, z: Int)) in x + y } // expected-note {{'x' declared here}}
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-46=arg1}} {{51-51=let (y, z) = arg1; }}
 // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{30-30=_: }}
-// expected-error@-3{{use of unresolved identifier 'y'; did you mean 'x'?}}
+// expected-error@-3{{cannot find 'y' in scope; did you mean 'x'?}}
 
 // rdar://problem/32214649 -- these regressed in Swift 4 mode
 // with SE-0110 because of a problem in associated type inference

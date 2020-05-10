@@ -49,7 +49,6 @@ add_swift_host_library(swiftBasic STATIC
   FileTypes.cpp
   JSONSerialization.cpp
   LangOptions.cpp
-  LLVMContext.cpp
   Located.cpp
   Mangler.cpp
   OutputFileMap.cpp
@@ -79,10 +78,10 @@ add_swift_host_library(swiftBasic STATIC
   # Platform-agnostic fallback TaskQueue implementation
   Default/TaskQueue.inc
 
-  GYB_SOURCES
-    UnicodeExtendedGraphemeClusters.cpp.gyb
-
   LLVM_LINK_COMPONENTS support)
+_swift_gyb_target_sources(swiftBasic PRIVATE
+    UnicodeExtendedGraphemeClusters.cpp.gyb)
+
 target_include_directories(swiftBasic PRIVATE
   ${UUID_INCLUDE})
 

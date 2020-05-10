@@ -125,6 +125,7 @@ KNOWN_SETTINGS=(
     skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
     skip-build-compiler-rt                        ""                "set to skip building Compiler-RT"
+    skip-build-lld                                ""                "set to skip building lld as part of llvm (linux only)"
     skip-build-cygwin                             ""                "set to skip building Swift stdlibs for Cygwin"
     skip-build-external-benchmarks                "1"               "set to skip building the external Swift Benchmark Suite. (skipped by default)"
     skip-build-freebsd                            ""                "set to skip building Swift stdlibs for FreeBSD"
@@ -449,7 +450,7 @@ function set_build_options_for_host() {
 
     # Hosts which can be cross-compiled must specify:
     # SWIFT_HOST_TRIPLE and llvm_target_arch.
-    # Hosts which have differing platforn names from their
+    # Hosts which have differing platform names from their
     # SWIFT_HOST_VARIANT_* values should change them here as well.
 
     verify_host_is_supported $host
@@ -481,6 +482,10 @@ function set_build_options_for_host() {
         appletvsimulator-*  | \
         watchos-*           | \
         watchsimulator-*)
+            swift_cmake_options+=(
+              -DPython2_EXECUTABLE=$(xcrun -f python2.7)
+              -DPython3_EXECUTABLE=$(xcrun -f python3)
+            )
             case ${host} in
                 macosx-x86_64)
                     SWIFT_HOST_TRIPLE="x86_64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
@@ -616,6 +621,10 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                -DCMAKE_OSX_SYSROOT:PATH="${cmake_os_sysroot}"
+                # This is needed to make sure to avoid using the wrong architecture
+                # in the compiler checks CMake performs
+                -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
             ;;
     esac
@@ -912,7 +921,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        iphone* | appletv* | watch* | linux-armv6 | linux-armv7 )
+        iphone* | appletv* | watch* | linux-armv6 | linux-armv7 | android-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1482,6 +1491,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
+                    -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     -DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON
@@ -1498,12 +1508,20 @@ for host in "${ALL_HOSTS[@]}"; do
                     llvm_enable_projects+=("clang-tools-extra")
                 fi
 
-                cmake_options+=(
-                    -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
-                )
+                # On non-Darwin platforms, build lld so we can always have a
+                # linker that is compatible with the swift we are using to
+                # compile the stdlib.
+                #
+                # This makes it easier to build target stdlibs on systems that
+                # have old toolchains without more modern linker features.
+                if [[ "$(uname -s)" != "Darwin" ]] ; then
+                    if [[ ! "${SKIP_BUILD_LLD}" ]]; then
+                        llvm_enable_projects+=("lld")
+                    fi
+                fi
 
                 cmake_options+=(
-                  -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
+                    -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
                 )
 
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
@@ -2822,10 +2840,12 @@ for host in "${ALL_HOSTS[@]}"; do
             # Run dsymutil on executables and shared libraries.
             #
             # Exclude shell scripts and static archives.
+            # Exclude swift-api-digester dSYM to reduce debug toolchain size.
             (cd "${INSTALL_SYMROOT}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v '.py$' | \
                grep -v '.a$' | \
+               grep -v 'swift-api-digester' | \
                xargs -n 1 -P ${BUILD_JOBS} ${dsymutil_path})
 
             # Strip executables, shared libraries and static libraries in

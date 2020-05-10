@@ -256,6 +256,22 @@ public:
     fprintf(file, ")");
   }
 
+  void visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    printHeader("opaque_archetype");
+    printField("id", O->getID().str());
+    printField("description", O->getDescription().str());
+    fprintf(file, " ordinal %u ", O->getOrdinal());
+    for (auto argList : O->getArgumentLists()) {
+      fprintf(file, "\n");
+      fprintf(indent(Indent + 2), "args: <");
+      for (auto arg : argList) {
+        printRec(arg);
+      }
+      fprintf(file, ">");
+    }
+    fprintf(file, ")");
+  }
+
   void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
     fprintf(file, ")");
@@ -347,6 +363,10 @@ struct TypeRefIsConcrete
   
   bool visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return true;
+  }
+    
+  bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    return false;
   }
 
 #define REF_STORAGE(Name, name, ...) \
@@ -517,7 +537,7 @@ public:
       }
 
       // Otherwise it requires a tuple wrapper.
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     }
 
     // This covers both none and multiple parameters.
@@ -659,6 +679,36 @@ public:
 
   Demangle::NodePointer visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return Dem.createNode(Node::Kind::OpaqueType);
+  }
+      
+  Demangle::NodePointer visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    auto decl = Dem.demangleSymbol(O->getID());
+    if (!decl)
+      return nullptr;
+    
+    auto index = Dem.createNode(Node::Kind::Index, O->getOrdinal());
+    
+    auto argNodeLists = Dem.createNode(Node::Kind::TypeList);
+    for (auto argList : O->getArgumentLists()) {
+      auto argNodeList = Dem.createNode(Node::Kind::TypeList);
+      
+      for (auto arg : argList) {
+        auto argNode = visit(arg);
+        if (!argNode)
+          return nullptr;
+        
+        argNodeList->addChild(argNode, Dem);
+      }
+      
+      argNodeLists->addChild(argNodeList, Dem);
+    }
+    
+    auto node = Dem.createNode(Node::Kind::OpaqueType);
+    node->addChild(decl, Dem);
+    node->addChild(index, Dem);
+    node->addChild(argNodeLists, Dem);
+    
+    return node;
   }
 };
 
@@ -831,6 +881,11 @@ public:
   const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return O;
   }
+
+  const TypeRef *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    return O;
+  }
+
 };
 
 static const TypeRef *
@@ -1008,6 +1063,21 @@ public:
 
   const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return O;
+  }
+    
+  const TypeRef *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    std::vector<const TypeRef *> newArgsBuffer;
+    for (auto argList : O->getArgumentLists()) {
+      for (auto arg : argList) {
+        newArgsBuffer.push_back(visit(arg));
+      }
+    }
+    
+    std::vector<ArrayRef<const TypeRef *>> newArgLists;
+    
+    return OpaqueArchetypeTypeRef::create(Builder, O->getID(), O->getDescription(),
+                                          O->getOrdinal(),
+                                          newArgLists);
   }
 };
 

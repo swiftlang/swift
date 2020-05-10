@@ -1071,7 +1071,7 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
     llvm::SmallString<32> Result;
     Result.append(getSimpleName(VD));
     Result.append("(");
-    for (auto Arg : VD->getFullName().getArgumentNames()) {
+    for (auto Arg : VD->getName().getArgumentNames()) {
       Result.append(Arg.empty() ? "_" : Arg.str());
       Result.append(":");
     }

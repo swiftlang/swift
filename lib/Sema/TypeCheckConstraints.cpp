@@ -87,14 +87,14 @@ bool TypeVariableType::Implementation::isClosureType() const {
   if (!(locator && locator->getAnchor()))
     return false;
 
-  return isa<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
+  return isExpr<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
 }
 
 bool TypeVariableType::Implementation::isClosureResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;
 
-  return isa<ClosureExpr>(locator->getAnchor()) &&
+  return isExpr<ClosureExpr>(locator->getAnchor()) &&
          locator->isLastElement<LocatorPathElt::ClosureResult>();
 }
 
@@ -184,18 +184,18 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 
 Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   SmallVector<LocatorPathElt, 4> pathBuffer;
-  Expr *anchor = getLocatorParts(pathBuffer);
+  auto anchor = getLocatorParts(pathBuffer);
   // Locators are not guaranteed to have an anchor
   // if constraint system is used to verify generic
   // requirements.
-  if (!anchor)
+  if (!anchor.is<Expr *>())
     return nullptr;
 
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
   SourceRange range;
   simplifyLocator(anchor, path, range);
-  return (path.empty() ? anchor : nullptr);
+  return (path.empty() ? getAsExpr(anchor) : nullptr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -392,7 +392,7 @@ static bool diagnoseRangeOperatorMisspell(DiagnosticEngine &Diags,
 
   if (!corrected.empty()) {
     Diags
-        .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+        .diagnose(UDRE->getLoc(), diag::cannot_find_in_scope_corrected,
                   UDRE->getName(), true, corrected)
         .highlight(UDRE->getSourceRange())
         .fixItReplace(UDRE->getSourceRange(), corrected);
@@ -416,7 +416,7 @@ static bool diagnoseIncDecOperator(DiagnosticEngine &Diags,
 
   if (!corrected.empty()) {
     Diags
-        .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+        .diagnose(UDRE->getLoc(), diag::cannot_find_in_scope_corrected,
                   UDRE->getName(), true, corrected)
         .highlight(UDRE->getSourceRange());
 
@@ -501,7 +501,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       // module we could offer a fix-it.
       for (auto lookupResult : inaccessibleResults) {
         auto *VD = lookupResult.getValueDecl();
-        VD->diagnose(diag::decl_declared_here, VD->getFullName());
+        VD->diagnose(diag::decl_declared_here, VD->getName());
       }
 
       // Don't try to recover here; we'll get more access-related diagnostics
@@ -537,7 +537,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
     auto emitBasicError = [&] {
       Context.Diags
-          .diagnose(Loc, diag::use_unresolved_identifier, Name,
+          .diagnose(Loc, diag::cannot_find_in_scope, Name,
                     Name.isOperator())
           .highlight(UDRE->getSourceRange());
     };
@@ -550,8 +550,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           if (typeContext->getSelfClassDecl())
             SelfType = DynamicSelfType::get(SelfType, Context);
           SelfType = DC->mapTypeIntoContext(SelfType);
-          return new (Context) TypeExpr(TypeLoc(new (Context)
-                                                FixedTypeRepr(SelfType, Loc)));
+          return new (Context)
+              TypeExpr(new (Context) FixedTypeRepr(SelfType, Loc));
         }
       }
 
@@ -561,7 +561,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
       if (auto typo = corrections.claimUniqueCorrection()) {
         auto diag = Context.Diags.diagnose(
-            Loc, diag::use_unresolved_identifier_corrected, Name,
+            Loc, diag::cannot_find_in_scope_corrected, Name,
             Name.isOperator(), typo->CorrectedName.getBaseIdentifier().str());
         diag.highlight(UDRE->getSourceRange());
         typo->addFixits(diag);
@@ -618,7 +618,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       if (Lookup.outerResults().empty()) {
         Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
         Context.Diags.diagnose(innerDecl, diag::decl_declared_here,
-                               localDeclAfterUse->getFullName());
+                               localDeclAfterUse->getName());
         Expr *error = new (Context) ErrorExpr(UDRE->getSourceRange());
         return error;
       }
@@ -644,9 +644,14 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                        D->getInterfaceType());
     }
 
-    return TypeExpr::createForDecl(UDRE->getNameLoc(), D,
-                                   Lookup[0].getDeclContext(),
-                                   UDRE->isImplicit());
+    auto *LookupDC = Lookup[0].getDeclContext();
+    if (UDRE->isImplicit()) {
+      return TypeExpr::createImplicitForDecl(
+          UDRE->getNameLoc(), D, LookupDC,
+          LookupDC->mapTypeIntoContext(D->getInterfaceType()));
+    } else {
+      return TypeExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
+    }
   }
 
   if (AllDeclRefs) {
@@ -715,13 +720,15 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto PD = dyn_cast<ProtocolDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(UDRE->getNameLoc(),
-                                         PD->getGenericParams()->getParams().front(),
-                                         /*DC*/nullptr,
-                                         /*isImplicit=*/true);
+      auto selfParam = PD->getGenericParams()->getParams().front();
+      BaseExpr = TypeExpr::createImplicitForDecl(
+          UDRE->getNameLoc(), selfParam,
+          /*DC*/ nullptr,
+          DC->mapTypeIntoContext(selfParam->getInterfaceType()));
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(UDRE->getNameLoc(), NTD, BaseDC,
-                                         /*isImplicit=*/true);
+      BaseExpr = TypeExpr::createImplicitForDecl(
+          UDRE->getNameLoc(), NTD, BaseDC,
+          DC->mapTypeIntoContext(NTD->getInterfaceType()));
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
                                            /*Implicit=*/true);
@@ -750,7 +757,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   Context.Diags.diagnose(Loc, diag::ambiguous_decl_ref, Name);
   for (auto Result : Lookup) {
     auto *Decl = Result.getValueDecl();
-    Context.Diags.diagnose(Decl, diag::decl_declared_here, Decl->getFullName());
+    Context.Diags.diagnose(Decl, diag::decl_declared_here, Decl->getName());
   }
   return new (Context) ErrorExpr(UDRE->getSourceRange());
 }
@@ -773,7 +780,7 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
     if (nestedArg->isSuperExpr())
       return ctorContext->getImplicitSelfDecl();
     if (auto declRef = dyn_cast<DeclRefExpr>(nestedArg))
-      if (declRef->getDecl()->getFullName() == DC->getASTContext().Id_self)
+      if (declRef->getDecl()->getName() == DC->getASTContext().Id_self)
         return ctorContext->getImplicitSelfDecl();
   }
   return nullptr;
@@ -988,7 +995,7 @@ namespace {
 
                 E = CallExpr::create(Context, newCallee, lParen, {newArg},
                                      {Identifier()}, {SourceLoc()}, rParen,
-                                     /*trailingClosure=*/nullptr,
+                                     /*trailingClosures=*/{},
                                      /*implicit=*/false);
               }
             }
@@ -1087,16 +1094,6 @@ namespace {
         TypeChecker::checkForForbiddenPrefix(
             getASTContext(), unresolved->getName().getBaseName());
         return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
-      }
-
-      if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
-        if (!PlaceholderE->getTypeLoc().isNull()) {
-          if (!TypeChecker::validateType(
-                  getASTContext(), PlaceholderE->getTypeLoc(),
-                  TypeResolution::forContextual(DC), None))
-            expr->setType(PlaceholderE->getTypeLoc().getType());
-        }
-        return finish(true, expr);
       }
 
       // Let's try to figure out if `InOutExpr` is out of place early
@@ -1313,15 +1310,6 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
     hadParameterError |= param->isInvalid();
   }
 
-  // Validate the result type, if present.
-  if (closure->hasExplicitResultType() &&
-      TypeChecker::validateType(getASTContext(),
-                                closure->getExplicitResultTypeLoc(),
-                                TypeResolution::forContextual(closure),
-                                TypeResolverContext::InExpression)) {
-    return false;
-  }
-
   if (hadParameterError)
     return false;
 
@@ -1383,7 +1371,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (Name.isSimpleName(getASTContext().Id_Protocol)) {
     auto *NewTypeRepr =
         new (getASTContext()) ProtocolTypeRepr(InnerTypeRepr, NameLoc);
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold 'T.Type' into an existential metatype if 'T' is a protocol,
@@ -1391,7 +1379,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (Name.isSimpleName(getASTContext().Id_Type)) {
     auto *NewTypeRepr =
         new (getASTContext()) MetatypeTypeRepr(InnerTypeRepr, NameLoc);
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold 'T.U' into a nested type.
@@ -1402,8 +1390,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::AllowUnavailable;
-    auto resolution = TypeResolution::forContextual(DC);
-    auto BaseTy = resolution.resolveType(InnerTypeRepr, options);
+    auto resolution = TypeResolution::forContextual(DC, options);
+    auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy && BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
@@ -1429,19 +1417,14 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
 
 TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
     UnresolvedSpecializeExpr *us) {
-  SmallVector<TypeRepr *, 4> genericArgs;
-  for (auto &type : us->getUnresolvedParams()) {
-    genericArgs.push_back(type.getTypeRepr());
-  }
-
-  auto angleRange = SourceRange(us->getLAngleLoc(), us->getRAngleLoc());
-
   // If this is a reference type a specialized type, form a TypeExpr.
-
   // The base should be a TypeExpr that we already resolved.
   if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
     if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
-      return TypeExpr::createForSpecializedDecl(ITR, genericArgs, angleRange,
+      return TypeExpr::createForSpecializedDecl(ITR,
+                                                us->getUnresolvedParams(),
+                                                SourceRange(us->getLAngleLoc(),
+                                                            us->getRAngleLoc()),
                                                 getASTContext());
     }
   }
@@ -1486,7 +1469,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     auto *NewTypeRepr =
         new (getASTContext()) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold T! into an IUO type when T is a TypeExpr.
@@ -1502,7 +1485,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto *NewTypeRepr = new (getASTContext())
         ImplicitlyUnwrappedOptionalTypeRepr(InnerTypeRepr,
                                             FVE->getExclaimLoc());
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold (T) into a type T with parens around it.
@@ -1517,7 +1500,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     auto *NewTypeRepr = TupleTypeRepr::create(getASTContext(), InnerTypeRepr,
                                               PE->getSourceRange());
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
   
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
@@ -1550,7 +1533,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     }
     auto *NewTypeRepr = TupleTypeRepr::create(
         getASTContext(), Elts, TE->getSourceRange(), SourceLoc(), Elts.size());
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
   
 
@@ -1566,7 +1549,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto *NewTypeRepr = new (getASTContext())
         ArrayTypeRepr(TyExpr->getTypeRepr(),
                       SourceRange(AE->getLBracketLoc(), AE->getRBracketLoc()));
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Fold [K : V] into a dictionary type.
@@ -1607,7 +1590,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         keyTypeRepr, valueTypeRepr,
         /*FIXME:colonLoc=*/SourceLoc(),
         SourceRange(DE->getLBracketLoc(), DE->getRBracketLoc()));
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
 
   // Reinterpret arrow expr T1 -> T2 as function type.
@@ -1699,7 +1682,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto NewTypeRepr = new (ctx)
         FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getThrowsLoc(),
                          AE->getArrowLoc(), ResultTypeRepr);
-    return new (ctx) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (ctx) TypeExpr(NewTypeRepr);
   }
   
   // Fold 'P & Q' into a composition type
@@ -1751,7 +1734,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       auto CompRepr = CompositionTypeRepr::create(getASTContext(), Types,
                                                   lhsExpr->getStartLoc(),
                                                   binaryExpr->getSourceRange());
-      return new (getASTContext()) TypeExpr(TypeLoc(CompRepr, Type()));
+      return new (getASTContext()) TypeExpr(CompRepr);
     }
   }
 
@@ -1926,38 +1909,34 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (!protocol)
     return nullptr;
 
-  Type type;
-  if (typeExpr->getTypeLoc().wasValidated()) {
-    type = typeExpr->getTypeLoc().getType();
+  TypeLoc typeLoc;
+  if (auto precheckedTy = typeExpr->getInstanceType()) {
+    typeLoc = TypeLoc(typeExpr->getTypeRepr(), precheckedTy);
   } else {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-    auto &typeLoc = typeExpr->getTypeLoc();
-    bool hadError = TypeChecker::validateType(
-        getASTContext(), typeLoc, TypeResolution::forContextual(DC), options);
-
-    if (hadError)
+    auto result = TypeResolution::forContextual(DC, options)
+                      .resolveType(typeExpr->getTypeRepr());
+    if (result->hasError())
       return nullptr;
-
-    type = typeLoc.getType();
+    typeLoc = TypeLoc{typeExpr->getTypeRepr(), result};
   }
 
-  if (!type || !type->getAnyNominal())
+  if (!typeLoc.getType() || !typeLoc.getType()->getAnyNominal())
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
   if (auto selectorTy = getASTContext().getSelectorType()) {
-    if (type->isEqual(selectorTy))
+    if (typeLoc.getType()->isEqual(selectorTy))
       return nullptr;
   }
 
-  auto *NTD = type->getAnyNominal();
+  auto *NTD = typeLoc.getType()->getAnyNominal();
   SmallVector<ProtocolConformance *, 2> conformances;
   return NTD->lookupConformance(DC->getParentModule(), protocol, conformances)
              ? CoerceExpr::forLiteralInit(getASTContext(), argExpr,
-                                          call->getSourceRange(),
-                                          typeExpr->getTypeLoc())
+                                          call->getSourceRange(), typeLoc)
              : nullptr;
 }
 
@@ -2002,7 +1981,7 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
 
 #pragma mark High-level entry points
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
-                                      TypeLoc convertType,
+                                      Type convertType,
                                       ContextualTypePurpose convertTypePurpose,
                                       TypeCheckExprOptions options) {
   SolutionApplicationTarget target(
@@ -2126,7 +2105,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             bool isAutoClosure) {
   assert(paramType && !paramType->hasError());
   return typeCheckExpression(
-      defaultValue, DC, TypeLoc::withoutLoc(paramType),
+      defaultValue, DC, paramType,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter);
 }
 
@@ -2501,7 +2480,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     return true;
 
   auto resultTy = TypeChecker::typeCheckExpression(
-      expr, dc, TypeLoc::withoutLoc(boolDecl->getDeclaredType()),
+      expr, dc, boolDecl->getDeclaredType(),
       CTP_Condition);
   return !resultTy;
 }
@@ -2671,7 +2650,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         else if (root != archetypeType)
           return Type();
         
-        auto locator = cs.getConstraintLocator(nullptr);
+        auto locator = cs.getConstraintLocator({});
         auto replacement = cs.createTypeVariable(locator,
                                                  TVO_CanBindToNoEscape);
 
@@ -2689,7 +2668,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
 
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
-      auto locator = cs.getConstraintLocator(nullptr);
+      auto locator = cs.getConstraintLocator({});
       auto replacement = cs.createTypeVariable(locator,
                                                TVO_CanBindToNoEscape);
       types[origType] = replacement;
@@ -2711,7 +2690,7 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
     type2 = replaceArchetypesWithTypeVariables(cs, type2);
   }
 
-  cs.addConstraint(kind, type1, type2, cs.getConstraintLocator(nullptr));
+  cs.addConstraint(kind, type1, type2, cs.getConstraintLocator({}));
 
   if (openArchetypes) {
     assert(!unwrappedIUO && "FIXME");
@@ -2991,15 +2970,14 @@ void Solution::dump(raw_ostream &out) const {
       out.indent(2);
       opened.first->dump(sm, out);
       out << " opens ";
-      interleave(opened.second.begin(), opened.second.end(),
-                 [&](OpenedType opened) {
-                   Type(opened.first).print(out, PO);
-                   out << " -> ";
-                   Type(opened.second).print(out, PO);
-                 },
-                 [&]() {
-                   out << ", ";
-                 });
+      llvm::interleave(
+          opened.second.begin(), opened.second.end(),
+          [&](OpenedType opened) {
+            Type(opened.first).print(out, PO);
+            out << " -> ";
+            Type(opened.second).print(out, PO);
+          },
+          [&]() { out << ", "; });
       out << "\n";
     }
   }
@@ -3042,18 +3020,17 @@ void ConstraintSystem::dump(Expr *E) const {
 }
 
 void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
-  auto getTypeOfExpr = [&](const Expr *E) -> Type {
+  auto getTypeOfExpr = [&](Expr *E) -> Type {
     if (hasType(E))
       return getType(E);
     return Type();
   };
-  auto getTypeOfTypeLoc = [&](const TypeLoc &TL) -> Type {
+  auto getTypeOfTypeLoc = [&](TypeLoc &TL) -> Type {
     if (hasType(TL))
       return getType(TL);
     return Type();
   };
-  auto getTypeOfKeyPathComponent =
-      [&](const KeyPathExpr *KP, unsigned I) -> Type {
+  auto getTypeOfKeyPathComponent = [&](KeyPathExpr *KP, unsigned I) -> Type {
     if (hasType(KP, I))
       return getType(KP, I);
     return Type();
@@ -3123,7 +3100,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\n";
   }
 
-  if (solverState && !solverState->hasRetiredConstraints()) {
+  if (solverState && solverState->hasRetiredConstraints()) {
     out << "\nRetired Constraints:\n";
     solverState->forEachRetired([&](Constraint &constraint) {
       out.indent(2);
@@ -3188,15 +3165,14 @@ void ConstraintSystem::print(raw_ostream &out) const {
       out.indent(2);
       opened.first->dump(&getASTContext().SourceMgr, out);
       out << " opens ";
-      interleave(opened.second.begin(), opened.second.end(),
-                 [&](OpenedType opened) {
-                   Type(opened.first).print(out, PO);
-                   out << " -> ";
-                   Type(opened.second).print(out, PO);
-                 },
-                 [&]() {
-                   out << ", ";
-                 });
+      llvm::interleave(
+          opened.second.begin(), opened.second.end(),
+          [&](OpenedType opened) {
+            Type(opened.first).print(out, PO);
+            out << " -> ";
+            Type(opened.second).print(out, PO);
+          },
+          [&]() { out << ", "; });
       out << "\n";
     }
   }
@@ -3218,6 +3194,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     }, [&] {
       out << ", ";
     });
+    out << "\n";
   }
 
   if (failedConstraint) {
@@ -3473,6 +3450,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     case CheckedCastKind::Unresolved:
       return failed();
     }
+    llvm_unreachable("invalid cast type");
   };
 
   // Check for casts between specific concrete types that cannot succeed.
@@ -3754,8 +3732,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
           auto protocolDecl =
               dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
           if (protocolDecl &&
-              !conformsToProtocol(toType, protocolDecl, dc,
-                                  ConformanceCheckFlags::InExpression)) {
+              !conformsToProtocol(toType, protocolDecl, dc)) {
             return failed();
           }
         }
@@ -3849,9 +3826,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     auto nsErrorTy = Context.getNSErrorType();
 
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-      if (!conformsToProtocol(toType, errorTypeProto, dc,
-                              ConformanceCheckFlags::InExpression)
-               .isInvalid()) {
+      if (!conformsToProtocol(toType, errorTypeProto, dc).isInvalid()) {
         if (nsErrorTy) {
           if (isSubtypeOf(fromType, nsErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
@@ -3861,9 +3836,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         }
       }
 
-      if (!conformsToProtocol(fromType, errorTypeProto, dc,
-                                     ConformanceCheckFlags::InExpression)
-              .isInvalid()) {
+      if (!conformsToProtocol(fromType, errorTypeProto, dc).isInvalid()) {
         // Cast of an error-conforming type to NSError or NSObject.
         if ((nsObject && toType->isEqual(nsObject)) ||
              (nsErrorTy && toType->isEqual(nsErrorTy)))

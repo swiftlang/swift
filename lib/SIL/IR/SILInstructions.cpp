@@ -422,7 +422,7 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
                               ModuleConventions.hasValue()
                                   ? ModuleConventions.getValue()
                                   : SILModuleConventions(F.getModule()));
-  SILType Result = Conv.getSILResultType();
+  SILType Result = Conv.getSILResultType(F.getTypeExpansionContext());
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -474,7 +474,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   SmallVector<ValueOwnershipKind, 8> resultOwnerships;
 
   for (auto &yield : substCalleeType->getYields()) {
-    auto yieldType = conv.getSILType(yield);
+    auto yieldType = conv.getSILType(yield, F.getTypeExpansionContext());
     auto convention = SILArgumentConvention(yield.getConvention());
     resultTypes.push_back(yieldType);
     resultOwnerships.push_back(
@@ -751,6 +751,7 @@ getExtracteeType(
         LookUpConformanceInModule(module.getSwiftModule()));
     return SILType::getPrimitiveObjectType(transposeFnTy);
   }
+  llvm_unreachable("invalid extractee");
 }
 
 LinearFunctionExtractInst::LinearFunctionExtractInst(
@@ -1122,19 +1123,86 @@ BindMemoryInst::create(SILDebugLocation Loc, SILValue Base, SILValue Index,
                                        TypeDependentOperands);
 }
 
-UncheckedRefCastAddrInst::UncheckedRefCastAddrInst(SILDebugLocation Loc,
-                                                   SILValue src,
-                                                   CanType srcType,
-                                                   SILValue dest,
-                                                   CanType targetType)
-    : InstructionBase(Loc),
-      Operands(this, src, dest), SourceType(srcType), TargetType(targetType) {}
+UncheckedRefCastAddrInst::
+UncheckedRefCastAddrInst(SILDebugLocation Loc, SILValue src, CanType srcType,
+                         SILValue dest, CanType targetType,
+                         ArrayRef<SILValue> TypeDependentOperands)
+    : AddrCastInstBase(Loc, src, srcType, dest, targetType,
+        TypeDependentOperands) {}
+
+UncheckedRefCastAddrInst *
+UncheckedRefCastAddrInst::create(SILDebugLocation Loc, SILValue src,
+        CanType srcType, SILValue dest, CanType targetType,
+        SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               srcType);
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               targetType);
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(2 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(UncheckedRefCastAddrInst));
+  return ::new (Buffer) UncheckedRefCastAddrInst(Loc, src, srcType,
+    dest, targetType, TypeDependentOperands);
+}
 
 UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
     SILDebugLocation Loc, SILValue src, CanType srcType, SILValue dest,
-    CanType targetType)
-    : InstructionBase(Loc),
-      Operands(this, src, dest), SourceType(srcType), TargetType(targetType) {}
+    CanType targetType, ArrayRef<SILValue> TypeDependentOperands)
+    : AddrCastInstBase(Loc, src, srcType, dest, targetType,
+        TypeDependentOperands) {}
+
+UnconditionalCheckedCastAddrInst *
+UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc, SILValue src,
+        CanType srcType, SILValue dest, CanType targetType,
+        SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               srcType);
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               targetType);
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(2 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastAddrInst));
+  return ::new (Buffer) UnconditionalCheckedCastAddrInst(Loc, src, srcType,
+    dest, targetType, TypeDependentOperands);
+}
+
+CheckedCastAddrBranchInst::CheckedCastAddrBranchInst(
+  SILDebugLocation DebugLoc, CastConsumptionKind consumptionKind,
+  SILValue src, CanType srcType, SILValue dest, CanType targetType,
+  ArrayRef<SILValue> TypeDependentOperands,
+  SILBasicBlock *successBB, SILBasicBlock *failureBB,
+  ProfileCounter Target1Count, ProfileCounter Target2Count)
+      : AddrCastInstBase(DebugLoc, src, srcType, dest,
+            targetType, TypeDependentOperands, consumptionKind,
+            successBB, failureBB, Target1Count, Target2Count) {
+  assert(consumptionKind != CastConsumptionKind::BorrowAlways &&
+         "BorrowAlways is not supported on addresses");
+}
+
+CheckedCastAddrBranchInst *
+CheckedCastAddrBranchInst::create(SILDebugLocation DebugLoc,
+         CastConsumptionKind consumptionKind,
+         SILValue src, CanType srcType, SILValue dest, CanType targetType,
+         SILBasicBlock *successBB, SILBasicBlock *failureBB,
+         ProfileCounter Target1Count, ProfileCounter Target2Count,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               srcType);
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               targetType);
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(2 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(CheckedCastAddrBranchInst));
+  return ::new (Buffer) CheckedCastAddrBranchInst(DebugLoc, consumptionKind,
+    src, srcType, dest, targetType, TypeDependentOperands,
+    successBB, failureBB, Target1Count, Target2Count);
+}
 
 StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
                                ArrayRef<SILValue> Elements, SILModule &M,

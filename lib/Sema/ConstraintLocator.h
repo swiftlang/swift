@@ -20,6 +20,7 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -34,10 +35,14 @@
 namespace swift {
 
 class Expr;
+class TypeLoc;
+class VarDecl;
+class Pattern;
 class SourceManager;
 
 namespace constraints {
-  class ConstraintSystem;
+
+class ConstraintSystem;
 
 /// Locates a given constraint within the expression being
 /// type-checked, which may refer down into subexpressions and parts of
@@ -302,8 +307,8 @@ public:
   }
 
   /// Retrieve the expression that anchors this locator.
-  Expr *getAnchor() const { return anchor; }
-  
+  ASTNode getAnchor() const { return anchor; }
+
   /// Retrieve the path that extends from the anchor to a specific
   /// subcomponent.
   ArrayRef<PathElement> getPath() const {
@@ -376,9 +381,10 @@ public:
   bool isForOptionalTry() const;
 
   /// Determine whether this locator points directly to a given expression.
-  template <class E> bool directlyAt() const {
-    auto *anchor = getAnchor();
-    return anchor && isa<E>(anchor) && getPath().empty();
+  template <typename E> bool directlyAt() const {
+    if (auto *expr = getAnchor().dyn_cast<Expr *>())
+      return isa<E>(expr) && getPath().empty();
+    return false;
   }
 
   /// Attempts to cast the first path element of the locator to a specific
@@ -492,9 +498,9 @@ public:
   GenericTypeParamType *getGenericParameter() const;
 
   /// Produce a profile of this locator, for use in a folding set.
-  static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
+  static void Profile(llvm::FoldingSetNodeID &id, ASTNode anchor,
                       ArrayRef<PathElement> path);
-  
+
   /// Produce a profile of this locator, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, anchor, getPath());
@@ -508,10 +514,8 @@ public:
 
 private:
   /// Initialize a constraint locator with an anchor and a path.
-  ConstraintLocator(Expr *anchor, ArrayRef<PathElement> path,
-                    unsigned flags)
-    : anchor(anchor), numPathElements(path.size()), summaryFlags(flags)
-  {
+  ConstraintLocator(ASTNode anchor, ArrayRef<PathElement> path, unsigned flags)
+      : anchor(anchor), numPathElements(path.size()), summaryFlags(flags) {
     // FIXME: Alignment.
     std::copy(path.begin(), path.end(),
               reinterpret_cast<PathElement *>(this + 1));
@@ -524,8 +528,7 @@ private:
   /// of the locator. The ConstraintSystem object is responsible for
   /// uniquing via the FoldingSet.
   static ConstraintLocator *create(llvm::BumpPtrAllocator &allocator,
-                                   Expr *anchor,
-                                   ArrayRef<PathElement> path,
+                                   ASTNode anchor, ArrayRef<PathElement> path,
                                    unsigned flags) {
     // FIXME: Alignment.
     unsigned size = sizeof(ConstraintLocator)
@@ -535,7 +538,7 @@ private:
   }
 
   /// The expression at which this locator is anchored.
-  Expr *anchor;
+  ASTNode anchor;
 
   /// The number of path elements in this locator.
   ///
@@ -934,19 +937,19 @@ public:
   }
 
   /// Get anchor expression associated with this locator builder.
-  Expr *getAnchor() const {
+  ASTNode getAnchor() const {
     for (auto prev = this; prev;
          prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
       if (auto *locator = prev->previous.dyn_cast<ConstraintLocator *>())
         return locator->getAnchor();
     }
 
-    return nullptr;
+    return {};
   }
 
   /// Retrieve the components of the complete locator, which includes
   /// the anchor expression and the path.
-  Expr *getLocatorParts(SmallVectorImpl<LocatorPathElt> &path) const {
+  ASTNode getLocatorParts(SmallVectorImpl<LocatorPathElt> &path) const {
     for (auto prev = this;
          prev;
          prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {

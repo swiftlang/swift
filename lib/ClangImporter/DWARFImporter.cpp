@@ -160,7 +160,7 @@ void ClangImporter::Implementation::lookupValueDWARF(
     if (!swiftDecl)
       continue;
 
-    if (swiftDecl->getFullName().matchesRef(name) &&
+    if (swiftDecl->getName().matchesRef(name) &&
         swiftDecl->getDeclContext()->isModuleScopeContext()) {
       forceLoadAllMembers(dyn_cast<IterableDeclContext>(swiftDecl));
       results.push_back(swiftDecl);

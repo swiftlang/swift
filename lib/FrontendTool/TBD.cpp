@@ -66,7 +66,6 @@ bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
     // FIXME: This would be a good test of the interface format.
     return false;
   case InputFileKind::None:
-  case InputFileKind::SwiftREPL:
   case InputFileKind::SIL:
   case InputFileKind::LLVM:
     return false;
@@ -75,7 +74,8 @@ bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
 }
 
 static bool validateSymbolSet(DiagnosticEngine &diags,
-                              llvm::StringSet<> symbols, llvm::Module &IRModule,
+                              llvm::StringSet<> symbols,
+                              const llvm::Module &IRModule,
                               bool diagnoseExtraSymbolsInTBD) {
   auto error = false;
 
@@ -135,7 +135,8 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
   return error;
 }
 
-bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule,
+bool swift::validateTBD(ModuleDecl *M,
+                        const llvm::Module &IRModule,
                         const TBDGenOptions &opts,
                         bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;
@@ -145,7 +146,8 @@ bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule,
                            diagnoseExtraSymbolsInTBD);
 }
 
-bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule,
+bool swift::validateTBD(FileUnit *file,
+                        const llvm::Module &IRModule,
                         const TBDGenOptions &opts,
                         bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;

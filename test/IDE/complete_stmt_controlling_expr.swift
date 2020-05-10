@@ -499,10 +499,10 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 // COND-WITH-RELATION-DAG: Decl[LocalVar]/Local:        localInt[#Int#]{{; name=.+$}}
 // COND-WITH-RELATION-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{; name=.+$}}
 // COND-WITH-RELATION-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testIf2({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testWhile3({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testIfElseIf5({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
-// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: testCStyleForIncrIE1({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testIf2({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testWhile3({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testIfElseIf5({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
+// COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testCStyleForIncrIE1({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
 
 // COND-WITH-RELATION1: Begin completions
 // COND-WITH-RELATION1-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#]{{; name=.+$}}
@@ -519,7 +519,7 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 enum A { case aaa }
 enum B { case bbb }
 // UNRESOLVED_B-NOT: aaa
-// UNRESOLVED_B: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bbb[#B#]; name=bbb
+// UNRESOLVED_B: Decl[EnumElement]/CurrNominal/TypeRelation[Identical]:     bbb[#B#]; name=bbb
 // UNRESOLVED_B-NOT: aaa
 
 struct AA {

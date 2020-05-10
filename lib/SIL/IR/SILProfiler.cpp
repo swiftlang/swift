@@ -121,6 +121,7 @@ static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
   case CaseParentKind::DoCatch:
     return caseStmt->getBody();
   }
+  llvm_unreachable("invalid parent kind");
 }
 
 /// Check that the input AST has at least been type-checked.

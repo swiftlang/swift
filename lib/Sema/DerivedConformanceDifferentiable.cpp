@@ -54,7 +54,7 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
     if (vd->getInterfaceType()->hasError())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
-    if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal, None))
+    if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal))
       continue;
     result.push_back(vd);
   }
@@ -80,7 +80,7 @@ static Type getTangentVectorType(VarDecl *decl, DeclContext *DC) {
   auto &C = decl->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto varType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
-  auto conf = TypeChecker::conformsToProtocol(varType, diffableProto, DC, None);
+  auto conf = TypeChecker::conformsToProtocol(varType, diffableProto, DC);
   if (!conf)
     return nullptr;
   Type tangentType = conf.getTypeWitnessByName(varType, C.Id_TangentVector);
@@ -96,7 +96,7 @@ static StructDecl *getTangentVectorStructDecl(DeclContext *DC) {
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   assert(diffableProto && "`Differentiable` protocol not found");
   auto conf = TypeChecker::conformsToProtocol(DC->getSelfTypeInContext(),
-                                              diffableProto, DC, None);
+                                              diffableProto, DC);
   assert(conf && "Nominal must conform to `Differentiable`");
   auto assocType =
       conf.getTypeWitnessByName(DC->getSelfTypeInContext(), C.Id_TangentVector);
@@ -139,13 +139,13 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     //   `X == X.TangentVector`.
     if (nominal->isImplicit() && structDecl == nominal->getDeclContext() &&
         TypeChecker::conformsToProtocol(structDecl->getDeclaredInterfaceType(),
-                                        diffableProto, DC, None))
+                                        diffableProto, DC))
       return structDecl;
     // 3. Equal nominal and conform to `AdditiveArithmetic`.
     if (structDecl == nominal) {
       // Check conformance to `AdditiveArithmetic`.
       if (TypeChecker::conformsToProtocol(nominalTypeInContext, addArithProto,
-                                          DC, None))
+                                          DC))
         return structDecl;
     }
     // Otherwise, candidate is invalid.
@@ -177,8 +177,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, diffableProto, DC,
-                                                 None);
+    return (bool)TypeChecker::conformsToProtocol(varType, diffableProto, DC);
   });
 }
 
@@ -377,7 +376,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto memberAssocContextualType =
         parentDC->mapTypeIntoContext(memberAssocInterfaceType);
     newMember->setInterfaceType(memberAssocInterfaceType);
-    Pattern *memberPattern = new (C) NamedPattern(newMember, /*implicit*/ true);
+    Pattern *memberPattern = NamedPattern::createImplicit(C, newMember);
     memberPattern->setType(memberAssocContextualType);
     memberPattern = TypedPattern::createImplicit(C, memberPattern,
                                                  memberAssocContextualType);
@@ -501,7 +500,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
     // Check whether to diagnose stored property.
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     bool conformsToDifferentiable =
-        !TypeChecker::conformsToProtocol(varType, diffableProto, nominal, None)
+        !TypeChecker::conformsToProtocol(varType, diffableProto, nominal)
              .isInvalid();
     // If stored property should not be diagnosed, continue.
     if (conformsToDifferentiable && !vd->isLet())
@@ -609,7 +608,7 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
 
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto nominalConformsToAddArith = TypeChecker::conformsToProtocol(
-      parentDC->getSelfTypeInContext(), addArithProto, parentDC, None);
+      parentDC->getSelfTypeInContext(), addArithProto, parentDC);
 
   // Return `Self` if conditions are met.
   if (!hasNoDerivativeStoredProp && !nominal->getSelfClassDecl() &&

@@ -161,6 +161,8 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::EndAccessInst:
+  case SILInstructionKind::SetDeallocatingInst:
     return true;
   default:
     return false;

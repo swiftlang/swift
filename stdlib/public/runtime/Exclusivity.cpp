@@ -14,12 +14,21 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOTE: This should really be applied in the CMakeLists.txt.  However, we do
+// not have a way to currently specify that at the target specific level yet.
+#if defined(_WIN32)
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define VCEXTRALEAN
+#endif
+
+#include "swift/Runtime/Exclusivity.h"
+#include "../SwiftShims/Visibility.h"
+#include "ThreadLocalStorage.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/Metadata.h"
-#include "ThreadLocalStorage.h"
 #include <memory>
 #include <stdio.h>
 
@@ -46,7 +55,7 @@ static const char *getAccessName(ExclusivityFlags flags) {
   }
 }
 
-LLVM_ATTRIBUTE_ALWAYS_INLINE
+SWIFT_ALWAYS_INLINE
 static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
                                       ExclusivityFlags newFlags, void *newPC,
                                       void *pointer) {
@@ -261,10 +270,10 @@ static SwiftTLSContext &getTLSContext() {
   return *ctx;
 }
 
-#elif SWIFT_TLS_HAS_THREADLOCAL
+#elif __has_feature(cxx_thread_local)
 // Second choice is direct language support for thread-locals.
 
-static LLVM_THREAD_LOCAL SwiftTLSContext TLSContext;
+static thread_local SwiftTLSContext TLSContext;
 
 static SwiftTLSContext &getTLSContext() {
   return TLSContext;

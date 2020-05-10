@@ -37,15 +37,6 @@ using mach_header_platform = mach_header;
 /// This lives within SEG_TEXT.
 constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 
-// Clone of private function getRootSuperclass. This returns the SwiftObject
-// class in the ABI-stable dylib, regardless of what the local runtime build
-// does, since we're always patching an ABI-stable dylib.
-__attribute__((visibility("hidden"), weak))
-const ClassMetadata *swift::getRootSuperclass() {
-  auto theClass = SWIFT_LAZY_CONSTANT(objc_getClass("_TtCs12_SwiftObject"));
-  return (const ClassMetadata *)theClass;
-}
-
 // A dummy target context descriptor to use in conformance records which point
 // to a NULL descriptor. It doesn't have to be completely valid, just something
 // that code reading conformance descriptors will ignore.
@@ -90,35 +81,9 @@ static void registerAddImageCallback(void *) {
   _dyld_register_func_for_add_image(addImageCallback);
 }
 
-static const Metadata *getObjCClassMetadata(const ClassMetadata *c) {
-  // Look up swift_getObjCClassMetadata dynamically. This handles the case
-  // where the main executable can't link against libswiftCore.dylib because
-  // it will be loaded dynamically from a location that isn't known at build
-  // time.
-  using FPtr = const Metadata *(*)(const ClassMetadata *);
-  FPtr func = SWIFT_LAZY_CONSTANT(
-    reinterpret_cast<FPtr>(dlsym(RTLD_DEFAULT, "swift_getObjCClassMetadata")));
-
-  return func(c);
-}
-
-// Clone of private helper swift::_swiftoverride_class_getSuperclass
-// for use in the override implementation.
-static const Metadata *_swift50override_class_getSuperclass(
-                                                    const Metadata *theClass) {
-  if (const ClassMetadata *classType = theClass->getClassObject()) {
-    if (classHasSuperclass(classType))
-      return getObjCClassMetadata(classType->Superclass);
-  }
-  
-  if (const ForeignClassMetadata *foreignClassType
-      = dyn_cast<ForeignClassMetadata>(theClass)) {
-    if (const Metadata *superclass = foreignClassType->Superclass)
-      return superclass;
-  }
-  
-  return nullptr;
-}
+// Defined in libswiftCompatibility51, which is always linked if we link against
+// libswiftCompatibility50
+const Metadata *_swiftoverride_class_getSuperclass(const Metadata *theClass);
 
 const WitnessTable *
 swift::swift50override_conformsToProtocol(const Metadata *type,
@@ -138,7 +103,7 @@ swift::swift50override_conformsToProtocol(const Metadata *type,
     auto result = original_conformsToProtocol(type, protocol);
     if (result)
       return result;
-  } while ((type = _swift50override_class_getSuperclass(type)));
+  } while ((type = _swiftoverride_class_getSuperclass(type)));
   
   return nullptr;
 }

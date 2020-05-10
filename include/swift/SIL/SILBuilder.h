@@ -1031,9 +1031,9 @@ public:
   createUncheckedRefCastAddr(SILLocation Loc,
                              SILValue src, CanType sourceFormalType,
                              SILValue dest, CanType targetFormalType) {
-    return insert(new (getModule()) UncheckedRefCastAddrInst(
+    return insert(UncheckedRefCastAddrInst::create(
         getSILDebugLocation(Loc), src, sourceFormalType,
-        dest, targetFormalType));
+        dest, targetFormalType, getFunction(), C.OpenedArchetypes));
   }
 
   UncheckedAddrCastInst *createUncheckedAddrCast(SILLocation Loc, SILValue Op,
@@ -1152,9 +1152,9 @@ public:
   createUnconditionalCheckedCastAddr(SILLocation Loc,
                                      SILValue src, CanType sourceFormalType,
                                      SILValue dest, CanType targetFormalType) {
-    return insert(new (getModule()) UnconditionalCheckedCastAddrInst(
+    return insert(UnconditionalCheckedCastAddrInst::create(
         getSILDebugLocation(Loc), src, sourceFormalType,
-        dest, targetFormalType));
+        dest, targetFormalType, getFunction(), C.OpenedArchetypes));
   }
 
   UnconditionalCheckedCastValueInst *
@@ -1989,9 +1989,10 @@ public:
                               SILBasicBlock *failureBB,
                               ProfileCounter Target1Count = ProfileCounter(),
                               ProfileCounter Target2Count = ProfileCounter()) {
-    return insertTerminator(new (getModule()) CheckedCastAddrBranchInst(
+    return insertTerminator(CheckedCastAddrBranchInst::create(
         getSILDebugLocation(Loc), consumption, src, sourceFormalType, dest,
-        targetFormalType, successBB, failureBB, Target1Count, Target2Count));
+        targetFormalType, successBB, failureBB, Target1Count, Target2Count,
+        getFunction(), C.OpenedArchetypes));
   }
 
   //===--------------------------------------------------------------------===//

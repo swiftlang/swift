@@ -49,6 +49,13 @@ func testFunc() {
   let _: (S) -> Int = f // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type '(S) -> Int'}}
 }
 
+struct SR_12432 {
+  static func takesKeyPath(_: KeyPath<SR_12432.S, String>) -> String { "" }
+
+  struct S {
+    let text: String = takesKeyPath(\.text) // okay
+  }
+}
 
 // SR-11234
 public extension Array {

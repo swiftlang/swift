@@ -481,8 +481,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) { return E; }
   Expr *visitTypeExpr(TypeExpr *E) {
     if (!E->isImplicit())
-      if (doIt(E->getTypeLoc()))
-        return nullptr;
+      if (auto *typerepr = E->getTypeRepr())
+        if (doIt(typerepr))
+          return nullptr;
 
     return E;
   }
@@ -507,6 +508,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
+
+  Expr *visitPropertyWrapperValuePlaceholderExpr(
+      PropertyWrapperValuePlaceholderExpr *E) {
+    if (auto *placeholder = doIt(E->getOpaqueValuePlaceholder()))
+      E->setOpaqueValuePlaceholder(dyn_cast<OpaqueValueExpr>(placeholder));
+    else
+      return nullptr;
+
+    if (E->getOriginalWrappedValue()) {
+      if (auto *newValue = doIt(E->getOriginalWrappedValue()))
+        E->setOriginalWrappedValue(newValue);
+      else
+        return nullptr;
+    }
+
+    return E;
+  }
 
   Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
 
@@ -792,9 +810,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitClosureExpr(ClosureExpr *expr) {
     visit(expr->getParameters());
 
-    if (expr->hasExplicitResultType())
-      if (doIt(expr->getExplicitResultTypeLoc()))
+    if (expr->hasExplicitResultType()) {
+      if (doIt(expr->getExplicitResultTypeRepr()))
         return nullptr;
+    }
 
     // Handle single-expression closures.
     if (expr->hasSingleExpressionBody()) {

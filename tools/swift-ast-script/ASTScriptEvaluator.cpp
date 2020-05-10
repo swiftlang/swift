@@ -83,7 +83,7 @@ public:
       out << ".(accessor)";
     } else {
       printDeclContext(out, decl->getDeclContext());
-      out << decl->getFullName();
+      out << decl->getName();
     }
   }
 

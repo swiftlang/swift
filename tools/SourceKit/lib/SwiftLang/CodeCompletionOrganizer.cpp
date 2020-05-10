@@ -114,7 +114,7 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
           using ChunkKind = ide::CodeCompletionString::Chunk::ChunkKind;
           if (chunk.is(ChunkKind::TypeAnnotation) && chunk.hasText() &&
               chunk.getText() == "Void") {
-            builder.setNotRecommended(Completion::TypeMismatch);
+            builder.setExpectedTypeRelation(Completion::Invalid);
           }
         }
       }
@@ -337,7 +337,7 @@ ImportDepth::ImportDepth(ASTContext &context,
   // specially by applying import depth 0.
   llvm::StringSet<> auxImports;
   for (StringRef moduleName :
-       invocation.getFrontendOptions().ImplicitImportModuleNames)
+       invocation.getFrontendOptions().getImplicitImportModuleNames())
     auxImports.insert(moduleName);
 
   // Private imports from this module.
@@ -350,9 +350,9 @@ ImportDepth::ImportDepth(ASTContext &context,
   main->getImportedModules(mainImports, importFilter);
   for (auto &import : mainImports) {
     uint8_t depth = 1;
-    if (auxImports.count(import.second->getName().str()))
+    if (auxImports.count(import.importedModule->getName().str()))
       depth = 0;
-    worklist.emplace_back(import.second, depth);
+    worklist.emplace_back(import.importedModule, depth);
   }
 
   // Fill depths with BFS over module imports.
@@ -380,10 +380,11 @@ ImportDepth::ImportDepth(ASTContext &context,
       uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap
 
       // Implicitly imported sub-modules get the same depth as their parent.
-      if (const clang::Module *CMI = import.second->findUnderlyingClangModule())
+      if (const clang::Module *CMI =
+              import.importedModule->findUnderlyingClangModule())
         if (CM && CMI->isSubModuleOf(CM))
           next = depth;
-      worklist.emplace_back(import.second, next);
+      worklist.emplace_back(import.importedModule, next);
     }
   }
 }
@@ -549,7 +550,9 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
       if (rules.hideCompletion(completion))
         continue;
 
-      if (options.hideLowPriority && completion->isNotRecommended())
+      if (options.hideLowPriority &&
+          (completion->isNotRecommended() ||
+           completion->getExpectedTypeRelation() == Completion::Invalid))
         continue;
 
       NameStyle style(completion->getName());
@@ -744,12 +747,9 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
   if (completion->isOperator())
     return ResultBucket::Operator;
 
-  bool matchesType =
-      completion->getExpectedTypeRelation() >= Completion::Convertible;
-
   switch (completion->getKind()) {
   case Completion::Literal:
-    if (matchesType) {
+    if (completion->getExpectedTypeRelation() >= Completion::Convertible) {
       return ResultBucket::LiteralTypeMatch;
     } else if (!hasRequiredTypes) {
       return ResultBucket::Literal;
@@ -764,7 +764,19 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
                : ResultBucket::Normal;
   case Completion::Pattern:
   case Completion::Declaration:
-    return matchesType ? ResultBucket::NormalTypeMatch : ResultBucket::Normal;
+    switch (completion->getExpectedTypeRelation()) {
+    case swift::ide::CodeCompletionResult::Convertible:
+    case swift::ide::CodeCompletionResult::Identical:
+      return ResultBucket::NormalTypeMatch;
+    case swift::ide::CodeCompletionResult::NotApplicable:
+    case swift::ide::CodeCompletionResult::Unknown:
+    case swift::ide::CodeCompletionResult::Unrelated:
+      return ResultBucket::Normal;
+    case swift::ide::CodeCompletionResult::Invalid:
+      if (!skipMetaGroups)
+        return ResultBucket::NotRecommended;
+      return ResultBucket::Normal;
+    }
   case Completion::BuiltinOperator:
     llvm_unreachable("operators should be handled above");
   }
@@ -1219,6 +1231,7 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
       case ChunkKind::TypeAnnotation:
       case ChunkKind::CallParameterInternalName:
       case ChunkKind::CallParameterClosureType:
+      case ChunkKind::CallParameterClosureExpr:
       case ChunkKind::CallParameterType:
       case ChunkKind::DeclAttrParamColon:
       case ChunkKind::Comma:
@@ -1255,8 +1268,7 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
 
 CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
     : sink(sink), current(base) {
-  isNotRecommended = current.isNotRecommended();
-  notRecommendedReason = current.getNotRecommendedReason();
+  typeRelation = current.getExpectedTypeRelation();
   semanticContext = current.getSemanticContext();
   completionString =
       const_cast<CodeCompletionString *>(current.getCompletionString());
@@ -1304,12 +1316,13 @@ Completion *CompletionBuilder::finish() {
       base = SwiftResult(
           semanticContext, current.getNumBytesToErase(), completionString,
           current.getAssociatedDeclKind(), current.getModuleName(),
-          isNotRecommended, notRecommendedReason, current.getBriefDocComment(),
-          current.getAssociatedUSRs(), current.getDeclKeywords(), opKind);
+          current.isNotRecommended(),  current.getNotRecommendedReason(),
+          current.getBriefDocComment(), current.getAssociatedUSRs(),
+          current.getDeclKeywords(), typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext,
                          current.getNumBytesToErase(), completionString,
-                         current.getExpectedTypeRelation(), opKind);
+                         typeRelation, opKind);
     }
 
     llvm::raw_svector_ostream OSS(nameStorage);

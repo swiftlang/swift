@@ -36,6 +36,9 @@ public:
     ///
     /// At the time of writing this just means ignoring .swiftsourceinfo files.
     bool OptimizeForIDE = false;
+
+    /// Interval second for checking dependencies in fast code completion.
+    unsigned CompletionCheckDependencyInterval = 5;
   };
 
 private:
@@ -43,24 +46,30 @@ private:
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  Settings update(Optional<bool> OptimizeForIDE);
+  Settings update(Optional<bool> OptimizeForIDE,
+                  Optional<unsigned> CompletionCheckDependencyInterval);
   bool shouldOptimizeForIDE() const;
+  unsigned getCompletionCheckDependencyInterval() const;
 };
 
 class Context {
   std::string RuntimeLibPath;
+  std::string DiagnosticDocumentationPath;
   std::unique_ptr<LangSupport> SwiftLang;
   std::shared_ptr<NotificationCenter> NotificationCtr;
   std::shared_ptr<GlobalConfig> Config;
 
 public:
-  Context(StringRef RuntimeLibPath,
-          llvm::function_ref<
-              std::unique_ptr<LangSupport>(Context &)> LangSupportFactoryFn,
+  Context(StringRef RuntimeLibPath, StringRef DiagnosticDocumentationPath,
+          llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
+              LangSupportFactoryFn,
           bool shouldDispatchNotificationsOnMain = true);
   ~Context();
 
   StringRef getRuntimeLibPath() const { return RuntimeLibPath; }
+  StringRef getDiagnosticDocumentationPath() const {
+    return DiagnosticDocumentationPath;
+  }
 
   LangSupport &getSwiftLangSupport() { return *SwiftLang; }
 

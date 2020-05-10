@@ -1672,7 +1672,7 @@ namespace {
                      / IGM.getPointerSize());
       } else {
         ExtraClassDescriptorFlags flags;
-        if (hasObjCResilientClassStub(IGM, getType()))
+        if (IGM.hasObjCResilientClassStub(getType()))
           flags.setObjCResilientClassStub(true);
         B.addInt32(flags.getOpaqueValue());
       }
@@ -1694,7 +1694,7 @@ namespace {
             ClassMetadataStrategy::Resilient)
         return;
 
-      if (!hasObjCResilientClassStub(IGM, getType()))
+      if (!IGM.hasObjCResilientClassStub(getType()))
         return;
 
       B.addRelativeAddress(
@@ -2317,6 +2317,7 @@ namespace {
       asImpl().layoutHeader();
 
       // See also: [pre-5.2-extra-data-zeroing]
+      // See also: [pre-5.3-extra-data-zeroing]
       if (asImpl().hasExtraDataPattern()) {
         asImpl().addExtraDataPattern();
       }
@@ -3389,8 +3390,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
       // Even non-@objc classes can have Objective-C categories attached, so
       // we always emit a resilient class stub as long as -enable-objc-interop
       // is set.
-      if (hasObjCResilientClassStub(IGM, classDecl)) {
-        emitObjCResilientClassStub(IGM, classDecl);
+      if (IGM.hasObjCResilientClassStub(classDecl)) {
+        IGM.emitObjCResilientClassStub(classDecl);
 
         if (classDecl->isObjC()) {
           auto *stub = IGM.getAddrOfObjCResilientClassStub(
@@ -3430,7 +3431,7 @@ void IRGenFunction::setInvariantLoad(llvm::LoadInst *load) {
 void IRGenFunction::setDereferenceableLoad(llvm::LoadInst *load,
                                            unsigned size) {
   auto sizeConstant = llvm::ConstantInt::get(IGM.Int64Ty, size);
-  auto sizeNode = llvm::MDNode::get(IGM.LLVMContext,
+  auto sizeNode = llvm::MDNode::get(IGM.getLLVMContext(),
                                   llvm::ConstantAsMetadata::get(sizeConstant));
   load->setMetadata(IGM.DereferenceableID, sizeNode);
 }
@@ -3730,7 +3731,7 @@ namespace {
     GenericMetadataPatternFlags getPatternFlags() {
       auto flags = super::getPatternFlags();
 
-      if (IGM.shouldPrespecializeGenericMetadata()) {
+      if (hasTrailingFlags()) {
         flags.setHasTrailingFlags(true);
       }
 
@@ -3743,7 +3744,11 @@ namespace {
                                                      HasDependentVWT);
     }
 
-    bool hasExtraDataPattern() {
+    bool hasTrailingFlags() {
+      return IGM.shouldPrespecializeGenericMetadata();
+    }
+
+    bool hasKnownFieldOffsets() {
       auto &ti = IGM.getTypeInfo(getLoweredType());
       if (!isa<FixedTypeInfo>(ti))
         return false;
@@ -3754,19 +3759,31 @@ namespace {
       return true;
     }
 
-    /// Fill in a constant field offset vector if possible.
+    bool hasExtraDataPattern() {
+      return hasKnownFieldOffsets() || hasTrailingFlags();
+    }
+
+    /// If present, the extra data pattern consists of one or both of the
+    /// following:
+    ///
+    /// - the field offset vector
+    /// - the trailing flags
     PartialPattern buildExtraDataPattern() {
       ConstantInitBuilder builder(IGM);
-      auto init = builder.beginArray(IGM.Int32Ty);
+      auto init = builder.beginStruct();
 
       struct Scanner : StructMetadataScanner<Scanner> {
+        GenericStructMetadataBuilder &Outer;
         SILType Type;
-        ConstantArrayBuilder &B;
-        Scanner(IRGenModule &IGM, StructDecl *target, SILType type,
-                ConstantArrayBuilder &B)
-          : StructMetadataScanner(IGM, target), Type(type), B(B) {}
+        ConstantStructBuilder &B;
+        Scanner(GenericStructMetadataBuilder &outer, IRGenModule &IGM, StructDecl *target, SILType type,
+                ConstantStructBuilder &B)
+            : StructMetadataScanner(IGM, target), Outer(outer), Type(type), B(B) {}
 
         void addFieldOffset(VarDecl *field) {
+          if (!Outer.hasKnownFieldOffsets()) {
+            return;
+          }
           auto offset = emitPhysicalStructMemberFixedOffset(IGM, Type, field);
           if (offset) {
             B.add(offset);
@@ -3782,21 +3799,27 @@ namespace {
         void noteEndOfFieldOffsets() {
           B.addAlignmentPadding(IGM.getPointerAlignment());
         }
+
+        void addTrailingFlags() { B.addInt64(0); }
       };
-      Scanner(IGM, Target, getLoweredType(), init).layout();
-      Size vectorSize = init.getNextOffsetFromGlobal();
+      Scanner(*this, IGM, Target, getLoweredType(), init).layout();
+      Size structSize = init.getNextOffsetFromGlobal();
 
       auto global = init.finishAndCreateGlobal("", IGM.getPointerAlignment(),
                                                /*constant*/ true);
 
       auto &layout = IGM.getMetadataLayout(Target);
-      return { global,
-               layout.getFieldOffsetVectorOffset().getStatic()
-                 - IGM.getOffsetOfStructTypeSpecificMetadataMembers(),
-               vectorSize };
-    }
 
-    void addTrailingFlags() { this->B.addInt(IGM.Int64Ty, 0); }
+      bool offsetUpToTrailingFlags = hasTrailingFlags() && !hasKnownFieldOffsets(); 
+      Size zeroingStart = IGM.getOffsetOfStructTypeSpecificMetadataMembers();
+      Offset zeroingEnd = offsetUpToTrailingFlags 
+                            ? layout.getTrailingFlagsOffset()
+                            : layout.getFieldOffsetVectorOffset();
+      return { global,
+               zeroingEnd.getStatic()
+                 - zeroingStart,
+               structSize };
+    }
 
     bool hasCompletionFunction() {
       return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
@@ -4171,24 +4194,58 @@ namespace {
         descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
       }
 
-      auto metadata =
+      return
         IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
                                {descriptor, arguments, templatePointer,
                                 extraSizeV});
+    }
 
-      // Initialize the payload-size field if we have a constant value for it.
-      // This is so small that we just do it inline instead of bothering
-      // with a pattern.
+    bool hasTrailingFlags() {
+      return IGM.shouldPrespecializeGenericMetadata();
+    }
+
+    bool hasKnownPayloadSize() {
+      auto &layout = IGM.getMetadataLayout(Target);
+      return layout.hasPayloadSizeOffset() && (bool)getConstantPayloadSize(IGM, Target);
+    }
+
+    bool hasExtraDataPattern() {
+      return hasKnownPayloadSize() || hasTrailingFlags();
+    }
+
+    /// If present, the extra data pattern consists of one or both of the
+    /// following:
+    ///
+    /// - the payload-size
+    /// - the trailing flags
+    PartialPattern buildExtraDataPattern() {
+      ConstantInitBuilder builder(IGM);
+      auto init = builder.beginStruct();
+
+      auto &layout = IGM.getMetadataLayout(Target);
+
       if (layout.hasPayloadSizeOffset()) {
         if (auto size = getConstantPayloadSize(IGM, Target)) {
-          auto offset = layout.getPayloadSizeOffset();
-          auto slot = IGF.emitAddressAtOffset(metadata, offset, IGM.SizeTy,
-                                              IGM.getPointerAlignment());
-          IGF.Builder.CreateStore(IGM.getSize(*size), slot);
+          init.addSize(*size);
         }
       }
+      if (hasTrailingFlags()) {
+        init.addInt64(0);
+      }
+      Size structSize = init.getNextOffsetFromGlobal();
 
-      return metadata;
+      auto global = init.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+                                               /*constant*/ true);
+
+      bool offsetUpToTrailingFlags = hasTrailingFlags() && !hasKnownPayloadSize(); 
+      Size zeroingStart = IGM.getOffsetOfEnumTypeSpecificMetadataMembers();
+      Offset zeroingEnd = offsetUpToTrailingFlags 
+                            ? layout.getTrailingFlagsOffset()
+                            : layout.getPayloadSizeOffset();
+      return { global,
+               zeroingEnd.getStatic()
+                 - zeroingStart,
+               structSize };
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
@@ -4198,7 +4255,7 @@ namespace {
     GenericMetadataPatternFlags getPatternFlags() {
       auto flags = super::getPatternFlags();
 
-      if (IGM.shouldPrespecializeGenericMetadata()) {
+      if (hasTrailingFlags()) {
         flags.setHasTrailingFlags(true);
       }
 

@@ -266,6 +266,25 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     args = std::move(replacement);
   }
 
+  // Implement the ptrauth builtins as no-ops when the Clang
+  // intrinsics are disabled.
+  if ((IID == llvm::Intrinsic::ptrauth_sign ||
+       IID == llvm::Intrinsic::ptrauth_auth ||
+       IID == llvm::Intrinsic::ptrauth_resign ||
+       IID == llvm::Intrinsic::ptrauth_strip) &&
+      !IGF.IGM.getClangASTContext().getLangOpts().PointerAuthIntrinsics) {
+    out.add(args.claimNext()); // Return the input pointer.
+    (void) args.claimNext();   // Ignore the key.
+    if (IID != llvm::Intrinsic::ptrauth_strip) {
+      (void) args.claimNext(); // Ignore the discriminator.
+    }
+    if (IID == llvm::Intrinsic::ptrauth_resign) {
+      (void) args.claimNext(); // Ignore the new key.
+      (void) args.claimNext(); // Ignore the new discriminator.
+    }
+    return;
+  }
+
   if (IID != llvm::Intrinsic::not_intrinsic) {
     SmallVector<llvm::Type*, 4> ArgTys;
     for (auto T : IInfo.Types)
@@ -657,7 +676,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // If the type is floating-point, then we need to bitcast to integer.
     auto valueTy = origValueTy;
     if (valueTy->isFloatingPointTy()) {
-      valueTy = llvm::IntegerType::get(IGF.IGM.LLVMContext,
+      valueTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(),
                                        valueTy->getPrimitiveSizeInBits());
     }
 

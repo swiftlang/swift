@@ -31,6 +31,7 @@ IDENTIFIER(Any)
 IDENTIFIER(ArrayLiteralElement)
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
+IDENTIFIER(buildArray)
 IDENTIFIER(buildBlock)
 IDENTIFIER(buildDo)
 IDENTIFIER(buildEither)
@@ -92,6 +93,8 @@ IDENTIFIER(keyPath)
 IDENTIFIER(makeIterator)
 IDENTIFIER(Iterator)
 IDENTIFIER(load)
+IDENTIFIER(main)
+IDENTIFIER_WITH_NAME(MainEntryPoint, "$main")
 IDENTIFIER(next)
 IDENTIFIER_(nsErrorDomain)
 IDENTIFIER(objectAtIndexedSubscript)
@@ -203,6 +206,9 @@ IDENTIFIER_(nsError)
 
 // Custom string interpolation type used by os log APIs.
 IDENTIFIER(OSLogMessage)
+// Types that are specialy handled in diagnostics for the os log APIs.
+IDENTIFIER(OSLog)
+IDENTIFIER(OSLogType)
 
 // Atomics ordering type identifiers.
 IDENTIFIER(AtomicLoadOrdering)

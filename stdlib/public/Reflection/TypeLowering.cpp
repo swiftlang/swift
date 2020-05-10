@@ -1118,7 +1118,7 @@ public:
       switch (FD->Kind) {
       case FieldDescriptorKind::Class:
         Refcounting = ReferenceCounting::Native;
-        LLVM_FALLTHROUGH;
+        SWIFT_FALLTHROUGH;
 
       case FieldDescriptorKind::ObjCClass:
         addAnyObject();
@@ -1584,6 +1584,10 @@ public:
   bool visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return false;
   }
+
+  bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    return false;
+  }
 };
 
 bool TypeConverter::hasFixedSize(const TypeRef *TR) {
@@ -1703,6 +1707,10 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   MetatypeRepresentation visitOpaqueTypeRef(const OpaqueTypeRef *O) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     return MetatypeRepresentation::Unknown;
   }
 };
@@ -2151,6 +2159,13 @@ public:
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     DEBUG_LOG(fprintf(stderr, "Can't lower opaque TypeRef"));
+    return nullptr;
+  }
+
+  const TypeInfo *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    // TODO: Provide a hook for the client to try to resolve the opaque archetype
+    // with additional information?
+    DEBUG_LOG(fprintf(stderr, "Can't lower unresolved opaque archetype TypeRef"));
     return nullptr;
   }
 };

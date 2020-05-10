@@ -955,6 +955,11 @@ llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
                                      const ValueDecl *witness,
                                      bool anySingleRequirement = false);
 
+void diagnoseConformanceFailure(Type T,
+                                ProtocolDecl *Proto,
+                                DeclContext *DC,
+                                SourceLoc ComplainLoc);
+
 }
 
 #endif // SWIFT_SEMA_PROTOCOL_H

@@ -400,8 +400,8 @@ TEST(ExprSyntaxTests, FunctionCallExprGetAPIs) {
   auto ArgList = getFullArgumentList();
   auto RightParen = SyntaxFactory::makeRightParenToken({}, {});
 
-  auto Call = SyntaxFactory::makeFunctionCallExpr(SymbolicRef, LeftParen,
-                                                  ArgList, RightParen, None);
+  auto Call = SyntaxFactory::makeFunctionCallExpr(
+      SymbolicRef, LeftParen, ArgList, RightParen, None, None);
 
   {
     auto GottenExpression1 = Call.getCalledExpression();
@@ -435,8 +435,8 @@ TEST(ExprSyntaxTests, FunctionCallExprMakeAPIs) {
   auto RightParen = SyntaxFactory::makeRightParenToken({}, {});
 
   {
-    auto Call = SyntaxFactory::makeFunctionCallExpr(SymbolicRef, LeftParen,
-                                                    ArgList, RightParen, None);
+    auto Call = SyntaxFactory::makeFunctionCallExpr(
+        SymbolicRef, LeftParen, ArgList, RightParen, None, None);
     llvm::SmallString<64> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     Call.print(OS);

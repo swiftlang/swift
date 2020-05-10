@@ -89,6 +89,8 @@ SWIFT_REQUEST(TypeChecker, HasDynamicMemberLookupAttributeRequest,
               bool(CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDynamicCallableAttributeRequest,
               bool(CanType), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
+              bool(SourceFile *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature (ModuleDecl *, GenericSignatureImpl *,
                                  GenericParamSource,
@@ -128,6 +130,8 @@ SWIFT_REQUEST(TypeChecker, ValidatePrecedenceGroupRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
               std::string(const TypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ModuleImplicitImportsRequest,
+              ArrayRef<ImplicitImport>(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, NamingPatternRequest,
               NamedPattern *(VarDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,
@@ -150,6 +154,9 @@ SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyTypeRequest,
               Type(VarDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PropertyWrapperLValuenessRequest,
+              Optional<PropertyWrapperLValueness>(VarDecl *), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperMutabilityRequest,
               Optional<PropertyWrapperMutability>(VarDecl *), Cached,
               NoLocationInfo)
@@ -168,8 +175,8 @@ SWIFT_REQUEST(TypeChecker, RequiresOpaqueAccessorsRequest, bool(VarDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RequiresOpaqueModifyCoroutineRequest,
               bool(AbstractStorageDecl *), SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ResilienceExpansionRequest,
-              ResilienceExpansion(DeclContext *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, FragileFunctionKindRequest,
+              FragileFunctionKind(DeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SelfAccessKindRequest, SelfAccessKind(FuncDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StorageImplInfoRequest,
@@ -219,6 +226,8 @@ SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
 SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
               Type(ProtocolDecl *, TypeEraserAttr *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
+              Type (TypeResolution *, TypeRepr *), Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
               Cached, NoLocationInfo)

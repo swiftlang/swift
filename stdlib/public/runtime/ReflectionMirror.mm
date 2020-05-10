@@ -23,7 +23,6 @@
 #include "swift/Runtime/Portability.h"
 #include "Private.h"
 #include "WeakReference.h"
-#include "llvm/Support/Compiler.h"
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
@@ -755,7 +754,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
           return callClass();
         }
       }
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     }
 
     /// TODO: Implement specialized mirror witnesses for all kinds.

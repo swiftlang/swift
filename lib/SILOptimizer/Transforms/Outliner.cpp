@@ -742,6 +742,18 @@ void BridgedArgument::eraseFromParent() {
   BridgeFun->eraseFromParent();
 }
 
+static ReleaseValueInst *findReleaseOf(SILValue releasedValue,
+                                       SILBasicBlock::iterator from,
+                                       SILBasicBlock::iterator to) {
+  while (from != to) {
+    auto release = dyn_cast<ReleaseValueInst>(&*from);
+    if (release && release->getOperand() == releasedValue)
+      return release;
+    ++from;
+  }
+  return nullptr;
+}
+
 BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
                                        ApplyInst *AI) {
   // Match
@@ -782,8 +794,11 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
 
   // Make sure that if we have a bridged value release that it is on the bridged
   // value.
-  auto *BridgedValueRelease =
-      dyn_cast<ReleaseValueInst>(std::next(SILBasicBlock::iterator(Enum)));
+  if (Enum->getParent() != AI->getParent())
+    return BridgedArgument();
+  auto *BridgedValueRelease = dyn_cast_or_null<ReleaseValueInst>(
+      findReleaseOf(BridgedValue, std::next(SILBasicBlock::iterator(Enum)),
+                    SILBasicBlock::iterator(AI)));
   if (BridgedValueRelease && BridgedValueRelease->getOperand() != BridgedValue)
     return BridgedArgument();
 
@@ -1232,6 +1247,7 @@ bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
   SmallPtrSet<SILBasicBlock *, 32> Visited;
   SmallVector<SILBasicBlock *, 128> Worklist;
   OutlinePatterns patterns(FuncBuilder);
+  bool changed = false;
 
   // Traverse the function.
   Worklist.push_back(&*Fun->begin());
@@ -1252,6 +1268,7 @@ bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
            FunctionsAdded.push_back(F);
          CurInst = LastInst;
          assert(LastInst->getParent() == CurBlock);
+         changed = true;
        } else if (isa<TermInst>(CurInst)) {
          std::copy(CurBlock->succ_begin(), CurBlock->succ_end(),
                    std::back_inserter(Worklist));
@@ -1261,7 +1278,7 @@ bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
        }
     }
   }
-  return false;
+  return changed;
 }
 
 namespace {

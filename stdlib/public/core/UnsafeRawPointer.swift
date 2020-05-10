@@ -288,8 +288,8 @@ public struct UnsafeRawPointer: _Pointer {
   ///
   ///     let count = 4
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
-  ///             bytes: 100,
-  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///             byteCount: 100,
+  ///             alignment: MemoryLayout<Int8>.alignment)
   ///     let int8Pointer = bytesPointer.bindMemory(to: Int8.self, capacity: count)
   ///
   /// After calling `bindMemory(to:capacity:)`, the first four bytes of the
@@ -653,8 +653,8 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   ///     let count = 4
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
-  ///             bytes: 100,
-  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///             byteCount: 100,
+  ///             alignment: MemoryLayout<Int8>.alignment)
   ///     let int8Pointer = bytesPointer.bindMemory(to: Int8.self, capacity: count)
   ///
   /// After calling `bindMemory(to:capacity:)`, the first four bytes of the
@@ -716,7 +716,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
   ///             byteCount: count * MemoryLayout<Int8>.stride,
   ///             alignment: MemoryLayout<Int8>.alignment)
-  ///     let int8Pointer = myBytes.initializeMemory(
+  ///     let int8Pointer = bytesPointer.initializeMemory(
   ///             as: Int8.self, repeating: 0, count: count)
   ///
   ///     // After using 'int8Pointer':
@@ -764,8 +764,8 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   ///     let count = 4
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
-  ///             bytes: count * MemoryLayout<Int8>.stride,
-  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///             byteCount: count * MemoryLayout<Int8>.stride,
+  ///             alignment: MemoryLayout<Int8>.alignment)
   ///     let values: [Int8] = [1, 2, 3, 4]
   ///     let int8Pointer = values.withUnsafeBufferPointer { buffer in
   ///         return bytesPointer.initializeMemory(as: Int8.self,
@@ -776,7 +776,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///     // (int8Pointer + 3).pointee == 4
   ///
   ///     // After using 'int8Pointer':
-  ///     int8Pointer.deallocate(count)
+  ///     int8Pointer.deallocate()
   ///
   /// After calling this method on a raw pointer `p`, the region starting at
   /// `p` and continuing up to `p + count * MemoryLayout<T>.stride` is bound
@@ -933,7 +933,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   ///     let typedPointer = p.bindMemory(to: U.self, capacity: 1)
   ///     typedPointer.deinitialize(count: 1)
-  ///     p.initializeMemory(as: T.self, to: newValue)
+  ///     p.initializeMemory(as: T.self, repeating: newValue, count: 1)
   ///
   /// - Parameters:
   ///   - value: The value to store as raw bytes.

@@ -51,6 +51,7 @@ namespace swift {
   class TypeVariableType;
   class TypeBase;
   class TypeDecl;
+  class TypeLoc;
   class ValueDecl;
 
   /// We frequently use three tag bits on all of these types.
@@ -63,6 +64,7 @@ namespace swift {
   constexpr size_t PatternAlignInBits = 3;
   constexpr size_t SILFunctionAlignInBits = 2;
   constexpr size_t TypeVariableAlignInBits = 4;
+  constexpr size_t TypeLocAlignInBits = 3;
 }
 
 namespace llvm {
@@ -123,6 +125,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILFunction,
                             swift::SILFunctionAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::AttributeBase, swift::AttrAlignInBits)
+
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeLoc, swift::TypeLocAlignInBits)
 
 static_assert(alignof(void*) >= 2, "pointer alignment is too small");
 

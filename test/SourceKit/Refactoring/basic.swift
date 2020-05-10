@@ -106,6 +106,16 @@ struct TestDefaultedParen {
 
 TestDefaultedParen.init()
 
+struct HasInitWithDefaultArgs {
+  init(x: Int = 10, y: Int = 20, z: Int = 10)
+}
+
+HasInitWithDefaultArgs(z: 45)
+HasInitWithDefaultArgs(y: 45, z: 89)
+
+func `hasBackticks`(`x`: Int) {}
+`hasBackticks`(`x`:2)
+
 // RUN: %sourcekitd-test -req=cursor -pos=3:1 -end-pos=5:13 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK1
 
 // CHECK1: ACTIONS BEGIN
@@ -138,6 +148,18 @@ TestDefaultedParen.init()
 // RUN: %sourcekitd-test -req=cursor -pos=98:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
 
 // RUN: %sourcekitd-test -req=cursor -pos=107:20  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
+
+// RUN: %sourcekitd-test -req=cursor -pos=113:24  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=114:24  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=114:31  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=114:31  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+
+// RUN: %sourcekitd-test -req=cursor -pos=116:6  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=116:7  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:1  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:2  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:16  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=117:17  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 
 // RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
 // RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT

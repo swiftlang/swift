@@ -335,15 +335,19 @@ public:
   /// in generating a cached PCH file for the bridging header.
   std::string getPCHHash() const;
 
-  SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() const {
+  /// Retrieve the stdlib kind to implicitly import.
+  ImplicitStdlibKind getImplicitStdlibKind() const {
     if (getInputKind() == InputFileKind::SIL) {
-      return SourceFile::ImplicitModuleImportKind::None;
+      return ImplicitStdlibKind::None;
     }
     if (getParseStdlib()) {
-      return SourceFile::ImplicitModuleImportKind::Builtin;
+      return ImplicitStdlibKind::Builtin;
     }
-    return SourceFile::ImplicitModuleImportKind::Stdlib;
+    return ImplicitStdlibKind::Stdlib;
   }
+
+  /// Whether the Swift -Onone support library should be implicitly imported.
+  bool shouldImportSwiftONoneSupport() const;
 
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
@@ -386,9 +390,25 @@ public:
 
   std::string getLdAddCFileOutputPathForWholeModule() const;
 
+public:
+  /// Given the current configuration of this frontend invocation, a set of
+  /// supplementary output paths, and a module, compute the appropriate set of
+  /// serialization options.
+  ///
+  /// FIXME: The \p module parameter supports the
+  /// \c SerializeOptionsForDebugging hack.
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                              bool moduleIsPublic) const;
+                              const ModuleDecl *module) const;
+
+  /// Returns an approximation of whether the given module could be
+  /// redistributed and consumed by external clients.
+  ///
+  /// FIXME: The scope of this computation should be limited entirely to
+  /// PrintAsObjC. Unfortunately, it has been co-opted to support the
+  /// \c SerializeOptionsForDebugging hack. Once this information can be
+  /// transferred from module files to the dSYMs, remove this.
+  bool isModuleExternallyConsumed(const ModuleDecl *mod) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -405,7 +425,6 @@ class CompilerInstance {
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
-  std::unique_ptr<SILModule> TheSILModule;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
 
   /// Null if no tracker.
@@ -449,10 +468,6 @@ class CompilerInstance {
   /// If \p BufID is already in the set, do nothing.
   void recordPrimaryInputBuffer(unsigned BufID);
 
-  /// Record in PrimarySourceFiles the fact that \p SF is a primary, and
-  /// call recordPrimaryInputBuffer on \p SF's buffer (if it exists).
-  void recordPrimarySourceFile(SourceFile *SF);
-
   bool isWholeModuleCompilation() { return PrimaryBufferIDs.empty(); }
 
 public:
@@ -478,12 +493,9 @@ public:
 
   bool hasASTContext() const { return Context != nullptr; }
 
-  SILOptions &getSILOptions() { return Invocation.getSILOptions(); }
   const SILOptions &getSILOptions() const { return Invocation.getSILOptions(); }
 
   Lowering::TypeConverter &getSILTypes();
-
-  void createSILModule();
 
   void addDiagnosticConsumer(DiagnosticConsumer *DC) {
     Diagnostics.addConsumer(*DC);
@@ -501,16 +513,6 @@ public:
   const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
   UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
-
-  SILModule *getSILModule() {
-    return TheSILModule.get();
-  }
-
-  std::unique_ptr<SILModule> takeSILModule();
-
-  bool hasSILModule() {
-    return static_cast<bool>(TheSILModule);
-  }
 
   ModuleDecl *getMainModule() const;
 
@@ -555,9 +557,7 @@ public:
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
-  const CompilerInvocation &getInvocation() {
-    return Invocation;
-  }
+  const CompilerInvocation &getInvocation() const { return Invocation; }
 
   /// If a code completion buffer has been set, returns the corresponding source
   /// file.
@@ -640,55 +640,25 @@ public:
 private:
   SourceFile *
   createSourceFileForMainModule(SourceFileKind FileKind,
-                                SourceFile::ImplicitModuleImportKind ImportKind,
                                 Optional<unsigned> BufferID,
                                 SourceFile::ParsingOptions options = {});
 
 public:
   void freeASTContext();
 
-  /// Frees up the SILModule that this instance is holding on to.
-  void freeSILModule();
-
 private:
   /// Load stdlib & return true if should continue, i.e. no error
   bool loadStdlib();
-  ModuleDecl *importUnderlyingModule();
-  ModuleDecl *importBridgingHeader();
 
-  void
-  getImplicitlyImportedModules(SmallVectorImpl<ModuleDecl *> &importModules);
-
-public: // for static functions in Frontend.cpp
-  struct ImplicitImports {
-    SourceFile::ImplicitModuleImportKind kind;
-    ModuleDecl *objCModuleUnderlyingMixedFramework;
-    ModuleDecl *headerModule;
-    SmallVector<ModuleDecl *, 4> modules;
-
-    explicit ImplicitImports(CompilerInstance &compiler);
-  };
-
-  static void addAdditionalInitialImportsTo(
-    SourceFile *SF, const ImplicitImports &implicitImports);
-
-private:
-  void addMainFileToModule(const ImplicitImports &implicitImports);
+  /// Retrieve a description of which modules should be implicitly imported.
+  ImplicitImportInfo getImplicitImportInfo() const;
 
   void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
-  void parseAndCheckTypesUpTo(const ImplicitImports &implicitImports,
-                              SourceFile::ASTStage_t LimitStage);
-
-  void parseLibraryFile(unsigned BufferID,
-                        const ImplicitImports &implicitImports);
 
   /// Return true if had load error
-  bool
-  parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports);
+  bool parsePartialModulesAndInputFiles();
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
-
-  void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage);
 
   void finishTypeChecking();
 

@@ -32,6 +32,7 @@
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -56,6 +57,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
@@ -473,11 +475,20 @@ struct ASTContext::Implementation {
 
   /// The IRGen specific SIL transforms that have been registered.
   SILTransformCtors IRGenSILPasses;
+
+#if !SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  /// The scratch context used to allocate intrinsic data on behalf of \c swift::IntrinsicInfo
+  std::unique_ptr<llvm::LLVMContext> IntrinsicScratchContext;
+#endif
 };
 
 ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
-      TheSyntaxArena(new syntax::SyntaxArena()) {}
+      TheSyntaxArena(new syntax::SyntaxArena())
+#if !SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+      , IntrinsicScratchContext(new llvm::LLVMContext())
+#endif
+      {}
 ASTContext::Implementation::~Implementation() {
   for (auto &cleanup : Cleanups)
     cleanup();
@@ -541,7 +552,8 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
     SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
     evaluator(Diags,
               langOpts.DebugDumpCycles,
-              langOpts.BuildRequestDependencyGraph),
+              langOpts.BuildRequestDependencyGraph,
+              langOpts.EnableExperientalPrivateIntransitiveDependencies),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
@@ -1447,6 +1459,22 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
         static_cast<ClangModuleLoader *>(loader.get());
 
   getImpl().ModuleLoaders.push_back(std::move(loader));
+}
+
+Optional<ModuleDependencies> ASTContext::getModuleDependencies(
+    StringRef moduleName, bool isUnderlyingClangModule,
+    ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) {
+  for (auto &loader : getImpl().ModuleLoaders) {
+    if (isUnderlyingClangModule &&
+        loader.get() != getImpl().TheClangModuleLoader)
+      continue;
+
+    if (auto dependencies = loader->getModuleDependencies(moduleName, cache,
+                                                          delegate))
+      return dependencies;
+  }
+
+  return None;
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
@@ -4791,4 +4819,19 @@ AutoDiffDerivativeFunctionIdentifier *AutoDiffDerivativeFunctionIdentifier::get(
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
+}
+
+llvm::LLVMContext &ASTContext::getIntrinsicScratchContext() const {
+#if !SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return *getImpl().IntrinsicScratchContext.get();
+#endif
+}
+
+bool ASTContext::isASCIIString(StringRef s) const {
+  for (unsigned char c : s) {
+    if (c > 127) {
+      return false;
+    }
+  }
+  return true;
 }

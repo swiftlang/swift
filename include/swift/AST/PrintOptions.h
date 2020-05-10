@@ -280,6 +280,9 @@ struct PrintOptions {
   /// Whether this print option is for printing .swiftinterface file
   bool IsForSwiftInterface = false;
 
+  /// Whether to print generic requirements in a where clause.
+  bool PrintGenericRequirements = true;
+
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.

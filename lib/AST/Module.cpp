@@ -143,7 +143,7 @@ class swift::SourceLookupCache {
   public:
     void add(ValueDecl *VD) {
       if (!VD->hasName()) return;
-      VD->getFullName().addToLookupTable(Members, VD);
+      VD->getName().addToLookupTable(Members, VD);
     }
 
     void clear() {
@@ -389,7 +389,7 @@ void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
     for (ValueDecl *vd : tlv.second) {
       // Declarations are added under their full and simple names.  Skip the
       // entry for the simple name so that we report each declaration once.
-      if (tlv.first.isSimpleName() && !vd->getFullName().isSimpleName())
+      if (tlv.first.isSimpleName() && !vd->getName().isSimpleName())
         continue;
       Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
     }
@@ -464,15 +464,24 @@ void SourceLookupCache::invalidate() {
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
-  : DeclContext(DeclContextKind::Module, nullptr),
-    TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }) {
+ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
+                       ImplicitImportInfo importInfo)
+    : DeclContext(DeclContextKind::Module, nullptr),
+      TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), {}),
+      ImportInfo(importInfo) {
 
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
 
   setAccess(AccessLevel::Public);
+}
+
+ArrayRef<ImplicitImport> ModuleDecl::getImplicitImports() const {
+  auto &evaluator = getASTContext().evaluator;
+  auto *mutableThis = const_cast<ModuleDecl *>(this);
+  return evaluateOrDefault(evaluator, ModuleImplicitImportsRequest{mutableThis},
+                           {});
 }
 
 bool ModuleDecl::isClangModule() const {
@@ -1094,7 +1103,7 @@ public:
   /// Only intended for use by lookupOperatorDeclForName.
   static ArrayRef<SourceFile::ImportedModuleDesc>
   getImportsForSourceFile(const SourceFile &SF) {
-    return SF.Imports;
+    return *SF.Imports;
   }
 };
 
@@ -1206,7 +1215,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
   ImportedOperatorsMap<OP_DECL> importedOperators;
   for (auto &imported : SourceFile::Impl::getImportsForSourceFile(SF)) {
     // Protect against source files that contrive to import their own modules.
-    if (imported.module.second == ownModule)
+    if (imported.module.importedModule == ownModule)
       continue;
 
     bool isExported =
@@ -1214,9 +1223,8 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc,
     if (!includePrivate && !isExported)
       continue;
 
-    Optional<OP_DECL *> maybeOp =
-        lookupOperatorDeclForName<OP_DECL>(imported.module.second, Loc, Name,
-                                           isCascading);
+    Optional<OP_DECL *> maybeOp = lookupOperatorDeclForName<OP_DECL>(
+        imported.module.importedModule, Loc, Name, isCascading);
     if (!maybeOp)
       return None;
     
@@ -1270,10 +1278,6 @@ OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
   if (!result.hasValue())
     return nullptr;
 
-  if (!result.getValue() ||
-      result.getValue()->getDeclContext()->getModuleScopeContext() != file) {
-    namelookup::recordLookupOfTopLevelName(file, desc.name, desc.isCascading);
-  }
   if (!result.getValue()) {
     result = lookupOperatorDeclForName<OperatorType>(file->getParentModule(),
                                                      desc.diagLoc, desc.name,
@@ -1282,51 +1286,27 @@ OperatorType *LookupOperatorRequest<OperatorType>::evaluate(
   return result.hasValue() ? result.getValue() : nullptr;
 }
 
-template <typename OperatorType>
-void LookupOperatorRequest<OperatorType>::writeDependencySink(
-    Evaluator &evaluator, ReferencedNameTracker &reqTracker,
-    OperatorType *o) const {
-  auto &desc = std::get<0>(this->getStorage());
-  auto *FU = desc.fileOrModule.template get<FileUnit *>();
-  auto shouldRegisterDependencyEdge = [&FU](OperatorType *o) -> bool {
-    if (!o)
-      return true;
-
-    auto *topLevelContext = o->getDeclContext()->getModuleScopeContext();
-    return topLevelContext != FU;
-  };
-
-  // FIXME(Evaluator Incremental Dependencies): This is all needlessly complex.
-  // For one, it does not take into account the fact that precedence groups can
-  // be shadowed, and so should be registered regardless of their defining
-  // module. Second, lookups for operators within the file define a valid named
-  // dependency just as much as lookups outside of the current source file.
-  if (!shouldRegisterDependencyEdge(o)) {
-    return;
-  }
-
-  reqTracker.addTopLevelName(desc.name, desc.isCascading);
-}
-
 #define LOOKUP_OPERATOR(Kind)                                                  \
   Kind##Decl *ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) {       \
-    auto result =                                                              \
-        lookupOperatorDeclForName<Kind##Decl>(this, loc, name,                 \
-                                              /*isCascading*/ false);          \
+    auto result = lookupOperatorDeclForName<Kind##Decl>(                       \
+        this, loc, name, /*isCascading*/ false);                               \
     return result ? *result : nullptr;                                         \
   }                                                                            \
-  template Kind##Decl *                                                        \
-  LookupOperatorRequest<Kind##Decl>::evaluate(Evaluator &e,                    \
-                                              OperatorLookupDescriptor) const; \
-  template                                                                     \
-  void LookupOperatorRequest<Kind##Decl>::writeDependencySink(                 \
-           Evaluator &, ReferencedNameTracker &, Kind##Decl *) const;          \
+  template Kind##Decl *LookupOperatorRequest<Kind##Decl>::evaluate(            \
+      Evaluator &e, OperatorLookupDescriptor) const;
 
 LOOKUP_OPERATOR(PrefixOperator)
 LOOKUP_OPERATOR(InfixOperator)
 LOOKUP_OPERATOR(PostfixOperator)
 LOOKUP_OPERATOR(PrecedenceGroup)
 #undef LOOKUP_OPERATOR
+
+void DirectOperatorLookupRequest::writeDependencySink(
+    evaluator::DependencyCollector &reqTracker,
+    TinyPtrVector<OperatorDecl *> ops) const {
+  auto &desc = std::get<0>(getStorage());
+  reqTracker.addTopLevelName(desc.name);
+}
 
 TinyPtrVector<OperatorDecl *>
 DirectOperatorLookupRequest::evaluate(Evaluator &evaluator,
@@ -1354,6 +1334,13 @@ void SourceFile::lookupOperatorDirect(
     Identifier name, OperatorFixity fixity,
     TinyPtrVector<OperatorDecl *> &results) const {
   getCache().lookupOperator(name, fixity, results);
+}
+
+void DirectPrecedenceGroupLookupRequest::writeDependencySink(
+    evaluator::DependencyCollector &reqTracker,
+    TinyPtrVector<PrecedenceGroupDecl *> groups) const {
+  auto &desc = std::get<0>(getStorage());
+  reqTracker.addTopLevelName(desc.name);
 }
 
 TinyPtrVector<PrecedenceGroupDecl *>
@@ -1399,7 +1386,10 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
   // We currently handle this for a direct import from the overlay, but not when
   // it happens through other imports.
   assert(filter && "no imports requested?");
-  for (auto desc : Imports) {
+  if (!Imports)
+    return;
+
+  for (auto desc : *Imports) {
     ModuleDecl::ImportFilter requiredFilter;
     if (desc.importOptions.contains(ImportFlags::Exported))
       requiredFilter |= ModuleDecl::ImportFilterKind::Public;
@@ -1410,11 +1400,27 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
     else
       requiredFilter |= ModuleDecl::ImportFilterKind::Private;
 
-    if (!separatelyImportedOverlays.lookup(desc.module.second).empty())
+    if (!separatelyImportedOverlays.lookup(desc.module.importedModule).empty())
       requiredFilter |= ModuleDecl::ImportFilterKind::ShadowedBySeparateOverlay;
 
     if (filter.contains(requiredFilter))
       modules.push_back(desc.module);
+  }
+}
+
+void SourceFile::dumpSeparatelyImportedOverlays() const {
+  for (auto &pair : separatelyImportedOverlays) {
+    auto &underlying = std::get<0>(pair);
+    auto &overlays = std::get<1>(pair);
+
+    llvm::errs() << (void*)underlying << " ";
+    underlying->dump(llvm::errs());
+
+    for (auto overlay : overlays) {
+      llvm::errs() << "- ";
+      llvm::errs() << (void*)overlay << " ";
+      overlay->dump(llvm::errs());
+    }
   }
 }
 
@@ -1479,9 +1485,9 @@ void
 ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out,
                                                   StringRef delim) const {
   SmallVector<StringRef, 8> elements(*this, {});
-  swift::interleave(llvm::reverse(elements),
-                    [&out](StringRef next) { out << next; },
-                    [&out, delim] { out << delim; });
+  llvm::interleave(
+      llvm::reverse(elements), [&out](StringRef next) { out << next; },
+      [&out, delim] { out << delim; });
 }
 
 void
@@ -1489,26 +1495,26 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
   std::sort(imports.begin(), imports.end(),
             [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
     // Arbitrarily sort by name to get a deterministic order.
-    if (lhs.second != rhs.second) {
+    if (lhs.importedModule != rhs.importedModule) {
       return std::lexicographical_compare(
-          lhs.second->getReverseFullModuleName(), {},
-          rhs.second->getReverseFullModuleName(), {});
+          lhs.importedModule->getReverseFullModuleName(), {},
+          rhs.importedModule->getReverseFullModuleName(), {});
     }
     using AccessPathElem = Located<Identifier>;
-    return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
-                                        rhs.first.begin(), rhs.first.end(),
-                                        [](const AccessPathElem &lElem,
-                                           const AccessPathElem &rElem) {
-      return lElem.Item.str() < rElem.Item.str();
-    });
+    return std::lexicographical_compare(
+        lhs.accessPath.begin(), lhs.accessPath.end(), rhs.accessPath.begin(),
+        rhs.accessPath.end(),
+        [](const AccessPathElem &lElem, const AccessPathElem &rElem) {
+          return lElem.Item.str() < rElem.Item.str();
+        });
   });
-  auto last = std::unique(imports.begin(), imports.end(),
-                          [](const ImportedModule &lhs,
-                             const ImportedModule &rhs) -> bool {
-    if (lhs.second != rhs.second)
-      return false;
-    return ModuleDecl::isSameAccessPath(lhs.first, rhs.first);
-  });
+  auto last = std::unique(
+      imports.begin(), imports.end(),
+      [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
+        if (lhs.importedModule != rhs.importedModule)
+          return false;
+        return ModuleDecl::isSameAccessPath(lhs.accessPath, rhs.accessPath);
+      });
   imports.erase(last, imports.end());
 }
 
@@ -1554,16 +1560,17 @@ bool ModuleDecl::isBuiltinModule() const {
   return this == getASTContext().TheBuiltinModule;
 }
 
-bool SourceFile::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
-  if (mainClass == MainClass)
+bool SourceFile::registerMainDecl(Decl *mainDecl, SourceLoc diagLoc) {
+  if (mainDecl == MainDecl)
     return false;
 
-  ArtificialMainKind kind = mainClass->getArtificialMainKind();
+  ArtificialMainKind kind = mainDecl->getArtificialMainKind();
   if (getParentModule()->registerEntryPointFile(this, diagLoc, kind))
     return true;
 
-  MainClass = mainClass;
-  MainClassDiagLoc = diagLoc;
+  MainDecl = mainDecl;
+  MainDeclDiagLoc = diagLoc;
+
   return false;
 }
 
@@ -1583,53 +1590,59 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   enum : unsigned {
     UIApplicationMainClass = 0,
     NSApplicationMainClass = 1,
-  } mainClassDiagKind;
+    MainType = 2,
+  } mainTypeDiagKind;
 
   switch (kind.getValue()) {
   case ArtificialMainKind::UIApplicationMain:
-    mainClassDiagKind = UIApplicationMainClass;
+    mainTypeDiagKind = UIApplicationMainClass;
     break;
   case ArtificialMainKind::NSApplicationMain:
-    mainClassDiagKind = NSApplicationMainClass;
+    mainTypeDiagKind = NSApplicationMainClass;
+    break;
+  case ArtificialMainKind::TypeMain:
+    mainTypeDiagKind = MainType;
     break;
   }
 
   FileUnit *existingFile = EntryPointInfo.getEntryPointFile();
-  const ClassDecl *existingClass = existingFile->getMainClass();
+  const Decl *existingDecl = existingFile->getMainDecl();
   SourceLoc existingDiagLoc;
 
   if (auto *sourceFile = dyn_cast<SourceFile>(existingFile)) {
-    if (existingClass) {
-      existingDiagLoc = sourceFile->getMainClassDiagLoc();
+    if (existingDecl) {
+      existingDiagLoc = sourceFile->getMainDeclDiagLoc();
     } else {
       if (auto bufID = sourceFile->getBufferID())
         existingDiagLoc = getASTContext().SourceMgr.getLocForBufferStart(*bufID);
     }
   }
 
-  if (existingClass) {
+  if (existingDecl) {
     if (EntryPointInfo.markDiagnosedMultipleMainClasses()) {
-      // If we already have a main class, and we haven't diagnosed it,
+      // If we already have a main type, and we haven't diagnosed it,
       // do so now.
       if (existingDiagLoc.isValid()) {
-        getASTContext().Diags.diagnose(existingDiagLoc, diag::attr_ApplicationMain_multiple,
-                           mainClassDiagKind);
+        getASTContext().Diags.diagnose(existingDiagLoc,
+                                       diag::attr_ApplicationMain_multiple,
+                                       mainTypeDiagKind);
       } else {
-        getASTContext().Diags.diagnose(existingClass, diag::attr_ApplicationMain_multiple,
-                           mainClassDiagKind);
+        getASTContext().Diags.diagnose(existingDecl,
+                                       diag::attr_ApplicationMain_multiple,
+                                       mainTypeDiagKind);
       }
     }
 
     // Always diagnose the new class.
     getASTContext().Diags.diagnose(diagLoc, diag::attr_ApplicationMain_multiple,
-                       mainClassDiagKind);
+                                   mainTypeDiagKind);
 
   } else {
     // We don't have an existing class, but we /do/ have a file in script mode.
     // Diagnose that.
     if (EntryPointInfo.markDiagnosedMainClassWithScript()) {
-      getASTContext().Diags.diagnose(diagLoc, diag::attr_ApplicationMain_with_script,
-                         mainClassDiagKind);
+      getASTContext().Diags.diagnose(
+          diagLoc, diag::attr_ApplicationMain_with_script, mainTypeDiagKind);
 
       if (existingDiagLoc.isValid()) {
         getASTContext().Diags.diagnose(existingDiagLoc,
@@ -1662,22 +1675,17 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
   topLevel->getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
-  stack.emplace_back(ModuleDecl::AccessPathTy(),
-                     const_cast<ModuleDecl *>(topLevel));
+  auto topLevelModule =
+      ModuleDecl::ImportedModule{ModuleDecl::AccessPathTy(), topLevel};
+  stack.emplace_back(topLevelModule);
 
   while (!stack.empty()) {
-    auto next = stack.pop_back_val().second;
+    auto next = stack.pop_back_val().importedModule;
 
     if (!visited.insert(next).second)
       continue;
 
     if (next->getName() != getParentModule()->getName()) {
-      // Hack: Assume other REPL files already have their libraries linked.
-      if (!next->getFiles().empty())
-        if (auto *nextSource = dyn_cast<SourceFile>(next->getFiles().front()))
-          if (nextSource->Kind == SourceFileKind::REPL)
-            continue;
-
       next->collectLinkLibraries(callback);
     }
 
@@ -1691,6 +1699,14 @@ bool ModuleDecl::walk(ASTWalker &Walker) {
     if (SF->walk(Walker))
       return true;
   return false;
+}
+
+ModuleDecl *ModuleDecl::getUnderlyingModuleIfOverlay() const {
+  for (auto *FU : getFiles()) {
+    if (auto *Mod = FU->getUnderlyingModuleIfOverlay())
+      return Mod;
+  }
+  return nullptr;
 }
 
 const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
@@ -1796,6 +1812,9 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
   SourceLoc unused;
 
   worklist.push_back(this);
+  if (auto *clangModule = getUnderlyingModuleIfOverlay())
+    worklist.push_back(clangModule);
+
   while (!worklist.empty()) {
     ModuleDecl *current = worklist.back();
     worklist.pop_back();
@@ -1815,10 +1834,34 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
           if (seen.insert(overlayMod).second) {
             overlayModules.push_back(overlayMod);
             worklist.push_back(overlayMod);
+            if (auto *clangModule = overlayMod->getUnderlyingModuleIfOverlay())
+              worklist.push_back(clangModule);
           }
         }
       }
     }
+  }
+}
+
+namespace {
+  using CrossImportMap =
+      llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>;
+
+
+  Identifier getBystanderIfDeclaring(ModuleDecl *mod, ModuleDecl *overlay,
+                                     CrossImportMap modCrossImports) {
+    auto ret = std::find_if(modCrossImports.begin(), modCrossImports.end(),
+                            [&](CrossImportMap::iterator::value_type &pair) {
+      for (OverlayFile *file: std::get<1>(pair)) {
+        ArrayRef<Identifier> overlays = file->getOverlayModuleNames(
+            mod, SourceLoc(), std::get<0>(pair));
+        if (std::find(overlays.begin(), overlays.end(),
+                      overlay->getName()) != overlays.end())
+          return true;
+      }
+      return false;
+    });
+    return ret != modCrossImports.end() ? ret->first : Identifier();
   }
 }
 
@@ -1839,30 +1882,24 @@ ModuleDecl::getDeclaringModuleAndBystander() {
 
   getImportedModules(imported, ModuleDecl::ImportFilterKind::Public);
   while (!imported.empty()) {
-    ModuleDecl *importedModule = std::get<1>(imported.back());
+    ModuleDecl *importedModule = imported.back().importedModule;
     imported.pop_back();
     if (!seen.insert(importedModule).second)
       continue;
 
-    using CrossImportMap =
-        llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>;
-    CrossImportMap &crossImports = importedModule->declaredCrossImports;
+    Identifier bystander = getBystanderIfDeclaring(
+        importedModule, overlayModule, importedModule->declaredCrossImports);
+    if (!bystander.empty())
+      return *(declaringModuleAndBystander = {importedModule, bystander});
 
-    // If any of MD's cross imports declare this module as its overlay, report
-    // MD as the underlying module.
-    auto ret = std::find_if(crossImports.begin(), crossImports.end(),
-                            [&](CrossImportMap::iterator::value_type &pair) {
-      for (OverlayFile *file: std::get<1>(pair)) {
-        ArrayRef<Identifier> overlays = file->getOverlayModuleNames(
-            importedModule, SourceLoc(), std::get<0>(pair));
-        if (std::find(overlays.begin(), overlays.end(),
-                      overlayModule->getName()) != overlays.end())
-          return true;
-      }
-      return false;
-    });
-    if (ret != crossImports.end())
-      return *(declaringModuleAndBystander = {importedModule, ret->first});
+    // Also check the imported module's underlying module if it's a traditional
+    // overlay (i.e. not a cross-import overlay).
+    if (auto *clangModule = importedModule->getUnderlyingModuleIfOverlay()) {
+      Identifier bystander = getBystanderIfDeclaring(
+          clangModule, overlayModule, clangModule->declaredCrossImports);
+      if (!bystander.empty())
+        return *(declaringModuleAndBystander = {clangModule, bystander});
+    }
 
     if (!importedModule->hasUnderscoredNaming())
       continue;
@@ -1878,8 +1915,9 @@ ModuleDecl::getDeclaringModuleAndBystander() {
 
 bool ModuleDecl::isCrossImportOverlayOf(ModuleDecl *other) {
   ModuleDecl *current = this;
+  ModuleDecl *otherClang = other->getUnderlyingModuleIfOverlay();
   while ((current = current->getDeclaringModuleAndBystander().first)) {
-    if (current == other)
+    if (current == other || current == otherClang)
       return true;
   }
   return false;
@@ -1894,10 +1932,11 @@ ModuleDecl *ModuleDecl::getDeclaringModuleIfCrossImportOverlay() {
 
 bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
     ModuleDecl *declaring, SmallVectorImpl<Identifier> &bystanderNames) {
+  auto *clangModule = declaring->getUnderlyingModuleIfOverlay();
   auto current = std::make_pair(this, Identifier());
   while ((current = current.first->getDeclaringModuleAndBystander()).first) {
     bystanderNames.push_back(current.second);
-    if (current.first == declaring)
+    if (current.first == declaring || current.first == clangModule)
       return true;
   }
   return false;
@@ -2027,27 +2066,25 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   }
 }
 
-void SourceFile::addImports(ArrayRef<ImportedModuleDesc> IM) {
-  if (IM.empty())
-    return;
-  ASTContext &ctx = getASTContext();
-  auto newBuf =
-      ctx.AllocateUninitialized<ImportedModuleDesc>(Imports.size() + IM.size());
+void SourceFile::setImports(ArrayRef<ImportedModuleDesc> imports) {
+  assert(!Imports && "Already computed imports");
+  Imports = getASTContext().AllocateCopy(imports);
+}
 
-  auto iter = newBuf.begin();
-  iter = std::uninitialized_copy(Imports.begin(), Imports.end(), iter);
-  iter = std::uninitialized_copy(IM.begin(), IM.end(), iter);
-  assert(iter == newBuf.end());
+bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
+                                                   SourceFile *SF) const {
+  using ModuleDesc = SourceFile::ImportedModuleDesc;
+  return llvm::any_of(SF->getImports(), [](ModuleDesc desc) {
+    return desc.importOptions.contains(
+        SourceFile::ImportFlags::ImplementationOnly);
+  });
+}
 
-  Imports = newBuf;
-
-  // Update the HasImplementationOnlyImports flag.
-  if (!HasImplementationOnlyImports) {
-    for (auto &desc : IM) {
-      if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
-        HasImplementationOnlyImports = true;
-    }
-  }
+bool SourceFile::hasImplementationOnlyImports() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, HasImplementationOnlyImportsRequest{mutableThis}, false);
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
@@ -2061,18 +2098,18 @@ bool SourceFile::hasTestableOrPrivateImport(
     // filename does not need to match (and we don't serialize it for such
     // decls).
     return std::any_of(
-        Imports.begin(), Imports.end(),
+        Imports->begin(), Imports->end(),
         [module, queryKind](ImportedModuleDesc desc) -> bool {
           if (queryKind == ImportQueryKind::TestableAndPrivate)
-            return desc.module.second == module &&
+            return desc.module.importedModule == module &&
                    (desc.importOptions.contains(ImportFlags::PrivateImport) ||
                     desc.importOptions.contains(ImportFlags::Testable));
           else if (queryKind == ImportQueryKind::TestableOnly)
-            return desc.module.second == module &&
+            return desc.module.importedModule == module &&
                    desc.importOptions.contains(ImportFlags::Testable);
           else {
             assert(queryKind == ImportQueryKind::PrivateOnly);
-            return desc.module.second == module &&
+            return desc.module.importedModule == module &&
                    desc.importOptions.contains(ImportFlags::PrivateImport);
           }
         });
@@ -2103,9 +2140,9 @@ bool SourceFile::hasTestableOrPrivateImport(
   if (filename.empty())
     return false;
 
-  return std::any_of(Imports.begin(), Imports.end(),
+  return std::any_of(Imports->begin(), Imports->end(),
                      [module, filename](ImportedModuleDesc desc) -> bool {
-                       return desc.module.second == module &&
+                       return desc.module.importedModule == module &&
                               desc.importOptions.contains(
                                   ImportFlags::PrivateImport) &&
                               desc.filename == filename;
@@ -2121,14 +2158,14 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
 
   // Look at the imports of this source file.
-  for (auto &desc : Imports) {
+  for (auto &desc : *Imports) {
     // Ignore implementation-only imports.
     if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
       continue;
 
     // If the module is imported this way, it's not imported
     // implementation-only.
-    if (imports.isImportedBy(module, desc.module.second))
+    if (imports.isImportedBy(module, desc.module.importedModule))
       return false;
   }
 
@@ -2138,9 +2175,9 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 
 void SourceFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
                                     SmallVectorImpl<Identifier> &spiGroups) const {
-  for (auto &import : Imports) {
+  for (auto &import : *Imports) {
     if (import.importOptions.contains(ImportFlags::SPIAccessControl) &&
-        importedModule == std::get<ModuleDecl*>(import.module)) {
+        importedModule == import.module.importedModule) {
       auto importedSpis = import.spiGroups;
       spiGroups.append(importedSpis.begin(), importedSpis.end());
     }
@@ -2243,36 +2280,6 @@ SourceFile::cacheVisibleDecls(SmallVectorImpl<ValueDecl*> &&globals) const {
 const SmallVectorImpl<ValueDecl *> &
 SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
-}
-
-static void performAutoImport(
-    SourceFile &SF,
-    SourceFile::ImplicitModuleImportKind implicitModuleImportKind) {
-  if (SF.Kind == SourceFileKind::SIL)
-    assert(implicitModuleImportKind ==
-           SourceFile::ImplicitModuleImportKind::None);
-
-  ASTContext &Ctx = SF.getASTContext();
-  ModuleDecl *M = nullptr;
-
-  switch (implicitModuleImportKind) {
-  case SourceFile::ImplicitModuleImportKind::None:
-    return;
-  case SourceFile::ImplicitModuleImportKind::Builtin:
-    M = Ctx.TheBuiltinModule;
-    break;
-  case SourceFile::ImplicitModuleImportKind::Stdlib:
-    M = Ctx.getStdlibModule(true);
-    break;
-  }
-
-  assert(M && "unable to auto-import module");
-
-  // FIXME: These will be the same for most source files, but we copy them
-  // over and over again.
-  auto Imports = SourceFile::ImportedModuleDesc(
-      ModuleDecl::ImportedModule({}, M), SourceFile::ImportOptions());
-  SF.addImports(Imports);
 }
 
 llvm::StringMap<SourceFilePathInfo>
@@ -2415,14 +2422,12 @@ ModuleDecl::computeMagicFileStringMap(bool shouldDiagnose) const {
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       ImplicitModuleImportKind ModImpKind,
                        bool KeepParsedTokens, bool BuildSyntaxTree,
                        ParsingOptions parsingOpts)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
       ParsingOpts(parsingOpts), Kind(K),
       SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
-  performAutoImport(*this, ModImpKind);
 
   if (isScriptMode()) {
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);
@@ -2450,7 +2455,6 @@ bool SourceFile::shouldCollectToken() const {
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
     return (bool)AllCorrectedTokens;
-  case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;
   }
@@ -2467,7 +2471,6 @@ bool SourceFile::canBeParsedInFull() const {
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
     return true;
-  case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;
   }
@@ -2479,7 +2482,7 @@ bool SourceFile::hasDelayedBodyParsing() const {
     return false;
 
   // Not supported right now.
-  if (Kind == SourceFileKind::REPL || Kind == SourceFileKind::SIL)
+  if (Kind == SourceFileKind::SIL)
     return false;
   if (hasInterfaceHash())
     return false;
@@ -2563,7 +2566,6 @@ StringRef SourceFile::getFilename() const {
 }
 
 ASTScope &SourceFile::getScope() {
-  assert(isSuitableForASTScopes() && "Should not be creating scope tree");
   if (!Scope)
     Scope = std::unique_ptr<ASTScope>(new (getASTContext()) ASTScope(this));
   return *Scope.get();
@@ -2627,23 +2629,17 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 }
 
 void SourceFile::createReferencedNameTracker() {
-  assert(!ReferencedNames && "This file already has a name tracker.");
   assert(!RequestReferencedNames && "This file already has a name tracker.");
-  ReferencedNames.emplace(ReferencedNameTracker());
   RequestReferencedNames.emplace(ReferencedNameTracker());
 }
 
 const ReferencedNameTracker *
 SourceFile::getConfiguredReferencedNameTracker() const {
-  if (getASTContext().LangOpts.EnableRequestBasedIncrementalDependencies) {
-    return getRequestBasedReferencedNameTracker();
-  } else {
-    return getLegacyReferencedNameTracker();
-  }
+  return getRequestBasedReferencedNameTracker();
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
-  for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes) {
+  for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes.takeVector()) {
     if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
       auto inserted = ValidatedOpaqueReturnTypes.insert(
                 {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
@@ -2654,7 +2650,6 @@ ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
     }
   }
 
-  UnvalidatedDeclsWithOpaqueReturnTypes.clear();
   return OpaqueReturnTypes;
 }
 
@@ -2694,16 +2689,21 @@ SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   if (!PrivateDiscriminator.empty())
     return PrivateDiscriminator;
 
-  assert(1 == count_if(getParentModule()->getFiles(),
-                       [](const FileUnit *FU) -> bool {
-                         return isa<SynthesizedFileUnit>(FU);
-                       }) &&
-         "Cannot promise uniqueness if multiple synthesized file units exist");
+  StringRef sourceFileName = getSourceFile().getFilename();
+  if (sourceFileName.empty()) {
+    assert(1 == count_if(getParentModule()->getFiles(),
+                         [](const FileUnit *FU) -> bool {
+                           return isa<SourceFile>(FU) &&
+                                  cast<SourceFile>(FU)->getFilename().empty();
+                         }) &&
+           "Cannot promise uniqueness if multiple source files are nameless");
+  }
 
   // Use a discriminator invariant across Swift version: a hash of the module
-  // name and a special string.
+  // name, the parent source file name, and a special string.
   llvm::MD5 hash;
   hash.update(getParentModule()->getName().str());
+  hash.update(llvm::sys::path::filename(sourceFileName));
   // TODO: Use a more robust discriminator for synthesized files. Pick something
   // that cannot conflict with `SourceFile` discriminators.
   hash.update("SYNTHESIZED FILE");
@@ -2725,7 +2725,7 @@ void SynthesizedFileUnit::lookupValue(
     DeclName name, NLKind lookupKind,
     SmallVectorImpl<ValueDecl *> &result) const {
   for (auto *decl : TopLevelDecls) {
-    if (decl->getFullName().matchesRef(name))
+    if (decl->getName().matchesRef(name))
       result.push_back(decl);
   }
 }

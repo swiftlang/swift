@@ -311,9 +311,9 @@ _Block_release(void) { }\n")
               # Reboot the device and remove everything in its tmp
               # directory. Build products and test executables are pushed
               # to that directory when running the test suite.
-              ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
+              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_clean.py"
           COMMAND
-              ${PYTHON_EXECUTABLE} "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
+              $<TARGET_FILE:Python3::Interpreter> "${SWIFT_SOURCE_DIR}/utils/android/adb_push_built_products.py"
               --ndk "${SWIFT_ANDROID_NDK_PATH}"
               --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
               --destination-arch "${ARCH}"

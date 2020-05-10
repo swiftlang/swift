@@ -92,6 +92,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DenseMap<const void *, llvm::TrackingMDNodeRef> DIModuleCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   TrackingDIRefMap DIRefMap;
+  TrackingDIRefMap InnerTypeCache;
   /// @}
 
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
@@ -589,13 +590,16 @@ private:
   static SILType getResultTypeForDebugInfo(IRGenModule &IGM,
                                            CanSILFunctionType fnTy) {
     if (fnTy->getNumResults() == 1) {
-      return fnTy->getResults()[0].getSILStorageType(IGM.getSILModule(), fnTy);
+      return fnTy->getResults()[0].getSILStorageType(
+          IGM.getSILModule(), fnTy, IGM.getMaximalTypeExpansionContext());
     } else if (!fnTy->getNumIndirectFormalResults()) {
-      return fnTy->getDirectFormalResultsType(IGM.getSILModule());
+      return fnTy->getDirectFormalResultsType(
+          IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
     } else {
       SmallVector<TupleTypeElt, 4> eltTys;
       for (auto &result : fnTy->getResults()) {
-        eltTys.push_back(result.getReturnValueType(IGM.getSILModule(), fnTy));
+        eltTys.push_back(result.getReturnValueType(
+            IGM.getSILModule(), fnTy, IGM.getMaximalTypeExpansionContext()));
       }
       return SILType::getPrimitiveAddressType(
           CanType(TupleType::get(eltTys, fnTy->getASTContext())));
@@ -620,7 +624,9 @@ private:
     // type. We currently represent a function with one n-tuple argument
     // as an n-ary function.
     for (auto Param : FnTy->getParameters())
-      createParameterType(Parameters, IGM.silConv.getSILType(Param, FnTy));
+      createParameterType(
+          Parameters, IGM.silConv.getSILType(
+                          Param, FnTy, IGM.getMaximalTypeExpansionContext()));
 
     return DBuilder.getOrCreateTypeArray(Parameters);
   }
@@ -716,7 +722,7 @@ private:
   }
   
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
-    ModuleDecl *M = IM.second;
+    ModuleDecl *M = IM.importedModule;
     if (Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
       return getOrCreateModule(*ModuleDesc, ModuleDesc->getModuleOrNull());
     StringRef Path = getFilenameFromDC(M);
@@ -765,7 +771,7 @@ private:
   }
 
   StringRef getMangledName(DebugTypeInfo DbgTy) {
-    if (DbgTy.IsMetadataType)
+    if (DbgTy.isMetadataType())
       return MetadataTypeDeclCache.find(DbgTy.getDecl()->getName().str())
           ->getKey();
 
@@ -829,12 +835,12 @@ private:
                                         llvm::DINode::DIFlags Flags) {
     unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
     auto *Ty = getOrCreateType(DbgTy);
-    auto *DITy = DBuilder.createMemberType(Scope, Name, File, 0,
-                                           SizeOfByte * DbgTy.size.getValue(),
-                                           0, OffsetInBits, Flags, Ty);
+    auto *DITy = DBuilder.createMemberType(
+        Scope, Name, File, 0, SizeOfByte * DbgTy.getSize().getValue(), 0,
+        OffsetInBits, Flags, Ty);
     OffsetInBits += getSizeInBits(Ty);
-    OffsetInBits =
-        llvm::alignTo(OffsetInBits, SizeOfByte * DbgTy.align.getValue());
+    OffsetInBits = llvm::alignTo(OffsetInBits,
+                                 SizeOfByte * DbgTy.getAlignment().getValue());
     return DITy;
   }
 
@@ -929,8 +935,9 @@ private:
         // one of the raw type as long as it is large enough to hold
         // all enum values. Use the raw type for the debug type, but
         // the storage size from the enum.
-        ElemDbgTy = DebugTypeInfo(ED->getRawType(), DbgTy.StorageType,
-                                  DbgTy.size, DbgTy.align, true, false);
+        ElemDbgTy =
+            DebugTypeInfo(ED->getRawType(), DbgTy.getStorageType(),
+                          DbgTy.getSize(), DbgTy.getAlignment(), true, false);
       else if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
         // A discriminated union. This should really be described as a
         // DW_TAG_variant_type. For now only describing the data.
@@ -941,12 +948,13 @@ private:
         // Discriminated union case without argument. Fallback to Int
         // as the element type; there is no storage here.
         Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
-        ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, Size(0),
+        ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.getStorageType(), Size(0),
                                   Alignment(1), true, false);
       }
       unsigned Offset = 0;
-      auto MTy = createMemberType(ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
-                                  Offset, Scope, File, Flags);
+      auto MTy =
+          createMemberType(ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
+                           Offset, Scope, File, Flags);
       Elements.push_back(MTy);
     }
     return DBuilder.getOrCreateArray(Elements);
@@ -958,7 +966,7 @@ private:
                                         llvm::DIFile *File, unsigned Line,
                                         llvm::DINode::DIFlags Flags) {
     unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
-    unsigned SizeInBits = DbgTy.size.getValue() * SizeOfByte;
+    unsigned SizeInBits = DbgTy.getSize().getValue() * SizeOfByte;
     // Default, since Swift doesn't allow specifying a custom alignment.
     unsigned AlignInBits = 0;
 
@@ -982,16 +990,17 @@ private:
   }
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
-    DebugTypeInfo BlandDbgTy(Ty, DbgTy.StorageType, DbgTy.size, DbgTy.align,
-                             DbgTy.DefaultAlignment, DbgTy.IsMetadataType);
+    DebugTypeInfo BlandDbgTy(Ty, DbgTy.getStorageType(), DbgTy.getSize(),
+                             DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
+                             DbgTy.isMetadataType());
     return getOrCreateType(BlandDbgTy);
   }
 
   uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy) {
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-    uint64_t BitWidth = DbgTy.size.getValue() * SizeOfByte;
-    llvm::Type *StorageType = DbgTy.StorageType
-                                  ? DbgTy.StorageType
+    uint64_t BitWidth = DbgTy.getSize().getValue() * SizeOfByte;
+    llvm::Type *StorageType = DbgTy.getStorageType()
+                                  ? DbgTy.getStorageType()
                                   : IGM.DataLayout.getSmallestLegalIntType(
                                         IGM.getLLVMContext(), BitWidth);
 
@@ -1003,23 +1012,44 @@ private:
     return BitWidth;
   }
 
+  /// Collect the type parameters of a bound generic type. This is needed to
+  /// anchor any typedefs that may appear in parameters so they can be
+  /// resolved in the debugger without needing to query the Swift module.
+  llvm::DINodeArray collectGenericParams(BoundGenericType *BGT) {
+      SmallVector<llvm::Metadata *, 16> TemplateParams;
+      for (auto Param : BGT->getGenericArgs()) {
+        TemplateParams.push_back(DBuilder.createTemplateTypeParameter(
+            TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param))));
+      }
+      return DBuilder.getOrCreateArray(TemplateParams);
+  }
+  
   /// Create a sized container for a sizeless type. Used to represent
   /// BoundGenericEnums that may have different sizes depending on what they are
   /// bound to, but still share a mangled name.
   llvm::DIType *createOpaqueStructWithSizedContainer(
       llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
       unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
-      StringRef MangledName) {
-    // Let the MDNode folding set do the work of uniquing the inner type. This
-    // should be cheap.
-    llvm::DICompositeType *UniqueType = DBuilder.createStructType(
-        Scope, Name, File, Line, 0, 0, Flags, nullptr,
-        DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
-        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+      StringRef MangledName, llvm::DINodeArray BoundParams) {
+    // This uses a separate cache and not DIRefMap for the inner type to avoid
+    // associating the anonymous container (which is specific to the
+    // variable/storage and not the type) with the MangledName.
+    llvm::DICompositeType *UniqueType = nullptr;
+    auto *UID = llvm::MDString::get(IGM.getLLVMContext(), MangledName);
+    if (llvm::Metadata *V = InnerTypeCache.lookup(UID))
+      UniqueType = cast<llvm::DICompositeType>(V);
+    else {
+      UniqueType = DBuilder.createStructType(
+          Scope, Name, File, Line, 0, 0, Flags, nullptr, nullptr,
+          llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+      if (BoundParams)
+        DBuilder.replaceArrays(UniqueType, nullptr, BoundParams);
+      InnerTypeCache[UID] = llvm::TrackingMDNodeRef(UniqueType);
+    }
+
     llvm::Metadata *Elements[] = {
         DBuilder.createMemberType(Scope, "", File, 0, SizeInBits,
                                   AlignInBits, 0, Flags, UniqueType)};
-
     return DBuilder.createStructType(
         Scope, "", File, Line, SizeInBits, AlignInBits, Flags,
         /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
@@ -1188,9 +1218,10 @@ private:
     // emitting the storage size of the struct, but it may be necessary
     // to emit the (target!) size of the underlying basic type.
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-    uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
-    unsigned AlignInBits =
-        DbgTy.DefaultAlignment ? 0 : DbgTy.align.getValue() * SizeOfByte;
+    uint64_t SizeInBits = DbgTy.getSize().getValue() * SizeOfByte;
+    unsigned AlignInBits = DbgTy.hasDefaultAlignment()
+                               ? 0
+                               : DbgTy.getAlignment().getValue() * SizeOfByte;
     unsigned Encoding = 0;
     llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
@@ -1332,7 +1363,7 @@ private:
       auto L = getDebugLoc(*this, Decl);
       return createOpaqueStructWithSizedContainer(
           Scope, Decl ? Decl->getNameStr() : "", File, L.Line, SizeInBits,
-          AlignInBits, Flags, MangledName);
+          AlignInBits, Flags, MangledName, collectGenericParams(StructTy));
     }
 
     case TypeKind::BoundGenericClass: {
@@ -1441,7 +1472,7 @@ private:
       auto *File = getOrCreateFile(L.Filename);
       return createOpaqueStructWithSizedContainer(
           Scope, Decl->getName().str(), File, L.Line, SizeInBits, AlignInBits,
-          Flags, MangledName);
+          Flags, MangledName, collectGenericParams(EnumTy));
     }
 
     case TypeKind::BuiltinVector: {
@@ -1480,9 +1511,9 @@ private:
       auto File = getOrCreateFile(L.Filename);
       // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
-      DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.StorageType, DbgTy.size,
-                                 DbgTy.align, DbgTy.DefaultAlignment,
-                                 false);
+      DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.getStorageType(),
+                                 DbgTy.getSize(), DbgTy.getAlignment(),
+                                 DbgTy.hasDefaultAlignment(), false);
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     File, L.Line, Scope);
     }
@@ -1637,7 +1668,23 @@ private:
       if (Decl->isOutermostPrivateOrFilePrivateScope())
         Scope = getFilePrivateScope(Scope, Decl);
 
+    // If this is a forward decl, create one for this mangled name and don't
+    // cache it.
+    if (DbgTy.isForwardDecl() && !isa<TypeAliasType>(DbgTy.getType())) {
+      auto *FwdDecl = DBuilder.createReplaceableCompositeType(
+          llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
+          llvm::dwarf::DW_LANG_Swift, 0, 0, llvm::DINode::FlagFwdDecl,
+          MangledName);
+      ReplaceMap.emplace_back(
+        std::piecewise_construct, std::make_tuple(DbgTy.getType()),
+          std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
+      return FwdDecl;
+    }
     llvm::DIType *DITy = createType(DbgTy, MangledName, Scope, getFile(Scope));
+
+    // Don't cache a type alias to a forward declaration either.
+    if (DbgTy.isForwardDecl())
+      return DITy;
 
     // Incrementally build the DIRefMap.
     if (auto *CTy = dyn_cast<llvm::DICompositeType>(DITy)) {
@@ -1765,7 +1812,7 @@ void IRGenDebugInfoImpl::finalize() {
   SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
   IGM.getSwiftModule()->getImportedModules(ModuleWideImports, ImportFilter);
   for (auto M : ModuleWideImports)
-    if (!ImportedModules.count(M.second))
+    if (!ImportedModules.count(M.importedModule))
       DBuilder.createImportedModule(MainFile, getOrCreateModule(M), MainFile,
                                     0);
 
@@ -2012,7 +2059,7 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);
   DBuilder.createImportedModule(File, DIMod, File, L.Line);
-  ImportedModules.insert(Imported.second);
+  ImportedModules.insert(Imported.importedModule);
 }
 
 llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(SILFunction &SILFn,
@@ -2122,8 +2169,10 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (FnTy)
     if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
       auto DTI = DebugTypeInfo::getFromTypeInfo(
-          ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy),
-          IGM.getTypeInfo(IGM.silConv.getSILType(*ErrorInfo, FnTy)));
+          ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy,
+                                        IGM.getMaximalTypeExpansionContext()),
+          IGM.getTypeInfo(IGM.silConv.getSILType(
+              *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext())));
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 
@@ -2178,11 +2227,11 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     return;
 
   // We cannot yet represent opened existentials.
-  if (DbgTy.Type->hasOpenedExistential())
+  if (DbgTy.getType()->hasOpenedExistential())
     return;
 
-  if (!DbgTy.size)
-    DbgTy.size = getStorageSize(IGM.DataLayout, Storage);
+  if (!DbgTy.getSize())
+    DbgTy.setSize(getStorageSize(IGM.DataLayout, Storage));
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");

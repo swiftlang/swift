@@ -21,7 +21,7 @@ var qA1 : aeiou.A
 var qA2 : asdf.A
 var qA3 : abcde.A
 
-var uS : S // expected-error {{use of undeclared type 'S'}}
+var uS : S // expected-error {{cannot find type 'S' in scope}}
 var qS1 : letters.S // expected-error {{no type named 'S' in module 'letters'}}
 var qS2 : asdf.S // expected-error {{no type named 'S' in module 'asdf'}}
 // but...!

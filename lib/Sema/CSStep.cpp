@@ -260,7 +260,7 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
   // "split" is considered a failure if previous step failed,
   // or there is a failure recorded by constraint system, or
   // system can't be simplified.
-  if (prevFailed || CS.failedConstraint || CS.simplify())
+  if (prevFailed || CS.getFailedConstraint() || CS.simplify())
     return done(/*isSuccess=*/false);
 
   // Figure out the sets of partial solutions that this component depends on.

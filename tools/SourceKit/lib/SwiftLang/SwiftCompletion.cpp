@@ -248,6 +248,7 @@ static void getResultStructure(
     auto C = chunks[i];
     if (C.is(ChunkKind::TypeAnnotation) ||
         C.is(ChunkKind::CallParameterClosureType) ||
+        C.is(ChunkKind::CallParameterClosureExpr) ||
         C.is(ChunkKind::Whitespace))
       continue;
 
@@ -268,6 +269,7 @@ static void getResultStructure(
     auto &C = chunks[i];
     if (C.is(ChunkKind::TypeAnnotation) ||
         C.is(ChunkKind::CallParameterClosureType) ||
+        C.is(ChunkKind::CallParameterClosureExpr) ||
         C.is(ChunkKind::Whitespace))
       continue;
 
@@ -289,7 +291,8 @@ static void getResultStructure(
       for (; i < chunks.size(); ++i) {
         if (chunks[i].endsPreviousNestedGroup(C.getNestingLevel()))
           break;
-        if (chunks[i].is(ChunkKind::CallParameterClosureType))
+        if (chunks[i].is(ChunkKind::CallParameterClosureType) ||
+            chunks[i].is(ChunkKind::CallParameterClosureExpr))
           continue;
         if (isOperator && chunks[i].is(ChunkKind::CallParameterType))
           continue;
@@ -610,7 +613,8 @@ static void constructTextForCallParam(
       continue;
     if (C.is(ChunkKind::CallParameterInternalName) ||
         C.is(ChunkKind::CallParameterType) ||
-        C.is(ChunkKind::CallParameterTypeBegin)) {
+        C.is(ChunkKind::CallParameterTypeBegin) ||
+        C.is(ChunkKind::CallParameterClosureExpr)) {
       break;
     }
     if (!C.hasText())
@@ -647,6 +651,15 @@ static void constructTextForCallParam(
     if (C.is(ChunkKind::CallParameterType)) {
       assert(TypeString.empty());
       TypeString = C.getText();
+    }
+    if (C.is(ChunkKind::CallParameterClosureExpr)) {
+      // We have a closure expression, so provide it directly instead of in
+      // a placeholder.
+      OS << "{";
+      if (!C.getText().empty())
+        OS << " " << C.getText();
+      OS << "\n" << getCodePlaceholder() << "\n}";
+      return;
     }
     if (C.isAnnotation() || !C.hasText())
       continue;
@@ -1221,6 +1234,7 @@ void SwiftLangSupport::codeCompleteOpen(
         completionKind = completionCtx.CodeCompletionKind;
         typeContextKind = completionCtx.typeContextKind;
         mayUseImplicitMemberExpr = completionCtx.MayUseImplicitMemberExpr;
+        consumer.setReusingASTContext(completionCtx.ReusingASTContext);
         completions =
             extendCompletions(results, sink, info, nameToPopularity, CCOpts);
       });

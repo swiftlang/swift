@@ -51,16 +51,16 @@ let _: String = useAssoc(AnotherType.self) // expected-error {{cannot convert va
 let _: Bool? = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'Bool?'}}
 let _: Int32? = useAssoc(AnotherType.self)
 
-let _ = wrapped // expected-error {{use of unresolved identifier 'wrapped'}}
+let _ = wrapped // expected-error {{cannot find 'wrapped' in scope}}
 let _ = unwrapped // okay
 
-_ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
+_ = usesWrapped(nil) // expected-error {{cannot find 'usesWrapped' in scope}}
 _ = usesUnwrapped(nil) // expected-error {{'nil' is not compatible with expected argument type 'Int32'}}
 
-let _: WrappedAlias = nil // expected-error {{use of undeclared type 'WrappedAlias'}}
+let _: WrappedAlias = nil // expected-error {{cannot find type 'WrappedAlias' in scope}}
 let _: UnwrappedAlias = nil // expected-error {{'nil' cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
 
-let _: ConstrainedWrapped<Int> = nil // expected-error {{use of undeclared type 'ConstrainedWrapped'}}
+let _: ConstrainedWrapped<Int> = nil // expected-error {{cannot find type 'ConstrainedWrapped' in scope}}
 let _: ConstrainedUnwrapped<Int> = nil // expected-error {{type 'Int' does not conform to protocol 'HasAssoc'}}
 
 func testExtensions(wrapped: WrappedInt, unwrapped: UnwrappedInt) {

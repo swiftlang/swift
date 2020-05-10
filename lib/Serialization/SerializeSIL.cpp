@@ -2145,7 +2145,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
          S.addTypeRef(KPI->getType().getASTType()),
          (unsigned)KPI->getType().getCategory(),
          ListOfValues);
-    for (const auto conf : serializeAfter) {
+    for (const auto &conf : serializeAfter) {
       S.writeConformance(conf, SILAbbrCodes);
     }
     S.writeGenericRequirements(reqts, SILAbbrCodes);
@@ -2400,7 +2400,7 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
     prop.isSerialized(),
     componentValues);
   
-  for (const auto conf : serializeAfter) {
+  for (const auto &conf : serializeAfter) {
     S.writeConformance(conf, SILAbbrCodes);
   }
 }

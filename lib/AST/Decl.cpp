@@ -19,6 +19,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -644,6 +645,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   case FileUnitKind::DWARFModule:
     return SourceLoc();
   }
+  llvm_unreachable("invalid file kind");
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
@@ -1827,7 +1829,7 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
     if (tuple->hasEllipsis())
       return false;
 
-    for (const auto elt : tuple->getElements()) {
+    for (const auto &elt : tuple->getElements()) {
       if (!isDefaultInitializable(elt.Type, ctx))
         return false;
     }
@@ -1971,30 +1973,53 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
   return false;
 }
 
-static bool isDirectToStorageAccess(const AccessorDecl *accessor,
+static bool isDirectToStorageAccess(const DeclContext *UseDC,
                                     const VarDecl *var, bool isAccessOnSelf) {
-  // All accesses have ordinary semantics except those to variables
-  // with storage from within their own accessors.
-  if (accessor->getStorage() != var)
-    return false;
-
   if (!var->hasStorage())
     return false;
 
-  // In Swift 5 and later, the access must also be a member access on 'self'.
-  if (!isAccessOnSelf &&
-      var->getDeclContext()->isTypeContext() &&
-      var->getASTContext().isSwiftVersionAtLeast(5))
+  auto *AFD = dyn_cast<AbstractFunctionDecl>(UseDC);
+  if (AFD == nullptr)
     return false;
 
-  // As a special case, 'read' and 'modify' coroutines with forced static
-  // dispatch must use ordinary semantics, so that the 'modify' coroutine for a
-  // 'dynamic' property uses Objective-C message sends and not direct access to
-  // storage.
-  if (accessor->hasForcedStaticDispatch())
+  // The property reference is for immediate class, not a derived class.
+  if (AFD->getParent()->getSelfNominalTypeDecl() !=
+      var->getDeclContext()->getSelfNominalTypeDecl())
     return false;
 
-  return true;
+  // If the storage is resilient, we cannot access it directly at all.
+  if (var->isResilient(UseDC->getParentModule(),
+                       UseDC->getResilienceExpansion()))
+    return false;
+
+  if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD)) {
+    // The access must also be a member access on 'self' in all language modes.
+    if (!isAccessOnSelf)
+      return false;
+
+    return true;
+  } else if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+    // The accessor must be for the variable itself.
+    if (accessor->getStorage() != var)
+      return false;
+
+    // In Swift 5 and later, the access must also be a member access on 'self'.
+    if (!isAccessOnSelf &&
+        var->getDeclContext()->isTypeContext() &&
+        var->getASTContext().isSwiftVersionAtLeast(5))
+      return false;
+
+    // As a special case, 'read' and 'modify' coroutines with forced static
+    // dispatch must use ordinary semantics, so that the 'modify' coroutine for a
+    // 'dynamic' property uses Objective-C message sends and not direct access to
+    // storage.
+    if (accessor->hasForcedStaticDispatch())
+      return false;
+
+    return true;
+  }
+
+  return false;
 }
 
 /// Determines the access semantics to use in a DeclRefExpr or
@@ -2002,14 +2027,9 @@ static bool isDirectToStorageAccess(const AccessorDecl *accessor,
 AccessSemantics
 ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
                                          bool isAccessOnSelf) const {
-  // The condition most likely to fast-path us is not being in an accessor,
-  // so we check that first.
-  if (auto *accessor = dyn_cast<AccessorDecl>(UseDC)) {
-    if (auto *var = dyn_cast<VarDecl>(this)) {
-      if (isDirectToStorageAccess(accessor, var, isAccessOnSelf))
-        return AccessSemantics::DirectToStorage;
-    }
-  }
+  if (auto *var = dyn_cast<VarDecl>(this))
+    if (isDirectToStorageAccess(UseDC, var, isAccessOnSelf))
+      return AccessSemantics::DirectToStorage;
 
   // Otherwise, it's a semantically normal access.  The client should be
   // able to figure out the most efficient way to do this access.
@@ -2758,7 +2778,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
 OverloadSignature ValueDecl::getOverloadSignature() const {
   OverloadSignature signature;
 
-  signature.Name = getFullName();
+  signature.Name = getName();
   signature.InProtocolExtension
     = static_cast<bool>(getDeclContext()->getExtendedProtocolDecl());
   signature.IsInstanceMember = isInstanceMember();
@@ -2875,8 +2895,18 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
-  if (getOpaqueResultTypeRepr() == nullptr)
+  if (getOpaqueResultTypeRepr() == nullptr) {
+    if (isa<ModuleDecl>(this))
+      return nullptr;
+    auto file = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+    // Don't look up when the decl is from source, otherwise a cycle will happen.
+    if (file->getKind() == FileUnitKind::SerializedAST) {
+      Mangle::ASTMangler mangler;
+      auto name = mangler.mangleOpaqueTypeDecl(this);
+      return file->lookupOpaqueResultType(name);
+    }
     return nullptr;
+  }
 
   return evaluateOrDefault(getASTContext().evaluator,
     OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},
@@ -3489,7 +3519,10 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   case AccessLevel::Public:
   case AccessLevel::Open: {
     if (useDC && VD->isSPI()) {
-      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      auto useModuleScopeContext = useDC->getModuleScopeContext();
+      if (useModuleScopeContext == sourceDC->getModuleScopeContext()) return true;
+
+      auto *useSF = dyn_cast<SourceFile>(useModuleScopeContext);
       return !useSF || useSF->isImportedAsSPI(VD);
     }
     return true;
@@ -4426,12 +4459,14 @@ StringRef ClassDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
-ArtificialMainKind ClassDecl::getArtificialMainKind() const {
+ArtificialMainKind Decl::getArtificialMainKind() const {
   if (getAttrs().hasAttribute<UIApplicationMainAttr>())
     return ArtificialMainKind::UIApplicationMain;
   if (getAttrs().hasAttribute<NSApplicationMainAttr>())
     return ArtificialMainKind::NSApplicationMain;
-  llvm_unreachable("class has no @ApplicationMain attr?!");
+  if (isa<FuncDecl>(this))
+    return ArtificialMainKind::TypeMain;
+  llvm_unreachable("type has no @Main attr?!");
 }
 
 static bool isOverridingDecl(const ValueDecl *Derived,
@@ -6266,6 +6301,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::EmptyDictionary:
     return true;
   }
+  llvm_unreachable("invalid default argument kind");
 }
 
 Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
@@ -6356,105 +6392,27 @@ void ParamDecl::setDefaultArgumentCaptureInfo(CaptureInfo captures) {
   DefaultValueAndFlags.getPointer()->Captures = captures;
 }
 
-/// Return nullptr if there is no property wrapper
-Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
-                                                     Expr *init) {
-  auto *PBD = var->getParentPatternBinding();
-  if (!PBD)
-    return nullptr;
-
-  // If there is no '=' on the pattern, there was no initial value.
-  if (PBD->getEqualLoc(0).isInvalid() && !PBD->isDefaultInitializable())
-    return nullptr;
-
-  ASTContext &ctx = var->getASTContext();
-  auto dc = var->getInnermostDeclContext();
-  const auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  if (wrapperAttrs.empty())
-    return nullptr;
-  auto innermostAttr = wrapperAttrs.back();
-  auto innermostNominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{innermostAttr, dc}, nullptr);
-  if (!innermostNominal)
-    return nullptr;
-
-      // Walker
+PropertyWrapperValuePlaceholderExpr *
+swift::findWrappedValuePlaceholder(Expr *init) {
   class Walker : public ASTWalker {
   public:
-    NominalTypeDecl *innermostNominal;
-    Expr *initArg = nullptr;
-
-    Walker(NominalTypeDecl *innermostNominal)
-      : innermostNominal(innermostNominal) { }
+    PropertyWrapperValuePlaceholderExpr *placeholder = nullptr;
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (initArg)
+      if (placeholder)
         return { false, E };
 
-      if (auto call = dyn_cast<CallExpr>(E)) {
-        ASTContext &ctx = innermostNominal->getASTContext();
-
-        // We're looking for an implicit call.
-        if (!call->isImplicit())
-          return { true, E };
-
-        // ... which may call the constructor of another property
-        // wrapper if there are multiple wrappers attached to the
-        // property.
-        if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
-          if (tuple->getNumElements() > 0) {
-            for (unsigned i : range(tuple->getNumElements())) {
-              if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
-                  tuple->getElementName(i) == ctx.Id_initialValue) {
-                auto elem = tuple->getElement(i)->getSemanticsProvidingExpr();
-
-                // Look through autoclosures.
-                if (auto autoclosure = dyn_cast<AutoClosureExpr>(elem))
-                  elem = autoclosure->getSingleExpressionBody();
-
-                if (elem->isImplicit() && isa<CallExpr>(elem)) {
-                  return { true, E };
-                }
-              }
-            }
-          }
-        }
-
-        // ... producing a value of the same nominal type as the
-        // innermost property wrapper.
-        if (!call->getType() ||
-            call->getType()->getAnyNominal() != innermostNominal)
-          return { false, E };
-
-        // Find the implicit initialValue/wrappedValue argument.
-        if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
-          for (unsigned i : range(tuple->getNumElements())) {
-            if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
-                tuple->getElementName(i) == ctx.Id_initialValue) {
-              initArg = tuple->getElement(i);
-              return { false, E };
-            }
-          }
-        }
+      if (auto *value = dyn_cast<PropertyWrapperValuePlaceholderExpr>(E)) {
+        placeholder = value;
+        return { false, value };
       }
 
       return { true, E };
     }
-  } walker(innermostNominal);
+  } walker;
   init->walk(walker);
 
-  Expr *initArg = walker.initArg;
-  if (initArg) {
-    initArg = initArg->getSemanticsProvidingExpr();
-    if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
-      if (!var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure()) {
-        // Remove the autoclosure part only for non-escaping autoclosures
-        initArg =
-            autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
-      }
-    }
-  }
-  return initArg;
+  return walker.placeholder;
 }
 
 /// Writes a tuple expression where each element is either `nil` or another such
@@ -6553,7 +6511,7 @@ ParamDecl::getDefaultValueStringRepresentation(
         }
 
         auto init =
-            findOriginalPropertyWrapperInitialValue(original, parentInit);
+            findWrappedValuePlaceholder(parentInit)->getOriginalWrappedValue();
         return extractInlinableText(getASTContext().SourceMgr, init, scratch);
       }
     }
@@ -6696,8 +6654,8 @@ SourceRange SubscriptDecl::getSignatureSourceRange() const {
 }
 
 DeclName AbstractFunctionDecl::getEffectiveFullName() const {
-  if (getFullName())
-    return getFullName();
+  if (getName())
+    return getName();
 
   if (auto accessor = dyn_cast<AccessorDecl>(this)) {
     auto &ctx = getASTContext();
@@ -6710,7 +6668,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Get:
     case AccessorKind::Read:
     case AccessorKind::Modify:
-      return subscript ? subscript->getFullName()
+      return subscript ? subscript->getName()
                        : DeclName(ctx, storage->getBaseName(),
                                   ArrayRef<Identifier>());
 
@@ -6722,8 +6680,8 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
       argNames.push_back(Identifier());
       // The subscript index parameters.
       if (subscript) {
-        argNames.append(subscript->getFullName().getArgumentNames().begin(),
-                        subscript->getFullName().getArgumentNames().end());
+        argNames.append(subscript->getName().getArgumentNames().begin(),
+                        subscript->getName().getArgumentNames().end());
       }
       return DeclName(ctx, storage->getBaseName(), argNames);
     }
@@ -6883,7 +6841,7 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
     llvm_unreachable("Unknown subclass of AbstractFunctionDecl");
   }
 
-  auto argNames = getFullName().getArgumentNames();
+  auto argNames = getName().getArgumentNames();
 
   // Use the preferred name if specified
   if (preferredName) {
@@ -7039,7 +6997,7 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 #ifndef NDEBUG
-  auto Name = getFullName();
+  const auto Name = getName();
   if (!isa<DestructorDecl>(this))
     assert((!Name || !Name.isSimpleName()) && "Must have a compound name");
   assert(!Name || (Name.getArgumentNames().size() == BodyParams->size()));
@@ -7153,6 +7111,20 @@ void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
 ArrayRef<AutoDiffConfig>
 AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
   prepareDerivativeFunctionConfigurations();
+
+  // Resolve derivative function configurations from `@differentiable`
+  // attributes by type-checking them.
+  for (auto *diffAttr : getAttrs().getAttributes<DifferentiableAttr>())
+    (void)diffAttr->getParameterIndices();
+  // For accessors: resolve derivative function configurations from storage
+  // `@differentiable` attributes by type-checking them.
+  if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
+    auto *storage = accessor->getStorage();
+    for (auto *diffAttr : storage->getAttrs().getAttributes<DifferentiableAttr>())
+      (void)diffAttr->getParameterIndices();
+  }
+
+  // Load derivative configurations from imported modules.
   auto &ctx = getASTContext();
   if (ctx.getCurrentGeneration() > DerivativeFunctionConfigGeneration) {
     unsigned previousGeneration = DerivativeFunctionConfigGeneration;
@@ -7394,6 +7366,12 @@ bool FuncDecl::isCallAsFunctionMethod() const {
          isInstanceMember();
 }
 
+bool FuncDecl::isMainTypeMainMethod() const {
+  return (getBaseIdentifier() == getASTContext().Id_main) &&
+         !isInstanceMember() && getResultInterfaceType()->isVoid() &&
+         getParameters()->size() == 0;
+}
+
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  bool Failable, SourceLoc FailabilityLoc,
                                  bool Throws,
@@ -7419,8 +7397,8 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
 
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   // The initializer must have a single, non-empty argument name.
-  if (getFullName().getArgumentNames().size() != 1 ||
-      getFullName().getArgumentNames()[0].empty())
+  if (getName().getArgumentNames().size() != 1 ||
+      getName().getArgumentNames()[0].empty())
     return false;
 
   auto *params = getParameters();
@@ -7982,7 +7960,7 @@ struct DeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
       return;
     const Decl *D = static_cast<const Decl *>(Entity);
     if (auto const *VD = dyn_cast<const ValueDecl>(D)) {
-      VD->getFullName().print(OS, false);
+      VD->getName().print(OS, false);
     } else {
       OS << "<"
          << Decl::getDescriptiveKindName(D->getDescriptiveKind())

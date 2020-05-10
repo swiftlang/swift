@@ -41,16 +41,16 @@ static bool
 printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm::raw_ostream &OS) {
   switch (AK) {
   case AccessorKind::Get:
-    OS << "getter:" << ASD->getFullName();
+    OS << "getter:" << ASD->getName();
     return false;
   case AccessorKind::Set:
-    OS << "setter:" << ASD->getFullName();
+    OS << "setter:" << ASD->getName();
     return false;
   case AccessorKind::DidSet:
-    OS << "didSet:" << ASD->getFullName();
+    OS << "didSet:" << ASD->getName();
     return false;
   case AccessorKind::WillSet:
-    OS << "willSet:" << ASD->getFullName() ;
+    OS << "willSet:" << ASD->getName() ;
     return false;
 
   case AccessorKind::Address:
@@ -71,7 +71,7 @@ static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
     return printArtificialName(FD->getStorage(), FD->getAccessorKind(), OS);
   }
 
-  OS << D->getFullName();
+  OS << D->getName();
   return false;
 }
 
@@ -381,7 +381,7 @@ private:
       while ((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
         LabelLocs.push_back(ArgLoc);
       }
-      Labels = MemberwiseInit->getFullName().getArgumentNames();
+      Labels = MemberwiseInit->getName().getArgumentNames();
     } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
       LabelLocs = CallParent->getArgumentLabelLocs();
       Labels = CallParent->getArgumentLabels();
@@ -720,7 +720,7 @@ bool IndexSwiftASTWalker::visitImports(
 
   llvm::SmallPtrSet<ModuleDecl *, 8> Reported;
   for (auto Import : Imports) {
-    ModuleDecl *Mod = Import.second;
+    ModuleDecl *Mod = Import.importedModule;
     bool NewReport = Reported.insert(Mod).second;
     if (!NewReport)
       continue;
@@ -1605,7 +1605,7 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   TopMod.getImportedModules(Imports);
 
   for (auto Import : Imports) {
-    collectRecursiveModuleImports(*Import.second, Visited);
+    collectRecursiveModuleImports(*Import.importedModule, Visited);
   }
 }
 

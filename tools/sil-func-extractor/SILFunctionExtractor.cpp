@@ -272,16 +272,16 @@ int main(int argc, char **argv) {
   if (CI.getASTContext().hadError())
     return 1;
 
-  // Load the SIL if we have a module. We have to do this after SILParse
-  // creating the unfortunate double if statement.
-  if (Invocation.hasSerializedAST()) {
-    assert(!CI.hasSILModule() &&
-           "performSema() should not create a SILModule.");
-    CI.createSILModule();
-    std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
-        CI.getASTContext(), CI.getSILModule(), nullptr);
+  auto SILMod = performSILGeneration(CI.getMainModule(), CI.getSILTypes(),
+                                     CI.getSILOptions());
 
-    if (extendedInfo.isSIB() || DisableSILLinking)
+  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
+  // us.
+  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
+    auto SL = SerializedSILLoader::create(
+        CI.getASTContext(), SILMod.get(), nullptr);
+
+    if (DisableSILLinking)
       SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
     else
       SL->getAll();
@@ -329,7 +329,7 @@ int main(int argc, char **argv) {
                              llvm::errs() << "    " << str << '\n';
                            }));
 
-  removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
+  removeUnwantedFunctions(SILMod.get(), MangledNames, DemangledNames);
 
   if (EmitSIB) {
     llvm::SmallString<128> OutputFile;
@@ -350,7 +350,7 @@ int main(int argc, char **argv) {
     serializationOpts.SerializeAllSIL = true;
     serializationOpts.IsSIB = true;
 
-    serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
+    serialize(CI.getMainModule(), serializationOpts, SILMod.get());
   } else {
     const StringRef OutputFile =
         OutputFilename.size() ? StringRef(OutputFilename) : "-";
@@ -360,8 +360,7 @@ int main(int argc, char **argv) {
     SILOpts.EmitSortedSIL = EnableSILSortOutput;
 
     if (OutputFile == "-") {
-      CI.getSILModule()->print(llvm::outs(), CI.getMainModule(), SILOpts,
-                               !DisableASTDump);
+      SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !DisableASTDump);
     } else {
       std::error_code EC;
       llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
@@ -370,8 +369,7 @@ int main(int argc, char **argv) {
                      << '\n';
         return 1;
       }
-      CI.getSILModule()->print(OS, CI.getMainModule(), SILOpts,
-                               !DisableASTDump);
+      SILMod->print(OS, CI.getMainModule(), SILOpts, !DisableASTDump);
     }
   }
 }

@@ -361,7 +361,6 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
       return LexerMode::SIL;
     case swift::SourceFileKind::Library:
     case swift::SourceFileKind::Main:
-    case swift::SourceFileKind::REPL:
       return LexerMode::Swift;
   }
   llvm_unreachable("covered switch");
@@ -1190,8 +1189,7 @@ struct ParserUnit::Implementation {
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM, Diags)),
         SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx), SFKind,
-            BufferID, SourceFile::ImplicitModuleImportKind::None,
-            Opts.CollectParsedToken, Opts.BuildSyntaxTree,
+            BufferID, Opts.CollectParsedToken, Opts.BuildSyntaxTree,
             SourceFile::ParsingFlags::DisableDelayedBodies |
                 SourceFile::ParsingFlags::DisablePoundIfEvaluation)) {}
 

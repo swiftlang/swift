@@ -36,6 +36,8 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
@@ -375,7 +377,7 @@ static void printGenericSpecializationInfo(
     raw_ostream &OS, StringRef Kind, StringRef Name,
     const GenericSpecializationInformation *SpecializationInfo,
     SubstitutionMap Subs = { }) {
-  if (!SpecializationInfo)
+  if (!SpecializationInfo && Subs.empty())
     return;
 
   auto PrintSubstitutions = [&](SubstitutionMap Subs) {
@@ -383,6 +385,11 @@ static void printGenericSpecializationInfo(
     interleave(Subs.getReplacementTypes(),
                [&](Type type) { OS << type; },
                [&] { OS << ", "; });
+    OS << '>';
+    OS << " conformances <";
+    interleave(Subs.getConformances(),
+               [&](ProtocolConformanceRef conf) { conf.print(OS); },
+               [&] { OS << ", ";});
     OS << '>';
   };
 
@@ -601,31 +608,41 @@ public:
     if (BB->args_empty())
       return;
 
-    for (SILValue V : BB->getArguments()) {
-      if (V->use_empty())
+    for (SILArgument *arg : BB->getArguments()) {
+      StringRef name;
+      if (arg->getDecl() && arg->getDecl()->hasName())
+        name = arg->getDecl()->getBaseName().userFacingName();
+
+      if (arg->use_empty() && name.empty())
         continue;
-      *this << "// " << Ctx.getID(V);
-      PrintState.OS.PadToColumn(50);
-      *this << "// user";
-      if (std::next(V->use_begin()) != V->use_end())
-        *this << 's';
-      *this << ": ";
 
-      llvm::SmallVector<ID, 32> UserIDs;
-      for (auto *Op : V->getUses())
-        UserIDs.push_back(Ctx.getID(Op->getUser()));
-
-      // Display the user ids sorted to give a stable use order in the
-      // printer's output if we are asked to do so. This makes diffing large
-      // sections of SIL significantly easier at the expense of not showing
-      // the _TRUE_ order of the users in the use list.
-      if (Ctx.sortSIL()) {
-        std::sort(UserIDs.begin(), UserIDs.end());
+      *this << "// " << Ctx.getID(arg);
+      if (!name.empty()) {
+        *this << " \"" << name << '\"';
       }
+      if (!arg->use_empty()) {
+        PrintState.OS.PadToColumn(50);
+        *this << "// user";
+        if (std::next(arg->use_begin()) != arg->use_end())
+          *this << 's';
+        *this << ": ";
 
-      interleave(UserIDs.begin(), UserIDs.end(),
-                 [&] (ID id) { *this << id; },
-                 [&] { *this << ", "; });
+        llvm::SmallVector<ID, 32> UserIDs;
+        for (auto *Op : arg->getUses())
+          UserIDs.push_back(Ctx.getID(Op->getUser()));
+
+        // Display the user ids sorted to give a stable use order in the
+        // printer's output if we are asked to do so. This makes diffing large
+        // sections of SIL significantly easier at the expense of not showing
+        // the _TRUE_ order of the users in the use list.
+        if (Ctx.sortSIL()) {
+          std::sort(UserIDs.begin(), UserIDs.end());
+        }
+
+        llvm::interleave(
+            UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
+            [&] { *this << ", "; });
+      }
       *this << '\n';
     }
   }
@@ -706,7 +723,9 @@ public:
       Ctx.printInstructionCallBack(&I);
       if (SILPrintGenericSpecializationInfo) {
         if (auto AI = ApplySite::isa(const_cast<SILInstruction *>(&I)))
-          if (AI.getSpecializationInfo() && AI.getCalleeFunction())
+          if ((AI.getSpecializationInfo() ||
+               !AI.getSubstitutionMap().empty()) &&
+              AI.getCalleeFunction())
             printGenericSpecializationInfo(
                 PrintState.OS, "call-site", AI.getCalleeFunction()->getName(),
                 AI.getSpecializationInfo(), AI.getSubstitutionMap());
@@ -784,8 +803,9 @@ public:
       std::sort(UserIDs.begin(), UserIDs.end());
     }
 
-    interleave(UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
+        [&] { *this << ", "; });
     return true;
   }
 
@@ -1044,15 +1064,16 @@ public:
       *this << "**" << Ctx.getID(result) << "** = ";
     } else {
       *this << '(';
-      interleave(result->getParent()->getResults(),
-                 [&](SILValue value) {
-                   if (value == SILValue(result)) {
-                     *this << "**" << Ctx.getID(result) << "**";
-                     return;
-                   }
-                   *this << Ctx.getID(value);
-                 },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          result->getParent()->getResults(),
+          [&](SILValue value) {
+            if (value == SILValue(result)) {
+              *this << "**" << Ctx.getID(result) << "**";
+              return;
+            }
+            *this << Ctx.getID(value);
+          },
+          [&] { *this << ", "; });
       *this << ')';
     }
 
@@ -1180,9 +1201,10 @@ public:
     printSubstitutions(AI->getSubstitutionMap(),
                        AI->getOrigCalleeType()->getInvocationGenericSignature());
     *this << '(';
-    interleave(AI->getArguments(),
-               [&](const SILValue &arg) { *this << Ctx.getID(arg); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        AI->getArguments(),
+        [&](const SILValue &arg) { *this << Ctx.getID(arg); },
+        [&] { *this << ", "; });
     *this << ") : ";
     if (auto callee = AI->getCallee())
       *this << callee->getType();
@@ -1258,7 +1280,7 @@ public:
     printSubstitutions(BI->getSubstitutions());
     *this << "(";
     
-    interleave(BI->getArguments(), [&](SILValue v) {
+    llvm::interleave(BI->getArguments(), [&](SILValue v) {
       *this << getIDAndType(v);
     }, [&]{
       *this << ", ";
@@ -1437,9 +1459,9 @@ public:
   }
 
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
-    interleave(MFE->getElements(),
-               [&](SILValue Var) { *this << getIDAndType(Var); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        MFE->getElements(), [&](SILValue Var) { *this << getIDAndType(Var); },
+        [&] { *this << ", "; });
   }
 
   void visitDebugValueInst(DebugValueInst *DVI) {
@@ -1655,22 +1677,24 @@ public:
 
   void visitStructInst(StructInst *SI) {
     *this << SI->getType() << " (";
-    interleave(SI->getElements(),
-               [&](const SILValue &V) { *this << getIDAndType(V); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        SI->getElements(), [&](const SILValue &V) { *this << getIDAndType(V); },
+        [&] { *this << ", "; });
     *this << ')';
   }
 
   void visitObjectInst(ObjectInst *OI) {
     *this << OI->getType() << " (";
-    interleave(OI->getBaseElements(),
-               [&](const SILValue &V) { *this << getIDAndType(V); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        OI->getBaseElements(),
+        [&](const SILValue &V) { *this << getIDAndType(V); },
+        [&] { *this << ", "; });
     if (!OI->getTailElements().empty()) {
       *this << ", [tail_elems] ";
-      interleave(OI->getTailElements(),
-                 [&](const SILValue &V) { *this << getIDAndType(V); },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          OI->getTailElements(),
+          [&](const SILValue &V) { *this << getIDAndType(V); },
+          [&] { *this << ", "; });
     }
     *this << ')';
   }
@@ -1690,16 +1714,17 @@ public:
     // If the type is simple, just print the tuple elements.
     if (SimpleType) {
       *this << '(';
-      interleave(TI->getElements(),
-                 [&](const SILValue &V){ *this << getIDAndType(V); },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          TI->getElements(),
+          [&](const SILValue &V) { *this << getIDAndType(V); },
+          [&] { *this << ", "; });
       *this << ')';
     } else {
       // Otherwise, print the type, then each value.
       *this << TI->getType() << " (";
-      interleave(TI->getElements(),
-                 [&](const SILValue &V) { *this << Ctx.getID(V); },
-                 [&] { *this << ", "; });
+      llvm::interleave(
+          TI->getElements(), [&](const SILValue &V) { *this << Ctx.getID(V); },
+          [&] { *this << ", "; });
       *this << ')';
     }
   }
@@ -2014,9 +2039,9 @@ public:
   void visitYieldInst(YieldInst *YI) {
     auto values = YI->getYieldedValues();
     if (values.size() != 1) *this << '(';
-    interleave(values,
-               [&](SILValue value) { *this << getIDAndType(value); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        values, [&](SILValue value) { *this << getIDAndType(value); },
+        [&] { *this << ", "; });
     if (values.size() != 1) *this << ')';
     *this << ", resume " << Ctx.getID(YI->getResumeBB())
           << ", unwind " << Ctx.getID(YI->getUnwindBB());
@@ -2109,9 +2134,9 @@ public:
     if (args.empty()) return;
 
     *this << '(';
-    interleave(args,
-               [&](SILValue v) { *this << getIDAndType(v); },
-               [&] { *this << ", "; });
+    llvm::interleave(
+        args, [&](SILValue v) { *this << getIDAndType(v); },
+        [&] { *this << ", "; });
     *this << ')';
   }
   
@@ -2436,7 +2461,7 @@ void SILBasicBlock::print(raw_ostream &OS) const {
   SILPrinter(Ctx).print(this);
 }
 
-void SILBasicBlock::print(raw_ostream &OS, SILPrintContext &Ctx) const {
+void SILBasicBlock::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
@@ -2481,6 +2506,17 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
   OS << getLinkageString(linkage);
 }
 
+static void printClangQualifiedNameCommentIfPresent(llvm::raw_ostream &OS,
+                                                    const clang::Decl *decl) {
+  if (decl) {
+    if (auto namedDecl = dyn_cast_or_null<clang::NamedDecl>(decl)) {
+      OS << "// clang name: ";
+      namedDecl->printQualifiedName(OS);
+      OS << "\n";
+    }
+  }
+}
+
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
@@ -2502,6 +2538,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   OS << "// " << demangleSymbol(getName()) << '\n';
+  printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
+
   OS << "sil ";
   printLinkage(OS, getLinkage(), isDefinition());
 
@@ -2637,7 +2675,8 @@ void SILFunction::printName(raw_ostream &OS) const {
 /// Pretty-print a global variable to the designated stream.
 void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "// " << demangleSymbol(getName()) << '\n';
-  
+  printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
+
   OS << "sil_global ";
   printLinkage(OS, getLinkage(), isDefinition());
 

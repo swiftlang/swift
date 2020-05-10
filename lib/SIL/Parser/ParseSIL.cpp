@@ -17,6 +17,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SILGenRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
@@ -105,17 +106,30 @@ SILParserState::SILParserState(SILModule *M)
 
 SILParserState::~SILParserState() = default;
 
-void swift::parseSourceFileSIL(SourceFile &SF, SILParserState *sil) {
-  auto bufferID = SF.getBufferID();
+std::unique_ptr<SILModule>
+ParseSILModuleRequest::evaluate(Evaluator &evaluator,
+                                SILGenDescriptor desc) const {
+  auto *SF = desc.getSourceFileToParse();
+  assert(SF);
+
+  auto bufferID = SF->getBufferID();
   assert(bufferID);
 
-  FrontendStatsTracer tracer(SF.getASTContext().Stats,
-                             "Parsing SIL");
-  Parser parser(*bufferID, SF, sil->Impl.get(),
-                /*persistentParserState*/ nullptr,
-                /*syntaxTreeCreator*/ nullptr);
+  auto *mod = SF->getParentModule();
+  auto silMod = SILModule::createEmptyModule(mod, desc.conv, desc.opts,
+                                             desc.isWholeModule());
+  SILParserState parserState(silMod.get());
+  Parser parser(*bufferID, *SF, parserState.Impl.get());
   PrettyStackTraceParser StackTrace(parser);
-  parser.parseTopLevelSIL();
+
+  auto hadError = parser.parseTopLevelSIL();
+  if (hadError) {
+    // The rest of the SIL pipeline expects well-formed SIL, so if we encounter
+    // a parsing error, just return an empty SIL module.
+    return SILModule::createEmptyModule(mod, desc.conv, desc.opts,
+                                        desc.isWholeModule());
+  }
+  return silMod;
 }
 
 //===----------------------------------------------------------------------===//
@@ -170,8 +184,7 @@ namespace {
     std::function<void(Type)> ParsedTypeCallback;
 
     bool performTypeLocChecking(TypeLoc &T, bool IsSILType,
-                                GenericEnvironment *GenericEnv = nullptr,
-                                DeclContext *DC = nullptr);
+                                GenericEnvironment *GenericEnv = nullptr);
 
     void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To);
@@ -1091,19 +1104,13 @@ static bool parseDeclSILOptional(bool *isTransparent,
 }
 
 bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
-                                       GenericEnvironment *GenericEnv,
-                                       DeclContext *DC) {
+                                       GenericEnvironment *GenericEnv) {
   if (GenericEnv == nullptr)
     GenericEnv = ContextGenericEnv;
 
-  if (!DC)
-    DC = &P.SF;
-  else if (!GenericEnv)
-    GenericEnv = DC->getGenericEnvironmentOfContext();
-
   return swift::performTypeLocChecking(P.Context, T,
                                        /*isSILMode=*/true, IsSILType,
-                                       GenericEnv, DC);
+                                       GenericEnv, &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -1698,8 +1705,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     TypeLoc Ty = TyR.get();
     if (defaultForProto)
       bindProtocolSelfInTypeRepr(Ty, defaultForProto);
-    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, GenericEnv,
-                               defaultForProto))
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, GenericEnv))
       return true;
     parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
@@ -5399,7 +5405,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
     for (auto &ArgName : ArgNames) {
-      SILType expectedTy = substConv.getSILArgumentType(ArgNo++);
+      SILType expectedTy =
+          substConv.getSILArgumentType(ArgNo++, B.getTypeExpansionContext());
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
@@ -5413,7 +5420,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
     for (auto &ArgName : ArgNames) {
-      SILType expectedTy = substConv.getSILArgumentType(ArgNo++);
+      SILType expectedTy =
+          substConv.getSILArgumentType(ArgNo++, B.getTypeExpansionContext());
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
@@ -5430,7 +5438,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     SmallVector<SILValue, 4> Args;
     unsigned ArgNo = substConv.getNumSILArguments() - ArgNames.size();
     for (auto &ArgName : ArgNames) {
-      SILType expectedTy = substConv.getSILArgumentType(ArgNo++);
+      SILType expectedTy =
+          substConv.getSILArgumentType(ArgNo++, B.getTypeExpansionContext());
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
@@ -5458,7 +5467,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     unsigned argNo = 0;
     SmallVector<SILValue, 4> args;
     for (auto &argName : ArgNames) {
-      SILType expectedTy = substConv.getSILArgumentType(argNo++);
+      SILType expectedTy =
+          substConv.getSILArgumentType(argNo++, B.getTypeExpansionContext());
       args.push_back(getLocalValue(argName, expectedTy, InstLoc, B));
     }
 
@@ -6250,6 +6260,8 @@ ProtocolConformanceRef SILParser::parseProtocolConformance(
   auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
   if (genericParams) {
     genericEnv = handleSILGenericParams(genericParams, &P.SF);
+  } else if (defaultForProto) {
+    genericEnv = defaultForProto->getGenericEnvironment();
   }
 
   auto retVal = parseProtocolConformanceHelper(proto, genericEnv, context,
@@ -6273,8 +6285,7 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
     bindProtocolSelfInTypeRepr(Ty, defaultForProto);
   }
 
-  if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv,
-                             defaultForProto))
+  if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv))
     return ProtocolConformanceRef();
   auto ConformingTy = Ty.getType();
 

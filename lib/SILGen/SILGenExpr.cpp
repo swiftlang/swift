@@ -519,6 +519,8 @@ namespace {
                                  MakeTemporarilyEscapableExpr *E, SGFContext C);
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
+    RValue visitPropertyWrapperValuePlaceholderExpr(
+        PropertyWrapperValuePlaceholderExpr *E, SGFContext C);
 
     RValue visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C);
     RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
@@ -1303,7 +1305,7 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   if (inExclusiveBorrowSelfSection(SGF.SelfInitDelegationState)) {
     if (auto *dre = dyn_cast<DeclRefExpr>(E->getSubExpr())) {
       if (isa<ParamDecl>(dre->getDecl()) &&
-          dre->getDecl()->getFullName() == SGF.getASTContext().Id_self &&
+          dre->getDecl()->getName() == SGF.getASTContext().Id_self &&
           dre->getDecl()->isImplicit()) {
         return visitDerivedToBaseExprOfSelf(SGF, dre, E, C);
       }
@@ -2371,7 +2373,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
     if (inExclusiveBorrowSelfSection(SelfInitDelegationState)) {
       if (auto *dre = dyn_cast<DeclRefExpr>(baseExpr)) {
         if (isa<ParamDecl>(dre->getDecl()) &&
-            dre->getDecl()->getFullName() == getASTContext().Id_self &&
+            dre->getDecl()->getName() == getASTContext().Id_self &&
             dre->getDecl()->isImplicit()) {
           return emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
               *this, loc, dre, metaTy);
@@ -2407,22 +2409,15 @@ RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   return visit(E->getClosureBody(), C);
 }
 
-static OpaqueValueExpr *opaqueValueExprToSubstituteForAutoClosure(
-    const AbstractClosureExpr *e) {
-  // When we find an autoclosure that just calls an opaque closure,
-  // this is a case where we've created the opaque closure as a
-  // stand-in for the autoclosure itself. Such an opaque closure is
-  // created when we have a property wrapper's 'init(wrappedValue:)'
-  // taking an autoclosure argument.
+/// Returns the wrapped value placeholder that is meant to be substituted
+/// in for the given autoclosure. This autoclosure placeholder is created
+/// when \c init(wrappedValue:) takes an autoclosure for the \c wrappedValue
+/// parameter.
+static PropertyWrapperValuePlaceholderExpr *
+wrappedValueAutoclosurePlaceholder(const AbstractClosureExpr *e) {
   if (auto ace = dyn_cast<AutoClosureExpr>(e)) {
     if (auto ce = dyn_cast<CallExpr>(ace->getSingleExpressionBody())) {
-      if (auto ove = dyn_cast<OpaqueValueExpr>(ce->getFn())) {
-        if (!ace->isImplicit() || !ove->isImplicit() || !ove->isPlaceholder())
-          return nullptr;
-
-        if (ace->getType()->isEqual(ove->getType()))
-          return ove;
-      }
+      return dyn_cast<PropertyWrapperValuePlaceholderExpr>(ce->getFn());
     }
   }
   return nullptr;
@@ -2430,8 +2425,8 @@ static OpaqueValueExpr *opaqueValueExprToSubstituteForAutoClosure(
 
 RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                                SGFContext C) {
-  if (auto ove = opaqueValueExprToSubstituteForAutoClosure(e))
-    return visitOpaqueValueExpr(ove, C);
+  if (auto *placeholder = wrappedValueAutoclosurePlaceholder(e))
+    return visitPropertyWrapperValuePlaceholderExpr(placeholder, C);
 
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
@@ -2777,9 +2772,9 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
   auto entry = thunk->begin();
   auto resultArgTy = signature->getSingleResult().getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.F.getTypeExpansionContext());
   auto baseArgTy = signature->getParameters()[0].getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.F.getTypeExpansionContext());
   if (genericEnv) {
     resultArgTy = genericEnv->mapTypeIntoContext(SGM.M, resultArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
@@ -2789,7 +2784,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   SILValue indexPtrArg;
   if (!indexes.empty()) {
     auto indexArgTy = signature->getParameters()[1].getSILStorageType(
-        SGM.M, signature);
+        SGM.M, signature, subSGF.F.getTypeExpansionContext());
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
   
@@ -2927,9 +2922,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   auto entry = thunk->begin();
   auto valueArgTy = signature->getParameters()[0].getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.getTypeExpansionContext());
   auto baseArgTy = signature->getParameters()[1].getSILStorageType(
-      SGM.M, signature);
+      SGM.M, signature, subSGF.getTypeExpansionContext());
   if (genericEnv) {
     valueArgTy = genericEnv->mapTypeIntoContext(SGM.M, valueArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
@@ -2940,7 +2935,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   
   if (!indexes.empty()) {
     auto indexArgTy = signature->getParameters()[2].getSILStorageType(
-        SGM.M, signature);
+        SGM.M, signature, subSGF.getTypeExpansionContext());
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
 
@@ -3094,10 +3089,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
-    auto lhsPtr =
-      entry->createFunctionArgument(params[0].getSILStorageType(SGM.M, signature));
-    auto rhsPtr =
-      entry->createFunctionArgument(params[1].getSILStorageType(SGM.M, signature));
+    auto lhsPtr = entry->createFunctionArgument(params[0].getSILStorageType(
+        SGM.M, signature, subSGF.getTypeExpansionContext()));
+    auto rhsPtr = entry->createFunctionArgument(params[1].getSILStorageType(
+        SGM.M, signature, subSGF.getTypeExpansionContext()));
 
     Scope scope(subSGF, loc);
 
@@ -3269,8 +3264,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
-    auto indexPtr = entry->createFunctionArgument(
-                                params[0].getSILStorageType(SGM.M, signature));
+    auto indexPtr = entry->createFunctionArgument(params[0].getSILStorageType(
+        SGM.M, signature, subSGF.getTypeExpansionContext()));
 
     SILValue hashCode;
 
@@ -5139,6 +5134,11 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   assert(SGF.OpaqueValues.count(E) && "Didn't bind OpaqueValueExpr");
   auto value = SGF.OpaqueValues[E];
   return RValue(SGF, E, SGF.manageOpaqueValue(value, E, C));
+}
+
+RValue RValueEmitter::visitPropertyWrapperValuePlaceholderExpr(
+    PropertyWrapperValuePlaceholderExpr *E, SGFContext C) {
+  return visitOpaqueValueExpr(E->getOpaqueValuePlaceholder(), C);
 }
 
 ProtocolDecl *SILGenFunction::getPointerProtocol() {

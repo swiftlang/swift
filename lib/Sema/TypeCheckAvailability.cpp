@@ -754,7 +754,7 @@ void TypeChecker::diagnosePotentialUnavailability(
     const ValueDecl *D, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
     const UnavailabilityReason &Reason) {
-  diagnosePotentialUnavailability(D, D->getFullName(), ReferenceRange,
+  diagnosePotentialUnavailability(D, D->getName(), ReferenceRange,
                                   ReferenceDC, Reason);
 }
 
@@ -1425,7 +1425,7 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   assert(Accessor->isGetterOrSetter());
 
   const AbstractStorageDecl *ASD = Accessor->getStorage();
-  DeclName Name = ASD->getFullName();
+  DeclName Name = ASD->getName();
 
   auto &diag = ForInout ? diag::availability_inout_accessor_only_version_newer
                         : diag::availability_accessor_only_version_newer;
@@ -1942,12 +1942,12 @@ getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
   static const unsigned NOT_ACCESSOR_INDEX = 2;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-    DeclName Name = accessor->getStorage()->getFullName();
+    DeclName Name = accessor->getStorage()->getName();
     assert(accessor->isGetterOrSetter());
     return {static_cast<unsigned>(accessor->getAccessorKind()), Name};
   }
 
-  return {NOT_ACCESSOR_INDEX, D->getFullName()};
+  return {NOT_ACCESSOR_INDEX, D->getName()};
 }
 
 void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
@@ -2078,7 +2078,7 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
     }
 
     DeclName newName = parsedName.formDeclName(ctx);
-    size_t numArgs = override->getFullName().getArgumentNames().size();
+    size_t numArgs = override->getName().getArgumentNames().size();
     if (!newName || newName.getArgumentNames().size() != numArgs)
       return;
 
@@ -2317,9 +2317,7 @@ class AvailabilityWalker : public ASTWalker {
   DeclContext *DC;
   MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
-  ResilienceExpansion Expansion;
-  Optional<TypeChecker::FragileFunctionKind> FragileKind;
-  bool TreatUsableFromInlineAsPublic = false;
+  FragileFunctionKind FragileKind;
 
   /// Returns true if DC is an \c init(rawValue:) declaration and it is marked
   /// implicit.
@@ -2336,10 +2334,7 @@ class AvailabilityWalker : public ASTWalker {
 
 public:
   AvailabilityWalker(DeclContext *DC) : Context(DC->getASTContext()), DC(DC) {
-    Expansion = DC->getResilienceExpansion();
-    if (Expansion == ResilienceExpansion::Minimal)
-      std::tie(FragileKind, TreatUsableFromInlineAsPublic)
-        = TypeChecker::getFragileFunctionKind(DC);
+    FragileKind = DC->getFragileFunctionKind();
   }
 
   // FIXME: Remove this
@@ -2619,10 +2614,9 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
       return false;
   }
 
-  if (FragileKind)
+  if (FragileKind.kind != FragileFunctionKind::None)
     if (R.isValid())
-      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, *FragileKind,
-                                                TreatUsableFromInlineAsPublic))
+      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, FragileKind))
         return true;
 
   if (diagnoseExplicitUnavailability(D, R, DC, call))
@@ -2672,10 +2666,8 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
     Context.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
   if (!integerType || !floatingType) return false;
 
-  return TypeChecker::conformsToProtocol(ty, integerType, DC,
-                                         ConformanceCheckFlags::InExpression) ||
-         TypeChecker::conformsToProtocol(ty, floatingType, DC,
-                                         ConformanceCheckFlags::InExpression);
+  return TypeChecker::conformsToProtocol(ty, integerType, DC) ||
+         TypeChecker::conformsToProtocol(ty, floatingType, DC);
 }
 
 
@@ -2834,6 +2826,23 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
   return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }
 
+/// Should we warn that \p valueDecl needs an explicit availability annotation
+/// in -require-explicit-availaiblity mode?
+static bool declNeedsExplicitAvailability(const ValueDecl *valueDecl) {
+  AccessScope scope =
+    valueDecl->getFormalAccessScope(/*useDC*/nullptr,
+                                  /*treatUsableFromInlineAsPublic*/true);
+  if (!scope.isPublic() ||
+      valueDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return false;
+
+  // Warn on decls without an introduction version.
+  auto &ctx = valueDecl->getASTContext();
+  auto safeRangeUnderApprox = AvailabilityInference::availableRange(valueDecl, ctx);
+  return !safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
+         !valueDecl->getAttrs().isUnavailable(ctx);
+}
+
 void swift::checkExplicitAvailability(Decl *decl) {
   // Check only if the command line option was set.
   if (!decl->getASTContext().LangOpts.RequireExplicitAvailability)
@@ -2846,27 +2855,35 @@ void swift::checkExplicitAvailability(Decl *decl) {
 
   ValueDecl *valueDecl = dyn_cast<ValueDecl>(decl);
   if (valueDecl == nullptr) {
-    // decl should be either a ValueDecl or an ExtensionDecl
+    // decl should be either a ValueDecl or an ExtensionDecl.
     auto extension = cast<ExtensionDecl>(decl);
     valueDecl = extension->getExtendedNominal();
     if (!valueDecl)
       return;
+
+    // Skip extensions without public members or conformances.
+    auto members = extension->getMembers();
+    auto hasMembers = std::any_of(members.begin(), members.end(),
+                                  [](const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        if (declNeedsExplicitAvailability(VD))
+          return true;
+      return false;
+    });
+
+    auto protocols = extension->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
+                                    [](const ProtocolDecl *PD) -> bool {
+      AccessScope scope =
+        PD->getFormalAccessScope(/*useDC*/nullptr,
+                                 /*treatUsableFromInlineAsPublic*/true);
+      return scope.isPublic();
+    });
+
+    if (!hasMembers && !hasProtocols) return;
   }
 
-  // Skip decls that are not public and not usable from inline.
-  AccessScope scope =
-    valueDecl->getFormalAccessScope(/*useDC*/nullptr,
-                                  /*treatUsableFromInlineAsPublic*/true);
-  if (!scope.isPublic() ||
-      decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-    return;
-
-  // Warn on decls without an introduction version.
-  auto &ctx = decl->getASTContext();
-  auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
-  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
-      !decl->getAttrs().isUnavailable(ctx)) {
-
+  if (declNeedsExplicitAvailability(valueDecl)) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
 
     auto suggestPlatform = decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
@@ -2882,6 +2899,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       {
          llvm::raw_string_ostream Out(AttrText);
 
+         auto &ctx = valueDecl->getASTContext();
          StringRef OriginalIndent = Lexer::getIndentationForLine(
            ctx.SourceMgr, InsertLoc);
          Out << "@available(" << suggestPlatform << ", *)\n"

@@ -61,7 +61,7 @@ func customHashable() {
 enum InvalidCustomHashable {
   case A, B
 
-  var hashValue: String { return "" } // expected-note {{previously declared here}}
+  var hashValue: String { return "" }
 }
 func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String {
   return ""
@@ -178,7 +178,7 @@ enum NoCases: Hashable, Comparable {}
 
 // rdar://19773050
 private enum Bar<T> {
-  case E(Unknown<T>)  // expected-error {{use of undeclared type 'Unknown'}}
+  case E(Unknown<T>)  // expected-error {{cannot find type 'Unknown' in scope}}
 
   mutating func value() -> T {
     switch self {

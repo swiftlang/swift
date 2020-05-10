@@ -527,7 +527,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
   case DiagnosticArgumentKind::ValueDecl:
     Out << FormatOpts.OpeningQuotationMark;
-    Arg.getAsValueDecl()->getFullName().printPretty(Out);
+    Arg.getAsValueDecl()->getName().printPretty(Out);
     Out << FormatOpts.ClosingQuotationMark;
     break;
 
@@ -556,7 +556,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
         selfTy->print(OutNaming);
         OutNaming << '.';
       }
-      namingDecl->getFullName().printPretty(OutNaming);
+      namingDecl->getName().printPretty(OutNaming);
 
       auto descriptiveKind = opaqueTypeDecl->getDescriptiveKind();
 
@@ -583,11 +583,14 @@ static void formatDiagnosticArgument(StringRef Modifier,
     }
     break;
   }
+
   case DiagnosticArgumentKind::TypeRepr:
     assert(Modifier.empty() && "Improper modifier for TypeRepr argument");
+    assert(Arg.getAsTypeRepr() && "TypeRepr argument is null");
     Out << FormatOpts.OpeningQuotationMark << Arg.getAsTypeRepr()
         << FormatOpts.ClosingQuotationMark;
     break;
+
   case DiagnosticArgumentKind::PatternKind:
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();

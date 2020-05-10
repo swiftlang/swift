@@ -3,7 +3,7 @@
 // SR-4594
 
 struct A {
-  var b: AnUndefinedType // expected-error {{use of undeclared type 'AnUndefinedType'}}
+  var b: AnUndefinedType // expected-error {{cannot find type 'AnUndefinedType' in scope}}
 }
 
 struct B {

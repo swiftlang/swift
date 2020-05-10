@@ -25,9 +25,26 @@
 namespace swift {
 
 class SILRemarkStreamer {
-  llvm::remarks::RemarkStreamer &llvmStreamer;
+private:
+  enum class Owner {
+    SILModule,
+    LLVM,
+  } owner;
+
+  /// The underlying LLVM streamer.
+  ///
+  /// If owned by a SILModule, this will be non-null.
+  std::unique_ptr<llvm::remarks::RemarkStreamer> streamer;
+  /// The owning LLVM context.
+  ///
+  /// If owned by LLVM, this will be non-null.
+  llvm::LLVMContext *context;
+
+  /// The remark output stream used to record SIL remarks to a file.
+  std::unique_ptr<llvm::raw_fd_ostream> remarkStream;
+
   // Source manager for resolving source locations.
-  const SourceManager &srcMgr;
+  const ASTContext &ctx;
   /// Convert diagnostics into LLVM remark objects.
   /// The lifetime of the members of the result is bound to the lifetime of
   /// the SIL remarks.
@@ -35,20 +52,29 @@ class SILRemarkStreamer {
   llvm::remarks::Remark
   toLLVMRemark(const OptRemark::Remark<RemarkT> &remark) const;
 
+  SILRemarkStreamer(std::unique_ptr<llvm::remarks::RemarkStreamer> &&streamer,
+                    std::unique_ptr<llvm::raw_fd_ostream> &&stream,
+                    const ASTContext &Ctx);
+
 public:
-  SILRemarkStreamer(llvm::remarks::RemarkStreamer &llvmStreamer,
-                    const SourceManager &srcMgr)
-      : llvmStreamer(llvmStreamer), srcMgr(srcMgr) {}
+  static std::unique_ptr<SILRemarkStreamer> create(SILModule &silModule);
+
+public:
+  llvm::remarks::RemarkStreamer &getLLVMStreamer();
+  const llvm::remarks::RemarkStreamer &getLLVMStreamer() const;
+
+  const ASTContext &getASTContext() const { return ctx; }
+
+public:
+  /// Perform a one-time ownership transfer to associate the underlying
+  /// \c llvm::remarks::RemarkStreamer with the given \c LLVMContext.
+  void intoLLVMContext(llvm::LLVMContext &Ctx) &;
+
+public:
   /// Emit a remark through the streamer.
   template <typename RemarkT>
   void emit(const OptRemark::Remark<RemarkT> &remark);
 };
-
-std::pair<std::unique_ptr<llvm::raw_fd_ostream>,
-          std::unique_ptr<SILRemarkStreamer>>
-createSILRemarkStreamer(SILModule &srcMgr, StringRef filename, StringRef passes,
-                        llvm::remarks::Format format,
-                        DiagnosticEngine &diagEngine, SourceManager &sourceMgr);
 
 // Implementation for template member functions.
 
@@ -80,13 +106,15 @@ llvm::remarks::Remark SILRemarkStreamer::toLLVMRemark(
   llvmRemark.PassName = optRemark.getPassName();
   llvmRemark.RemarkName = optRemark.getIdentifier();
   llvmRemark.FunctionName = optRemark.getDemangledFunctionName();
-  llvmRemark.Loc = toRemarkLocation(optRemark.getLocation(), srcMgr);
+  llvmRemark.Loc =
+      toRemarkLocation(optRemark.getLocation(), getASTContext().SourceMgr);
 
   for (const OptRemark::Argument &arg : optRemark.getArgs()) {
     llvmRemark.Args.emplace_back();
     llvmRemark.Args.back().Key = arg.key;
     llvmRemark.Args.back().Val = arg.val;
-    llvmRemark.Args.back().Loc = toRemarkLocation(arg.loc, srcMgr);
+    llvmRemark.Args.back().Loc =
+        toRemarkLocation(arg.loc, getASTContext().SourceMgr);
   }
 
   return llvmRemark;
@@ -94,10 +122,10 @@ llvm::remarks::Remark SILRemarkStreamer::toLLVMRemark(
 
 template <typename RemarkT>
 void SILRemarkStreamer::emit(const OptRemark::Remark<RemarkT> &optRemark) {
-  if (!llvmStreamer.matchesFilter(optRemark.getPassName()))
+  if (!getLLVMStreamer().matchesFilter(optRemark.getPassName()))
     return;
 
-  return llvmStreamer.getSerializer().emit(toLLVMRemark(optRemark));
+  return getLLVMStreamer().getSerializer().emit(toLLVMRemark(optRemark));
 }
 
 } // namespace swift

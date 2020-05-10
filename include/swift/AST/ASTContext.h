@@ -50,6 +50,10 @@ namespace clang {
   class ObjCInterfaceDecl;
 }
 
+namespace llvm {
+  class LLVMContext;
+}
+
 namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
@@ -74,6 +78,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
+  class ModuleDependencies;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class SourceFile;
@@ -87,6 +92,7 @@ namespace swift {
   class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
+  class ModuleDependenciesCache;
   class ModuleLoader;
   class NominalTypeDecl;
   class NormalProtocolConformance;
@@ -115,6 +121,7 @@ namespace swift {
   class UnifiedStatsReporter;
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
+  struct SubASTContextDelegate;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -706,6 +713,16 @@ public:
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                        bool isClang = false, bool isDWARF = false);
 
+  /// Retrieve the module dependencies for the module with the given name.
+  ///
+  /// \param isUnderlyingClangModule When true, only look for a Clang module
+  /// with the given name, ignoring any Swift modules.
+  Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName,
+      bool isUnderlyingClangModule,
+      ModuleDependenciesCache &cache,
+      SubASTContextDelegate &delegate);
+
   /// Load extensions to the given nominal type from the external
   /// module loaders.
   ///
@@ -949,6 +966,11 @@ private:
                                        GenericSignatureBuilder &&builder);
   friend class GenericSignatureBuilder;
 
+private:
+  friend class IntrinsicInfo;
+  /// Retrieve an LLVMContext that is used for scratch space for intrinsic lookup.
+  llvm::LLVMContext &getIntrinsicScratchContext() const;
+
 public:
   /// Retrieve or create the stored generic signature builder for the given
   /// canonical generic signature and module.
@@ -1005,6 +1027,10 @@ public:
 
   /// Retrieve the IRGen specific SIL passes.
   SILTransformCtors getIRGenSILTransforms() const;
+  
+  /// Check whether a given string would be considered "pure ASCII" by the
+  /// standard library's String implementation.
+  bool isASCIIString(StringRef s) const;
 
 private:
   friend Decl;

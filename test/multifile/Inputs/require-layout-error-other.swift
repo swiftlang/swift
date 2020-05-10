@@ -1,3 +1,3 @@
 public struct S {
-  var x: DoesNotExist // expected-error {{use of undeclared type 'DoesNotExist'}}
+  var x: DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }

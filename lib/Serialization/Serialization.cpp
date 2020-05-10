@@ -940,15 +940,16 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 static void flattenImportPath(const ModuleDecl::ImportedModule &import,
                               SmallVectorImpl<char> &out) {
   llvm::raw_svector_ostream outStream(out);
-  import.second->getReverseFullModuleName().printForward(outStream,
-                                                         StringRef("\0", 1));
+  import.importedModule->getReverseFullModuleName().printForward(
+      outStream, StringRef("\0", 1));
 
-  if (import.first.empty())
+  if (import.accessPath.empty())
     return;
 
   outStream << '\0';
-  assert(import.first.size() == 1 && "can only handle top-level decl imports");
-  auto accessPathElem = import.first.front();
+  assert(import.accessPath.size() == 1 &&
+         "can only handle top-level decl imports");
+  auto accessPathElem = import.accessPath.front();
   outStream << accessPathElem.Item.str();
 }
 
@@ -1035,7 +1036,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
   ModuleDecl *bridgingHeaderModule = clangImporter->getImportedHeaderModule();
-  ModuleDecl::ImportedModule bridgingHeaderImport{{}, bridgingHeaderModule};
+  ModuleDecl::ImportedModule bridgingHeaderImport{ModuleDecl::AccessPathTy(),
+                                                  bridgingHeaderModule};
 
   // Make sure the bridging header module is always at the top of the import
   // list, mimicking how it is processed before any module imports when
@@ -1061,8 +1063,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
 
   ModuleDecl *theBuiltinModule = M->getASTContext().TheBuiltinModule;
   for (auto import : allImports) {
-    if (import.second == theBuiltinModule ||
-        import.second == bridgingHeaderModule) {
+    if (import.importedModule == theBuiltinModule ||
+        import.importedModule == bridgingHeaderModule) {
       continue;
     }
 
@@ -1081,18 +1083,18 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       stableImportControl = ImportControl::ImplementationOnly;
 
     SmallVector<Identifier, 4> spis;
-    M->lookupImportedSPIGroups(import.second, spis);
+    M->lookupImportedSPIGroups(import.importedModule, spis);
 
     ImportedModule.emit(ScratchRecord,
                         static_cast<uint8_t>(stableImportControl),
-                        !import.first.empty(), !spis.empty(), importPath);
+                        !import.accessPath.empty(), !spis.empty(), importPath);
 
     if (!spis.empty()) {
       SmallString<64> out;
       llvm::raw_svector_ostream outStream(out);
-      swift::interleave(spis,
-                        [&outStream](Identifier next) { outStream << next.str(); },
-                        [&outStream] { outStream << StringRef("\0", 1); });
+      llvm::interleave(
+          spis, [&outStream](Identifier next) { outStream << next.str(); },
+          [&outStream] { outStream << StringRef("\0", 1); });
       ImportedModuleSPI.emit(ScratchRecord, out);
     }
   }
@@ -2657,8 +2659,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     switch (pattern->getKind()) {
     case PatternKind::Paren: {
       unsigned abbrCode = S.DeclTypeAbbrCodes[ParenPatternLayout::Code];
-      ParenPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     pattern->isImplicit());
+      ParenPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
       writePattern(cast<ParenPattern>(pattern)->getSubPattern());
       break;
     }
@@ -2668,8 +2669,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       unsigned abbrCode = S.DeclTypeAbbrCodes[TuplePatternLayout::Code];
       TuplePatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                      S.addTypeRef(getPatternType()),
-                                     tuple->getNumElements(),
-                                     tuple->isImplicit());
+                                     tuple->getNumElements());
 
       abbrCode = S.DeclTypeAbbrCodes[TuplePatternEltLayout::Code];
       for (auto &elt : tuple->getElements()) {
@@ -2686,15 +2686,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       unsigned abbrCode = S.DeclTypeAbbrCodes[NamedPatternLayout::Code];
       NamedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                      S.addDeclRef(named->getDecl()),
-                                     S.addTypeRef(getPatternType()),
-                                     named->isImplicit());
+                                     S.addTypeRef(getPatternType()));
       break;
     }
     case PatternKind::Any: {
       unsigned abbrCode = S.DeclTypeAbbrCodes[AnyPatternLayout::Code];
       AnyPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   S.addTypeRef(getPatternType()),
-                                   pattern->isImplicit());
+                                   S.addTypeRef(getPatternType()));
       break;
     }
     case PatternKind::Typed: {
@@ -2702,8 +2700,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[TypedPatternLayout::Code];
       TypedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     S.addTypeRef(getPatternType()),
-                                     typed->isImplicit());
+                                     S.addTypeRef(getPatternType()));
       writePattern(typed->getSubPattern());
       break;
     }
@@ -2719,7 +2716,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[VarPatternLayout::Code];
       VarPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   var->isLet(), var->isImplicit());
+                                   var->isLet());
       writePattern(var->getSubPattern());
       break;
     }
@@ -3392,8 +3389,8 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[FuncLayout::Code];
     SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
     nameComponentsAndDependencies.push_back(
-        S.addDeclBaseNameRef(fn->getFullName().getBaseName()));
-    for (auto argName : fn->getFullName().getArgumentNames())
+        S.addDeclBaseNameRef(fn->getBaseName()));
+    for (auto argName : fn->getName().getArgumentNames())
       nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
@@ -3420,8 +3417,8 @@ public:
                            S.addDeclRef(fn->getOperatorDecl()),
                            S.addDeclRef(fn->getOverriddenDecl()),
                            overriddenDeclAffectsABI(fn->getOverriddenDecl()),
-                           fn->getFullName().getArgumentNames().size() +
-                             fn->getFullName().isCompoundName(),
+                           fn->getName().getArgumentNames().size() +
+                             fn->getName().isCompoundName(),
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
@@ -3454,12 +3451,13 @@ public:
     SubstitutionMapID underlyingTypeID = 0;
     if (auto underlying = opaqueDecl->getUnderlyingTypeSubstitutions())
       underlyingTypeID = S.addSubstitutionMapRef(*underlying);
-
+    uint8_t rawAccessLevel =
+      getRawStableAccessLevel(opaqueDecl->getFormalAccess());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
     OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
-                                 underlyingTypeID);
+                                 underlyingTypeID, rawAccessLevel);
     writeGenericParams(opaqueDecl->getGenericParams());
   }
 
@@ -3527,7 +3525,7 @@ public:
     SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
     auto baseName = S.addDeclBaseNameRef(elem->getBaseName());
     nameComponentsAndDependencies.push_back(baseName);
-    for (auto argName : elem->getFullName().getArgumentNames())
+    for (auto argName : elem->getName().getArgumentNames())
       nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
 
     Type ty = elem->getInterfaceType();
@@ -3557,7 +3555,7 @@ public:
                                   isRawValueImplicit,
                                   isNegative,
                                   S.addUniquedStringRef(RawValueText),
-                                  elem->getFullName().getArgumentNames().size()+1,
+                                  elem->getName().getArgumentNames().size()+1,
                                   nameComponentsAndDependencies);
     if (auto *PL = elem->getParameterList())
       writeParameterList(PL);
@@ -3572,7 +3570,7 @@ public:
     Accessors accessors = getAccessors(subscript);
 
     SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
-    for (auto argName : subscript->getFullName().getArgumentNames())
+    for (auto argName : subscript->getName().getArgumentNames())
       nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
 
     for (auto accessor : accessors.Decls)
@@ -3613,8 +3611,7 @@ public:
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
                                 rawStaticSpelling,
-                                subscript->
-                                  getFullName().getArgumentNames().size(),
+                                subscript->getName().getArgumentNames().size(),
                                 S.addDeclRef(subscript->getOpaqueResultTypeDecl()),
                                 numVTableEntries,
                                 nameComponentsAndDependencies);
@@ -3630,7 +3627,7 @@ public:
     auto contextID = S.addDeclContextRef(ctor->getDeclContext());
 
     SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
-    for (auto argName : ctor->getFullName().getArgumentNames())
+    for (auto argName : ctor->getName().getArgumentNames())
       nameComponentsAndDependencies.push_back(S.addDeclBaseNameRef(argName));
 
     Type ty = ctor->getInterfaceType();
@@ -3661,7 +3658,7 @@ public:
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
                                   firstTimeRequired,
-                                  ctor->getFullName().getArgumentNames().size(),
+                                  ctor->getName().getArgumentNames().size(),
                                   nameComponentsAndDependencies);
 
     writeGenericParams(ctor->getGenericParams());
@@ -4985,7 +4982,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   }
   for (auto nextFile : files) {
     if (nextFile->hasEntryPoint())
-      entryPointClassID = addDeclRef(nextFile->getMainClass());
+      entryPointClassID = addDeclRef(nextFile->getMainDecl());
 
     // FIXME: Switch to a visitor interface?
     SmallVector<Decl *, 32> fileDecls;

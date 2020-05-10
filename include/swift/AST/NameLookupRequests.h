@@ -188,8 +188,9 @@ public:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &e) const;
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &e) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ArrayRef<ProtocolDecl *> result) const;
 };
 
@@ -239,7 +240,7 @@ public:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            NominalTypeDecl *result) const;
 };
 
@@ -328,7 +329,8 @@ public:
 
 public:
   // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 class GenericParamListRequest :
@@ -431,8 +433,9 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            LookupResult res) const;
 };
 
@@ -477,7 +480,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            QualifiedLookupResult l) const;
 };
 
@@ -502,8 +505,9 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            QualifiedLookupResult lookupResult) const;
 };
 
@@ -528,7 +532,8 @@ private:
 
 public:
   // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 /// The input type for a direct lookup request.
@@ -580,7 +585,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            TinyPtrVector<ValueDecl *> result) const;
 };
 
@@ -644,16 +649,15 @@ template <typename OperatorType>
 class LookupOperatorRequest
     : public SimpleRequest<LookupOperatorRequest<OperatorType>,
                            OperatorType *(OperatorLookupDescriptor),
-                           RequestFlags::Cached|RequestFlags::DependencySink> {
+                           RequestFlags::Cached> {
   using SimpleRequest<LookupOperatorRequest<OperatorType>,
                       OperatorType *(OperatorLookupDescriptor),
-                      RequestFlags::Cached |
-                          RequestFlags::DependencySink>::SimpleRequest;
+                      RequestFlags::Cached>::SimpleRequest;
 
 private:
   friend SimpleRequest<LookupOperatorRequest<OperatorType>,
                        OperatorType *(OperatorLookupDescriptor),
-                       RequestFlags::Cached|RequestFlags::DependencySink>;
+                       RequestFlags::Cached>;
 
   // Evaluation.
   OperatorType *evaluate(Evaluator &evaluator,
@@ -662,11 +666,6 @@ private:
 public:
   // Cached.
   bool isCached() const { return true; }
-
-public:
-  // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
-                           OperatorType *o) const;
 };
 
 using LookupPrefixOperatorRequest = LookupOperatorRequest<PrefixOperatorDecl>;
@@ -680,7 +679,8 @@ class DirectOperatorLookupRequest
     : public SimpleRequest<DirectOperatorLookupRequest,
                            TinyPtrVector<OperatorDecl *>(
                                OperatorLookupDescriptor, OperatorFixity),
-                           RequestFlags::Uncached> {
+                           RequestFlags::Uncached |
+                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -690,6 +690,11 @@ private:
   TinyPtrVector<OperatorDecl *>
   evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor,
            OperatorFixity fixity) const;
+
+public:
+  // Incremental dependencies.
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
+                           TinyPtrVector<OperatorDecl *> ops) const;
 };
 
 /// Looks up an precedencegroup in a given file or module without looking
@@ -698,7 +703,8 @@ class DirectPrecedenceGroupLookupRequest
     : public SimpleRequest<DirectPrecedenceGroupLookupRequest,
                            TinyPtrVector<PrecedenceGroupDecl *>(
                                OperatorLookupDescriptor),
-                           RequestFlags::Uncached> {
+                           RequestFlags::Uncached |
+                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -707,6 +713,11 @@ private:
 
   TinyPtrVector<PrecedenceGroupDecl *>
   evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor) const;
+
+public:
+  // Incremental dependencies.
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
+                           TinyPtrVector<PrecedenceGroupDecl *> groups) const;
 };
 
 class LookupConformanceDescriptor final {
@@ -755,7 +766,7 @@ private:
 
 public:
   // Incremental dependencies
-  void writeDependencySink(Evaluator &evaluator, ReferencedNameTracker &tracker,
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceRef result) const;
 };
 

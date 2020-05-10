@@ -21,8 +21,8 @@ class C {
 // LOOP_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: Seq[#[Int]#]{{; name=.+$}}
 // LOOP_1-DAG: Decl[LocalVar]/Local:               I[#Int#]{{; name=.+$}}
 // LOOP_1-DAG: Decl[LocalVar]/Local:               G[#Gen#]{{; name=.+$}}
-// LOOP_1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
-// LOOP_1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
+// LOOP_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
+// LOOP_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f2({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
 
 	func f2(_ Seq : [Int], I : Int, G: Gen) {
 		for i in #^LOOP_2^# {
@@ -33,8 +33,8 @@ class C {
 // LOOP_2-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: Seq[#[Int]#]{{; name=.+$}}
 // LOOP_2-DAG: Decl[LocalVar]/Local:               I[#Int#]{{; name=.+$}}
 // LOOP_2-DAG: Decl[LocalVar]/Local:               G[#Gen#]{{; name=.+$}}
-// LOOP_2-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
-// LOOP_2-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
+// LOOP_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
+// LOOP_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f2({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#]{{; name=.+$}}
 
 // LOOP_2_NEGATIVE-NOT: TypeRelation[{{.*}}]: SequenceType[#SequenceType#];
 

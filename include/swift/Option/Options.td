@@ -135,14 +135,6 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
-def enable_fine_grained_dependencies :
-Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Be more selective about incremental recompilation">;
-
-def disable_fine_grained_dependencies :
-Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Don't be more selective about incremental recompilation">;
-
 def enable_type_fingerprints :
 Flag<["-"], "enable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Enable per-nominal and extension body fingerprints">;
@@ -519,6 +511,12 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
+def experimental_private_intransitive_dependencies : Flag<["-"],
+    "experimental-private-intransitive-dependencies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable experimental dependency tracking that never cascades">;
+
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -527,6 +525,10 @@ def suppress_warnings : Flag<["-"], "suppress-warnings">,
 def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
   Flags<[FrontendOption]>,
   HelpText<"Treat warnings as errors">;
+
+def no_warnings_as_errors : Flag<["-"], "no-warnings-as-errors">,
+  Flags<[FrontendOption]>,
+  HelpText<"Don't treat warnings as errors">;
 
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -1026,6 +1028,10 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   MetaVarName<"<type>">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
+
+def scan_dependencies : Flag<["-"], "scan-dependencies">,
+  HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
   Flags<[FrontendOption]>,

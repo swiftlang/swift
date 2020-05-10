@@ -567,8 +567,14 @@ def create_argument_parser():
 
     option(['--indexstore-db'], toggle_true('build_indexstoredb'),
            help='build IndexStoreDB')
+    option('--test-indexstore-db-sanitize-all',
+           toggle_true('test_indexstoredb_sanitize_all'),
+           help='run indexstore-db tests under all sanitizers')
     option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
+    option('--test-sourcekit-lsp-sanitize-all',
+           toggle_true('test_sourcekitlsp_sanitize_all'),
+           help='run sourcekit-lsp tests under all sanitizers')
     option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
            help='install SwiftSyntax')
     option('--swiftsyntax-verify-generated-files',

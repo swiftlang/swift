@@ -100,11 +100,15 @@ class ModuleFile
   /// modules, which are assumed to contain canonical SIL for an entire module.
   bool IsSIB = false;
 
+  // Full blob from the misc. version field of the metadata block. This should
+  // include the version string of the compiler that built the module.
+  StringRef MiscVersion;
+
 public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:
-    ModuleDecl::ImportedModule Import = {};
+    llvm::Optional<ModuleDecl::ImportedModule> Import = llvm::None;
     const StringRef RawPath;
     const StringRef RawSPIs;
     SmallVector<Identifier, 4> spiGroups;
@@ -142,7 +146,7 @@ public:
     }
 
     bool isLoaded() const {
-      return Import.second != nullptr;
+      return Import.hasValue() && Import->importedModule != nullptr;
     }
 
     bool isExported() const {

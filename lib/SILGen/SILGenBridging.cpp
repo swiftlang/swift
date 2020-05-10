@@ -220,9 +220,9 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   assert(isa<MetatypeType>(metatypeParam.getInterfaceType()) &&
          cast<MetatypeType>(metatypeParam.getInterfaceType()).getInstanceType()
            == swiftValueType);
-  SILValue metatypeValue =
-  SGF.B.createMetatype(loc,
-                       metatypeParam.getSILStorageType(SGF.SGM.M, witnessFnTy));
+  SILValue metatypeValue = SGF.B.createMetatype(
+      loc, metatypeParam.getSILStorageType(SGF.SGM.M, witnessFnTy,
+                                           SGF.getTypeExpansionContext()));
 
   auto witnessCI =
       SGF.getConstantInfo(SGF.getTypeExpansionContext(), witnessConstant);
@@ -371,7 +371,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   formalBlockType = getBridgedBlockType(SGF.SGM, formalBlockType);
 
   // Set up the indirect result.
-  SILType blockResultTy = blockTy->getAllResultsSubstType(SGF.SGM.M);
+  SILType blockResultTy =
+      blockTy->getAllResultsSubstType(SGF.SGM.M, SGF.getTypeExpansionContext());
   SILValue indirectResult;
   if (blockTy->getNumResults() != 0) {
     auto result = blockTy->getSingleResult();
@@ -399,7 +400,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   SmallVector<ManagedValue, 4> args;
   for (unsigned i : indices(funcTy->getParameters())) {
     auto &param = blockTy->getParameters()[i];
-    SILType paramTy = blockConv.getSILType(param);
+    SILType paramTy =
+        blockConv.getSILType(param, SGF.getTypeExpansionContext());
     SILValue v = entry->createFunctionArgument(paramTy);
     ManagedValue mv;
     
@@ -433,9 +435,9 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
 
     CanType formalBridgedType = bridgedParamTypes[i];
     CanType formalNativeType = nativeParamTypes[i];
-    SILType loweredNativeTy =
-      funcTy->getParameters()[i].getSILStorageType(SGF.SGM.M, funcTy);
-    
+    SILType loweredNativeTy = funcTy->getParameters()[i].getSILStorageType(
+        SGF.SGM.M, funcTy, SGF.getTypeExpansionContext());
+
     args.push_back(SGF.emitBridgedToNativeValue(loc, mv, formalBridgedType,
                                                 formalNativeType,
                                                 loweredNativeTy));
@@ -835,7 +837,8 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   if (funcTy->getNumResults() != 0) {
     auto result = funcTy->getSingleResult();
     if (result.getConvention() == ResultConvention::Indirect) {
-      SILType resultTy = fnConv.getSILType(result);
+      SILType resultTy =
+          fnConv.getSILType(result, SGF.getTypeExpansionContext());
       indirectResult = entry->createFunctionArgument(resultTy);
     }
   }
@@ -851,14 +854,14 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
     CanType formalBlockParamTy = formalBlockParams[i];
     CanType formalFuncParamTy = formalFuncParams[i];
 
-    auto paramTy = fnConv.getSILType(param);
+    auto paramTy = fnConv.getSILType(param, SGF.getTypeExpansionContext());
     SILValue v = entry->createFunctionArgument(paramTy);
 
     // First get the managed parameter for this function.
     auto mv = emitManagedParameter(SGF, loc, param, v);
 
-    SILType loweredBlockArgTy = blockTy->getParameters()[i]
-      .getSILStorageType(SGF.SGM.M, blockTy);
+    SILType loweredBlockArgTy = blockTy->getParameters()[i].getSILStorageType(
+        SGF.SGM.M, blockTy, SGF.getTypeExpansionContext());
 
     // Then bridge the native value to its bridged variant.
     mv = SGF.emitNativeToBridgedValue(loc, mv, formalFuncParamTy,
@@ -904,7 +907,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
       init->finishInitialization(SGF);
     }
     init->getManagedAddress().forward(SGF);
-    r = SGF.B.createTuple(loc, fnConv.getSILResultType(), ArrayRef<SILValue>());
+    r = SGF.B.createTuple(
+        loc, fnConv.getSILResultType(SGF.getTypeExpansionContext()),
+        ArrayRef<SILValue>());
 
     // Otherwise, return the result at +1.
   } else {
@@ -1376,14 +1381,12 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
     // Consider the bridged values to be "call results" since they're coming
     // from potentially nil-unsound ObjC callers.
-    ManagedValue native =
-      SGF.emitBridgedToNativeValue(loc,
-         bridgedArgs[i],
-         bridgedFormalTypes[i],
-         nativeFormalTypes[i],
-         swiftFnTy->getParameters()[i].getSILStorageType(SGF.SGM.M, swiftFnTy),
-         SGFContext(),
-         /*isCallResult*/ true);
+    ManagedValue native = SGF.emitBridgedToNativeValue(
+        loc, bridgedArgs[i], bridgedFormalTypes[i], nativeFormalTypes[i],
+        swiftFnTy->getParameters()[i].getSILStorageType(
+            SGF.SGM.M, swiftFnTy, SGF.getTypeExpansionContext()),
+        SGFContext(),
+        /*isCallResult*/ true);
     SILValue argValue;
 
     // This can happen if the value is resilient in the calling convention
@@ -1445,8 +1448,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   SmallVector<SILValue, 4> args;
 
   if (substConv.hasIndirectSILResults()) {
-    args.push_back(
-        emitTemporaryAllocation(loc, substConv.getSingleSILResultType()));
+    args.push_back(emitTemporaryAllocation(
+        loc, substConv.getSingleSILResultType(getTypeExpansionContext())));
   }
 
   // If the '@objc' was inferred due to deprecated rules,
@@ -1521,8 +1524,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   SILFunctionConventions objcConv(CanSILFunctionType(objcFnTy), SGM.M);
   SILFunctionConventions nativeConv(CanSILFunctionType(nativeInfo.SILFnType),
                                     SGM.M);
-  auto swiftResultTy = F.mapTypeIntoContext(nativeConv.getSILResultType());
-  auto objcResultTy = objcConv.getSILResultType();
+  auto swiftResultTy = F.mapTypeIntoContext(
+      nativeConv.getSILResultType(getTypeExpansionContext()));
+  auto objcResultTy = objcConv.getSILResultType(getTypeExpansionContext());
 
   // Call the native entry point.
   SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
@@ -1578,7 +1582,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     {
       B.emitBlock(errorBB);
       SILValue nativeError = errorBB->createPhiArgument(
-          substConv.getSILErrorType(), ValueOwnershipKind::Owned);
+          substConv.getSILErrorType(getTypeExpansionContext()),
+          ValueOwnershipKind::Owned);
 
       // In this branch, the eventual return value is mostly invented.
       // Store the native error in the appropriate location and return.
@@ -1657,8 +1662,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   if (nativeConv.hasIndirectSILResults()) {
     assert(nativeConv.getNumIndirectSILResults() == 1
            && "bridged exploded result?!");
-    indirectResult =
-        F.begin()->createFunctionArgument(nativeConv.getSingleSILResultType());
+    indirectResult = F.begin()->createFunctionArgument(
+        nativeConv.getSingleSILResultType(F.getTypeExpansionContext()));
   }
   
   // Forward the arguments.
@@ -1775,8 +1780,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
         auto foreignParam = foreignFnTy->getParameters()[foreignArgIndex++];
         SILType foreignLoweredTy =
-          F.mapTypeIntoContext(
-            foreignParam.getSILStorageType(F.getModule(), foreignFnTy));
+            F.mapTypeIntoContext(foreignParam.getSILStorageType(
+                F.getModule(), foreignFnTy, F.getTypeExpansionContext()));
 
         auto bridged = emitNativeToBridgedValue(fd, param, nativeFormalType,
                                                 foreignFormalType,

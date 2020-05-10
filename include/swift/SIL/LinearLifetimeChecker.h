@@ -48,6 +48,7 @@ class LinearLifetimeChecker {
 public:
   class Error;
   struct ErrorBehaviorKind;
+  class ErrorBuilder;
 
 private:
   friend class SILOwnershipVerifier;
@@ -97,16 +98,16 @@ private:
   /// to leak. Can be used to insert missing destroys.
   Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
                    ArrayRef<Operand *> nonConsumingUses,
-                   ErrorBehaviorKind errorBehavior);
+                   ErrorBuilder &errorBuilder);
 
   Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
                    ArrayRef<Operand *> nonConsumingUses,
-                   ErrorBehaviorKind errorBehavior,
+                   ErrorBuilder &errorBuilder,
                    function_ref<void(SILBasicBlock *)> leakingBlockCallback);
 
   Error checkValueImpl(
       SILValue value, ArrayRef<Operand *> consumingUses,
-      ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior,
+      ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
       Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback);
 };
 

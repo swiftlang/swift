@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -268,11 +268,15 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
          realMinimumCapacity._builtinWordValue, Element.self)
 
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
-      let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
-      let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
-
-      _initStorageHeader(
-        count: uninitializedCount, capacity: realCapacity)
+      if let allocSize = _mallocSize(ofAllocation: storageAddr) {
+        let endAddr = storageAddr + allocSize
+        let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
+        _initStorageHeader(
+          count: uninitializedCount, capacity: realCapacity)
+      } else {
+        _initStorageHeader(
+          count: uninitializedCount, capacity: realMinimumCapacity)
+      }
     }
   }
 
@@ -603,12 +607,14 @@ internal func += <Element, C: Collection>(
 ) where C.Element == Element {
 
   let oldCount = lhs.count
-  let newCount = oldCount + numericCast(rhs.count)
+  let newCount = oldCount + rhs.count
 
   let buf: UnsafeMutableBufferPointer<Element>
   
   if _fastPath(newCount <= lhs.capacity) {
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
+    buf = UnsafeMutableBufferPointer(
+      start: lhs.firstElementAddress + oldCount,
+      count: rhs.count)
     lhs.count = newCount
   }
   else {
@@ -620,7 +626,9 @@ internal func += <Element, C: Collection>(
       from: lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
     (lhs, newLHS) = (newLHS, lhs)
-    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
+    buf = UnsafeMutableBufferPointer(
+      start: lhs.firstElementAddress + oldCount,
+      count: rhs.count)
   }
 
   var (remainders,writtenUpTo) = buf.initialize(from: rhs)
@@ -712,7 +720,7 @@ internal func _copyCollectionToContiguousArray<
   C: Collection
 >(_ source: C) -> ContiguousArray<C.Element>
 {
-  let count: Int = numericCast(source.count)
+  let count = source.count
   if count == 0 {
     return ContiguousArray()
   }
@@ -721,7 +729,9 @@ internal func _copyCollectionToContiguousArray<
     _uninitializedCount: count,
     minimumCapacity: 0)
 
-  let p = UnsafeMutableBufferPointer(start: result.firstElementAddress, count: count)
+  let p = UnsafeMutableBufferPointer(
+    start: result.firstElementAddress,
+    count: count)
   var (itr, end) = source._copyContents(initializing: p)
 
   _debugPrecondition(itr.next() == nil,

@@ -56,6 +56,7 @@ add_swift_host_library(swiftAST STATIC
   InlinableText.cpp
   LayoutConstraint.cpp
   Module.cpp
+  ModuleDependencies.cpp
   ModuleLoader.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp

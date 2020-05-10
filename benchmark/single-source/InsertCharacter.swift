@@ -1,4 +1,4 @@
-//===--- InsertCharacter.swift ------------------------------------------------===//
+//===--- InsertCharacter.swift --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,13 +12,27 @@
 
 import TestsUtils
 
+let t: [BenchmarkCategory] = [.validation, .api, .String]
+
 public let InsertCharacter = [
-  BenchmarkInfo(name: "InsertCharacterEndIndex", runFunction: run_InsertCharacterEndIndex, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterTowardsEndIndex", runFunction: run_InsertCharacterTowardsEndIndex, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterStartIndex", runFunction: run_InsertCharacterStartIndex, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterEndIndexNonASCII", runFunction: run_InsertCharacterEndIndexNonASCII, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterTowardsEndIndexNonASCII", runFunction: run_InsertCharacterTowardsEndIndexNonASCII, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterStartIndexNonASCII", runFunction: run_InsertCharacterStartIndexNonASCII, tags: [.validation, .api], setUpFunction: buildWorkload)
+  BenchmarkInfo(name: "InsertCharacterEndIndex",
+    runFunction: run_InsertCharacterEndIndex, tags: t,
+    setUpFunction: buildWorkload),
+  BenchmarkInfo(name: "InsertCharacterTowardsEndIndex",
+    runFunction: run_InsertCharacterTowardsEndIndex, tags: t,
+    setUpFunction: buildWorkload),
+  BenchmarkInfo(name: "InsertCharacterStartIndex",
+    runFunction: run_InsertCharacterStartIndex, tags: t,
+    setUpFunction: buildWorkload, legacyFactor: 5),
+  BenchmarkInfo(name: "InsertCharacterEndIndexNonASCII",
+    runFunction: run_InsertCharacterEndIndexNonASCII, tags: t,
+    setUpFunction: buildWorkload),
+  BenchmarkInfo(name: "InsertCharacterTowardsEndIndexNonASCII",
+    runFunction: run_InsertCharacterTowardsEndIndexNonASCII, tags: t,
+    setUpFunction: buildWorkload),
+  BenchmarkInfo(name: "InsertCharacterStartIndexNonASCII",
+    runFunction: run_InsertCharacterStartIndexNonASCII, tags: t,
+    setUpFunction: buildWorkload)
 ]
 
 let str = String(repeating: "A very long ASCII string.", count: 200)
@@ -76,7 +90,8 @@ func run_InsertCharacterEndIndexNonASCII(_ N: Int) {
 // Insert at start index
 
 @inline(__always)
-func insertAtStartIndex(_ c: Character, in string: String, count: Int, insertions: Int) {
+func insertAtStartIndex(
+  _ c: Character, in string: String, count: Int, insertions: Int) {
   var workload = str
   for _ in 0..<count {
     for _ in 0..<insertions {
@@ -89,7 +104,7 @@ func insertAtStartIndex(_ c: Character, in string: String, count: Int, insertion
 
 @inline(never)
 func run_InsertCharacterStartIndex(_ N: Int) {
-  insertAtStartIndex("w", in: str, count: N * 75, insertions: 50)
+  insertAtStartIndex("w", in: str, count: N * 15, insertions: 50)
 }
 
 @inline(never)

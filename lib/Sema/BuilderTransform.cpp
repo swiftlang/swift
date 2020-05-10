@@ -73,25 +73,26 @@ class BuilderClosureVisitor
     if (!cs)
       return nullptr;
 
-    // FIXME: Setting a TypeLoc on this expression is necessary in order
+    // FIXME: Setting a base on this expression is necessary in order
     // to get diagnostics if something about this builder call fails,
     // e.g. if there isn't a matching overload for `buildBlock`.
-    // But we can only do this if there isn't a type variable in the type.
-    TypeLoc typeLoc;
-    if (!builderType->hasTypeVariable()) {
-      typeLoc = TypeLoc(new (ctx) FixedTypeRepr(builderType, loc), builderType);
+    TypeExpr *typeExpr;
+    auto simplifiedTy = cs->simplifyType(builderType);
+    if (!simplifiedTy->hasTypeVariable()) {
+      typeExpr = TypeExpr::createImplicitHack(loc, simplifiedTy, ctx);
+    } else {
+      // HACK: If there's not enough information in the constraint system,
+      // create a garbage base type to force it to diagnose
+      // this as an ambiguous expression.
+      typeExpr = TypeExpr::createImplicitHack(loc, ErrorType::get(ctx), ctx);
     }
-
-    auto typeExpr = new (ctx) TypeExpr(typeLoc);
     cs->setType(typeExpr, MetatypeType::get(builderType));
-    cs->setType(&typeExpr->getTypeLoc(), builderType);
 
     SmallVector<SourceLoc, 4> argLabelLocs;
     for (auto i : indices(argLabels)) {
       argLabelLocs.push_back(args[i]->getStartLoc());
     }
 
-    typeExpr->setImplicit();
     auto memberRef = new (ctx) UnresolvedDotExpr(
         typeExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
         /*implicit=*/true);
@@ -100,7 +101,7 @@ class BuilderClosureVisitor
     SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
     Expr *result = CallExpr::create(ctx, memberRef, openLoc, args,
                                     argLabels, argLabelLocs, closeLoc,
-                                    /*trailing closure*/ nullptr,
+                                    /*trailing closures*/{},
                                     /*implicit*/true);
 
     return result;
@@ -123,7 +124,7 @@ class BuilderClosureVisitor
 
         // Function must have the right argument labels, if provided.
         if (!argLabels.empty()) {
-          auto funcLabels = func->getFullName().getArgumentNames();
+          auto funcLabels = func->getName().getArgumentNames();
           if (argLabels.size() > funcLabels.size() ||
               funcLabels.slice(0, argLabels.size()) != argLabels)
             continue;
@@ -550,8 +551,7 @@ protected:
       return nullptr;
     }
 
-    // FIXME: Need a locator for the "if" statement.
-    Type resultType = cs->addJoinConstraint(nullptr,
+    Type resultType = cs->addJoinConstraint(cs->getConstraintLocator(ifStmt),
         {
           { cs->getType(thenExpr), cs->getConstraintLocator(thenExpr) },
           { cs->getType(elseExpr), cs->getConstraintLocator(elseExpr) }
@@ -708,8 +708,8 @@ protected:
     }
 
     // Form the type of the switch itself.
-    // FIXME: Need a locator for the "switch" statement.
-    Type resultType = cs->addJoinConstraint(nullptr, injectedCaseTerms);
+    Type resultType = cs->addJoinConstraint(
+        cs->getConstraintLocator(switchStmt), injectedCaseTerms);
     if (!resultType) {
       hadError = true;
       return nullptr;
@@ -740,11 +740,125 @@ protected:
     return visit(caseStmt->getBody());
   }
 
+  VarDecl *visitForEachStmt(ForEachStmt *forEachStmt) {
+    // for...in statements are handled via buildArray(_:); bail out if the
+    // builder does not support it.
+    if (!builderSupports(ctx.Id_buildArray)) {
+      if (!unhandledNode)
+        unhandledNode = forEachStmt;
+      return nullptr;
+    }
+
+    // For-each statements require the Sequence protocol. If we don't have
+    // it (which generally means the standard library isn't loaded), fall
+    // out of the function-builder path entirely to let normal type checking
+    // take care of this.
+    auto sequenceProto = TypeChecker::getProtocol(
+        dc->getASTContext(), forEachStmt->getForLoc(),
+        KnownProtocolKind::Sequence);
+    if (!sequenceProto) {
+      if (!unhandledNode)
+        unhandledNode = forEachStmt;
+      return nullptr;
+    }
+
+    // Generate constraints for the loop header. This also wires up the
+    // types for the patterns.
+    auto target = SolutionApplicationTarget::forForEachStmt(
+        forEachStmt, sequenceProto, dc, /*bindPatternVarsOneWay=*/true);
+    if (cs) {
+      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+        hadError = true;
+        return nullptr;
+      }
+
+      cs->setSolutionApplicationTarget(forEachStmt, target);
+    }
+
+    // Visit the loop body itself.
+    VarDecl *bodyVar = visit(forEachStmt->getBody());
+    if (!bodyVar)
+      return nullptr;
+
+    // If there's no constraint system, there is nothing left to visit.
+    if (!cs)
+      return nullptr;
+
+    // Form a variable of array type that will capture the result of each
+    // iteration of the loop. We need a fresh type variable to remove the
+    // lvalue-ness of the array variable.
+    SourceLoc loc = forEachStmt->getForLoc();
+    VarDecl *arrayVar = buildVar(loc);
+    Type arrayElementType = cs->createTypeVariable(
+        cs->getConstraintLocator(forEachStmt), 0);
+    cs->addConstraint(
+        ConstraintKind::Equal, cs->getType(bodyVar), arrayElementType,
+        cs->getConstraintLocator(
+          forEachStmt, ConstraintLocator::RValueAdjustment));
+    Type arrayType = ArraySliceType::get(arrayElementType);
+    cs->setType(arrayVar, arrayType);
+
+    // Form an initialization of the array to an empty array literal.
+    Expr *arrayInitExpr = ArrayExpr::create(ctx, loc, { }, { }, loc);
+    cs->setContextualType(
+        arrayInitExpr, TypeLoc::withoutLoc(arrayType), CTP_CannotFail);
+    arrayInitExpr = cs->generateConstraints(arrayInitExpr, dc);
+    if (!arrayInitExpr) {
+      hadError = true;
+      return nullptr;
+    }
+    cs->addConstraint(
+        ConstraintKind::Equal, cs->getType(arrayInitExpr), arrayType,
+        cs->getConstraintLocator(
+          arrayInitExpr, LocatorPathElt::ContextualType()));
+
+    // Form a call to Array.append(_:) to add the result of executing each
+    // iteration of the loop body to the array formed above.
+    SourceLoc endLoc = forEachStmt->getEndLoc();
+    auto arrayVarRef = buildVarRef(arrayVar, endLoc);
+    auto arrayAppendRef = new (ctx) UnresolvedDotExpr(
+        arrayVarRef, endLoc, DeclNameRef(ctx.getIdentifier("append")),
+        DeclNameLoc(endLoc), /*implicit=*/true);
+    arrayAppendRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+    auto bodyVarRef = buildVarRef(bodyVar, endLoc);
+    Expr *arrayAppendCall = CallExpr::create(
+        ctx, arrayAppendRef, endLoc, { bodyVarRef } , { Identifier() },
+        { endLoc }, endLoc, /*trailingClosures=*/{}, /*implicit=*/true);
+    arrayAppendCall = cs->generateConstraints(arrayAppendCall, dc);
+    if (!arrayAppendCall) {
+      hadError = true;
+      return nullptr;
+    }
+
+    // Form the final call to buildArray(arrayVar) to allow the function
+    // builder to reshape the array into whatever it wants as the result of
+    // the for-each loop.
+    auto finalArrayVarRef = buildVarRef(arrayVar, endLoc);
+    auto buildArrayCall = buildCallIfWanted(
+        endLoc, ctx.Id_buildArray, { finalArrayVarRef }, { Identifier() });
+    assert(buildArrayCall);
+    buildArrayCall = cs->generateConstraints(buildArrayCall, dc);
+    if (!buildArrayCall) {
+      hadError = true;
+      return nullptr;
+    }
+
+    // Form a final variable for the for-each expression itself, which will
+    // be initialized with the call to the function builder's buildArray(_:).
+    auto finalForEachVar = buildVar(loc);
+    cs->setType(finalForEachVar, cs->getType(buildArrayCall));
+    applied.capturedStmts.insert(
+      {forEachStmt, {
+          finalForEachVar,
+          { arrayVarRef, arrayInitExpr, arrayAppendCall, buildArrayCall }}});
+
+    return finalForEachVar;
+  }
+
   CONTROL_FLOW_STMT(Guard)
   CONTROL_FLOW_STMT(While)
   CONTROL_FLOW_STMT(DoCatch)
   CONTROL_FLOW_STMT(RepeatWhile)
-  CONTROL_FLOW_STMT(ForEach)
   CONTROL_FLOW_STMT(Case)
   CONTROL_FLOW_STMT(Break)
   CONTROL_FLOW_STMT(Continue)
@@ -764,6 +878,9 @@ struct FunctionBuilderTarget {
     ReturnValue,
     /// The temporary variable into which the result should be assigned.
     TemporaryVar,
+    /// An expression to evaluate at the end of the block, allowing the update
+    /// of some state from an outer scope.
+    Expression,
   } kind;
 
   /// Captured variable information.
@@ -776,6 +893,10 @@ struct FunctionBuilderTarget {
   static FunctionBuilderTarget forAssign(VarDecl *temporaryVar,
                                          llvm::TinyPtrVector<Expr *> exprs) {
     return FunctionBuilderTarget{TemporaryVar, {temporaryVar, exprs}};
+  }
+
+  static FunctionBuilderTarget forExpression(Expr *expr) {
+    return FunctionBuilderTarget{Expression, { nullptr, { expr }}};
   }
 };
 
@@ -881,7 +1002,12 @@ private:
       assign->setType(TupleType::getEmpty(ctx));
       return assign;
     }
+
+    case FunctionBuilderTarget::Expression:
+      // Execute the expression.
+      return rewriteExpr(capturedExpr);
     }
+    llvm_unreachable("invalid function builder target");
   }
 
   /// Declare the given temporary variable, adding the appropriate
@@ -894,7 +1020,7 @@ private:
 
     // Form a new pattern binding to bind the temporary variable to the
     // transformed expression.
-    auto pattern = new (ctx) NamedPattern(temporaryVar,/*implicit=*/true);
+    auto pattern = NamedPattern::createImplicit(ctx, temporaryVar);
     pattern->setType(temporaryVar->getType());
 
     auto pbd = PatternBindingDecl::create(
@@ -1180,6 +1306,59 @@ public:
     return caseStmt;
   }
 
+  Stmt *visitForEachStmt(
+      ForEachStmt *forEachStmt, FunctionBuilderTarget target) {
+    // Translate the for-each loop header.
+    ConstraintSystem &cs = solution.getConstraintSystem();
+    auto forEachTarget =
+        rewriteTarget(*cs.getSolutionApplicationTarget(forEachStmt));
+    if (!forEachTarget)
+      return nullptr;
+
+    const auto &captured = target.captured;
+    auto finalForEachVar = captured.first;
+    auto arrayVarRef = captured.second[0];
+    auto arrayVar = cast<VarDecl>(cast<DeclRefExpr>(arrayVarRef)->getDecl());
+    auto arrayInitExpr = captured.second[1];
+    auto arrayAppendCall = captured.second[2];
+    auto buildArrayCall = captured.second[3];
+
+    // Collect the three steps to initialize the array variable to an
+    // empty array, execute the loop to collect the results of each iteration,
+    // then form the buildArray() call to the write the result.
+    std::vector<ASTNode> outerBodySteps;
+
+    // Step 1: Declare and initialize the array variable.
+    arrayVar->setInterfaceType(solution.simplifyType(cs.getType(arrayVar)));
+    arrayInitExpr = rewriteExpr(arrayInitExpr);
+    declareTemporaryVariable(arrayVar, outerBodySteps, arrayInitExpr);
+
+    // Step 2. Transform the body of the for-each statement. Each iteration
+    // will append the result of executing the loop body to the array.
+    auto body = forEachStmt->getBody();
+    auto capturedBody = takeCapturedStmt(body);
+    auto newBody = cast<BraceStmt>(
+        visitBraceStmt(
+          body,
+          FunctionBuilderTarget::forExpression(arrayAppendCall),
+          FunctionBuilderTarget::forAssign(
+            capturedBody.first, {capturedBody.second.front()})));
+    forEachStmt->setBody(newBody);
+    outerBodySteps.push_back(forEachStmt);
+
+    // Step 3. Perform the buildArray() call to turn the array of results
+    // collected from the iterations into a single value under the control of
+    // the function builder.
+    outerBodySteps.push_back(
+        initializeTarget(
+          FunctionBuilderTarget::forAssign(finalForEachVar, {buildArrayCall})));
+
+    // Form a brace statement to put together the three main steps for the
+    // for-each loop translation outlined above.
+    return BraceStmt::create(
+        ctx, forEachStmt->getStartLoc(), outerBodySteps, newBody->getEndLoc());
+  }
+
 #define UNHANDLED_FUNCTION_BUILDER_STMT(STMT) \
   Stmt *visit##STMT##Stmt(STMT##Stmt *stmt, FunctionBuilderTarget target) { \
     llvm_unreachable("Function builders do not allow statement of kind " \
@@ -1193,7 +1372,6 @@ public:
   UNHANDLED_FUNCTION_BUILDER_STMT(Defer)
   UNHANDLED_FUNCTION_BUILDER_STMT(DoCatch)
   UNHANDLED_FUNCTION_BUILDER_STMT(RepeatWhile)
-  UNHANDLED_FUNCTION_BUILDER_STMT(ForEach)
   UNHANDLED_FUNCTION_BUILDER_STMT(Break)
   UNHANDLED_FUNCTION_BUILDER_STMT(Continue)
   UNHANDLED_FUNCTION_BUILDER_STMT(Fallthrough)
@@ -1300,32 +1478,10 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
-  // Find an expression... any expression... to use for a locator.
-  // FIXME: This is a hack because we don't have the notion of locators that
-  // refer to statements.
-  Expr *fakeAnchor = nullptr;
-  {
-    class FindExprWalker : public ASTWalker {
-      Expr *&fakeAnchor;
-
-    public:
-      explicit FindExprWalker(Expr *&fakeAnchor) : fakeAnchor(fakeAnchor) { }
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) {
-        if (!fakeAnchor)
-          fakeAnchor = E;
-
-        return { false, nullptr };
-      }
-    } walker(fakeAnchor);
-
-    func->getBody()->walk(walker);
-  }
-
   if (auto result = cs.matchFunctionBuilder(
           func, builderType, resultContextType, resultConstraintKind,
-          /*calleeLocator=*/cs.getConstraintLocator(fakeAnchor),
-          /*FIXME:*/cs.getConstraintLocator(fakeAnchor))) {
+          cs.getConstraintLocator(func->getBody()),
+          cs.getConstraintLocator(func->getBody()))) {
     if (result->isFailure())
       return nullptr;
   }

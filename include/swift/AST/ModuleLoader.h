@@ -23,7 +23,9 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "swift/AST/ModuleDependencies.h"
 
 namespace llvm {
 class FileCollector;
@@ -41,7 +43,10 @@ class ClangImporterOptions;
 class ClassDecl;
 class FileUnit;
 class ModuleDecl;
+class ModuleDependencies;
+class ModuleDependenciesCache;
 class NominalTypeDecl;
+class SourceFile;
 class TypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
@@ -78,6 +83,15 @@ public:
   /// Return the underlying clang::DependencyCollector that this
   /// class wraps.
   std::shared_ptr<clang::DependencyCollector> getClangCollector();
+};
+
+/// Abstract interface to run an action in a sub ASTContext.
+struct SubASTContextDelegate {
+  virtual bool runInSubContext(ASTContext &ctx, StringRef interfacePath,
+    llvm::function_ref<bool(ASTContext&)> action) {
+    llvm_unreachable("function should be overriden");
+  }
+  virtual ~SubASTContextDelegate() = default;
 };
 
 /// Abstract interface that loads named modules into the AST.
@@ -177,6 +191,12 @@ public:
   /// Discover overlays declared alongside this file and add infomation about
   /// them to it.
   void findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module, FileUnit *file);
+
+  /// Retrieve the dependencies for the given, named module, or \c None
+  /// if no such module exists.
+  virtual Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName,
+      ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) = 0;
 };
 
 } // namespace swift

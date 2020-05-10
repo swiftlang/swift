@@ -312,19 +312,31 @@ bool DeclContext::isGenericContext() const {
   return false;
 }
 
-/// Get the most optimal resilience expansion for the body of this function.
-/// If the body is able to be inlined into functions in other resilience
-/// domains, this ensures that only sufficiently-conservative access patterns
-/// are used.
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
-  auto &context = getASTContext();
-  return evaluateOrDefault(context.evaluator,
-                           ResilienceExpansionRequest { const_cast<DeclContext *>(this) },
-                           ResilienceExpansion::Minimal);
+  auto fragileKind = getFragileFunctionKind();
+  switch (fragileKind.kind) {
+  case FragileFunctionKind::Transparent:
+  case FragileFunctionKind::Inlinable:
+  case FragileFunctionKind::AlwaysEmitIntoClient:
+  case FragileFunctionKind::DefaultArgument:
+  case FragileFunctionKind::PropertyInitializer:
+    return ResilienceExpansion::Minimal;
+  case FragileFunctionKind::None:
+    return ResilienceExpansion::Maximal;
+  }
+
+  llvm_unreachable("Bad fragile function kind");
 }
 
-ResilienceExpansion
-swift::ResilienceExpansionRequest::evaluate(Evaluator &evaluator,
+FragileFunctionKind DeclContext::getFragileFunctionKind() const {
+  auto &context = getASTContext();
+  return evaluateOrDefault(context.evaluator,
+                           FragileFunctionKindRequest { const_cast<DeclContext *>(this) },
+                           {FragileFunctionKind::None, false});
+}
+
+FragileFunctionKind
+swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
                                             DeclContext *context) const {
   for (const auto *dc = context->getLocalContext(); dc && dc->isLocalContext();
        dc = dc->getParent()) {
@@ -336,14 +348,26 @@ swift::ResilienceExpansionRequest::evaluate(Evaluator &evaluator,
       auto *VD = cast<ValueDecl>(dc->getAsDecl());
       assert(VD->hasParameterList());
 
-      auto access =
+      if (VD->getDeclContext()->isLocalContext()) {
+        auto kind = VD->getDeclContext()->getFragileFunctionKind();
+        if (kind.kind != FragileFunctionKind::None)
+          return {FragileFunctionKind::DefaultArgument,
+                  kind.allowUsableFromInline};
+      }
+
+      auto effectiveAccess =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
+      auto formalAccess =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/false);
+      if (effectiveAccess.isPublic()) {
+        return {FragileFunctionKind::DefaultArgument,
+                !formalAccess.isPublic()};
+      }
 
-      if (access.isPublic())
-        return ResilienceExpansion::Minimal;
-
-      return ResilienceExpansion::Maximal;
+      return {FragileFunctionKind::None,
+              /*allowUsableFromInline=*/false};
     }
 
     // Stored property initializer contexts use minimal resilience expansion
@@ -354,12 +378,14 @@ swift::ResilienceExpansionRequest::evaluate(Evaluator &evaluator,
           NTD->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);
         if (!nominalAccess.isPublic())
-          return ResilienceExpansion::Maximal;
+          return {FragileFunctionKind::None,
+                  /*allowUsableFromInline=*/false};
 
         if (NTD->isFormallyResilient())
-          return ResilienceExpansion::Maximal;
+          return {FragileFunctionKind::None,
+                  /*allowUsableFromInline=*/false};
 
-        return ResilienceExpansion::Minimal;
+        return {FragileFunctionKind::PropertyInitializer, true};
       }
     }
 
@@ -375,32 +401,44 @@ swift::ResilienceExpansionRequest::evaluate(Evaluator &evaluator,
 
       // If the function is not externally visible, we will not be serializing
       // its body.
-      if (!funcAccess.isPublic())
-        break;
+      if (!funcAccess.isPublic()) {
+        return {FragileFunctionKind::None,
+                /*allowUsableFromInline=*/false};
+      }
 
       // If the function is public, @_transparent implies @inlinable.
-      if (AFD->isTransparent())
-        return ResilienceExpansion::Minimal;
+      if (AFD->isTransparent()) {
+        return {FragileFunctionKind::Transparent,
+                /*allowUsableFromInline=*/true};
+      }
 
-      if (AFD->getAttrs().hasAttribute<InlinableAttr>())
-        return ResilienceExpansion::Minimal;
+      if (AFD->getAttrs().hasAttribute<InlinableAttr>()) {
+        return {FragileFunctionKind::Inlinable,
+                /*allowUsableFromInline=*/true};
+      }
 
-      if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-        return ResilienceExpansion::Minimal;
+      if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+        return {FragileFunctionKind::AlwaysEmitIntoClient,
+                /*allowUsableFromInline=*/true};
+      }
 
       // If a property or subscript is @inlinable or @_alwaysEmitIntoClient,
       // the accessors are @inlinable or @_alwaysEmitIntoClient also.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
         auto *storage = accessor->getStorage();
-        if (storage->getAttrs().getAttribute<InlinableAttr>())
-          return ResilienceExpansion::Minimal;
-        if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-          return ResilienceExpansion::Minimal;
+        if (storage->getAttrs().getAttribute<InlinableAttr>()) {
+          return {FragileFunctionKind::Inlinable,
+                  /*allowUsableFromInline=*/true};
+        }
+        if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+          return {FragileFunctionKind::AlwaysEmitIntoClient,
+                  /*allowUsableFromInline=*/true};
+        }
       }
     }
   }
 
-  return ResilienceExpansion::Maximal;
+  return {FragileFunctionKind::None, false};
 }
 
 /// Determine whether the innermost context is generic.
@@ -550,7 +588,7 @@ void AccessScope::dump() const {
     if (auto *ext = dyn_cast<ExtensionDecl>(decl))
       llvm::errs() << ext->getExtendedNominal()->getName();
     else if (auto *named = dyn_cast<ValueDecl>(decl))
-      llvm::errs() << named->getFullName();
+      llvm::errs() << named->getName();
     else
       llvm::errs() << (const void *)decl;
 
@@ -649,7 +687,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     break;
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    OS << " name=" << AFD->getFullName();
+    OS << " name=" << AFD->getName();
     if (AFD->hasInterfaceType())
       OS << " : " << AFD->getInterfaceType();
     else

@@ -272,6 +272,13 @@ bool conflicting(ASTContext &ctx,
                  bool *wouldConflictInSwift5 = nullptr,
                  bool skipProtocolExtensionCheck = false);
 
+/// The kind of artificial main to generate.
+enum class ArtificialMainKind : uint8_t {
+  NSApplicationMain,
+  UIApplicationMain,
+  TypeMain,
+};
+
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
 protected:
@@ -778,6 +785,13 @@ public:
   SourceRange getSourceRangeIncludingAttrs() const;
 
   SourceLoc TrailingSemiLoc;
+
+  /// Returns the appropriate kind of entry point to generate for this class,
+  /// based on its attributes.
+  ///
+  /// It is an error to call this on a type that does not have either an
+  /// *ApplicationMain or an main attribute.
+  ArtificialMainKind getArtificialMainKind() const;
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(const char *filename));
@@ -2489,8 +2503,7 @@ public:
   bool isOperator() const { return Name.isOperator(); }
 
   /// Retrieve the full name of the declaration.
-  /// TODO: Rename to getName?
-  DeclName getFullName() const { return Name; }
+  DeclName getName() const { return Name; }
   void setName(DeclName name) { Name = name; }
 
   /// Retrieve the base name of the declaration, ignoring any argument
@@ -2504,7 +2517,7 @@ public:
   /// Generates a DeclNameRef referring to this declaration with as much
   /// specificity as possible.
   DeclNameRef createNameRef() const {
-    return DeclNameRef(getFullName());
+    return DeclNameRef(Name);
   }
 
   /// Retrieve the name to use for this declaration when interoperating
@@ -2833,7 +2846,6 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -3031,6 +3043,10 @@ public:
   /// Retrieve the interface type of the underlying type.
   Type getUnderlyingType() const;
   void setUnderlyingType(Type type);
+
+  /// Returns the interface type of the underlying type if computed, null
+  /// otherwise. Should only be used for dumping.
+  Type getCachedUnderlyingType() const { return UnderlyingTy.getType(); }
 
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
@@ -3508,14 +3524,12 @@ public:
 
   /// Return the range of semantics attributes attached to this NominalTypeDecl.
   auto getSemanticsAttrs() const
-      -> decltype(getAttrs().getAttributes<SemanticsAttr>()) {
-    return getAttrs().getAttributes<SemanticsAttr>();
+      -> decltype(getAttrs().getSemanticsAttrs()) {
+    return getAttrs().getSemanticsAttrs();
   }
 
   bool hasSemanticsAttr(StringRef attrValue) const {
-    return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
-      return attrValue.equals(attr->Value);
-    });
+    return getAttrs().hasSemanticsAttr(attrValue);
   }
 
   /// Whether this declaration has a synthesized memberwise initializer.
@@ -3810,12 +3824,6 @@ public:
   }
 };
 
-/// The kind of artificial main to generate for a class.
-enum class ArtificialMainKind : uint8_t {
-  NSApplicationMain,
-  UIApplicationMain,
-};
-
 /// This is the base type for AncestryOptions. Each flag describes possible
 /// interesting kinds of superclasses that a class may have.
 enum class AncestryFlags : uint8_t {
@@ -4082,13 +4090,6 @@ public:
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Returns the appropriate kind of entry point to generate for this class,
-  /// based on its attributes.
-  ///
-  /// It is an error to call this on a class that does not have a
-  /// *ApplicationMain attribute.
-  ArtificialMainKind getArtificialMainKind() const;
 
   using NominalTypeDecl::lookupDirect;
 
@@ -4930,7 +4931,7 @@ protected:
   PointerUnion<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
   VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
-          bool issCaptureList, SourceLoc nameLoc, Identifier name,
+          bool isCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
 
 public:
@@ -4945,7 +4946,6 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -5243,7 +5243,7 @@ public:
   ///
   /// \code
   /// @Lazy var i = 17
-  /// \end
+  /// \endcode
   ///
   /// Or when there is no initializer but each composed property wrapper has
   /// a suitable `init(wrappedValue:)`.
@@ -5920,7 +5920,7 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    assert(!getName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -6293,6 +6293,8 @@ public:
   }
   bool isCallAsFunctionMethod() const;
 
+  bool isMainTypeMainMethod() const;
+
   SelfAccessKind getSelfAccessKind() const;
 
   void setSelfAccessKind(SelfAccessKind mod) {
@@ -6618,7 +6620,7 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getFullName().isSpecial() && "Cannot get string for special names");
+    assert(!getName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 
@@ -7152,18 +7154,16 @@ class OperatorDecl : public Decl {
   
   Identifier name;
 
-  ArrayRef<Identifier> Identifiers;
-  ArrayRef<SourceLoc> IdentifierLocs;
+  ArrayRef<Located<Identifier>> Identifiers;
   ArrayRef<NominalTypeDecl *> DesignatedNominalTypes;
   SourceLoc getLocFromSource() const { return NameLoc; }
   friend class Decl;
 public:
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
-               ArrayRef<Identifier> Identifiers,
-               ArrayRef<SourceLoc> IdentifierLocs)
+               ArrayRef<Located<Identifier>> Identifiers)
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        Identifiers(Identifiers), IdentifierLocs(IdentifierLocs) {}
+        Identifiers(Identifiers) {}
 
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
@@ -7185,6 +7185,7 @@ public:
     case DeclKind::PostfixOperator:
       return OperatorFixity::Postfix;
     }
+    llvm_unreachable("inavlid decl kind");
   }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
@@ -7198,12 +7199,8 @@ public:
   ///
   /// \todo These two purposes really ought to be in separate properties and the
   /// designated type list should be of TypeReprs instead of Identifiers.
-  ArrayRef<Identifier> getIdentifiers() const {
+  ArrayRef<Located<Identifier>> getIdentifiers() const {
     return Identifiers;
-  }
-
-  ArrayRef<SourceLoc> getIdentifierLocs() const {
-    return IdentifierLocs;
   }
 
   ArrayRef<NominalTypeDecl *> getDesignatedNominalTypes() const {
@@ -7234,18 +7231,17 @@ class InfixOperatorDecl : public OperatorDecl {
 public:
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
                     SourceLoc nameLoc, SourceLoc colonLoc,
-                    ArrayRef<Identifier> identifiers,
-                    ArrayRef<SourceLoc> identifierLocs)
+                    ArrayRef<Located<Identifier>> identifiers)
       : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
-                     identifiers, identifierLocs),
+                     identifiers),
         ColonLoc(colonLoc) {}
 
   SourceLoc getEndLoc() const {
-    auto identifierLocs = getIdentifierLocs();
-    if (identifierLocs.empty())
+    auto identifiers = getIdentifiers();
+    if (identifiers.empty())
       return getNameLoc();
 
-    return identifierLocs.back();
+    return identifiers.back().Loc;
   }
 
   SourceRange getSourceRange() const {
@@ -7276,10 +7272,9 @@ class PrefixOperatorDecl : public OperatorDecl {
 public:
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                      SourceLoc NameLoc,
-                     ArrayRef<Identifier> Identifiers,
-                     ArrayRef<SourceLoc> IdentifierLocs)
+                     ArrayRef<Located<Identifier>> Identifiers)
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     Identifiers, IdentifierLocs) {}
+                     Identifiers) {}
 
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                      SourceLoc NameLoc,
@@ -7311,10 +7306,9 @@ class PostfixOperatorDecl : public OperatorDecl {
 public:
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                       SourceLoc NameLoc,
-                      ArrayRef<Identifier> Identifiers,
-                      ArrayRef<SourceLoc> IdentifierLocs)
+                      ArrayRef<Located<Identifier>> Identifiers)
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     Identifiers, IdentifierLocs) {}
+                     Identifiers) {}
 
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                       SourceLoc NameLoc,
@@ -7371,7 +7365,7 @@ public:
     return new (ctx) MissingMemberDecl(DC, name, numVTableEntries, hasStorage);
   }
 
-  DeclName getFullName() const {
+  DeclName getName() const {
     return Name;
   }
 

@@ -29,15 +29,19 @@ namespace swift {
   class Expr;
   class Stmt;
   class Decl;
+  class Pattern;
+  class TypeLoc;
   class DeclContext;
   class SourceLoc;
   class SourceRange;
   class ASTWalker;
   enum class ExprKind : uint8_t;
   enum class DeclKind : uint8_t;
+  enum class PatternKind : uint8_t;
   enum class StmtKind;
 
-  struct ASTNode : public llvm::PointerUnion<Expr*, Stmt*, Decl*> {
+  struct ASTNode : public llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *,
+                                             TypeLoc *> {
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 
@@ -61,6 +65,7 @@ namespace swift {
     FUNC(Stmt)
     FUNC(Expr)
     FUNC(Decl)
+    FUNC(Pattern)
 #undef FUNC
     
     SWIFT_DEBUG_DUMP;

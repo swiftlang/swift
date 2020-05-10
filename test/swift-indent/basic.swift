@@ -308,6 +308,14 @@ let s = """
             c
     """
 
+func wantsToIndentContents() {
+    let dontLetItIndentMyValue = """
+a
+    b
+        c
+"""
+}
+
 print("""
     foo {
         bar()
@@ -904,6 +912,14 @@ let x: Array<(
 let x = foo<Int,
             String,
             Int>()
+
+let x = foo<
+    Int,
+    String,
+    Int
+>()
+.filter { $0 > 10 }
+.count
 
 
 // Invalid elements should still be indented.

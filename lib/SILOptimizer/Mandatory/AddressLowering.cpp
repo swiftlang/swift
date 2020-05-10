@@ -447,7 +447,8 @@ void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
 unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
   auto &ctx = pass.F->getModule().getASTContext();
   unsigned argIdx = 0;
-  for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes()) {
+  for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(
+           pass.F->getTypeExpansionContext())) {
     auto bodyResultTy = pass.F->mapTypeIntoContext(resultTy);
     auto var = new (ctx)
         ParamDecl(SourceLoc(), SourceLoc(),
@@ -944,7 +945,9 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
 
       if (loweredCalleeConv.isSILIndirect(resultInfo)) {
         SILValue indirectResultAddr = materializeIndirectResultAddress(
-            origDirectResultVal, loweredCalleeConv.getSILType(resultInfo));
+            origDirectResultVal,
+            loweredCalleeConv.getSILType(
+                resultInfo, callBuilder.getTypeExpansionContext()));
         // Record the new indirect call argument.
         newCallArgs[newResultArgIdx++] = indirectResultAddr;
         // Leave a placeholder for indirect results.
@@ -1131,9 +1134,10 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   } else if (newDirectResults.size() == 1) {
     newReturnVal = newDirectResults[0];
   } else {
-    newReturnVal =
-        B.createTuple(returnInst->getLoc(),
-                      pass.loweredFnConv.getSILResultType(), newDirectResults);
+    newReturnVal = B.createTuple(
+        returnInst->getLoc(),
+        pass.loweredFnConv.getSILResultType(B.getTypeExpansionContext()),
+        newDirectResults);
   }
   SILValue origFullResult = returnInst->getOperand();
   returnInst->setOperand(newReturnVal);

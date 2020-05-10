@@ -76,16 +76,16 @@ takes_double8(double8_value)
 
 // These shouldn't be imported, since there's no type to map them to.
 
-let char17_value = makes_char17()   // expected-error{{unresolved identifier 'makes_char17'}}
-let uchar21_value = makes_uchar21() // expected-error{{unresolved identifier 'makes_uchar21'}}
-let short5_value = makes_short5()   // expected-error{{unresolved identifier 'makes_short5'}}
-let ushort6_value = makes_ushort6() // expected-error{{unresolved identifier 'makes_ushort6'}}
-let int128_value = makes_int128()   // expected-error{{unresolved identifier 'makes_int128'}}
-let uint20_value = makes_uint20()   // expected-error{{unresolved identifier 'makes_uint20'}}
+let char17_value = makes_char17()   // expected-error{{cannot find 'makes_char17' in scope}}
+let uchar21_value = makes_uchar21() // expected-error{{cannot find 'makes_uchar21' in scope}}
+let short5_value = makes_short5()   // expected-error{{cannot find 'makes_short5' in scope}}
+let ushort6_value = makes_ushort6() // expected-error{{cannot find 'makes_ushort6' in scope}}
+let int128_value = makes_int128()   // expected-error{{cannot find 'makes_int128' in scope}}
+let uint20_value = makes_uint20()   // expected-error{{cannot find 'makes_uint20' in scope}}
 
-takes_char17(char17_value)   // expected-error{{unresolved identifier 'takes_char17'}}
-takes_uchar21(uchar21_value) // expected-error{{unresolved identifier 'takes_uchar21'}}
-takes_short5(short5_value)   // expected-error{{unresolved identifier 'takes_short5'}}
-takes_ushort6(ushort6_value) // expected-error{{unresolved identifier 'takes_ushort6'}}
-takes_int128(int128_value)   // expected-error{{unresolved identifier 'takes_int128'}}
-takes_uint20(uint20_value)   // expected-error{{unresolved identifier 'takes_uint20'}}
+takes_char17(char17_value)   // expected-error{{cannot find 'takes_char17' in scope}}
+takes_uchar21(uchar21_value) // expected-error{{cannot find 'takes_uchar21' in scope}}
+takes_short5(short5_value)   // expected-error{{cannot find 'takes_short5' in scope}}
+takes_ushort6(ushort6_value) // expected-error{{cannot find 'takes_ushort6' in scope}}
+takes_int128(int128_value)   // expected-error{{cannot find 'takes_int128' in scope}}
+takes_uint20(uint20_value)   // expected-error{{cannot find 'takes_uint20' in scope}}
