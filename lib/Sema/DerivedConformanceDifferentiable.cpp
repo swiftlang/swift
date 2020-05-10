@@ -42,11 +42,11 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
   for (auto *vd : nominal->getStoredProperties()) {
     // Peer through property wrappers: use original wrapped properties instead.
     if (auto *originalProperty = vd->getOriginalWrappedProperty()) {
-      // Skip wrapped properties that do not define a setter. They define a setter
-      // only if property wrappers define a setter for `var wrappedValue`.
-      // `mutating func move(along:)` cannot be synthesized to update these
-      // properties.
-      if (!originalProperty->getAccessor(AccessorKind::Set))
+      // Skip immutable wrapped properties. `mutating func move(along:)` cannot
+      // be synthesized to update these properties.
+      auto mutability = originalProperty->getPropertyWrapperMutability();
+      assert(mutability.hasValue() && "Expected wrapped property mutability");
+      if (mutability->Setter != PropertyWrapperMutability::Value::Mutating)
         continue;
       // Use the original wrapped property.
       vd = originalProperty;
@@ -510,9 +510,9 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
       // to update these properties.
       auto *wrapperDecl =
           vd->getInterfaceType()->getNominalOrBoundGenericNominal();
-      auto *wrappedValueDecl =
-          wrapperDecl->getPropertyWrapperTypeInfo().valueVar;
-      if (!wrappedValueDecl->getAccessor(AccessorKind::Set)) {
+      auto mutability = originalProperty->getPropertyWrapperMutability();
+      assert(mutability.hasValue() && "Expected wrapped property mutability");
+      if (mutability->Setter != PropertyWrapperMutability::Value::Mutating) {
         auto loc =
             originalProperty->getAttributeInsertionLoc(/*forModifier*/ false);
         Context.Diags

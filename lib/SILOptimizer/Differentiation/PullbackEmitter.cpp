@@ -517,40 +517,6 @@ void PullbackEmitter::addToAdjointBuffer(SILBasicBlock *origBB,
 // Member accessor pullback generation
 //--------------------------------------------------------------------------//
 
-/// Returns true if the given original function is a "semantic member accessor".
-static bool isSemanticMemberAccessor(SILFunction *original) {
-  auto *dc = original->getDeclContext();
-  if (!dc)
-    return false;
-  auto *decl = dc->getAsDecl();
-  if (!decl)
-    return false;
-  auto *accessor = dyn_cast<AccessorDecl>(decl);
-  if (!accessor)
-    return false;
-  // Currently, only getters and setters are supported.
-  // TODO(SR-12640): Support `modify` accessors.
-  if (accessor->getAccessorKind() != AccessorKind::Get &&
-      accessor->getAccessorKind() != AccessorKind::Set)
-    return false;
-  // Accessor must come from a `var` declaration.
-  auto *varDecl = dyn_cast<VarDecl>(accessor->getStorage());
-  if (!varDecl)
-    return false;
-  // Return true for stored property accessors.
-  if (varDecl->hasStorage())
-    return true;
-  // Return true for properties that have attached property wrappers.
-  if (varDecl->hasAttachedPropertyWrapper())
-    return true;
-  // Otherwise, return false.
-  // User-defined accessors can never be supported because they may use custom
-  // logic that does not semantically perform a member access.
-  // TODO(SR-12636): Support `@differentiable(useInTangentVector)` computed
-  // properties.
-  return false;
-}
-
 bool PullbackEmitter::runForSemanticMemberAccessor() {
   auto &original = getOriginal();
   auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
@@ -593,7 +559,8 @@ bool PullbackEmitter::runForSemanticMemberGetter() {
   auto origResult = origFormalResults[getIndices().source];
 
   // TODO(TF-970): Emit diagnostic when `TangentVector` is not a struct.
-  auto tangentVectorSILTy = pullback.getConventions().getSingleSILResultType();
+  auto tangentVectorSILTy = pullback.getConventions().getSingleSILResultType(
+      TypeExpansionContext::minimal());
   auto tangentVectorTy = tangentVectorSILTy.getASTType();
   auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
 
@@ -806,15 +773,6 @@ bool PullbackEmitter::run() {
         return;
       visited.insert(v);
       auto type = v->getType();
-      // Diagnose active enum values. Differentiation of enum values requires
-      // special adjoint value handling and is not yet supported. Diagnose
-      // only the first active enum value to prevent too many diagnostics.
-      if (!diagnosedActiveEnumValue && type.getEnumOrBoundGenericEnum()) {
-        getContext().emitNondifferentiabilityError(
-            v, getInvoker(), diag::autodiff_enums_unsupported);
-        errorOccurred = true;
-        diagnosedActiveEnumValue = true;
-      }
       // Diagnose active values whose value category is incompatible with their
       // tangent types's value category.
       //
@@ -841,6 +799,19 @@ bool PullbackEmitter::run() {
             errorOccurred = true;
           }
         }
+      }
+      // Do not emit remaining activity-related diagnostics for semantic member
+      // accessors, which have special-case pullback generation.
+      if (isSemanticMemberAccessor(&original))
+        return;
+      // Diagnose active enum values. Differentiation of enum values requires
+      // special adjoint value handling and is not yet supported. Diagnose
+      // only the first active enum value to prevent too many diagnostics.
+      if (!diagnosedActiveEnumValue && type.getEnumOrBoundGenericEnum()) {
+        getContext().emitNondifferentiabilityError(
+            v, getInvoker(), diag::autodiff_enums_unsupported);
+        errorOccurred = true;
+        diagnosedActiveEnumValue = true;
       }
       // Skip address projections.
       // Address projections do not need their own adjoint buffers; they
