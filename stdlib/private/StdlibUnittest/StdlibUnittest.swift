@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -2831,7 +2831,7 @@ public func checkLosslessStringConvertible<Instance>(
 }
 
 public func nthIndex<C: Collection>(_ x: C, _ n: Int) -> C.Index {
-  return x.index(x.startIndex, offsetBy: numericCast(n))
+  return x.index(x.startIndex, offsetBy: n)
 }
 
 public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Element {
