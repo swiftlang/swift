@@ -324,11 +324,6 @@ public:
   /// These accessors have special-case pullback generation based on their
   /// semantic behavior.
   ///
-  /// "Semantic member accessors" currently include:
-  /// - Stored property accessors. These are implicitly generated.
-  /// - Property wrapper wrapped value accessors. These are implicitly generated
-  ///   and internally call `var wrappedValue`.
-  ///
   /// Returns true if any error occurs.
   bool runForSemanticMemberAccessor();
   bool runForSemanticMemberGetter();

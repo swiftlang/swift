@@ -177,14 +177,30 @@ let _: @differentiable (Float) -> TF_691<Float> = { x in id(TF_691(x)) }
 
 @propertyWrapper
 struct Wrapper<Value> {
-  var wrappedValue: Value
+  private var value: Value
+  var wrappedValue: Value {
+    get { value }
+    set { value = newValue }
+  }
   var projectedValue: Self { self }
+
+  init(wrappedValue: Value) {
+    self.value = wrappedValue
+  }
 }
 
 @propertyWrapper
 struct DifferentiableWrapper<Value> {
-  var wrappedValue: Value
+  private var value: Value
+  var wrappedValue: Value {
+    get { value }
+    set { value = newValue }
+  }
   var projectedValue: Self { self }
+
+  init(wrappedValue: Value) {
+    self.value = wrappedValue
+  }
 }
 extension DifferentiableWrapper: Differentiable where Value: Differentiable {}
 // Note: property wrapped value differentiation works even if wrapper types do
