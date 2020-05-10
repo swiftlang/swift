@@ -374,7 +374,6 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       foreach(module IN LISTS icu_modules)
         set(module_lib "${SWIFT_WASI_wasm32_ICU_${module}}")
         get_filename_component(module_lib_name ${module_lib} NAME)
-        message("swift_icu_${module}_${sdk} depends on ${module_lib}")
         add_custom_command_target(swift_icu_${module}_${sdk}
           COMMAND
             "${CMAKE_COMMAND}" -E copy
