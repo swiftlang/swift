@@ -96,7 +96,7 @@ function(swift_create_stdlib_targets name variant define_all_alias)
 
     if(sdk STREQUAL "WASI")
       add_dependencies(${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}${variant} wasi_icu_binaries)
-    endif
+    endif()
 
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       set(target_variant -${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch})
