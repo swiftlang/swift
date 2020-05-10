@@ -892,10 +892,13 @@ function(swift_icu_variables_set sdk arch result)
 endfunction()
 
 if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WASI")
-  file(DOWNLOAD 
-    "https://github.com/swiftwasm/icu4c-wasi/releases/download/0.5.0/icu4c-wasi.tar.xz"
-    "${SWIFT_SOURCE_DIR}/../icu.tar.xz"
-    EXPECTED_HASH MD5=25943864ebbfff15cf5aee8d9d5cc4d7)
+  set(WASI_ICU_URL "" CACHE STRING
+    "Download URL for the WASI ICU distribution")
+  set(WASI_ICU_MD5 "" CACHE STRING
+    "The expected has of the WASI ICU distribution archive")
+
+  file(DOWNLOAD "${WASI_ICU_URL}" "${SWIFT_SOURCE_DIR}/../icu.tar.xz"
+    EXPECTED_HASH MD5=${WASI_ICU_MD5})
 
     get_filename_component(SWIFT_SOURCE_BASEDIR "${SWIFT_SOURCE_DIR}" DIRECTORY)
     set(WASI_ICU_DISTRIBUTION_TARGET)
@@ -903,10 +906,12 @@ if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WASI")
       COMMAND 
         ${CMAKE_COMMAND} -E 
           tar xfv "${SWIFT_SOURCE_BASEDIR}/icu.tar.xz"
+      WORKING_DIRECTORY 
+        "${SWIFT_SOURCE_BASEDIR}"
       OUTPUT
-        ${SWIFT_WASI_wasm32_ICU_UC}
-        ${SWIFT_WASI_wasm32_ICU_I18N}
-        ${SWIFT_WASI_wasm32_ICU_DATA})
+        "${SWIFT_WASI_wasm32_ICU_UC}"
+        "${SWIFT_WASI_wasm32_ICU_I18N}"
+        "${SWIFT_WASI_wasm32_ICU_DATA}")
 endif()
 
 # ICU is provided through CoreFoundation on Darwin.  On other hosts, if the ICU
