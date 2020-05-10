@@ -320,10 +320,6 @@ public:
 
   SourceLoc EndTypeCheckLoc;
 
-  /// Used to check for discarded expression values: in the REPL top-level
-  /// expressions are not discarded.
-  bool IsREPL;
-
   /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
   bool IsBraceStmtFromTopLevelDecl;
 
@@ -369,20 +365,16 @@ public:
   };
 
   StmtChecker(AbstractFunctionDecl *AFD)
-      : Ctx(AFD->getASTContext()), TheFunc(AFD), DC(AFD), IsREPL(false),
+      : Ctx(AFD->getASTContext()), TheFunc(AFD), DC(AFD),
         IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(ClosureExpr *TheClosure)
       : Ctx(TheClosure->getASTContext()), TheFunc(TheClosure),
-        DC(TheClosure), IsREPL(false), IsBraceStmtFromTopLevelDecl(false) {}
+        DC(TheClosure), IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(DeclContext *DC)
-      : Ctx(DC->getASTContext()), TheFunc(), DC(DC), IsREPL(false),
+      : Ctx(DC->getASTContext()), TheFunc(), DC(DC),
         IsBraceStmtFromTopLevelDecl(false) {
-    if (const SourceFile *SF = DC->getParentSourceFile())
-      if (SF->Kind == SourceFileKind::REPL)
-        IsREPL = true;
-
     IsBraceStmtFromTopLevelDecl = isa<TopLevelCodeDecl>(DC);
   }
 
@@ -1579,9 +1571,8 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 
       // Type check the expression.
       TypeCheckExprOptions options = TypeCheckExprFlags::IsExprStmt;
-      bool isDiscarded = !(IsREPL && isa<TopLevelCodeDecl>(DC))
-        && !getASTContext().LangOpts.Playground
-        && !getASTContext().LangOpts.DebuggerSupport;
+      bool isDiscarded = (!getASTContext().LangOpts.Playground &&
+                          !getASTContext().LangOpts.DebuggerSupport);
       if (isDiscarded)
         options |= TypeCheckExprFlags::IsDiscarded;
 

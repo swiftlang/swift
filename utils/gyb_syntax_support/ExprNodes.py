@@ -394,6 +394,21 @@ EXPR_NODES = [
              Child('Pattern', kind='Pattern'),
          ]),
 
+    # trailing-closure-element -> identifier ':' closure-expression
+    Node('MultipleTrailingClosureElement', kind='Syntax',
+         children=[
+             Child('Label', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken'
+                   ]),
+             Child('Colon', kind='ColonToken'),
+             Child('Closure', kind='ClosureExpr'),
+         ]),
+
+    Node('MultipleTrailingClosureElementList', kind='SyntaxCollection',
+         element='MultipleTrailingClosureElement'),
+
     # call-expr -> expr '(' call-argument-list ')' closure-expr?
     #            | expr closure-expr
     Node('FunctionCallExpr', kind='Expr',
@@ -407,6 +422,10 @@ EXPR_NODES = [
                    is_optional=True),
              Child('TrailingClosure', kind='ClosureExpr',
                    is_optional=True),
+             Child('AdditionalTrailingClosures',
+                   kind='MultipleTrailingClosureElementList',
+                   collection_element_name='AdditionalTralingClosure',
+                   is_optional=True),
          ]),
 
     # subscript-expr -> expr '[' call-argument-list ']' closure-expr?
@@ -418,6 +437,10 @@ EXPR_NODES = [
                    collection_element_name='Argument'),
              Child('RightBracket', kind='RightSquareBracketToken'),
              Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
+             Child('AdditionalTrailingClosures',
+                   kind='MultipleTrailingClosureElementList',
+                   collection_element_name='AdditionalTralingClosure',
                    is_optional=True),
          ]),
 

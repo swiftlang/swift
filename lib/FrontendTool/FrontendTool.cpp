@@ -1066,17 +1066,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
                                         FrontendObserver *observer) {
-  auto mod = Instance.getMainModule();
-  if (auto SM = Instance.takeSILModule()) {
-    const PrimarySpecificPaths PSPs =
-        Instance.getPrimarySpecificPathsForAtMostOnePrimary();
-    return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
-                                         ReturnValue, observer);
-  }
-
   const auto &Invocation = Instance.getInvocation();
   const SILOptions &SILOpts = Invocation.getSILOptions();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
+
+  auto *mod = Instance.getMainModule();
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.
@@ -1278,9 +1272,8 @@ static bool performCompile(CompilerInstance &Instance,
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
   if (Action == FrontendOptions::ActionType::REPL) {
-    runREPL(Instance, ProcessCmdLine(Args.begin(), Args.end()),
-            Invocation.getParseStdlib());
-    return Context.hadError();
+    llvm::report_fatal_error("Compiler-internal integrated REPL has been "
+                             "removed; use the LLDB-enhanced REPL instead.");
   }
 
   if (auto r = dumpASTIfNeeded(Instance))
@@ -1290,9 +1283,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
   emitSwiftRangesForAllPrimaryInputsIfNeeded(Instance);
   emitCompiledSourceForAllPrimaryInputsIfNeeded(Instance);
+
+  SWIFT_DEFER {
+    // We might have freed the ASTContext already, but in that case we must have
+    // emitted the dependencies first.
+    if (Instance.hasASTContext())
+      emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+  };
 
   emitIndexData(Instance);
 
@@ -1461,30 +1460,24 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
   }
 }
 
-enum class DeallocatableResources {
-  None,
-  SILModule,
-  SILModuleAndASTContext,
-};
-static DeallocatableResources
-computeDeallocatableResources(const CompilerInstance &Instance) {
-  // If the stats reporter is installed, we need the ASTContext and SILModule
-  // to live through the entire compilation process.
+static void freeASTContextIfPossible(CompilerInstance &Instance) {
+  // If the stats reporter is installed, we need the ASTContext to live through
+  // the entire compilation process.
   if (Instance.getASTContext().Stats) {
-    return DeallocatableResources::None;
+    return;
   }
 
   // If we're going to dump the API of the module, we cannot tear down
   // the ASTContext, as that would cause the module to be freed prematurely.
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   if (!opts.DumpAPIPath.empty()) {
-    return DeallocatableResources::SILModule;
+    return;
   }
 
   // Verifying incremental dependencies relies on access to the Swift Module's
-  // source files. We can still free the SIL module, though.
+  // source files.
   if (opts.EnableIncrementalDependencyVerifier) {
-    return DeallocatableResources::SILModule;
+    return;
   }
 
   // If there are multiple primary inputs it is too soon to free
@@ -1493,24 +1486,14 @@ computeDeallocatableResources(const CompilerInstance &Instance) {
   // unlikely to reduce the peak heap size. So, only optimize the
   // single-primary-case (or WMO).
   if (opts.InputsAndOutputs.hasMultiplePrimaryInputs()) {
-    return DeallocatableResources::SILModule;
+    return;
   }
 
-  return DeallocatableResources::SILModuleAndASTContext;
-}
+  // Make sure we emit dependencies now, because we can't do it after the
+  // context is gone.
+  emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
 
-static void freeDeallocatableResourcesIfPossible(CompilerInstance &Instance) {
-  switch (computeDeallocatableResources(Instance)) {
-  case DeallocatableResources::None:
-    break;
-  case DeallocatableResources::SILModule:
-    Instance.freeSILModule();
-    break;
-  case DeallocatableResources::SILModuleAndASTContext:
-    Instance.freeSILModule();
-    Instance.freeASTContext();
-    break;
-  }
+  Instance.freeASTContext();
 }
 
 static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
@@ -1523,7 +1506,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
       Instance.getASTContext().LangOpts.EffectiveLanguageVersion;
 
   // Free up some compiler resources now that we have an IRModule.
-  freeDeallocatableResourcesIfPossible(Instance);
+  freeASTContextIfPossible(Instance);
 
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(opts, Instance.getDiags(), nullptr, HashGlobal, IRModule,
@@ -2182,14 +2165,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance->getMainModule(),
                        Invocation.getFrontendOptions().DumpAPIPath);
-  }
-
-  // If we're asked to enable private intransitive dependencies, we need to
-  // write over the dependency files we just emitted because we need to
-  // get the dependencies written post-Sema down on disk.
-  // FIXME: Evaluate the impact turning this on universally has.
-  if (Invocation.getLangOptions().EnableExperientalPrivateIntransitiveDependencies) {
-    emitReferenceDependenciesForAllPrimaryInputsIfNeeded(*Instance);
   }
 
   // Verify reference dependencies of the current compilation job *before*

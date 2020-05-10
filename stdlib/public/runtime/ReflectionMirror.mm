@@ -755,7 +755,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
           return callClass();
         }
       }
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     }
 
     /// TODO: Implement specialized mirror witnesses for all kinds.

@@ -425,7 +425,6 @@ class CompilerInstance {
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
-  std::unique_ptr<SILModule> TheSILModule;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
 
   /// Null if no tracker.
@@ -498,8 +497,6 @@ public:
 
   Lowering::TypeConverter &getSILTypes();
 
-  void createSILModule();
-
   void addDiagnosticConsumer(DiagnosticConsumer *DC) {
     Diagnostics.addConsumer(*DC);
   }
@@ -516,16 +513,6 @@ public:
   const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
   UnifiedStatsReporter *getStatsReporter() const { return Stats.get(); }
-
-  SILModule *getSILModule() {
-    return TheSILModule.get();
-  }
-
-  std::unique_ptr<SILModule> takeSILModule();
-
-  bool hasSILModule() {
-    return static_cast<bool>(TheSILModule);
-  }
 
   ModuleDecl *getMainModule() const;
 
@@ -658,9 +645,6 @@ private:
 
 public:
   void freeASTContext();
-
-  /// Frees up the SILModule that this instance is holding on to.
-  void freeSILModule();
 
 private:
   /// Load stdlib & return true if should continue, i.e. no error

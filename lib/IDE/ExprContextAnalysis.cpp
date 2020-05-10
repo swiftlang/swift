@@ -418,21 +418,26 @@ static bool collectPossibleCalleesForApply(
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
-      Type fnType = fnExpr->getType();
-      if ((!fnType || fnType->hasError() || fnType->hasUnresolvedType()) &&
-          decl->hasInterfaceType())
-        fnType = decl->getInterfaceType();
-      if (fnType) {
-        fnType = fnType->getWithoutSpecifierType();
-        if (auto *funcTy = fnType->getAs<AnyFunctionType>())
+      Type declTy = fnExpr->getType();
+      if ((!declTy || declTy->hasError() || declTy->hasUnresolvedType()) &&
+          decl->hasInterfaceType()) {
+        declTy = decl->getInterfaceType();
+        declTy = decl->getInnermostDeclContext()->mapTypeIntoContext(declTy);
+      }
+      if (declTy) {
+        declTy = declTy->getWithoutSpecifierType();
+        if (auto *funcTy = declTy->getAs<AnyFunctionType>())
           candidates.emplace_back(funcTy, decl);
       }
     }
   } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
     for (auto *decl : OSRE->getDecls()) {
-      if (decl->hasInterfaceType())
-        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+      if (decl->hasInterfaceType()) {
+        auto declTy = decl->getInterfaceType();
+        declTy = decl->getInnermostDeclContext()->mapTypeIntoContext(declTy);
+        if (auto *funcType = declTy->getAs<AnyFunctionType>())
           candidates.emplace_back(funcType, decl);
+      }
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(DC, UDE->getBase(), UDE->getName(),
@@ -571,8 +576,9 @@ class ExprContextAnalyzer {
 
   // Results populated by Analyze()
   SmallVectorImpl<Type> &PossibleTypes;
-  SmallVectorImpl<const AnyFunctionType::Param *> &PossibleParams;
+  SmallVectorImpl<PossibleParamInfo> &PossibleParams;
   SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees;
+  Expr *&AnalyzedExpr;
   bool &singleExpressionBody;
 
   void recordPossibleType(Type ty) {
@@ -582,8 +588,8 @@ class ExprContextAnalyzer {
     PossibleTypes.push_back(ty->getRValueType());
   }
 
-  void recordPossibleParam(const AnyFunctionType::Param &arg) {
-    PossibleParams.push_back(&arg);
+  void recordPossibleParam(const AnyFunctionType::Param *arg, bool isRequired) {
+    PossibleParams.emplace_back(arg, isRequired);
   }
 
   /// Collect context information at call argument position.
@@ -607,6 +613,7 @@ class ExprContextAnalyzer {
     } else {
       llvm_unreachable("unexpected expression kind");
     }
+    assert(!Candidates.empty());
     PossibleCallees.assign(Candidates.begin(), Candidates.end());
 
     // Determine the position of code completion token in call argument.
@@ -616,6 +623,8 @@ class ExprContextAnalyzer {
       return false;
 
     // Collect possible types (or labels) at the position.
+    // FIXME: Take variadic and optional parameters into account. We need to do
+    //        something equivalent to 'constraints::matchCallArguments'
     {
       bool MayNeedName = !HasName && !E->isImplicit() &&
                          (isa<CallExpr>(E) | isa<SubscriptExpr>(E) ||
@@ -638,24 +647,32 @@ class ExprContextAnalyzer {
             paramList = nullptr;
         }
         for (auto Pos = Position; Pos < Params.size(); ++Pos) {
-          const auto &Param = Params[Pos];
-          Type ty = Param.getPlainType();
+          const auto &paramType = Params[Pos];
+          Type ty = paramType.getPlainType();
           if (memberDC && ty->hasTypeParameter())
             ty = memberDC->mapTypeIntoContext(ty);
 
-          if (Param.hasLabel() && MayNeedName) {
-            if (seenArgs.insert({Param.getLabel(), ty.getPointer()}).second)
-              recordPossibleParam(Param);
-            if (paramList && paramList->get(Position)->isDefaultArgument())
+          if (paramType.hasLabel() && MayNeedName) {
+            bool isDefaulted = paramList &&
+                               paramList->get(Pos)->isDefaultArgument();
+            if (seenArgs.insert({paramType.getLabel(), ty.getPointer()}).second)
+              recordPossibleParam(&paramType, !isDefaulted);
+            if (isDefaulted)
               continue;
           } else {
             auto argTy = ty;
-            if (Param.isInOut())
+            if (paramType.isInOut())
               argTy = InOutType::get(argTy);
             if (seenTypes.insert(argTy.getPointer()).second)
               recordPossibleType(argTy);
           }
           break;
+        }
+        // If the argument position is out of expeceted number, indicate that
+        // with optional nullptr param.
+        if (Position >= Params.size()) {
+          if (seenArgs.insert({Identifier(), nullptr}).second)
+            recordPossibleParam(nullptr, /*isRequired=*/false);
         }
       }
     }
@@ -663,6 +680,7 @@ class ExprContextAnalyzer {
   }
 
   void analyzeExpr(Expr *Parent) {
+    AnalyzedExpr = Parent;
     switch (Parent->getKind()) {
     case ExprKind::Call:
     case ExprKind::Subscript:
@@ -923,12 +941,13 @@ class ExprContextAnalyzer {
 public:
   ExprContextAnalyzer(
       DeclContext *DC, Expr *ParsedExpr, SmallVectorImpl<Type> &PossibleTypes,
-      SmallVectorImpl<const AnyFunctionType::Param *> &PossibleArgs,
+      SmallVectorImpl<PossibleParamInfo> &PossibleArgs,
       SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
-      bool &singleExpressionBody)
+      Expr *&AnalyzedExpr, bool &singleExpressionBody)
       : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
         Context(DC->getASTContext()), PossibleTypes(PossibleTypes),
         PossibleParams(PossibleArgs), PossibleCallees(PossibleCallees),
+        AnalyzedExpr(AnalyzedExpr),
         singleExpressionBody(singleExpressionBody) {}
 
   void Analyze() {
@@ -942,8 +961,12 @@ public:
         switch (E->getKind()) {
         case ExprKind::Call: {
           // Iff the cursor is in argument position.
-          auto argsRange = cast<CallExpr>(E)->getArg()->getSourceRange();
-          return SM.rangeContains(argsRange, ParsedExpr->getSourceRange());
+          auto call = cast<CallExpr>(E);
+          auto fnRange = call->getFn()->getSourceRange();
+          auto argsRange = call->getArg()->getSourceRange();
+          auto exprRange = ParsedExpr->getSourceRange();
+          return !SM.rangeContains(fnRange, exprRange) &&
+                 SM.rangeContains(argsRange, exprRange);
         }
         case ExprKind::Subscript: {
           // Iff the cursor is in index position.
@@ -1033,7 +1056,8 @@ public:
 
 ExprContextInfo::ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
   ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleParams,
-                               PossibleCallees, singleExpressionBody);
+                               PossibleCallees, AnalyzedExpr,
+                               singleExpressionBody);
   Analyzer.Analyze();
 }
 

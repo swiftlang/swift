@@ -66,7 +66,6 @@ bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
     // FIXME: This would be a good test of the interface format.
     return false;
   case InputFileKind::None:
-  case InputFileKind::SwiftREPL:
   case InputFileKind::SIL:
   case InputFileKind::LLVM:
     return false;

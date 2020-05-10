@@ -5556,6 +5556,7 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
       llvm_unreachable(
           "When possible, OptionSet is derived via memberwise init synthesis");
   }
+  llvm_unreachable("unknown derivable protocol kind");
 }
 
 Type TypeChecker::deriveTypeWitness(DeclContext *DC,

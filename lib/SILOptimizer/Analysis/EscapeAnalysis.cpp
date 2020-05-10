@@ -1022,8 +1022,8 @@ EscapeAnalysis::ConnectionGraph::getValueContent(SILValue ptrVal) {
 
 CGNode *EscapeAnalysis::ConnectionGraph::getReturnNode() {
   if (!ReturnNode) {
-    SILType resultTy =
-        F->mapTypeIntoContext(F->getConventions().getSILResultType());
+    SILType resultTy = F->mapTypeIntoContext(
+        F->getConventions().getSILResultType(F->getTypeExpansionContext()));
     bool hasReferenceOnly = EA->hasReferenceOnly(resultTy, *F);
     ReturnNode = allocNode(nullptr, NodeType::Return, false, hasReferenceOnly);
   }

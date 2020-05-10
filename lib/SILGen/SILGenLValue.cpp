@@ -1492,7 +1492,8 @@ namespace {
         // nonmutating setter, for example.
         if (base.getType().isAddress() &&
             base.getType().getObjectType() ==
-                setterConv.getSILArgumentType(argIdx)) {
+                setterConv.getSILArgumentType(argIdx,
+                                              SGF.getTypeExpansionContext())) {
           capturedBase = SGF.B.createTrivialLoadOr(
               loc, capturedBase, LoadOwnershipQualifier::Take);
         }
@@ -1517,8 +1518,9 @@ namespace {
             SILType::getPrimitiveAddressType(loweredSubstArgType.getASTType());
         }
         auto loweredSubstParamTy = SILType::getPrimitiveType(
-                    param.getArgumentType(SGF.SGM.M, substSetterTy),
-                    loweredSubstArgType.getCategory());
+            param.getArgumentType(SGF.SGM.M, substSetterTy,
+                                  SGF.getTypeExpansionContext()),
+            loweredSubstArgType.getCategory());
         // Handle reabstraction differences.
         if (Mval.getType() != loweredSubstParamTy) {
           Mval = SGF.emitSubstToOrigValue(loc, Mval,

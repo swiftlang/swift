@@ -102,9 +102,6 @@ namespace swift {
 
   /// @}
 
-  /// Parse a source file's SIL declarations into a given SIL module.
-  void parseSourceFileSIL(SourceFile &SF, SILParserState *sil);
-
   /// Finish the code completion.
   void performCodeCompletionSecondPass(SourceFile &SF,
                                        CodeCompletionCallbacksFactory &Factory);
@@ -140,7 +137,7 @@ namespace swift {
   void performPCMacro(SourceFile &SF);
 
   /// Bind all 'extension' visible from \p SF to the extended nominal.
-  void bindExtensions(SourceFile &SF);
+  void bindExtensions(ModuleDecl &mod);
 
   /// Once import resolution is complete, this walks the AST to resolve types
   /// and diagnose problems therein.

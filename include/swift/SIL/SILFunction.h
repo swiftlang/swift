@@ -416,7 +416,7 @@ public:
 
   void setEntryCount(ProfileCounter Count) { EntryCount = Count; }
 
-  bool isNoReturnFunction() const;
+  bool isNoReturnFunction(TypeExpansionContext context) const;
 
   /// Unsafely rewrite the lowered type of this function.
   ///

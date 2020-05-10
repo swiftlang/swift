@@ -182,8 +182,8 @@ namespace swift {
 }
 
 // FIXME: HACK: copied from HeapObject.cpp
-extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
-void _swift_release_dealloc(swift::HeapObject *object);
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
+_swift_release_dealloc(swift::HeapObject *object);
 
 namespace swift {
 
@@ -546,7 +546,7 @@ class RefCountBitsT {
   // Returns true if the increment is a fast-path result.
   // Returns false if the increment should fall back to some slow path
   // (for example, because UseSlowRC is set or because the refcount overflowed).
-  LLVM_NODISCARD SWIFT_ALWAYS_INLINE bool
+  SWIFT_NODISCARD SWIFT_ALWAYS_INLINE bool
   incrementStrongExtraRefCount(uint32_t inc) {
     // This deliberately overflows into the UseSlowRC field.
     bits += BitsType(inc) << Offsets::StrongExtraRefCountShift;
@@ -557,7 +557,7 @@ class RefCountBitsT {
   // Returns false if the decrement should fall back to some slow path
   // (for example, because UseSlowRC is set
   // or because the refcount is now zero and should deinit).
-  LLVM_NODISCARD SWIFT_ALWAYS_INLINE bool
+  SWIFT_NODISCARD SWIFT_ALWAYS_INLINE bool
   decrementStrongExtraRefCount(uint32_t dec) {
 #ifndef NDEBUG
     if (!hasSideTable() && !isImmortal(false)) {
@@ -697,19 +697,19 @@ class RefCounts {
 
   // Out-of-line slow paths.
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   void incrementSlow(RefCountBits oldbits, uint32_t inc) SWIFT_CC(PreserveMost);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   bool tryIncrementSlow(RefCountBits oldbits);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   bool tryIncrementNonAtomicSlow(RefCountBits oldbits);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   void incrementUnownedSlow(uint32_t inc);
 
   public:
@@ -1409,8 +1409,8 @@ class HeapObjectSideTableEntry {
 
   
   // WEAK
-  
-  LLVM_NODISCARD
+
+  SWIFT_NODISCARD
   HeapObjectSideTableEntry* incrementWeak() {
     // incrementWeak need not be atomic w.r.t. concurrent deinit initiation.
     // The client can't actually get a reference to the object without

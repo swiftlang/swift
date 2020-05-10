@@ -67,6 +67,18 @@ namespace swift {
   class KeyPathExpr;
   class CaptureListExpr;
 
+struct TrailingClosure {
+  Identifier Label;
+  SourceLoc LabelLoc;
+  Expr *ClosureExpr;
+
+  TrailingClosure(Expr *closure)
+      : TrailingClosure(Identifier(), SourceLoc(), closure) {}
+
+  TrailingClosure(Identifier label, SourceLoc labelLoc, Expr *closure)
+      : Label(label), LabelLoc(labelLoc), ClosureExpr(closure) {}
+};
+
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
 #define LAST_EXPR(Id) Last_Expr = Id,
@@ -200,10 +212,7 @@ protected:
     FieldNo : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleExpr, Expr, 1+1+1+32,
-    /// Whether this tuple has a trailing closure.
-    HasTrailingClosure : 1,
-
+  SWIFT_INLINE_BITFIELD_FULL(TupleExpr, Expr, 1+1+32,
     /// Whether this tuple has any labels.
     HasElementNames : 1,
 
@@ -532,6 +541,11 @@ public:
   /// Returns true if this is a reference to the implicit self of function.
   bool isSelfExprOf(const AbstractFunctionDecl *AFD,
                     bool sameBase = false) const;
+
+  /// Given that this is a packed argument expression of the sort that
+  /// would be produced from packSingleArgument, return the index of the
+  /// unlabeled trailing closure, if there is one.
+  Optional<unsigned> getUnlabeledTrailingClosureIndexOfPackedArgument() const;
 
   /// Produce a mapping from each subexpression to its parent
   /// expression, with the provided expression serving as the root of
@@ -1198,7 +1212,7 @@ public:
                                    ArrayRef<Identifier> argLabels,
                                    ArrayRef<SourceLoc> argLabelLocs,
                                    SourceLoc rParenLoc,
-                                   Expr *trailingClosure,
+                                   ArrayRef<TrailingClosure> trailingClosures,
                                    bool implicit);
 
   LiteralKind getLiteralKind() const {
@@ -1218,6 +1232,11 @@ public:
   /// Whether this call with written with a trailing closure.
   bool hasTrailingClosure() const {
     return Bits.ObjectLiteralExpr.HasTrailingClosure;
+  }
+
+  /// Return the index of the unlabeled trailing closure argument.
+  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
+    return getArg()->getUnlabeledTrailingClosureIndexOfPackedArgument();
   }
 
   SourceLoc getSourceLoc() const { return PoundLoc; }
@@ -1806,6 +1825,11 @@ public:
     return Bits.DynamicSubscriptExpr.HasTrailingClosure;
   }
 
+  /// Return the index of the unlabeled trailing closure argument.
+  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
+    return Index->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  }
+
   SourceLoc getLoc() const { return Index->getStartLoc(); }
 
   SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
@@ -1848,7 +1872,7 @@ public:
                                       ArrayRef<Identifier> argLabels,
                                       ArrayRef<SourceLoc> argLabelLocs,
                                       SourceLoc rParenLoc,
-                                      Expr *trailingClosure,
+                                      ArrayRef<TrailingClosure> trailingClosures,
                                       bool implicit);
 
   DeclNameRef getName() const { return Name; }
@@ -1873,6 +1897,11 @@ public:
   /// Whether this call with written with a trailing closure.
   bool hasTrailingClosure() const {
     return Bits.UnresolvedMemberExpr.HasTrailingClosure;
+  }
+
+  /// Return the index of the unlabeled trailing closure argument.
+  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
+    return getArgument()->getUnlabeledTrailingClosureIndexOfPackedArgument();
   }
 
   SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
@@ -2056,6 +2085,11 @@ public:
   /// Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return Bits.ParenExpr.HasTrailingClosure; }
 
+  Optional<unsigned>
+  getUnlabeledTrailingClosureIndexOfPackedArgument() const {
+    return hasTrailingClosure() ? Optional<unsigned>(0) : None;
+  }
+
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
 };
   
@@ -2068,6 +2102,8 @@ class TupleExpr final : public Expr,
 
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
+
+  Optional<unsigned> FirstTrailingArgumentAt;
 
   size_t numTrailingObjects(OverloadToken<Expr *>) const {
     return getNumElements();
@@ -2095,11 +2131,11 @@ class TupleExpr final : public Expr,
     return { getTrailingObjects<SourceLoc>(), getNumElements() };
   }
 
-  TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
-            ArrayRef<Identifier> ElementNames, 
+  TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
+            ArrayRef<Expr *> SubExprs,
+            ArrayRef<Identifier> ElementNames,
             ArrayRef<SourceLoc> ElementNameLocs,
-            SourceLoc RParenLoc, bool HasTrailingClosure, bool Implicit, 
-            Type Ty);
+            Optional<unsigned> FirstTrailingArgumentAt, bool Implicit, Type Ty);
 
 public:
   /// Create a tuple.
@@ -2109,6 +2145,15 @@ public:
                            ArrayRef<Identifier> ElementNames, 
                            ArrayRef<SourceLoc> ElementNameLocs,
                            SourceLoc RParenLoc, bool HasTrailingClosure, 
+                           bool Implicit, Type Ty = Type());
+
+  static TupleExpr *create(ASTContext &ctx,
+                           SourceLoc LParenLoc,
+                           SourceLoc RParenLoc,
+                           ArrayRef<Expr *> SubExprs,
+                           ArrayRef<Identifier> ElementNames,
+                           ArrayRef<SourceLoc> ElementNameLocs,
+                           Optional<unsigned> FirstTrailingArgumentAt,
                            bool Implicit, Type Ty = Type());
 
   /// Create an empty tuple.
@@ -2124,8 +2169,25 @@ public:
 
   SourceRange getSourceRange() const;
 
+  bool hasAnyTrailingClosures() const {
+    return (bool) FirstTrailingArgumentAt;
+  }
+
   /// Whether this expression has a trailing closure as its argument.
-  bool hasTrailingClosure() const { return Bits.TupleExpr.HasTrailingClosure; }
+  bool hasTrailingClosure() const {
+    return FirstTrailingArgumentAt
+               ? *FirstTrailingArgumentAt == getNumElements() - 1
+               : false;
+  }
+
+  bool hasMultipleTrailingClosures() const {
+    return FirstTrailingArgumentAt ? !hasTrailingClosure() : false;
+  }
+
+  Optional<unsigned>
+  getUnlabeledTrailingClosureIndexOfPackedArgument() const {
+    return FirstTrailingArgumentAt;
+  }
 
   /// Retrieve the elements of this tuple.
   MutableArrayRef<Expr*> getElements() {
@@ -2136,8 +2198,22 @@ public:
   ArrayRef<Expr*> getElements() const {
     return { getTrailingObjects<Expr *>(), getNumElements() };
   }
+
+  MutableArrayRef<Expr*> getTrailingElements() {
+    return getElements().take_back(getNumTrailingElements());
+  }
+  
+  ArrayRef<Expr*> getTrailingElements() const {
+    return getElements().take_back(getNumTrailingElements());
+  }
   
   unsigned getNumElements() const { return Bits.TupleExpr.NumElements; }
+
+  unsigned getNumTrailingElements() const {
+    return FirstTrailingArgumentAt
+               ? getNumElements() - *FirstTrailingArgumentAt
+               : 0;
+  }
   
   Expr *getElement(unsigned i) const {
     return getElements()[i];
@@ -2374,7 +2450,7 @@ public:
                                ArrayRef<Identifier> indexArgLabels,
                                ArrayRef<SourceLoc> indexArgLabelLocs,
                                SourceLoc rSquareLoc,
-                               Expr *trailingClosure,
+                               ArrayRef<TrailingClosure> trailingClosures,
                                ConcreteDeclRef decl = ConcreteDeclRef(),
                                bool implicit = false,
                                AccessSemantics semantics
@@ -2396,6 +2472,11 @@ public:
   /// Whether this call was written with a trailing closure.
   bool hasTrailingClosure() const {
     return Bits.SubscriptExpr.HasTrailingClosure;
+  }
+
+  /// Return the index of the unlabeled trailing closure argument.
+  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
+    return getIndex()->getUnlabeledTrailingClosureIndexOfPackedArgument();
   }
 
   /// Determine whether this subscript reference should bypass the
@@ -4243,6 +4324,9 @@ public:
   /// Whether this application was written using a trailing closure.
   bool hasTrailingClosure() const;
 
+  /// Return the index of the unlabeled trailing closure argument.
+  Optional<unsigned> getUnlabeledTrailingClosureIndex() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&
            E->getKind() <= ExprKind::Last_ApplyExpr;
@@ -4287,8 +4371,8 @@ public:
       llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
         return E->getType();
       }) {
-    return create(ctx, fn, SourceLoc(), args, argLabels, { }, SourceLoc(),
-                  /*trailingClosure=*/nullptr, /*implicit=*/true, getType);
+    return create(ctx, fn, SourceLoc(), args, argLabels, {}, SourceLoc(),
+                  /*trailingClosures=*/{}, /*implicit=*/true, getType);
   }
 
   /// Create a new call expression.
@@ -4299,11 +4383,12 @@ public:
   /// or which must be empty.
   /// \param argLabelLocs The locations of the argument labels, whose size must
   /// equal args.size() or which must be empty.
-  /// \param trailingClosure The trailing closure, if any.
+  /// \param trailingClosures The list of trailing closures, if any.
   static CallExpr *create(
       ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
       ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
-      SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
+      SourceLoc rParenLoc, ArrayRef<TrailingClosure> trailingClosures,
+      bool implicit,
       llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
         return E->getType();
       });
@@ -4325,8 +4410,13 @@ public:
   unsigned getNumArguments() const { return Bits.CallExpr.NumArgLabels; }
   bool hasArgumentLabelLocs() const { return Bits.CallExpr.HasArgLabelLocs; }
 
-  /// Whether this call with written with a trailing closure.
+  /// Whether this call with written with a single trailing closure.
   bool hasTrailingClosure() const { return Bits.CallExpr.HasTrailingClosure; }
+
+  /// Return the index of the unlabeled trailing closure argument.
+  Optional<unsigned> getUnlabeledTrailingClosureIndex() const {
+    return getArg()->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  }
 
   using TrailingCallArguments::getArgumentLabels;
 
@@ -5191,7 +5281,7 @@ public:
                                      ArrayRef<Identifier> indexArgLabels,
                                      ArrayRef<SourceLoc> indexArgLabelLocs,
                                      SourceLoc rSquareLoc,
-                                     Expr *trailingClosure);
+                                     ArrayRef<TrailingClosure> trailingClosures);
     
     /// Create an unresolved component for a subscript.
     ///
@@ -5243,7 +5333,7 @@ public:
                               ArrayRef<Identifier> indexArgLabels,
                               ArrayRef<SourceLoc> indexArgLabelLocs,
                               SourceLoc rSquareLoc,
-                              Expr *trailingClosure,
+                              ArrayRef<TrailingClosure> trailingClosures,
                               Type elementType,
                               ArrayRef<ProtocolConformanceRef> indexHashables);
 
@@ -5631,7 +5721,8 @@ inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
 Expr *packSingleArgument(
     ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
     ArrayRef<Identifier> &argLabels, ArrayRef<SourceLoc> &argLabelLocs,
-    SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
+    SourceLoc rParenLoc, ArrayRef<TrailingClosure> trailingClosures,
+    bool implicit,
     SmallVectorImpl<Identifier> &argLabelsScratch,
     SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
     llvm::function_ref<Type(Expr *)> getType = [](Expr *E) -> Type {
