@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -106,7 +106,7 @@ extension TestSuite {
         var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let survivingIndices = _allIndices(
           into: c,
-          in: c.index(c.startIndex, offsetBy: numericCast(test.numberToRemove)) ..<
+          in: c.index(c.startIndex, offsetBy: test.numberToRemove) ..<
             c.endIndex
         )
         c.removeFirst(test.numberToRemove)
@@ -251,7 +251,7 @@ extension TestSuite {
         let survivingIndices = _allIndices(
           into: c,
           in: c.startIndex ..<
-            c.index(c.endIndex, offsetBy: numericCast(-test.numberToRemove))
+            c.index(c.endIndex, offsetBy: -test.numberToRemove)
         )
         c.removeLast(test.numberToRemove)
         expectEqualSequence(
