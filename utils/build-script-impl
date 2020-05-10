@@ -118,11 +118,6 @@ KNOWN_SETTINGS=(
 
     ## WebAssembly/WASI Options
     wasi-sdk                                      ""                "An absolute path to the WASI SDK that will be used as a libc implementation for Wasm builds"
-    wasi-icu-uc                                   ""                "Path to libicuuc.so"
-    wasi-icu-uc-include                           ""                "Path to a directory containing headers for libicuuc"
-    wasi-icu-i18n                                 ""                "Path to libicui18n.so"
-    wasi-icu-i18n-include                         ""                "Path to a directory containing headers libicui18n"
-    wasi-icu-data                                 ""                "Path to libicudata.so"
 
     ## Build Types for Components
     swift-stdlib-build-type                       "Debug"           "the CMake build variant for Swift"
