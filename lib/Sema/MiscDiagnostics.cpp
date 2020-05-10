@@ -3243,10 +3243,15 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       if (!argsTy || argsTy->hasError()) return;
 
       SourceLoc closureLoc;
-      if (auto PE = dyn_cast<ParenExpr>(argsExpr))
-        closureLoc = PE->getSubExpr()->getStartLoc();
-      else if (auto TE = dyn_cast<TupleExpr>(argsExpr))
+      if (auto TE = dyn_cast<TupleExpr>(argsExpr)) {
+        assert(TE->getNumElements() != 0 && "Unexpected empty TupleExpr");
+        // Labeled trailing closure; this is fine.
+        // FIXME: It should also be fine even when the label is `_`.
+        if (TE->getElementNameLoc(0).isValid()) return;
         closureLoc = TE->getElements().back()->getStartLoc();
+      } else if (auto PE = dyn_cast<ParenExpr>(argsExpr)) {
+        closureLoc = PE->getSubExpr()->getStartLoc();
+      }
 
       Identifier closureLabel;
       if (auto TT = argsTy->getAs<TupleType>()) {
@@ -3297,7 +3302,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 /// Conditional statements, including 'for' or `switch` doesn't allow ambiguous
 /// trailing closures in these conditions part. Even if the parser can recover
 /// them, we force them to disambiguate.
-//
+///
 /// E.g.:
 ///   if let _ = arr?.map {$0+1} { ... }
 ///   for _ in numbers.filter {$0 > 4} { ... }
