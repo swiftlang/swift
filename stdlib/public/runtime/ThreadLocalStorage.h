@@ -13,7 +13,6 @@
 #ifndef SWIFT_RUNTIME_THREADLOCALSTORAGE_H
 #define SWIFT_RUNTIME_THREADLOCALSTORAGE_H
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Config.h"
 
 // Depending on the target, we may be able to use dedicated TSD keys or

@@ -7111,10 +7111,19 @@ void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
 ArrayRef<AutoDiffConfig>
 AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
   prepareDerivativeFunctionConfigurations();
+
   // Resolve derivative function configurations from `@differentiable`
   // attributes by type-checking them.
   for (auto *diffAttr : getAttrs().getAttributes<DifferentiableAttr>())
     (void)diffAttr->getParameterIndices();
+  // For accessors: resolve derivative function configurations from storage
+  // `@differentiable` attributes by type-checking them.
+  if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
+    auto *storage = accessor->getStorage();
+    for (auto *diffAttr : storage->getAttrs().getAttributes<DifferentiableAttr>())
+      (void)diffAttr->getParameterIndices();
+  }
+
   // Load derivative configurations from imported modules.
   auto &ctx = getASTContext();
   if (ctx.getCurrentGeneration() > DerivativeFunctionConfigGeneration) {

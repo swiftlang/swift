@@ -467,9 +467,7 @@ public:
     auto *repr = IdentTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
-    Type ty = TypeChecker::resolveIdentifierType(
-        TypeResolution::forContextual(DC, options), repr);
-
+    auto ty = TypeResolution::forContextual(DC, options).resolveType(repr);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
       return nullptr;
@@ -566,8 +564,8 @@ public:
       auto *prefixRepr = IdentTypeRepr::create(Context, components);
 
       // See first if the entire repr resolves to a type.
-      Type enumTy = TypeChecker::resolveIdentifierType(
-          TypeResolution::forContextual(DC, options), prefixRepr);
+      Type enumTy = TypeResolution::forContextual(DC, options)
+                        .resolveType(prefixRepr);
       if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
         return nullptr;
 

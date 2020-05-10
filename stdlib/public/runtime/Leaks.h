@@ -23,7 +23,6 @@
 
 #include "../SwiftShims/Visibility.h"
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Config.h"
 
 namespace swift {

@@ -33,7 +33,6 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
 #include <stdint.h>
 #include <assert.h>
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Config.h"
