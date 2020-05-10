@@ -27,7 +27,14 @@ set(swift_stubs_c_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 list(APPEND swift_stubs_c_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_stubs_c_compile_flags -I${SWIFT_SOURCE_DIR}/include)
 
+set(swift_stubs_dependencies)
+if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WASI")
+  list(APPEND swift_stubs_dependencies ${WASI_ICU_DISTRIBUTION_TARGET})
+endif()
+
 add_swift_target_library(swiftStdlibStubs
+                  DEPENDS
+                    ${swift_stubs_dependencies}
                   OBJECT_LIBRARY
                     ${swift_stubs_sources}
                     ${swift_stubs_objc_sources}

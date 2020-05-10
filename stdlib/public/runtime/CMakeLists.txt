@@ -358,8 +358,8 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       add_custom_command_target(swift_static_stdlib_${sdk}_args
         COMMAND
           "${CMAKE_COMMAND}" -E copy
-        "${linkfile_src}"
-          "${SWIFTSTATICLIB_DIR}/${linkfile}"
+            "${linkfile_src}"
+            "${SWIFTSTATICLIB_DIR}/${linkfile}"
         OUTPUT
           "${SWIFTSTATICLIB_DIR}/${linkfile}"
         DEPENDS
@@ -374,6 +374,7 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       foreach(module IN LISTS icu_modules)
         set(module_lib "${SWIFT_WASI_wasm32_ICU_${module}}")
         get_filename_component(module_lib_name ${module_lib} NAME)
+        message("swift_icu_${module}_${sdk} depends on ${module_lib}")
         add_custom_command_target(swift_icu_${module}_${sdk}
           COMMAND
             "${CMAKE_COMMAND}" -E copy
