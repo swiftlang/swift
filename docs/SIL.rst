@@ -2107,6 +2107,94 @@ make the use of such types more convenient; it does not shift the
 ultimate responsibility for assuring the safety of unsafe
 language/library features away from the user.
 
+Copy-on-Write Representation
+----------------------------
+
+Copy-on-Write (COW) data structures are implemented by a reference to an object
+which is copied on mutation in case it's not uniquely referenced.
+
+A COW mutation sequence in SIL typically looks like::
+
+    (%uniq, %buffer) = begin_cow_mutation %immutable_buffer : $BufferClass
+    cond_br %uniq, bb_uniq, bb_not_unique
+  bb_uniq:
+    br bb_mutate(%buffer : $BufferClass)
+  bb_not_unique:
+    %copied_buffer = apply %copy_buffer_function(%buffer) : ...
+    br bb_mutate(%copied_buffer : $BufferClass)
+  bb_mutate(%mutable_buffer : $BufferClass):
+    %field = ref_element_addr %mutable_buffer : $BufferClass, #BufferClass.Field
+    store %value to %field : $ValueType
+    %new_immutable_buffer = end_cow_mutation %buffer : $BufferClass
+
+Loading from a COW data structure looks like::
+
+    %field1 = ref_element_addr [immutable] %immutable_buffer : $BufferClass, #BufferClass.Field
+    %value1 = load %field1 : $*FieldType
+    ...
+    %field2 = ref_element_addr [immutable] %immutable_buffer : $BufferClass, #BufferClass.Field
+    %value2 = load %field2 : $*FieldType
+
+The ``immutable`` attribute means that loading values from ``ref_element_addr``
+and ``ref_tail_addr`` instructions, which have the *same* operand, are
+equivalent.
+In other words, it's guaranteed that a buffer's properties are not mutated
+between two ``ref_element/tail_addr [immutable]`` as long as they have the
+same buffer reference as operand.
+This is even true if e.g. the buffer 'escapes' to an unknown function.
+
+
+In the example above, ``%value2`` is equal to ``%value1`` because the operand
+of both ``ref_element_addr`` instructions is the same ``%immutable_buffer``.
+Conceptually, the content of a COW buffer object can be seen as part of
+the same *static* (immutable) SSA value as the buffer reference.
+
+The lifetime of a COW value is strictly separated into *mutable* and
+*immutable* regions by ``begin_cow_mutation`` and
+``end_cow_mutation`` instructions::
+
+  %b1 = alloc_ref $BufferClass
+  // The buffer %b1 is mutable
+  %b2 = end_cow_mutation %b1 : $BufferClass
+  // The buffer %b2 is immutable
+  (%u1, %b3) = begin_cow_mutation %b1 : $BufferClass
+  // The buffer %b3 is mutable
+  %b4 = end_cow_mutation %b3 : $BufferClass
+  // The buffer %b4 is immutable
+  ...
+
+Both, ``begin_cow_mutation`` and ``end_cow_mutation``, consume their operand
+and return the new buffer as an *owned* value.
+The ``begin_cow_mutation`` will compile down to a uniqueness check and
+``end_cow_mutation`` will compile to a no-op.
+
+Although the physical pointer value of the returned buffer reference is the
+same as the operand, it's important to generate a *new* buffer reference in
+SIL. It prevents the optimizer from moving buffer accesses from a *mutable* into
+a *immutable* region and vice versa.
+
+Because the buffer *content* is conceptually part of the
+buffer *reference* SSA value, there must be a new buffer reference every time
+the buffer content is mutated.
+
+To illustrate this, let's look at an example, where a COW value is mutated in
+a loop. As with a scalar SSA value, also mutating a COW buffer will enforce a
+phi-argument in the loop header block (for simplicity the code for copying a
+non-unique buffer is not shown)::
+
+  header_block(%b_phi : $BufferClass):
+    (%u, %b_mutate) = begin_cow_mutation %b_phi : $BufferClass
+    // Store something to %b_mutate
+    %b_immutable = end_cow_mutation %b_mutate : $BufferClass
+    cond_br %loop_cond, exit_block, backedge_block
+  backedge_block:
+    br header_block(b_immutable : $BufferClass)
+  exit_block:
+
+Two adjacent ``begin_cow_mutation`` and ``end_cow_mutation`` instructions
+don't need to be in the same function.
+
+
 Instruction Set
 ---------------
 
