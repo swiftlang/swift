@@ -79,6 +79,14 @@ public:
       SILValue value, Operand *consumingUse,
       function_ref<void(SILBasicBlock::iterator insertPt)> visitor);
 
+  /// Given a linear lifetime defined by \p value and \p consumingUses, return
+  /// true if all uses in \p usesToTest are strictly not contained within the
+  /// region where the Linear Lifetime defined by \p value and \p consumingUses
+  /// is live. Otherwise, returns false.
+  bool usesNotContainedWithinLifetime(SILValue value,
+                                      ArrayRef<Operand *> consumingUses,
+                                      ArrayRef<Operand *> usesToTest);
+
 private:
   /// Returns true if:
   ///
@@ -108,7 +116,9 @@ private:
   Error checkValueImpl(
       SILValue value, ArrayRef<Operand *> consumingUses,
       ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
-      Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback);
+      Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+      Optional<function_ref<void(Operand *)>>
+          nonConsumingUsesOutsideLifetimeCallback);
 };
 
 } // namespace swift
