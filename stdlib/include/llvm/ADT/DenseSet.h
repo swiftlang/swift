@@ -23,6 +23,7 @@
 #include <iterator>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 namespace detail {
@@ -298,5 +299,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_DENSESET_H

@@ -404,8 +404,8 @@ static unsigned GetAutoSenseRadix(StringRef &Str) {
   return 10;
 }
 
-bool llvm::consumeUnsignedInteger(StringRef &Str, unsigned Radix,
-                                  unsigned long long &Result) {
+bool __swift::__runtime::llvm::consumeUnsignedInteger(
+    StringRef &Str, unsigned Radix, unsigned long long &Result) {
   // Autosense radix if not specified.
   if (Radix == 0)
     Radix = GetAutoSenseRadix(Str);
@@ -452,8 +452,8 @@ bool llvm::consumeUnsignedInteger(StringRef &Str, unsigned Radix,
   return false;
 }
 
-bool llvm::consumeSignedInteger(StringRef &Str, unsigned Radix,
-                                long long &Result) {
+bool __swift::__runtime::llvm::consumeSignedInteger(
+    StringRef &Str, unsigned Radix, long long &Result) {
   unsigned long long ULLVal;
 
   // Handle positive strings first.
@@ -482,8 +482,8 @@ bool llvm::consumeSignedInteger(StringRef &Str, unsigned Radix,
 
 /// GetAsUnsignedInteger - Workhorse method that converts a integer character
 /// sequence of radix up to 36 to an unsigned long long value.
-bool llvm::getAsUnsignedInteger(StringRef Str, unsigned Radix,
-                                unsigned long long &Result) {
+bool __swift::__runtime::llvm::getAsUnsignedInteger(
+    StringRef Str, unsigned Radix, unsigned long long &Result) {
   if (consumeUnsignedInteger(Str, Radix, Result))
     return true;
 
@@ -492,8 +492,8 @@ bool llvm::getAsUnsignedInteger(StringRef Str, unsigned Radix,
   return !Str.empty();
 }
 
-bool llvm::getAsSignedInteger(StringRef Str, unsigned Radix,
-                              long long &Result) {
+bool __swift::__runtime::llvm::getAsSignedInteger(
+    StringRef Str, unsigned Radix, long long &Result) {
   if (consumeSignedInteger(Str, Radix, Result))
     return true;
 
@@ -594,6 +594,6 @@ bool StringRef::getAsDouble(double &Result, bool AllowInexact) const {
 }
 
 // Implementation of StringRef hashing.
-hash_code llvm::hash_value(StringRef S) {
+hash_code __swift::__runtime::llvm::hash_value(StringRef S) {
   return hash_combine_range(S.begin(), S.end());
 }

@@ -46,6 +46,7 @@
 #endif
 #endif
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// ByteSwap_16 - This function returns a byte-swapped representation of
@@ -161,5 +162,6 @@ inline void swapByteOrder(T &Value) {
 
 } // end namespace sys
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif

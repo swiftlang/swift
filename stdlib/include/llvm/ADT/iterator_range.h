@@ -20,6 +20,7 @@
 
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// A range adaptor for a pair of iterators.
@@ -59,5 +60,6 @@ template <typename T> iterator_range<T> make_range(std::pair<T, T> p) {
 }
 
 }
+}} // namespace swift::runtime
 
 #endif

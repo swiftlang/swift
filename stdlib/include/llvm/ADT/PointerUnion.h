@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 template <typename T> struct PointerUnionTypeSelectorReturn {
@@ -288,5 +289,6 @@ template <typename ...PTs> struct DenseMapInfo<PointerUnion<PTs...>> {
 };
 
 } // end namespace llvm
+}} // swift::runtime
 
 #endif // LLVM_ADT_POINTERUNION_H

@@ -17,6 +17,7 @@
 #include "llvm/ADT/StringRef.h"
 #include <cstddef>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// SmallString - A SmallString is just a SmallVector with methods and accessors
@@ -289,5 +290,6 @@ public:
 };
 
 } // end namespace llvm
+}} // swift::runtime
 
 #endif // LLVM_ADT_SMALLSTRING_H

@@ -32,6 +32,7 @@
 #include <type_traits>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// This is all the stuff common to all SmallVectors.
@@ -1251,20 +1252,23 @@ to_vector(R &&Range) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 namespace std {
 
   /// Implement std::swap in terms of SmallVector swap.
   template<typename T>
   inline void
-  swap(llvm::SmallVectorImpl<T> &LHS, llvm::SmallVectorImpl<T> &RHS) {
+  swap(__swift::__runtime::llvm::SmallVectorImpl<T> &LHS,
+       __swift::__runtime::llvm::SmallVectorImpl<T> &RHS) {
     LHS.swap(RHS);
   }
 
   /// Implement std::swap in terms of SmallVector swap.
   template<typename T, unsigned N>
   inline void
-  swap(llvm::SmallVector<T, N> &LHS, llvm::SmallVector<T, N> &RHS) {
+  swap(__swift::__runtime::llvm::SmallVector<T, N> &LHS,
+       __swift::__runtime::llvm::SmallVector<T, N> &RHS) {
     LHS.swap(RHS);
   }
 

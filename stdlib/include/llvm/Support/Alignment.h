@@ -28,6 +28,7 @@
 #include <string>
 #endif // NDEBUG
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 #define ALIGN_CHECK_ISPOSITIVE(decl)                                           \
@@ -361,5 +362,6 @@ inline std::string DebugStr(const MaybeAlign &MA) {
 #undef ALIGN_CHECK_ISPOSITIVE
 
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_ALIGNMENT_H_

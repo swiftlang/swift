@@ -17,6 +17,7 @@
 #include "llvm/Support/Compiler.h"
 #include <string>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class StringRef;
   class Twine;
@@ -123,6 +124,7 @@ LLVM_ATTRIBUTE_NORETURN void
 llvm_unreachable_internal(const char *msg = nullptr, const char *file = nullptr,
                           unsigned line = 0);
 }
+}} // namespace swift::runtime
 
 /// Marks that the current location is not supposed to be reachable.
 /// In !NDEBUG builds, prints the message and location info to stderr.
@@ -134,11 +136,11 @@ llvm_unreachable_internal(const char *msg = nullptr, const char *file = nullptr,
 /// allows compilers to omit some unnecessary code.
 #ifndef NDEBUG
 #define llvm_unreachable(msg) \
-  ::llvm::llvm_unreachable_internal(msg, __FILE__, __LINE__)
+  __swift::__runtime::llvm::llvm_unreachable_internal(msg, __FILE__, __LINE__)
 #elif defined(LLVM_BUILTIN_UNREACHABLE)
 #define llvm_unreachable(msg) LLVM_BUILTIN_UNREACHABLE
 #else
-#define llvm_unreachable(msg) ::llvm::llvm_unreachable_internal()
+#define llvm_unreachable(msg) __swift::__runtime::llvm::llvm_unreachable_internal()
 #endif
 
 #endif

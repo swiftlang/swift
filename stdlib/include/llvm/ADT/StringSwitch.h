@@ -17,6 +17,7 @@
 #include <cassert>
 #include <cstring>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// A switch()-like statement whose cases are string literals.
@@ -192,5 +193,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_STRINGSWITCH_H

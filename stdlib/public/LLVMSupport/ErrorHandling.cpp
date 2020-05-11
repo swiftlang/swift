@@ -61,8 +61,8 @@ static std::mutex ErrorHandlerMutex;
 static std::mutex BadAllocErrorHandlerMutex;
 #endif
 
-void llvm::install_fatal_error_handler(fatal_error_handler_t handler,
-                                       void *user_data) {
+void __swift::__runtime::llvm::install_fatal_error_handler(
+    fatal_error_handler_t handler, void *user_data) {
 #if LLVM_ENABLE_THREADS == 1
   std::lock_guard<std::mutex> Lock(ErrorHandlerMutex);
 #endif
@@ -71,7 +71,7 @@ void llvm::install_fatal_error_handler(fatal_error_handler_t handler,
   ErrorHandlerUserData = user_data;
 }
 
-void llvm::remove_fatal_error_handler() {
+void __swift::__runtime::llvm::remove_fatal_error_handler() {
 #if LLVM_ENABLE_THREADS == 1
   std::lock_guard<std::mutex> Lock(ErrorHandlerMutex);
 #endif
@@ -79,19 +79,23 @@ void llvm::remove_fatal_error_handler() {
   ErrorHandlerUserData = nullptr;
 }
 
-void llvm::report_fatal_error(const char *Reason, bool GenCrashDiag) {
+void __swift::__runtime::llvm::report_fatal_error(const char *Reason,
+                                                  bool GenCrashDiag) {
   report_fatal_error(Twine(Reason), GenCrashDiag);
 }
 
-void llvm::report_fatal_error(const std::string &Reason, bool GenCrashDiag) {
+void __swift::__runtime::llvm::report_fatal_error(const std::string &Reason,
+                                                  bool GenCrashDiag) {
   report_fatal_error(Twine(Reason), GenCrashDiag);
 }
 
-void llvm::report_fatal_error(StringRef Reason, bool GenCrashDiag) {
+void __swift::__runtime::llvm::report_fatal_error(StringRef Reason,
+                                                  bool GenCrashDiag) {
   report_fatal_error(Twine(Reason), GenCrashDiag);
 }
 
-void llvm::report_fatal_error(const Twine &Reason, bool GenCrashDiag) {
+void __swift::__runtime::llvm::report_fatal_error(const Twine &Reason,
+                                                  bool GenCrashDiag) {
   llvm::fatal_error_handler_t handler = nullptr;
   void* handlerData = nullptr;
   {
@@ -126,8 +130,8 @@ void llvm::report_fatal_error(const Twine &Reason, bool GenCrashDiag) {
   abort();
 }
 
-void llvm::install_bad_alloc_error_handler(fatal_error_handler_t handler,
-                                           void *user_data) {
+void __swift::__runtime::llvm::install_bad_alloc_error_handler(
+    fatal_error_handler_t handler, void *user_data) {
 #if LLVM_ENABLE_THREADS == 1
   std::lock_guard<std::mutex> Lock(BadAllocErrorHandlerMutex);
 #endif
@@ -136,7 +140,7 @@ void llvm::install_bad_alloc_error_handler(fatal_error_handler_t handler,
   BadAllocErrorHandlerUserData = user_data;
 }
 
-void llvm::remove_bad_alloc_error_handler() {
+void __swift::__runtime::llvm::remove_bad_alloc_error_handler() {
 #if LLVM_ENABLE_THREADS == 1
   std::lock_guard<std::mutex> Lock(BadAllocErrorHandlerMutex);
 #endif
@@ -144,7 +148,8 @@ void llvm::remove_bad_alloc_error_handler() {
   BadAllocErrorHandlerUserData = nullptr;
 }
 
-void llvm::report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {
+void __swift::__runtime::llvm::report_bad_alloc_error(const char *Reason,
+                                                      bool GenCrashDiag) {
   fatal_error_handler_t Handler = nullptr;
   void *HandlerData = nullptr;
   {
@@ -180,7 +185,7 @@ void llvm::report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {
 #ifdef LLVM_ENABLE_EXCEPTIONS
 // Do not set custom new handler if exceptions are enabled. In this case OOM
 // errors are handled by throwing 'std::bad_alloc'.
-void llvm::install_out_of_memory_new_handler() {
+void __swift::__runtime::llvm::install_out_of_memory_new_handler() {
 }
 #else
 // Causes crash on allocation failure. It is called prior to the handler set by
@@ -191,7 +196,7 @@ static void out_of_memory_new_handler() {
 
 // Installs new handler that causes crash on allocation failure. It is called by
 // InitLLVM.
-void llvm::install_out_of_memory_new_handler() {
+void __swift::__runtime::llvm::install_out_of_memory_new_handler() {
   std::new_handler old = std::set_new_handler(out_of_memory_new_handler);
   (void)old;
   assert((old == nullptr || old == out_of_memory_new_handler) &&
@@ -199,8 +204,8 @@ void llvm::install_out_of_memory_new_handler() {
 }
 #endif
 
-void llvm::llvm_unreachable_internal(const char *msg, const char *file,
-                                     unsigned line) {
+void __swift::__runtime::llvm::llvm_unreachable_internal(
+    const char *msg, const char *file, unsigned line) {
   // This code intentionally doesn't call the ErrorHandler callback, because
   // llvm_unreachable is intended to be used to indicate "impossible"
   // situations, and not legitimate runtime errors.

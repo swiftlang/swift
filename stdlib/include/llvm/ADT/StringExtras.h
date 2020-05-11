@@ -27,6 +27,7 @@
 #include <string>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 template<typename T> class SmallVectorImpl;
@@ -502,5 +503,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_STRINGEXTRAS_H
