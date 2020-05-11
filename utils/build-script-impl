@@ -118,11 +118,6 @@ KNOWN_SETTINGS=(
 
     ## WebAssembly/WASI Options
     wasi-sdk                                      ""                "An absolute path to the WASI SDK that will be used as a libc implementation for Wasm builds"
-    wasi-icu-uc                                   ""                "Path to libicuuc.so"
-    wasi-icu-uc-include                           ""                "Path to a directory containing headers for libicuuc"
-    wasi-icu-i18n                                 ""                "Path to libicui18n.so"
-    wasi-icu-i18n-include                         ""                "Path to a directory containing headers libicui18n"
-    wasi-icu-data                                 ""                "Path to libicudata.so"
 
     ## Build Types for Components
     swift-stdlib-build-type                       "Debug"           "the CMake build variant for Swift"
@@ -1622,11 +1617,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_WASI_SDK_PATH:STRING="${WASI_SDK}"
-                        -DSWIFT_WASI_wasm32_ICU_UC:STRING="${WASI_ICU_UC}"
-                        -DSWIFT_WASI_wasm32_ICU_UC_INCLUDE:STRING="${WASI_ICU_UC_INCLUDE}"
-                        -DSWIFT_WASI_wasm32_ICU_I18N:STRING="${WASI_ICU_I18N}"
-                        -DSWIFT_WASI_wasm32_ICU_I18N_INCLUDE:STRING="${WASI_ICU_I18N_INCLUDE}"
-                        -DSWIFT_WASI_wasm32_ICU_DATA:STRING="${WASI_ICU_DATA}"
                     )
                 fi
 

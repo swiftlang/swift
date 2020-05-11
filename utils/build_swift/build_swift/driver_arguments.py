@@ -1098,17 +1098,6 @@ def create_argument_parser():
            help='An absolute path to WASI SDK that will be used as a libc '
                 'implementation for Wasm builds')
 
-    option('--wasi-icu-uc', store_path,
-           help='Path to libicuuc.so')
-    option('--wasi-icu-uc-include', store_path,
-           help='Path to a directory containing headers for libicuuc')
-    option('--wasi-icu-i18n', store_path,
-           help='Path to libicui18n.so')
-    option('--wasi-icu-i18n-include', store_path,
-           help='Path to a directory containing headers libicui18n')
-    option('--wasi-icu-data', store_path,
-           help='Path to libicudata.so')
-
     # -------------------------------------------------------------------------
     in_group('Experimental language features')
 

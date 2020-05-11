@@ -358,8 +358,8 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       add_custom_command_target(swift_static_stdlib_${sdk}_args
         COMMAND
           "${CMAKE_COMMAND}" -E copy
-        "${linkfile_src}"
-          "${SWIFTSTATICLIB_DIR}/${linkfile}"
+            "${linkfile_src}"
+            "${SWIFTSTATICLIB_DIR}/${linkfile}"
         OUTPUT
           "${SWIFTSTATICLIB_DIR}/${linkfile}"
         DEPENDS

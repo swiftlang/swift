@@ -887,6 +887,36 @@ function(swift_icu_variables_set sdk arch result)
   endif()
 endfunction()
 
+if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WASI")
+  set(WASI_ICU_URL "" CACHE STRING
+    "Download URL for the WASI ICU distribution")
+  set(WASI_ICU_MD5 "" CACHE STRING
+    "The expected MD5 hash of the WASI ICU distribution archive")
+
+  file(DOWNLOAD "${WASI_ICU_URL}" "${SWIFT_SOURCE_DIR}/../icu.tar.xz"
+    EXPECTED_HASH MD5=${WASI_ICU_MD5})
+
+  get_filename_component(SWIFT_SOURCE_BASEDIR "${SWIFT_SOURCE_DIR}" DIRECTORY)
+  set(WASI_ICU_OUT_LIB "${SWIFT_SOURCE_BASEDIR}/icu_out/lib")
+  set(SWIFT_WASI_wasm32_ICU_UC_INCLUDE "${SWIFT_SOURCE_BASEDIR}/icu_out/include")
+  set(SWIFT_WASI_wasm32_ICU_I18N_INCLUDE "${SWIFT_SOURCE_BASEDIR}/icu_out/include")
+  set(SWIFT_WASI_wasm32_ICU_UC "${WASI_ICU_OUT_LIB}/libicuuc.a")
+  set(SWIFT_WASI_wasm32_ICU_I18N "${WASI_ICU_OUT_LIB}/libicui18n.a")
+  set(SWIFT_WASI_wasm32_ICU_DATA "${WASI_ICU_OUT_LIB}/libicudata.a")
+
+  set(WASI_ICU_DISTRIBUTION_TARGET)
+  add_custom_command_target(WASI_ICU_DISTRIBUTION_TARGET
+    COMMAND 
+      ${CMAKE_COMMAND} -E 
+        tar xfv "${SWIFT_SOURCE_BASEDIR}/icu.tar.xz"
+    WORKING_DIRECTORY 
+      "${SWIFT_SOURCE_BASEDIR}"
+    OUTPUT
+      "${SWIFT_WASI_wasm32_ICU_DATA}"
+      "${SWIFT_WASI_wasm32_ICU_I18N}"
+      "${SWIFT_WASI_wasm32_ICU_UC}")
+endif()
+
 # ICU is provided through CoreFoundation on Darwin.  On other hosts, if the ICU
 # unicode and i18n include and library paths are not defined, perform a standard
 # package lookup.  Otherwise, rely on the paths specified by the user.  These
