@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -221,8 +221,7 @@ internal let _errorDomainUserInfoProviderQueue = DispatchQueue(
   label: "SwiftFoundation._errorDomainUserInfoProviderQueue")
 
 /// Retrieve the default userInfo dictionary for a given error.
-public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
-  -> AnyObject? {
+public func _getErrorDefaultUserInfo<T: Error>(_ error: T) -> AnyObject? {
   let hasUserInfoValueProvider: Bool
 
   // If the OS supports user info value providers, use those
@@ -311,6 +310,13 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
     result[NSLocalizedRecoveryOptionsErrorKey] =
       recoverableError.recoveryOptions
     result[NSRecoveryAttempterErrorKey] = __NSErrorRecoveryAttempter()
+  }
+
+  // Provide a non-localized description (if not already present). This can be
+  // used by CFError/NSError when a localized description or localized failure
+  // reason isn't available.
+  if result[kCFErrorDescriptionKey as String] == nil {
+    result[kCFErrorDescriptionKey as String] = String(describing: error)
   }
 
   return result as AnyObject

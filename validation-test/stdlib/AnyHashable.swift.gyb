@@ -708,33 +708,6 @@ enum MinimalHashableRCSwiftError : Error, Hashable {
   case caseA(LifetimeTracked)
   case caseB(LifetimeTracked)
   case caseC(LifetimeTracked)
-
-  func hash(into hasher: inout Hasher) {
-    switch self {
-    case .caseA:
-      hasher.combine(10)
-    case .caseB:
-      hasher.combine(20)
-    case .caseC:
-      hasher.combine(30)
-    }
-  }
-
-  static func == (
-    lhs: MinimalHashableRCSwiftError,
-    rhs: MinimalHashableRCSwiftError
-  ) -> Bool {
-    switch (lhs, rhs) {
-    case (.caseA(let lhs), .caseA(let rhs)):
-      return lhs == rhs
-    case (.caseB(let lhs), .caseB(let rhs)):
-      return lhs == rhs
-    case (.caseC(let lhs), .caseC(let rhs)):
-      return lhs == rhs
-    default:
-      return false
-    }
-  }
 }
 
 AnyHashableTests.test("AnyHashable(MinimalHashablePODSwiftError)/Hashable") {
@@ -768,11 +741,11 @@ AnyHashableTests.test("AnyHashable(MinimalHashableRCSwiftError)/Hashable") {
   checkHashable(
     xs,
     equalityOracle: { $0 / 2 == $1 / 2 },
-    hashEqualityOracle: { $0 / 4 == $1 / 4 })
+    hashEqualityOracle: { $0 / 2 == $1 / 2 })
   checkHashable(
     xs.map(AnyHashable.init),
     equalityOracle: { $0 / 2 == $1 / 2 },
-    hashEqualityOracle: { $0 / 4 == $1 / 4 })
+    hashEqualityOracle: { $0 / 2 == $1 / 2 })
 }
 
 AnyHashableTests.test("AnyHashable(MinimalHashableRCSwiftError).base") {
@@ -1025,7 +998,11 @@ AnyHashableTests.test("AnyHashable(__SwiftNativeNSError(MinimalHashablePODSwiftE
     let bridgedNSError = swiftError as NSError
     return [
       bridgedNSError,
-      NSError(domain: bridgedNSError.domain, code: bridgedNSError.code)
+      NSError(
+        domain:   bridgedNSError.domain,
+        code:     bridgedNSError.code,
+        userInfo: bridgedNSError.userInfo
+      )
     ]
   }
   expectEqual(
@@ -1034,15 +1011,28 @@ AnyHashableTests.test("AnyHashable(__SwiftNativeNSError(MinimalHashablePODSwiftE
   expectEqual("__SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
 
   func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
-    // Swift errors compare equal to the `NSError`s that have the same domain
-    // and code.
+    // * Equality of a bridgedNSError and an NSError uses __CFErrorEqual,
+    //   which compares their codes, domains, and userInfo.
+    // * Equality of two bridgedNSErrors uses the synthesized `==` of the enum.
     return lhs / 4 == rhs / 4
   }
 
-  checkHashable(nsErrors, equalityOracle: equalityOracle)
+  func hashEqualityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
+    // * Hashing of NSError uses __CFErrorHash, which combines only the
+    //   domain and code (i.e. userInfo isn't combined).
+    // * Hashing of bridgedNSError also uses __CFErrorHash, because
+    //   __SwiftNativeNSError doesn't override the `hash` property.
+    return lhs / 4 == rhs / 4
+  }
+
+  checkHashable(
+    nsErrors,
+    equalityOracle: equalityOracle,
+    hashEqualityOracle: hashEqualityOracle)
   checkHashable(
     nsErrors.map(AnyHashable.init),
-    equalityOracle: equalityOracle)
+    equalityOracle: equalityOracle,
+    hashEqualityOracle: hashEqualityOracle)
 
   // FIXME(id-as-any): run `checkHashable` on an array of mixed
   // `AnyHashable(MinimalHashablePODSwiftError)` and
@@ -1068,7 +1058,7 @@ AnyHashableTests.test("AnyHashable(__SwiftNativeNSError(MinimalHashableRCSwiftEr
   checkHashable(
     swiftErrors,
     equalityOracle: { $0 / 2 == $1 / 2 },
-    hashEqualityOracle: { $0 / 4 == $1 / 4 },
+    hashEqualityOracle: { $0 / 2 == $1 / 2 },
     allowBrokenTransitivity: false)
 
   let nsErrors: [NSError] = swiftErrors.flatMap {
@@ -1076,7 +1066,11 @@ AnyHashableTests.test("AnyHashable(__SwiftNativeNSError(MinimalHashableRCSwiftEr
     let bridgedNSError = swiftError as NSError
     return [
       bridgedNSError,
-      NSError(domain: bridgedNSError.domain, code: bridgedNSError.code)
+      NSError(
+        domain:   bridgedNSError.domain,
+        code:     bridgedNSError.code,
+        userInfo: bridgedNSError.userInfo
+      )
     ]
   }
 
@@ -1091,24 +1085,18 @@ AnyHashableTests.test("AnyHashable(__SwiftNativeNSError(MinimalHashableRCSwiftEr
   expectEqual("NSError", String(describing: type(of: nsErrors[1])))
 
   func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
-    // Equality of bridged Swift errors takes the payload into account, so for
-    // a fixed X, Y, all `.caseX(LifetimeTracked(Y))` compare equal.
-    // They also compare equal to the `NSError`s that have the same domain
-    // and code.
-    if lhs / 4 == rhs / 4 {
-      return true
-    }
-    // `NSError`s that have the same domain and code as a bridged Swift
-    // error compare equal to all Swift errors with the same domain and code
-    // regardless of the payload.
-    if (lhs % 2 == 1 || rhs % 2 == 1) && (lhs / 8 == rhs / 8) {
-      return true
-    }
-    return false
+    // * Equality of a bridgedNSError and an NSError uses __CFErrorEqual,
+    //   which compares their codes, domains, and userInfo.
+    // * Equality of two bridgedNSErrors uses the synthesized `==` of the enum,
+    //   so for a fixed X, Y, all `.caseX(LifetimeTracked(Y))` compare equal.
+    return lhs / 4 == rhs / 4
   }
 
   func hashEqualityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
-    // Every NSError that has the same domain and code hash the same way.
+    // * Hashing of NSError uses __CFErrorHash, which combines only the
+    //   domain and code (i.e. userInfo isn't combined).
+    // * Hashing of bridgedNSError also uses __CFErrorHash, because
+    //   __SwiftNativeNSError doesn't override the `hash` property.
     return lhs / 8 == rhs / 8
   }
 

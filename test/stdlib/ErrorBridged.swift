@@ -885,4 +885,15 @@ ErrorBridgingTests.test("Swift Error description memory management") {
   }
 }
 
+ErrorBridgingTests.test("kCFErrorDescriptionKey in localizedDescription") {
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    enum MyError: Error {
+      case uhOh(String)
+    }
+    let myError = MyError.uhOh("The toaster is broken!")
+    let description = String(describing: myError)
+    expectTrue(myError.localizedDescription.contains(description))
+  }
+}
+
 runAllTests()
