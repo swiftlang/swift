@@ -262,10 +262,6 @@ private:
   /// The indexed profile data to be used for PGO, or nullptr.
   std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
 
-  /// True if this SILModule really contains the whole module, i.e.
-  /// optimizations can assume that they see the whole module.
-  bool wholeModule;
-
   /// The options passed into this SILModule.
   const SILOptions &Options;
 
@@ -281,8 +277,7 @@ private:
   llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
 
   SILModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-            const SILOptions &Options, const DeclContext *associatedDC,
-            bool wholeModule);
+            const SILOptions &Options, const DeclContext *associatedDC);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -357,8 +352,7 @@ public:
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
   createEmptyModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-                    const SILOptions &Options,
-                    bool WholeModule = false);
+                    const SILOptions &Options);
 
   /// Get the Swift module associated with this SIL module.
   ModuleDecl *getSwiftModule() const { return TheSwiftModule; }
@@ -382,7 +376,7 @@ public:
   /// Returns true if this SILModule really contains the whole module, i.e.
   /// optimizations can assume that they see the whole module.
   bool isWholeModule() const {
-    return wholeModule;
+    return isa<ModuleDecl>(AssociatedDeclContext);
   }
 
   bool isStdlibModule() const;
