@@ -6282,7 +6282,7 @@ bool UnableToInferKeyPathRootFailure::diagnoseAsError() {
     if (contextualType &&
         contextualType->getAnyNominal() == ctx.getAnyKeyPathDecl()) {
       return emitDiagnostic(
-          diag::cannot_infer_contextual_keypath_type_any_contextual);
+          diag::cannot_infer_keypath_root_anykeypath_context);
     }
     return emitDiagnostic(
         diag::cannot_infer_contextual_keypath_type_specify_root);
