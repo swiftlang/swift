@@ -5682,6 +5682,19 @@ static bool isForKeyPathSubscript(ConstraintSystem &cs,
   return false;
 }
 
+static bool isForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
+                                              ConstraintLocator *locator) {
+  if (!locator || !locator->getAnchor())
+    return false;
+
+  if (auto *SE = dyn_cast<SubscriptExpr>(locator->getAnchor())) {
+    auto *indexExpr = SE->getIndex();
+    return isa<ParenExpr>(indexExpr) &&
+           isa<KeyPathExpr>(indexExpr->getSemanticsProvidingExpr());
+  }
+  return false;
+}
+
 /// Determine whether all of the given candidate overloads
 /// found through conditional conformances of a given base type.
 /// This is useful to figure out whether it makes sense to
@@ -5809,7 +5822,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
 
-  if (isForKeyPathSubscript(*this, memberLocator)) {
+  // Add key path result.
+  // If we are including inaccessible members, check for the use of a keypath
+  // subscript without a `keyPath:` label. Add it to the result so that it
+  // can be caught by the missing argument label checking later.
+  if (isForKeyPathSubscript(*this, memberLocator) ||
+      (isForKeyPathSubscriptWithoutLabel(*this, memberLocator)
+       && includeInaccessibleMembers)) {
     if (baseTy->isAnyObject()) {
       result.addUnviable(
           OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication),
@@ -9694,14 +9713,21 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
           path[0].getKind() == ConstraintLocator::SubscriptMember) ||
          (path.size() == 2 &&
           path[1].getKind() == ConstraintLocator::KeyPathDynamicMember));
+
   auto indexTuple = dyn_cast<TupleExpr>(subscript->getIndex());
-  if (!indexTuple || indexTuple->getNumElements() != 1)
-    return;
-  
-  auto keyPathExpr = dyn_cast<KeyPathExpr>(indexTuple->getElement(0));
+  auto indexParen = dyn_cast<ParenExpr>(subscript->getIndex());
+  // If a keypath subscript is used without the expected `keyPath:` label,
+  // continue with type-checking when attempting fixes so that it gets caught
+  // by the argument label checking. In such cases, the KeyPathExpr is contained
+  // in a ParenExpr, instead of a TupleExpr.
+  assert(((indexTuple && indexTuple->getNumElements() == 1) || indexParen) &&
+         "Expected KeyPathExpr to be in either TupleExpr or ParenExpr");
+
+  auto keyPathExpr = dyn_cast<KeyPathExpr>(
+      indexTuple ? indexTuple->getElement(0) : indexParen->getSubExpr());
   if (!keyPathExpr)
     return;
-  
+
   auto typeVar = getType(keyPathExpr)->getAs<TypeVariableType>();
   if (!typeVar)
     return;
