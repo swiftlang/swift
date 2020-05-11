@@ -99,6 +99,8 @@ SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
       AssociatedDeclContext(associatedDC),
       Stage(SILStage::Raw), wholeModule(wholeModule), Options(Options),
       serialized(false), SerializeSILAction(), Types(TC) {
+  assert(AssociatedDeclContext);
+
   // We always add the base SILModule serialization callback.
   std::unique_ptr<DeserializationNotificationHandler> callback(
       new SILModule::SerializationCallback());

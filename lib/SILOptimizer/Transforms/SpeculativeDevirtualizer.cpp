@@ -285,8 +285,6 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
   auto *Method = CMI->getMember().getAbstractFunctionDecl();
   assert(Method && "not a function");
 
-  const DeclContext *DC = AI.getModule().getAssociatedContext();
-
   if (CD->isFinal())
     return true;
 
@@ -295,13 +293,8 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
   if (CD->checkAncestry(AncestryFlags::ObjC))
     return false;
 
-  // Without an associated context we cannot perform any
-  // access-based optimizations.
-  if (!DC)
-    return false;
-
   // Only handle classes defined within the SILModule's associated context.
-  if (!CD->isChildContextOf(DC))
+  if (!CD->isChildContextOf(AI.getModule().getAssociatedContext()))
     return false;
 
   if (!CD->hasAccess())

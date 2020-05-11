@@ -366,15 +366,15 @@ public:
   ASTContext &getASTContext() const;
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
 
-  /// Get the Swift DeclContext associated with this SIL module.
+  /// Get the Swift DeclContext associated with this SIL module. This is never
+  /// null.
   ///
   /// All AST declarations within this context are assumed to have been fully
   /// processed as part of generating this module. This allows certain passes
   /// to make additional assumptions about these declarations.
   ///
   /// If this is the same as TheSwiftModule, the entire module is being
-  /// compiled as a single unit. If this is null, no context-based assumptions
-  /// can be made.
+  /// compiled as a single unit.
   const DeclContext *getAssociatedContext() const {
     return AssociatedDeclContext;
   }
