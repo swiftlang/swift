@@ -17,6 +17,7 @@
 #include "llvm/Support/Threading.h"
 #include <cassert>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
   namespace sys {
     // ThreadLocalImpl - Common base class of all ThreadLocal instantiations.
@@ -58,5 +59,6 @@ namespace llvm {
     };
   }
 }
+}}
 
 #endif

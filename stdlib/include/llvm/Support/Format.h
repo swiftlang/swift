@@ -31,6 +31,7 @@
 #include <tuple>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// This is a helper class used for handling formatted output.  It is the
@@ -253,5 +254,6 @@ format_bytes_with_ascii(ArrayRef<uint8_t> Bytes,
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif

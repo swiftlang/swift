@@ -39,21 +39,22 @@ bool llvm::llvm_is_multithreaded() {
 #if LLVM_ENABLE_THREADS == 0 ||                                                \
     (!defined(_WIN32) && !defined(HAVE_PTHREAD_H))
 // Support for non-Win32, non-pthread implementation.
-void llvm::llvm_execute_on_thread(void (*Fn)(void *), void *UserData,
-                                  llvm::Optional<unsigned> StackSizeInBytes) {
+void __swift::__runtime::llvm::llvm_execute_on_thread(
+    void (*Fn)(void *), void *UserData,
+    llvm::Optional<unsigned> StackSizeInBytes) {
   (void)StackSizeInBytes;
   Fn(UserData);
 }
 
-uint64_t llvm::get_threadid() { return 0; }
+uint64_t __swift::__runtime::llvm::get_threadid() { return 0; }
 
-uint32_t llvm::get_max_thread_name_length() { return 0; }
+uint32_t __swift::__runtime::llvm::get_max_thread_name_length() { return 0; }
 
-void llvm::set_thread_name(const Twine &Name) {}
+void __swift::__runtime::llvm::set_thread_name(const Twine &Name) {}
 
-void llvm::get_thread_name(SmallVectorImpl<char> &Name) { Name.clear(); }
+void __swift::__runtime::llvm::get_thread_name(SmallVectorImpl<char> &Name) { Name.clear(); }
 
-llvm::BitVector llvm::get_thread_affinity_mask() { return {}; }
+llvm::BitVector __swift::__runtime::llvm::get_thread_affinity_mask() { return {}; }
 
 unsigned llvm::ThreadPoolStrategy::compute_thread_count() const {
   // When threads are disabled, ensure clients will loop at least once.
@@ -61,7 +62,7 @@ unsigned llvm::ThreadPoolStrategy::compute_thread_count() const {
 }
 
 #if LLVM_ENABLE_THREADS == 0
-void llvm::llvm_execute_on_thread_async(
+void __swift::__runtime::llvm::llvm_execute_on_thread_async(
     llvm::unique_function<void()> Func,
     llvm::Optional<unsigned> StackSizeInBytes) {
   (void)Func;
@@ -71,7 +72,7 @@ void llvm::llvm_execute_on_thread_async(
 }
 #else
 // Support for non-Win32, non-pthread implementation.
-void llvm::llvm_execute_on_thread_async(
+void __swift::__runtime::llvm::llvm_execute_on_thread_async(
     llvm::unique_function<void()> Func,
     llvm::Optional<unsigned> StackSizeInBytes) {
   (void)StackSizeInBytes;
@@ -114,15 +115,16 @@ enum class JoiningPolicy { Join, Detach };
 #include "Windows/Threading.inc"
 #endif
 
-void llvm::llvm_execute_on_thread(void (*Fn)(void *), void *UserData,
-                                  llvm::Optional<unsigned> StackSizeInBytes) {
+void __swift::__runtime::llvm::llvm_execute_on_thread(
+    void (*Fn)(void *), void *UserData,
+    llvm::Optional<unsigned> StackSizeInBytes) {
 
   SyncThreadInfo Info = {Fn, UserData};
   llvm_execute_on_thread_impl(threadFuncSync, &Info, StackSizeInBytes,
                               JoiningPolicy::Join);
 }
 
-void llvm::llvm_execute_on_thread_async(
+void __swift::__runtime::llvm::llvm_execute_on_thread_async(
     llvm::unique_function<void()> Func,
     llvm::Optional<unsigned> StackSizeInBytes) {
   llvm_execute_on_thread_impl(&threadFuncAsync,
@@ -133,7 +135,7 @@ void llvm::llvm_execute_on_thread_async(
 #endif
 
 Optional<ThreadPoolStrategy>
-llvm::get_threadpool_strategy(StringRef Num, ThreadPoolStrategy Default) {
+__swift::__runtime::llvm::get_threadpool_strategy(StringRef Num, ThreadPoolStrategy Default) {
   if (Num == "all")
     return llvm::hardware_concurrency();
   if (Num.empty())

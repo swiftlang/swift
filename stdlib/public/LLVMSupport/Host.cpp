@@ -52,7 +52,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-using namespace llvm;
+using namespace __swift::__runtime::llvm;
 
 static std::unique_ptr<llvm::MemoryBuffer>
     LLVM_ATTRIBUTE_UNUSED getProcCpuinfoContent() {

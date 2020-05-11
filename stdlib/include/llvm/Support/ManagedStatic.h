@@ -16,6 +16,7 @@
 #include <atomic>
 #include <cstddef>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// object_creator - Helper method for ManagedStatic.
@@ -121,5 +122,6 @@ struct llvm_shutdown_obj {
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_MANAGEDSTATIC_H

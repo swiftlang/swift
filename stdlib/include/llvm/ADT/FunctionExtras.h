@@ -38,6 +38,7 @@
 #include "llvm/Support/type_traits.h"
 #include <memory>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 template <typename FunctionT> class unique_function;
@@ -289,5 +290,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_FUNCTION_H

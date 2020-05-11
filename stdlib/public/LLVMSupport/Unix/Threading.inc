@@ -93,7 +93,7 @@ llvm_execute_on_thread_impl(void *(*ThreadFunc)(void *), void *Arg,
   }
 }
 
-uint64_t llvm::get_threadid() {
+uint64_t __swift::__runtime::llvm::get_threadid() {
 #if defined(__APPLE__)
   // Calling "mach_thread_self()" bumps the reference count on the thread
   // port, so we need to deallocate it. mach_task_self() doesn't bump the ref
@@ -135,11 +135,11 @@ static constexpr uint32_t get_max_thread_name_length_impl() {
 #endif
 }
 
-uint32_t llvm::get_max_thread_name_length() {
+uint32_t __swift::__runtime::llvm::get_max_thread_name_length() {
   return get_max_thread_name_length_impl();
 }
 
-void llvm::set_thread_name(const Twine &Name) {
+void __swift::__runtime::llvm::set_thread_name(const Twine &Name) {
   // Make sure the input is null terminated.
   SmallString<64> Storage;
   StringRef NameStr = Name.toNullTerminatedStringRef(Storage);
@@ -169,7 +169,7 @@ void llvm::set_thread_name(const Twine &Name) {
 #endif
 }
 
-void llvm::get_thread_name(SmallVectorImpl<char> &Name) {
+void __swift::__runtime::llvm::get_thread_name(SmallVectorImpl<char> &Name) {
   Name.clear();
 
 #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
@@ -230,7 +230,7 @@ void llvm::get_thread_name(SmallVectorImpl<char> &Name) {
 #endif
 }
 
-SetThreadPriorityResult llvm::set_thread_priority(ThreadPriority Priority) {
+SetThreadPriorityResult __swift::__runtime::llvm::set_thread_priority(ThreadPriority Priority) {
 #if defined(__linux__) && defined(SCHED_IDLE)
   // Some *really* old glibcs are missing SCHED_IDLE.
   // http://man7.org/linux/man-pages/man3/pthread_setschedparam.3.html
@@ -283,12 +283,12 @@ int computeHostNumHardwareThreads() {
   return 1;
 }
 
-void llvm::ThreadPoolStrategy::apply_thread_strategy(
+void __swift::__runtime::llvm::ThreadPoolStrategy::apply_thread_strategy(
     unsigned ThreadPoolNum) const {}
 
-llvm::BitVector llvm::get_thread_affinity_mask() {
+llvm::BitVector __swift::__runtime::llvm::get_thread_affinity_mask() {
   // FIXME: Implement
   llvm_unreachable("Not implemented!");
 }
 
-unsigned llvm::get_cpus() { return 1; }
+unsigned __swift::__runtime::llvm::get_cpus() { return 1; }

@@ -16,6 +16,7 @@
 
 #include <string>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class StringRef;
 class raw_ostream;
@@ -117,5 +118,6 @@ namespace sys {
   void CleanupOnSignal(uintptr_t Context);
 } // End sys namespace
 } // End llvm namespace
+}} // namespace swift::runtime
 
 #endif

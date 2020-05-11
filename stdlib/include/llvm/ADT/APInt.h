@@ -22,6 +22,7 @@
 #include <cstring>
 #include <string>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class FoldingSetNodeID;
 class StringRef;
@@ -2286,5 +2287,6 @@ void StoreIntToMemory(const APInt &IntVal, uint8_t *Dst, unsigned StoreBytes);
 void LoadIntFromMemory(APInt &IntVal, uint8_t *Src, unsigned LoadBytes);
 
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

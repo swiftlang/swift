@@ -14,6 +14,7 @@
 #ifndef LLVM_SUPPORT_UNICODE_H
 #define LLVM_SUPPORT_UNICODE_H
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class StringRef;
 
@@ -66,5 +67,6 @@ int foldCharSimple(int C);
 } // namespace unicode
 } // namespace sys
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

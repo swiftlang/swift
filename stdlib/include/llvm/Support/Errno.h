@@ -17,6 +17,7 @@
 #include <string>
 #include <type_traits>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys {
 
@@ -42,5 +43,6 @@ inline decltype(auto) RetryAfterSignal(const FailT &Fail, const Fun &F,
 
 }  // namespace sys
 }  // namespace llvm
+}} // namespace swift::runtime
 
 #endif  // LLVM_SYSTEM_ERRNO_H

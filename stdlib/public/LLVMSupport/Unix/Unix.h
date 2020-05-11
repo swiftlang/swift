@@ -74,6 +74,7 @@ LLVM_ATTRIBUTE_NORETURN static inline void ReportErrnumFatal(const char *Msg,
   llvm::report_fatal_error(ErrMsg);
 }
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys {
 
@@ -106,5 +107,6 @@ inline struct timeval toTimeVal(TimePoint<std::chrono::microseconds> TP) {
 
 } // namespace sys
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

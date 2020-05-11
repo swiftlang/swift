@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 bool ConvertUTF8toWide(unsigned WideCharWidth, llvm::StringRef Source,
@@ -247,4 +248,5 @@ bool convertWideToUTF8(const std::wstring &Source, std::string &Result) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 

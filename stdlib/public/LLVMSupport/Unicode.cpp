@@ -15,6 +15,7 @@
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/UnicodeCharRanges.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys {
 namespace unicode {
@@ -363,4 +364,5 @@ int columnWidthUTF8(StringRef Text) {
 } // namespace unicode
 } // namespace sys
 } // namespace llvm
+}} // namespace swift::runtime
 

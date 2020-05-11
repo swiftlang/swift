@@ -59,6 +59,7 @@
 #endif
 #endif
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 using namespace sys;
@@ -162,6 +163,7 @@ static void SetMemoryLimits(unsigned size) {
 }
 
 }
+}} // namespace swift::runtime
 
 static std::vector<const char *>
 toNullTerminatedCStringArray(ArrayRef<StringRef> Strings, StringSaver &Saver) {
@@ -329,6 +331,7 @@ static bool Execute(ProcessInfo &PI, StringRef Program,
   return true;
 }
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 ProcessInfo sys::Wait(const ProcessInfo &PI, unsigned SecondsToWait,
@@ -497,3 +500,4 @@ bool llvm::sys::commandLineFitsWithinSystemLimits(StringRef Program,
   return true;
 }
 }
+}} // namespace swift::runtime

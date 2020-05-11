@@ -49,6 +49,7 @@ using namespace llvm;
    hexadecimal strings.  */
 static_assert(APFloatBase::integerPartWidth % 4 == 0, "Part width must be divisible by 4!");
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
   /* Represents floating point arithmetic semantics.  */
   struct fltSemantics {
@@ -4816,5 +4817,6 @@ APFloat::opStatus APFloat::convertToInteger(APSInt &result,
 }
 
 } // End llvm namespace
+}} // namespace swift::runtime
 
 #undef APFLOAT_DISPATCH_ON_SEMANTICS

@@ -51,6 +51,7 @@
 // Must be included after windows.h
 #include <wincrypt.h>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// Determines if the program is running on Windows 8 or newer. This
@@ -245,5 +246,6 @@ std::error_code widenPath(const Twine &Path8, SmallVectorImpl<wchar_t> &Path16,
 } // end namespace windows
 } // end namespace sys
 } // end namespace llvm.
+}} // namespace swift::runtime
 
 #endif

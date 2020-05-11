@@ -21,6 +21,7 @@
 #include <cstring>
 #include <type_traits>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace support {
 
@@ -423,5 +424,6 @@ inline void write64be(void *P, uint64_t V) { write64<big>(P, V); }
 
 } // end namespace support
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_ENDIAN_H

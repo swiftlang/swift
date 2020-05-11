@@ -12,6 +12,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 struct TagNameItem {
@@ -34,4 +35,5 @@ enum AttrMagic { Format_Version = 0x41 };
 
 } // namespace ELFAttrs
 } // namespace llvm
+}} // namespace swift::runtime
 #endif

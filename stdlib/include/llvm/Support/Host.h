@@ -15,6 +15,7 @@
 
 #include <string>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class MallocAllocator;
 class StringRef;
@@ -68,5 +69,6 @@ namespace sys {
   }
 }
 }
+}} // namespace swift::runtime
 
 #endif

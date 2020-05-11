@@ -39,6 +39,7 @@
 #include <utility>
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class ErrorSuccess;
@@ -1360,5 +1361,6 @@ inline Error unwrap(LLVMErrorRef ErrRef) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_ERROR_H

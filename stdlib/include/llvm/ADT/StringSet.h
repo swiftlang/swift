@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/StringMap.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// StringSet - A wrapper for StringMap that provides set-like functionality.
@@ -48,5 +49,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_STRINGSET_H

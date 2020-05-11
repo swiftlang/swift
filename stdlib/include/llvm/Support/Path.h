@@ -21,6 +21,7 @@
 #include <iterator>
 #include <system_error>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys {
 namespace path {
@@ -469,5 +470,6 @@ bool remove_dots(SmallVectorImpl<char> &path, bool remove_dot_dot = false,
 } // end namespace path
 } // end namespace sys
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif

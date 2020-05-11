@@ -20,6 +20,7 @@
 #include "llvm/Support/SMLoc.h"
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class raw_ostream;
@@ -286,5 +287,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_SOURCEMGR_H

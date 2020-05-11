@@ -96,6 +96,7 @@
 // Wrap everything in namespace llvm so that programs can link with llvm and
 // their own version of the unicode libraries.
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /* ---------------------------------------------------------------------
@@ -302,5 +303,6 @@ std::error_code UTF16ToCurCP(const wchar_t *utf16, size_t utf16_len,
 #endif
 
 } /* end namespace llvm */
+}} // namespace swift::runtime
 
 #endif

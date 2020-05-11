@@ -57,7 +57,7 @@ static constexpr size_t MaxSignalHandlerCallbacks = 8;
 static CallbackAndCookie CallBacksToRun[MaxSignalHandlerCallbacks];
 
 // Signal-safe.
-void sys::RunSignalHandlers() {
+void __swift::__runtime::llvm::sys::RunSignalHandlers() {
   for (size_t I = 0; I < MaxSignalHandlerCallbacks; ++I) {
     auto &RunMe = CallBacksToRun[I];
     auto Expected = CallbackAndCookie::Status::Initialized;

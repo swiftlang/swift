@@ -28,6 +28,7 @@
 #ifndef LLVM_SUPPORT_DEBUG_H
 #define LLVM_SUPPORT_DEBUG_H
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class raw_ostream;
@@ -122,5 +123,6 @@ raw_ostream &dbgs();
 #define LLVM_DEBUG(X) DEBUG_WITH_TYPE(DEBUG_TYPE, X)
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_DEBUG_H

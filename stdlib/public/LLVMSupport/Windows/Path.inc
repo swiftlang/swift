@@ -59,6 +59,7 @@ static bool is_separator(const wchar_t value) {
   }
 }
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys  {
 namespace windows {
@@ -1502,3 +1503,4 @@ std::error_code UTF16ToCurCP(const wchar_t *utf16, size_t utf16_len,
 } // end namespace windows
 } // end namespace sys
 } // end namespace llvm
+}} // namespace swift::runtime

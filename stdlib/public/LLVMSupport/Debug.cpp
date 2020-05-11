@@ -38,6 +38,7 @@ using namespace llvm;
 
 // Even though LLVM might be built with NDEBUG, define symbols that the code
 // built without NDEBUG can depend on via the llvm/Support/Debug.h header.
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 /// Exported boolean set by the -debug option.
 bool DebugFlag = false;
@@ -75,6 +76,7 @@ void setCurrentDebugTypes(const char **Types, unsigned Count) {
     CurrentDebugType->push_back(Types[T]);
 }
 } // namespace llvm
+}} // namespace swift::runtime
 
 // All Debug.h functionality is a no-op in NDEBUG mode.
 #ifndef NDEBUG
@@ -129,7 +131,7 @@ static void debug_user_sig_handler(void *Cookie) {
 }
 
 /// dbgs - Return a circular-buffered debug stream.
-raw_ostream &llvm::dbgs() {
+raw_ostream &__swift::__runtime::llvm::dbgs() {
   // Do one-time initialization in a thread-safe way.
   static struct dbgstream {
     circular_raw_ostream strm;
@@ -151,15 +153,17 @@ raw_ostream &llvm::dbgs() {
 
 #else
 // Avoid "has no symbols" warning.
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
   /// dbgs - Return errs().
   raw_ostream &dbgs() {
     return errs();
   }
 }
+}} // namespace swift::runtime
 
 #endif
 
 /// EnableDebugBuffering - Turn on signal handler installation.
 ///
-bool llvm::EnableDebugBuffering = false;
+bool __swift::__runtime::llvm::EnableDebugBuffering = false;
