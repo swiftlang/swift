@@ -19,7 +19,6 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/Config/abi-breaking.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <cassert>
@@ -533,37 +532,21 @@ class early_inc_iterator_impl
 
   using PointerT = typename std::iterator_traits<WrappedIteratorT>::pointer;
 
-protected:
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-  bool IsEarlyIncremented = false;
-#endif
-
 public:
   early_inc_iterator_impl(WrappedIteratorT I) : BaseT(I) {}
 
   using BaseT::operator*;
   typename BaseT::reference operator*() {
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-    assert(!IsEarlyIncremented && "Cannot dereference twice!");
-    IsEarlyIncremented = true;
-#endif
     return *(this->I)++;
   }
 
   using BaseT::operator++;
   early_inc_iterator_impl &operator++() {
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-    assert(IsEarlyIncremented && "Cannot increment before dereferencing!");
-    IsEarlyIncremented = false;
-#endif
     return *this;
   }
 
   using BaseT::operator==;
   bool operator==(const early_inc_iterator_impl &RHS) const {
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-    assert(!IsEarlyIncremented && "Cannot compare after dereferencing!");
-#endif
     return BaseT::operator==(RHS);
   }
 };
