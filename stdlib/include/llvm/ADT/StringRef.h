@@ -33,7 +33,6 @@ extern "C" size_t __builtin_strlen(const char *);
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
-  class APInt;
   class hash_code;
   template <typename T> class SmallVectorImpl;
   template <typename T> struct DenseMapInfo;
@@ -218,28 +217,6 @@ namespace llvm {
     /// numbers.
     LLVM_NODISCARD
     int compare_numeric(StringRef RHS) const;
-
-    /// Determine the edit distance between this string and another
-    /// string.
-    ///
-    /// \param Other the string to compare this string against.
-    ///
-    /// \param AllowReplacements whether to allow character
-    /// replacements (change one character into another) as a single
-    /// operation, rather than as two operations (an insertion and a
-    /// removal).
-    ///
-    /// \param MaxEditDistance If non-zero, the maximum edit distance that
-    /// this routine is allowed to compute. If the edit distance will exceed
-    /// that maximum, returns \c MaxEditDistance+1.
-    ///
-    /// \returns the minimum number of character insertions, removals,
-    /// or (if \p AllowReplacements is \c true) replacements needed to
-    /// transform one of the given strings into the other. If zero,
-    /// the strings are identical.
-    LLVM_NODISCARD
-    unsigned edit_distance(StringRef Other, bool AllowReplacements = true,
-                           unsigned MaxEditDistance = 0) const;
 
     /// str - Get the contents as an std::string.
     LLVM_NODISCARD
@@ -561,27 +538,6 @@ namespace llvm {
       Result = ULLVal;
       return false;
     }
-
-    /// Parse the current string as an integer of the specified \p Radix, or of
-    /// an autosensed radix if the \p Radix given is 0.  The current value in
-    /// \p Result is discarded, and the storage is changed to be wide enough to
-    /// store the parsed integer.
-    ///
-    /// \returns true if the string does not solely consist of a valid
-    /// non-empty number in the appropriate base.
-    ///
-    /// APInt::fromString is superficially similar but assumes the
-    /// string is well-formed in the given radix.
-    bool getAsInteger(unsigned Radix, APInt &Result) const;
-
-    /// Parse the current string as an IEEE double-precision floating
-    /// point value.  The string must be a well-formed double.
-    ///
-    /// If \p AllowInexact is false, the function will fail if the string
-    /// cannot be represented exactly.  Otherwise, the function only fails
-    /// in case of an overflow or underflow, or an invalid floating point
-    /// representation.
-    bool getAsDouble(double &Result, bool AllowInexact = true) const;
 
     /// @}
     /// @name String Operations
