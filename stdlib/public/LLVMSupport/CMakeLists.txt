@@ -1,8 +1,3 @@
-set(LLVM_ENABLE_ABI_BREAKING_CHECKS NO)
-set(LLVM_ENABLE_REVERSE_ITERATION NO)
-
-configure_file(${PROJECT_SOURCE_DIR}/include/llvm/Config/abi-breaking.h.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/llvm/Config/abi-breaking.h)
 
 set(LLVM_DEFAULT_TARGET_TRIPLE)
 set(LLVM_ENABLE_DUMP)
