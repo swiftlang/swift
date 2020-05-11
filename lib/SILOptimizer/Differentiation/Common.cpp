@@ -71,6 +71,44 @@ DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
   return result;
 }
 
+bool isSemanticMemberAccessor(SILFunction *original) {
+  auto *dc = original->getDeclContext();
+  if (!dc)
+    return false;
+  auto *decl = dc->getAsDecl();
+  if (!decl)
+    return false;
+  auto *accessor = dyn_cast<AccessorDecl>(decl);
+  if (!accessor)
+    return false;
+  // Currently, only getters and setters are supported.
+  // TODO(SR-12640): Support `modify` accessors.
+  if (accessor->getAccessorKind() != AccessorKind::Get &&
+      accessor->getAccessorKind() != AccessorKind::Set)
+    return false;
+  // Accessor must come from a `var` declaration.
+  auto *varDecl = dyn_cast<VarDecl>(accessor->getStorage());
+  if (!varDecl)
+    return false;
+  // Return true for stored property accessors.
+  if (varDecl->hasStorage() && varDecl->isInstanceMember())
+    return true;
+  // Return true for properties that have attached property wrappers.
+  if (varDecl->hasAttachedPropertyWrapper())
+    return true;
+  // Otherwise, return false.
+  // User-defined accessors can never be supported because they may use custom
+  // logic that does not semantically perform a member access.
+  return false;
+}
+
+bool hasSemanticMemberAccessorCallee(ApplySite applySite) {
+  if (auto *FRI = dyn_cast<FunctionRefBaseInst>(applySite.getCallee()))
+    if (auto *F = FRI->getReferencedFunctionOrNull())
+      return isSemanticMemberAccessor(F);
+  return false;
+}
+
 void forEachApplyDirectResult(
     FullApplySite applySite,
     llvm::function_ref<void(SILValue)> resultCallback) {

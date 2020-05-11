@@ -37,6 +37,8 @@ benefit of all Swift developers.
 - [Debugging Swift Executables](#debugging-swift-executables)
     - [Determining the mangled name of a function in LLDB](#determining-the-mangled-name-of-a-function-in-lldb)
     - [Manually symbolication using LLDB](#manually-symbolication-using-lldb)
+    - [Viewing allocation history, references, and page-level info](#viewing-allocation-history-references-and-page-level-info)
+    - [Printing memory contents](#printing-memory-contents)
 - [Debugging LLDB failures](#debugging-lldb-failures)
     - ["Types" Log](#types-log)
     - ["Expression" Log](#expression-log)
@@ -679,6 +681,90 @@ function in the current frame:
 One can perform manual symbolication of a crash log or an executable using LLDB
 without running the actual executable. For a detailed guide on how to do this,
 see: https://lldb.llvm.org/symbolication.html.
+
+## Viewing allocation history, references, and page-level info
+
+The `malloc_history` tool (macOS only) shows the history of `malloc` and `free`
+calls for a particular pointer. To enable malloc_history, you must run the
+target process with the environment variable MallocStackLogging=1. Then you can
+see the allocation history of any pointer:
+
+    malloc_history YourProcessName 0x12345678
+
+By default, this will show a compact call stack representation for each event
+that puts everything on a single line. For a more readable but larger
+representation, pass -callTree.
+
+This works even when you have the process paused in the debugger!
+
+The `leaks` tool (macOS only) can do more than just find leaks. You can use its
+pointer tracing engine to show you where a particular block is referenced:
+
+    leaks YourProcessName --trace=0x12345678
+
+Like malloc_history, this works even when you're in the middle of debugging the
+process.
+
+Sometimes you just want to know some basic info about the region of memory an
+address is in. The `memory region` lldb command will print out basic info about
+the region containing a pointer, such as its permissions and whether it's stack,
+heap, or a loaded image.
+
+lldb comes with a heap script that offers powerful tools to search for pointers:
+
+    (lldb) p (id)[NSApplication sharedApplication]
+    (id) $0 = 0x00007fc50f904ba0
+    (lldb) script import lldb.macosx.heap
+    "crashlog" and "save_crashlog" command installed, use the "--help" option for detailed help
+    "malloc_info", "ptr_refs", "cstr_refs", "find_variable", and "objc_refs" commands have been installed, use the "--help" options on these commands for detailed help.
+    (lldb) ptr_refs 0x00007fc50f904ba0
+    0x0000600003a49580: malloc(    48) -> 0x600003a49560 + 32
+    0x0000600003a6cfe0: malloc(    48) -> 0x600003a6cfc0 + 32
+    0x0000600001f80190: malloc(   112) -> 0x600001f80150 + 64     NSMenuItem55 bytes after NSMenuItem
+    0x0000600001f80270: malloc(   112) -> 0x600001f80230 + 64     NSMenuItem55 bytes after NSMenuItem
+    0x0000600001f80350: malloc(   112) -> 0x600001f80310 + 64     NSMenuItem55 bytes after NSMenuItem
+    ...
+
+## Printing memory contents
+
+lldb's `x` command is cryptic but extremely useful for printing out memory
+contents. Example:
+
+    (lldb) x/5a `(Class)objc_getClass("NSString")`
+    0x7fff83f6d660: 0x00007fff83f709f0 (void *)0x00007fff8c6550f0: NSObject
+    0x7fff83f6d668: 0x00007fff8c655118 (void *)0x00007fff8c6550f0: NSObject
+    0x7fff83f6d670: 0x000060000089c500 -> 0x00007fff2d49c550 "_getCString:maxLength:encoding:"
+    0x7fff83f6d678: 0x000580100000000f
+    0x7fff83f6d680: 0x000060000348e784
+
+Let's unpack the command a bit. The `5` says that we want to print five entries.
+`a` means to print them as addresses, which gives you some automatic symbol
+lookups and pointer chasing as we see here. Finally, we give it the address. The
+backticks around the expression tells it to evaluate that expression and use the
+result as the address. Another example:
+
+    (lldb) x/10xb 0x000060000089c500
+    0x60000089c500: 0x50 0xc5 0x49 0x2d 0xff 0x7f 0x00 0x00
+    0x60000089c508: 0x77 0x63
+
+Here, `x` means to print the values as hex, and `b` means to print byte by byte.
+The following specifiers are available:
+
+* o - octal
+* x - hexadecimal
+* d - decimal
+* u - unsigned decimal
+* t - binary
+* f - floating point
+* a - address
+* c - char
+* s - string
+* i - instruction
+* b - byte
+* h - halfword (16-bit value)
+* w - word (32-bit value)
+* g - giant word (64-bit value)
+
 
 # Debugging LLDB failures
 
