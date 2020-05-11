@@ -540,11 +540,9 @@ bool PullbackEmitter::runForSemanticMemberGetter() {
   auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
   assert(accessor->getAccessorKind() == AccessorKind::Get);
 
-  auto origExitIt = original.findReturnBB();
-  assert(origExitIt != original.end() &&
-         "Functions without returns must have been diagnosed");
-  auto *origExit = &*origExitIt;
-  builder.setInsertionPoint(pullback.getEntryBlock());
+  auto *origEntry = original.getEntryBlock();
+  auto *pbEntry = pullback.getEntryBlock();
+  builder.setInsertionPoint(pbEntry);
 
   // Get getter argument and result values.
   //   Getter type: $(Self) -> Result
@@ -582,10 +580,10 @@ bool PullbackEmitter::runForSemanticMemberGetter() {
   // TODO(TF-1255): Simplify using unified adjoint value data structure.
   switch (tangentVectorSILTy.getCategory()) {
   case SILValueCategory::Object: {
-    auto adjResult = getAdjointValue(origExit, origResult);
+    auto adjResult = getAdjointValue(origEntry, origResult);
     switch (adjResult.getKind()) {
     case AdjointValueKind::Zero:
-      addAdjointValue(origExit, origSelf,
+      addAdjointValue(origEntry, origSelf,
                       makeZeroAdjointValue(tangentVectorSILTy), pbLoc);
       break;
     case AdjointValueKind::Concrete:
@@ -603,7 +601,7 @@ bool PullbackEmitter::runForSemanticMemberGetter() {
           eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
         }
       }
-      addAdjointValue(origExit, origSelf,
+      addAdjointValue(origEntry, origSelf,
                       makeAggregateAdjointValue(tangentVectorSILTy, eltVals),
                       pbLoc);
     }
@@ -615,7 +613,7 @@ bool PullbackEmitter::runForSemanticMemberGetter() {
     auto pbIndRes = pullback.getIndirectResults().front();
     auto *adjSelf = createFunctionLocalAllocation(
         pbIndRes->getType().getObjectType(), pbLoc);
-    setAdjointBuffer(origExit, origSelf, adjSelf);
+    setAdjointBuffer(origEntry, origSelf, adjSelf);
     for (auto *field : tangentVectorDecl->getStoredProperties()) {
       auto *adjSelfElt = builder.createStructElementAddr(pbLoc, adjSelf, field);
       if (field == tanField) {
@@ -623,14 +621,16 @@ bool PullbackEmitter::runForSemanticMemberGetter() {
         // TODO(TF-1255): Simplify using unified adjoint value data structure.
         switch (origResult->getType().getCategory()) {
         case SILValueCategory::Object: {
-          auto adjResult = getAdjointValue(origExit, origResult);
+          auto adjResult = getAdjointValue(origEntry, origResult);
           auto adjResultValue = materializeAdjointDirect(adjResult, pbLoc);
-          builder.emitStoreValueOperation(pbLoc, adjResultValue, adjSelfElt,
+          auto adjResultValueCopy =
+              builder.emitCopyValueOperation(pbLoc, adjResultValue);
+          builder.emitStoreValueOperation(pbLoc, adjResultValueCopy, adjSelfElt,
                                           StoreOwnershipQualifier::Init);
           break;
         }
         case SILValueCategory::Address: {
-          auto adjResult = getAdjointBuffer(origExit, origResult);
+          auto adjResult = getAdjointBuffer(origEntry, origResult);
           builder.createCopyAddr(pbLoc, adjResult, adjSelfElt, IsTake,
                                  IsInitialization);
           destroyedLocalAllocations.insert(adjResult);
@@ -657,8 +657,9 @@ bool PullbackEmitter::runForSemanticMemberSetter() {
   auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
   assert(accessor->getAccessorKind() == AccessorKind::Set);
 
-  auto origEntry = original.getEntryBlock();
-  builder.setInsertionPoint(pullback.getEntryBlock());
+  auto *origEntry = original.getEntryBlock();
+  auto *pbEntry = pullback.getEntryBlock();
+  builder.setInsertionPoint(pbEntry);
 
   // Get setter argument values.
   //              Setter type: $(inout Self, Argument) -> ()
@@ -703,6 +704,7 @@ bool PullbackEmitter::runForSemanticMemberSetter() {
     auto adjArg = builder.emitLoadValueOperation(pbLoc, adjSelfElt,
                                                  LoadOwnershipQualifier::Take);
     setAdjointValue(origEntry, origArg, makeConcreteAdjointValue(adjArg));
+    blockTemporaries[pbEntry].insert(adjArg);
     break;
   }
   case SILValueCategory::Address: {
