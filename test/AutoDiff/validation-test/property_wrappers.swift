@@ -141,6 +141,8 @@ PropertyWrapperTests.test("SimpleClass") {
 */
 
 // From: https://github.com/apple/swift-evolution/blob/master/proposals/0258-property-wrappers.md#proposed-solution
+// Tests the following functionality:
+// - Enum property wrapper.
 @propertyWrapper
 enum Lazy<Value> {
   case uninitialized(() -> Value)
@@ -151,10 +153,13 @@ enum Lazy<Value> {
   }
 
   var wrappedValue: Value {
+    // TODO(TF-1250): Replace with actual mutating getter implementation.
+    // Requires differentiation to support functions with multiple results.
     get {
       switch self {
       case .uninitialized(let initializer):
         let value = initializer()
+        // NOTE: Actual implementation assigns to `self` here.
         return value
       case .initialized(let value):
         return value
