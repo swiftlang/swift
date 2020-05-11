@@ -172,17 +172,12 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
 
   // WebAssembly doesn't support atomics yet, see https://bugs.swift.org/browse/SR-12097
   // for more details.
-  if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
-    TargetOpts.ThreadModel = llvm::ThreadModel::Single;
-
-  clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
-
-  // WebAssembly doesn't support atomics or DWARF5 yet.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm()) {
     TargetOpts.DebuggerTuning = llvm::DebuggerKind::Default;
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
   }
 
+  clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
   return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }
 
