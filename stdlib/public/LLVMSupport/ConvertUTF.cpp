@@ -79,6 +79,7 @@
 
 ConvertUTF_DISABLE_WARNINGS
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 static const int halfShift  = 10; /* used for shifting by 10 bits */
@@ -734,5 +735,6 @@ ConversionResult ConvertUTF8toUTF32(const UTF8 **sourceStart,
    --------------------------------------------------------------------- */
 
 } // namespace llvm
+}} // namespace swift::runtime
 
 ConvertUTF_RESTORE_WARNINGS

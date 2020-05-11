@@ -48,6 +48,7 @@
 #include <string>
 #include <system_error>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class MemoryBufferRef;
@@ -615,5 +616,6 @@ private:
 } // end namespace yaml
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_YAMLPARSER_H

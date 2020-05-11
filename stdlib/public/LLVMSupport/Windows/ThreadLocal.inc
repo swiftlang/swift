@@ -18,6 +18,7 @@
 #include "llvm/Support/Windows/WindowsSupport.h"
 #include "llvm/Support/ThreadLocal.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 sys::ThreadLocalImpl::ThreadLocalImpl() : data() {
@@ -49,3 +50,4 @@ void sys::ThreadLocalImpl::removeInstance() {
 }
 
 }
+}} // namespace swift::runtime

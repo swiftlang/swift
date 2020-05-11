@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <string>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
   class formatv_object_base;
@@ -540,5 +541,6 @@ namespace llvm {
   /// @}
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_TWINE_H

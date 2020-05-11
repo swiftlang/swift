@@ -19,6 +19,7 @@
 
 #include <cstdint>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 #if LLVM_ENABLE_ABI_BREAKING_CHECKS
@@ -94,5 +95,6 @@ public:
 #endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
 
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

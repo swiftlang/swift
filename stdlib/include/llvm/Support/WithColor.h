@@ -13,6 +13,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 extern cl::OptionCategory ColorCategory;
@@ -120,5 +121,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_LIB_DEBUGINFO_WITHCOLOR_H

@@ -31,6 +31,7 @@
 #include "llvm/Support/Error.h"
 #include <system_error>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 template <typename T> class ArrayRef;
 class StringRef;
@@ -216,5 +217,6 @@ public:
 
 }
 }
+}} // namespace swift::runtime
 
 #endif

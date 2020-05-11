@@ -14,6 +14,7 @@
 
 #include <cstdint>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 enum class FloatStyle { Exponent, ExponentUpper, Fixed, Percent };
 enum class IntegerStyle {
@@ -43,6 +44,7 @@ void write_hex(raw_ostream &S, uint64_t N, HexPrintStyle Style,
 void write_double(raw_ostream &S, double D, FloatStyle Style,
                   Optional<size_t> Precision = None);
 }
+}} // namespace swift::runtime
 
 #endif
 

@@ -217,6 +217,7 @@ createUniqueEntity(const Twine &Model, int &ResultFD,
   return EC;
 }
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys  {
 namespace path {
@@ -1126,6 +1127,7 @@ ErrorOr<perms> getPermissions(const Twine &Path) {
 } // end namespace fs
 } // end namespace sys
 } // end namespace llvm
+}} // namespace swift::runtime
 
 // Include the truly platform-specific parts.
 #if defined(LLVM_ON_UNIX)

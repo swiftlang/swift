@@ -24,6 +24,7 @@
 //===          independent code.
 //===----------------------------------------------------------------------===//
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys {
 
@@ -73,3 +74,4 @@ std::string StrError(int errnum) {
 
 }  // namespace sys
 }  // namespace llvm
+}} // namespace swift::runtime

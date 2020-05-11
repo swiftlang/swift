@@ -25,6 +25,7 @@
 #include <cstring>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// ForwardIterator for the bits that are set.
@@ -955,6 +956,7 @@ template <> struct DenseMapInfo<BitVector> {
   }
 };
 } // end namespace llvm
+}} // namespace swift::runtime
 
 namespace std {
   /// Implement std::swap in terms of BitVector swap.

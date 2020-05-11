@@ -16,6 +16,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// Rounding mode.
@@ -173,5 +174,6 @@ void DenormalMode::print(raw_ostream &OS) const {
 }
 
 }
+}} // namespace swift::runtime
 
 #endif // LLVM_FLOATINGPOINTMODE_H

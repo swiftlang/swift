@@ -17,6 +17,7 @@
 #include "llvm/ADT/None.h"
 #include <cassert>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// Represents a location in source code.
@@ -60,5 +61,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_SMLOC_H

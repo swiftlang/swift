@@ -17,6 +17,7 @@
 #undef mips
 #undef sparc
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// Triple - Helper class for working with autoconf configuration names. For
@@ -897,6 +898,7 @@ public:
 };
 
 } // End llvm namespace
+}} // namespace swift::runtime
 
 
 #endif

@@ -546,7 +546,7 @@ unsigned APInt::getBitsNeeded(StringRef str, uint8_t radix) {
   }
 }
 
-hash_code llvm::hash_value(const APInt &Arg) {
+hash_code __swift::__runtime::llvm::hash_value(const APInt &Arg) {
   if (Arg.isSingleWord())
     return hash_combine(Arg.BitWidth, Arg.U.VAL);
 
@@ -3060,8 +3060,8 @@ llvm::APIntOps::GetMostSignificantDifferentBit(const APInt &A, const APInt &B) {
 
 /// StoreIntToMemory - Fills the StoreBytes bytes of memory starting from Dst
 /// with the integer held in IntVal.
-void llvm::StoreIntToMemory(const APInt &IntVal, uint8_t *Dst,
-                            unsigned StoreBytes) {
+void __swift::__runtime::llvm::StoreIntToMemory(
+    const APInt &IntVal, uint8_t *Dst, unsigned StoreBytes) {
   assert((IntVal.getBitWidth()+7)/8 >= StoreBytes && "Integer too small!");
   const uint8_t *Src = (const uint8_t *)IntVal.getRawData();
 
@@ -3086,7 +3086,8 @@ void llvm::StoreIntToMemory(const APInt &IntVal, uint8_t *Dst,
 
 /// LoadIntFromMemory - Loads the integer stored in the LoadBytes bytes starting
 /// from Src into IntVal, which is assumed to be wide enough and to hold zero.
-void llvm::LoadIntFromMemory(APInt &IntVal, uint8_t *Src, unsigned LoadBytes) {
+void __swift::__runtime::llvm::LoadIntFromMemory(
+    APInt &IntVal, uint8_t *Src, unsigned LoadBytes) {
   assert((IntVal.getBitWidth()+7)/8 >= LoadBytes && "Integer too small!");
   uint8_t *Dst = reinterpret_cast<uint8_t *>(
                    const_cast<uint64_t *>(IntVal.getRawData()));

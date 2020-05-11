@@ -59,6 +59,7 @@
 #include <cassert>
 #include <cstddef>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// A CRTP mixin class that adds reference counting to a type.
@@ -265,5 +266,6 @@ template <class T> struct simplify_type<const IntrusiveRefCntPtr<T>> {
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_INTRUSIVEREFCNTPTR_H

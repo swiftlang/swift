@@ -26,6 +26,7 @@
 #include <iterator>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// SmallPtrSetImplBase - This is the common code shared among all the
@@ -491,6 +492,7 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 namespace std {
 

@@ -20,6 +20,7 @@
 
 #include "llvm/Support/ELFAttributes.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace ARMBuildAttrs {
 
@@ -242,5 +243,6 @@ enum {
 
 } // namespace ARMBuildAttrs
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

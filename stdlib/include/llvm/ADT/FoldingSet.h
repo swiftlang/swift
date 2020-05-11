@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// This folding set used for two purposes:
@@ -803,5 +804,6 @@ struct FoldingSetTrait<std::pair<T1, T2>> {
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_FOLDINGSET_H

@@ -18,6 +18,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// SmallVector-backed MemoryBuffer instance.
@@ -61,5 +62,6 @@ private:
 };
 
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

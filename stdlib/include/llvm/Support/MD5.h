@@ -33,6 +33,7 @@
 #include <array>
 #include <cstdint>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 template <unsigned N> class SmallString;
@@ -118,5 +119,6 @@ inline uint64_t MD5Hash(StringRef Str) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_MD5_H

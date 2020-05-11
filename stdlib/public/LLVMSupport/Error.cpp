@@ -48,6 +48,7 @@ namespace {
 
 static ManagedStatic<ErrorErrorCategory> ErrorErrorCat;
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 void ErrorInfoBase::anchor() {}
@@ -148,6 +149,7 @@ void report_fatal_error(Error Err, bool GenCrashDiag) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 LLVMErrorTypeId LLVMGetErrorTypeId(LLVMErrorRef Err) {
   return reinterpret_cast<ErrorInfoBase *>(Err)->dynamicClassID();

@@ -119,6 +119,7 @@ void MappingNode::anchor() {}
 void SequenceNode::anchor() {}
 void AliasNode::anchor() {}
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace yaml {
 
@@ -162,6 +163,7 @@ struct Token {
 
 } // end namespace yaml
 } // end namespace llvm
+}} // namespace swift::runtime
 
 using TokenQueueT = BumpPtrList<Token>;
 
@@ -245,6 +247,7 @@ static UTF8Decoded decodeUTF8(StringRef Range) {
   return std::make_pair(0, 0);
 }
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace yaml {
 
@@ -556,6 +559,7 @@ private:
 
 } // end namespace yaml
 } // end namespace llvm
+}}
 
 /// encodeUTF8 - Encode \a UnicodeScalarValue in UTF-8 and append it to result.
 static void encodeUTF8( uint32_t UnicodeScalarValue

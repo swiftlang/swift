@@ -11,6 +11,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class CrashRecoveryContextCleanup;
 
@@ -262,5 +263,6 @@ public:
   }
 };
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_CRASHRECOVERYCONTEXT_H

@@ -13,6 +13,7 @@
 #include "llvm/Support/FormatVariadicDetails.h"
 #include "llvm/Support/raw_ostream.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 enum class AlignStyle { Left, Center, Right };
 
@@ -72,5 +73,6 @@ private:
   }
 };
 }
+}} // namespace swift::runtime
 
 #endif

@@ -24,6 +24,7 @@
 #undef MemoryFence
 #endif
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
   namespace sys {
     void MemoryFence();
@@ -38,5 +39,6 @@ namespace llvm {
                             cas_flag old_value);
   }
 }
+}} // namespace swift::runtime
 
 #endif

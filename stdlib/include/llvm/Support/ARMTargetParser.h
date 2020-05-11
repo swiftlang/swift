@@ -18,6 +18,7 @@
 #include "llvm/Support/ARMBuildAttributes.h"
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class Triple;
@@ -276,5 +277,6 @@ StringRef computeDefaultTargetABI(const Triple &TT, StringRef CPU);
 
 } // namespace ARM
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

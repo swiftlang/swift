@@ -42,6 +42,7 @@
 #include <type_traits>
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class StringSaver;
@@ -2130,5 +2131,6 @@ bool ProvidePositionalOption(Option *Handler, StringRef Arg, int i);
 } // end namespace cl
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_COMMANDLINE_H

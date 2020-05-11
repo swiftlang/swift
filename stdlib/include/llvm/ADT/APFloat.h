@@ -31,6 +31,7 @@
     llvm_unreachable("Unexpected semantics");                                  \
   } while (false)
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 struct fltSemantics;
@@ -1321,6 +1322,7 @@ inline APFloat maximum(const APFloat &A, const APFloat &B) {
 }
 
 } // namespace llvm
+}} // swift::runtime
 
 #undef APFLOAT_DISPATCH_ON_SEMANTICS
 #endif // LLVM_ADT_APFLOAT_H

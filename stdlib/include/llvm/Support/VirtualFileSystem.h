@@ -35,6 +35,7 @@
 #include <utility>
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class MemoryBuffer;
@@ -799,5 +800,6 @@ public:
 
 } // namespace vfs
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_VIRTUALFILESYSTEM_H

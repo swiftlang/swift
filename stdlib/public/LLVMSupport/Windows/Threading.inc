@@ -62,11 +62,11 @@ llvm_execute_on_thread_impl(unsigned (__stdcall *ThreadFunc)(void *), void *Arg,
   }
 }
 
-uint64_t llvm::get_threadid() {
+uint64_t __swift::__runtime::llvm::get_threadid() {
   return uint64_t(::GetCurrentThreadId());
 }
 
-uint32_t llvm::get_max_thread_name_length() { return 0; }
+uint32_t __swift::__runtime::llvm::get_max_thread_name_length() { return 0; }
 
 #if defined(_MSC_VER)
 static void SetThreadName(DWORD Id, LPCSTR Name) {
@@ -96,7 +96,7 @@ static void SetThreadName(DWORD Id, LPCSTR Name) {
 }
 #endif
 
-void llvm::set_thread_name(const Twine &Name) {
+void __swift::__runtime::llvm::set_thread_name(const Twine &Name) {
 #if defined(_MSC_VER)
   // Make sure the input is null terminated.
   SmallString<64> Storage;
@@ -105,7 +105,7 @@ void llvm::set_thread_name(const Twine &Name) {
 #endif
 }
 
-void llvm::get_thread_name(SmallVectorImpl<char> &Name) {
+void __swift::__runtime::llvm::get_thread_name(SmallVectorImpl<char> &Name) {
   // "Name" is not an inherent property of a thread on Windows.  In fact, when
   // you "set" the name, you are only firing a one-time message to a debugger
   // which it interprets as a program setting its threads' name.  We may be
@@ -115,7 +115,7 @@ void llvm::get_thread_name(SmallVectorImpl<char> &Name) {
   Name.clear();
 }
 
-SetThreadPriorityResult llvm::set_thread_priority(ThreadPriority Priority) {
+SetThreadPriorityResult __swift::__runtime::llvm::set_thread_priority(ThreadPriority Priority) {
   // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-setthreadpriority
   // Begin background processing mode. The system lowers the resource scheduling
   // priorities of the thread so that it can perform background work without
@@ -267,7 +267,7 @@ llvm::ThreadPoolStrategy::compute_cpu_socket(unsigned ThreadPoolNum) const {
 }
 
 // Assign the current thread to a more appropriate CPU socket or CPU group
-void llvm::ThreadPoolStrategy::apply_thread_strategy(
+void __swift::__runtime::llvm::ThreadPoolStrategy::apply_thread_strategy(
     unsigned ThreadPoolNum) const {
   Optional<unsigned> Socket = compute_cpu_socket(ThreadPoolNum);
   if (!Socket)
@@ -279,7 +279,7 @@ void llvm::ThreadPoolStrategy::apply_thread_strategy(
   SetThreadGroupAffinity(GetCurrentThread(), &Affinity, nullptr);
 }
 
-llvm::BitVector llvm::get_thread_affinity_mask() {
+llvm::BitVector __swift::__runtime::llvm::get_thread_affinity_mask() {
   GROUP_AFFINITY Affinity{};
   GetThreadGroupAffinity(GetCurrentThread(), &Affinity);
 
@@ -301,4 +301,4 @@ llvm::BitVector llvm::get_thread_affinity_mask() {
   return V;
 }
 
-unsigned llvm::get_cpus() { return getProcessorGroups().size(); }
+unsigned __swift::__runtime::llvm::get_cpus() { return getProcessorGroups().size(); }

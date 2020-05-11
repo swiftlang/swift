@@ -520,6 +520,7 @@ directory_iterator OverlayFileSystem::dir_begin(const Twine &Dir,
 
 void ProxyFileSystem::anchor() {}
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace vfs {
 
@@ -985,6 +986,7 @@ std::error_code InMemoryFileSystem::isLocal(const Twine &Path, bool &Result) {
 
 } // namespace vfs
 } // namespace llvm
+}} // namespace swift::runtime
 
 //===-----------------------------------------------------------------------===/
 // RedirectingFileSystem implementation

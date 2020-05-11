@@ -15,6 +15,7 @@
 #include <chrono>
 #include <ctime>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class raw_ostream;
@@ -167,5 +168,6 @@ public:
 };
 
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_CHRONO_H

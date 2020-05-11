@@ -20,6 +20,7 @@
 #include <string>
 #include <tuple>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// Represents a version number in the form major[.minor[.subminor[.build]]].
@@ -157,4 +158,6 @@ public:
 raw_ostream &operator<<(raw_ostream &Out, const VersionTuple &V);
 
 } // end namespace llvm
+}} // namespace swift::runtime
+
 #endif // LLVM_SUPPORT_VERSIONTUPLE_H
