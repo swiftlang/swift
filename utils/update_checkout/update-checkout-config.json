@@ -10,6 +10,8 @@
             "remote": { "id": "apple/swift-llbuild" } },
         "swift-tools-support-core": {
             "remote": { "id": "apple/swift-tools-support-core" } },
+        "swift-argument-parser": {
+            "remote": { "id": "apple/swift-argument-parser" } },
         "swiftpm": {
             "remote": { "id": "apple/swift-package-manager" } },
         "swift-syntax": {
@@ -61,6 +63,7 @@
                 "cmark": "master",
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
+                "swift-argument-parser": "master",
                 "swiftpm": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
@@ -89,6 +92,7 @@
                 "cmark": "master",
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
+                "swift-argument-parser": "master",
                 "swiftpm": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
