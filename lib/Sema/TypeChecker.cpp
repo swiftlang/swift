@@ -332,13 +332,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     FrontendStatsTracer tracer(Ctx.Stats,
                                "Type checking and Semantic analysis");
 
-    if (Ctx.TypeCheckerOpts.SkipNonInlinableFunctionBodies)
-      // Disable this optimization if we're compiling SwiftOnoneSupport, because
-      // we _definitely_ need to look inside every declaration to figure out
-      // what gets prespecialized.
-      if (SF->getParentModule()->isOnoneSupportModule())
-        Ctx.TypeCheckerOpts.SkipNonInlinableFunctionBodies = false;
-
     if (!Ctx.LangOpts.DisableAvailabilityChecking) {
       // Build the type refinement hierarchy for the primary
       // file before type checking.
