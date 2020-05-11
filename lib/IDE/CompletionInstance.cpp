@@ -317,6 +317,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   LangOptions langOpts = CI.getASTContext().LangOpts;
   langOpts.DisableParserLookup = true;
+  // Ensure all non-function-body tokens are hashed into the interface hash
+  langOpts.EnableTypeFingerprints = false;
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
@@ -331,8 +333,6 @@ bool CompletionInstance::performCachedOperationIfPossible(
       SourceFile(*tmpM, oldSF->Kind, tmpBufferID, /*KeepParsedTokens=*/false,
                  /*BuildSyntaxTree=*/false, oldSF->getParsingOptions());
   tmpSF->enableInterfaceHash();
-  // Ensure all non-function-body tokens are hashed into the interface hash
-  tmpCtx->LangOpts.EnableTypeFingerprints = false;
 
   // FIXME: Since we don't setup module loaders on the temporary AST context,
   // 'canImport()' conditional compilation directive always fails. That causes

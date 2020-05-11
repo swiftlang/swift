@@ -629,6 +629,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::EmitSyntax) {
+    Opts.BuildSyntaxTree = true;
+    Opts.VerifySyntaxTree = true;
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
