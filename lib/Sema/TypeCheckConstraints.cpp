@@ -2214,7 +2214,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
   if (!expr)
     return nullptr;
 
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+  if (CS.isDebugMode()) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
@@ -2228,7 +2228,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
     return nullptr;
 
   auto &solution = viable[0];
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+  if (CS.isDebugMode()) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
     solution.dump(log);

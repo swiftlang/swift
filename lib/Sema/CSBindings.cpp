@@ -107,7 +107,7 @@ ConstraintSystem::determineBestBindings() {
 
     inferTransitiveSupertypeBindings(cache, bindings);
 
-    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+    if (isDebugMode()) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       bindings.dump(typeVar, log, solverState->depth * 2);
     }
