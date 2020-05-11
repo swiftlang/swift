@@ -61,6 +61,23 @@ ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v);
 /// tuple-typed and such a user exists.
 DestructureTupleInst *getSingleDestructureTupleUser(SILValue value);
 
+/// Returns true if the given original function is a "semantic member accessor".
+///
+/// "Semantic member accessors" are attached to member properties that have a
+/// corresponding tangent stored property in the parent `TangentVector` type.
+/// These accessors have special-case pullback generation based on their
+/// semantic behavior.
+///
+/// "Semantic member accessors" currently include:
+/// - Stored property accessors. These are implicitly generated.
+/// - Property wrapper wrapped value accessors. These are implicitly generated
+///   and internally call `var wrappedValue`.
+bool isSemanticMemberAccessor(SILFunction *original);
+
+/// Returns true if the given apply site has a "semantic member accessor"
+/// callee.
+bool hasSemanticMemberAccessorCallee(ApplySite applySite);
+
 /// Given a full apply site, apply the given callback to each of its
 /// "direct results".
 ///
@@ -211,19 +228,16 @@ inline void createEntryArguments(SILFunction *f) {
     decl->setSpecifier(ParamDecl::Specifier::Default);
     entry->createFunctionArgument(type, decl);
   };
-  // f->getLoweredFunctionType()->remap
   for (auto indResTy :
        conv.getIndirectSILResultTypes(f->getTypeExpansionContext())) {
     if (indResTy.hasArchetype())
       indResTy = indResTy.mapTypeOutOfContext();
     createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
-    // createFunctionArgument(indResTy.getAddressType());
   }
   for (auto paramTy : conv.getParameterSILTypes(f->getTypeExpansionContext())) {
     if (paramTy.hasArchetype())
       paramTy = paramTy.mapTypeOutOfContext();
     createFunctionArgument(f->mapTypeIntoContext(paramTy));
-    // createFunctionArgument(paramTy);
   }
 }
 

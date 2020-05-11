@@ -22,6 +22,8 @@
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Differentiation/VJPEmitter.h"
 
+#include "swift/AST/Expr.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
@@ -151,8 +153,8 @@ void PullbackEmitter::cleanUpTemporariesForBlock(SILBasicBlock *bb,
 const Lowering::TypeLowering &PullbackEmitter::getTypeLowering(Type type) {
   auto pbGenSig =
       getPullback().getLoweredFunctionType()->getSubstGenericSignature();
-  Lowering::AbstractionPattern pattern(
-      pbGenSig, type->getCanonicalType(pbGenSig));
+  Lowering::AbstractionPattern pattern(pbGenSig,
+                                       type->getCanonicalType(pbGenSig));
   return getPullback().getTypeLowering(pattern, type);
 }
 
@@ -512,6 +514,209 @@ void PullbackEmitter::addToAdjointBuffer(SILBasicBlock *origBB,
 }
 
 //--------------------------------------------------------------------------//
+// Member accessor pullback generation
+//--------------------------------------------------------------------------//
+
+bool PullbackEmitter::runForSemanticMemberAccessor() {
+  auto &original = getOriginal();
+  auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
+  switch (accessor->getAccessorKind()) {
+  case AccessorKind::Get:
+    return runForSemanticMemberGetter();
+  case AccessorKind::Set:
+    return runForSemanticMemberSetter();
+  // TODO(SR-12640): Support `modify` accessors.
+  default:
+    llvm_unreachable("Unsupported accessor kind; inconsistent with "
+                     "`isSemanticMemberAccessor`?");
+  }
+}
+
+bool PullbackEmitter::runForSemanticMemberGetter() {
+  auto &original = getOriginal();
+  auto &pullback = getPullback();
+  auto pbLoc = getPullback().getLocation();
+
+  auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
+  assert(accessor->getAccessorKind() == AccessorKind::Get);
+
+  auto origExitIt = original.findReturnBB();
+  assert(origExitIt != original.end() &&
+         "Functions without returns must have been diagnosed");
+  auto *origExit = &*origExitIt;
+  builder.setInsertionPoint(pullback.getEntryBlock());
+
+  // Get getter argument and result values.
+  //   Getter type: $(Self) -> Result
+  // Pullback type: $(Result', PB_Struct) -> Self'
+  assert(original.getLoweredFunctionType()->getNumParameters() == 1);
+  assert(pullback.getLoweredFunctionType()->getNumParameters() == 2);
+  assert(pullback.getLoweredFunctionType()->getNumResults() == 1);
+  SILValue origSelf = original.getArgumentsWithoutIndirectResults().front();
+
+  SmallVector<SILValue, 8> origFormalResults;
+  collectAllFormalResultsInTypeOrder(original, origFormalResults);
+  auto origResult = origFormalResults[getIndices().source];
+
+  // TODO(TF-970): Emit diagnostic when `TangentVector` is not a struct.
+  auto tangentVectorSILTy = pullback.getConventions().getSingleSILResultType(
+      TypeExpansionContext::minimal());
+  auto tangentVectorTy = tangentVectorSILTy.getASTType();
+  auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
+
+  // Look up the corresponding field in the tangent space.
+  VarDecl *origField = cast<VarDecl>(accessor->getStorage());
+  VarDecl *tanField = nullptr;
+  auto tanFieldLookup = tangentVectorDecl->lookupDirect(origField->getName());
+  if (tanFieldLookup.empty()) {
+    getContext().emitNondifferentiabilityError(
+        pbLoc.getSourceLoc(), getInvoker(),
+        diag::autodiff_stored_property_no_corresponding_tangent,
+        origSelf->getType().getASTType().getString(), origField->getNameStr());
+    errorOccurred = true;
+    return true;
+  }
+  tanField = cast<VarDecl>(tanFieldLookup.front());
+
+  // Switch based on the base tangent struct's value category.
+  // TODO(TF-1255): Simplify using unified adjoint value data structure.
+  switch (tangentVectorSILTy.getCategory()) {
+  case SILValueCategory::Object: {
+    auto adjResult = getAdjointValue(origExit, origResult);
+    switch (adjResult.getKind()) {
+    case AdjointValueKind::Zero:
+      addAdjointValue(origExit, origSelf,
+                      makeZeroAdjointValue(tangentVectorSILTy), pbLoc);
+      break;
+    case AdjointValueKind::Concrete:
+    case AdjointValueKind::Aggregate: {
+      SmallVector<AdjointValue, 8> eltVals;
+      for (auto *field : tangentVectorDecl->getStoredProperties()) {
+        if (field == tanField) {
+          eltVals.push_back(adjResult);
+        } else {
+          auto substMap = tangentVectorTy->getMemberSubstitutionMap(
+              field->getModuleContext(), field);
+          auto fieldTy = field->getType().subst(substMap);
+          auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
+          assert(fieldSILTy.isObject());
+          eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
+        }
+      }
+      addAdjointValue(origExit, origSelf,
+                      makeAggregateAdjointValue(tangentVectorSILTy, eltVals),
+                      pbLoc);
+    }
+    }
+    break;
+  }
+  case SILValueCategory::Address: {
+    assert(pullback.getIndirectResults().size() == 1);
+    auto pbIndRes = pullback.getIndirectResults().front();
+    auto *adjSelf = createFunctionLocalAllocation(
+        pbIndRes->getType().getObjectType(), pbLoc);
+    setAdjointBuffer(origExit, origSelf, adjSelf);
+    for (auto *field : tangentVectorDecl->getStoredProperties()) {
+      auto *adjSelfElt = builder.createStructElementAddr(pbLoc, adjSelf, field);
+      if (field == tanField) {
+        // Switch based on the property's value category.
+        // TODO(TF-1255): Simplify using unified adjoint value data structure.
+        switch (origResult->getType().getCategory()) {
+        case SILValueCategory::Object: {
+          auto adjResult = getAdjointValue(origExit, origResult);
+          auto adjResultValue = materializeAdjointDirect(adjResult, pbLoc);
+          builder.emitStoreValueOperation(pbLoc, adjResultValue, adjSelfElt,
+                                          StoreOwnershipQualifier::Init);
+          break;
+        }
+        case SILValueCategory::Address: {
+          auto adjResult = getAdjointBuffer(origExit, origResult);
+          builder.createCopyAddr(pbLoc, adjResult, adjSelfElt, IsTake,
+                                 IsInitialization);
+          destroyedLocalAllocations.insert(adjResult);
+          break;
+        }
+        }
+      } else {
+        auto fieldType = pullback.mapTypeIntoContext(field->getInterfaceType())
+                             ->getCanonicalType();
+        emitZeroIndirect(fieldType, adjSelfElt, pbLoc);
+      }
+    }
+    break;
+  }
+  }
+  return false;
+}
+
+bool PullbackEmitter::runForSemanticMemberSetter() {
+  auto &original = getOriginal();
+  auto &pullback = getPullback();
+  auto pbLoc = getPullback().getLocation();
+
+  auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
+  assert(accessor->getAccessorKind() == AccessorKind::Set);
+
+  auto origEntry = original.getEntryBlock();
+  builder.setInsertionPoint(pullback.getEntryBlock());
+
+  // Get setter argument values.
+  //              Setter type: $(inout Self, Argument) -> ()
+  // Pullback type (wrt self): $(inout Self', PB_Struct) -> ()
+  // Pullback type (wrt both): $(inout Self', PB_Struct) -> Argument'
+  assert(original.getLoweredFunctionType()->getNumParameters() == 2);
+  assert(pullback.getLoweredFunctionType()->getNumParameters() == 2);
+  assert(pullback.getLoweredFunctionType()->getNumResults() == 0 ||
+         pullback.getLoweredFunctionType()->getNumResults() == 1);
+
+  SILValue origArg = original.getArgumentsWithoutIndirectResults()[0];
+  SILValue origSelf = original.getArgumentsWithoutIndirectResults()[1];
+
+  // TODO(TF-970): Emit diagnostic when `TangentVector` is not a struct.
+  auto tangentVectorSILTy = pullback.getLoweredFunctionType()
+                                ->getParameters()[0]
+                                .getSILStorageInterfaceType();
+  assert(tangentVectorSILTy.getCategory() == SILValueCategory::Address);
+  auto tangentVectorTy = tangentVectorSILTy.getASTType();
+  auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
+
+  // Look up the corresponding field in the tangent space.
+  VarDecl *origField = cast<VarDecl>(accessor->getStorage());
+  VarDecl *tanField = nullptr;
+  auto tanFieldLookup = tangentVectorDecl->lookupDirect(origField->getName());
+  if (tanFieldLookup.empty()) {
+    getContext().emitNondifferentiabilityError(
+        pbLoc.getSourceLoc(), getInvoker(),
+        diag::autodiff_stored_property_no_corresponding_tangent,
+        origSelf->getType().getASTType().getString(), origField->getNameStr());
+    errorOccurred = true;
+    return true;
+  }
+  tanField = cast<VarDecl>(tanFieldLookup.front());
+
+  auto adjSelf = getAdjointBuffer(origEntry, origSelf);
+  auto *adjSelfElt = builder.createStructElementAddr(pbLoc, adjSelf, tanField);
+  // Switch based on the property's value category.
+  // TODO(TF-1255): Simplify using unified adjoint value data structure.
+  switch (origArg->getType().getCategory()) {
+  case SILValueCategory::Object: {
+    auto adjArg = builder.emitLoadValueOperation(pbLoc, adjSelfElt,
+                                                 LoadOwnershipQualifier::Take);
+    setAdjointValue(origEntry, origArg, makeConcreteAdjointValue(adjArg));
+    break;
+  }
+  case SILValueCategory::Address: {
+    addToAdjointBuffer(origEntry, origArg, adjSelfElt, pbLoc);
+    builder.emitDestroyOperation(pbLoc, adjSelfElt);
+    break;
+  }
+  }
+  emitZeroIndirect(adjSelfElt->getType().getASTType(), adjSelfElt, pbLoc);
+
+  return false;
+}
+
+//--------------------------------------------------------------------------//
 // Entry point
 //--------------------------------------------------------------------------//
 
@@ -568,15 +773,6 @@ bool PullbackEmitter::run() {
         return;
       visited.insert(v);
       auto type = v->getType();
-      // Diagnose active enum values. Differentiation of enum values requires
-      // special adjoint value handling and is not yet supported. Diagnose
-      // only the first active enum value to prevent too many diagnostics.
-      if (!diagnosedActiveEnumValue && type.getEnumOrBoundGenericEnum()) {
-        getContext().emitNondifferentiabilityError(
-            v, getInvoker(), diag::autodiff_enums_unsupported);
-        errorOccurred = true;
-        diagnosedActiveEnumValue = true;
-      }
       // Diagnose active values whose value category is incompatible with their
       // tangent types's value category.
       //
@@ -603,6 +799,19 @@ bool PullbackEmitter::run() {
             errorOccurred = true;
           }
         }
+      }
+      // Do not emit remaining activity-related diagnostics for semantic member
+      // accessors, which have special-case pullback generation.
+      if (isSemanticMemberAccessor(&original))
+        return;
+      // Diagnose active enum values. Differentiation of enum values requires
+      // special adjoint value handling and is not yet supported. Diagnose
+      // only the first active enum value to prevent too many diagnostics.
+      if (!diagnosedActiveEnumValue && type.getEnumOrBoundGenericEnum()) {
+        getContext().emitNondifferentiabilityError(
+            v, getInvoker(), diag::autodiff_enums_unsupported);
+        errorOccurred = true;
+        diagnosedActiveEnumValue = true;
       }
       // Skip address projections.
       // Address projections do not need their own adjoint buffers; they
@@ -756,12 +965,21 @@ bool PullbackEmitter::run() {
                << " as the adjoint of original result " << origResult);
   }
 
+  // If the original function is an accessor with special-case pullback
+  // generation logic, do special-case generation.
+  if (isSemanticMemberAccessor(&original)) {
+    if (runForSemanticMemberAccessor())
+      return true;
+  }
+  // Otherwise, perform standard pullback generation.
   // Visit original blocks blocks in post-order and perform differentiation
   // in corresponding pullback blocks. If errors occurred, back out.
-  for (auto *bb : postOrderPostDomOrder) {
-    visitSILBasicBlock(bb);
-    if (errorOccurred)
-      return true;
+  else {
+    for (auto *bb : postOrderPostDomOrder) {
+      visitSILBasicBlock(bb);
+      if (errorOccurred)
+        return true;
+    }
   }
 
   // Prepare and emit a `return` in the pullback exit block.
@@ -1343,8 +1561,7 @@ void PullbackEmitter::visitStructInst(StructInst *si) {
     auto adjStruct = materializeAdjointDirect(std::move(av), loc);
     // Find the struct `TangentVector` type.
     auto structTy = remapType(si->getType()).getASTType();
-    auto tangentVectorTy =
-        getTangentSpace(structTy)->getType()->getCanonicalType();
+    auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
     assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
     auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
     assert(tangentVectorDecl);
@@ -1406,8 +1623,7 @@ void PullbackEmitter::visitStructExtractInst(StructExtractInst *sei) {
          "differentiated; activity analysis should not marked as varied");
   auto *bb = sei->getParent();
   auto structTy = remapType(sei->getOperand()->getType()).getASTType();
-  auto tangentVectorTy =
-      getTangentSpace(structTy)->getType()->getCanonicalType();
+  auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
   assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
   auto tangentVectorSILTy = SILType::getPrimitiveObjectType(tangentVectorTy);
   auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
@@ -1449,8 +1665,7 @@ void PullbackEmitter::visitStructExtractInst(StructExtractInst *sei) {
         auto substMap = tangentVectorTy->getMemberSubstitutionMap(
             field->getModuleContext(), field);
         auto fieldTy = field->getType().subst(substMap);
-        auto fieldSILTy = getContext().getTypeConverter().getLoweredType(
-            fieldTy, TypeExpansionContext::minimal());
+        auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
         assert(fieldSILTy.isObject());
         eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
       }
@@ -1466,8 +1681,7 @@ void PullbackEmitter::visitRefElementAddrInst(RefElementAddrInst *reai) {
   auto *bb = reai->getParent();
   auto adjBuf = getAdjointBuffer(bb, reai);
   auto classTy = remapType(reai->getOperand()->getType()).getASTType();
-  auto tangentVectorTy =
-      getTangentSpace(classTy)->getType()->getCanonicalType();
+  auto tangentVectorTy = getTangentSpace(classTy)->getCanonicalType();
   assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
   auto tangentVectorSILTy = SILType::getPrimitiveObjectType(tangentVectorTy);
   auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
@@ -1498,8 +1712,7 @@ void PullbackEmitter::visitRefElementAddrInst(RefElementAddrInst *reai) {
       auto substMap = tangentVectorTy->getMemberSubstitutionMap(
           field->getModuleContext(), field);
       auto fieldTy = field->getType().subst(substMap);
-      auto fieldSILTy = getContext().getTypeConverter().getLoweredType(
-          fieldTy, TypeExpansionContext::minimal());
+      auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
       assert(fieldSILTy.isObject());
       eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
     }
@@ -2083,8 +2296,8 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
   auto type = lhsDestAccess->getType();
   auto astType = type.getASTType();
   auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = astType->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(swiftMod));
+  auto tangentSpace =
+      astType->getAutoDiffTangentSpace(LookUpConformanceInModule(swiftMod));
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
   case TangentSpace::Kind::TangentVector: {

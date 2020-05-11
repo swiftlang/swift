@@ -33,7 +33,6 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
 #include <stdint.h>
 #include <assert.h>
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Config.h"
@@ -546,7 +545,7 @@ class RefCountBitsT {
   // Returns true if the increment is a fast-path result.
   // Returns false if the increment should fall back to some slow path
   // (for example, because UseSlowRC is set or because the refcount overflowed).
-  LLVM_NODISCARD SWIFT_ALWAYS_INLINE bool
+  SWIFT_NODISCARD SWIFT_ALWAYS_INLINE bool
   incrementStrongExtraRefCount(uint32_t inc) {
     // This deliberately overflows into the UseSlowRC field.
     bits += BitsType(inc) << Offsets::StrongExtraRefCountShift;
@@ -557,7 +556,7 @@ class RefCountBitsT {
   // Returns false if the decrement should fall back to some slow path
   // (for example, because UseSlowRC is set
   // or because the refcount is now zero and should deinit).
-  LLVM_NODISCARD SWIFT_ALWAYS_INLINE bool
+  SWIFT_NODISCARD SWIFT_ALWAYS_INLINE bool
   decrementStrongExtraRefCount(uint32_t dec) {
 #ifndef NDEBUG
     if (!hasSideTable() && !isImmortal(false)) {
@@ -1409,8 +1408,8 @@ class HeapObjectSideTableEntry {
 
   
   // WEAK
-  
-  LLVM_NODISCARD
+
+  SWIFT_NODISCARD
   HeapObjectSideTableEntry* incrementWeak() {
     // incrementWeak need not be atomic w.r.t. concurrent deinit initiation.
     // The client can't actually get a reference to the object without

@@ -2566,7 +2566,6 @@ StringRef SourceFile::getFilename() const {
 }
 
 ASTScope &SourceFile::getScope() {
-  assert(isSuitableForASTScopes() && "Should not be creating scope tree");
   if (!Scope)
     Scope = std::unique_ptr<ASTScope>(new (getASTContext()) ASTScope(this));
   return *Scope.get();
@@ -2640,7 +2639,7 @@ SourceFile::getConfiguredReferencedNameTracker() const {
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
-  for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes) {
+  for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes.takeVector()) {
     if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
       auto inserted = ValidatedOpaqueReturnTypes.insert(
                 {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
@@ -2651,7 +2650,6 @@ ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
     }
   }
 
-  UnvalidatedDeclsWithOpaqueReturnTypes.clear();
   return OpaqueReturnTypes;
 }
 

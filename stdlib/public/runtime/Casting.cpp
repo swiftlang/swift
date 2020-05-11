@@ -21,7 +21,6 @@
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Config.h"
@@ -39,7 +38,6 @@
 #include "swift/Runtime/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/Support/Compiler.h"
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #include "SwiftObject.h"
@@ -894,7 +892,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         maybeDeallocateSource(result);
         return result;
       }
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
 
     case MetadataKind::Enum:
     case MetadataKind::Optional:
@@ -910,7 +908,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         maybeDeallocateSource(success);
         return success;
       }
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
 
     default:
       return fallbackForNonClass();
@@ -1127,7 +1125,7 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
     // Get the actual class object.
     targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
       ->Class;
-    LLVM_FALLTHROUGH;
+    SWIFT_FALLTHROUGH;
   case MetadataKind::Class:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
@@ -1135,7 +1133,7 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
 #if SWIFT_OBJC_INTEROP
@@ -1171,7 +1169,7 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     case MetadataKind::Class:
     case MetadataKind::ForeignClass:
       // Check if the source is a subclass of the target.
@@ -1207,7 +1205,7 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
     // Get the actual class object.
     targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
       ->Class;
-    LLVM_FALLTHROUGH;
+    SWIFT_FALLTHROUGH;
   case MetadataKind::Class:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
@@ -1215,7 +1213,7 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
 #if SWIFT_OBJC_INTEROP
@@ -1254,7 +1252,7 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     case MetadataKind::Class:
     case MetadataKind::ForeignClass:
       // Check if the source is a subclass of the target.
@@ -2403,7 +2401,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
         return _dynamicCastFromAnyHashable(dest, src, srcType,
                                            targetType, flags);
       }
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
 
     case MetadataKind::Enum:
     case MetadataKind::Optional: {
@@ -2518,7 +2516,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
       break;
     }
 
-    LLVM_FALLTHROUGH;
+    SWIFT_FALLTHROUGH;
 
   // The non-polymorphic types.
   default:

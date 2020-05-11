@@ -645,6 +645,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   case FileUnitKind::DWARFModule:
     return SourceLoc();
   }
+  llvm_unreachable("invalid file kind");
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
@@ -3518,7 +3519,10 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   case AccessLevel::Public:
   case AccessLevel::Open: {
     if (useDC && VD->isSPI()) {
-      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      auto useModuleScopeContext = useDC->getModuleScopeContext();
+      if (useModuleScopeContext == sourceDC->getModuleScopeContext()) return true;
+
+      auto *useSF = dyn_cast<SourceFile>(useModuleScopeContext);
       return !useSF || useSF->isImportedAsSPI(VD);
     }
     return true;
@@ -6297,6 +6301,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::EmptyDictionary:
     return true;
   }
+  llvm_unreachable("invalid default argument kind");
 }
 
 Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
@@ -7106,10 +7111,19 @@ void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
 ArrayRef<AutoDiffConfig>
 AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
   prepareDerivativeFunctionConfigurations();
+
   // Resolve derivative function configurations from `@differentiable`
   // attributes by type-checking them.
   for (auto *diffAttr : getAttrs().getAttributes<DifferentiableAttr>())
     (void)diffAttr->getParameterIndices();
+  // For accessors: resolve derivative function configurations from storage
+  // `@differentiable` attributes by type-checking them.
+  if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
+    auto *storage = accessor->getStorage();
+    for (auto *diffAttr : storage->getAttrs().getAttributes<DifferentiableAttr>())
+      (void)diffAttr->getParameterIndices();
+  }
+
   // Load derivative configurations from imported modules.
   auto &ctx = getASTContext();
   if (ctx.getCurrentGeneration() > DerivativeFunctionConfigGeneration) {

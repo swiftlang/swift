@@ -2209,6 +2209,19 @@ public:
         make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
   }
 
+  /// Return the range of semantics attributes attached to this attribute set.
+  auto getSemanticsAttrs() const
+      -> decltype(getAttributes<SemanticsAttr>()) {
+    return getAttributes<SemanticsAttr>();
+  }
+
+  /// Return whether this attribute set includes the given semantics attribute.
+  bool hasSemanticsAttr(StringRef attrValue) const {
+    return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
+      return attrValue.equals(attr->Value);
+    });
+  }
+
   // Remove the given attribute from the list of attributes. Used when
   // the attribute was semantically invalid.
   void removeAttribute(const DeclAttribute *attr) {

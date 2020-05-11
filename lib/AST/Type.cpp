@@ -2969,6 +2969,7 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
 
     return typeDecl->getEffectiveAccess() > AccessLevel::Internal;
   }
+  llvm_unreachable("invalid subsitution kind");
 }
 
 Type ReplaceOpaqueTypesWithUnderlyingTypes::

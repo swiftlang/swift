@@ -3450,6 +3450,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     case CheckedCastKind::Unresolved:
       return failed();
     }
+    llvm_unreachable("invalid cast type");
   };
 
   // Check for casts between specific concrete types that cannot succeed.

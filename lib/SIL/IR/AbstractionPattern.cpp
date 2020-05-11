@@ -222,8 +222,7 @@ bool AbstractionPattern::requiresClass() const {
     auto type = getType();
     if (auto archetype = dyn_cast<ArchetypeType>(type))
       return archetype->requiresClass();
-    if (isa<DependentMemberType>(type) ||
-        isa<GenericTypeParamType>(type)) {
+    if (type->isTypeParameter()) {
       if (getKind() == Kind::ClangType) {
         // ObjC generics are always class constrained.
         return true;
@@ -765,22 +764,13 @@ void AbstractionPattern::print(raw_ostream &out) const {
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CFunctionAsMethodType:
-  case Kind::CXXMethodType:
-  case Kind::CurriedCXXMethodType:
-  case Kind::PartialCurriedCXXMethodType:
     out << (getKind() == Kind::ClangType
               ? "AP::ClangType(" :
             getKind() == Kind::CurriedCFunctionAsMethodType
               ? "AP::CurriedCFunctionAsMethodType(" :
-            getKind() == Kind::CFunctionAsMethodType
-              ? "AP::CFunctionAsMethodType(" :
-            getKind() == Kind::CXXMethodType
-              ? "AP::CXXMethodType(" :
-            getKind() == Kind::CurriedCXXMethodType
-              ? "AP::CurriedCXXMethodType(" :
-            getKind() == Kind::PartialCurriedCXXMethodType
-              ? "AP::PartialCurriedCXXMethodType("
-              : "AP::PartialCurriedCFunctionAsMethodType(");
+            getKind() == Kind::PartialCurriedCFunctionAsMethodType
+              ? "AP::PartialCurriedCFunctionAsMethodType("
+              : "AP::CFunctionAsMethodType(");
     if (auto sig = getGenericSignature()) {
       sig->print(out);
     }
@@ -798,6 +788,23 @@ void AbstractionPattern::print(raw_ostream &out) const {
         out << "static";
       }
     }
+    out << ")";
+    return;
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+    out << (getKind() == Kind::CXXMethodType
+              ? "AP::CXXMethodType(" :
+            getKind() == Kind::CurriedCXXMethodType
+              ? "AP::CurriedCXXMethodType("
+              : "AP::PartialCurriedCXXMethodType");
+    if (auto sig = getGenericSignature()) {
+      sig->print(out);
+    }
+    getType().dump(out);
+    out << ", ";
+    getCXXMethod()->dump();
+    assert(!hasImportAsMemberStatus());
     out << ")";
     return;
   case Kind::CurriedObjCMethodType:

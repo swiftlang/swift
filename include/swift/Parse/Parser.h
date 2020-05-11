@@ -888,7 +888,8 @@ public:
   void parseTopLevel(SmallVectorImpl<Decl *> &decls);
 
   /// Parse the top-level SIL decls into the SIL module.
-  void parseTopLevelSIL();
+  /// \returns \c true if there was a parsing error.
+  bool parseTopLevelSIL();
 
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {

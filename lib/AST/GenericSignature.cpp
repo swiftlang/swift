@@ -379,7 +379,8 @@ GenericSignatureImpl::lookupConformance(CanType type,
 }
 
 bool GenericSignatureImpl::requiresClass(Type type) {
-  if (!type->isTypeParameter()) return false;
+  assert(type->isTypeParameter() &&
+         "Only type parameters can have superclass requirements");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =

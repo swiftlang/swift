@@ -443,23 +443,28 @@ int main(int argc, char **argv) {
   if (HadError)
     return finishDiagProcessing(1);
 
-  // Load the SIL if we have a module. We have to do this after SILParse
-  // creating the unfortunate double if statement.
-  if (Invocation.hasSerializedAST()) {
-    assert(!CI.hasSILModule() &&
-           "performSema() should not create a SILModule.");
-    CI.createSILModule();
-    std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
-        CI.getASTContext(), CI.getSILModule(), nullptr);
+  auto *mod = CI.getMainModule();
+  assert(mod->getFiles().size() == 1);
 
-    if (extendedInfo.isSIB() || DisableSILLinking)
+  std::unique_ptr<SILModule> SILMod;
+  if (PerformWMO) {
+    SILMod = performSILGeneration(mod, CI.getSILTypes(), CI.getSILOptions());
+  } else {
+    SILMod = performSILGeneration(*mod->getFiles()[0], CI.getSILTypes(),
+                                  CI.getSILOptions());
+  }
+  SILMod->setSerializeSILAction([]{});
+
+  // Load the SIL if we have a non-SIB serialized module. SILGen handles SIB for
+  // us.
+  if (Invocation.hasSerializedAST() && !extendedInfo.isSIB()) {
+    auto SL = SerializedSILLoader::create(
+        CI.getASTContext(), SILMod.get(), nullptr);
+    if (DisableSILLinking)
       SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
     else
       SL->getAll();
   }
-
-  if (CI.getSILModule())
-    CI.getSILModule()->setSerializeSILAction([]{});
 
   if (!RemarksFilename.empty()) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
@@ -474,24 +479,21 @@ int main(int argc, char **argv) {
       SILOpts.OptRecordFormat = *formatOrErr;
     }
 
-    CI.getSILModule()->installSILRemarkStreamer();
+    SILMod->installSILRemarkStreamer();
   }
 
   if (OptimizationGroup == OptGroup::Diagnostics) {
-    runSILDiagnosticPasses(*CI.getSILModule());
+    runSILDiagnosticPasses(*SILMod.get());
   } else if (OptimizationGroup == OptGroup::Performance) {
-    runSILOptimizationPasses(*CI.getSILModule());
+    runSILOptimizationPasses(*SILMod.get());
   } else if (OptimizationGroup == OptGroup::Lowering) {
-    runSILLoweringPasses(*CI.getSILModule());
+    runSILLoweringPasses(*SILMod.get());
   } else {
-    auto *SILMod = CI.getSILModule();
-    {
-      auto T = irgen::createIRGenModule(
-          SILMod, Invocation.getOutputFilenameForAtMostOnePrimary(),
-          Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "");
-      runCommandLineSelectedPasses(SILMod, T.second);
-      irgen::deleteIRGenModule(T);
-    }
+    auto T = irgen::createIRGenModule(
+        SILMod.get(), Invocation.getOutputFilenameForAtMostOnePrimary(),
+        Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "");
+    runCommandLineSelectedPasses(SILMod.get(), T.second);
+    irgen::deleteIRGenModule(T);
   }
 
   if (EmitSIB) {
@@ -513,7 +515,7 @@ int main(int argc, char **argv) {
     serializationOpts.SerializeAllSIL = true;
     serializationOpts.IsSIB = true;
 
-    serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
+    serialize(CI.getMainModule(), serializationOpts, SILMod.get());
   } else {
     const StringRef OutputFile = OutputFilename.size() ?
                                    StringRef(OutputFilename) : "-";
@@ -521,8 +523,7 @@ int main(int argc, char **argv) {
     SILOpts.EmitVerboseSIL = EmitVerboseSIL;
     SILOpts.EmitSortedSIL = EnableSILSortOutput;
     if (OutputFile == "-") {
-      CI.getSILModule()->print(llvm::outs(), CI.getMainModule(),
-                               SILOpts, !DisableASTDump);
+      SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !DisableASTDump);
     } else {
       std::error_code EC;
       llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
@@ -531,8 +532,7 @@ int main(int argc, char **argv) {
                      << EC.message() << '\n';
         return finishDiagProcessing(1);
       }
-      CI.getSILModule()->print(OS, CI.getMainModule(), SILOpts,
-                               !DisableASTDump);
+      SILMod->print(OS, CI.getMainModule(), SILOpts, !DisableASTDump);
     }
   }
 

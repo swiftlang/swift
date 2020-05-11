@@ -18,10 +18,10 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKEMITTER_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_PULLBACKEMITTER_H
 
+#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/AdjointValue.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
-#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 
 #include "swift/SIL/TypeSubstCloner.h"
 #include "llvm/ADT/DenseMap.h"
@@ -100,7 +100,7 @@ private:
   SILBuilder localAllocBuilder;
 
   /// Stack buffers allocated for storing local adjoint values.
-  SmallVector<SILValue, 64> functionLocalAllocations;
+  SmallVector<AllocStackInst *, 64> functionLocalAllocations;
 
   /// A set used to remember local allocations that were destroyed.
   llvm::SmallDenseSet<SILValue> destroyedLocalAllocations;
@@ -315,6 +315,19 @@ public:
   /// Performs pullback generation on the empty pullback function. Returns true
   /// if any error occurs.
   bool run();
+
+  /// Performs pullback generation on the empty pullback function, given that
+  /// the original function is a "semantic member accessor".
+  ///
+  /// "Semantic member accessors" are attached to member properties that have a
+  /// corresponding tangent stored property in the parent `TangentVector` type.
+  /// These accessors have special-case pullback generation based on their
+  /// semantic behavior.
+  ///
+  /// Returns true if any error occurs.
+  bool runForSemanticMemberAccessor();
+  bool runForSemanticMemberGetter();
+  bool runForSemanticMemberSetter();
 
   /// If original result is non-varied, it will always have a zero derivative.
   /// Skip full pullback generation and simply emit zero derivatives for wrt
