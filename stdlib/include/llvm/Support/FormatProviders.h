@@ -24,6 +24,7 @@
 #include <type_traits>
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace detail {
 template <typename T>
@@ -418,5 +419,6 @@ public:
   }
 };
 }
+}} // namespace swift::runtime
 
 #endif

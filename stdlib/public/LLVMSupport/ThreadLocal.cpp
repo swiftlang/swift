@@ -21,6 +21,7 @@
 
 #if !defined(LLVM_ENABLE_THREADS) || LLVM_ENABLE_THREADS == 0
 // Define all methods as no-ops if threading is explicitly disabled
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 using namespace sys;
 ThreadLocalImpl::ThreadLocalImpl() : data() { }
@@ -38,6 +39,7 @@ void ThreadLocalImpl::removeInstance() {
   setInstance(nullptr);
 }
 }
+}} // namespace swift::runtime
 #elif defined(LLVM_ON_UNIX)
 #include "Unix/ThreadLocal.inc"
 #elif defined( _WIN32)

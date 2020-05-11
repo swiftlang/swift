@@ -4,6 +4,7 @@
 #include "llvm/Config/abi-breaking.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 template<class T = void *>
@@ -16,4 +17,5 @@ bool shouldReverseIterate() {
 }
 
 }
+}} // namespace swift::runtime
 #endif

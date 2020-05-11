@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <memory>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class MemoryBufferRef;
@@ -284,5 +285,6 @@ public:
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(MemoryBuffer, LLVMMemoryBufferRef)
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_MEMORYBUFFER_H

@@ -16,6 +16,7 @@
 #include <type_traits>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// CRTP base class which implements the entire standard iterator facade
@@ -369,5 +370,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_ITERATOR_H

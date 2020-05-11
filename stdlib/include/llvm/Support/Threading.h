@@ -47,6 +47,7 @@
 #include "llvm/Support/Atomic.h"
 #endif
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class Twine;
 
@@ -267,5 +268,6 @@ void llvm_execute_on_thread_async(
   enum class SetThreadPriorityResult { FAILURE, SUCCESS };
   SetThreadPriorityResult set_thread_priority(ThreadPriority Priority);
 }
+}} // namespace swift::runtime
 
 #endif

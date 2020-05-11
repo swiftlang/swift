@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/APInt.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class LLVM_NODISCARD APSInt : public APInt {
@@ -349,5 +350,6 @@ inline raw_ostream &operator<<(raw_ostream &OS, const APSInt &I) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif

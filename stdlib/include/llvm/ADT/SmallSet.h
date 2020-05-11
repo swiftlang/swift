@@ -25,6 +25,7 @@
 #include <type_traits>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// SmallSetIterator - This class implements a const_iterator for SmallSet by
@@ -274,5 +275,6 @@ bool operator!=(const SmallSet<T, LN, C> &LHS, const SmallSet<T, RN, C> &RHS) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_SMALLSET_H

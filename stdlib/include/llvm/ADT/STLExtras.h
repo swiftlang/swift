@@ -39,6 +39,7 @@
 #include <random> // for std::mt19937
 #endif
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 // Only used by compiler if both template types are the same.  Useful when
@@ -1955,5 +1956,6 @@ template <class Ptr> auto to_address(const Ptr &P) { return P.operator->(); }
 template <class T> constexpr T *to_address(T *P) { return P; }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_STLEXTRAS_H

@@ -19,6 +19,7 @@
 #include <initializer_list>
 #include <iterator>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 template <typename ValueTy> class StringMapConstIterator;
@@ -451,5 +452,6 @@ private:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_STRINGMAP_H

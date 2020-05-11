@@ -14,6 +14,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Allocator.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// Saves strings in the provided stable storage and returns a
@@ -54,4 +55,6 @@ public:
 };
 
 }
+}} // namespace swift::runtime
+
 #endif

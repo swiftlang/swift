@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 using namespace sys;
 
@@ -58,7 +59,9 @@ void ThreadLocalImpl::removeInstance() {
 }
 
 }
+}} // namespace swift::runtime
 #else
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 using namespace sys;
 ThreadLocalImpl::ThreadLocalImpl() : data() { }
@@ -67,4 +70,5 @@ void ThreadLocalImpl::setInstance(const void* d) { data = const_cast<void*>(d);}
 void *ThreadLocalImpl::getInstance() { return data; }
 void ThreadLocalImpl::removeInstance() { setInstance(0); }
 }
+}} // namespace swift::runtime
 #endif

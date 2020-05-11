@@ -29,6 +29,7 @@
 //===          and must not be UNIX code
 //===----------------------------------------------------------------------===//
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 ProcessInfo::ProcessInfo() : Pid(0), Process(0), ReturnCode(0) {}
@@ -166,6 +167,7 @@ static HANDLE RedirectIO(Optional<StringRef> Path, int fd,
 }
 
 }
+}} // namespace swift::runtime
 
 static bool Execute(ProcessInfo &PI, StringRef Program,
                     ArrayRef<StringRef> Args, Optional<ArrayRef<StringRef>> Env,

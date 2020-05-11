@@ -108,6 +108,7 @@ typedef uint_t uint;
 
 using namespace llvm;
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys  {
 namespace fs {
@@ -1248,3 +1249,4 @@ std::error_code copy_file(const Twine &From, const Twine &To) {
 
 } // end namespace sys
 } // end namespace llvm
+}} // namespace swift::runtime

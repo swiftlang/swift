@@ -21,6 +21,7 @@
 #include <type_traits>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// Represents either an error or a value T.
@@ -268,5 +269,6 @@ operator==(const ErrorOr<T> &Err, E Code) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_ERROROR_H

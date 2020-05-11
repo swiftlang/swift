@@ -49,6 +49,7 @@
 #include <sys/stat.h>
 #endif
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys {
 namespace fs {
@@ -1440,5 +1441,6 @@ public:
 } // end namespace fs
 } // end namespace sys
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_FILESYSTEM_H

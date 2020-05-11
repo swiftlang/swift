@@ -20,6 +20,7 @@
 #include "llvm/Support/ErrorOr.h"
 #include <system_error>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace sys {
 
@@ -204,5 +205,6 @@ namespace sys {
 #endif
   }
 }
+}} // namespace swift::runtime
 
 #endif

@@ -31,6 +31,7 @@
 
 #include <system_error>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 enum class errc {
   argument_list_too_long = int(std::errc::argument_list_too_long),
@@ -79,6 +80,7 @@ inline std::error_code make_error_code(errc E) {
   return std::error_code(static_cast<int>(E), std::generic_category());
 }
 }
+}} // namespace swift::runtime
 
 namespace std {
 template <> struct is_error_code_enum<llvm::errc> : std::true_type {};

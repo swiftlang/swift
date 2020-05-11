@@ -11,8 +11,10 @@
 
 #include <system_error>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 std::error_code mapWindowsError(unsigned EV);
 }
+}} // namespace swift::runtime
 
 #endif

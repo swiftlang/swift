@@ -17,6 +17,7 @@
 
 #include "llvm/ADT/StringRef.h"
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// StringMapEntryBase - Shared base class of StringMapEntry instances.
@@ -131,5 +132,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_STRINGMAPENTRY_H

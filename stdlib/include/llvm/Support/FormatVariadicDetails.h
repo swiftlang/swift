@@ -14,6 +14,7 @@
 
 #include <type_traits>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 template <typename T, typename Enable = void> struct format_provider {};
 class Error;
@@ -158,5 +159,6 @@ build_format_adapter(T &&Item) {
 }
 }
 }
+}} // namespace swift::runtime
 
 #endif

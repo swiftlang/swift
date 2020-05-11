@@ -21,6 +21,7 @@
 #include "llvm/Support/AArch64TargetParser.h"
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class StringRef;
 
@@ -173,5 +174,6 @@ IsaVersion getIsaVersion(StringRef GPU);
 } // namespace AMDGPU
 
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

@@ -30,6 +30,7 @@
 extern "C" size_t __builtin_strlen(const char *);
 #endif
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
   class APInt;
@@ -930,5 +931,6 @@ namespace llvm {
   hash_code hash_value(StringRef S);
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_STRINGREF_H

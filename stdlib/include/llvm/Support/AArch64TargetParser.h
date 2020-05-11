@@ -18,6 +18,7 @@
 #include "llvm/Support/ARMTargetParser.h"
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 // FIXME:This should be made into class design,to avoid dupplication.
 namespace llvm {
 
@@ -140,5 +141,6 @@ bool parseBranchProtection(StringRef Spec, ParsedBranchProtection &PBP,
 
 } // namespace AArch64
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

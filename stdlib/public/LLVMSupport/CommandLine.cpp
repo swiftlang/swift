@@ -52,6 +52,7 @@ using namespace cl;
 //===----------------------------------------------------------------------===//
 // Template instantiations and anchors.
 //
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 namespace cl {
 template class basic_parser<bool>;
@@ -74,6 +75,7 @@ template class opt<char>;
 template class opt<bool>;
 }
 } // end namespace llvm::cl
+}} // namespace swift::runtime
 
 // Pin the vtables to this file.
 void GenericOptionValue::anchor() {}
@@ -476,7 +478,7 @@ void Option::reset() {
 }
 
 // Initialise the general option category.
-OptionCategory llvm::cl::GeneralCategory("General options");
+OptionCategory __swift::__runtime::llvm::cl::GeneralCategory("General options");
 
 void OptionCategory::registerCategory() {
   GlobalParser->registerCategory(this);
@@ -487,10 +489,10 @@ void OptionCategory::registerCategory() {
 // initialization because it is referenced from cl::opt constructors, which run
 // dynamically in an arbitrary order.
 LLVM_REQUIRE_CONSTANT_INITIALIZATION
-ManagedStatic<SubCommand> llvm::cl::TopLevelSubCommand;
+ManagedStatic<SubCommand> __swift::__runtime::llvm::cl::TopLevelSubCommand;
 
 // A special subcommand that can be used to put an option into all subcommands.
-ManagedStatic<SubCommand> llvm::cl::AllSubCommands;
+ManagedStatic<SubCommand> __swift::__runtime::llvm::cl::AllSubCommands;
 
 void SubCommand::registerSubCommand() {
   GlobalParser->registerSubCommand(this);
@@ -706,7 +708,8 @@ static inline bool ProvideOption(Option *Handler, StringRef ArgName,
   return false;
 }
 
-bool llvm::cl::ProvidePositionalOption(Option *Handler, StringRef Arg, int i) {
+bool __swift::__runtime::llvm::cl::ProvidePositionalOption(
+    Option *Handler, StringRef Arg, int i) {
   int Dummy = i;
   return ProvideOption(Handler, Handler->ArgStr, Arg, 0, nullptr, Dummy);
 }
@@ -1013,9 +1016,9 @@ tokenizeWindowsCommandLineImpl(StringRef Src, StringSaver &Saver,
     AddToken(Saver.save(Token.str()));
 }
 
-void cl::TokenizeWindowsCommandLine(StringRef Src, StringSaver &Saver,
-                                    SmallVectorImpl<const char *> &NewArgv,
-                                    bool MarkEOLs) {
+void __swift::__runtime::llvm::cl::TokenizeWindowsCommandLine(
+    StringRef Src, StringSaver &Saver, SmallVectorImpl<const char *> &NewArgv,
+    bool MarkEOLs) {
   auto AddToken = [&](StringRef Tok) { NewArgv.push_back(Tok.data()); };
   auto OnEOL = [&]() {
     if (MarkEOLs)
@@ -1079,7 +1082,7 @@ static bool hasUTF8ByteOrderMark(ArrayRef<char> S) {
 }
 
 // FName must be an absolute path.
-static llvm::Error ExpandResponseFile(
+static __swift::__runtime::llvm::Error ExpandResponseFile(
     StringRef FName, StringSaver &Saver, TokenizerCallback Tokenizer,
     SmallVectorImpl<const char *> &NewArgv, bool MarkEOLs, bool RelativeNames,
     llvm::vfs::FileSystem &FS) {

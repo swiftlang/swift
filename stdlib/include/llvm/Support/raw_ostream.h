@@ -23,6 +23,7 @@
 #include <system_error>
 #include <type_traits>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class formatv_object_base;
@@ -597,5 +598,6 @@ public:
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_RAW_OSTREAM_H

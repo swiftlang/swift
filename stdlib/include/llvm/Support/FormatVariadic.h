@@ -40,6 +40,7 @@
 #include <utility>
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 enum class ReplacementType { Empty, Format, Literal };
@@ -257,5 +258,6 @@ inline auto formatv(const char *Fmt, Ts &&... Vals) -> formatv_object<decltype(
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_FORMATVARIADIC_H
