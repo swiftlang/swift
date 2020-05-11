@@ -17,7 +17,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Twine.h"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -243,39 +242,6 @@ inline std::string fromHex(StringRef Input) {
   return Hex;
 }
 
-/// Convert the string \p S to an integer of the specified type using
-/// the radix \p Base.  If \p Base is 0, auto-detects the radix.
-/// Returns true if the number was successfully converted, false otherwise.
-template <typename N> bool to_integer(StringRef S, N &Num, unsigned Base = 0) {
-  return !S.getAsInteger(Base, Num);
-}
-
-namespace detail {
-template <typename N>
-inline bool to_float(const Twine &T, N &Num, N (*StrTo)(const char *, char **)) {
-  SmallString<32> Storage;
-  StringRef S = T.toNullTerminatedStringRef(Storage);
-  char *End;
-  N Temp = StrTo(S.data(), &End);
-  if (*End != '\0')
-    return false;
-  Num = Temp;
-  return true;
-}
-}
-
-inline bool to_float(const Twine &T, float &Num) {
-  return detail::to_float(T, Num, strtof);
-}
-
-inline bool to_float(const Twine &T, double &Num) {
-  return detail::to_float(T, Num, strtod);
-}
-
-inline bool to_float(const Twine &T, long double &Num) {
-  return detail::to_float(T, Num, strtold);
-}
-
 inline std::string utostr(uint64_t X, bool isNeg = false) {
   char Buffer[21];
   char *BufPtr = std::end(Buffer);
@@ -298,37 +264,6 @@ inline std::string itostr(int64_t X) {
     return utostr(static_cast<uint64_t>(X));
 }
 
-inline std::string toString(const APInt &I, unsigned Radix, bool Signed,
-                            bool formatAsCLiteral = false) {
-  SmallString<40> S;
-  I.toString(S, Radix, Signed, formatAsCLiteral);
-  return std::string(S.str());
-}
-
-inline std::string toString(const APSInt &I, unsigned Radix) {
-  return toString(I, Radix, I.isSigned());
-}
-
-/// StrInStrNoCase - Portable version of strcasestr.  Locates the first
-/// occurrence of string 's1' in string 's2', ignoring case.  Returns
-/// the offset of s2 in s1 or npos if s2 cannot be found.
-StringRef::size_type StrInStrNoCase(StringRef s1, StringRef s2);
-
-/// getToken - This function extracts one token from source, ignoring any
-/// leading characters that appear in the Delimiters string, and ending the
-/// token at any of the characters that appear in the Delimiters string.  If
-/// there are no tokens in the source string, an empty string is returned.
-/// The function returns a pair containing the extracted token and the
-/// remaining tail string.
-std::pair<StringRef, StringRef> getToken(StringRef Source,
-                                         StringRef Delimiters = " \t\n\v\f\r");
-
-/// SplitString - Split up the specified string according to the specified
-/// delimiters, appending the result fragments to the output list.
-void SplitString(StringRef Source,
-                 SmallVectorImpl<StringRef> &OutFragments,
-                 StringRef Delimiters = " \t\n\v\f\r");
-
 /// Returns the English suffix for an ordinal integer (-st, -nd, -rd, -th).
 inline StringRef getOrdinalSuffix(unsigned Val) {
   // It is critically important that we do this perfectly for
@@ -347,29 +282,6 @@ inline StringRef getOrdinalSuffix(unsigned Val) {
     }
   }
 }
-
-/// Print each character of the specified string, escaping it if it is not
-/// printable or if it is an escape char.
-void printEscapedString(StringRef Name, raw_ostream &Out);
-
-/// Print each character of the specified string, escaping HTML special
-/// characters.
-void printHTMLEscaped(StringRef String, raw_ostream &Out);
-
-/// printLowerCase - Print each character as lowercase if it is uppercase.
-void printLowerCase(StringRef String, raw_ostream &Out);
-
-/// Converts a string from camel-case to snake-case by replacing all uppercase
-/// letters with '_' followed by the letter in lowercase, except if the
-/// uppercase letter is the first character of the string.
-std::string convertToSnakeFromCamelCase(StringRef input);
-
-/// Converts a string from snake-case to camel-case by replacing all occurrences
-/// of '_' followed by a lowercase letter with the letter in uppercase.
-/// Optionally allow capitalization of the first letter (if it is a lowercase
-/// letter)
-std::string convertToCamelFromSnakeCase(StringRef input,
-                                        bool capitalizeFirst = false);
 
 namespace detail {
 

@@ -20,46 +20,10 @@
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class StringRef;
-  class Twine;
-
-  /// An error handler callback.
-  typedef void (*fatal_error_handler_t)(void *user_data,
-                                        const std::string& reason,
-                                        bool gen_crash_diag);
-
-  /// install_fatal_error_handler - Installs a new error handler to be used
-  /// whenever a serious (non-recoverable) error is encountered by LLVM.
-  ///
-  /// If no error handler is installed the default is to print the error message
-  /// to stderr, and call exit(1).  If an error handler is installed then it is
-  /// the handler's responsibility to log the message, it will no longer be
-  /// printed to stderr.  If the error handler returns, then exit(1) will be
-  /// called.
-  ///
-  /// It is dangerous to naively use an error handler which throws an exception.
-  /// Even though some applications desire to gracefully recover from arbitrary
-  /// faults, blindly throwing exceptions through unfamiliar code isn't a way to
-  /// achieve this.
-  ///
-  /// \param user_data - An argument which will be passed to the install error
-  /// handler.
-  void install_fatal_error_handler(fatal_error_handler_t handler,
-                                   void *user_data = nullptr);
-
-  /// Restores default error handling behaviour.
-  void remove_fatal_error_handler();
-
-  /// ScopedFatalErrorHandler - This is a simple helper class which just
-  /// calls install_fatal_error_handler in its constructor and
-  /// remove_fatal_error_handler in its destructor.
-  struct ScopedFatalErrorHandler {
-    explicit ScopedFatalErrorHandler(fatal_error_handler_t handler,
-                                     void *user_data = nullptr) {
-      install_fatal_error_handler(handler, user_data);
-    }
-
-    ~ScopedFatalErrorHandler() { remove_fatal_error_handler(); }
-  };
+/// An error handler callback.
+typedef void (*fatal_error_handler_t)(void *user_data,
+                                      const std::string& reason,
+                                      bool gen_crash_diag);
 
 /// Reports a serious error, calling any installed error handler. These
 /// functions are intended to be used for error conditions which are outside
@@ -75,32 +39,6 @@ LLVM_ATTRIBUTE_NORETURN void report_fatal_error(const std::string &reason,
                                                 bool gen_crash_diag = true);
 LLVM_ATTRIBUTE_NORETURN void report_fatal_error(StringRef reason,
                                                 bool gen_crash_diag = true);
-LLVM_ATTRIBUTE_NORETURN void report_fatal_error(const Twine &reason,
-                                                bool gen_crash_diag = true);
-
-/// Installs a new bad alloc error handler that should be used whenever a
-/// bad alloc error, e.g. failing malloc/calloc, is encountered by LLVM.
-///
-/// The user can install a bad alloc handler, in order to define the behavior
-/// in case of failing allocations, e.g. throwing an exception. Note that this
-/// handler must not trigger any additional allocations itself.
-///
-/// If no error handler is installed the default is to print the error message
-/// to stderr, and call exit(1).  If an error handler is installed then it is
-/// the handler's responsibility to log the message, it will no longer be
-/// printed to stderr.  If the error handler returns, then exit(1) will be
-/// called.
-///
-///
-/// \param user_data - An argument which will be passed to the installed error
-/// handler.
-void install_bad_alloc_error_handler(fatal_error_handler_t handler,
-                                     void *user_data = nullptr);
-
-/// Restores default bad alloc error handling behavior.
-void remove_bad_alloc_error_handler();
-
-void install_out_of_memory_new_handler();
 
 /// Reports a bad alloc error, calling any user defined bad alloc
 /// error handler. In contrast to the generic 'report_fatal_error'

@@ -14,12 +14,10 @@
 #define LLVM_ADT_DENSEMAP_H
 
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/EpochTracker.h"
 #include "llvm/Support/AlignOf.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemAlloc.h"
-#include "llvm/Support/ReverseIteration.h"
 #include "llvm/Support/type_traits.h"
 #include <algorithm>
 #include <cassert>
@@ -58,7 +56,7 @@ class DenseMapIterator;
 
 template <typename DerivedT, typename KeyT, typename ValueT, typename KeyInfoT,
           typename BucketT>
-class DenseMapBase : public DebugEpochBase {
+class DenseMapBase {
   template <typename T>
   using const_arg_type_t = typename const_pointer_or_const_ref<T>::type;
 
@@ -77,22 +75,18 @@ public:
     // empty buckets.
     if (empty())
       return end();
-    if (shouldReverseIterate<KeyT>())
-      return makeIterator(getBucketsEnd() - 1, getBuckets(), *this);
-    return makeIterator(getBuckets(), getBucketsEnd(), *this);
+    return makeIterator(getBuckets(), getBucketsEnd());
   }
   inline iterator end() {
-    return makeIterator(getBucketsEnd(), getBucketsEnd(), *this, true);
+    return makeIterator(getBucketsEnd(), getBucketsEnd(), true);
   }
   inline const_iterator begin() const {
     if (empty())
       return end();
-    if (shouldReverseIterate<KeyT>())
-      return makeConstIterator(getBucketsEnd() - 1, getBuckets(), *this);
-    return makeConstIterator(getBuckets(), getBucketsEnd(), *this);
+    return makeConstIterator(getBuckets(), getBucketsEnd());
   }
   inline const_iterator end() const {
-    return makeConstIterator(getBucketsEnd(), getBucketsEnd(), *this, true);
+    return makeConstIterator(getBucketsEnd(), getBucketsEnd(), true);
   }
 
   LLVM_NODISCARD bool empty() const {
@@ -104,13 +98,11 @@ public:
   /// before resizing again.
   void reserve(size_type NumEntries) {
     auto NumBuckets = getMinBucketToReserveForEntries(NumEntries);
-    incrementEpoch();
     if (NumBuckets > getNumBuckets())
       grow(NumBuckets);
   }
 
   void clear() {
-    incrementEpoch();
     if (getNumEntries() == 0 && getNumTombstones() == 0) return;
 
     // If the capacity of the array is huge, and the # elements used is small,
@@ -151,19 +143,13 @@ public:
   iterator find(const_arg_type_t<KeyT> Val) {
     BucketT *TheBucket;
     if (LookupBucketFor(Val, TheBucket))
-      return makeIterator(TheBucket,
-                          shouldReverseIterate<KeyT>() ? getBuckets()
-                                                       : getBucketsEnd(),
-                          *this, true);
+      return makeIterator(TheBucket, getBucketsEnd(), true);
     return end();
   }
   const_iterator find(const_arg_type_t<KeyT> Val) const {
     const BucketT *TheBucket;
     if (LookupBucketFor(Val, TheBucket))
-      return makeConstIterator(TheBucket,
-                               shouldReverseIterate<KeyT>() ? getBuckets()
-                                                            : getBucketsEnd(),
-                               *this, true);
+      return makeConstIterator(TheBucket, getBucketsEnd(), true);
     return end();
   }
 
@@ -176,20 +162,14 @@ public:
   iterator find_as(const LookupKeyT &Val) {
     BucketT *TheBucket;
     if (LookupBucketFor(Val, TheBucket))
-      return makeIterator(TheBucket,
-                          shouldReverseIterate<KeyT>() ? getBuckets()
-                                                       : getBucketsEnd(),
-                          *this, true);
+      return makeIterator(TheBucket, getBucketsEnd(), true);
     return end();
   }
   template<class LookupKeyT>
   const_iterator find_as(const LookupKeyT &Val) const {
     const BucketT *TheBucket;
     if (LookupBucketFor(Val, TheBucket))
-      return makeConstIterator(TheBucket,
-                               shouldReverseIterate<KeyT>() ? getBuckets()
-                                                            : getBucketsEnd(),
-                               *this, true);
+      return makeConstIterator(TheBucket, getBucketsEnd(), true);
     return end();
   }
 
@@ -223,22 +203,13 @@ public:
   std::pair<iterator, bool> try_emplace(KeyT &&Key, Ts &&... Args) {
     BucketT *TheBucket;
     if (LookupBucketFor(Key, TheBucket))
-      return std::make_pair(makeIterator(TheBucket,
-                                         shouldReverseIterate<KeyT>()
-                                             ? getBuckets()
-                                             : getBucketsEnd(),
-                                         *this, true),
+      return std::make_pair(makeIterator(TheBucket, getBucketsEnd(), true),
                             false); // Already in map.
 
     // Otherwise, insert the new element.
     TheBucket =
         InsertIntoBucket(TheBucket, std::move(Key), std::forward<Ts>(Args)...);
-    return std::make_pair(makeIterator(TheBucket,
-                                       shouldReverseIterate<KeyT>()
-                                           ? getBuckets()
-                                           : getBucketsEnd(),
-                                       *this, true),
-                          true);
+    return std::make_pair(makeIterator(TheBucket, getBucketsEnd(), true), true);
   }
 
   // Inserts key,value pair into the map if the key isn't already in the map.
@@ -248,21 +219,12 @@ public:
   std::pair<iterator, bool> try_emplace(const KeyT &Key, Ts &&... Args) {
     BucketT *TheBucket;
     if (LookupBucketFor(Key, TheBucket))
-      return std::make_pair(makeIterator(TheBucket,
-                                         shouldReverseIterate<KeyT>()
-                                             ? getBuckets()
-                                             : getBucketsEnd(),
-                                         *this, true),
+      return std::make_pair(makeIterator(TheBucket, getBucketsEnd(), true),
                             false); // Already in map.
 
     // Otherwise, insert the new element.
     TheBucket = InsertIntoBucket(TheBucket, Key, std::forward<Ts>(Args)...);
-    return std::make_pair(makeIterator(TheBucket,
-                                       shouldReverseIterate<KeyT>()
-                                           ? getBuckets()
-                                           : getBucketsEnd(),
-                                       *this, true),
-                          true);
+    return std::make_pair(makeIterator(TheBucket, getBucketsEnd(), true), true);
   }
 
   /// Alternate version of insert() which allows a different, and possibly
@@ -275,21 +237,13 @@ public:
                                       const LookupKeyT &Val) {
     BucketT *TheBucket;
     if (LookupBucketFor(Val, TheBucket))
-      return std::make_pair(makeIterator(TheBucket,
-                                         shouldReverseIterate<KeyT>()
-                                             ? getBuckets()
-                                             : getBucketsEnd(),
-                                         *this, true),
+      return std::make_pair(makeIterator(TheBucket, getBucketsEnd(), *this, true),
                             false); // Already in map.
 
     // Otherwise, insert the new element.
     TheBucket = InsertIntoBucketWithLookup(TheBucket, std::move(KV.first),
                                            std::move(KV.second), Val);
-    return std::make_pair(makeIterator(TheBucket,
-                                       shouldReverseIterate<KeyT>()
-                                           ? getBuckets()
-                                           : getBucketsEnd(),
-                                       *this, true),
+    return std::make_pair(makeIterator(TheBucket, getBucketsEnd(), *this, true),
                           true);
   }
 
@@ -462,24 +416,13 @@ protected:
   }
 
 private:
-  iterator makeIterator(BucketT *P, BucketT *E,
-                        DebugEpochBase &Epoch,
-                        bool NoAdvance=false) {
-    if (shouldReverseIterate<KeyT>()) {
-      BucketT *B = P == getBucketsEnd() ? getBuckets() : P + 1;
-      return iterator(B, E, Epoch, NoAdvance);
-    }
-    return iterator(P, E, Epoch, NoAdvance);
+  iterator makeIterator(BucketT *P, BucketT *E, bool NoAdvance=false) {
+    return iterator(P, E, NoAdvance);
   }
 
   const_iterator makeConstIterator(const BucketT *P, const BucketT *E,
-                                   const DebugEpochBase &Epoch,
                                    const bool NoAdvance=false) const {
-    if (shouldReverseIterate<KeyT>()) {
-      const BucketT *B = P == getBucketsEnd() ? getBuckets() : P + 1;
-      return const_iterator(B, E, Epoch, NoAdvance);
-    }
-    return const_iterator(P, E, Epoch, NoAdvance);
+    return const_iterator(P, E, NoAdvance);
   }
 
   unsigned getNumEntries() const {
@@ -565,8 +508,6 @@ private:
   template <typename LookupKeyT>
   BucketT *InsertIntoBucketImpl(const KeyT &Key, const LookupKeyT &Lookup,
                                 BucketT *TheBucket) {
-    incrementEpoch();
-
     // If the load of the hash table is more than 3/4, or if fewer than 1/8 of
     // the buckets are empty (meaning that many are filled with tombstones),
     // grow the table.
@@ -757,8 +698,6 @@ public:
   }
 
   void swap(DenseMap& RHS) {
-    this->incrementEpoch();
-    RHS.incrementEpoch();
     std::swap(Buckets, RHS.Buckets);
     std::swap(NumEntries, RHS.NumEntries);
     std::swap(NumTombstones, RHS.NumTombstones);
@@ -1190,7 +1129,7 @@ private:
 
 template <typename KeyT, typename ValueT, typename KeyInfoT, typename Bucket,
           bool IsConst>
-class DenseMapIterator : DebugEpochBase::HandleBase {
+class DenseMapIterator {
   friend class DenseMapIterator<KeyT, ValueT, KeyInfoT, Bucket, true>;
   friend class DenseMapIterator<KeyT, ValueT, KeyInfoT, Bucket, false>;
 
@@ -1209,16 +1148,9 @@ private:
 public:
   DenseMapIterator() = default;
 
-  DenseMapIterator(pointer Pos, pointer E, const DebugEpochBase &Epoch,
-                   bool NoAdvance = false)
-      : DebugEpochBase::HandleBase(&Epoch), Ptr(Pos), End(E) {
-    assert(isHandleInSync() && "invalid construction!");
-
+  DenseMapIterator(pointer Pos, pointer E, bool NoAdvance = false)
+      : Ptr(Pos), End(E) {
     if (NoAdvance) return;
-    if (shouldReverseIterate<KeyT>()) {
-      RetreatPastEmptyBuckets();
-      return;
-    }
     AdvancePastEmptyBuckets();
   }
 
@@ -1229,29 +1161,19 @@ public:
             typename = std::enable_if_t<!IsConstSrc && IsConst>>
   DenseMapIterator(
       const DenseMapIterator<KeyT, ValueT, KeyInfoT, Bucket, IsConstSrc> &I)
-      : DebugEpochBase::HandleBase(I), Ptr(I.Ptr), End(I.End) {}
+      : Ptr(I.Ptr), End(I.End) {}
 
   reference operator*() const {
-    assert(isHandleInSync() && "invalid iterator access!");
     assert(Ptr != End && "dereferencing end() iterator");
-    if (shouldReverseIterate<KeyT>())
-      return Ptr[-1];
     return *Ptr;
   }
   pointer operator->() const {
-    assert(isHandleInSync() && "invalid iterator access!");
     assert(Ptr != End && "dereferencing end() iterator");
-    if (shouldReverseIterate<KeyT>())
-      return &(Ptr[-1]);
     return Ptr;
   }
 
   friend bool operator==(const DenseMapIterator &LHS,
                          const DenseMapIterator &RHS) {
-    assert((!LHS.Ptr || LHS.isHandleInSync()) && "handle not in sync!");
-    assert((!RHS.Ptr || RHS.isHandleInSync()) && "handle not in sync!");
-    assert(LHS.getEpochAddress() == RHS.getEpochAddress() &&
-           "comparing incomparable iterators!");
     return LHS.Ptr == RHS.Ptr;
   }
 
@@ -1261,19 +1183,12 @@ public:
   }
 
   inline DenseMapIterator& operator++() {  // Preincrement
-    assert(isHandleInSync() && "invalid iterator access!");
     assert(Ptr != End && "incrementing end() iterator");
-    if (shouldReverseIterate<KeyT>()) {
-      --Ptr;
-      RetreatPastEmptyBuckets();
-      return *this;
-    }
     ++Ptr;
     AdvancePastEmptyBuckets();
     return *this;
   }
   DenseMapIterator operator++(int) {  // Postincrement
-    assert(isHandleInSync() && "invalid iterator access!");
     DenseMapIterator tmp = *this; ++*this; return tmp;
   }
 
