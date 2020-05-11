@@ -20,7 +20,7 @@ bb2:
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'destroy_value_before_end_borrow'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   end_borrow %1 : $Builtin.NativeObject
@@ -36,7 +36,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'destroy_value_before_end_borrow_coroutine'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   end_apply %2
@@ -55,7 +55,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'destroy_value_before_end_borrow_coroutine_2'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   abort_apply %2
@@ -74,7 +74,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'destroy_value_before_end_borrow_coroutine_3'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   abort_apply %2
@@ -104,7 +104,7 @@ bb3:
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   end_apply %3
@@ -125,7 +125,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_2'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   abort_apply %3
@@ -146,7 +146,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_3'
-// CHECK: Found use after free?!
+// CHECK: Found outside of lifetime use?!
 // CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
 // CHECK: Non Consuming User:   abort_apply %3
