@@ -2735,13 +2735,21 @@ WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
       "stored property %0 has no derivative because %1 does not conform to "
       "'Differentiable'; add an explicit '@noDerivative' attribute"
       "%select{|, or conform %2 to 'AdditiveArithmetic'}3",
-      (Identifier, Type, Identifier, bool))
-WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
+      (/*propName*/ Identifier, /*propType*/ Type, /*nominalName*/ Identifier,
+       /*nominalCanDeriveAdditiveArithmetic*/ bool))
+WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
-      "requires all stored properties to be mutable; use 'var' instead, or add "
-      "an explicit '@noDerivative' attribute"
+      "requires all stored properties not marked with `@noDerivative` to be "
+      "mutable; add an explicit '@noDerivative' attribute"
       "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
-      (Identifier, Identifier, bool))
+      (/*wrapperType*/ StringRef, /*nominalName*/ Identifier,
+       /*nominalCanDeriveAdditiveArithmetic*/ bool))
+WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
+      "synthesis of the 'Differentiable.move(along:)' requirement for %0 "
+      "requires all stored properties not marked with `@noDerivative` to be "
+      "mutable; use 'var' instead, or add an explicit '@noDerivative' attribute"
+      "%select{|, or conform %0 to 'AdditiveArithmetic'}1",
+      (/*nominalName*/ Identifier, /*nominalCanDeriveAdditiveArithmetic*/ bool))
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(broken_pointwise_multiplicative_requirement,none,
       "PointwiseMultiplicative protocol is broken: unexpected requirement", ())

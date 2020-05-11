@@ -24,7 +24,7 @@ struct ImmutableStoredProperties: Differentiable {
   // expected-warning @+1 {{stored property 'nondiff' has no derivative because 'Int' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
   let nondiff: Int
 
-  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties not marked with `@noDerivative` to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic}} {{3-3=@noDerivative }}
   let diff: Float
 }
 func testImmutableStoredProperties() {
@@ -36,7 +36,8 @@ struct MutableStoredPropertiesWithInitialValue: Differentiable {
 }
 // Test struct with both an empty constructor and memberwise initializer.
 struct AllMixedStoredPropertiesHaveInitialValue: Differentiable {
-  let x = Float(1)  // expected-warning {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties not marked with `@noDerivative` to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
+  let x = Float(1)
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
   static func testMemberwiseInitializer() {
@@ -323,20 +324,32 @@ where T: AdditiveArithmetic {}
 extension NoMemberwiseInitializerExtended: Differentiable
 where T: Differentiable & AdditiveArithmetic {}
 
+// Test property wrappers.
 // TF-1190: Test `@noDerivative` warning for property wrapper backing storage properties.
 
 @propertyWrapper
-struct Wrapper<Value> {
+struct ImmutableWrapper<Value> {
   private var value: Value
-  var wrappedValue: Value {
-    value
-  }
+  var wrappedValue: Value { value }
 }
-struct TF_1190<T> {}
-struct TF_1190_Outer: Differentiable {
-  // expected-warning @+1 {{stored property '_x' has no derivative because 'Wrapper<TF_1190<Float>>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
-  @Wrapper var x: TF_1190<Float>
-  @noDerivative @Wrapper var y: TF_1190<Float>
+
+@propertyWrapper
+struct Wrapper<Value> {
+  var wrappedValue: Value
+}
+
+struct Generic<T> {}
+extension Generic: Differentiable where T: Differentiable {}
+
+struct WrappedProperties: Differentiable {
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'WrappedProperties' requires all stored properties not marked with `@noDerivative` to be mutable; add an explicit '@noDerivative' attribute}}
+  @ImmutableWrapper var immutableInt: Generic<Int>
+
+  // expected-warning @+1 {{stored property 'mutableInt' has no derivative because 'Generic<Int>' does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  @Wrapper var mutableInt: Generic<Int>
+
+  @Wrapper var float: Generic<Float>
+  @noDerivative @ImmutableWrapper var nondiff: Generic<Int>
 }
 
 // Verify that cross-file derived conformances are disallowed.
