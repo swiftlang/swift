@@ -79,7 +79,7 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
 
-  for (LookupResultEntry result : foundElements) {
+  for (const LookupResultEntry &result : foundElements) {
     ValueDecl *e = result.getValueDecl();
     assert(e);
     if (e->isInvalid()) {
@@ -1315,39 +1315,6 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
                                     EEP->getLoc());
       if (!elt) {
         if (!type->hasError()) {
-          // Lowercasing of Swift.Optional's cases is handled in the
-          // standard library itself, not through the clang importer,
-          // so we have to do this check here. Additionally, .Some
-          // isn't a static VarDecl, so the existing mechanics in
-          // extractEnumElement won't work.
-          if (type->getAnyNominal() == Context.getOptionalDecl()) {
-            if (EEP->getName().isSimpleName("None") ||
-                EEP->getName().isSimpleName("Some")) {
-              SmallString<4> Rename;
-              camel_case::toLowercaseWord(EEP->getName()
-                                               .getBaseIdentifier().str(),
-                                          Rename);
-              diags.diagnose(
-                  EEP->getLoc(), diag::availability_decl_unavailable_rename,
-                  /*"getter" prefix*/ 2, EEP->getName().getBaseName(),
-                  /*replaced*/ false, /*special kind*/ 0, Rename.str(),
-                  /*message*/ StringRef())
-                  .fixItReplace(EEP->getLoc(), Rename.str());
-
-              return nullptr;
-            }
-          
-          // If we have the original expression parse tree, try reinterpreting
-          // it as an expr-pattern if enum element lookup failed, since `.foo`
-          // could also refer to a static member of the context type.
-          } else if (EEP->hasUnresolvedOriginalExpr()) {
-            P = new (Context) ExprPattern(EEP->getUnresolvedOriginalExpr(),
-                                          nullptr, nullptr);
-            return coercePatternToType(
-                pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
-                options);
-          }
-
           // If we have an optional type, let's try to see if the case
           // exists in its base type and if it does then synthesize an
           // OptionalSomePattern that wraps the case. This uses recursion
@@ -1369,6 +1336,15 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
                              EEP->getName(), type);
               return nullptr;
             }
+          } else if (EEP->hasUnresolvedOriginalExpr()) {
+            // If we have the original expression parse tree, try reinterpreting
+            // it as an expr-pattern if enum element lookup failed, since `.foo`
+            // could also refer to a static member of the context type.
+            P = new (Context) ExprPattern(EEP->getUnresolvedOriginalExpr(),
+                                          nullptr, nullptr);
+            return coercePatternToType(
+                pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
+                options);
           }
         }
       }
