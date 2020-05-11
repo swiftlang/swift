@@ -115,8 +115,8 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   auto bufferID = SF->getBufferID();
   assert(bufferID);
 
-  auto *mod = SF->getParentModule();
-  auto silMod = SILModule::createEmptyModule(mod, desc.conv, desc.opts);
+  auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
+                                             desc.opts);
   SILParserState parserState(silMod.get());
   Parser parser(*bufferID, *SF, parserState.Impl.get());
   PrettyStackTraceParser StackTrace(parser);
@@ -125,7 +125,7 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   if (hadError) {
     // The rest of the SIL pipeline expects well-formed SIL, so if we encounter
     // a parsing error, just return an empty SIL module.
-    return SILModule::createEmptyModule(mod, desc.conv, desc.opts);
+    return SILModule::createEmptyModule(desc.context, desc.conv, desc.opts);
   }
   return silMod;
 }

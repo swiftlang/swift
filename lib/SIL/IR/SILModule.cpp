@@ -92,13 +92,17 @@ class SILModule::SerializationCallback final
   }
 };
 
-SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
-                     const SILOptions &Options, const DeclContext *associatedDC)
-    : TheSwiftModule(SwiftModule),
-      AssociatedDeclContext(associatedDC),
-      Stage(SILStage::Raw), Options(Options), serialized(false),
+SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+                     Lowering::TypeConverter &TC, const SILOptions &Options)
+    : Stage(SILStage::Raw), Options(Options), serialized(false),
       SerializeSILAction(), Types(TC) {
-  assert(AssociatedDeclContext);
+  assert(!context.isNull());
+  if (auto *file = context.dyn_cast<FileUnit *>()) {
+    AssociatedDeclContext = file;
+  } else {
+    AssociatedDeclContext = context.get<ModuleDecl *>();
+  }
+  TheSwiftModule = AssociatedDeclContext->getParentModule();
 
   // We always add the base SILModule serialization callback.
   std::unique_ptr<DeserializationNotificationHandler> callback(
@@ -123,10 +127,10 @@ SILModule::~SILModule() {
   }
 }
 
-std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC,
-                             const SILOptions &Options) {
-  return std::unique_ptr<SILModule>(new SILModule(M, TC, Options, M));
+std::unique_ptr<SILModule> SILModule::createEmptyModule(
+    llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+    Lowering::TypeConverter &TC, const SILOptions &Options) {
+  return std::unique_ptr<SILModule>(new SILModule(context, TC, Options));
 }
 
 ASTContext &SILModule::getASTContext() const {

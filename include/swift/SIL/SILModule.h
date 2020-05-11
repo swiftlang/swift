@@ -107,8 +107,6 @@ enum class SILStage {
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
   friend class SILFunctionBuilder;
-  friend class SILGenSourceFileRequest;
-  friend class SILGenWholeModuleRequest;
 
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
@@ -276,8 +274,8 @@ private:
   /// invalidation message is sent.
   llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
 
-  SILModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-            const SILOptions &Options, const DeclContext *associatedDC);
+  SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+            Lowering::TypeConverter &TC, const SILOptions &Options);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -348,11 +346,14 @@ public:
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
 
-  /// Create and return an empty SIL module that we can
-  /// later parse SIL bodies directly into, without converting from an AST.
+  /// Create and return an empty SIL module suitable for generating or parsing
+  /// SIL into.
+  ///
+  /// \param context The associated decl context. This should be a FileUnit in
+  /// single-file mode, and a ModuleDecl in whole-module mode.
   static std::unique_ptr<SILModule>
-  createEmptyModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-                    const SILOptions &Options);
+  createEmptyModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+                    Lowering::TypeConverter &TC, const SILOptions &Options);
 
   /// Get the Swift module associated with this SIL module.
   ModuleDecl *getSwiftModule() const { return TheSwiftModule; }
