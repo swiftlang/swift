@@ -410,7 +410,8 @@ bool GenericSignatureImpl::requiresClass(Type type) {
 
 /// Determine the superclass bound on the given dependent type.
 Type GenericSignatureImpl::getSuperclassBound(Type type) {
-  if (!type->isTypeParameter()) return nullptr;
+  assert(type->isTypeParameter() &&
+         "Only type parameters can have superclass requirements");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -456,8 +457,7 @@ GenericSignatureImpl::getConformsTo(Type type) {
 }
 
 bool GenericSignatureImpl::conformsToProtocol(Type type, ProtocolDecl *proto) {
-  // FIXME: Deal with concrete conformances here?
-  if (!type->isTypeParameter()) return false;
+  assert(type->isTypeParameter() && "Expected a type parameter");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -561,7 +561,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
     // requirement, but it could also be in terms of concrete types if it has
     // been substituted/otherwise 'resolved', so we need to handle both.
     auto baseType = canFirstType;
-    if (canFirstType->isTypeParameter()) {
+    if (baseType->isTypeParameter()) {
       auto directSuperclass = getSuperclassBound(baseType);
       if (!directSuperclass)
         return false;
