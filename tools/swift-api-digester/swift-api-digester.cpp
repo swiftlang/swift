@@ -1145,6 +1145,8 @@ public:
     // Decls with @_alwaysEmitIntoClient aren't required to have an
     // @available attribute.
     if (!Ctx.getOpts().SkipOSCheck &&
+        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::DAK_Available,
+                                                    D->getDeclKind()) &&
         !D->getIntroducingVersion().hasOSAvailability() &&
         !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
       D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
