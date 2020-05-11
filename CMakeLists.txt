@@ -105,10 +105,6 @@ option(SWIFT_BUILD_PERF_TESTSUITE
     "Create in-tree targets for building swift performance benchmarks."
     FALSE)
 
-option(SWIFT_BUILD_EXTERNAL_PERF_TESTSUITE
-    "Create out-of-tree targets for building swift performance benchmarks."
-    FALSE)
-
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 
 option(SWIFT_INCLUDE_DOCS
@@ -1143,10 +1139,6 @@ add_subdirectory(userdocs)
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   if(SWIFT_BUILD_PERF_TESTSUITE)
     add_subdirectory(benchmark)
-  endif()
-  if(SWIFT_BUILD_EXTERNAL_PERF_TESTSUITE)
-    include(SwiftExternalBenchmarkBuild)
-    add_external_benchmark_suite()
   endif()
 endif()
 
