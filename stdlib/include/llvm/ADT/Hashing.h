@@ -55,6 +55,7 @@
 #include <tuple>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// An opaque object representing a hash code.
@@ -678,5 +679,6 @@ hash_code hash_value(const std::basic_string<T> &arg) {
 }
 
 } // namespace llvm
+}} // namespace swift::runtime
 
 #endif

@@ -24,6 +24,7 @@
 #include <type_traits>
 #include <vector>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
   template<typename T> struct DenseMapInfo;
@@ -601,5 +602,6 @@ namespace llvm {
   };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_ARRAYREF_H

@@ -25,6 +25,7 @@
 #include <new>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class raw_ostream;
@@ -492,5 +493,6 @@ raw_ostream &operator<<(raw_ostream &OS, const Optional<T> &O) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_OPTIONAL_H

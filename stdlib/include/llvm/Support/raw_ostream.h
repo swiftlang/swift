@@ -28,6 +28,7 @@
 #include <system_error>
 #include <type_traits>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 class formatv_object_base;
@@ -735,5 +736,6 @@ Error writeToOutput(StringRef OutputFileName,
                     std::function<Error(raw_ostream &)> Write);
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_RAW_OSTREAM_H

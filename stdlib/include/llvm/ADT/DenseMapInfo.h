@@ -20,6 +20,7 @@
 #include <tuple>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 namespace detail {
@@ -291,5 +292,6 @@ template <> struct DenseMapInfo<hash_code> {
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_DENSEMAPINFO_H

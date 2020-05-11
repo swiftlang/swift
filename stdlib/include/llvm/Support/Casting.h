@@ -20,6 +20,7 @@
 #include <memory>
 #include <type_traits>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 //===----------------------------------------------------------------------===//
@@ -402,5 +403,6 @@ LLVM_NODISCARD inline auto unique_dyn_cast_or_null(std::unique_ptr<Y> &&Val) {
 }
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_CASTING_H

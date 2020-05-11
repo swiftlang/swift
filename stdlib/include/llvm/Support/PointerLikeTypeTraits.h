@@ -18,6 +18,7 @@
 #include <cassert>
 #include <type_traits>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// A traits type that is used to handle pointer types and things that are just
@@ -148,5 +149,6 @@ struct PointerLikeTypeTraits<ReturnT (*)(ParamTs...)>
     : FunctionPointerLikeTypeTraits<4, ReturnT (*)(ParamTs...)> {};
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif

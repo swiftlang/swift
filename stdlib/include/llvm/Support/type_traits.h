@@ -17,6 +17,7 @@
 #include <type_traits>
 #include <utility>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 
@@ -97,7 +98,7 @@ union trivial_helper {
 template <typename T>
 struct is_trivially_copy_constructible
     : std::is_copy_constructible<
-          ::llvm::detail::copy_construction_triviality_helper<T>> {};
+          __swift::__runtime::llvm::detail::copy_construction_triviality_helper<T>> {};
 template <typename T>
 struct is_trivially_copy_constructible<T &> : std::true_type {};
 template <typename T>
@@ -108,7 +109,7 @@ struct is_trivially_copy_constructible<T &&> : std::false_type {};
 template <typename T>
 struct is_trivially_move_constructible
     : std::is_move_constructible<
-          ::llvm::detail::move_construction_triviality_helper<T>> {};
+          __swift::__runtime::llvm::detail::move_construction_triviality_helper<T>> {};
 template <typename T>
 struct is_trivially_move_constructible<T &> : std::true_type {};
 template <typename T>
@@ -187,5 +188,6 @@ class is_trivially_copyable<T*> : public std::true_type {
 
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_TYPE_TRAITS_H

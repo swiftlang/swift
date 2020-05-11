@@ -15,6 +15,7 @@
 
 #include <type_traits>
 
+inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// A suitably aligned and sized character array member which can hold elements
@@ -30,5 +31,6 @@ template <typename T, typename... Ts> struct AlignedCharArrayUnion {
 };
 
 } // end namespace llvm
+}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_ALIGNOF_H
