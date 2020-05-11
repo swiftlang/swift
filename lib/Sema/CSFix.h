@@ -259,7 +259,11 @@ enum class FixKind : uint8_t {
   AllowKeyPathRootTypeMismatch,
 
   /// Allow key path to be bound to a function type with more than 1 argument
-  AllowMultiArgFuncKeyPathMismatch
+  AllowMultiArgFuncKeyPathMismatch,
+  
+  /// Specify key path root type when it cannot be infered by context.
+  SpecifyKeyPathRootType,
+
 };
 
 class ConstraintFix {
@@ -1821,6 +1825,21 @@ public:
 
   static AllowKeyPathRootTypeMismatch *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+};
+
+class SpecifyKeyPathRootType : public ConstraintFix {
+    SpecifyKeyPathRootType(ConstraintSystem &cs, ConstraintLocator *locator)
+        : ConstraintFix(cs, FixKind::SpecifyKeyPathRootType, locator) {}
+
+  public:
+    std::string getName() const {
+      return "specify key path root type";
+    }
+
+    bool diagnose(const Solution &solution, bool asNote = false) const;
+
+    static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -1107,6 +1107,11 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
             cs, TypeVar->getImpl().getLocator());
         if (cs.recordFix(fix))
           return true;
+      } else if (srcLocator->isKeyPathRoot()) {
+        auto *fix =
+            SpecifyKeyPathRootType::create(cs, TypeVar->getImpl().getLocator());
+        if (cs.recordFix(fix))
+          return true;
       }
     }
   }

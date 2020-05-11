@@ -57,6 +57,11 @@ ERROR(could_not_find_value_subscript,none,
       "value of type %0 has no subscripts",
       (Type))
 
+ERROR(could_not_find_value_subscript_key_path,none,
+      "value of type %0 has no matching subscript candidates; "
+      "did you mean to use a key path subscript?",
+      (Type))
+
 ERROR(could_not_find_tuple_member,none,
       "value of tuple type %0 has no member %1", (Type, DeclNameRef))
 
@@ -71,6 +76,11 @@ ERROR(could_not_find_value_dynamic_member_corrected,none,
 ERROR(could_not_find_value_dynamic_member,none,
       "value of type %0 has no dynamic member %2 using key path from root type %1",
       (Type, Type, DeclNameRef))
+ERROR(cannot_infer_contextual_keypath_type_specify_root,none,
+      "cannot infer key path type from context; consider explicitly adding a root type", ())
+ERROR(cannot_infer_contextual_keypath_type_any_contextual,none,
+     "'AnyKeyPath' does not provide enough context for root type to be inferred implicitly; "
+     "consider explicitly adding a root type", ())
 
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclNameRef))
