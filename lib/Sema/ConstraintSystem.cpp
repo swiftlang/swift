@@ -3197,6 +3197,16 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   if (diagnoseAmbiguityWithEphemeralPointers(*this, solutions))
     return true;
 
+
+  // Algorithm is as follows:
+  //
+  // a. Aggregate all of the available fixes based on callee locator;
+  // b. For each ambiguous overload match aggregated fixes and diagnose;
+  // c. Discard all of the fixes which have been already considered
+  //    as part of overload diagnostics;
+  // d. Diagnose remaining (uniqued based on kind + locator) fixes
+  //    iff they appear in all of the solutions.
+
   using Fix = std::pair<const Solution *, const ConstraintFix *>;
 
   llvm::SmallSetVector<Fix, 4> fixes;
