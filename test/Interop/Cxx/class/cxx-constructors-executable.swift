@@ -1,7 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -I %S/Inputs/ -o %t/cxx_interop -Xfrontend -enable-cxx-interop
-// RUN: %target-codesign %t/cxx_interop
-// RUN: %target-run %t/cxx_interop
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-cxx-interop)
 //
 // REQUIRES: executable_test
 
@@ -29,9 +26,9 @@ CxxConstructorTestSuite.test("MemberOfClassType") {
 }
 
 CxxConstructorTestSuite.test("ConstructorWithParam") {
-  let instance = ConstructorWithParam(123456)
+  let instance = ConstructorWithParam(2)
 
-  expectEqual(123456, instance.x)
+  expectEqual(44, instance.x)
 }
 
 runAllTests()

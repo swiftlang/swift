@@ -430,7 +430,7 @@ namespace {
 
   private:
     void expand(SILParameterInfo param);
-    llvm::Type *addIndirectResult(bool noCapture = true);
+    llvm::Type *addIndirectResult();
 
     SILFunctionConventions getSILFuncConventions() const {
       return SILFunctionConventions(FnType, IGM.getSILModule());
@@ -484,8 +484,7 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
   auto resultType = getSILFuncConventions().getSILResultType(
       IGM.getMaximalTypeExpansionContext());
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
-  addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet(),
-                              noCapture);
+  addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet());
   addPointerParameter(resultTI.getStorageType());
   return IGM.VoidTy;
 }
@@ -1272,6 +1271,16 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   SmallVector<clang::CanQualType,4> paramTys;
   auto const &clangCtx = IGM.getClangASTContext();
 
+  bool formalIndirectResult = FnType->getNumResults() > 0 &&
+                              FnType->getSingleResult().isFormalIndirect();
+  if (formalIndirectResult) {
+    auto resultType = getSILFuncConventions().getSingleSILResultType(
+        IGM.getMaximalTypeExpansionContext());
+    auto clangTy =
+        IGM.getClangASTContext().getPointerType(IGM.getClangType(resultType));
+    paramTys.push_back(clangTy);
+  }
+
   switch (FnType->getRepresentation()) {
   case SILFunctionTypeRepresentation::ObjCMethod: {
     // ObjC methods take their 'self' argument first, followed by an
@@ -1336,17 +1345,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   }
 
   // If we return indirectly, that is the first parameter type.
-  bool formalIndirect = FnType->getNumResults() > 0 &&
-                        FnType->getSingleResult().isFormalIndirect();
-  if (formalIndirect || returnInfo.isIndirect()) {
-    // Specify "nocapture" if we're returning the result indirectly for
-    // low-level ABI reasons, as the called function never sees the implicit
-    // output parameter.
-    // On the other hand, if the result is a formal indirect result in SIL, that
-    // means that the Clang function has an explicit output parameter (e.g. it's
-    // a C++ constructor), which it might capture -- so don't specify
-    // "nocapture" in that case.
-    addIndirectResult(/* noCapture = */ returnInfo.isIndirect());
+  if (returnInfo.isIndirect()) {
+    addIndirectResult();
   }
 
   size_t firstParamToLowerNormally = 0;
@@ -1430,6 +1430,13 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     case clang::CodeGen::ABIArgInfo::InAlloca:
       llvm_unreachable("Need to handle InAlloca during signature expansion");
     }
+  }
+
+  if (formalIndirectResult) {
+    // If the result is a formal indirect result in SIL, that means that the
+    // Clang function has an explicit output parameter (e.g. it's a C++
+    // constructor), which it might capture -- so don't specify "nocapture".
+    addIndirectResultAttributes(IGM, Attrs, 0, claimSRet(), /* nocapture = */ false);
   }
 
   if (returnInfo.isIndirect() || returnInfo.isIgnore()) {
@@ -2811,6 +2818,11 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   } else if (fnType->getRepresentation()
                 == SILFunctionTypeRepresentation::Block) {
     // Ignore the physical block-object parameter.
+    firstParam += 1;
+  // Or the indirect result parameter.
+  } else if (fnType->getNumResults() > 0 &&
+             fnType->getSingleResult().isFormalIndirect()) {
+    // Ignore the indirect result parameter.
     firstParam += 1;
   }
 

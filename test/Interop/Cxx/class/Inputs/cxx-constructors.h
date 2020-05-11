@@ -17,6 +17,18 @@ struct DefaultConstructorDeleted {
 };
 
 struct ConstructorWithParam {
-  ConstructorWithParam(int val) : x(val) {}
+  ConstructorWithParam(int val) : x(val + 42) {}
   int x;
+};
+
+struct Base {};
+
+struct ArgType {
+  int i = 42;
+};
+
+struct HasVirtualBase : public virtual Base {
+  HasVirtualBase() = delete;
+  HasVirtualBase(ArgType Arg) {}
+  int i;
 };

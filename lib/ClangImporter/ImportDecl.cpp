@@ -3439,14 +3439,19 @@ namespace {
 
       bool hasReferenceableFields = !members.empty();
 
-      if (hasZeroInitializableStorage &&
-          !Impl.SwiftContext.LangOpts.EnableCXXInterop) {
-        // Add constructors for the struct.
+      const clang::CXXRecordDecl *cxxRecordDecl =
+          dyn_cast<clang::CXXRecordDecl>(decl);
+      if (hasZeroInitializableStorage && !cxxRecordDecl) {
+        // Add default constructor for the struct if compiling in C mode.
+        // If we're compiling for C++, we'll import the C++ default constructor
+        // (if there is one), so we don't need to synthesize one here.
         ctors.push_back(createDefaultConstructor(Impl, result));
       }
 
+      bool hasUserDeclaredConstructor =
+          cxxRecordDecl && cxxRecordDecl->hasUserDeclaredConstructor();
       if (hasReferenceableFields && hasMemberwiseInitializer &&
-          !Impl.SwiftContext.LangOpts.EnableCXXInterop) {
+          !hasUserDeclaredConstructor) {
         // The default zero initializer suppresses the implicit value
         // constructor that would normally be formed, so we have to add that
         // explicitly as well.
@@ -3893,7 +3898,6 @@ namespace {
 
       AbstractFunctionDecl *result = nullptr;
       if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
-        // TODO: Is failable, throws etc. correct?
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
