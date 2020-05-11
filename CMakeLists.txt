@@ -261,7 +261,7 @@ set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
 #
-# User-configurable ICU specific options for Android, FreeBSD, Linux, Haiku, and WebAssembly.
+# User-configurable ICU specific options for Android, FreeBSD, Linux, Haiku, and WASI.
 #
 
 foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS;HAIKU;WASI)
@@ -608,6 +608,8 @@ else()
     set(SWIFT_HOST_VARIANT_ARCH_default "itanium")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "(x86|i686)")
     set(SWIFT_HOST_VARIANT_ARCH_default "i686")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "wasm32")
+    set(SWIFT_HOST_VARIANT_ARCH_default "wasm32")
   else()
     message(FATAL_ERROR "Unrecognized architecture on host system: ${CMAKE_SYSTEM_PROCESSOR}")
   endif()
@@ -792,16 +794,10 @@ if(swift_build_windows AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   configure_sdk_windows("Windows" "msvc" "${SWIFT_SDK_WINDOWS_ARCHITECTURES}")
 endif()
 
-# Should we cross-compile the standard library for WebAssembly (WASI)?
+# Should we cross-compile the standard library for WASI?
 is_sdk_requested(WASI swift_build_wasm)
 if(swift_build_wasm AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASI")
-  if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY OR SWIFT_BUILD_DYNAMIC_STDLIB)
-    message(FATAL_ERROR "Unable to build dynamic overlay/stdlib for WASI. WASM does not support dynamic linking.")
-  endif()
-  if("${SWIFT_SDK_WASI_ARCHITECTURES}" STREQUAL "")
-    set(SWIFT_SDK_WASI_ARCHITECTURES wasm32)
-  endif()
-  configure_sdk_unix("WASI" "${SWIFT_SDK_WASI_ARCHITECTURES}")
+  configure_sdk_unix(WASI wasm32)
 endif()
 
 if("${SWIFT_SDKS}" STREQUAL "")

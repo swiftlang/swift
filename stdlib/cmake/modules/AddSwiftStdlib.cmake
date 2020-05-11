@@ -311,6 +311,10 @@ function(_add_target_variant_c_compile_flags)
     endif()
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "WASI")
+    list(APPEND result "-D_WASI_EMULATED_MMAN")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -1526,6 +1530,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_LINUX
         SWIFT_MODULE_DEPENDS_OSX
         SWIFT_MODULE_DEPENDS_TVOS
+        SWIFT_MODULE_DEPENDS_WASI
         SWIFT_MODULE_DEPENDS_WATCHOS
 	    SWIFT_MODULE_DEPENDS_WASI
         SWIFT_MODULE_DEPENDS_WINDOWS
