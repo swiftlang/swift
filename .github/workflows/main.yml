@@ -69,11 +69,6 @@ jobs:
         with:
           name: macos-installable
           path: ../swift-wasm-DEVELOPMENT-SNAPSHOT-osx.tar.gz
-      - name: Upload packaging scripts
-        uses: actions/upload-artifact@v1
-        with:
-          name: packaging-scripts
-          path: utils/webassembly
       - name: Pack test results
         run: tar cJf swift-test-results.tar.gz ../build/*/swift-macosx-x86_64/swift-test-results
       - name: Upload test results
