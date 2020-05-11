@@ -280,8 +280,6 @@ private:
   /// invalidation message is sent.
   llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
 
-  // Intentionally marked private so that we need to use 'constructSIL()'
-  // to construct a SILModule.
   SILModule(ModuleDecl *M, Lowering::TypeConverter &TC,
             const SILOptions &Options, const DeclContext *associatedDC,
             bool wholeModule);
@@ -354,17 +352,6 @@ public:
 
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
-
-  /// Construct a SIL module from an AST module.
-  ///
-  /// The module will be constructed in the Raw stage. The provided AST module
-  /// should contain source files.
-  ///
-  /// If a source file is provided, SIL will only be emitted for decls in that
-  /// source file.
-  static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, Lowering::TypeConverter &TC,
-               const SILOptions &Options, FileUnit *sf = nullptr);
 
   /// Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
