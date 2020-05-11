@@ -147,10 +147,7 @@ enum class SubstFlags {
   /// Map member types to their desugared witness type.
   DesugarMemberTypes = 0x02,
   /// Substitute types involving opaque type archetypes.
-  SubstituteOpaqueArchetypes = 0x04,
-  /// Force substitution of opened archetypes. Normally -- without these flag --
-  /// opened archetype conformances are not substituted.
-  ForceSubstituteOpenedExistentials = 0x08,
+  SubstituteOpaqueArchetypes = 0x04
 };
 
 /// Options for performing substitutions into a type.
