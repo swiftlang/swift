@@ -47,9 +47,9 @@ func testGlobal() {
 // GLOBAL_EXPR-DAG: Literal[_Image]/None:               <name>#imageLiteral</name>(<callarg><callarg.label>resourceName</callarg.label>: <callarg.type><typeid.sys>String</typeid.sys></callarg.type></callarg>); name=#imageLiteral(resourceName: String)
 // GLOBAL_EXPR-DAG: Literal[Tuple]/None:                (<callarg><callarg.param>values</callarg.param></callarg>); name=(values)
 // GLOBAL_EXPR-DAG: Keyword[#function]/None:            <name>#function</name>; name=#function
-// GLOBAL_EXPR-DAG: Decl[Module]/None:                  <name>Swift</name>; name=Swift
-// GLOBAL_EXPR-DAG: Decl[Struct]/OtherModule[Swift]:    <name>Int</name>; name=Int
-// GLOBAL_EXPR-DAG: Decl[FreeFunction]/OtherModule[Swift]: <name>print</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>items</callarg.param>: <callarg.type><keyword>Any</keyword></callarg.type>...</callarg>, <callarg><callarg.label>to</callarg.label> <callarg.param>output</callarg.param>: &amp;<callarg.type><typeid.sys>TextOutputStream</typeid.sys></callarg.type></callarg>); name=print(items: Any..., to: &TextOutputStream)
+// GLOBAL_EXPR-DAG: Decl[Module]/None/IsSystem:         <name>Swift</name>; name=Swift
+// GLOBAL_EXPR-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: <name>Int</name>; name=Int
+// GLOBAL_EXPR-DAG: Decl[FreeFunction]/OtherModule[Swift]/IsSystem: <name>print</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>items</callarg.param>: <callarg.type><keyword>Any</keyword></callarg.type>...</callarg>, <callarg><callarg.label>to</callarg.label> <callarg.param>output</callarg.param>: &amp;<callarg.type><typeid.sys>TextOutputStream</typeid.sys></callarg.type></callarg>); name=print(items: Any..., to: &TextOutputStream)
 // GLOBAL_EXPR: End completions
 
 
@@ -58,8 +58,8 @@ func testType(value: #^GLOBAL_TYPE^#) {}
 // GLOBAL_TYPE-DAG: Keyword/None:                       <keyword>Any</keyword>; name=Any
 // GLOBAL_TYPE-DAG: Decl[Struct]/CurrModule:            <name>MyStruct</name>; name=MyStruct
 // GLOBAL_TYPE-DAG: Decl[Module]/None:                  <name>swift_ide_test</name>; name=swift_ide_test
-// GLOBAL_TYPE-DAG: Decl[Module]/None:                  <name>Swift</name>; name=Swift
-// GLOBAL_TYPE-DAG: Decl[Struct]/OtherModule[Swift]:    <name>Int</name>; name=Int
+// GLOBAL_TYPE-DAG: Decl[Module]/None/IsSystem:         <name>Swift</name>; name=Swift
+// GLOBAL_TYPE-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: <name>Int</name>; name=Int
 // GLOBAL_TYPE: End completions
 
 
@@ -89,7 +89,7 @@ func testPostfix(value: MyStruct) {
 // EXPR_POSTFIX-DAG: Decl[Subscript]/CurrNominal:        [<callarg><callarg.label>_</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>]; name=[param: Int]
 // EXPR_POSTFIX-DAG: Decl[Subscript]/CurrNominal:        [<callarg><callarg.label>label</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>]; name=[label: Int]
 // EXPR_POSTFIX-DAG: Keyword[self]/CurrNominal:          <keyword>self</keyword>; name=self
-// EXPR_POSTFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: <name>+</name>; name=+ MyStruct
+// EXPR_POSTFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: <name>+</name>; name=+ MyStruct
 // EXPR_POSTFIX: End completions
 
 func testImplicitMember() -> MyStruct {
