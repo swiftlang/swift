@@ -4570,14 +4570,9 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   if (!resolvedDiffParamIndices)
     return true;
 
-  // Check if the differentiability parameter indices are valid.
-  if (checkDifferentiabilityParameters(
-          originalAFD, resolvedDiffParamIndices, originalFnType,
-          derivative->getGenericEnvironment(), derivative->getModuleContext(),
-          parsedDiffParams, attr->getLocation()))
-    return true;
-
   // Set the resolved differentiability parameter indices in the attribute.
+  // Differentiability parameter indices verification is done by
+  // `AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType` below.
   attr->setParameterIndices(resolvedDiffParamIndices);
 
   // Compute the expected differential/pullback type.
@@ -4588,43 +4583,39 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Helper for diagnosing derivative function type errors.
   auto errorHandler = [&](const DerivativeFunctionTypeError &error) {
+    attr->setInvalid();
     switch (error.kind) {
     case DerivativeFunctionTypeError::Kind::NoSemanticResults:
       diags
           .diagnose(attr->getLocation(),
                     diag::autodiff_attr_original_multiple_semantic_results)
           .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
-      attr->setInvalid();
       return;
     case DerivativeFunctionTypeError::Kind::MultipleSemanticResults:
       diags
           .diagnose(attr->getLocation(),
                     diag::autodiff_attr_original_multiple_semantic_results)
           .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
-      attr->setInvalid();
       return;
-    case DerivativeFunctionTypeError::Kind::NonDifferentiableParameters: {
-      auto *nonDiffParamIndices = error.getNonDifferentiableParameterIndices();
-      SmallVector<AnyFunctionType::Param, 4> diffParams;
-      error.functionType->getSubsetParameters(resolvedDiffParamIndices,
-                                              diffParams);
-      for (unsigned i : range(diffParams.size())) {
-        if (!nonDiffParamIndices->contains(i))
-          continue;
-        SourceLoc loc = parsedDiffParams.empty() ? attr->getLocation()
-                                                 : parsedDiffParams[i].getLoc();
-        auto diffParamType = diffParams[i].getPlainType();
-        diags.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
-                       diffParamType);
-      }
+    case DerivativeFunctionTypeError::Kind::NoDifferentiabilityParameters:
+      diags.diagnose(attr->getLocation(),
+                     diag::diff_params_clause_no_inferred_parameters);
+      return;
+    case DerivativeFunctionTypeError::Kind::
+        NonDifferentiableDifferentiabilityParameter: {
+      auto nonDiffParam = error.getNonDifferentiableTypeAndIndex();
+      SourceLoc loc = parsedDiffParams.empty()
+                          ? attr->getLocation()
+                          : parsedDiffParams[nonDiffParam.second].getLoc();
+      diags.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
+                     nonDiffParam.first);
       return;
     }
     case DerivativeFunctionTypeError::Kind::NonDifferentiableResult:
-      auto originalResultType = error.getNonDifferentiableResultType();
+      auto nonDiffResult = error.getNonDifferentiableTypeAndIndex();
       diags.diagnose(attr->getLocation(),
                      diag::differentiable_attr_result_not_differentiable,
-                     originalResultType);
-      attr->setInvalid();
+                     nonDiffResult.first);
       return;
     }
   };
