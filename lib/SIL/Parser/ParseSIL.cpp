@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SILParsedLocalValueMap.h"
 #include "SILParserFunctionBuilder.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -21,6 +22,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
@@ -47,6 +49,7 @@ using namespace swift::syntax;
 //===----------------------------------------------------------------------===//
 
 namespace swift {
+
 // This has to be in the 'swift' namespace because it's forward-declared for
 // SILParserState.
 class SILParserTUState : public SILParserTUStateBase {
@@ -161,6 +164,7 @@ namespace {
   class SILParser {
     friend SILParserTUState;
   public:
+    SILParsedLocalValueMap localValueMap;
     Parser &P;
     SILModule &SILMod;
     SILParserTUState &TUState;
@@ -175,10 +179,6 @@ namespace {
     llvm::DenseMap<Identifier, SILBasicBlock*> BlocksByName;
     llvm::DenseMap<SILBasicBlock*,
                    Located<Identifier>> UndefinedBlocks;
-
-    /// Data structures used to perform name lookup for local values.
-    llvm::StringMap<ValueBase*> LocalValues;
-    llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     /// A callback to be invoked every time a type was deserialized.
     std::function<void(Type)> ParsedTypeCallback;
@@ -195,9 +195,12 @@ namespace {
 
   public:
     SILParser(Parser &P)
-        : P(P), SILMod(static_cast<SILParserTUState *>(P.SIL)->M),
+        : localValueMap(static_cast<SILParserTUState *>(P.SIL)->M), P(P),
+          SILMod(static_cast<SILParserTUState *>(P.SIL)->M),
           TUState(*static_cast<SILParserTUState *>(P.SIL)),
-          ParsedTypeCallback([](Type ty) {}) {}
+          ParsedTypeCallback([](Type ty) {}) {
+      localValueMap.hadError = [&HadError = HadError]() { HadError = true; };
+    }
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
@@ -224,21 +227,17 @@ namespace {
     /// being defined.
     SILBasicBlock *getBBForReference(Identifier Name, SourceLoc Loc);
 
-    struct UnresolvedValueName {
-      StringRef Name;
-      SourceLoc NameLoc;
+    /// Call into localValueStorage.getLocalValue.
+    SILValue getLocalValue(UnresolvedValueName name, SILType type,
+                           SILLocation loc, SILBuilder &builder) {
+      // TODO: builder -> builder.getFunction().
+      return localValueMap.getLocalValue(name, type, loc, builder);
+    }
 
-      bool isUndef() const { return Name == "undef"; }
-    };
-
-    /// getLocalValue - Get a reference to a local value with the specified name
-    /// and type.
-    SILValue getLocalValue(UnresolvedValueName Name, SILType Type,
-                           SILLocation L, SILBuilder &B);
-
-    /// setLocalValue - When an instruction or block argument is defined, this
-    /// method is used to register it and update our symbol table.
-    void setLocalValue(ValueBase *Value, StringRef Name, SourceLoc NameLoc);
+    /// Call into localValueStorage.setLocalValue.
+    void setLocalValue(SILValue val, StringRef name, SourceLoc loc) {
+      localValueMap.setLocalValue(val, name, loc);
+    }
 
     SILDebugLocation getDebugLoc(SILBuilder & B, SILLocation Loc) {
       return SILDebugLocation(Loc, F->getDebugScope());
@@ -538,15 +537,13 @@ bool SILParser::diagnoseProblems() {
 
     HadError = true;
   }
-  
-  if (!ForwardRefLocalValues.empty()) {
-    // FIXME: These are going to come out in nondeterministic order.
-    for (auto &Entry : ForwardRefLocalValues)
-      P.diagnose(Entry.second, diag::sil_use_of_undefined_value,
-                 Entry.first());
+
+  if (!localValueMap.getForwardRefs().empty()) {
+    for (auto &Entry : localValueMap.getForwardRefs())
+      P.diagnose(Entry.second, diag::sil_use_of_undefined_value, Entry.first);
     HadError = true;
   }
-  
+
   return HadError;
 }
 
@@ -675,72 +672,6 @@ SILBasicBlock *SILParser::getBBForReference(Identifier Name, SourceLoc Loc) {
 bool SILParser::parseGlobalName(Identifier &Name) {
   return P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
          parseSILIdentifier(Name, diag::expected_sil_value_name);
-}
-
-/// getLocalValue - Get a reference to a local value with the specified name
-/// and type.
-SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
-                                  SILLocation Loc, SILBuilder &B) {
-  if (Name.isUndef())
-    return SILUndef::get(Type, B.getFunction());
-
-  // Check to see if this is already defined.
-  ValueBase *&Entry = LocalValues[Name.Name];
-
-  if (Entry) {
-    // If this value is already defined, check it to make sure types match.
-    SILType EntryTy = Entry->getType();
-
-    if (EntryTy != Type) {
-      HadError = true;
-      P.diagnose(Name.NameLoc, diag::sil_value_use_type_mismatch, Name.Name,
-                 EntryTy.getASTType(), Type.getASTType());
-      // Make sure to return something of the requested type.
-      return new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
-    }
-
-    return SILValue(Entry);
-  }
-  
-  // Otherwise, this is a forward reference.  Create a dummy node to represent
-  // it until we see a real definition.
-  ForwardRefLocalValues[Name.Name] = Name.NameLoc;
-
-  Entry = new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
-  return Entry;
-}
-
-/// setLocalValue - When an instruction or block argument is defined, this
-/// method is used to register it and update our symbol table.
-void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
-                              SourceLoc NameLoc) {
-  ValueBase *&Entry = LocalValues[Name];
-
-  // If this value was already defined, it is either a redefinition, or a
-  // specification for a forward referenced value.
-  if (Entry) {
-    if (!ForwardRefLocalValues.erase(Name)) {
-      P.diagnose(NameLoc, diag::sil_value_redefinition, Name);
-      HadError = true;
-      return;
-    }
-
-    // If the forward reference was of the wrong type, diagnose this now.
-    if (Entry->getType() != Value->getType()) {
-      P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
-                 Entry->getType().getASTType(),
-                 Value->getType().getASTType());
-      HadError = true;
-    } else {
-      // Forward references only live here if they have a single result.
-      Entry->replaceAllUsesWith(Value);
-    }
-    Entry = Value;
-    return;
-  }
-
-  // Otherwise, just store it in our map.
-  Entry = Value;
 }
 
 
