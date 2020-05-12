@@ -213,7 +213,7 @@ void SwiftLangSupport::codeComplete(
     }
 
     SKConsumer.setReusingASTContext(info.completionContext->ReusingASTContext);
-    SKConsumer.setAnnotatedTypename(info.completionContext->getAnnnoateResult());
+    SKConsumer.setAnnotatedTypename(info.completionContext->getAnnotateResult());
   });
 
   std::string Error;
@@ -1236,7 +1236,7 @@ void SwiftLangSupport::codeCompleteOpen(
         typeContextKind = completionCtx.typeContextKind;
         mayUseImplicitMemberExpr = completionCtx.MayUseImplicitMemberExpr;
         consumer.setReusingASTContext(completionCtx.ReusingASTContext);
-        consumer.setAnnotatedTypename(completionCtx.getAnnnoateResult());
+        consumer.setAnnotatedTypename(completionCtx.getAnnotateResult());
         completions =
             extendCompletions(results, sink, info, nameToPopularity, CCOpts);
       });

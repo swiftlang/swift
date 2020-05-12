@@ -889,7 +889,7 @@ public:
       : Cache(Cache) {}
 
   void setAnnotateResult(bool flag) { CurrentResults.annotateResult = flag; }
-  bool getAnnnoateResult() { return CurrentResults.annotateResult; }
+  bool getAnnotateResult() { return CurrentResults.annotateResult; }
 
   /// Allocate a string owned by the code completion context.
   StringRef copyString(StringRef Str);
