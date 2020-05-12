@@ -452,6 +452,10 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   if (CastOpt.optimizeMetatypeConversion(TTOCMI, MetatypeRepresentation::Thick))
     MadeChange = true;
 
+  if (auto *OCTTMI = dyn_cast<ObjCToThickMetatypeInst>(TTOCMI->getOperand())) {
+    TTOCMI->replaceAllUsesWith(OCTTMI->getOperand());
+    return eraseInstFromFunction(*TTOCMI);
+  }
   return nullptr;
 }
 
@@ -472,6 +476,10 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   if (CastOpt.optimizeMetatypeConversion(OCTTMI, MetatypeRepresentation::ObjC))
     MadeChange = true;
 
+  if (auto *TTOCMI = dyn_cast<ThickToObjCMetatypeInst>(OCTTMI->getOperand())) {
+    OCTTMI->replaceAllUsesWith(TTOCMI->getOperand());
+    return eraseInstFromFunction(*OCTTMI);
+  }
   return nullptr;
 }
 
