@@ -1149,6 +1149,10 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
 
   // In an if-let, the actual type of the expression is Optional of whatever
   // was written.
+  // FIXME: This is not good, `TypeRepr`s are supposed to represent what the
+  // user actually wrote in source (that's why they don't have any `isImplicit`
+  // bit). This synthesized `OptionalTypeRepr` leads to workarounds in other
+  // parts where we want to reason about the types as perceived by the user.
   if (isOptional)
     repr = new (Context) OptionalTypeRepr(repr, SourceLoc());
 
