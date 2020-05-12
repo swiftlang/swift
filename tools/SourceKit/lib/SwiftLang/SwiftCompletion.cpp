@@ -77,8 +77,7 @@ struct SwiftToSourceKitCompletionAdapter {
 
   static void getResultSourceText(const CodeCompletionString *CCStr,
                                   raw_ostream &OS);
-  static void getResultTypeName(const CodeCompletionString *CCStr,
-                                raw_ostream &OS);
+
   static void getResultAssociatedUSRs(ArrayRef<StringRef> AssocUSRs,
                                       raw_ostream &OS);
 };
@@ -212,8 +211,9 @@ void SwiftLangSupport::codeComplete(
               SKConsumer, Result, CCOpts.annotatedDescription))
         break;
     }
-    
+
     SKConsumer.setReusingASTContext(info.completionContext->ReusingASTContext);
+    SKConsumer.setAnnotatedTypename(info.completionContext->getAnnotateResult());
   });
 
   std::string Error;
@@ -473,7 +473,10 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   unsigned TypeBegin = SS.size();
   {
     llvm::raw_svector_ostream ccOS(SS);
-    getResultTypeName(Result->getCompletionString(), ccOS);
+    if (annotatedDescription)
+      ide::printCodeCompletionResultTypeNameAnnotated(*Result, ccOS);
+    else
+      ide::printCodeCompletionResultTypeName(*Result, ccOS);
   }
   unsigned TypeEnd = SS.size();
 
@@ -544,6 +547,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   Info.ModuleName = Result->getModuleName();
   Info.DocBrief = Result->getBriefDocComment();
   Info.NotRecommended = Result->isNotRecommended();
+  Info.IsSystem = Result->isSystem();
 
   Info.NumBytesToErase = Result->getNumBytesToErase();
 
@@ -702,16 +706,13 @@ void SwiftToSourceKitCompletionAdapter::getResultSourceText(
       --i;
       continue;
     }
-    if (!C.isAnnotation() && C.hasText()) {
-      OS << C.getText();
+    if (C.is(ChunkKind::TypeAnnotationBegin)) {
+      // Skip type annotation structure.
+      auto level = C.getNestingLevel();
+      do { ++i; } while (i != Chunks.size() && !Chunks[i].endsPreviousNestedGroup(level));
+      --i;
     }
-  }
-}
-
-void SwiftToSourceKitCompletionAdapter::getResultTypeName(
-    const CodeCompletionString *CCStr, raw_ostream &OS) {
-  for (auto C : CCStr->getChunks()) {
-    if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) {
+    if (!C.isAnnotation() && C.hasText()) {
       OS << C.getText();
     }
   }
@@ -1235,6 +1236,7 @@ void SwiftLangSupport::codeCompleteOpen(
         typeContextKind = completionCtx.typeContextKind;
         mayUseImplicitMemberExpr = completionCtx.MayUseImplicitMemberExpr;
         consumer.setReusingASTContext(completionCtx.ReusingASTContext);
+        consumer.setAnnotatedTypename(completionCtx.getAnnotateResult());
         completions =
             extendCompletions(results, sink, info, nameToPopularity, CCOpts);
       });

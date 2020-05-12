@@ -93,6 +93,7 @@ struct CodeCompletionInfo {
   UIdent TypeRelation;
   Optional<uint8_t> ModuleImportDepth;
   bool NotRecommended;
+  bool IsSystem;
   unsigned NumBytesToErase;
 
   struct IndexRange {
@@ -147,6 +148,7 @@ public:
 
   virtual void setCompletionKind(UIdent kind) {};
   virtual void setReusingASTContext(bool) = 0;
+  virtual void setAnnotatedTypename(bool) = 0;
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 

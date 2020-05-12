@@ -1946,6 +1946,7 @@ public:
 
   void setCompletionKind(UIdent kind) override;
   void setReusingASTContext(bool flag) override;
+  void setAnnotatedTypename(bool flag) override;
   bool handleResult(const CodeCompletionInfo &Info) override;
 };
 } // end anonymous namespace
@@ -1982,6 +1983,11 @@ void SKCodeCompletionConsumer::setReusingASTContext(bool flag) {
     RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
 }
 
+void SKCodeCompletionConsumer::setAnnotatedTypename(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyAnnotatedTypename, flag);
+}
+
 bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
   Optional<StringRef> ModuleNameOpt;
   if (!R.ModuleName.empty())
@@ -2006,6 +2012,7 @@ bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
                      R.SemanticContext,
                      R.TypeRelation,
                      R.NotRecommended,
+                     R.IsSystem,
                      R.NumBytesToErase);
   return true;
 }
@@ -2039,6 +2046,7 @@ public:
   void endGroup() override;
   void setNextRequestStart(unsigned offset) override;
   void setReusingASTContext(bool flag) override;
+  void setAnnotatedTypename(bool flag) override;
 };
 } // end anonymous namespace
 
@@ -2181,6 +2189,8 @@ bool SKGroupedCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) 
     result.set(KeyModuleImportDepth, *R.ModuleImportDepth);
   if (R.NotRecommended)
     result.set(KeyNotRecommended, R.NotRecommended);
+  if (R.IsSystem)
+    result.set(KeyIsSystem, R.IsSystem);
   result.set(KeyNumBytesToErase, R.NumBytesToErase);
 
   if (R.descriptionStructure) {
@@ -2239,6 +2249,10 @@ void SKGroupedCodeCompletionConsumer::setNextRequestStart(unsigned offset) {
 void SKGroupedCodeCompletionConsumer::setReusingASTContext(bool flag) {
   if (flag)
     RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
+}
+void SKGroupedCodeCompletionConsumer::setAnnotatedTypename(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyAnnotatedTypename, flag);
 }
 
 //===----------------------------------------------------------------------===//

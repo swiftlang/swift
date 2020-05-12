@@ -182,6 +182,10 @@ public:
     /// This chunk should not be inserted into the editor buffer.
     TypeAnnotation,
 
+    /// Structured group version of 'TypeAnnotation'.
+    /// This grouped chunks should not be inserted into the editor buffer.
+    TypeAnnotationBegin,
+
     /// A brace statement -- left brace and right brace.  The preferred
     /// position to put the cursor after the completion result is inserted
     /// into the editor buffer is between the braces.
@@ -195,7 +199,8 @@ public:
     return Kind == ChunkKind::CallParameterBegin ||
            Kind == ChunkKind::GenericParameterBegin ||
            Kind == ChunkKind::OptionalBegin ||
-           Kind == ChunkKind::CallParameterTypeBegin;
+           Kind == ChunkKind::CallParameterTypeBegin ||
+           Kind == ChunkKind::TypeAnnotationBegin;
   }
 
   static bool chunkHasText(ChunkKind Kind) {
@@ -594,6 +599,7 @@ private:
   unsigned SemanticContext : 3;
   unsigned NotRecommended : 1;
   unsigned NotRecReason : 3;
+  unsigned IsSystem : 1;
 
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
@@ -634,6 +640,7 @@ public:
     assert(!isOperator() ||
            getOperatorKind() != CodeCompletionOperatorKind::None);
     AssociatedKind = 0;
+    IsSystem = 0;
   }
 
   /// Constructs a \c Keyword result.
@@ -651,6 +658,7 @@ public:
         TypeDistance(TypeDistance) {
     assert(CompletionString);
     AssociatedKind = static_cast<unsigned>(Kind);
+    IsSystem = 0;
   }
 
   /// Constructs a \c Literal result.
@@ -667,6 +675,7 @@ public:
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(LiteralKind);
+    IsSystem = 0;
     assert(CompletionString);
   }
 
@@ -694,6 +703,7 @@ public:
         TypeDistance(TypeDistance) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
+    IsSystem = getDeclIsSystem(AssociatedDecl);
     assert(CompletionString);
     if (isOperator())
       KnownOperatorKind =
@@ -706,8 +716,8 @@ public:
   CodeCompletionResult(SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
-                       CodeCompletionDeclKind DeclKind, StringRef ModuleName,
-                       bool NotRecommended,
+                       CodeCompletionDeclKind DeclKind, bool IsSystem,
+                       StringRef ModuleName, bool NotRecommended,
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
@@ -718,10 +728,10 @@ public:
         KnownOperatorKind(unsigned(KnownOperatorKind)),
         SemanticContext(unsigned(SemanticContext)),
         NotRecommended(NotRecommended), NotRecReason(NotRecReason),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
-        TypeDistance(TypeDistance) {
+        IsSystem(IsSystem), NumBytesToErase(NumBytesToErase),
+        CompletionString(CompletionString), ModuleName(ModuleName),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
+        DocWords(DocWords), TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
     assert(!isOperator() ||
@@ -761,6 +771,10 @@ public:
   CodeCompletionOperatorKind getOperatorKind() const {
     assert(isOperator());
     return static_cast<CodeCompletionOperatorKind>(KnownOperatorKind);
+  }
+
+  bool isSystem() const {
+    return static_cast<bool>(IsSystem);
   }
 
   ExpectedTypeRelation getExpectedTypeRelation() const {
@@ -810,6 +824,7 @@ public:
   getCodeCompletionOperatorKind(StringRef name);
   static CodeCompletionOperatorKind
   getCodeCompletionOperatorKind(CodeCompletionString *str);
+  static bool getDeclIsSystem(const Decl *D);
 };
 
 struct CodeCompletionResultSink {
@@ -874,7 +889,7 @@ public:
       : Cache(Cache) {}
 
   void setAnnotateResult(bool flag) { CurrentResults.annotateResult = flag; }
-  bool getAnnnoateResult() { return CurrentResults.annotateResult; }
+  bool getAnnotateResult() { return CurrentResults.annotateResult; }
 
   /// Allocate a string owned by the code completion context.
   StringRef copyString(StringRef Str);
