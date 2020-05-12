@@ -127,7 +127,7 @@ public struct Slice<Base: Collection> {
   ///
   ///     print(singleNonZeroDigits.count)
   ///     // Prints "9"
-  ///     prints(singleNonZeroDigits.base.count)
+  ///     print(singleNonZeroDigits.base.count)
   ///     // Prints "10"
   ///     print(singleDigits == singleNonZeroDigits.base)
   ///     // Prints "true"
