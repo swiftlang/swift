@@ -55,8 +55,8 @@ sil_global hidden @fixedGlobal : $LargeResilientStruct
 // CHECK: @otherGlobal = {{(dllexport )?}}{{(protected )?}}global [[BUFFER]] zeroinitializer
 sil_global [let] @otherGlobal : $Size
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testSmallGlobal()
-sil @testSmallGlobal : $@convention(thin) () -> () {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @testSmallGlobal()
+sil @testSmallGlobal : $@convention(thin) () -> Int32 {
 bb0:
   // This is just a no-op
   alloc_global @smallGlobal
@@ -67,10 +67,8 @@ bb0:
   %x_addr = struct_element_addr %addr : $*SmallResilientStruct, #SmallResilientStruct.x
   %x = load %x_addr : $*Int32
 
-  %tuple = tuple ()
-
-  // CHECK: ret void
-  return %tuple : $()
+  // CHECK: ret i32 [[VALUE]]
+  return %x : $Int32
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testLargeGlobal()
@@ -89,21 +87,19 @@ bb0:
   return %tuple : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testFixedGlobal()
-sil @testFixedGlobal : $@convention(thin) () -> () {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @testFixedGlobal()
+sil @testFixedGlobal : $@convention(thin) () -> Int64 {
 bb0:
   alloc_global @fixedGlobal
 
   %addr = global_addr @fixedGlobal : $*LargeResilientStruct
 
-  // CHECK:      load i64, i64* getelementptr inbounds (%T17global_resilience20LargeResilientStructV, %T17global_resilience20LargeResilientStructV* @fixedGlobal, i32 0, i32 1, i32 0)
+  // CHECK: [[VALUE:%.*]] = load i64, i64* getelementptr inbounds (%T17global_resilience20LargeResilientStructV, %T17global_resilience20LargeResilientStructV* @fixedGlobal, i32 0, i32 1, i32 0)
   %x_addr = struct_element_addr %addr : $*LargeResilientStruct, #LargeResilientStruct.x
   %x = load %x_addr : $*Int64
 
-  %tuple = tuple ()
-
-  // CHECK: ret void
-  return %tuple : $()
+  // CHECK: ret i64 [[VALUE]]
+  return %x : $Int64
 }
 
 // CHECK-LABEL: define {{.*}} @testOtherGlobal
