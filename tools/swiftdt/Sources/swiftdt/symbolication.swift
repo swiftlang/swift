@@ -1,4 +1,4 @@
-import Darwin
+import Foundation
 import SymbolicationShims
 
 private let symbolicationPath =
@@ -51,25 +51,11 @@ enum Sym {
     symbol(symbolicationHandle, "task_stop_peeking")
 }
 
-private enum CF {
-  static let path = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
-  static let handle = dlopen(path, RTLD_LAZY)!
-  static let stringCreateWithCString:
-    @convention(c) (UnsafeRawPointer?, UnsafePointer<CChar>, UInt32) ->
-      Unmanaged<AnyObject> = symbol(handle, "CFStringCreateWithCString")
-  static let stringEncodingUTF8: UInt32 = 0x08000100
-}
-
 typealias CSMachineTime = UInt64
 let kCSNow = CSMachineTime(Int64.max) + 1
 
-private func withNSString<T>(_ str: String, call: (AnyObject) -> T) -> T {
-  let cfstr = CF.stringCreateWithCString(nil, str, CF.stringEncodingUTF8)
-  return call(cfstr.takeRetainedValue())
-}
-
 func pidFromHint(_ hint: String) -> pid_t? {
-  let result = withNSString(hint, call: Sym.pidFromHint)
+  let result = Sym.pidFromHint(hint as NSString)
   return result == 0 ? nil : result
 }
 

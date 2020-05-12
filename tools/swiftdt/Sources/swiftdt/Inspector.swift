@@ -1,4 +1,4 @@
-import Darwin
+import Foundation
 import SwiftRemoteMirror
 import SymbolicationShims
 

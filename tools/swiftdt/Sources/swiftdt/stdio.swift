@@ -1,4 +1,4 @@
-import Darwin
+import Foundation
 
 enum Std {
   struct File: TextOutputStream {
