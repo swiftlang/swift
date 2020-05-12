@@ -152,7 +152,7 @@ public:
                       TypeArrayView<GenericTypeParamType> genericParams,
                       ArrayRef<Requirement> requirements);
 public:
-  using ConformsToArray = SmallVector<ProtocolDecl *, 2>;
+  using RequiredProtocols = SmallVector<ProtocolDecl *, 2>;
 
 private:
   // Direct comparison is disabled for generic signatures.  Canonicalize them
@@ -318,12 +318,13 @@ public:
   /// Determine the superclass bound on the given dependent type.
   Type getSuperclassBound(Type type) const;
 
-  /// Determine the set of protocols to which the given dependent type
-  /// must conform.
-  GenericSignature::ConformsToArray getConformsTo(Type type) const;
+  /// Determine the set of protocols to which the given type parameter is
+  /// required to conform.
+  GenericSignature::RequiredProtocols getRequiredProtocols(Type type) const;
 
-  /// Determine whether the given dependent type conforms to this protocol.
-  bool conformsToProtocol(Type type, ProtocolDecl *proto) const;
+  /// Determine whether the given type parameter is required to conform to
+  /// the given protocol.
+  bool requiresProtocol(Type type, ProtocolDecl *proto) const;
 
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type) const;
