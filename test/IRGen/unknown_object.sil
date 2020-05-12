@@ -4,6 +4,8 @@ sil_stage canonical
 
 import Builtin
 
+sil @anyobject_user : $@convention(thin) (@guaranteed Builtin.AnyObject) -> ()
+
 // CHECK-LABEL: @retain_release_unknown_object
 sil [ossa] @retain_release_unknown_object : $@convention(thin) (@guaranteed Builtin.AnyObject) -> () {
 entry(%x : @guaranteed $Builtin.AnyObject):
@@ -13,6 +15,8 @@ entry(%x : @guaranteed $Builtin.AnyObject):
   br bb1
 
 bb1:
+  %func = function_ref @anyobject_user : $@convention(thin) (@guaranteed Builtin.AnyObject) -> ()
+  apply %func(%y) : $@convention(thin) (@guaranteed Builtin.AnyObject) -> ()
   // CHECK-native: swift_release
   // CHECK-objc: swift_unknownObjectRelease
   destroy_value %y : $Builtin.AnyObject

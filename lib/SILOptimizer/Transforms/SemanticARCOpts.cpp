@@ -710,11 +710,20 @@ struct SemanticARCOptVisitor
   /// consumed operand.
   FrozenMultiMap<SILValue, Operand *> joinedOwnedIntroducerToConsumedOperands;
 
+  /// If set to true, then we should only run cheap optimizations that do not
+  /// build up data structures or analyze code in depth.
+  ///
+  /// As an example, we do not do load [copy] optimizations here since they
+  /// generally involve more complex analysis, but simple peepholes of
+  /// copy_values we /do/ allow.
+  bool onlyGuaranteedOpts;
+
   using FrozenMultiMapRange =
       decltype(joinedOwnedIntroducerToConsumedOperands)::PairToSecondEltRange;
 
-  explicit SemanticARCOptVisitor(SILFunction &F)
-      : F(F), addressToExhaustiveWriteListCache(constructCacheValue) {}
+  explicit SemanticARCOptVisitor(SILFunction &F, bool onlyGuaranteedOpts)
+      : F(F), addressToExhaustiveWriteListCache(constructCacheValue),
+        onlyGuaranteedOpts(onlyGuaranteedOpts) {}
 
   DeadEndBlocks &getDeadEndBlocks() {
     if (!TheDeadEndBlocks)
@@ -1250,6 +1259,10 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
 //
 // TODO: This needs a better name.
 bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
+  // For now, do not run this optimization. This is just to be careful.
+  if (onlyGuaranteedOpts)
+    return false;
+
   SmallVector<BorrowedValue, 4> borrowScopeIntroducers;
 
   // Find all borrow introducers for our copy operand. If we are unable to find
@@ -1424,6 +1437,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
 /// If cvi only has destroy value users, then cvi is a dead live range. Lets
 /// eliminate all such dead live ranges.
 bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
+  // This is a cheap optimization generally.
+
   // See if we are lucky and have a simple case.
   if (auto *op = cvi->getSingleUse()) {
     if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
@@ -1622,6 +1637,10 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
   }
 
   // Otherwise, we couldn't handle this case, so return false.
+  //
+  // NOTE: We would generally do a more complex analysis here to handle the more
+  // general case. That would most likely /not/ be a guaranteed optimization
+  // until we investigate/measure.
   return false;
 }
 
@@ -1928,6 +1947,11 @@ bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load, const LiveRange &lr) {
 // Convert a load [copy] from unique storage [read] that has all uses that can
 // accept a guaranteed parameter to a load_borrow.
 bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
+  // This optimization can use more complex analysis. We should do some
+  // experiments before enabling this by default as a guaranteed optimization.
+  if (onlyGuaranteedOpts)
+    return false;
+
   if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return false;
 
@@ -1970,6 +1994,11 @@ namespace {
 // case DiagnosticConstantPropagation exposed anything new in this assert
 // configuration.
 struct SemanticARCOpts : SILFunctionTransform {
+  bool guaranteedOptsOnly;
+
+  SemanticARCOpts(bool guaranteedOptsOnly)
+      : guaranteedOptsOnly(guaranteedOptsOnly) {}
+
   void run() override {
     SILFunction &f = *getFunction();
 
@@ -1982,7 +2011,7 @@ struct SemanticARCOpts : SILFunctionTransform {
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 
-    SemanticARCOptVisitor visitor(f);
+    SemanticARCOptVisitor visitor(f, guaranteedOptsOnly);
 
     // Add all the results of all instructions that we want to visit to the
     // worklist.
@@ -2008,4 +2037,10 @@ struct SemanticARCOpts : SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createSemanticARCOpts() { return new SemanticARCOpts(); }
+SILTransform *swift::createSemanticARCOpts() {
+  return new SemanticARCOpts(false /*guaranteed*/);
+}
+
+SILTransform *swift::createGuaranteedARCOpts() {
+  return new SemanticARCOpts(true /*guaranteed*/);
+}

@@ -12,7 +12,6 @@ silopt_register_sources(
   DiagnoseStaticExclusivity.cpp
   DiagnoseUnreachable.cpp
   Differentiation.cpp
-  GuaranteedARCOpts.cpp
   IRGenPrepare.cpp
   MandatoryInlining.cpp
   PredictableMemOpt.cpp

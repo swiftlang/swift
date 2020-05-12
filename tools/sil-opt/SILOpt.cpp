@@ -48,7 +48,13 @@ namespace cl = llvm::cl;
 
 namespace {
 
-enum class OptGroup { Unknown, Diagnostics, Performance, Lowering };
+enum class OptGroup {
+  Unknown,
+  Diagnostics,
+  OnonePerformance,
+  Performance,
+  Lowering
+};
 
 } // end anonymous namespace
 
@@ -147,6 +153,8 @@ static llvm::cl::opt<OptGroup> OptimizationGroup(
         clEnumValN(OptGroup::Diagnostics, "diagnostics",
                    "Run diagnostic passes"),
         clEnumValN(OptGroup::Performance, "O", "Run performance passes"),
+        clEnumValN(OptGroup::OnonePerformance, "Onone-performance",
+                   "Run Onone perf passes"),
         clEnumValN(OptGroup::Lowering, "lowering", "Run lowering passes")),
     llvm::cl::init(OptGroup::Unknown));
 
@@ -482,18 +490,27 @@ int main(int argc, char **argv) {
     SILMod->installSILRemarkStreamer();
   }
 
-  if (OptimizationGroup == OptGroup::Diagnostics) {
+  switch (OptimizationGroup) {
+  case OptGroup::Diagnostics:
     runSILDiagnosticPasses(*SILMod.get());
-  } else if (OptimizationGroup == OptGroup::Performance) {
+    break;
+  case OptGroup::Performance:
     runSILOptimizationPasses(*SILMod.get());
-  } else if (OptimizationGroup == OptGroup::Lowering) {
+    break;
+  case OptGroup::Lowering:
     runSILLoweringPasses(*SILMod.get());
-  } else {
+    break;
+  case OptGroup::OnonePerformance:
+    runSILPassesForOnone(*SILMod.get());
+    break;
+  case OptGroup::Unknown: {
     auto T = irgen::createIRGenModule(
         SILMod.get(), Invocation.getOutputFilenameForAtMostOnePrimary(),
         Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "");
     runCommandLineSelectedPasses(SILMod.get(), T.second);
     irgen::deleteIRGenModule(T);
+    break;
+  }
   }
 
   if (EmitSIB) {

@@ -78,8 +78,15 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
   P.addRawSILInstLowering();
 }
 
-static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("Guaranteed Passes");
+// This pipeline defines a set of mandatory diagnostic passes and a set of
+// supporting optimization passes that enable those diagnostics. These are run
+// before any performance optimizations and in contrast to those optimizations
+// _IS_ run when SourceKit emits diagnostics.
+//
+// Any passes not needed for diagnostic emission that need to run at -Onone
+// should be in the -Onone pass pipeline and the prepare optimizations pipeline.
+static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
+  P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
   P.addSILGenCleanup();
   P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
@@ -142,7 +149,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
 
-  P.addGuaranteedARCOpts();
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
@@ -169,7 +175,7 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
   }
 
   // Otherwise run the rest of diagnostics.
-  addMandatoryOptPipeline(P);
+  addMandatoryDiagnosticOptPipeline(P);
 
   if (SILViewGuaranteedCFG) {
     addCFGPrinterPipeline(P, "SIL View Guaranteed CFG");
@@ -730,9 +736,14 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
 
-  P.startPipeline("Mandatory Combines");
+  // These are optimizations that we do not need to enable diagnostics (or
+  // depend on other passes needed for diagnostics). Thus we can run them later
+  // and avoid having SourceKit run these passes when just emitting diagnostics
+  // in the editor.
+  P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
+  P.addGuaranteedARCOpts();
 
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
