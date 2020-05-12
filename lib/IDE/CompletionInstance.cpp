@@ -315,10 +315,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
   auto tmpBufferID = tmpSM.addMemBufferCopy(completionBuffer);
   tmpSM.setCodeCompletionPoint(tmpBufferID, Offset);
 
-  LangOptions langOpts;
+  LangOptions langOpts = CI.getASTContext().LangOpts;
   langOpts.DisableParserLookup = true;
-  TypeCheckerOptions typeckOpts;
-  SearchPathOptions searchPathOpts;
+  TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
+  SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
@@ -327,15 +327,22 @@ bool CompletionInstance::performCachedOperationIfPossible(
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
-  SourceFile *tmpSF =
-      new (*tmpCtx) SourceFile(*tmpM, oldSF->Kind, tmpBufferID,
-                               SourceFile::ImplicitModuleImportKind::None);
+  SourceFile *tmpSF = new (*tmpCtx)
+      SourceFile(*tmpM, oldSF->Kind, tmpBufferID,
+                 SourceFile::ImplicitModuleImportKind::None,
+                 /*KeepParsedTokens=*/false, /*BuildSyntaxTree=*/false,
+                 oldSF->getParsingOptions());
   tmpSF->enableInterfaceHash();
   // Ensure all non-function-body tokens are hashed into the interface hash
   tmpCtx->LangOpts.EnableTypeFingerprints = false;
 
-  // Couldn't find any completion token?
+  // FIXME: Since we don't setup module loaders on the temporary AST context,
+  // 'canImport()' conditional compilation directive always fails. That causes
+  // interface hash change and prevents fast-completion.
+
+  // Parse and get the completion context.
   auto *newState = tmpSF->getDelayedParserState();
+  // Couldn't find any completion token?
   if (!newState->hasCodeCompletionDelayedDeclState())
     return false;
 
