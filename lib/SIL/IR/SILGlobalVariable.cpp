@@ -109,6 +109,12 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
     case SILInstructionKind::BuiltinInst: {
       auto *bi = cast<BuiltinInst>(I);
       switch (M.getBuiltinInfo(bi->getName()).ID) {
+        case BuiltinValueKind::ZeroInitializer: {
+          auto type = bi->getType().getASTType();
+          if (auto vector = dyn_cast<BuiltinVectorType>(type))
+            type = vector.getElementType();
+          return isa<BuiltinIntegerType>(type) || isa<BuiltinFloatType>(type);
+        }
         case BuiltinValueKind::PtrToInt:
           if (isa<LiteralInst>(bi->getArguments()[0]))
             return true;
