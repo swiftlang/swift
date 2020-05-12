@@ -2656,10 +2656,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 ;;
             llvm)
-                if [[ -z "${LLVM_INSTALL_COMPONENTS}" ]] ; then
+                if [[ -z "${LLVM_INSTALL_COMPONENTS}" ]] && [[ -z "${INSTALL_LLVM}" ]]; then
                     continue
                 fi
-                if [[ "${LLVM_INSTALL_COMPONENTS}" == "all" ]]; then
+                if [[ "${LLVM_INSTALL_COMPONENTS}" == "all" ]] || [[ -n "${INSTALL_LLVM}" ]] ; then
                     INSTALL_TARGETS=install
                 else
                     INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/;/ install-/g')
