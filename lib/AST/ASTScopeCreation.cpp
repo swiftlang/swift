@@ -712,7 +712,7 @@ public:
         }
       }
     }
-    for (const auto dcAndScope : bogusDCs) {
+    for (const auto &dcAndScope : bogusDCs) {
       llvm::errs() << "ASTScope tree confabulated: " << dcAndScope.getFirst()
                    << ":\n";
       dcAndScope.getFirst()->printContext(llvm::errs());
@@ -768,8 +768,7 @@ bool ASTScope::areInactiveIfConfigClausesSupported() {
 
 void ASTScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
   auto *const SF = AFD->getParentSourceFile();
-  if (SF->isSuitableForASTScopes())
-    SF->getScope().expandFunctionBodyImpl(AFD);
+  SF->getScope().expandFunctionBodyImpl(AFD);
 }
 
 void ASTScope::expandFunctionBodyImpl(AbstractFunctionDecl *AFD) {

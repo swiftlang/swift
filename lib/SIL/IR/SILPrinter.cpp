@@ -36,6 +36,8 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
@@ -375,7 +377,7 @@ static void printGenericSpecializationInfo(
     raw_ostream &OS, StringRef Kind, StringRef Name,
     const GenericSpecializationInformation *SpecializationInfo,
     SubstitutionMap Subs = { }) {
-  if (!SpecializationInfo)
+  if (!SpecializationInfo && Subs.empty())
     return;
 
   auto PrintSubstitutions = [&](SubstitutionMap Subs) {
@@ -383,6 +385,11 @@ static void printGenericSpecializationInfo(
     interleave(Subs.getReplacementTypes(),
                [&](Type type) { OS << type; },
                [&] { OS << ", "; });
+    OS << '>';
+    OS << " conformances <";
+    interleave(Subs.getConformances(),
+               [&](ProtocolConformanceRef conf) { conf.print(OS); },
+               [&] { OS << ", ";});
     OS << '>';
   };
 
@@ -716,7 +723,9 @@ public:
       Ctx.printInstructionCallBack(&I);
       if (SILPrintGenericSpecializationInfo) {
         if (auto AI = ApplySite::isa(const_cast<SILInstruction *>(&I)))
-          if (AI.getSpecializationInfo() && AI.getCalleeFunction())
+          if ((AI.getSpecializationInfo() ||
+               !AI.getSubstitutionMap().empty()) &&
+              AI.getCalleeFunction())
             printGenericSpecializationInfo(
                 PrintState.OS, "call-site", AI.getCalleeFunction()->getName(),
                 AI.getSpecializationInfo(), AI.getSubstitutionMap());
@@ -2452,7 +2461,7 @@ void SILBasicBlock::print(raw_ostream &OS) const {
   SILPrinter(Ctx).print(this);
 }
 
-void SILBasicBlock::print(raw_ostream &OS, SILPrintContext &Ctx) const {
+void SILBasicBlock::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
@@ -2497,6 +2506,17 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
   OS << getLinkageString(linkage);
 }
 
+static void printClangQualifiedNameCommentIfPresent(llvm::raw_ostream &OS,
+                                                    const clang::Decl *decl) {
+  if (decl) {
+    if (auto namedDecl = dyn_cast_or_null<clang::NamedDecl>(decl)) {
+      OS << "// clang name: ";
+      namedDecl->printQualifiedName(OS);
+      OS << "\n";
+    }
+  }
+}
+
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
@@ -2518,6 +2538,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   OS << "// " << demangleSymbol(getName()) << '\n';
+  printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
+
   OS << "sil ";
   printLinkage(OS, getLinkage(), isDefinition());
 
@@ -2653,7 +2675,8 @@ void SILFunction::printName(raw_ostream &OS) const {
 /// Pretty-print a global variable to the designated stream.
 void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "// " << demangleSymbol(getName()) << '\n';
-  
+  printClangQualifiedNameCommentIfPresent(OS, getClangDecl());
+
   OS << "sil_global ";
   printLinkage(OS, getLinkage(), isDefinition());
 

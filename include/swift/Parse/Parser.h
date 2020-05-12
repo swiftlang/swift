@@ -54,7 +54,7 @@ namespace swift {
   class ScopeInfo;
   class SourceManager;
   class TupleType;
-  struct TypeLoc;
+  class TypeLoc;
   
   struct EnumElementInfo;
   
@@ -494,13 +494,7 @@ public:
     ~BacktrackingScope();
     bool willBacktrack() const { return Backtrack; }
 
-    void cancelBacktrack() {
-      Backtrack = false;
-      SynContext->setTransparent();
-      SynContext.reset();
-      DT.commit();
-      TempReceiver.shouldTransfer = true;
-    }
+    void cancelBacktrack();
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -888,7 +882,8 @@ public:
   void parseTopLevel(SmallVectorImpl<Decl *> &decls);
 
   /// Parse the top-level SIL decls into the SIL module.
-  void parseTopLevelSIL();
+  /// \returns \c true if there was a parsing error.
+  bool parseTopLevelSIL();
 
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {
@@ -1551,7 +1546,7 @@ public:
           ParameterList *&params,
           SourceLoc &throwsLoc,
           SourceLoc &arrowLoc,
-          TypeRepr *&explicitResultType,
+          TypeExpr *&explicitResultType,
           SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
@@ -1567,10 +1562,12 @@ public:
                              SmallVectorImpl<Identifier> &exprLabels,
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
-                             Expr *&trailingClosure,
+                             SmallVectorImpl<TrailingClosure> &trailingClosures,
                              syntax::SyntaxKind Kind);
 
-  ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
+  ParserStatus
+  parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
+                        SmallVectorImpl<TrailingClosure> &closures);
 
   /// Parse an object literal.
   ///

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/USRGeneration.h"
+#include "swift/Syntax/TokenKinds.h"
 #include "DeclarationFragmentPrinter.h"
 #include "SymbolGraphASTWalker.h"
 
@@ -53,6 +54,7 @@ DeclarationFragmentPrinter::getKindSpelling(FragmentKind Kind) const {
     case FragmentKind::None:
       llvm_unreachable("Fragment kind of 'None' has no spelling");
   }
+  llvm_unreachable("invalid fragment kind");
 }
 
 void DeclarationFragmentPrinter::closeFragment() {
@@ -145,4 +147,38 @@ void DeclarationFragmentPrinter::printText(StringRef Text) {
     openFragment(FragmentKind::Text);
   }
   Spelling.append(Text);
+}
+
+void DeclarationFragmentPrinter::printAbridgedType(const GenericTypeDecl *TD,
+                                                   bool PrintKeyword) {
+  if (PrintKeyword) {
+    openFragment(DeclarationFragmentPrinter::FragmentKind::Keyword);
+    switch (TD->getKind()) {
+      case DeclKind::Struct:
+        printText(getTokenText(tok::kw_struct));
+        break;
+      case DeclKind::Enum:
+        printText(getTokenText(tok::kw_enum));
+        break;
+      case DeclKind::Protocol:
+        printText(getTokenText(tok::kw_protocol));
+        break;
+      case DeclKind::Class:
+        printText(getTokenText(tok::kw_class));
+        break;
+      case DeclKind::TypeAlias:
+        printText(getTokenText(tok::kw_typealias));
+        break;
+      case DeclKind::OpaqueType:
+        llvm_unreachable("OpaqueType should not be in symbol graphs!");
+      default:
+        llvm_unreachable("GenericTypeDecl kind not handled in DeclarationFragmentPrinter!");
+    }
+
+    openFragment(DeclarationFragmentPrinter::FragmentKind::Text);
+    printText(" ");
+  }
+
+  openFragment(DeclarationFragmentPrinter::FragmentKind::Identifier);
+  printText(TD->getNameStr());
 }

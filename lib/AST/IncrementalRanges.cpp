@@ -261,7 +261,7 @@ std::vector<CharSourceRange> SwiftRangesEmitter::coalesceSortedRanges(
 std::vector<SerializableSourceRange>
 SwiftRangesEmitter::serializeRanges(std::vector<CharSourceRange> ranges) const {
   std::vector<SerializableSourceRange> result;
-  for (const auto r : ranges)
+  for (const auto &r : ranges)
     result.push_back(SerializableSourceRange(r, sourceMgr));
   return result;
 }

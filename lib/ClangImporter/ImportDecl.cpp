@@ -45,6 +45,7 @@
 #include "swift/Config.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/CharInfo.h"
 #include "swift/Basic/Statistic.h"
 #include "clang/Basic/TargetInfo.h"
@@ -2189,7 +2190,7 @@ namespace {
           if (fd->isInstanceMember() != decl->isInstanceProperty())
             continue;
 
-          assert(fd->getFullName().getArgumentNames().empty());
+          assert(fd->getName().getArgumentNames().empty());
           foundMethod = true;
         } else {
           auto *var = cast<VarDecl>(result);
@@ -3311,6 +3312,12 @@ namespace {
       // it is nested in a struct.
 
       for (auto m : decl->decls()) {
+        if (isa<clang::AccessSpecDecl>(m)) {
+          // The presence of AccessSpecDecls themselves does not influence
+          // whether we can generate a member-wise initializer.
+          continue;
+        }
+
         auto nd = dyn_cast<clang::NamedDecl>(m);
         if (!nd) {
           // We couldn't import the member, so we can't reference it in Swift.
@@ -3341,8 +3348,8 @@ namespace {
 
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
-          if (!isa<clang::TypeDecl>(nd)) {
-            // We don't know what this field is.
+          if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
+            // We don't know what this member is.
             // Assume it may be important in C.
             hasUnreferenceableStorage = true;
             hasMemberwiseInitializer = false;
@@ -3954,10 +3961,6 @@ namespace {
     }
 
     Decl *VisitVarDecl(const clang::VarDecl *decl) {
-      // FIXME: Swift does not have static variables in structs/classes yet.
-      if (decl->getDeclContext()->isRecord())
-        return nullptr;
-
       // Variables are imported as... variables.
       Optional<ImportedName> correctSwiftName;
       auto importedName = importFullName(decl, correctSwiftName);
@@ -4160,7 +4163,7 @@ namespace {
       for (auto decl : classDecl->lookupDirect(selector, isInstance)) {
         if ((decl->getClangDecl()
              || !decl->getDeclContext()->getParentSourceFile())
-            && importedName.getDeclName() == decl->getFullName()
+            && importedName.getDeclName() == decl->getName()
             && filter(decl)) {
           result = true;
           break;
@@ -4465,7 +4468,7 @@ namespace {
       // We only care about recording methods with no arguments here, because
       // they can shadow imported properties.
       if (!isa<AccessorDecl>(result) &&
-          result->getFullName().getArgumentNames().empty()) {
+          result->getName().getArgumentNames().empty()) {
         recordMemberInContext(dc, result);
       }
 
@@ -6519,7 +6522,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
     return;
   // Dig out the Objective-C superclass.
   SmallVector<ValueDecl *, 4> results;
-  superDecl->lookupQualified(superDecl, DeclNameRef(decl->getFullName()),
+  superDecl->lookupQualified(superDecl, DeclNameRef(decl->getName()),
                              NL_QualifiedDefault | NL_KnownNoDependency,
                              results);
   for (auto member : results) {
@@ -6592,7 +6595,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   // operation.
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
-      superDecl, DeclNameRef(subscript->getFullName()),
+      superDecl, DeclNameRef(subscript->getName()),
       NL_QualifiedDefault | NL_KnownNoDependency, lookup);
 
   for (auto result : lookup) {
@@ -7705,7 +7708,7 @@ void ClangImporter::Implementation::importAttributes(
   // Hack: mark any method named "print" with less than two parameters as
   // warn_unqualified_access.
   if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
-    if (isPrintLikeMethod(MD->getFullName(), MD->getDeclContext())) {
+    if (isPrintLikeMethod(MD->getName(), MD->getDeclContext())) {
       // Use a non-implicit attribute so it shows up in the generated
       // interface.
       MD->getAttrs().add(new (C) WarnUnqualifiedAccessAttr(/*implicit*/false));
@@ -7902,7 +7905,7 @@ static void finishTypeWitnesses(
                           NL_OnlyTypes |
                           NL_ProtocolMembers);
 
-    dc->lookupQualified(nominal, DeclNameRef(assocType->getFullName()), options,
+    dc->lookupQualified(nominal, DeclNameRef(assocType->getName()), options,
                         lookupResults);
     for (auto member : lookupResults) {
       auto typeDecl = cast<TypeDecl>(member);

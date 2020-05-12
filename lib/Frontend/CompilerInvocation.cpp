@@ -196,8 +196,6 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
     return SourceFileKind::Main;
   case InputFileKind::SwiftLibrary:
     return SourceFileKind::Library;
-  case InputFileKind::SwiftREPL:
-    return SourceFileKind::REPL;
   case InputFileKind::SwiftModuleInterface:
     return SourceFileKind::Interface;
   case InputFileKind::SIL:
@@ -402,10 +400,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
-  Opts.EnableRequestBasedIncrementalDependencies =
-      Args.hasFlag(OPT_enable_request_based_incremental_dependencies,
-                   OPT_disable_request_based_incremental_dependencies,
-                   Opts.EnableRequestBasedIncrementalDependencies);
   Opts.EnableASTScopeLookup =
       Args.hasFlag(options::OPT_enable_astscope_lookup,
                    options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
@@ -424,21 +418,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
 
-  Opts.EnableFineGrainedDependencies =
-      Args.hasFlag(options::OPT_enable_fine_grained_dependencies,
-                   options::OPT_disable_fine_grained_dependencies,
-                   Opts.EnableFineGrainedDependencies);
   Opts.EnableTypeFingerprints =
       Args.hasFlag(options::OPT_enable_type_fingerprints,
                    options::OPT_disable_type_fingerprints,
                    LangOptions().EnableTypeFingerprints);
-
-  if (!Opts.EnableFineGrainedDependencies && Opts.EnableTypeFingerprints) {
-    Diags.diagnose(
-        SourceLoc(),
-        diag::warning_type_fingerprints_require_fine_grained_dependencies);
-    Opts.EnableTypeFingerprints = false;
-  }
 
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
@@ -449,13 +432,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.EnableExperimentalAdditiveArithmeticDerivedConformances = true;
 
+  if (Args.hasArg(OPT_experimental_private_intransitive_dependencies))
+    Opts.EnableExperientalPrivateIntransitiveDependencies = true;
+
   Opts.EnableExperimentalForwardModeDifferentiation |=
       Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
+
+  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
+
   Opts.Playground |= Args.hasArg(OPT_playground);
+  Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
+  if (Args.hasArg(OPT_disable_playground_transform))
+    Opts.PlaygroundTransform = false;
+  Opts.PlaygroundHighPerformance |=
+      Args.hasArg(OPT_playground_high_performance);
+
+  // This can be enabled independently of the playground transform.
+  Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
+
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
@@ -553,9 +551,22 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
+  std::string TargetArgScratch;
+
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
+
+    // Backward compatibility hack: infer "simulator" environment for x86
+    // iOS/tvOS/watchOS. The driver takes care of this for the frontend
+    // most of the time, but loading of old .swiftinterface files goes
+    // directly to the frontend.
+    if (tripleInfersSimulatorEnvironment(Target)) {
+      // Set the simulator environment.
+      Target.setEnvironment(llvm::Triple::EnvironmentType::Simulator);
+      TargetArgScratch = Target.str();
+      TargetArg = TargetArgScratch;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_target_variant)) {
@@ -760,7 +771,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
-  if (Args.hasArg(OPT_warnings_as_errors))
+  if (Args.hasFlag(options::OPT_warnings_as_errors,
+                   options::OPT_no_warnings_as_errors, false))
     Opts.ExtraArgs.push_back("-Werror");
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
@@ -845,7 +857,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                    /*Default=*/llvm::sys::Process::StandardErrHasColors());
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
-  Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
+  Opts.WarningsAsErrors = Args.hasFlag(options::OPT_warnings_as_errors,
+                                       options::OPT_no_warnings_as_errors,
+                                       false);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
   Opts.PrintEducationalNotes |= Args.hasArg(OPT_print_educational_notes);
   Opts.EnableExperimentalFormatting |=

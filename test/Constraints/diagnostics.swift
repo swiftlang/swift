@@ -252,7 +252,7 @@ _ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Class' re
 
 // Type variables not getting erased with nested closures
 struct Toe {
-  let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
+  let toenail: Nail // expected-error {{cannot find type 'Nail' in scope}}
 
   func clip() {
     // TODO(diagnostics): Solver should stop once it has detected that `toenail` doesn't exist and report that.
@@ -1469,4 +1469,38 @@ func gericArgToParamInout(_ x: inout [[Int]]) { // expected-note {{change variab
   gericArgToParamInoutOptional(&x) // expected-error {{cannot convert value of type '[[Int]]' to expected argument type '[[String]]?'}}
   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
   // expected-error@-2 {{inout argument could be set to a value with a type other than '[[Int]]'; use a value declared as type '[[String]]?' instead}}
+}
+
+// SR-12725
+struct SR12725<E> {} // expected-note {{arguments to generic parameter 'E' ('Int' and 'Double') are expected to be equal}}
+func generic<T>(_ value: inout T, _ closure: (SR12725<T>) -> Void) {}
+
+let arg: Int
+generic(&arg) { (g: SR12725<Double>) -> Void in } // expected-error {{cannot convert value of type '(SR12725<Double>) -> Void' to expected argument type '(SR12725<Int>) -> Void'}}
+
+// rdar://problem/62428353 - bad error message for passing `T` where `inout T` was expected
+func rdar62428353<T>(_ t: inout T) {
+  let v = t // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  rdar62428353(v) // expected-error {{cannot pass immutable value as inout argument: 'v' is a 'let' constant}}
+}
+
+func rdar62989214() {
+  struct Flag {
+    var isTrue: Bool
+  }
+
+  @propertyWrapper @dynamicMemberLookup
+  struct Wrapper<Value> {
+    var wrappedValue: Value
+
+    subscript<Subject>(
+      dynamicMember keyPath: WritableKeyPath<Value, Subject>
+    ) -> Wrapper<Subject> {
+      get { fatalError() }
+    }
+  }
+
+  func test(arr: Wrapper<[Flag]>, flag: Flag) {
+    arr[flag].isTrue // expected-error {{cannot convert value of type 'Flag' to expected argument type 'Int'}}
+  }
 }

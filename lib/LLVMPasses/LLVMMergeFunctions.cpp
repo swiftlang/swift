@@ -38,7 +38,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/IR/Attributes.h"
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
@@ -543,8 +542,8 @@ static bool isEligibleFunction(Function *F) {
   // outweighs the benefit.
   for (BasicBlock &BB : *F) {
     for (Instruction &I : BB) {
-      if (CallSite CS = CallSite(&I)) {
-        Function *Callee = CS.getCalledFunction();
+      if (CallBase *CB = dyn_cast<CallBase>(&I)) {
+        Function *Callee = CB->getCalledFunction();
         if (Callee && !mayMergeCallsToFunction(*Callee))
           return false;
         if (!Callee || !Callee->isIntrinsic()) {
@@ -1079,7 +1078,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
       removeEquivalenceClassFromTree(FE);
     
     auto *CI = dyn_cast<CallInst>(I);
-    if (!CI || CI->getCalledValue() != Old) {
+    if (!CI || CI->getCalledOperand() != Old) {
       AllReplaced = false;
       continue;
     }

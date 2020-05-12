@@ -422,7 +422,7 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
                               ModuleConventions.hasValue()
                                   ? ModuleConventions.getValue()
                                   : SILModuleConventions(F.getModule()));
-  SILType Result = Conv.getSILResultType();
+  SILType Result = Conv.getSILResultType(F.getTypeExpansionContext());
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -474,7 +474,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   SmallVector<ValueOwnershipKind, 8> resultOwnerships;
 
   for (auto &yield : substCalleeType->getYields()) {
-    auto yieldType = conv.getSILType(yield);
+    auto yieldType = conv.getSILType(yield, F.getTypeExpansionContext());
     auto convention = SILArgumentConvention(yield.getConvention());
     resultTypes.push_back(yieldType);
     resultOwnerships.push_back(
@@ -751,6 +751,7 @@ getExtracteeType(
         LookUpConformanceInModule(module.getSwiftModule()));
     return SILType::getPrimitiveObjectType(transposeFnTy);
   }
+  llvm_unreachable("invalid extractee");
 }
 
 LinearFunctionExtractInst::LinearFunctionExtractInst(

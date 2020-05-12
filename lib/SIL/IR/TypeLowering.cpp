@@ -1821,7 +1821,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
     auto origMeta = origType.getAs<MetatypeType>();
     if (!origMeta) {
       // If the metatype matches a dependent type, it must be thick.
-      assert(origType.isTypeParameter());
+      assert(origType.isTypeParameterOrOpaqueArchetype());
       repr = MetatypeRepresentation::Thick;
     } else {
       // Otherwise, we're thin if the metatype is thinnable both
@@ -2784,8 +2784,9 @@ checkForABIDifferencesInYield(TypeConverter &TC, SILModule &M,
     return TypeConverter::ABIDifference::NeedsThunk;
 
   // Also make sure that the actual yield types match in ABI.
-  return TC.checkForABIDifferences(M, yield1.getSILStorageType(M, fnTy1),
-                                   yield2.getSILStorageType(M, fnTy2));
+  return TC.checkForABIDifferences(
+      M, yield1.getSILStorageType(M, fnTy1, TypeExpansionContext::minimal()),
+      yield2.getSILStorageType(M, fnTy2, TypeExpansionContext::minimal()));
 }
 
 TypeConverter::ABIDifference
@@ -2833,10 +2834,13 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
       return ABIDifference::NeedsThunk;
 
     if (checkForABIDifferences(M,
-                               result1.getSILStorageType(M, fnTy1),
-                               result2.getSILStorageType(M, fnTy2),
-             /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::CompatibleRepresentation)
+                               result1.getSILStorageType(
+                                   M, fnTy1, TypeExpansionContext::minimal()),
+                               result2.getSILStorageType(
+                                   M, fnTy2, TypeExpansionContext::minimal()),
+                               /*thunk iuos*/ fnTy1->getLanguage() ==
+                                   SILFunctionLanguage::Swift) !=
+        ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 
@@ -2861,11 +2865,13 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
     if (error1.getConvention() != error2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(M,
-                               error1.getSILStorageType(M, fnTy1),
-                               error2.getSILStorageType(M, fnTy2),
-              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::CompatibleRepresentation)
+    if (checkForABIDifferences(
+            M,
+            error1.getSILStorageType(M, fnTy1, TypeExpansionContext::minimal()),
+            error2.getSILStorageType(M, fnTy2, TypeExpansionContext::minimal()),
+            /*thunk iuos*/ fnTy1->getLanguage() ==
+                SILFunctionLanguage::Swift) !=
+        ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 
@@ -2877,11 +2883,13 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
 
     // Parameters are contravariant and our relation is not symmetric, so
     // make sure to flip the relation around.
-    if (checkForABIDifferences(M,
-                               param2.getSILStorageType(M, fnTy2),
-                               param1.getSILStorageType(M, fnTy1),
-              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::CompatibleRepresentation)
+    if (checkForABIDifferences(
+            M,
+            param2.getSILStorageType(M, fnTy2, TypeExpansionContext::minimal()),
+            param1.getSILStorageType(M, fnTy1, TypeExpansionContext::minimal()),
+            /*thunk iuos*/ fnTy1->getLanguage() ==
+                SILFunctionLanguage::Swift) !=
+        ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 

@@ -79,6 +79,10 @@ class TempRValueOptPass : public SILFunctionTransform {
   checkTempObjectDestroy(AllocStackInst *tempObj, CopyAddrInst *copyInst,
                          ValueLifetimeAnalysis::Frontier &tempAddressFrontier);
 
+  bool checkNoTempObjectModificationInApply(Operand *tempObjUser,
+                                            SILInstruction *inst,
+                                            SILValue srcAddr);
+
   bool tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst);
   std::pair<SILBasicBlock::iterator, bool>
   tryOptimizeStoreIntoTemp(StoreInst *si);
@@ -107,6 +111,62 @@ bool TempRValueOptPass::collectLoadsFromProjection(
 
     if (!collectLoads(projUseOper, user, projection, srcAddr, loadInsts))
       return false;
+  }
+  return true;
+}
+
+/// Check if 'tempObjUser' passed to the apply instruction can be modified by it
+bool TempRValueOptPass::checkNoTempObjectModificationInApply(
+    Operand *tempObjUser, SILInstruction *applyInst, SILValue srcAddr) {
+  ApplySite apply(applyInst);
+
+  // Check if the function can just read from tempObjUser.
+  auto convention = apply.getArgumentConvention(*tempObjUser);
+  if (!convention.isGuaranteedConvention()) {
+    LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
+                               "its source"
+                            << *applyInst);
+    return false;
+  }
+
+  // If we do not have an src address, but are indirect, bail. We would need
+  // to perform function signature specialization to change the functions
+  // signature to pass something direct.
+  if (!srcAddr && convention.isIndirectConvention()) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  Temp used to materialize value for indirect convention?! Can "
+           "not remove temporary without func sig opts"
+        << *applyInst);
+    return false;
+  }
+
+  // Check if there is another function argument, which is inout which might
+  // modify the source address if we have one.
+  //
+  // When a use of the temporary is an apply, then we need to prove that the
+  // function called by the apply cannot modify the temporary's source
+  // value. By design, this should be handled by
+  // `checkNoSourceModification`. However, this would be too conservative
+  // since it's common for the apply to have an @out argument, and alias
+  // analysis cannot prove that the @out does not alias with `src`. Instead,
+  // `checkNoSourceModification` always avoids analyzing the current use, so
+  // applies need to be handled here. We already know that an @out cannot
+  // alias with `src` because the `src` value must be initialized at the point
+  // of the call. Hence, it is sufficient to check specifically for another
+  // @inout that might alias with `src`.
+  if (srcAddr) {
+    auto calleeConv = apply.getSubstCalleeConv();
+    unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
+    for (const auto &operand : apply.getArgumentOperands()) {
+      auto argConv = calleeConv.getSILArgumentConvention(calleeArgIdx);
+      if (argConv.isInoutConvention()) {
+        if (!aa->isNoAlias(operand.get(), srcAddr)) {
+          return false;
+        }
+      }
+      ++calleeArgIdx;
+    }
   }
   return true;
 }
@@ -172,59 +232,23 @@ bool TempRValueOptPass::collectLoads(
      LLVM_FALLTHROUGH;
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst: {
-    ApplySite apply(user);
-
-    // Check if the function can just read from userOp.
-    auto convention = apply.getArgumentConvention(*userOp);
-    if (!convention.isGuaranteedConvention()) {
-      LLVM_DEBUG(llvm::dbgs() << "  Temp consuming use may write/destroy "
-                                 "its source"
-                              << *user);
+    if (!checkNoTempObjectModificationInApply(userOp, user, srcAddr))
       return false;
-    }
-
-    // If we do not have an src address, but are indirect, bail. We would need
-    // to perform function signature specialization to change the functions
-    // signature to pass something direct.
-    if (!srcAddr && convention.isIndirectConvention()) {
-      LLVM_DEBUG(
-          llvm::dbgs()
-          << "  Temp used to materialize value for indirect convention?! Can "
-             "not remove temporary without func sig opts"
-          << *user);
-      return false;
-    }
-
-    // Check if there is another function argument, which is inout which might
-    // modify the source address if we have one.
-    //
-    // When a use of the temporary is an apply, then we need to prove that the
-    // function called by the apply cannot modify the temporary's source
-    // value. By design, this should be handled by
-    // `checkNoSourceModification`. However, this would be too conservative
-    // since it's common for the apply to have an @out argument, and alias
-    // analysis cannot prove that the @out does not alias with `src`. Instead,
-    // `checkNoSourceModification` always avoids analyzing the current use, so
-    // applies need to be handled here. We already know that an @out cannot
-    // alias with `src` because the `src` value must be initialized at the point
-    // of the call. Hence, it is sufficient to check specifically for another
-    // @inout that might alias with `src`.
-    if (srcAddr) {
-      auto calleeConv = apply.getSubstCalleeConv();
-      unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
-      for (const auto &operand : apply.getArgumentOperands()) {
-        auto argConv = calleeConv.getSILArgumentConvention(calleeArgIdx);
-        if (argConv.isInoutConvention()) {
-          if (!aa->isNoAlias(operand.get(), srcAddr)) {
-            return false;
-          }
-        }
-        ++calleeArgIdx;
-      }
-    }
-
     // Everything is okay with the function call. Register it as a "load".
     loadInsts.insert(user);
+    return true;
+  }
+  case SILInstructionKind::BeginApplyInst: {
+    if (!checkNoTempObjectModificationInApply(userOp, user, srcAddr))
+      return false;
+
+    auto beginApply = cast<BeginApplyInst>(user);
+    // Register 'end_apply'/'abort_apply' as loads as well
+    // 'checkNoSourceModification' should check instructions until
+    // 'end_apply'/'abort_apply'.
+    for (auto tokenUses : beginApply->getTokenResult()->getUses()) {
+      loadInsts.insert(tokenUses->getUser());
+    }
     return true;
   }
   case SILInstructionKind::OpenExistentialAddrInst: {
@@ -604,6 +628,16 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     // We pass in SILValue() since we do not have a source address.
     if (!collectLoads(useOper, user, tempObj, SILValue(), loadInsts))
       return {std::next(si->getIterator()), false};
+
+    // Bail if there is any kind of user which is not handled in the code below.
+    switch (user->getKind()) {
+      case SILInstructionKind::CopyAddrInst:
+      case SILInstructionKind::FixLifetimeInst:
+      case SILInstructionKind::MarkDependenceInst:
+        continue;
+      default:
+        return {std::next(si->getIterator()), false};
+    }
   }
 
   // Since store is always a consuming operation, we do not need to worry about

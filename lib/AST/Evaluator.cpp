@@ -60,12 +60,22 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-Evaluator::Evaluator(DiagnosticEngine &diags,
-                     bool debugDumpCycles,
-                     bool buildDependencyGraph)
-  : diags(diags),
-    debugDumpCycles(debugDumpCycles),
-    buildDependencyGraph(buildDependencyGraph) { }
+static evaluator::DependencyCollector::Mode
+computeDependencyModeFromFlags(bool enableExperimentalPrivateDeps) {
+  using Mode = evaluator::DependencyCollector::Mode;
+  if (enableExperimentalPrivateDeps) {
+    return Mode::ExperimentalPrivateDependencies;
+  }
+  return Mode::StatusQuo;
+}
+
+Evaluator::Evaluator(DiagnosticEngine &diags, bool debugDumpCycles,
+                     bool buildDependencyGraph,
+                     bool enableExperimentalPrivateDeps)
+    : diags(diags), debugDumpCycles(debugDumpCycles),
+      buildDependencyGraph(buildDependencyGraph),
+      collector{computeDependencyModeFromFlags(enableExperimentalPrivateDeps)} {
+}
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -366,4 +376,26 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
 
 void Evaluator::dumpDependenciesGraphviz() const {
   printDependenciesGraphviz(llvm::dbgs());
+}
+
+void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
+                                                   DeclBaseName name) {
+  if (auto *tracker = getActiveDependencyTracker())
+    tracker->addUsedMember({subject, name}, isActiveSourceCascading());
+}
+
+void evaluator::DependencyCollector::addPotentialMember(
+    NominalTypeDecl *subject) {
+  if (auto *tracker = getActiveDependencyTracker())
+    tracker->addUsedMember({subject, Identifier()}, isActiveSourceCascading());
+}
+
+void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
+  if (auto *tracker = getActiveDependencyTracker())
+    tracker->addTopLevelName(name, isActiveSourceCascading());
+}
+
+void evaluator::DependencyCollector::addDynamicLookupName(DeclBaseName name) {
+  if (auto *tracker = getActiveDependencyTracker())
+    tracker->addDynamicLookupName(name, isActiveSourceCascading());
 }

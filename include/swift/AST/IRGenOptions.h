@@ -122,6 +122,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Resumption functions from yield-many coroutines.
   PointerAuthSchema YieldManyResumeFunctions;
+
+  /// Resilient class stub initializer callbacks.
+  PointerAuthSchema ResilientClassStubInitCallbacks;
 };
 
 /// The set of options supported by IR generation.
@@ -177,9 +180,6 @@ public:
 
   /// Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
-  
-  /// Whether we're generating code for the integrated REPL.
-  unsigned IntegratedREPL : 1;
   
   /// Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
@@ -317,7 +317,7 @@ public:
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
-        IntegratedREPL(false), DisableLLVMOptzns(false),
+        DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
         DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
         FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),

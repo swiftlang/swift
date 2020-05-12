@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine -sil-print-generic-specialization-info | %FileCheck %s
+// RUN: %target-swift-frontend -O %s -emit-ir
 
 // These tests exercise the same SILCombine optimization as
 // existential_type_propagation.sil, but cover additional corner
@@ -615,3 +616,91 @@ bb0(%0 : $*τ_0_0, %1 : $*τ_0_2, %2 : $*τ_0_1):
   dealloc_stack %5 : $*P1
   return %25 : $()
 }
+
+
+public class MyObject {
+  deinit
+  init()
+}
+
+public protocol SubscriptionViewControllerDelegate { }
+
+public class SubscriptionViewController {
+  deinit
+  init()
+}
+
+public protocol ResourceKitProtocol : MyObject { }
+
+public protocol ResourceKitDelegate {
+  func subscriptionViewController(for resourceKit: ResourceKitProtocol)
+}
+
+class ViewController : ResourceKitDelegate {
+  func subscriptionViewController(for resourceKit: ResourceKitProtocol)
+  deinit
+  init()
+}
+
+class SubscriptionViewControllerBuilder {
+  @_hasStorage final let delegate: SubscriptionViewControllerDelegate { get }
+  init(delegate: SubscriptionViewControllerDelegate)
+  deinit
+}
+
+extension MyObject : SubscriptionViewControllerDelegate { }
+
+// Make sure that we correctly update the substitution map of the apply.
+// To satisfy ``τ_0_0 : SubscriptionViewControllerDelegate`` the updated
+// substitution map of
+//   apply %10<$@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol>
+// needs to contain the concrete conformance
+//   ``(normal_conformance type=NSObject protocol=SubscriptionViewControllerDelegate)``
+// not ``(abstract_conformance  protocol=SubscriptionViewControllerDelegate)``
+
+sil @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
+
+// CHECK: sil @test_opend_archeype_concrete_conformance_substitution : $@convention(method) (@guaranteed ResourceKitProtocol, @guaranteed ViewController) -> () {
+// CHECK: bb0([[ARG:%.*]] : $ResourceKitProtocol, [[ARG2:%.*]] : $ViewController):
+// CHECK:   [[T1:%.*]] = metatype $@thick SubscriptionViewControllerBuilder.Type
+// CHECK:   [[T2:%.*]] = open_existential_ref [[ARG]] : $ResourceKitProtocol to $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
+// CHECK:   [[T3:%.*]] = alloc_stack $SubscriptionViewControllerDelegate
+// CHECK:   [[T4:%.*]] = init_existential_addr [[T3]] : $*SubscriptionViewControllerDelegate, $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
+// CHECK:   store [[T2]] to [[T4]] : $*@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
+// CHECK:   [[T5:%.*]] = function_ref @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
+// CHECK:   [[T6:%.*]] = alloc_stack $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
+// CHECK:   copy_addr [[T4]] to [initialization] [[T6]] : $*@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
+// CHECK: Generic specialization information for call-site callee2 <ResourceKitProtocol> conformances <(inherited_conformance type=ResourceKitProtocol protocol=SubscriptionViewControllerDelegate
+// CHECK:  (normal_conformance type=MyObject protocol=SubscriptionViewControllerDelegate))>:
+// CHECK:   apply [[T5]]<@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol>([[T6]], [[T1]])
+
+sil @test_opend_archeype_concrete_conformance_substitution : $@convention(method) (@guaranteed ResourceKitProtocol, @guaranteed ViewController) -> () {
+bb0(%0 : $ResourceKitProtocol, %1 : $ViewController):
+  %4 = metatype $@thick SubscriptionViewControllerBuilder.Type
+  %5 = open_existential_ref %0 : $ResourceKitProtocol to $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
+  %6 = alloc_stack $SubscriptionViewControllerDelegate
+  %7 = init_existential_addr %6 : $*SubscriptionViewControllerDelegate, $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
+  strong_retain %5 : $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
+  store %5 to %7 : $*@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122") ResourceKitProtocol
+  %10 = function_ref @callee2: $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
+  %11 = open_existential_addr mutable_access %6 : $*SubscriptionViewControllerDelegate to $*@opened("FAA82796-8893-11EA-9C89-ACDE48001122") SubscriptionViewControllerDelegate
+  %12 = alloc_stack $@opened("FAA82796-8893-11EA-9C89-ACDE48001122") SubscriptionViewControllerDelegate
+  copy_addr %11 to [initialization] %12 : $*@opened("FAA82796-8893-11EA-9C89-ACDE48001122") SubscriptionViewControllerDelegate
+  %14 = apply %10<@opened("FAA82796-8893-11EA-9C89-ACDE48001122") SubscriptionViewControllerDelegate>(%12, %4) : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
+  destroy_addr %6 : $*SubscriptionViewControllerDelegate
+  dealloc_stack %12 : $*@opened("FAA82796-8893-11EA-9C89-ACDE48001122") SubscriptionViewControllerDelegate
+  dealloc_stack %6 : $*SubscriptionViewControllerDelegate
+  strong_release %14 : $SubscriptionViewControllerBuilder
+  %19 = tuple ()
+  return %19 : $()
+}
+
+sil_vtable SubscriptionViewControllerBuilder {}
+sil_vtable SubscriptionViewController {}
+sil_vtable ViewController  {}
+sil_vtable CCCC {}
+sil_vtable CC {}
+sil_vtable C {}
+sil_vtable C_PQ {}
+sil_vtable CDefaultStatic {}
+sil_vtable MyObject {}

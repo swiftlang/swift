@@ -606,7 +606,7 @@ extension Unicode.Scalar.Properties {
   ///
   ///     let scalars: [Unicode.Scalar] = ["😎", "$", "0"]
   ///     for s in scalars {
-  ///         print(s, "-->", s.isEmoji)
+  ///         print(s, "-->", s.properties.isEmoji)
   ///     }
   ///     // 😎 --> true
   ///     // $ --> false
@@ -1365,9 +1365,9 @@ extension Unicode.Scalar.Properties {
   ///     for scalar in scalars {
   ///         print(scalar, "-->", scalar.properties.numericType)
   ///     }
-  ///     // 4 --> decimal
-  ///     // ④ --> digit
-  ///     // ⅕ --> numeric
+  ///     // 4 --> Optional(Swift.Unicode.NumericType.decimal)
+  ///     // ④ --> Optional(Swift.Unicode.NumericType.digit)
+  ///     // ⅕ --> Optional(Swift.Unicode.NumericType.numeric)
   ///     // X --> nil
   ///
   /// This property corresponds to the "Numeric_Type" property in the
@@ -1389,9 +1389,9 @@ extension Unicode.Scalar.Properties {
   ///     for scalar in scalars {
   ///         print(scalar, "-->", scalar.properties.numericValue)
   ///     }
-  ///     // 4 --> 4.0
-  ///     // ④ --> 4.0
-  ///     // ⅕ --> 0.2
+  ///     // 4 --> Optional(4.0)
+  ///     // ④ --> Optional(4.0)
+  ///     // ⅕ --> Optional(0.2)
   ///     // X --> nil
   ///
   /// This property corresponds to the "Numeric_Value" property in the [Unicode

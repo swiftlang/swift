@@ -36,12 +36,12 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Differentiation/ADContext.h"
+#include "swift/SILOptimizer/Differentiation/JVPEmitter.h"
+#include "swift/SILOptimizer/Differentiation/Thunk.h"
+#include "swift/SILOptimizer/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
-#include "swift/SILOptimizer/Utils/Differentiation/JVPEmitter.h"
-#include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
-#include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
@@ -656,9 +656,9 @@ emitDerivativeFunctionReference(
     auto loc = witnessMethod->getLoc();
     auto requirementDeclRef = witnessMethod->getMember();
     auto *requirementDecl = requirementDeclRef.getAbstractFunctionDecl();
-    // If requirement declaration does not have any `@differentiable`
-    // attributes, produce an error.
-    if (!requirementDecl->getAttrs().hasAttribute<DifferentiableAttr>()) {
+    // If requirement declaration does not have any derivative function
+    // configurations, produce an error.
+    if (requirementDecl->getDerivativeFunctionConfigurations().empty()) {
       context.emitNondifferentiabilityError(
           original, invoker, diag::autodiff_protocol_member_not_differentiable);
       return None;
@@ -701,9 +701,9 @@ emitDerivativeFunctionReference(
     auto loc = classMethod->getLoc();
     auto methodDeclRef = classMethod->getMember();
     auto *methodDecl = methodDeclRef.getAbstractFunctionDecl();
-    // If method declaration does not have any `@differentiable` attributes,
-    // produce an error.
-    if (!methodDecl->getAttrs().hasAttribute<DifferentiableAttr>()) {
+    // If method declaration does not have any derivative function
+    // configurations, produce an error.
+    if (methodDecl->getDerivativeFunctionConfigurations().empty()) {
       context.emitNondifferentiabilityError(
           original, invoker, diag::autodiff_class_member_not_differentiable);
       return None;

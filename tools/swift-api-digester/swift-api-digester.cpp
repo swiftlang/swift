@@ -27,6 +27,7 @@
 // the output of api-digester will include such changes.
 
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/IDE/APIDigesterData.h"
 #include <functional>
@@ -77,6 +78,10 @@ ProtReqWhiteList("protocol-requirement-white-list",
 
 static llvm::cl::opt<std::string>
 OutputFile("o", llvm::cl::desc("Output file"),
+           llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+OutputDir("output-dir", llvm::cl::desc("Directory path to where we dump the generated Json files"),
            llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
@@ -253,6 +258,12 @@ static llvm::cl::opt<bool>
 UseEmptyBaseline("empty-baseline",
                 llvm::cl::desc("Use empty baseline for diagnostics"),
                 llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+SerializedDiagPath("serialize-diagnostics-path",
+                   llvm::cl::desc("Serialize diagnostics to a path"),
+                   llvm::cl::cat(Category));
+
 } // namespace options
 
 namespace {
@@ -1134,6 +1145,8 @@ public:
     // Decls with @_alwaysEmitIntoClient aren't required to have an
     // @available attribute.
     if (!Ctx.getOpts().SkipOSCheck &&
+        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::DAK_Available,
+                                                    D->getDeclKind()) &&
         !D->getIntroducingVersion().hasOSAvailability() &&
         !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
       D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
@@ -2280,6 +2293,20 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
   }
 }
 
+static std::unique_ptr<DiagnosticConsumer>
+createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
+  if (!options::SerializedDiagPath.empty()) {
+    FailOnError = true;
+    return serialized_diagnostics::createConsumer(options::SerializedDiagPath);
+  } else if (options::CompilerStyleDiags) {
+    FailOnError = true;
+    return std::make_unique<PrintingDiagnosticConsumer>();
+  } else {
+    FailOnError = false;
+    return std::make_unique<ModuleDifferDiagsConsumer>(true, OS);
+  }
+}
+
 static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                              SDKNodeRoot *RightModule, StringRef OutputPath,
                              llvm::StringSet<> ProtocolReqWhitelist) {
@@ -2296,9 +2323,9 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
     OS = FileOS.get();
   }
-  std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
-    std::make_unique<PrintingDiagnosticConsumer>():
-    std::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
+  bool FailOnError;
+  std::unique_ptr<DiagnosticConsumer> pConsumer =
+    createDiagConsumer(*OS, FailOnError);
 
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
@@ -2312,7 +2339,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   // Find member hoist changes to help refine diagnostics.
   findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
   DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
-  return options::CompilerStyleDiags && Ctx.getDiags().hadAnyError() ? 1 : 0;
+  return FailOnError && Ctx.getDiags().hadAnyError() ? 1 : 0;
 }
 
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
@@ -2696,6 +2723,10 @@ static StringRef getBaselineFilename(llvm::Triple Triple) {
     return "appletvos.json";
   else if (Triple.isWatchOS())
     return "watchos.json";
+  else if (Triple.isOSLinux())
+    return "linux.json";
+  else if (Triple.isOSWindows())
+    return "windows.json";
   else {
     llvm::errs() << "Unsupported triple target\n";
     exit(1);
@@ -2713,8 +2744,10 @@ static std::string getDefaultBaselinePath(const char *Main, StringRef Module,
   return BaselinePath.str().str();
 }
 
-static std::string getCustomBaselinePath(llvm::Triple Triple) {
+static std::string getCustomBaselinePath(llvm::Triple Triple, bool ABI) {
   llvm::SmallString<128> BaselinePath(options::BaselineDirPath);
+  // Look for ABI or API baseline
+  llvm::sys::path::append(BaselinePath, ABI? "ABI": "API");
   llvm::sys::path::append(BaselinePath, getBaselineFilename(Triple));
   return BaselinePath.str().str();
 }
@@ -2736,7 +2769,8 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
          "Cannot find builtin baseline for more than one module");
   std::string Path;
   if (!options::BaselineDirPath.empty()) {
-    Path = getCustomBaselinePath(Invok.getLangOptions().Target);
+    Path = getCustomBaselinePath(Invok.getLangOptions().Target,
+                                 Ctx.checkingABI());
   } else if (options::UseEmptyBaseline) {
     Path = getEmptyBaselinePath(Main);
   } else {
@@ -2753,6 +2787,24 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
   }
   Collector.deSerialize(Path);
   return Collector.getSDKRoot();
+}
+
+static std::string getJsonOutputFilePath(llvm::Triple Triple, bool ABI) {
+  if (!options::OutputFile.empty())
+    return options::OutputFile;
+  if (!options::OutputDir.empty()) {
+    llvm::SmallString<128> OutputPath(options::OutputDir);
+    llvm::sys::path::append(OutputPath, ABI? "ABI": "API");
+    if (!llvm::sys::fs::exists(OutputPath.str())) {
+      llvm::errs() << "Baseline directory " << OutputPath.str()
+                   << " doesn't exist\n";
+      exit(1);
+    }
+    llvm::sys::path::append(OutputPath, getBaselineFilename(Triple));
+    return OutputPath.str();
+  }
+  llvm::errs() << "Unable to decide output file path\n";
+  exit(1);
 }
 
 int main(int argc, char *argv[]) {
@@ -2773,7 +2825,9 @@ int main(int argc, char *argv[]) {
   switch (options::Action) {
   case ActionType::DumpSDK:
     return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
+      dumpSDKContent(InitInvok, Modules,
+                     getJsonOutputFilePath(InitInvok.getLangOptions().Target, Opts.ABI),
+                     Opts);
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
     ComparisonInputMode Mode = checkComparisonInputMode();

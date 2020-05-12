@@ -180,7 +180,7 @@ let theBits = unsafeBitCast(&x, ...)
 
 Should only be used if necessary. This has the effect of forcing inlining to occur before any dataflow analyses take place. Unless you specifically need this behavior, use `@_inline(__always)` or some other mechanism. Its primary purpose is to force the compiler's static checks to peer into the body for diagnostic purposes.
 
-Use of this attribute imposes limitations on what can be in the body. For more details, refer to the [documentation](https://github.com/apple/swift/blob/master/docs/TransparentAttr.rst).
+Use of this attribute imposes limitations on what can be in the body. For more details, refer to the [documentation](https://github.com/apple/swift/blob/master/docs/TransparentAttr.md).
 
 #### `@unsafe_no_objc_tagged_pointer`
 
@@ -218,9 +218,9 @@ The standard library cannot import the Darwin module (much less an ICU module), 
 
 ### Internal structures
 
-#### `_FixedArray`
+#### `_FixedArray16`
 
-The standard library has internal fixed size arrays of some limited sizes. This provides fast random access into contiguous (usually stack-allocated) memory. These are metaprogrammed based on size, so if you need a new size not currently defined, add it to the `sizes` gyb variable. See [FixedArray.swift.gyb](https://github.com/apple/swift/blob/master/stdlib/public/core/FixedArray.swift.gyb) for implementation.
+The standard library has an internal array type of fixed size 16. This provides fast random access into contiguous (usually stack-allocated) memory. See [FixedArray.swift](https://github.com/apple/swift/blob/master/stdlib/public/core/FixedArray.swift) for implementation.
 
 #### Thread Local Storage
 

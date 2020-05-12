@@ -62,11 +62,11 @@ func callOverridden(_ b: B) {
 
 @objc
 class Base {
-  func meth(_ x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
+  func meth(_ x: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
 }
 @objc
 class Sub : Base {
-  func meth(_ x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
+  func meth(_ x: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
 }
 
 // Objective-C method overriding

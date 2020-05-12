@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "DerivedConformances.h"
@@ -39,14 +40,20 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
   auto &C = nominal->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   for (auto *vd : nominal->getStoredProperties()) {
+    // Peer through property wrappers: use original wrapped properties instead.
+    if (auto *originalProperty = vd->getOriginalWrappedProperty()) {
+      // Skip immutable wrapped properties. `mutating func move(along:)` cannot
+      // be synthesized to update these properties.
+      auto mutability = originalProperty->getPropertyWrapperMutability();
+      assert(mutability.hasValue() && "Expected wrapped property mutability");
+      if (mutability->Setter != PropertyWrapperMutability::Value::Mutating)
+        continue;
+      // Use the original wrapped property.
+      vd = originalProperty;
+    }
     // Skip stored properties with `@noDerivative` attribute.
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
-    // For property wrapper backing storage properties, skip if original
-    // property has `@noDerivative` attribute.
-    if (auto *originalProperty = vd->getOriginalWrappedProperty())
-      if (originalProperty->getAttrs().hasAttribute<NoDerivativeAttr>())
-        continue;
     // Skip `let` stored properties. `mutating func move(along:)` cannot be
     // synthesized to update these properties.
     if (vd->isLet())
@@ -54,7 +61,7 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
     if (vd->getInterfaceType()->hasError())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
-    if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal, None))
+    if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal))
       continue;
     result.push_back(vd);
   }
@@ -80,7 +87,7 @@ static Type getTangentVectorType(VarDecl *decl, DeclContext *DC) {
   auto &C = decl->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto varType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
-  auto conf = TypeChecker::conformsToProtocol(varType, diffableProto, DC, None);
+  auto conf = TypeChecker::conformsToProtocol(varType, diffableProto, DC);
   if (!conf)
     return nullptr;
   Type tangentType = conf.getTypeWitnessByName(varType, C.Id_TangentVector);
@@ -96,7 +103,7 @@ static StructDecl *getTangentVectorStructDecl(DeclContext *DC) {
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   assert(diffableProto && "`Differentiable` protocol not found");
   auto conf = TypeChecker::conformsToProtocol(DC->getSelfTypeInContext(),
-                                              diffableProto, DC, None);
+                                              diffableProto, DC);
   assert(conf && "Nominal must conform to `Differentiable`");
   auto assocType =
       conf.getTypeWitnessByName(DC->getSelfTypeInContext(), C.Id_TangentVector);
@@ -139,13 +146,13 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     //   `X == X.TangentVector`.
     if (nominal->isImplicit() && structDecl == nominal->getDeclContext() &&
         TypeChecker::conformsToProtocol(structDecl->getDeclaredInterfaceType(),
-                                        diffableProto, DC, None))
+                                        diffableProto, DC))
       return structDecl;
     // 3. Equal nominal and conform to `AdditiveArithmetic`.
     if (structDecl == nominal) {
       // Check conformance to `AdditiveArithmetic`.
       if (TypeChecker::conformsToProtocol(nominalTypeInContext, addArithProto,
-                                          DC, None))
+                                          DC))
         return structDecl;
     }
     // Otherwise, candidate is invalid.
@@ -177,8 +184,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, diffableProto, DC,
-                                                 None);
+    return (bool)TypeChecker::conformsToProtocol(varType, diffableProto, DC);
   });
 }
 
@@ -225,15 +231,15 @@ deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     if (confRef.isConcrete())
       memberMethodDecl = confRef.getConcrete()->getWitnessDecl(methodReq);
     assert(memberMethodDecl && "Member method declaration must exist");
-    auto memberMethodDRE =
+    auto *memberMethodDRE =
         new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
     memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `x.move(along:)`.
-    auto memberExpr =
+    Expr *memberExpr =
         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                               /*Implicit*/ true);
-    auto memberMethodExpr =
+    auto *memberMethodExpr =
         new (C) DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberExpr);
 
     // Create reference to parameter member: `direction.x`.
@@ -377,7 +383,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto memberAssocContextualType =
         parentDC->mapTypeIntoContext(memberAssocInterfaceType);
     newMember->setInterfaceType(memberAssocInterfaceType);
-    Pattern *memberPattern = new (C) NamedPattern(newMember, /*implicit*/ true);
+    Pattern *memberPattern = NamedPattern::createImplicit(C, newMember);
     memberPattern->setType(memberAssocContextualType);
     memberPattern = TypedPattern::createImplicit(C, memberPattern,
                                                  memberAssocContextualType);
@@ -484,24 +490,56 @@ static void addAssociatedTypeAliasDecl(Identifier name, DeclContext *sourceDC,
 static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
                                                  NominalTypeDecl *nominal,
                                                  DeclContext *DC) {
-  auto *diffableProto = Context.getProtocol(KnownProtocolKind::Differentiable);
+  // If nominal type can conform to `AdditiveArithmetic`, suggest adding a
+  // conformance to `AdditiveArithmetic` in fix-its.
+  // `Differentiable` protocol requirements all have default implementations
+  // when `Self` conforms to `AdditiveArithmetic`, so `Differentiable`
+  // derived conformances will no longer be necessary.
   bool nominalCanDeriveAdditiveArithmetic =
       DerivedConformance::canDeriveAdditiveArithmetic(nominal, DC);
+  auto *diffableProto = Context.getProtocol(KnownProtocolKind::Differentiable);
+  // Check all stored properties.
   for (auto *vd : nominal->getStoredProperties()) {
+    // Peer through property wrappers: use original wrapped properties.
+    if (auto *originalProperty = vd->getOriginalWrappedProperty()) {
+      // Skip wrapped properties with `@noDerivative` attribute.
+      if (originalProperty->getAttrs().hasAttribute<NoDerivativeAttr>())
+        continue;
+      // Diagnose wrapped properties whose property wrappers do not define
+      // `wrappedValue.set`. `mutating func move(along:)` cannot be synthesized
+      // to update these properties.
+      auto *wrapperDecl =
+          vd->getInterfaceType()->getNominalOrBoundGenericNominal();
+      auto mutability = originalProperty->getPropertyWrapperMutability();
+      assert(mutability.hasValue() && "Expected wrapped property mutability");
+      if (mutability->Setter != PropertyWrapperMutability::Value::Mutating) {
+        auto loc =
+            originalProperty->getAttributeInsertionLoc(/*forModifier*/ false);
+        Context.Diags
+            .diagnose(
+                loc,
+                diag::
+                    differentiable_immutable_wrapper_implicit_noderivative_fixit,
+                wrapperDecl->getNameStr(), nominal->getName(),
+                nominalCanDeriveAdditiveArithmetic)
+            .fixItInsert(loc, "@noDerivative ");
+        // Add an implicit `@noDerivative` attribute.
+        originalProperty->getAttrs().add(
+            new (Context) NoDerivativeAttr(/*Implicit*/ true));
+        continue;
+      }
+      // Use the original wrapped property.
+      vd = originalProperty;
+    }
     if (vd->getInterfaceType()->hasError())
       continue;
     // Skip stored properties with `@noDerivative` attribute.
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
-    // For property wrapper backing storage properties, skip if original
-    // property has `@noDerivative` attribute.
-    if (auto *originalProperty = vd->getOriginalWrappedProperty())
-      if (originalProperty->getAttrs().hasAttribute<NoDerivativeAttr>())
-        continue;
     // Check whether to diagnose stored property.
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     bool conformsToDifferentiable =
-        !TypeChecker::conformsToProtocol(varType, diffableProto, nominal, None)
+        !TypeChecker::conformsToProtocol(varType, diffableProto, nominal)
              .isInvalid();
     // If stored property should not be diagnosed, continue.
     if (conformsToDifferentiable && !vd->isLet())
@@ -509,14 +547,8 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
     // Otherwise, add an implicit `@noDerivative` attribute.
     vd->getAttrs().add(new (Context) NoDerivativeAttr(/*Implicit*/ true));
     auto loc = vd->getAttributeInsertionLoc(/*forModifier*/ false);
-    if (auto *originalProperty = vd->getOriginalWrappedProperty())
-      loc = originalProperty->getAttributeInsertionLoc(/*forModifier*/ false);
     assert(loc.isValid() && "Expected valid source location");
-    // If nominal type can conform to `AdditiveArithmetic`, suggest conforming
-    // adding a conformance to `AdditiveArithmetic`.
-    // `Differentiable` protocol requirements all have default implementations
-    // when `Self` conforms to `AdditiveArithmetic`, so `Differentiable`
-    // derived conformances will no longer be necessary.
+    // Diagnose properties that do not conform to `Differentiable`.
     if (!conformsToDifferentiable) {
       Context.Diags
           .diagnose(
@@ -527,11 +559,11 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
           .fixItInsert(loc, "@noDerivative ");
       continue;
     }
+    // Otherwise, diagnose `let` property.
     Context.Diags
         .diagnose(loc,
                   diag::differentiable_let_property_implicit_noderivative_fixit,
-                  vd->getName(), nominal->getName(),
-                  nominalCanDeriveAdditiveArithmetic)
+                  nominal->getName(), nominalCanDeriveAdditiveArithmetic)
         .fixItInsert(loc, "@noDerivative ");
   }
 }
@@ -609,7 +641,7 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
 
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto nominalConformsToAddArith = TypeChecker::conformsToProtocol(
-      parentDC->getSelfTypeInContext(), addArithProto, parentDC, None);
+      parentDC->getSelfTypeInContext(), addArithProto, parentDC);
 
   // Return `Self` if conditions are met.
   if (!hasNoDerivativeStoredProp && !nominal->getSelfClassDecl() &&

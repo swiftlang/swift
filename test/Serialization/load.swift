@@ -6,4 +6,4 @@
 // These errors should happen before we've built the module to import.
 import new_module // expected-error{{no such module 'new_module'}}
 
-new_module.getZero() // expected-error {{use of unresolved identifier 'new_module'}}
+new_module.getZero() // expected-error {{cannot find 'new_module' in scope}}

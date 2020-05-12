@@ -33,7 +33,6 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
 #include <stdint.h>
 #include <assert.h>
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Config.h"
@@ -182,8 +181,8 @@ namespace swift {
 }
 
 // FIXME: HACK: copied from HeapObject.cpp
-extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
-void _swift_release_dealloc(swift::HeapObject *object);
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
+_swift_release_dealloc(swift::HeapObject *object);
 
 namespace swift {
 
@@ -373,21 +372,17 @@ class RefCountBitsT {
   // to improve performance of debug builds.
   
   private:
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  bool getUseSlowRC() const {
-    return bool(getField(UseSlowRC));
-  }
+    SWIFT_ALWAYS_INLINE
+    bool getUseSlowRC() const { return bool(getField(UseSlowRC)); }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void setUseSlowRC(bool value) {
-    setField(UseSlowRC, value);
-  }
+    SWIFT_ALWAYS_INLINE
+    void setUseSlowRC(bool value) { setField(UseSlowRC, value); }
 
   public:
   
   enum Immortal_t { Immortal };
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   bool isImmortal(bool checkSlowRCBit) const {
     if (checkSlowRCBit) {
       return (getField(IsImmortal) == Offsets::IsImmortalMask) &&
@@ -396,43 +391,43 @@ class RefCountBitsT {
       return (getField(IsImmortal) == Offsets::IsImmortalMask);
     }
   }
-  
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+
+  SWIFT_ALWAYS_INLINE
   bool isOverflowingUnownedRefCount(uint32_t oldValue, uint32_t inc) const {
     auto newValue = getUnownedRefCount();
     return newValue != oldValue + inc ||
       newValue == Offsets::UnownedRefCountMask;
   }
-  
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+
+  SWIFT_ALWAYS_INLINE
   void setIsImmortal(bool value) {
     assert(value);
     setField(IsImmortal, Offsets::IsImmortalMask);
     setField(UseSlowRC, value);
   }
-  
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+
+  SWIFT_ALWAYS_INLINE
   bool pureSwiftDeallocation() const {
     return bool(getField(PureSwiftDealloc)) && !bool(getField(UseSlowRC));
   }
-  
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+
+  SWIFT_ALWAYS_INLINE
   void setPureSwiftDeallocation(bool value) {
     setField(PureSwiftDealloc, value);
   }
-  
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+
+  SWIFT_ALWAYS_INLINE
   RefCountBitsT() = default;
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   constexpr
   RefCountBitsT(uint32_t strongExtraCount, uint32_t unownedCount)
     : bits((BitsType(strongExtraCount) << Offsets::StrongExtraRefCountShift) |
            (BitsType(1)                << Offsets::PureSwiftDeallocShift) |
            (BitsType(unownedCount)     << Offsets::UnownedRefCountShift))
   { }
-  
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+
+  SWIFT_ALWAYS_INLINE
   constexpr
   RefCountBitsT(Immortal_t immortal)
   : bits((BitsType(2) << Offsets::StrongExtraRefCountShift) |
@@ -440,7 +435,7 @@ class RefCountBitsT {
          (BitsType(1) << Offsets::UseSlowRCShift))
   { }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   RefCountBitsT(HeapObjectSideTableEntry* side)
     : bits((reinterpret_cast<BitsType>(side) >> Offsets::SideTableUnusedLowBits)
            | (BitsType(1) << Offsets::UseSlowRCShift)
@@ -449,7 +444,7 @@ class RefCountBitsT {
     assert(refcountIsInline);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   RefCountBitsT(const RefCountBitsT<RefCountIsInline> *newbitsPtr) {
     bits = 0;
 
@@ -472,8 +467,8 @@ class RefCountBitsT {
       copyFieldFrom(newbits, UseSlowRC);
     }
   }
-  
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+
+  SWIFT_ALWAYS_INLINE
   bool hasSideTable() const {
     bool hasSide = getUseSlowRC() && !isImmortal(false);
 
@@ -484,7 +479,7 @@ class RefCountBitsT {
     return hasSide;
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   HeapObjectSideTableEntry *getSideTable() const {
     assert(hasSideTable());
 
@@ -493,32 +488,31 @@ class RefCountBitsT {
       (uintptr_t(getField(SideTable)) << Offsets::SideTableUnusedLowBits);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   uint32_t getUnownedRefCount() const {
     assert(!hasSideTable());
     return uint32_t(getField(UnownedRefCount));
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   bool getIsDeiniting() const {
     assert(!hasSideTable());
     return bool(getField(IsDeiniting));
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   uint32_t getStrongExtraRefCount() const {
     assert(!hasSideTable());
     return uint32_t(getField(StrongExtraRefCount));
   }
 
-
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   void setHasSideTable(bool value) {
     bits = 0;
     setUseSlowRC(value);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   void setSideTable(HeapObjectSideTableEntry *side) {
     assert(hasSideTable());
     // Stored value is a shifted pointer.
@@ -529,19 +523,19 @@ class RefCountBitsT {
     setField(SideTableMark, 1);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   void setUnownedRefCount(uint32_t value) {
     assert(!hasSideTable());
     setField(UnownedRefCount, value);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   void setIsDeiniting(bool value) {
     assert(!hasSideTable());
     setField(IsDeiniting, value);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   void setStrongExtraRefCount(uint32_t value) {
     assert(!hasSideTable());
     setField(StrongExtraRefCount, value);
@@ -551,8 +545,8 @@ class RefCountBitsT {
   // Returns true if the increment is a fast-path result.
   // Returns false if the increment should fall back to some slow path
   // (for example, because UseSlowRC is set or because the refcount overflowed).
-  LLVM_NODISCARD LLVM_ATTRIBUTE_ALWAYS_INLINE
-  bool incrementStrongExtraRefCount(uint32_t inc) {
+  SWIFT_NODISCARD SWIFT_ALWAYS_INLINE bool
+  incrementStrongExtraRefCount(uint32_t inc) {
     // This deliberately overflows into the UseSlowRC field.
     bits += BitsType(inc) << Offsets::StrongExtraRefCountShift;
     return (SignedBitsType(bits) >= 0);
@@ -562,8 +556,8 @@ class RefCountBitsT {
   // Returns false if the decrement should fall back to some slow path
   // (for example, because UseSlowRC is set
   // or because the refcount is now zero and should deinit).
-  LLVM_NODISCARD LLVM_ATTRIBUTE_ALWAYS_INLINE
-  bool decrementStrongExtraRefCount(uint32_t dec) {
+  SWIFT_NODISCARD SWIFT_ALWAYS_INLINE bool
+  decrementStrongExtraRefCount(uint32_t dec) {
 #ifndef NDEBUG
     if (!hasSideTable() && !isImmortal(false)) {
       // Can't check these assertions with side table present.
@@ -583,19 +577,19 @@ class RefCountBitsT {
   }
 
   // Returns the old reference count before the increment.
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   uint32_t incrementUnownedRefCount(uint32_t inc) {
     uint32_t old = getUnownedRefCount();
     setUnownedRefCount(old + inc);
     return old;
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   void decrementUnownedRefCount(uint32_t dec) {
     setUnownedRefCount(getUnownedRefCount() - dec);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   bool isUniquelyReferenced() {
     static_assert(Offsets::UnownedRefCountBitCount +
                   Offsets::IsDeinitingBitCount +
@@ -614,7 +608,7 @@ class RefCountBitsT {
       !getUseSlowRC() && !getIsDeiniting() && getStrongExtraRefCount() == 0;
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   BitsType getBitsValue() {
     return bits;
   }
@@ -636,45 +630,41 @@ class alignas(sizeof(void*) * 2) SideTableRefCountBits : public RefCountBitsT<Re
   uint32_t weakBits;
 
   public:
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  SideTableRefCountBits() = default;
+    SWIFT_ALWAYS_INLINE
+    SideTableRefCountBits() = default;
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  constexpr
-  SideTableRefCountBits(uint32_t strongExtraCount, uint32_t unownedCount)
-    : RefCountBitsT<RefCountNotInline>(strongExtraCount, unownedCount)
-    // weak refcount starts at 1 on behalf of the unowned count
-    , weakBits(1)
-  { }
+    SWIFT_ALWAYS_INLINE
+    constexpr SideTableRefCountBits(uint32_t strongExtraCount,
+                                    uint32_t unownedCount)
+        : RefCountBitsT<RefCountNotInline>(strongExtraCount, unownedCount)
+          // weak refcount starts at 1 on behalf of the unowned count
+          ,
+          weakBits(1) {}
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  SideTableRefCountBits(HeapObjectSideTableEntry* side) = delete;
+    SWIFT_ALWAYS_INLINE
+    SideTableRefCountBits(HeapObjectSideTableEntry *side) = delete;
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  SideTableRefCountBits(InlineRefCountBits newbits)
-    : RefCountBitsT<RefCountNotInline>(&newbits), weakBits(1)
-  { }
+    SWIFT_ALWAYS_INLINE
+    SideTableRefCountBits(InlineRefCountBits newbits)
+        : RefCountBitsT<RefCountNotInline>(&newbits), weakBits(1) {}
 
-  
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void incrementWeakRefCount() {
-    weakBits++;
+    SWIFT_ALWAYS_INLINE
+    void incrementWeakRefCount() { weakBits++; }
+
+    SWIFT_ALWAYS_INLINE
+    bool decrementWeakRefCount() {
+      assert(weakBits > 0);
+      weakBits--;
+      return weakBits == 0;
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  bool decrementWeakRefCount() {
-    assert(weakBits > 0);
-    weakBits--;
-    return weakBits == 0;
-  }
-
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   uint32_t getWeakRefCount() {
     return weakBits;
   }
 
   // Side table ref count never has a side table of its own.
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   bool hasSideTable() {
     return false;
   }
@@ -706,19 +696,19 @@ class RefCounts {
 
   // Out-of-line slow paths.
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   void incrementSlow(RefCountBits oldbits, uint32_t inc) SWIFT_CC(PreserveMost);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   bool tryIncrementSlow(RefCountBits oldbits);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   bool tryIncrementNonAtomicSlow(RefCountBits oldbits);
 
-  LLVM_ATTRIBUTE_NOINLINE
+  SWIFT_NOINLINE
   void incrementUnownedSlow(uint32_t inc);
 
   public:
@@ -882,22 +872,22 @@ class RefCounts {
 
   // Decrement the reference count.
   // Return true if the caller should now deinit the object.
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   bool decrementShouldDeinit(uint32_t dec) {
     return doDecrement<DontPerformDeinit>(dec);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   bool decrementShouldDeinitNonAtomic(uint32_t dec) {
     return doDecrementNonAtomic<DontPerformDeinit>(dec);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   void decrementAndMaybeDeinit(uint32_t dec) {
     doDecrement<DoPerformDeinit>(dec);
   }
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  SWIFT_ALWAYS_INLINE
   void decrementAndMaybeDeinitNonAtomic(uint32_t dec) {
     doDecrementNonAtomic<DoPerformDeinit>(dec);
   }
@@ -1418,8 +1408,8 @@ class HeapObjectSideTableEntry {
 
   
   // WEAK
-  
-  LLVM_NODISCARD
+
+  SWIFT_NODISCARD
   HeapObjectSideTableEntry* incrementWeak() {
     // incrementWeak need not be atomic w.r.t. concurrent deinit initiation.
     // The client can't actually get a reference to the object without
@@ -1472,9 +1462,9 @@ class HeapObjectSideTableEntry {
 // This version can actually be non-atomic.
 template <>
 template <PerformDeinit performDeinit>
-LLVM_ATTRIBUTE_ALWAYS_INLINE
-inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
-  
+SWIFT_ALWAYS_INLINE inline bool
+RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
+
   // We can get away without atomicity here.
   // The caller claims that there are no other threads with strong references 
   // to this object.

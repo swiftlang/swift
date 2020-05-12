@@ -98,7 +98,7 @@ where SubSequence: MutableCollection
   /// the index of one of the strings in the slice, and then using that index
   /// in the original array.
   ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
   ///     let streetsSlice = streets[2 ..< streets.endIndex]
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
@@ -222,7 +222,7 @@ extension MutableCollection {
   /// the index of one of the strings in the slice, and then using that index
   /// in the original array.
   ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
   ///     let streetsSlice = streets[2 ..< streets.endIndex]
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"

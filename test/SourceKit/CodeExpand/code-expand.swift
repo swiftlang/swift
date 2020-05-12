@@ -68,24 +68,40 @@ func f1() {
 // CHECK-NEXT: }
 
 func f1() {
+  bar(<#T##__skip__: () -> ()##() -> ()#>, <#T##d: () -> ()##() -> ()#>)
+}
+// CHECK:   bar {
+// CHECK-NEXT:	<#code#>
+// CHECK-NEXT:	} _: {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }
+
+func f1() {
   bar(<#T##d: () -> ()##() -> ()#>, <#T##d: () -> ()##() -> ()#>)
 }
-// CHECK:   bar({
-// CHECK-NEXT:	<#code#>
-// CHECK-NEXT:	}, {
-// CHECK-NEXT:	<#code#>
-// CHECK-NEXT:	})
+// CHECK:   bar {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  } _: {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }
 
+func f1() {
+  bar(a : <#T##__skip__: () -> ()##() -> ()#>, b : <#T##d: () -> ()##() -> ()#>)
+}
+// CHECK: bar {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: } b: {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
 
 func f1() {
   bar(a : <#T##d: () -> ()##() -> ()#>, b : <#T##d: () -> ()##() -> ()#>)
 }
-// CHECK: bar(a : {
+// CHECK: bar {
 // CHECK-NEXT: <#code#>
-// CHECK-NEXT: }, b : {
+// CHECK-NEXT: } b: {
 // CHECK-NEXT: <#code#>
-// CHECK-NEXT: })
-
+// CHECK-NEXT: }
 
 func f1() {
   bar(a : {}}, <#T##d: () -> ()##() -> ()#>)

@@ -875,14 +875,14 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     // Key path referring to the property being accessed.
     Expr *propertyKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
     propertyKeyPath = UnresolvedDotExpr::createImplicit(ctx, propertyKeyPath,
-        enclosingSelfAccess->accessedProperty->getFullName());
+        enclosingSelfAccess->accessedProperty->getName());
     propertyKeyPath = new (ctx) KeyPathExpr(
         SourceLoc(), nullptr, propertyKeyPath, /*hasLeadingDot=*/true);
 
     // Key path referring to the backing storage property.
     Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
     storageKeyPath = UnresolvedDotExpr::createImplicit(ctx, storageKeyPath,
-                                                       storage->getFullName());
+                                                       storage->getName());
     storageKeyPath = new (ctx) KeyPathExpr(SourceLoc(), nullptr, storageKeyPath,
                                            /*hasLeadingDot=*/true);
     Expr *args[3] = {selfDRE, propertyKeyPath, storageKeyPath};
@@ -890,8 +890,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
     lookupExpr = SubscriptExpr::create(
         ctx, wrapperMetatype, SourceLoc(), args,
-        subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
-        nullptr, subscriptDecl, /*Implicit=*/true);
+        subscriptDecl->getName().getArgumentNames(), { }, SourceLoc(),
+        /*trailingClosures=*/{}, subscriptDecl, /*Implicit=*/true);
 
     // FIXME: Since we're not resolving overloads or anything, we should be
     // building fully type-checked AST above; we already have all the
@@ -956,7 +956,7 @@ static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc, None))
+    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc))
       return result;
   }
 
@@ -1002,7 +1002,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   FuncDecl *copyMethod = nullptr;
   for (auto member : conformance.getRequirement()->getMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
-      if (func->getFullName() == copyWithZoneName) {
+      if (func->getName() == copyWithZoneName) {
         copyMethod = func;
         break;
       }
@@ -1264,13 +1264,12 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   Tmp1VD->setHasNonPatternBindingInit();
   Tmp1VD->setImplicit();
 
-  auto *Named = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
+  auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD);
   Named->setType(Tmp1VD->getType());
-  auto *Let = new (Ctx) VarPattern(SourceLoc(), /*let*/true, Named,
-                                   /*implict*/true);
+  auto *Let = VarPattern::createImplicit(Ctx, /*let*/true, Named);
   Let->setType(Named->getType());
-  auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc(),
-                                             /*implicit*/true);
+  auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc());
+  Some->setImplicit();
   Some->setElementDecl(Ctx.getOptionalSomeDecl());
   Some->setType(OptionalType::get(Let->getType()));
 
@@ -1332,7 +1331,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   InitValue = new (Ctx) LazyInitializerExpr(InitValue);
   InitValue->setType(initType);
 
-  Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
+  Pattern *Tmp2PBDPattern = NamedPattern::createImplicit(Ctx, Tmp2VD);
   Tmp2PBDPattern =
     TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, Tmp2VD->getType());
 
@@ -1492,7 +1491,7 @@ static Expr *maybeWrapInOutExpr(Expr *expr, ASTContext &ctx) {
 /// setter which calls them.
 static std::pair<BraceStmt *, bool>
 synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
-                             ASTContext &Ctx) {
+                             ASTContext &Ctx, bool isLazy = false) {
   auto VD = cast<VarDecl>(Set->getStorage());
 
   SourceLoc Loc = VD->getLoc();
@@ -1559,10 +1558,9 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     // parameter or it's provided explicitly in the parameter list.
     if (!didSet->isSimpleDidSet()) {
       Expr *OldValueExpr =
-          buildStorageReference(Set, VD, target,
+          buildStorageReference(Set, VD, isLazy ? TargetImpl::Ordinary : target,
                                 /*isUsedForGetAccess=*/true,
-                                /*isUsedForSetAccess=*/true,
-                                Ctx);
+                                /*isUsedForSetAccess=*/true, Ctx);
 
       // Error recovery.
       if (OldValueExpr == nullptr) {
@@ -1576,7 +1574,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
                                    Ctx.getIdentifier("tmp"), Set);
       OldValue->setImplicit();
       OldValue->setInterfaceType(VD->getValueInterfaceType());
-      auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
+      auto *tmpPattern = NamedPattern::createImplicit(Ctx, OldValue);
       auto *tmpPBD = PatternBindingDecl::createImplicit(
           Ctx, StaticSpellingKind::None, tmpPattern, OldValueExpr, Set);
       SetterBody.push_back(tmpPBD);
@@ -1590,8 +1588,9 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(), true);
   ValueDRE->setType(ValueDecl->getType());
-  createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, target,
-                                            SetterBody, Ctx);
+  createPropertyStoreOrCallSuperclassSetter(
+      Set, ValueDRE, isLazy ? VD->getLazyStorageProperty() : VD, target,
+      SetterBody, Ctx);
 
   if (auto didSet = VD->getParsedAccessor(AccessorKind::DidSet))
     callObserver(didSet, OldValue);
@@ -1619,6 +1618,10 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
       // Lazy property setters write to the underlying storage.
+      if (var->hasObservers()) {
+        return synthesizeObservedSetterBody(setter, TargetImpl::Storage, ctx,
+                                            /*isLazy=*/true);
+      }
       auto *storage = var->getLazyStorageProperty();
       return synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Storage,
                                                     storage, ctx);
@@ -1760,9 +1763,16 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
 
   bool isModify = accessor->getAccessorKind() == AccessorKind::Modify;
 
+  // Special-case for a modify coroutine of a simple stored property with
+  // observers. We can yield a borrowed copy of the underlying storage
+  // in this case. However, if the accessor was synthesized on-demand,
+  // we do the more general thing, because on-demand accessors might be
+  // serialized, which prevents them from being able to directly reference
+  // didSet/willSet accessors, which are private.
   if (isModify &&
       (storageReadWriteImpl == ReadWriteImplKind::StoredWithSimpleDidSet ||
-       storageReadWriteImpl == ReadWriteImplKind::InheritedWithSimpleDidSet)) {
+       storageReadWriteImpl == ReadWriteImplKind::InheritedWithSimpleDidSet) &&
+      !accessor->hasForcedStaticDispatch()) {
     return synthesizeModifyCoroutineBodyWithSimpleDidSet(accessor, ctx);
   }
 
@@ -2294,7 +2304,7 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
 
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
-  Pattern *PBDPattern = new (Context) NamedPattern(Storage, /*implicit*/true);
+  Pattern *PBDPattern = NamedPattern::createImplicit(Context, Storage);
   PBDPattern->setType(StorageTy);
   PBDPattern = TypedPattern::createImplicit(Context, PBDPattern, StorageTy);
   auto *InitExpr = new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
@@ -2367,7 +2377,7 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   addMemberToContextIfNeeded(property, dc, var);
 
   // Create the pattern binding declaration for the property.
-  Pattern *pbdPattern = new (ctx) NamedPattern(property, /*implicit=*/true);
+  Pattern *pbdPattern = NamedPattern::createImplicit(ctx, property);
   pbdPattern->setType(propertyType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, propertyType);
   auto pbd = PatternBindingDecl::createImplicit(
@@ -2615,7 +2625,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
       var->setInvalid();
       if (auto nominalWrapper = wrapperType->getAnyNominal()) {
         nominalWrapper->diagnose(diag::property_wrapper_declared_here,
-                                 nominalWrapper->getFullName());
+                                 nominalWrapper->getName());
       }
       return PropertyWrapperBackingPropertyInfo();
     }
@@ -2638,7 +2648,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   addMemberToContextIfNeeded(backingVar, dc, var);
 
   // Create the pattern binding declaration for the backing property.
-  Pattern *pbdPattern = new (ctx) NamedPattern(backingVar, /*implicit=*/true);
+  Pattern *pbdPattern = NamedPattern::createImplicit(ctx, backingVar);
   pbdPattern->setType(storageType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
@@ -2791,11 +2801,10 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   }
 
   // Lazy properties must be written as stored properties in the source.
-  if (!info.isSimpleStored()) {
-    diagnoseAndRemoveAttr(var, attr,
-                          info.hasStorage()
-                          ? diag::lazy_not_observable
-                          : diag::lazy_not_on_computed);
+  if (info.getReadImpl() != ReadImplKind::Stored &&
+      (info.getWriteImpl() != WriteImplKind::Stored &&
+       info.getWriteImpl() != WriteImplKind::StoredWithObservers)) {
+    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_computed);
     invalid = true;
   }
 
@@ -3054,6 +3063,13 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     } else {
       readImpl = ReadImplKind::Stored;
     }
+
+  // Extensions can't have stored properties. If there are braces, assume
+  // this is an incomplete computed property. This avoids an "extensions
+  // must not contain stored properties" error later on.
+  } else if (isa<ExtensionDecl>(storage->getDeclContext()) &&
+             storage->getBracesRange().isValid()) {
+    readImpl = ReadImplKind::Get;
 
   // Otherwise, it's stored.
   } else {

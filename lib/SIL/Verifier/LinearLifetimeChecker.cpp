@@ -22,11 +22,15 @@
 
 #define DEBUG_TYPE "sil-linear-lifetime-checker"
 #include "LinearLifetimeCheckerPrivate.h"
+#include "swift/Basic/BlotMapVector.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 
@@ -44,13 +48,22 @@ struct State {
   /// parent block of the value.
   Optional<SILValue> value;
 
-  /// The block where the live range begins. If the field value is not None,
-  /// then this is value->getParentBlock();
-  SILBasicBlock *beginBlock;
+  /// The insertion point where the live range begins. If the field value is not
+  /// None, then:
+  //
+  // 1. If this value is defined by an instruction, it will be
+  //    value->getDefiningInstruction().
+  //
+  // 2. If this is an argument, this is the first instruction in the argument's
+  //    defining block.
+  SILInstruction *beginInst;
 
-  /// The result error object that use to signal either that no errors were
-  /// found or if errors are found the specific type of error that was found.
-  LinearLifetimeChecker::Error error;
+  /// A builder object that we use to build a LinearLifetimeChecker::Error
+  /// object that describes exhaustively the set of errors that we encountered.
+  ///
+  /// It also handles any asserts/messages that need to be emitted if we are
+  /// supposed to fail hard.
+  LinearLifetimeChecker::ErrorBuilder &errorBuilder;
 
   /// The blocks that we have already visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
@@ -59,6 +72,11 @@ struct State {
   /// our caller. The intention is that this can be used in a failing case to
   /// put in missing destroys.
   Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback;
+
+  /// If non-null a callback that we should pass all uses that we detect are not
+  /// within the linear lifetime we are checking.
+  Optional<function_ref<void(Operand *)>>
+      nonConsumingUseOutsideLifetimeCallback;
 
   /// The list of passed in consuming uses.
   ArrayRef<Operand *> consumingUses;
@@ -71,7 +89,13 @@ struct State {
 
   /// The set of blocks with non-consuming uses and the associated
   /// non-consuming use SILInstruction.
-  llvm::SmallDenseMap<SILBasicBlock *, Operand *, 8> blocksWithNonConsumingUses;
+  ///
+  /// NOTE: This is initialized in initializeAllNonConsumingUses after which it
+  /// is frozen. Before this is frozen, one can only add new (Key, Value) pairs
+  /// to the map. Once frozen, map operations and blot-erase operations can be
+  /// performed. Additionally it provides a getRange() operation that can be
+  /// used to iterate over all (Key, [Value]) pairs ignoring erased keys.
+  SmallFrozenMultiMap<SILBasicBlock *, Operand *, 8> blocksWithNonConsumingUses;
 
   /// The worklist that we use when performing our block dataflow.
   SmallVector<SILBasicBlock *, 32> worklist;
@@ -81,23 +105,33 @@ struct State {
   SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
+        LinearLifetimeChecker::ErrorBuilder &errorBuilder,
         Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+        Optional<function_ref<void(Operand *)>>
+            nonConsumingUseOutsideLifetimeCallback,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
-      : value(value), beginBlock(value->getParentBlock()), error(errorBehavior),
-        visitedBlocks(visitedBlocks),
+      : value(value), beginInst(value->getDefiningInsertionPoint()),
+        errorBuilder(errorBuilder), visitedBlocks(visitedBlocks),
         leakingBlockCallback(leakingBlockCallback),
+        nonConsumingUseOutsideLifetimeCallback(
+            nonConsumingUseOutsideLifetimeCallback),
         consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
 
   State(SILBasicBlock *beginBlock,
         SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-        LinearLifetimeChecker::ErrorBehaviorKind errorBehavior,
+        LinearLifetimeChecker::ErrorBuilder &errorBuilder,
         Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+        Optional<function_ref<void(Operand *)>>
+            nonConsumingUseOutsideLifetimeCallback,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
-      : value(), beginBlock(beginBlock), error(errorBehavior),
+      : value(), beginInst(&*beginBlock->begin()), errorBuilder(errorBuilder),
         visitedBlocks(visitedBlocks),
         leakingBlockCallback(leakingBlockCallback),
+        nonConsumingUseOutsideLifetimeCallback(
+            nonConsumingUseOutsideLifetimeCallback),
         consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
+
+  SILBasicBlock *getBeginBlock() const { return beginInst->getParent(); }
 
   void initializeAllNonConsumingUses(ArrayRef<Operand *> nonConsumingUsers);
   void initializeAllConsumingUses(
@@ -157,35 +191,44 @@ struct State {
 
 void State::initializeAllNonConsumingUses(
     ArrayRef<Operand *> nonConsumingUsers) {
+  SWIFT_DEFER {
+    // Once we have finished initializing blocksWithNonConsumingUses, we need to
+    // freeze it. By using a defer here, we can make sure we don't forget to do
+    // this below.
+    blocksWithNonConsumingUses.setFrozen();
+  };
+
   for (Operand *use : nonConsumingUsers) {
     auto *userBlock = use->getUser()->getParent();
-    // First try to associate User with User->getParent().
-    auto result =
-        blocksWithNonConsumingUses.insert(std::make_pair(userBlock, use));
 
-    // If the insertion succeeds, then we know that there is no more work to
-    // be done, so process the next use.
-    if (result.second)
-      continue;
-
-    // If the insertion fails, then we have at least two non-consuming uses in
-    // the same block. Since we are performing a liveness type of dataflow, we
-    // only need the last non-consuming use to show that all consuming uses post
-    // dominate both. Since we do not need to deal with cond_br that have
-    // non-trivial values, we now can check if Use is after Result.first->second
-    // in the use list. If Use is not later, then we wish to keep the already
-    // mapped value, not use, so continue.
-    if (std::find_if(result.first->second->getUser()->getIterator(),
-                     userBlock->end(),
+    // Make sure that this non consuming user is in either not in our definition
+    // block or is strictly after our defining instruction. If so, stash the use
+    // and continue.
+    if (userBlock != getBeginBlock() ||
+        std::find_if(beginInst->getIterator(), userBlock->end(),
                      [&use](const SILInstruction &inst) -> bool {
                        return use->getUser() == &inst;
-                     }) == userBlock->end()) {
+                     }) != userBlock->end()) {
+      blocksWithNonConsumingUses.insert(userBlock, use);
       continue;
     }
 
-    // At this point, we know that user is later in the Block than
-    // result.first->second, so store user instead.
-    result.first->second = use;
+    if (nonConsumingUseOutsideLifetimeCallback) {
+      (*nonConsumingUseOutsideLifetimeCallback)(use);
+    }
+
+    // Otherwise, we emit an error since we found a use before our def. We do
+    // not bail early here since we want to gather up /all/ that we find.
+    errorBuilder.handleUseOutsideOfLifetime([&] {
+      llvm::errs() << "Found use outside of lifetime?!\n"
+                   << "Value: ";
+      if (auto v = value) {
+        llvm::errs() << *v;
+      } else {
+        llvm::errs() << "N/A. \n";
+      }
+      llvm::errs() << "User: " << use->getUser();
+    });
   }
 }
 
@@ -213,7 +256,7 @@ void State::initializeAllConsumingUses(
     // If this user is in the same block as the value, do not visit
     // predecessors. We must be extra tolerant here since we allow for
     // unreachable code.
-    if (userBlock == beginBlock)
+    if (userBlock == getBeginBlock())
       continue;
 
     // Then for each predecessor of this block...
@@ -232,9 +275,8 @@ void State::initializeConsumingUse(Operand *consumingUse,
   if (blocksWithConsumingUses.insert(userBlock).second)
     return;
 
-  error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
-                 << "Found over consume?!\n";
+  errorBuilder.handleOverConsume([&] {
+    llvm::errs() << "Found over consume?!\n";
     if (auto v = value) {
       llvm::errs() << "Value: " << *v;
     } else {
@@ -251,24 +293,33 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
   // If we do not have any consuming uses in the same block as our
   // consuming user, then we can not have a same block use-after-free.
   auto iter = blocksWithNonConsumingUses.find(userBlock);
-  if (iter == blocksWithNonConsumingUses.end())
+  if (!iter.hasValue()) {
     return;
+  }
 
-  Operand *nonConsumingUse = iter->second;
+  auto nonConsumingUsesInBlock = *iter;
 
-  // Make sure that the non-consuming use is before the consuming
+  // Make sure that all of our non-consuming uses are before the consuming
   // use. Otherwise, we have a use after free. Since we do not allow for cond_br
   // anymore, we know that both of our users are non-cond branch users and thus
   // must be instructions in the given block. Make sure that the non consuming
   // user is strictly before the consuming user.
-  if (std::find_if(consumingUse->getUser()->getIterator(), userBlock->end(),
-                   [&nonConsumingUse](const SILInstruction &i) -> bool {
-                     return nonConsumingUse->getUser() == &i;
-                   }) != userBlock->end()) {
-    error.handleUseAfterFree([&] {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
-                   << "'\n"
-                   << "Found use after free?!\n"
+  for (auto *nonConsumingUse : nonConsumingUsesInBlock) {
+    if (std::find_if(consumingUse->getUser()->getIterator(), userBlock->end(),
+                     [&nonConsumingUse](const SILInstruction &i) -> bool {
+                       return nonConsumingUse->getUser() == &i;
+                     }) == userBlock->end()) {
+      continue;
+    }
+
+    if (nonConsumingUseOutsideLifetimeCallback) {
+      (*nonConsumingUseOutsideLifetimeCallback)(nonConsumingUse);
+    }
+
+    // NOTE: We do not exit here since we want to catch /all/ errors that we can
+    // find.
+    errorBuilder.handleUseOutsideOfLifetime([&] {
+      llvm::errs() << "Found outside of lifetime use?!\n"
                    << "Value: ";
       if (auto v = value) {
         llvm::errs() << *v;
@@ -276,15 +327,14 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
         llvm::errs() << "N/A. \n";
       }
       llvm::errs() << "Consuming User: " << *consumingUse->getUser()
-                   << "Non Consuming User: " << *iter->second->getUser()
+                   << "Non Consuming User: " << *nonConsumingUse->getUser()
                    << "Block: bb" << userBlock->getDebugID() << "\n\n";
     });
-    return;
   }
 
-  // Erase the use since we know that it is properly joint post-dominated.
-  blocksWithNonConsumingUses.erase(iter);
-  return;
+  // Erase the use since we know that it is either properly joint post-dominated
+  // or it was not and we emitted use after free errors.
+  blocksWithNonConsumingUses.erase(userBlock);
 }
 
 void State::checkPredsForDoubleConsume(Operand *consumingUse,
@@ -303,9 +353,8 @@ void State::checkPredsForDoubleConsume(Operand *consumingUse,
     }
   }
 
-  error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
-                 << "Found over consume?!\n"
+  errorBuilder.handleOverConsume([&] {
+    llvm::errs() << "Found over consume?!\n"
                  << "Value: ";
     if (auto v = value) {
       llvm::errs() << *v;
@@ -334,9 +383,8 @@ void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
     }
   }
 
-  error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
-                 << "Found over consume?!\n"
+  errorBuilder.handleOverConsume([&] {
+    llvm::errs() << "Found over consume?!\n"
                  << "Value: ";
     if (auto v = value) {
       llvm::errs() << *v;
@@ -402,7 +450,7 @@ void State::performDataflow(DeadEndBlocks &deBlocks) {
     // further to do since we do not want to visit the predecessors of our
     // dominating block. On the other hand, we do want to add its successors to
     // the successorBlocksThatMustBeVisited set.
-    if (block == beginBlock)
+    if (block == getBeginBlock())
       continue;
 
     // Then for each predecessor of this block:
@@ -437,19 +485,17 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
     }
 
     // If we are supposed to error on leaks, do so now.
-    error.handleLeak([&] {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
-                   << "'\n"
-                   << "Error! Found a leak due to a consuming post-dominance "
+    errorBuilder.handleLeak([&] {
+      llvm::errs() << "Error! Found a leak due to a consuming post-dominance "
                       "failure!\n";
       if (auto v = value) {
         llvm::errs() << "Value: " << *value;
       } else {
         llvm::errs() << "Value: N/A\n";
       }
-      llvm::errs() << "    Post Dominating Failure Blocks:\n";
+      llvm::errs() << "Post Dominating Failure Blocks:\n";
       for (auto *succBlock : successorBlocksThatMustBeVisited) {
-        llvm::errs() << "        bb" << succBlock->getDebugID();
+        llvm::errs() << "bb" << succBlock->getDebugID();
       }
       llvm::errs() << '\n';
     });
@@ -458,38 +504,34 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
     // wants us to tell it where to insert compensating destroys.
   }
 
-  // Make sure that we do not have any lifetime ending uses left to visit that
-  // are not transitively unreachable blocks.... so return early.
-  if (blocksWithNonConsumingUses.empty()) {
-    return;
-  }
-
   // If we do have remaining blocks, then these non lifetime ending uses must be
-  // outside of our "alive" blocks implying a use-after free.
-  for (auto &pair : blocksWithNonConsumingUses) {
-    if (deBlocks.isDeadEnd(pair.first)) {
+  // outside of our "alive" blocks implying an outside of lifetime use. It could
+  // be a use-before-def or a use-after-free.
+  for (auto pair : blocksWithNonConsumingUses.getRange()) {
+    auto *block = pair.first;
+    if (deBlocks.isDeadEnd(block)) {
       continue;
     }
 
-    error.handleUseAfterFree([&] {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
-                   << "'\n"
-                   << "Found use after free due to unvisited non lifetime "
-                      "ending uses?!\n"
-                   << "Value: ";
-      if (auto v = value) {
-        llvm::errs() << *v;
-      } else {
-        llvm::errs() << "N/A. \n";
+    auto useList = pair.second;
+    for (auto *use : useList) {
+      if (nonConsumingUseOutsideLifetimeCallback) {
+        (*nonConsumingUseOutsideLifetimeCallback)(use);
       }
 
-      llvm::errs() << "    Remaining Users:\n";
-      for (auto &pair : blocksWithNonConsumingUses) {
-        llvm::errs() << "User:" << *pair.second->getUser() << "Block: bb"
-                     << pair.first->getDebugID() << "\n";
-      }
-      llvm::errs() << "\n";
-    });
+      errorBuilder.handleUseOutsideOfLifetime([&] {
+        llvm::errs() << "Found outside of lifetime use!\n"
+                     << "Value: ";
+        if (auto v = value) {
+          llvm::errs() << *v;
+        } else {
+          llvm::errs() << "N/A. \n";
+        }
+
+        llvm::errs() << "User:" << *use->getUser() << "Block: bb"
+                     << block->getDebugID() << "\n";
+      });
+    }
   }
 }
 
@@ -499,13 +541,16 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
 
 LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     SILValue value, ArrayRef<Operand *> consumingUses,
-    ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior,
-    Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback) {
+    ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
+    Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+    Optional<function_ref<void(Operand *)>>
+        nonConsumingUseOutsideLifetimeCallback) {
   assert((!consumingUses.empty() || !deadEndBlocks.empty()) &&
          "Must have at least one consuming user?!");
 
-  State state(value, visitedBlocks, errorBehavior, leakingBlockCallback,
-              consumingUses, nonConsumingUses);
+  State state(value, visitedBlocks, errorBuilder, leakingBlockCallback,
+              nonConsumingUseOutsideLifetimeCallback, consumingUses,
+              nonConsumingUses);
 
   // First add our non-consuming uses and their blocks to the
   // blocksWithNonConsumingUses map. While we do this, if we have multiple uses
@@ -535,25 +580,27 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     // Check if any of our non consuming uses are not in the parent block and
     // are reachable. We flag those as additional use after frees. Any in the
     // same block, we would have flagged.
-    if (llvm::any_of(nonConsumingUses, [&](Operand *use) {
-          auto *useParent = use->getUser()->getParent();
-          return useParent != value->getParentBlock() &&
-                 !deadEndBlocks.isDeadEnd(useParent);
-        })) {
-      state.error.handleUseAfterFree([&] {
+    for (auto *use : nonConsumingUses) {
+      auto *useParent = use->getUser()->getParent();
+      if (useParent == value->getParentBlock() ||
+          deadEndBlocks.isDeadEnd(useParent)) {
+        continue;
+      }
+
+      if (nonConsumingUseOutsideLifetimeCallback) {
+        (*nonConsumingUseOutsideLifetimeCallback)(use);
+      }
+
+      state.errorBuilder.handleUseOutsideOfLifetime([&] {
         llvm::errs() << "Function: '" << value->getFunction()->getName()
                      << "'\n"
-                     << "Found use after free due to unvisited non lifetime "
-                        "ending uses?!\n"
-                     << "Value: " << *value << "    Remaining Users:\n";
-        for (const auto &use : nonConsumingUses) {
-          llvm::errs() << "User: " << *use->getUser();
-        }
-        llvm::errs() << "\n";
+                     << "Found non consuming use outside of the lifetime being "
+                        "verified.\n"
+                     << "Value: " << *value << "User: " << *use->getUser();
       });
     }
 
-    return state.error;
+    return std::move(state.errorBuilder).consumeAndGetFinalError();
   }
 
   // Ok, we may have multiple consuming uses. Add the user block of each of our
@@ -588,29 +635,31 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
   // ...and then check that the end state shows that we have a valid linear
   // typed value.
   state.checkDataflowEndState(deadEndBlocks);
-  return state.error;
+  return std::move(state.errorBuilder).consumeAndGetFinalError();
 }
 
 LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
     SILValue value, ArrayRef<Operand *> consumingUses,
-    ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior) {
-  return checkValueImpl(value, consumingUses, nonConsumingUses, errorBehavior,
-                        None);
+    ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder) {
+  return checkValueImpl(value, consumingUses, nonConsumingUses, errorBuilder,
+                        None, None);
 }
 
 LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
     SILValue value, ArrayRef<Operand *> consumingUses,
-    ArrayRef<Operand *> nonConsumingUses, ErrorBehaviorKind errorBehavior,
+    ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
     function_ref<void(SILBasicBlock *)> leakingBlocksCallback) {
-  return checkValueImpl(value, consumingUses, nonConsumingUses, errorBehavior,
-                        leakingBlocksCallback);
+  return checkValueImpl(value, consumingUses, nonConsumingUses, errorBuilder,
+                        leakingBlocksCallback, None);
 }
 
 bool LinearLifetimeChecker::completeConsumingUseSet(
     SILValue value, Operand *consumingUse,
     function_ref<void(SILBasicBlock::iterator)> visitor) {
+  ErrorBuilder errorBuilder(*value->getFunction(),
+                            ErrorBehaviorKind::ReturnFalse);
   auto error =
-      checkValue(value, {consumingUse}, {}, ErrorBehaviorKind::ReturnFalse,
+      checkValue(value, {consumingUse}, {}, errorBuilder,
                  [&](SILBasicBlock *block) { return visitor(block->begin()); });
 
   if (!error.getFoundError()) {
@@ -624,7 +673,41 @@ bool LinearLifetimeChecker::completeConsumingUseSet(
 bool LinearLifetimeChecker::validateLifetime(
     SILValue value, ArrayRef<Operand *> consumingUses,
     ArrayRef<Operand *> nonConsumingUses) {
-  return !checkValue(value, consumingUses, nonConsumingUses,
-                     ErrorBehaviorKind::ReturnFalse)
+  ErrorBuilder errorBuilder(*value->getFunction(),
+                            ErrorBehaviorKind::ReturnFalse);
+  return !checkValue(value, consumingUses, nonConsumingUses, errorBuilder)
               .getFoundError();
+}
+
+bool LinearLifetimeChecker::usesNotContainedWithinLifetime(
+    SILValue value, ArrayRef<Operand *> consumingUses,
+    ArrayRef<Operand *> usesToTest) {
+
+  auto errorBehavior = ErrorBehaviorKind(
+      ErrorBehaviorKind::ReturnFalse |
+      ErrorBehaviorKind::StoreNonConsumingUsesOutsideLifetime);
+  ErrorBuilder errorBuilder(*value->getFunction(), errorBehavior);
+
+  using OptType = Optional<function_ref<void(Operand *)>>;
+#ifndef NDEBUG
+  SmallVector<Operand *, 32> uniqueUsers;
+#endif
+  unsigned numFoundUses = 0;
+  auto error = checkValueImpl(value, consumingUses, usesToTest, errorBuilder,
+                              None, OptType([&](Operand *use) {
+#ifndef NDEBUG
+                                uniqueUsers.push_back(use);
+#endif
+                                ++numFoundUses;
+                              }));
+
+#ifndef NDEBUG
+  // Make sure in assert builds that we did not double count any operands.
+  sortUnique(uniqueUsers);
+  assert(numFoundUses == uniqueUsers.size());
+#endif
+
+  // Return true if we /did/ found an error and when emitting that error, we
+  // found /all/ uses we were looking for.
+  return error.getFoundError() && numFoundUses == usesToTest.size();
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -941,7 +941,7 @@ public func checkOneLevelOfRandomAccessCollection<
     instances,
     distances: distances,
     of: collection,
-    distanceOracle: { (x:Int, y:Int) in numericCast(y - x) },
+    distanceOracle: { (x:Int, y:Int) in y - x },
     advanceOracle: { x, y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), message(),
@@ -1709,7 +1709,7 @@ public func checkOneLevelOfRandomAccessCollection<
     instances,
     distances: distances,
     of: collection,
-    distanceOracle: { (x:Int, y:Int) in numericCast(y - x) },
+    distanceOracle: { (x:Int, y:Int) in y - x },
     advanceOracle: { x, y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), message(),
@@ -1888,7 +1888,7 @@ public func checkRangeReplaceable<C, N>(
         let growth = newCount - oldCount
 
         let expectedCount = source.count + growth
-        let actualCount = numericCast(a.count) as Int
+        let actualCount = a.count
         if actualCount != expectedCount {
           reportFailure(
             &a, "\(actualCount) != expected count \(expectedCount)")

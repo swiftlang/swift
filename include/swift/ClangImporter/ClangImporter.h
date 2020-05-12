@@ -369,6 +369,23 @@ public:
 
   void verifyAllModules() override;
 
+  Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache,
+      SubASTContextDelegate &delegate) override;
+
+  /// Add dependency information for the bridging header.
+  ///
+  /// \param moduleName the name of the Swift module whose dependency
+  /// information will be augmented with information about the given
+  /// bridging header.
+  ///
+  /// \param cache The module dependencies cache to update, with information
+  /// about new Clang modules discovered along the way.
+  ///
+  /// \returns \c true if an error occurred, \c false otherwise
+  bool addBridgingHeaderDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache);
+
   clang::TargetInfo &getTargetInfo() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;

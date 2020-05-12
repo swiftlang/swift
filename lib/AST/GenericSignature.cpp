@@ -379,7 +379,8 @@ GenericSignatureImpl::lookupConformance(CanType type,
 }
 
 bool GenericSignatureImpl::requiresClass(Type type) {
-  if (!type->isTypeParameter()) return false;
+  assert(type->isTypeParameter() &&
+         "Only type parameters can have superclass requirements");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -410,7 +411,8 @@ bool GenericSignatureImpl::requiresClass(Type type) {
 
 /// Determine the superclass bound on the given dependent type.
 Type GenericSignatureImpl::getSuperclassBound(Type type) {
-  if (!type->isTypeParameter()) return nullptr;
+  assert(type->isTypeParameter() &&
+         "Only type parameters can have superclass requirements");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -456,8 +458,7 @@ GenericSignatureImpl::getConformsTo(Type type) {
 }
 
 bool GenericSignatureImpl::conformsToProtocol(Type type, ProtocolDecl *proto) {
-  // FIXME: Deal with concrete conformances here?
-  if (!type->isTypeParameter()) return false;
+  assert(type->isTypeParameter() && "Expected a type parameter");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -561,7 +562,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
     // requirement, but it could also be in terms of concrete types if it has
     // been substituted/otherwise 'resolved', so we need to handle both.
     auto baseType = canFirstType;
-    if (canFirstType->isTypeParameter()) {
+    if (baseType->isTypeParameter()) {
       auto directSuperclass = getSuperclassBound(baseType);
       if (!directSuperclass)
         return false;
@@ -592,18 +593,22 @@ bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
 }
 
 SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
-                                                 GenericSignature otherSig) {
+                                            GenericSignature otherSig) const {
   SmallVector<Requirement, 4> result;
 
-  // If the signatures are the same, all requirements are satisfied.
+  // If the signatures match by pointer, all requirements are satisfied.
   if (otherSig.getPointer() == this) return result;
 
   // If there is no other signature, no requirements are satisfied.
   if (!otherSig){
-    result.insert(result.end(),
-                  getRequirements().begin(), getRequirements().end());
+    const auto reqs = getRequirements();
+    result.append(reqs.begin(), reqs.end());
     return result;
   }
+
+  // If the canonical signatures are equal, all requirements are satisfied.
+  if (getCanonicalSignature() == otherSig->getCanonicalSignature())
+    return result;
 
   // Find the requirements that aren't satisfied.
   for (const auto &req : getRequirements()) {

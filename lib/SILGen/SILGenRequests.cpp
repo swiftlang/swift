@@ -46,14 +46,57 @@ SourceLoc swift::extractNearestSourceLoc(const SILGenDescriptor &desc) {
   return SourceLoc();
 }
 
-evaluator::DependencySource
-SILGenSourceFileRequest::readDependencySource(Evaluator &e) const {
+evaluator::DependencySource SILGenSourceFileRequest::readDependencySource(
+    const evaluator::DependencyCollector &e) const {
   auto &desc = std::get<0>(getStorage());
   auto *unit = desc.context.get<FileUnit *>();
   return {
     dyn_cast_or_null<SourceFile>(unit),
     evaluator::DependencyScope::Cascading
   };
+}
+
+ArrayRef<FileUnit *> SILGenDescriptor::getFiles() const {
+  if (auto *mod = context.dyn_cast<ModuleDecl *>())
+    return mod->getFiles();
+
+  // For a single file, we can form an ArrayRef that points at its storage in
+  // the union.
+  return llvm::makeArrayRef(*context.getAddrOfPtr1());
+}
+
+bool SILGenDescriptor::isWholeModule() const {
+  return context.is<ModuleDecl *>();
+}
+
+SourceFile *SILGenDescriptor::getSourceFileToParse() const {
+#ifndef NDEBUG
+  auto sfCount = llvm::count_if(getFiles(), [](FileUnit *file) {
+    return isa<SourceFile>(file);
+  });
+  auto silFileCount = llvm::count_if(getFiles(), [](FileUnit *file) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    return SF && SF->Kind == SourceFileKind::SIL;
+  });
+  assert(silFileCount == 0 || (silFileCount == 1 && sfCount == 1) &&
+         "Cannot currently mix a .sil file with other SourceFiles");
+#endif
+
+  for (auto *file : getFiles()) {
+    // Skip other kinds of files.
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    // Given the above precondition that a .sil file isn't mixed with other
+    // SourceFiles, we can return a SIL file if we have it, or return nullptr.
+    if (SF->Kind == SourceFileKind::SIL) {
+      return SF;
+    } else {
+      return nullptr;
+    }
+  }
+  return nullptr;
 }
 
 // Define request evaluation functions for each of the SILGen requests.

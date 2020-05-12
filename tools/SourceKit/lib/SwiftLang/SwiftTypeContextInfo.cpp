@@ -91,7 +91,7 @@ void SwiftLangSupport::getExpressionContextInfo(
 
         // Name.
         memberElem.DeclNameBegin = SS.size();
-        member->getFullName().print(OS);
+        member->getName().print(OS);
         memberElem.DeclNameLength = SS.size() - memberElem.DeclNameBegin;
 
         // Description.

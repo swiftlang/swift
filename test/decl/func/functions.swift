@@ -78,20 +78,20 @@ func parseError1b(_ a: // expected-error {{expected parameter type following ':'
 
 func parseError2(_ a: Int, b: ) {} // expected-error {{expected parameter type following ':'}} {{30-30= <#type#>}}
 
-func parseError3(_ a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}} {{39-39= <#type#>}}
+func parseError3(_ a: unknown_type, b: ) {} // expected-error {{cannot find type 'unknown_type' in scope}}  expected-error {{expected parameter type following ':'}} {{39-39= <#type#>}}
 
 func parseError4(_ a: , b: ) {} // expected-error 2{{expected parameter type following ':'}}
 
-func parseError5(_ a: b: ) {} // expected-error {{use of undeclared type 'b'}}  expected-error {{expected ',' separator}} {{24-24=,}} expected-error {{expected parameter name followed by ':'}}
+func parseError5(_ a: b: ) {} // expected-error {{cannot find type 'b' in scope}}  expected-error {{expected ',' separator}} {{24-24=,}} expected-error {{expected parameter name followed by ':'}}
 
-func parseError6(_ a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}} {{39-39= <#type#>}}
+func parseError6(_ a: unknown_type, b: ) {} // expected-error {{cannot find type 'unknown_type' in scope}}  expected-error {{expected parameter type following ':'}} {{39-39= <#type#>}}
 
-func parseError7(_ a: Int, goo b: unknown_type) {} // expected-error {{use of undeclared type 'unknown_type'}}
+func parseError7(_ a: Int, goo b: unknown_type) {} // expected-error {{cannot find type 'unknown_type' in scope}}
 
-public func foo(_ a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error 2{{use of undeclared type 'Bar'}}
+public func foo(_ a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error 2{{cannot find type 'Bar' in scope}}
 
 func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter name followed by ':'}}
-  return a  // expected-error {{use of unresolved identifier 'a'}}
+  return a  // expected-error {{cannot find 'a' in scope}}
 }
 parenPatternInArg(0)  // expected-error {{argument passed to call that takes no arguments}}
 
@@ -104,12 +104,12 @@ _ = nullaryClosure(0)
 // parameter labels, and they are thus not in scope in the body of the function.
 // expected-error@+1{{unnamed parameters must be written}} {{27-27=_: }}
 func destructureArgument( (result: Int, error: Bool) ) -> Int {
-  return result  // expected-error {{use of unresolved identifier 'result'}}
+  return result  // expected-error {{cannot find 'result' in scope}}
 }
 
 // The former is the same as this:
 func destructureArgument2(_ a: (result: Int, error: Bool) ) -> Int {
-  return result  // expected-error {{use of unresolved identifier 'result'}}
+  return result  // expected-error {{cannot find 'result' in scope}}
 }
 
 
@@ -168,7 +168,7 @@ func testCurryFixits() {
 
 // Bogus diagnostic talking about a 'var' where there is none
 func invalidInOutParam(x: inout XYZ) {}
-// expected-error@-1{{use of undeclared type 'XYZ'}}
+// expected-error@-1{{cannot find type 'XYZ' in scope}}
 
 // Parens around the 'inout'
 func parentheticalInout(_ x: ((inout Int))) {}

@@ -62,6 +62,7 @@ NormalDifferentiableFunctionTypeComponent::getAsDerivativeFunctionKind() const {
   case VJP:
     return {AutoDiffDerivativeFunctionKind::VJP};
   }
+  llvm_unreachable("invalid derivative kind");
 }
 
 LinearDifferentiableFunctionTypeComponent::
@@ -93,6 +94,7 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   case Transpose:
     return None;
   }
+  llvm_unreachable("invalid derivative kind");
 }
 
 void SILAutoDiffIndices::print(llvm::raw_ostream &s) const {
@@ -134,7 +136,7 @@ bool swift::isDifferentiableProgrammingEnabled(SourceFile &SF) {
   // the given source file.
   bool importsDifferentiationModule = false;
   for (auto import : namelookup::getAllImports(&SF)) {
-    if (import.second->getName() == ctx.Id_Differentiation) {
+    if (import.importedModule->getName() == ctx.Id_Differentiation) {
       importsDifferentiationModule = true;
       break;
     }
@@ -375,6 +377,7 @@ Type TangentSpace::getType() const {
   case Kind::Tuple:
     return value.tupleType;
   }
+  llvm_unreachable("invalid tangent space kind");
 }
 
 CanType TangentSpace::getCanonicalType() const {

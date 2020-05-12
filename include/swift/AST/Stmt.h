@@ -1015,6 +1015,7 @@ public:
       return SourceRange(getLoc(), getLoc());
     }
     }
+    llvm_unreachable("invalid parent kind");
   }
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }

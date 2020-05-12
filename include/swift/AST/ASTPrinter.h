@@ -30,7 +30,7 @@ namespace swift {
   class TypeDecl;
   class EnumElementDecl;
   class Type;
-  struct TypeLoc;
+  class TypeLoc;
   class Pattern;
   class ExtensionDecl;
   class NominalTypeDecl;

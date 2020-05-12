@@ -630,7 +630,7 @@ static void reportAttributes(ASTContext &Ctx,
       case PlatformKind::iOS:
         PlatformUID = PlatformIOS; break;
       case PlatformKind::macCatalyst:
-        PlatformUID = PlatformIOS; break;
+        PlatformUID = PlatformMacCatalyst; break;
       case PlatformKind::OSX:
         PlatformUID = PlatformOSX; break;
       case PlatformKind::tvOS:
@@ -869,7 +869,7 @@ static void addParameters(const AbstractFunctionDecl *FD,
                           SourceManager &SM,
                           unsigned BufferID) {
   ArrayRef<Identifier> ArgNames;
-  DeclName Name = FD->getFullName();
+  DeclName Name = FD->getName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
@@ -882,7 +882,7 @@ static void addParameters(const SubscriptDecl *D,
                           SourceManager &SM,
                           unsigned BufferID) {
   ArrayRef<Identifier> ArgNames;
-  DeclName Name = D->getFullName();
+  DeclName Name = D->getName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
@@ -983,8 +983,9 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
-  printModuleInterface(M, None, TraversalOptions, Printer, Options,
-                       true);
+
+  printModuleInterface(M, None, TraversalOptions, Printer, Options, true);
+
   Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);
   Info.References = std::move(Printer.References);

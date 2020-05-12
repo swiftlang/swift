@@ -1955,7 +1955,8 @@ public:
   }
 
   bool isCalleeNoReturn() const {
-    return getSubstCalleeSILType().isNoReturnFunction(this->getModule());
+    return getSubstCalleeSILType().isNoReturnFunction(
+        this->getModule(), TypeExpansionContext(*this->getFunction()));
   }
 
   bool isCalleeThin() const {
@@ -8107,6 +8108,7 @@ public:
     case AutoDiffDerivativeFunctionKind::VJP:
       return getVJPFunction();
     }
+    llvm_unreachable("invalid derivative kind");
   }
 };
 

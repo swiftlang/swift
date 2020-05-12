@@ -435,8 +435,8 @@ func resyncParserB11() {}
 // rdar://21346928
 func optStr() -> String? { return nil }
 let x = (optStr() ?? "autoclosure").#^TOP_LEVEL_AUTOCLOSURE_1^#
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      unicodeScalars[#String.UnicodeScalarView#]
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal/IsSystem: unicodeScalars[#String.UnicodeScalarView#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal/IsSystem: utf16[#String.UTF16View#]
 
 func resyncParserB12() {}
 
@@ -470,9 +470,9 @@ func resyncParserB14() {}
 var stringInterp = "\(#^STRING_INTERP_3^#)"
 _ = "" + "\(#^STRING_INTERP_4^#)" + ""
 // STRING_INTERP: Begin completions
-// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(value): T#}[')'][#Void#];
+// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: ['(']{#(value): T#}[')'][#Void#];
 // STRING_INTERP-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#];
-// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: fooFunc1()[#Void#];
+// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: fooFunc1()[#Void#];
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: optStr()[#String?#];
 // STRING_INTERP-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#];
 // STRING_INTERP: End completions

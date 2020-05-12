@@ -23,6 +23,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Statistic.h"
@@ -47,8 +48,9 @@ class RequirementRepr;
 class SpecializeAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
-struct TypeLoc;
+class TypeLoc;
 class Witness;
+class TypeResolution;
 struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
@@ -120,9 +122,10 @@ public:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &e) const;
-  void writeDependencySink(Evaluator &eval,
-                           ReferencedNameTracker &tracker, Type t) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &e) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
+                           Type t) const;
 };
 
 /// Request the raw type of the given enum.
@@ -889,7 +892,8 @@ public:
 
 public:
   // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 /// Request to obtain a list of stored properties in a nominal type.
@@ -2029,7 +2033,8 @@ public:
 
 public:
   // Incremental dependencies.
-  evaluator::DependencySource readDependencySource(Evaluator &) const;
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &) const;
 };
 
 /// Computes whether the specified type or a super-class/super-protocol has the
@@ -2270,8 +2275,9 @@ private:
 
 public:
   // Incremental dependencies
-  evaluator::DependencySource readDependencySource(Evaluator &eval) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceLookupResult r) const;
 };
 
@@ -2297,8 +2303,9 @@ public:
   void cacheResult(evaluator::SideEffect) const;
 
 public:
-  evaluator::DependencySource readDependencySource(Evaluator &eval) const;
-  void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,
+  evaluator::DependencySource
+  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  void writeDependencySink(evaluator::DependencyCollector &tracker,
                            evaluator::SideEffect) const;
 };
 
@@ -2343,6 +2350,84 @@ public:
     return std::get<0>(getStorage())->getAccessorKind() == AccessorKind::DidSet;
   }
 };
+
+/// A module which has been implicitly imported.
+struct ImplicitImport {
+  using ImportOptions = SourceFile::ImportOptions;
+
+  ModuleDecl *Module;
+  ImportOptions Options;
+
+  ImplicitImport(ModuleDecl *module, ImportOptions opts = {})
+      : Module(module), Options(opts) {}
+
+  friend bool operator==(const ImplicitImport &lhs,
+                         const ImplicitImport &rhs) {
+    return lhs.Module == rhs.Module &&
+           lhs.Options.toRaw() == rhs.Options.toRaw();
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const ImplicitImport &import);
+
+/// Computes the loaded modules that should be implicitly imported by each file
+/// of a given module.
+class ModuleImplicitImportsRequest
+    : public SimpleRequest<ModuleImplicitImportsRequest,
+                           ArrayRef<ImplicitImport>(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<ImplicitImport>
+  evaluate(Evaluator &evaluator, ModuleDecl *module) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether a file performs an implementation-only import.
+class HasImplementationOnlyImportsRequest
+    : public SimpleRequest<HasImplementationOnlyImportsRequest,
+                           bool(SourceFile *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+class ResolveTypeRequest
+    : public SimpleRequest<ResolveTypeRequest,
+                           Type(TypeResolution *, TypeRepr *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+public:
+  // Cycle handling.
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, TypeResolution *resolution,
+                TypeRepr *repr) const;
+};
+
+void simple_display(llvm::raw_ostream &out, const TypeResolution *resolution);
+SourceLoc extractNearestSourceLoc(const TypeRepr *repr);
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-verifier"
+#include "VerifierPrivate.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -44,7 +45,9 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+
 using namespace swift;
+using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
@@ -282,7 +285,7 @@ void verifyKeyPathComponent(SILModule &M,
       auto baseParam = substGetterType->getParameters()[0];
       require(baseParam.getConvention() == normalArgConvention,
               "getter base parameter should have normal arg convention");
-      require(baseParam.getArgumentType(M, substGetterType)
+      require(baseParam.getArgumentType(M, substGetterType, typeExpansionContext)
                 == loweredBaseTy.getASTType(),
               "getter base parameter should match base of component");
       
@@ -291,9 +294,11 @@ void verifyKeyPathComponent(SILModule &M,
         require(indicesParam.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(indicesParam.getArgumentType(M, substGetterType)->getAnyNominal()
-                  == C.getUnsafeRawPointerDecl(),
-                "indices pointer should be an UnsafeRawPointer");
+        require(
+            indicesParam
+                    .getArgumentType(M, substGetterType, typeExpansionContext)
+                    ->getAnyNominal() == C.getUnsafeRawPointerDecl(),
+            "indices pointer should be an UnsafeRawPointer");
       }
 
       require(substGetterType->getNumResults() == 1,
@@ -301,10 +306,11 @@ void verifyKeyPathComponent(SILModule &M,
       auto result = substGetterType->getResults()[0];
       require(result.getConvention() == ResultConvention::Indirect,
               "getter result should be @out");
-      require(result.getReturnValueType(M, substGetterType)
-                == loweredComponentTy.getASTType(),
-              "getter result should match the maximal abstraction of the "
-              "formal component type");
+      require(
+          result.getReturnValueType(M, substGetterType, typeExpansionContext) ==
+              loweredComponentTy.getASTType(),
+          "getter result should match the maximal abstraction of the "
+          "formal component type");
     }
     
     if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
@@ -346,16 +352,19 @@ void verifyKeyPathComponent(SILModule &M,
         require(indicesParam.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(indicesParam.getArgumentType(M, substSetterType)->getAnyNominal()
-                  == C.getUnsafeRawPointerDecl(),
-                "indices pointer should be an UnsafeRawPointer");
+        require(
+            indicesParam
+                    .getArgumentType(M, substSetterType, typeExpansionContext)
+                    ->getAnyNominal() == C.getUnsafeRawPointerDecl(),
+            "indices pointer should be an UnsafeRawPointer");
       }
 
-      require(newValueParam.getArgumentType(M, substSetterType) ==
-                loweredComponentTy.getASTType(),
+      require(newValueParam.getArgumentType(M, substSetterType,
+                                            typeExpansionContext) ==
+                  loweredComponentTy.getASTType(),
               "setter value should match the maximal abstraction of the "
               "formal component type");
-      
+
       require(substSetterType->getNumResults() == 0,
               "setter should have no results");
     }
@@ -562,6 +571,12 @@ struct ImmutableAddressUseVerifier {
         if (isConsumingOrMutatingYieldUse(use))
           return true;
         break;
+      case SILInstructionKind::BeginAccessInst:
+        if (cast<BeginAccessInst>(inst)->getAccessKind() != SILAccessKind::Read)
+          return true;
+        break;
+      case SILInstructionKind::EndAccessInst:
+        break;
       case SILInstructionKind::CopyAddrInst:
         if (isConsumingOrMutatingCopyAddrUse(use))
           return true;
@@ -655,6 +670,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
 
   DeadEndBlocks DEBlocks;
+  LoadBorrowNeverInvalidatedAnalysis loadBorrowNeverInvalidatedAnalysis;
   bool SingleFunction = true;
 
   SILVerifier(const SILVerifier&) = delete;
@@ -681,6 +697,8 @@ public:
     }
     llvm::dbgs() << "In function:\n";
     F.print(llvm::dbgs());
+    llvm::dbgs() << "In module:\n";
+    F.getModule().print(llvm::dbgs());
 
     // We abort by default because we want to always crash in
     // the debugger.
@@ -848,10 +866,11 @@ public:
 
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
-        fnConv(F.getConventionsInContext()),
-        TC(F.getModule().Types), OpenedArchetypes(&F), Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)),
-        DEBlocks(&F), SingleFunction(SingleFunction) {
+        fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
+        OpenedArchetypes(&F), Dominance(nullptr),
+        InstNumbers(numInstsInFunction(F)), DEBlocks(&F),
+        loadBorrowNeverInvalidatedAnalysis(DEBlocks),
+        SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
       
@@ -1424,9 +1443,10 @@ public:
     require(site.getNumArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = site.getNumArguments(); i < size; ++i) {
-      requireSameType(site.getArguments()[i]->getType(),
-                      substConv.getSILArgumentType(i),
-                      "operand of 'apply' doesn't match function input type");
+      requireSameType(
+          site.getArguments()[i]->getType(),
+          substConv.getSILArgumentType(i, F.getTypeExpansionContext()),
+          "operand of 'apply' doesn't match function input type");
     }
   }
 
@@ -1435,7 +1455,7 @@ public:
 
     SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
     requireSameType(
-        AI->getType(), calleeConv.getSILResultType(),
+        AI->getType(), calleeConv.getSILResultType(F.getTypeExpansionContext()),
         "type of apply instruction doesn't match function result type");
     if (AI->isNonThrowing()) {
       require(calleeConv.funcTy->hasErrorResult(),
@@ -1469,7 +1489,7 @@ public:
     require(normalBB->args_size() == 1,
             "normal destination of try_apply must take one argument");
     requireSameType((*normalBB->args_begin())->getType(),
-                    calleeConv.getSILResultType(),
+                    calleeConv.getSILResultType(F.getTypeExpansionContext()),
                     "normal destination of try_apply must take argument "
                     "of normal result type");
 
@@ -1479,7 +1499,7 @@ public:
     require(errorBB->args_size() == 1,
             "error destination of try_apply must take one argument");
     requireSameType((*errorBB->args_begin())->getType(),
-                    calleeConv.getSILErrorType(),
+                    calleeConv.getSILErrorType(F.getTypeExpansionContext()),
                     "error destination of try_apply must take argument "
                     "of error result type");
   }
@@ -1494,7 +1514,8 @@ public:
             "length mismatch in callee yields vs. begin_apply results");
     for (auto i : indices(yields)) {
       requireSameType(
-          yieldResults[i]->getType(), calleeConv.getSILType(yields[i]),
+          yieldResults[i]->getType(),
+          calleeConv.getSILType(yields[i], F.getTypeExpansionContext()),
           "callee yield type does not match begin_apply result type");
     }
 
@@ -1584,7 +1605,8 @@ public:
     for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       requireSameType(
           PAI->getArguments()[i]->getType(),
-          substConv.getSILArgumentType(appliedArgStartIdx + i),
+          substConv.getSILArgumentType(appliedArgStartIdx + i,
+                                       F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
     }
@@ -1611,8 +1633,9 @@ public:
       if (expectedResult.getConvention()
             == ResultConvention::UnownedInnerPointer) {
         expectedResult = SILResultInfo(
-                   expectedResult.getReturnValueType(F.getModule(), substTy),
-                   ResultConvention::Unowned);
+            expectedResult.getReturnValueType(F.getModule(), substTy,
+                                              F.getTypeExpansionContext()),
+            ResultConvention::Unowned);
         require(originalResult == expectedResult,
                 "result type of result function type for partially applied "
                 "@unowned_inner_pointer function should have @unowned"
@@ -1624,8 +1647,9 @@ public:
       } else if (expectedResult.getConvention()
             == ResultConvention::Autoreleased) {
         expectedResult = SILResultInfo(
-                     expectedResult.getReturnValueType(F.getModule(), substTy),
-                     ResultConvention::Owned);
+            expectedResult.getReturnValueType(F.getModule(), substTy,
+                                              F.getTypeExpansionContext()),
+            ResultConvention::Owned);
         require(originalResult == expectedResult,
                 "result type of result function type for partially applied "
                 "@autoreleased function should have @owned convention");
@@ -1867,6 +1891,8 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
+    require(loadBorrowNeverInvalidatedAnalysis.isNeverInvalidated(LBI),
+            "Found load borrow that is invalidated by a local write?!");
   }
 
   void checkEndBorrowInst(EndBorrowInst *EBI) {
@@ -2051,7 +2077,8 @@ public:
     }
     require(argIdx < conv.getNumSILArguments(),
             "initializer or setter has too few arguments");
-    SILType argTy = conv.getSILArgumentType(argIdx++);
+    SILType argTy =
+        conv.getSILArgumentType(argIdx++, F.getTypeExpansionContext());
     if (ty.isAddress() && argTy.isObject())
       ty = ty.getObjectType();
     requireSameType(ty, argTy, "wrong argument type of initializer or setter");
@@ -2078,16 +2105,20 @@ public:
       case 0:
         require(initConv.getNumDirectSILResults() == 1,
                 "wrong number of init function results");
-        requireSameType(Dest->getType().getObjectType(),
-                        *initConv.getDirectSILResultTypes().begin(),
-                        "wrong init function result type");
+        requireSameType(
+            Dest->getType().getObjectType(),
+            *initConv.getDirectSILResultTypes(F.getTypeExpansionContext())
+                 .begin(),
+            "wrong init function result type");
         break;
       case 1:
         require(initConv.getNumDirectSILResults() == 0,
                 "wrong number of init function results");
-        requireSameType(Dest->getType(),
-                        *initConv.getIndirectSILResultTypes().begin(),
-                        "wrong indirect init function result type");
+        requireSameType(
+            Dest->getType(),
+            *initConv.getIndirectSILResultTypes(F.getTypeExpansionContext())
+                 .begin(),
+            "wrong indirect init function result type");
         break;
       default:
         require(false, "wrong number of indirect init function results");
@@ -2855,7 +2886,8 @@ public:
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
-    return fnConv.getSILType(ft->getParameters().back());
+    return fnConv.getSILType(ft->getParameters().back(),
+                             F.getTypeExpansionContext());
   }
 
   void checkWitnessMethodInst(WitnessMethodInst *AMI) {
@@ -2953,9 +2985,11 @@ public:
       if (fnDecl->hasDynamicSelfResult()) {
         auto anyObjectTy = C.getAnyObjectType();
         for (auto &dynResult : dynResults) {
-          auto newResultTy
-            = dynResult.getReturnValueType(F.getModule(), methodTy)
-                       ->replaceCovariantResultType(anyObjectTy, 0);
+          auto newResultTy =
+              dynResult
+                  .getReturnValueType(F.getModule(), methodTy,
+                                      F.getTypeExpansionContext())
+                  ->replaceCovariantResultType(anyObjectTy, 0);
           dynResult = SILResultInfo(newResultTy->getCanonicalType(),
                                     dynResult.getConvention());
         }
@@ -3965,9 +3999,12 @@ public:
     LLVM_DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =
-        F.getLoweredType(
-             F.mapTypeIntoContext(fnConv.getSILResultType()).getASTType())
-            .getCategoryType(fnConv.getSILResultType().getCategory());
+        F.getLoweredType(F.mapTypeIntoContext(fnConv.getSILResultType(
+                                                  F.getTypeExpansionContext()))
+                             .getASTType())
+            .getCategoryType(
+                fnConv.getSILResultType(F.getTypeExpansionContext())
+                    .getCategory());
     SILType instResultType = RI->getOperand()->getType();
     LLVM_DEBUG(llvm::dbgs() << "function return type: ";
                functionResultType.dump();
@@ -3984,9 +4021,11 @@ public:
             "throw in function that doesn't have an error result");
 
     SILType functionResultType =
-        F.getLoweredType(
-             F.mapTypeIntoContext(fnConv.getSILErrorType()).getASTType())
-            .getCategoryType(fnConv.getSILErrorType().getCategory());
+        F.getLoweredType(F.mapTypeIntoContext(fnConv.getSILErrorType(
+                                                  F.getTypeExpansionContext()))
+                             .getASTType())
+            .getCategoryType(fnConv.getSILErrorType(F.getTypeExpansionContext())
+                                 .getCategory());
     SILType instResultType = TI->getOperand()->getType();
     LLVM_DEBUG(llvm::dbgs() << "function error result type: ";
                functionResultType.dump();
@@ -4011,8 +4050,8 @@ public:
     require(yieldedValues.size() == yieldInfos.size(),
             "wrong number of yielded values for function");
     for (auto i : indices(yieldedValues)) {
-      SILType yieldType =
-        F.mapTypeIntoContext(fnConv.getSILType(yieldInfos[i]));
+      SILType yieldType = F.mapTypeIntoContext(
+          fnConv.getSILType(yieldInfos[i], F.getTypeExpansionContext()));
       requireSameType(yieldedValues[i]->getType(), yieldType,
                       "yielded value does not match yield type of coroutine");
     }
@@ -4453,7 +4492,9 @@ public:
             "invoke function must take block storage as @inout_aliasable "
             "parameter");
     requireSameType(
-        storageParam.getArgumentType(F.getModule(), invokeTy), storageTy,
+        storageParam.getArgumentType(F.getModule(), invokeTy,
+                                     F.getTypeExpansionContext()),
+        storageTy,
         "invoke function must take block storage type as first parameter");
 
     require(IBSHI->getType().isObject(), "result must be a value");
@@ -4714,16 +4755,18 @@ public:
   void verifyEntryBlock(SILBasicBlock *entry) {
     require(entry->pred_empty(), "entry block cannot have predecessors");
 
-    LLVM_DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
-               for (auto *arg
-                    : make_range(entry->args_begin(), entry->args_end()))
-                   arg->getType()
-                       .dump();
-               llvm::dbgs() << "Input types for SIL function type ";
-               F.getLoweredFunctionType()->print(llvm::dbgs());
-               llvm::dbgs() << ":\n";
-               for (auto paramTy
-                    : fnConv.getParameterSILTypes()) { paramTy.dump(); });
+    LLVM_DEBUG(
+        llvm::dbgs() << "Argument types for entry point BB:\n";
+        for (auto *arg
+             : make_range(entry->args_begin(), entry->args_end()))
+            arg->getType()
+                .dump();
+        llvm::dbgs() << "Input types for SIL function type ";
+        F.getLoweredFunctionType()->print(llvm::dbgs()); llvm::dbgs() << ":\n";
+        for (auto paramTy
+             : fnConv.getParameterSILTypes(F.getTypeExpansionContext())) {
+          paramTy.dump();
+        });
 
     require(entry->args_size() == (fnConv.getNumIndirectSILResults()
                                    + fnConv.getNumParameters()),
@@ -4763,10 +4806,11 @@ public:
 
     for (auto result : fnConv.getIndirectSILResults()) {
       assert(fnConv.isSILIndirect(result));
-      check("indirect result", fnConv.getSILType(result));
+      check("indirect result",
+            fnConv.getSILType(result, F.getTypeExpansionContext()));
     }
     for (auto param : F.getLoweredFunctionType()->getParameters()) {
-      check("parameter", fnConv.getSILType(param));
+      check("parameter", fnConv.getSILType(param, F.getTypeExpansionContext()));
     }
 
     require(matched, "entry point argument types do not match function type");

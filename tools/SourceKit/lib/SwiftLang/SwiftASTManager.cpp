@@ -373,9 +373,11 @@ struct SwiftASTManager::Implementation {
   explicit Implementation(
       std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
       std::shared_ptr<GlobalConfig> Config,
-      std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath)
+      std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath,
+      StringRef DiagnosticDocumentationPath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
         RuntimeResourcePath(RuntimeResourcePath),
+        DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
   }
 
@@ -383,6 +385,7 @@ struct SwiftASTManager::Implementation {
   std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<SwiftStatistics> Stats;
   std::string RuntimeResourcePath;
+  std::string DiagnosticDocumentationPath;
   SourceManager SourceMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
   llvm::sys::Mutex CacheMtx;
@@ -408,9 +411,10 @@ struct SwiftASTManager::Implementation {
 SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
     std::shared_ptr<GlobalConfig> Config,
-    std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath)
-    : Impl(*new Implementation(EditorDocs, Config, Stats,
-                               RuntimeResourcePath)) {}
+    std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath,
+    StringRef DiagnosticDocumentationPath)
+    : Impl(*new Implementation(EditorDocs, Config, Stats, RuntimeResourcePath,
+                               DiagnosticDocumentationPath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
@@ -485,10 +489,14 @@ bool SwiftASTManager::initCompilerInvocation(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
   SmallVector<const char *, 16> Args;
-  // Make sure to put '-resource-dir' at the top to allow overriding it by
-  // the passed in arguments.
+  // Make sure to put '-resource-dir' and '-diagnostic-documentation-path' at
+  // the top to allow overriding them with the passed in arguments.
   Args.push_back("-resource-dir");
   Args.push_back(Impl.RuntimeResourcePath.c_str());
+  Args.push_back("-Xfrontend");
+  Args.push_back("-diagnostic-documentation-path");
+  Args.push_back("-Xfrontend");
+  Args.push_back(Impl.DiagnosticDocumentationPath.c_str());
   Args.append(OrigArgs.begin(), OrigArgs.end());
 
   SmallString<32> ErrStr;
@@ -520,19 +528,21 @@ bool SwiftASTManager::initCompilerInvocation(
   ImporterOpts.DetailedPreprocessingRecord = true;
 
   assert(!Invocation.getModuleName().empty());
-  Invocation.getLangOptions().AttachCommentsToDecls = true;
-  Invocation.getLangOptions().DiagnosticsEditorMode = true;
-  Invocation.getLangOptions().CollectParsedToken = true;
-  auto &FrontendOpts = Invocation.getFrontendOptions();
-  if (FrontendOpts.PlaygroundTransform) {
+
+  auto &LangOpts = Invocation.getLangOptions();
+  LangOpts.AttachCommentsToDecls = true;
+  LangOpts.DiagnosticsEditorMode = true;
+  LangOpts.CollectParsedToken = true;
+  if (LangOpts.PlaygroundTransform) {
     // The playground instrumenter changes the AST in ways that disrupt the
     // SourceKit functionality. Since we don't need the instrumenter, and all we
     // actually need is the playground semantics visible to the user, like
     // silencing the "expression resolves to an unused l-value" error, disable it.
-    FrontendOpts.PlaygroundTransform = false;
+    LangOpts.PlaygroundTransform = false;
   }
 
   // Disable the index-store functionality for the sourcekitd requests.
+  auto &FrontendOpts = Invocation.getFrontendOptions();
   FrontendOpts.IndexStorePath.clear();
   ImporterOpts.IndexStorePath.clear();
 
@@ -909,7 +919,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
   TopMod->getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports) {
-    ModuleDecl *Mod = Import.second;
+    ModuleDecl *Mod = Import.importedModule;
     if (Mod->isSystemModule())
       continue;
     // FIXME: Setup dependencies on the included headers.

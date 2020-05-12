@@ -33,10 +33,12 @@
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Strings.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/Mangle.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -235,14 +237,19 @@ std::string ASTMangler::mangleClosureWitnessThunk(
 }
 
 std::string ASTMangler::mangleGlobalVariableFull(const VarDecl *decl) {
-  // As a special case, Clang functions and globals don't get mangled at all.
-  // FIXME: When we can import C++, use Clang's mangler.
+  // Clang globals get mangled using Clang's mangler.
   if (auto clangDecl =
       dyn_cast_or_null<clang::DeclaratorDecl>(decl->getClangDecl())) {
     if (auto asmLabel = clangDecl->getAttr<clang::AsmLabelAttr>()) {
       Buffer << '\01' << asmLabel->getLabel();
     } else {
-      Buffer << clangDecl->getName();
+      if (clangDecl->getDeclContext()->isTranslationUnit()) {
+        Buffer << clangDecl->getName();
+      } else {
+        clang::MangleContext *mangler =
+          decl->getClangDecl()->getASTContext().createMangleContext();
+        mangler->mangleName(clangDecl, Buffer);
+      }
     }
     return finalize();
   }
@@ -1569,6 +1576,17 @@ static char getParamConvention(ParameterConvention conv) {
   llvm_unreachable("bad parameter convention");
 };
 
+static Optional<char>
+getParamDifferentiability(SILParameterDifferentiability diffKind) {
+  switch (diffKind) {
+  case swift::SILParameterDifferentiability::DifferentiableOrNotApplicable:
+    return None;
+  case swift::SILParameterDifferentiability::NotDifferentiable:
+    return 'w';
+  }
+  llvm_unreachable("bad parameter convention");
+};
+
 static char getResultConvention(ResultConvention conv) {
   switch (conv) {
     case ResultConvention::Indirect: return 'r';
@@ -1658,6 +1676,8 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
+    if (auto diffKind = getParamDifferentiability(param.getDifferentiability()))
+      OpArgs.push_back(*diffKind);
     appendType(param.getInterfaceType());
   }
 

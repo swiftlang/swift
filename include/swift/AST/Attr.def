@@ -147,7 +147,10 @@ SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
   OnNominalType |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   6)
-// NOTE: 7 is unused
+SIMPLE_DECL_ATTR(main, MainType,
+  OnClass | OnStruct | OnEnum | OnExtension |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  7)
 SIMPLE_DECL_ATTR(_exported, Exported,
   OnImport |
   UserInaccessible |

@@ -222,6 +222,19 @@ swift::Parser::BacktrackingScope::~BacktrackingScope() {
   }
 }
 
+void swift::Parser::BacktrackingScope::cancelBacktrack() {
+  if (!Backtrack)
+    return;
+
+  Backtrack = false;
+  SynContext->cancelBacktrack();
+  SynContext->setTransparent();
+  if (SynContext->isTopOfContextStack())
+    SynContext.reset();
+  DT.commit();
+  TempReceiver.shouldTransfer = true;
+}
+
 /// Tokenizes a string literal, taking into account string interpolation.
 static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 const SourceManager &SM,
@@ -361,7 +374,6 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
       return LexerMode::SIL;
     case swift::SourceFileKind::Library:
     case swift::SourceFileKind::Main:
-    case swift::SourceFileKind::REPL:
       return LexerMode::Swift;
   }
   llvm_unreachable("covered switch");
@@ -1190,8 +1202,7 @@ struct ParserUnit::Implementation {
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM, Diags)),
         SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx), SFKind,
-            BufferID, SourceFile::ImplicitModuleImportKind::None,
-            Opts.CollectParsedToken, Opts.BuildSyntaxTree,
+            BufferID, Opts.CollectParsedToken, Opts.BuildSyntaxTree,
             SourceFile::ParsingFlags::DisableDelayedBodies |
                 SourceFile::ParsingFlags::DisablePoundIfEvaluation)) {}
 

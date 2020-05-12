@@ -33,7 +33,6 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -273,6 +272,13 @@ namespace {
           // context.
           if (superclassType.hasArchetype())
             Options |= ClassMetadataFlags::ClassHasGenericLayout;
+
+          // Since we're not going to visit the superclass, make sure that we still
+          // set ClassHasObjCAncestry correctly.
+          if (superclassType.getASTType()->getReferenceCounting()
+                == ReferenceCounting::ObjC) {
+            Options |= ClassMetadataFlags::ClassHasObjCAncestry;
+          }
         } else {
           // Otherwise, we are allowed to have total knowledge of the superclass
           // fields, so walk them to compute the layout.
@@ -2091,41 +2097,44 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 /// We emit Objective-C class stubs for non-generic classes with resilient
 /// ancestry. This lets us attach categories to the class even though it
 /// does not have statically-emitted metadata.
-bool irgen::hasObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
-  assert(IGM.getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
-  return IGM.ObjCInterop && !D->isGenericContext();
+bool IRGenModule::hasObjCResilientClassStub(ClassDecl *D) {
+  assert(getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
+  return ObjCInterop && !D->isGenericContext();
 }
 
-void irgen::emitObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
-  assert(hasObjCResilientClassStub(IGM, D));
+void IRGenModule::emitObjCResilientClassStub(ClassDecl *D) {
+  assert(hasObjCResilientClassStub(D));
 
-  llvm::Constant *fields[] = {
-    llvm::ConstantInt::get(IGM.SizeTy, 0), // reserved
-    llvm::ConstantInt::get(IGM.SizeTy, 1), // isa
-    IGM.getAddrOfObjCMetadataUpdateFunction(D, NotForDefinition)
-  };
-  auto init = llvm::ConstantStruct::get(IGM.ObjCFullResilientClassStubTy,
-                                        makeArrayRef(fields));
+  ConstantInitBuilder builder(*this);
+  auto fields = builder.beginStruct(ObjCFullResilientClassStubTy);
+  fields.addInt(SizeTy, 0); // reserved
+  fields.addInt(SizeTy, 1); // isa
+  auto *impl = getAddrOfObjCMetadataUpdateFunction(D, NotForDefinition);
+  const auto &schema =
+      getOptions().PointerAuth.ResilientClassStubInitCallbacks;
+  fields.addSignedPointer(impl, schema, PointerAuthEntity()); // callback
+
+  auto init = fields.finishAndCreateFuture();
 
   // Define the full stub. This is a private symbol.
+  LinkEntity entity = LinkEntity::forObjCResilientClassStub(
+      D, TypeMetadataAddress::FullMetadata);
   auto fullObjCStub = cast<llvm::GlobalVariable>(
-      IGM.getAddrOfObjCResilientClassStub(D, ForDefinition,
-                                          TypeMetadataAddress::FullMetadata));
-  fullObjCStub->setInitializer(init);
+      getAddrOfLLVMVariable(entity, init, DebugTypeInfo()));
 
   // Emit the metadata update function referenced above.
-  emitObjCMetadataUpdateFunction(IGM, D);
+  emitObjCMetadataUpdateFunction(*this, D);
 
   // Apply the offset.
-  auto *objcStub = llvm::ConstantExpr::getBitCast(fullObjCStub, IGM.Int8PtrTy);
+  auto *objcStub = llvm::ConstantExpr::getBitCast(fullObjCStub, Int8PtrTy);
   objcStub = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      IGM.Int8Ty, objcStub, IGM.getSize(IGM.getPointerSize()));
+      Int8Ty, objcStub, getSize(getPointerSize()));
   objcStub = llvm::ConstantExpr::getPointerCast(objcStub,
-      IGM.ObjCResilientClassStubTy->getPointerTo());
+      ObjCResilientClassStubTy->getPointerTo());
 
-  auto entity = LinkEntity::forObjCResilientClassStub(
+  entity = LinkEntity::forObjCResilientClassStub(
       D, TypeMetadataAddress::AddressPoint);
-  IGM.defineAlias(entity, objcStub);
+  defineAlias(entity, objcStub);
 }
 
 /// Emit the private data (RO-data) associated with a class.

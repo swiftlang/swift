@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -116,8 +116,7 @@ internal struct _SliceBuffer<Element>
   /// the given collection.
   ///
   /// - Precondition: This buffer is backed by a uniquely-referenced
-  ///   `_ContiguousArrayBuffer` and
-  ///   `insertCount <= numericCast(newValues.count)`.
+  ///   `_ContiguousArrayBuffer` and `insertCount <= newValues.count`.
   @inlinable
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
@@ -126,7 +125,7 @@ internal struct _SliceBuffer<Element>
   ) where C: Collection, C.Element == Element {
 
     _invariantCheck()
-    _internalInvariant(insertCount <= numericCast(newValues.count))
+    _internalInvariant(insertCount <= newValues.count)
 
     _internalInvariant(_hasNativeBuffer)
     _internalInvariant(isUniquelyReferenced())

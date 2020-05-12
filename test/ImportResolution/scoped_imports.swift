@@ -22,4 +22,4 @@ import func ClangModuleWithOverlay.ClangTypeImportAsMemberStaticMethod
 import func ClangModuleWithOverlay.ClangTypeImportAsMemberInstanceMethod
 import struct ClangModuleWithOverlay.ClangTypeInner
 
-func foo(_ x: ClangType.Inner) {} // expected-error {{use of undeclared type 'ClangType'}}
+func foo(_ x: ClangType.Inner) {} // expected-error {{cannot find type 'ClangType' in scope}}

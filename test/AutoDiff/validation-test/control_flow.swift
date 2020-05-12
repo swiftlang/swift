@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// REQUIRES: SR12741
+
 import _Differentiation
 import StdlibUnittest
 

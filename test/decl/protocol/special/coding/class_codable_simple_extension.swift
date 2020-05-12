@@ -20,7 +20,7 @@ class SimpleClass { // expected-note {{did you mean 'init'?}}
   }
 }
 
-extension SimpleClass : Codable {} // expected-error 2 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be be satisfied by a 'required' initializer in the class definition}}
+extension SimpleClass : Codable {} // expected-error 2 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be satisfied by a 'required' initializer in the class definition}}
 
 // They should not receive synthesized init(from:), but should receive an encode(to:).
 let _ = SimpleClass.init(from:) // expected-error {{type 'SimpleClass' has no member 'init(from:)'}}

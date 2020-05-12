@@ -20,7 +20,6 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
-#include "llvm/Support/Compiler.h"
 
 #if defined(__APPLE__) && defined(__MACH__)
 #include <TargetConditionals.h>
@@ -192,10 +191,10 @@ public:
   }
 #endif
 
-  LLVM_LIBRARY_VISIBILITY
+  SWIFT_LIBRARY_VISIBILITY
   const ClassMetadata *_swift_getClass(const void *object);
 
-  LLVM_LIBRARY_VISIBILITY
+  SWIFT_LIBRARY_VISIBILITY
   bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
 
   static inline

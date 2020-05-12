@@ -227,7 +227,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
-  inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
+  inputArgs.AddAllArgs(arguments, options::OPT_warnings_as_errors,
+                       options::OPT_no_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
@@ -243,10 +244,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
   inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_fine_grained_dependencies);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_disable_fine_grained_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_enable_type_fingerprints);
   inputArgs.AddLastArg(arguments, options::OPT_disable_type_fingerprints);
   inputArgs.AddLastArg(arguments,
@@ -264,7 +261,9 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                        options::OPT_enable_experimental_concise_pound_file);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
-  
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_experimental_private_intransitive_dependencies);
+
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
@@ -573,6 +572,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-module";
   case file_types::TY_ImportedModules:
     return "-emit-imported-modules";
+  case file_types::TY_JSONDependencies:
+    return "-scan-dependencies";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -839,6 +840,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_PCH:
     case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
+    case file_types::TY_JSONDependencies:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:

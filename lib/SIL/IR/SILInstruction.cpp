@@ -1002,6 +1002,22 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
     }
   }
 
+  if (auto *ga = dyn_cast<GlobalAddrInst>(this)) {
+    // Global variables with resilient types might be allocated into a buffer
+    // and not statically in the data segment.
+    // In this case, the global_addr depends on alloc_global being executed
+    // first. We model this by letting global_addr have a side effect.
+    // It prevents e.g. LICM to move a global_addr out of a loop while keeping
+    // the alloc_global inside the loop.
+    SILModule &M = ga->getFunction()->getModule();
+    auto expansion = TypeExpansionContext::maximal(M.getAssociatedContext(),
+                                                   M.isWholeModule());
+    const TypeLowering &tl =
+      M.Types.getTypeLowering(ga->getType().getObjectType(), expansion);
+    return tl.isFixedABI() ? MemoryBehavior::None :
+                             MemoryBehavior::MayHaveSideEffects;
+  }
+
   switch (getKind()) {
 #define FULL_INST(CLASS, TEXTUALNAME, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)  \
   case SILInstructionKind::CLASS:                                              \

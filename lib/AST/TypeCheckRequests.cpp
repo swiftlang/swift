@@ -157,8 +157,8 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
     protocolDecl->LazySemanticInfo.SuperclassType.setPointerAndInt(value, true);
 }
 
-evaluator::DependencySource
-SuperclassTypeRequest::readDependencySource(Evaluator &e) const {
+evaluator::DependencySource SuperclassTypeRequest::readDependencySource(
+    const evaluator::DependencyCollector &e) const {
   const auto access = std::get<0>(getStorage())->getFormalAccess();
   return {
     e.getActiveDependencySourceOrNull(),
@@ -166,9 +166,8 @@ SuperclassTypeRequest::readDependencySource(Evaluator &e) const {
   };
 }
 
-void SuperclassTypeRequest::writeDependencySink(Evaluator &eval,
-                                                ReferencedNameTracker &tracker,
-                                                Type value) const {
+void SuperclassTypeRequest::writeDependencySink(
+    evaluator::DependencyCollector &tracker, Type value) const {
   if (!value)
     return;
 
@@ -177,7 +176,7 @@ void SuperclassTypeRequest::writeDependencySink(Evaluator &eval,
   ClassDecl *Super = value->getClassOrBoundGenericClass();
   if (!Super)
     return;
-  tracker.addUsedMember({Super, Identifier()}, eval.isActiveSourceCascading());
+  tracker.addPotentialMember(Super);
 }
 
 //----------------------------------------------------------------------------//
@@ -1349,8 +1348,8 @@ void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
   std::get<0>(getStorage())->setCheckedRedeclaration();
 }
 
-evaluator::DependencySource
-CheckRedeclarationRequest::readDependencySource(Evaluator &eval) const {
+evaluator::DependencySource CheckRedeclarationRequest::readDependencySource(
+    const evaluator::DependencyCollector &eval) const {
   auto *current = std::get<0>(getStorage());
   auto *currentDC = current->getDeclContext();
   return {
@@ -1360,8 +1359,7 @@ CheckRedeclarationRequest::readDependencySource(Evaluator &eval) const {
 }
 
 void CheckRedeclarationRequest::writeDependencySink(
-    Evaluator &eval, ReferencedNameTracker &tracker,
-    evaluator::SideEffect) const {
+    evaluator::DependencyCollector &tracker, evaluator::SideEffect) const {
   auto *current = std::get<0>(getStorage());
   if (!current->hasName())
     return;
@@ -1373,12 +1371,10 @@ void CheckRedeclarationRequest::writeDependencySink(
 
   if (currentDC->isTypeContext()) {
     if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
-      tracker.addUsedMember({nominal, current->getBaseName()},
-                            eval.isActiveSourceCascading());
+      tracker.addUsedMember(nominal, current->getBaseName());
     }
   } else {
-    tracker.addTopLevelName(current->getBaseName(),
-                            eval.isActiveSourceCascading());
+    tracker.addTopLevelName(current->getBaseName());
   }
 }
 
@@ -1388,33 +1384,28 @@ void CheckRedeclarationRequest::writeDependencySink(
 
 evaluator::DependencySource
 LookupAllConformancesInContextRequest::readDependencySource(
-    Evaluator &eval) const {
+    const evaluator::DependencyCollector &collector) const {
   auto *dc = std::get<0>(getStorage());
   AccessLevel defaultAccess;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     const NominalTypeDecl *nominal = ext->getExtendedNominal();
     if (!nominal) {
-      return {
-        eval.getActiveDependencySourceOrNull(),
-        evaluator::DependencyScope::Cascading
-      };
+      return {collector.getActiveDependencySourceOrNull(),
+              evaluator::DependencyScope::Cascading};
     }
     defaultAccess = nominal->getFormalAccess();
   } else {
     defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
   }
-  return {
-    eval.getActiveDependencySourceOrNull(),
-    evaluator::getScopeForAccessLevel(defaultAccess)
-  };
+  return {collector.getActiveDependencySourceOrNull(),
+          evaluator::getScopeForAccessLevel(defaultAccess)};
 }
 
 void LookupAllConformancesInContextRequest::writeDependencySink(
-    Evaluator &eval, ReferencedNameTracker &tracker,
+    evaluator::DependencyCollector &tracker,
     ProtocolConformanceLookupResult conformances) const {
   for (auto conformance : conformances) {
-    tracker.addUsedMember({conformance->getProtocol(), Identifier()},
-                          eval.isActiveSourceCascading());
+    tracker.addPotentialMember(conformance->getProtocol());
   }
 }
 
@@ -1439,8 +1430,8 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 
-evaluator::DependencySource
-TypeCheckSourceFileRequest::readDependencySource(Evaluator &e) const {
+evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
+    const evaluator::DependencyCollector &e) const {
   return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
 }
 
@@ -1477,7 +1468,6 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
     // skip verification and avoid caching it.
 #ifndef NDEBUG
     if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
-        SF->Kind != SourceFileKind::REPL &&
         SF->Kind != SourceFileKind::SIL &&
         !Ctx.LangOpts.DebuggerSupport) {
       Ctx.verifyAllLoadedModules();
@@ -1491,11 +1481,42 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
 //----------------------------------------------------------------------------//
 
 evaluator::DependencySource
-TypeCheckFunctionBodyUntilRequest::readDependencySource(Evaluator &e) const {
+TypeCheckFunctionBodyUntilRequest::readDependencySource(
+    const evaluator::DependencyCollector &e) const {
   // We're going under a function body scope, unconditionally flip the scope
   // to private.
   return {
     std::get<0>(getStorage())->getParentSourceFile(),
     evaluator::DependencyScope::Private
   };
+}
+
+//----------------------------------------------------------------------------//
+// ModuleImplicitImportsRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ImplicitImport &import) {
+  out << "implicit import of ";
+  simple_display(out, import.Module);
+}
+
+//----------------------------------------------------------------------------//
+// ResolveTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void ResolveTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *repr = std::get<1>(getStorage());
+  diags.diagnose(repr->getLoc(), diag::circular_type_resolution_note, repr);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const TypeResolution *resolution) {
+  out << "while resolving type ";
+}
+
+SourceLoc swift::extractNearestSourceLoc(const TypeRepr *repr) {
+  if (!repr)
+    return SourceLoc();
+  return repr->getLoc();
 }

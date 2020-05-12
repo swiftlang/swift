@@ -1196,9 +1196,7 @@ public:
       // it should be parented by the innermost function.
       auto enclosingScope = Scopes[Scopes.size() - 2];
       auto enclosingDC = enclosingScope.dyn_cast<DeclContext*>();
-      if (enclosingDC && !isa<AbstractClosureExpr>(enclosingDC)
-          && !(isa<SourceFile>(enclosingDC)
-               && cast<SourceFile>(enclosingDC)->Kind == SourceFileKind::REPL)){
+      if (enclosingDC && !isa<AbstractClosureExpr>(enclosingDC)){
         auto parentDC = E->getParent();
         if (!isa<Initializer>(parentDC)) {
           Out << "a closure in non-local context should be parented "
@@ -2814,8 +2812,8 @@ public:
 
       // All of the parameter names should match.
       if (!isa<DestructorDecl>(AFD)) { // Destructor has no non-self params.
-        auto paramNames = AFD->getFullName().getArgumentNames();
-        bool checkParamNames = (bool)AFD->getFullName();
+        auto paramNames = AFD->getName().getArgumentNames();
+        bool checkParamNames = (bool)AFD->getName();
         auto *firstParams = AFD->getParameters();
 
         if (checkParamNames &&

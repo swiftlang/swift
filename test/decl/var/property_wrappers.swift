@@ -818,11 +818,26 @@ struct TestProjectionValuePropertyAttr {
 @propertyWrapper
 struct BrokenLazy { }
 // expected-error@-1{{property wrapper type 'BrokenLazy' does not contain a non-static property named 'wrappedValue'}}
-// expected-note@-2{{'BrokenLazy' declared here}}
 
 struct S {
-  @BrokenLazy // expected-error{{struct 'BrokenLazy' cannot be used as an attribute}}
+  @BrokenLazy
   var wrappedValue: Int
+}
+
+@propertyWrapper
+struct DynamicSelfStruct {
+  var wrappedValue: Self { self } // okay
+  var projectedValue: Self { self } // okay
+}
+
+@propertyWrapper
+class DynamicSelf {
+  var wrappedValue: Self { self } // expected-error {{property wrapper wrapped value cannot have dynamic Self type}}
+  var projectedValue: Self? { self } // expected-error {{property wrapper projected value cannot have dynamic Self type}}
+}
+
+struct UseDynamicSelfWrapper {
+  @DynamicSelf() var value
 }
 
 // ---------------------------------------------------------------------------

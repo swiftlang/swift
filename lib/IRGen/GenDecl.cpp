@@ -2224,7 +2224,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     inFixedBuffer = true;
     storageType = getFixedBufferTy();
     fixedSize = Size(DataLayout.getTypeAllocSize(storageType));
-    fixedAlignment = Alignment(DataLayout.getABITypeAlignment(storageType));
+    fixedAlignment = getFixedBufferAlignment(*this);
   }
 
   // Check whether we've created the global variable already.
@@ -3020,11 +3020,6 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
       cast<llvm::GlobalValue>(entry), entity);
     return {gotEquivalent, ConstantReference::Indirect};
   };
-  
-  // The integrated REPL incrementally adds new definitions, so always use
-  // indirect references in this mode.
-  if (IRGen.Opts.IntegratedREPL)
-    return indirect();
 
   // Dynamically replaceable function keys are stored in the GlobalVars
   // table, but they don't have an associated Decl, so they require

@@ -168,7 +168,8 @@ void ContextInfoCallbacks::getImplicitMembers(
 
   lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
                            /*includeInstanceMembers=*/false,
-                           /*includeDerivedRequirements*/false);
+                           /*includeDerivedRequirements*/false,
+                           /*includeProtocolExtensionMembers*/true);
 }
 
 void PrintingTypeContextInfoConsumer::handleResults(
@@ -191,7 +192,7 @@ void PrintingTypeContextInfoConsumer::handleResults(
       OS << "   - ";
 
       OS << "Name: ";
-      VD->getFullName().print(OS);
+      VD->getName().print(OS);
       OS << "\n";
 
       StringRef BriefDoc = VD->getBriefComment();

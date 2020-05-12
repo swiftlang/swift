@@ -355,11 +355,9 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
   
   // Make sure this type conforms to OptionSet
   auto *optionSetProto = VD->getASTContext().getProtocol(KnownProtocolKind::OptionSet);
-  bool conformsToOptionSet = (bool)TypeChecker::containsProtocol(
+  bool conformsToOptionSet = (bool)TypeChecker::conformsToProtocol(
                                                   DC->getSelfTypeInContext(),
-                                                  optionSetProto,
-                                                  DC,
-                                                  /*Flags*/None);
+                                                  optionSetProto, DC);
   
   if (!conformsToOptionSet)
     return;
@@ -492,9 +490,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   if (!currentFile || currentDC->isLocalContext())
     return std::make_tuple<>();
 
-  ReferencedNameTracker *tracker = currentFile->getLegacyReferencedNameTracker();
-  bool isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
-
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
   if (currentDC->isTypeContext()) {
@@ -502,20 +497,12 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
       auto found = nominal->lookupDirect(current->getBaseName());
       otherDefinitions.append(found.begin(), found.end());
-      // FIXME(Evaluator Incremental Dependencies): Remove this. The direct
-      // lookup registers this edge, and so does the redeclaration request.
-      if (tracker)
-        tracker->addUsedMember({nominal, current->getBaseName()}, isCascading);
     }
   } else {
     // Look within a module context.
     currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
                                                 otherDefinitions);
-    // FIXME(Evaluator Incremental Dependencies): Remove this. The redeclaration
-    // request itself registers this edge.
-    if (tracker)
-      tracker->addTopLevelName(current->getBaseName(), isCascading);
   }
 
   // Compare this signature against the signature of other
@@ -569,8 +556,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
     const auto *currentOverride = current->getOverriddenDecl();
     const auto *otherOverride = other->getOverriddenDecl();
     if (currentOverride && currentOverride == otherOverride) {
-      current->diagnose(diag::multiple_override, current->getFullName());
-      other->diagnose(diag::multiple_override_prev, other->getFullName());
+      current->diagnose(diag::multiple_override, current->getName());
+      other->diagnose(diag::multiple_override_prev, other->getName());
       current->setInvalid();
       break;
     }
@@ -697,8 +684,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
       // would be in Swift 5 mode, emit a warning instead of an error.
       if (wouldBeSwift5Redeclaration) {
         current->diagnose(diag::invalid_redecl_swift5_warning,
-                          current->getFullName());
-        other->diagnose(diag::invalid_redecl_prev, other->getFullName());
+                          current->getName());
+        other->diagnose(diag::invalid_redecl_prev, other->getName());
       } else {
         const auto *otherInit = dyn_cast<ConstructorDecl>(other);
         // Provide a better description for implicit initializers.
@@ -709,13 +696,13 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           // productive diagnostic.
           if (!other->getOverriddenDecl())
             current->diagnose(diag::invalid_redecl_init,
-                              current->getFullName(),
+                              current->getName(),
                               otherInit->isMemberwiseInitializer());
         } else if (!current->isImplicit() && !other->isImplicit()) {
           ctx.Diags.diagnoseWithNotes(
             current->diagnose(diag::invalid_redecl,
-                              current->getFullName()), [&]() {
-            other->diagnose(diag::invalid_redecl_prev, other->getFullName());
+                              current->getName()), [&]() {
+            other->diagnose(diag::invalid_redecl_prev, other->getName());
           });
         }
         current->setInvalid();
@@ -930,8 +917,7 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
 #define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
   if (auto proto = TypeChecker::getProtocol(                                   \
           type->getASTContext(), SourceLoc(), KnownProtocolKind::Kind)) {      \
-    if (TypeChecker::conformsToProtocol(type, proto, dc,                       \
-                                        ConformanceCheckFlags::InExpression))  \
+    if (TypeChecker::conformsToProtocol(type, proto, dc))                      \
       return std::string(String);                                              \
   }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
@@ -1052,8 +1038,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
     auto ref = TypeChecker::conformsToProtocol(
-        superclassType, decodableProto, superclassDecl,
-        ConformanceCheckOptions(), SourceLoc());
+        superclassType, decodableProto, superclassDecl);
     if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
@@ -1082,8 +1067,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
       auto ref = TypeChecker::conformsToProtocol(
-          superclassType, encodableProto, superclassDecl,
-          ConformanceCheckOptions(), SourceLoc());
+          superclassType, encodableProto, superclassDecl);
       if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
@@ -1195,7 +1179,6 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       return;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
-    case SourceFileKind::REPL:
       break;
     }
   }
@@ -1272,13 +1255,13 @@ public:
       // expressions to mean something builtin to the language.  We *do* allow
       // these if they are escaped with backticks though.
       if (VD->getDeclContext()->isTypeContext() &&
-          (VD->getFullName().isSimpleName(Context.Id_Type) ||
-           VD->getFullName().isSimpleName(Context.Id_Protocol)) &&
+          (VD->getName().isSimpleName(Context.Id_Type) ||
+           VD->getName().isSimpleName(Context.Id_Protocol)) &&
           VD->getNameLoc().isValid() &&
           Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
         auto &DE = getASTContext().Diags;
         DE.diagnose(VD->getNameLoc(), diag::reserved_member_name,
-                    VD->getFullName(), VD->getBaseIdentifier().str());
+                    VD->getName(), VD->getBaseIdentifier().str());
         DE.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");
@@ -1315,8 +1298,7 @@ public:
           Ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
       if (nominalTypes.empty() && wantsDesignatedTypes) {
         auto identifiers = OD->getIdentifiers();
-        auto identifierLocs = OD->getIdentifierLocs();
-        if (checkDesignatedTypes(OD, identifiers, identifierLocs, Ctx))
+        if (checkDesignatedTypes(OD, identifiers))
           OD->setInvalid();
       }
       return;
@@ -1516,7 +1498,6 @@ public:
           case SourceFileKind::SIL:
             return;
           case SourceFileKind::Main:
-          case SourceFileKind::REPL:
           case SourceFileKind::Library:
             break;
           }
@@ -1531,7 +1512,6 @@ public:
         if (DC->isModuleScopeContext()) {
           switch (SF->Kind) {
           case SourceFileKind::Main:
-          case SourceFileKind::REPL:
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
@@ -1699,7 +1679,7 @@ public:
     auto *DC = NTD->getDeclContext();
     auto kind = DC->getFragileFunctionKind();
     if (kind.kind != FragileFunctionKind::None) {
-      NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getFullName(),
+      NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getName(),
                     static_cast<unsigned>(kind.kind));
     }
 
@@ -1728,7 +1708,7 @@ public:
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
           NTD->diagnose(diag::unsupported_type_nested_in_generic_function,
-                        NTD->getName(), AFD->getFullName());
+                        NTD->getName(), AFD->getName());
         } else {
           NTD->diagnose(diag::unsupported_type_nested_in_generic_closure,
                         NTD->getName());
@@ -1956,23 +1936,11 @@ public:
 
     if (auto superclassTy = CD->getSuperclass()) {
       ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
-
-      if (auto *SF = CD->getParentSourceFile()) {
-        // FIXME(Evaluator Incremental Dependencies): Remove this. Type lookup
-        // for the superclass will run (un)qualified lookup which will register
-        // the appropriate edge, then SuperclassTypeRequest registers the
-        // potential member edge.
-        if (auto *tracker = SF->getLegacyReferencedNameTracker()) {
-          bool isPrivate =
-              CD->getFormalAccess() <= AccessLevel::FilePrivate;
-          tracker->addUsedMember({Super, Identifier()}, !isPrivate);
-        }
-      }
-
       bool isInvalidSuperclass = false;
 
       if (Super->isFinal()) {
-        CD->diagnose(diag::inheritance_from_final_class, Super->getName());
+        CD->diagnose(diag::inheritance_from_final_class,
+                     Super->getDeclaredType());
         // FIXME: should this really be skipping the rest of decl-checking?
         return;
       }
@@ -2066,17 +2034,6 @@ public:
     // Check for circular inheritance within the protocol.
     (void)PD->hasCircularInheritedProtocols();
 
-    if (SF) {
-      if (auto *tracker = SF->getLegacyReferencedNameTracker()) {
-        bool isNonPrivate = (PD->getFormalAccess() > AccessLevel::FilePrivate);
-        // FIXME(Evaluator Incremental Dependencies): Remove this. Type lookup
-        // for the ancestor protocols will run (un)qualified lookup which will
-        // register the appropriate edge.
-        for (auto *parentProto : PD->getInheritedProtocols())
-          tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
-      }
-    }
-
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
@@ -2097,6 +2054,7 @@ public:
         GenericSignature::get({PD->getProtocolSelfType()},
                               PD->getRequirementSignature());
 
+      llvm::errs() << "\n";
       llvm::errs() << "Protocol requirement signature:\n";
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
@@ -2160,7 +2118,6 @@ public:
         return false;
       case SourceFileKind::Library:
       case SourceFileKind::Main:
-      case SourceFileKind::REPL:
         break;
       }
     }
@@ -2260,7 +2217,7 @@ public:
         // We did not find 'Self'. Complain.
         FD->diagnose(diag::operator_in_unrelated_type,
                      FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
-                     FD->getFullName());
+                     FD->getName());
       }
     }
 
@@ -2393,7 +2350,7 @@ public:
     if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
       if (!ED->getGenericParams() && !ED->isInvalid()) {
         ED->diagnose(diag::extension_nongeneric_trailing_where,
-                     nominal->getFullName())
+                     nominal->getName())
           .highlight(trailingWhereClause->getSourceRange());
       }
     }
@@ -2499,10 +2456,10 @@ public:
       if (CD->isFailable() &&
           CD->getOverriddenDecl() &&
           !CD->getOverriddenDecl()->isFailable()) {
-        CD->diagnose(diag::failable_initializer_override, CD->getFullName());
+        CD->diagnose(diag::failable_initializer_override, CD->getName());
         auto *OD = CD->getOverriddenDecl();
         OD->diagnose(diag::nonfailable_initializer_override_here,
-                     OD->getFullName());
+                     OD->getName());
       }
     }
 
@@ -2539,7 +2496,7 @@ public:
         }
         if (CD->getFormalAccess() < requiredAccess) {
           auto diag = CD->diagnose(diag::required_initializer_not_accessible,
-                                   nominal->getFullName());
+                                   nominal->getName());
           fixItAccess(diag, CD, requiredAccess);
         }
       }

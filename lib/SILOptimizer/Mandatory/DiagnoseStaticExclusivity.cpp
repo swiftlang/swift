@@ -886,17 +886,15 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
       });
   }
 
-  if (auto *AI = dyn_cast<ApplyInst>(&I)) {
-    // Record calls to swap() for potential Fix-Its.
-    if (isCallToStandardLibrarySwap(AI, I.getFunction()->getASTContext()))
-      State.CallsToSwap.push_back(AI);
-    else
-      checkForViolationAtApply(AI, State);
-    return;
-  }
-
-  if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
-    checkForViolationAtApply(TAI, State);
+  if (auto apply = FullApplySite::isa(&I)) {
+    if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+      // Record calls to swap() for potential Fix-Its.
+      if (isCallToStandardLibrarySwap(AI, I.getFunction()->getASTContext())) {
+        State.CallsToSwap.push_back(AI);
+        return;
+      }
+    }
+    checkForViolationAtApply(apply, State);
     return;
   }
 

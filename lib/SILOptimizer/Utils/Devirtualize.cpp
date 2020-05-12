@@ -410,8 +410,9 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
     return SubstitutionMap();
 
   // Add any generic substitutions for the base class.
-  Type baseSelfType = baseCalleeType->getSelfParameter()
-                                    .getArgumentType(module, baseCalleeType);
+  Type baseSelfType = baseCalleeType->getSelfParameter().getArgumentType(
+      module, baseCalleeType,
+      applySite.getFunction()->getTypeExpansionContext());
   if (auto metatypeType = baseSelfType->getAs<MetatypeType>())
     baseSelfType = metatypeType->getInstanceType();
 
@@ -436,8 +437,9 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   SubstitutionMap origSubMap = applySite.getSubstitutionMap();
 
   Type calleeSelfType =
-      applySite.getOrigCalleeType()->getSelfParameter()
-               .getArgumentType(module, applySite.getOrigCalleeType());
+      applySite.getOrigCalleeType()->getSelfParameter().getArgumentType(
+          module, applySite.getOrigCalleeType(),
+          applySite.getFunction()->getTypeExpansionContext());
   if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
     calleeSelfType = metatypeType->getInstanceType();
   auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
@@ -460,11 +462,11 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
                                              baseCalleeSig);
 }
 
-static ApplyInst *replaceApplyInst(SILBuilder &builder, SILLocation loc,
-                                   ApplyInst *oldAI, SILValue newFn,
-                                   SubstitutionMap newSubs,
-                                   ArrayRef<SILValue> newArgs,
-                                   ArrayRef<SILValue> newArgBorrows) {
+// Return the new apply and true if a cast required CFG modification.
+static std::pair<ApplyInst *, bool /* changedCFG */>
+replaceApplyInst(SILBuilder &builder, SILLocation loc, ApplyInst *oldAI,
+                 SILValue newFn, SubstitutionMap newSubs,
+                 ArrayRef<SILValue> newArgs, ArrayRef<SILValue> newArgBorrows) {
   auto *newAI =
       builder.createApply(loc, newFn, newSubs, newArgs, oldAI->isNonThrowing());
 
@@ -475,15 +477,15 @@ static ApplyInst *replaceApplyInst(SILBuilder &builder, SILLocation loc,
   }
 
   // Check if any casting is required for the return value.
-  SILValue resultValue = castValueToABICompatibleType(
+  auto castRes = castValueToABICompatibleType(
       &builder, loc, newAI, newAI->getType(), oldAI->getType());
 
-  oldAI->replaceAllUsesWith(resultValue);
-  return newAI;
+  oldAI->replaceAllUsesWith(castRes.first);
+  return {newAI, castRes.second};
 }
 
 // Return the new try_apply and true if a cast required CFG modification.
-static std::pair<TryApplyInst *, bool>
+static std::pair<TryApplyInst *, bool /* changedCFG */>
 replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
                     SILValue newFn, SubstitutionMap newSubs,
                     ArrayRef<SILValue> newArgs, SILFunctionConventions conv,
@@ -491,7 +493,8 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
   SILBasicBlock *normalBB = oldTAI->getNormalBB();
   SILBasicBlock *resultBB = nullptr;
 
-  SILType newResultTy = conv.getSILResultType();
+  SILType newResultTy =
+      conv.getSILResultType(builder.getTypeExpansionContext());
 
   // Does the result value need to be casted?
   auto oldResultTy = normalBB->getArgument(0)->getType();
@@ -531,8 +534,8 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
     builder.setInsertionPoint(resultBB);
 
     SILValue resultValue = resultBB->getArgument(0);
-    resultValue = castValueToABICompatibleType(&builder, loc, resultValue,
-                                               newResultTy, oldResultTy);
+    std::tie(resultValue, std::ignore) = castValueToABICompatibleType(
+        &builder, loc, resultValue, newResultTy, oldResultTy);
     builder.createBranch(loc, normalBB, {resultValue});
   }
 
@@ -540,11 +543,13 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
   return {newTAI, resultCastRequired};
 }
 
-static BeginApplyInst *
+// Return the new begin_apply and true if a cast required CFG modification.
+static std::pair<BeginApplyInst *, bool /* changedCFG */>
 replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
                       BeginApplyInst *oldBAI, SILValue newFn,
                       SubstitutionMap newSubs, ArrayRef<SILValue> newArgs,
                       ArrayRef<SILValue> newArgBorrows) {
+  bool changedCFG = false;
   auto *newBAI = builder.createBeginApply(loc, newFn, newSubs, newArgs,
                                           oldBAI->isNonThrowing());
 
@@ -558,13 +563,14 @@ replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
   for (auto i : indices(oldYields)) {
     auto oldYield = oldYields[i];
     auto newYield = newYields[i];
-    newYield = castValueToABICompatibleType(
+    auto yieldCastRes = castValueToABICompatibleType(
         &builder, loc, newYield, newYield->getType(), oldYield->getType());
-    oldYield->replaceAllUsesWith(newYield);
+    oldYield->replaceAllUsesWith(yieldCastRes.first);
+    changedCFG |= yieldCastRes.second;
   }
 
   if (newArgBorrows.empty())
-    return newBAI;
+    return {newBAI, changedCFG};
 
   SILValue token = newBAI->getTokenResult();
 
@@ -579,10 +585,11 @@ replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
     }
   }
 
-  return newBAI;
+  return {newBAI, changedCFG};
 }
 
-static PartialApplyInst *
+// Return the new partial_apply and true if a cast required CFG modification.
+static std::pair<PartialApplyInst *, bool /* changedCFG */>
 replacePartialApplyInst(SILBuilder &builder, SILLocation loc,
                         PartialApplyInst *oldPAI, SILValue newFn,
                         SubstitutionMap newSubs, ArrayRef<SILValue> newArgs) {
@@ -592,15 +599,15 @@ replacePartialApplyInst(SILBuilder &builder, SILLocation loc,
       builder.createPartialApply(loc, newFn, newSubs, newArgs, convention);
 
   // Check if any casting is required for the partially-applied function.
-  SILValue resultValue = castValueToABICompatibleType(
+  auto castRes = castValueToABICompatibleType(
       &builder, loc, newPAI, newPAI->getType(), oldPAI->getType());
-  oldPAI->replaceAllUsesWith(resultValue);
+  oldPAI->replaceAllUsesWith(castRes.first);
 
-  return newPAI;
+  return {newPAI, castRes.second};
 }
 
 // Return the new apply and true if the CFG was also modified.
-static std::pair<ApplySite, bool>
+static std::pair<ApplySite, bool /* changedCFG */>
 replaceApplySite(SILBuilder &builder, SILLocation loc, ApplySite oldAS,
                  SILValue newFn, SubstitutionMap newSubs,
                  ArrayRef<SILValue> newArgs, SILFunctionConventions conv,
@@ -608,9 +615,8 @@ replaceApplySite(SILBuilder &builder, SILLocation loc, ApplySite oldAS,
   switch (oldAS.getKind()) {
   case ApplySiteKind::ApplyInst: {
     auto *oldAI = cast<ApplyInst>(oldAS);
-    return {replaceApplyInst(builder, loc, oldAI, newFn, newSubs, newArgs,
-                             newArgBorrows),
-            false};
+    return replaceApplyInst(builder, loc, oldAI, newFn, newSubs, newArgs,
+                            newArgBorrows);
   }
   case ApplySiteKind::TryApplyInst: {
     auto *oldTAI = cast<TryApplyInst>(oldAS);
@@ -619,16 +625,14 @@ replaceApplySite(SILBuilder &builder, SILLocation loc, ApplySite oldAS,
   }
   case ApplySiteKind::BeginApplyInst: {
     auto *oldBAI = dyn_cast<BeginApplyInst>(oldAS);
-    return {replaceBeginApplyInst(builder, loc, oldBAI, newFn, newSubs, newArgs,
-                                  newArgBorrows),
-            false};
+    return replaceBeginApplyInst(builder, loc, oldBAI, newFn, newSubs, newArgs,
+                                 newArgBorrows);
   }
   case ApplySiteKind::PartialApplyInst: {
     assert(newArgBorrows.empty());
     auto *oldPAI = cast<PartialApplyInst>(oldAS);
-    return {
-        replacePartialApplyInst(builder, loc, oldPAI, newFn, newSubs, newArgs),
-        false};
+    return replacePartialApplyInst(builder, loc, oldPAI, newFn, newSubs,
+                                   newArgs);
   }
   }
   llvm_unreachable("covered switch");
@@ -734,10 +738,11 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
 /// return the result value of the new ApplyInst if created one or null.
 ///
 /// Return the new apply and true if the CFG was also modified.
-std::pair<FullApplySite, bool>
+std::pair<FullApplySite, bool /* changedCFG */>
 swift::devirtualizeClassMethod(FullApplySite applySite,
                                SILValue classOrMetatype, ClassDecl *cd,
                                OptRemark::Emitter *ore) {
+  bool changedCFG = false;
   LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : "
                           << *applySite.getInstruction());
 
@@ -774,17 +779,21 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
   SmallVector<SILValue, 8> newArgBorrows;
 
   auto indirectResultArgIter = applySite.getIndirectSILResults().begin();
-  for (auto resultTy : substConv.getIndirectSILResultTypes()) {
-    newArgs.push_back(castValueToABICompatibleType(
+  for (auto resultTy : substConv.getIndirectSILResultTypes(
+           applySite.getFunction()->getTypeExpansionContext())) {
+    auto castRes = castValueToABICompatibleType(
         &builder, loc, *indirectResultArgIter, indirectResultArgIter->getType(),
-        resultTy));
+        resultTy);
+    newArgs.push_back(castRes.first);
+    changedCFG |= castRes.second;
     ++indirectResultArgIter;
   }
 
   auto paramArgIter = applySite.getArgumentsWithoutIndirectResults().begin();
   // Skip the last parameter, which is `self`. Add it below.
   for (auto param : substConv.getParameters()) {
-    auto paramType = substConv.getSILType(param);
+    auto paramType =
+        substConv.getSILType(param, builder.getTypeExpansionContext());
     SILValue arg = *paramArgIter;
     if (builder.hasOwnership() && arg->getType().isObject()
         && arg.getOwnershipKind() == ValueOwnershipKind::Owned
@@ -793,15 +802,18 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
       arg = borrowBuilder.createBeginBorrow(loc, arg);
       newArgBorrows.push_back(arg);
     }
-    arg = castValueToABICompatibleType(&builder, loc, arg,
+    auto argCastRes = castValueToABICompatibleType(&builder, loc, arg,
                                        paramArgIter->getType(), paramType);
-    newArgs.push_back(arg);
+
+    newArgs.push_back(argCastRes.first);
+    changedCFG |= argCastRes.second;
     ++paramArgIter;
   }
   ApplySite newAS;
-  bool modifiedCFG;
-  std::tie(newAS, modifiedCFG) = replaceApplySite(
+  bool neededCFGChange;
+  std::tie(newAS, neededCFGChange) = replaceApplySite(
       builder, loc, applySite, fri, subs, newArgs, substConv, newArgBorrows);
+  changedCFG |= neededCFGChange;
   FullApplySite newAI = FullApplySite::isa(newAS.getInstruction());
   assert(newAI);
 
@@ -815,7 +827,7 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
     });
   NumClassDevirt++;
 
-  return {newAI, modifiedCFG};
+  return {newAI, changedCFG};
 }
 
 std::pair<FullApplySite, bool> swift::tryDevirtualizeClassMethod(
@@ -954,8 +966,12 @@ swift::getWitnessMethodSubstitutions(SILModule &module, ApplySite applySite,
 
   auto *mod = module.getSwiftModule();
   bool isSelfAbstract =
-    witnessFnTy->getSelfInstanceType(module)->is<GenericTypeParamType>();
-  auto *classWitness = witnessFnTy->getWitnessMethodClass(module);
+      witnessFnTy
+          ->getSelfInstanceType(
+              module, applySite.getFunction()->getTypeExpansionContext())
+          ->is<GenericTypeParamType>();
+  auto *classWitness = witnessFnTy->getWitnessMethodClass(
+      module, applySite.getFunction()->getTypeExpansionContext());
 
   return ::getWitnessMethodSubstitutions(mod, cRef, requirementSig,
                                          witnessThunkSig, origSubs,
@@ -971,6 +987,7 @@ static std::pair<ApplySite, bool>
 devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
                           ProtocolConformanceRef cRef,
                           OptRemark::Emitter *ore) {
+  bool changedCFG = false;
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
   auto &module = applySite.getModule();
@@ -984,10 +1001,11 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
 
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
-  auto calleeCanType = f->getLoweredFunctionTypeInContext(
-      TypeExpansionContext(*applySite.getFunction()));
-  auto substCalleeCanType = calleeCanType->substGenericArgs(
-      module, subMap, TypeExpansionContext(*applySite.getFunction()));
+  auto typeExpansionContext =
+      applySite.getFunction()->getTypeExpansionContext();
+  auto calleeCanType = f->getLoweredFunctionTypeInContext(typeExpansionContext);
+  auto substCalleeCanType =
+      calleeCanType->substGenericArgs(module, subMap, typeExpansionContext);
 
   // Collect arguments from the apply instruction.
   SmallVector<SILValue, 4> arguments;
@@ -1000,7 +1018,8 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
   unsigned substArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
   for (auto arg : applySite.getArguments()) {
     auto paramInfo = substConv.getSILArgumentConvention(substArgIdx);
-    auto paramType = substConv.getSILArgumentType(substArgIdx++);
+    auto paramType =
+        substConv.getSILArgumentType(substArgIdx++, typeExpansionContext);
     if (arg->getType() != paramType) {
       if (argBuilder.hasOwnership()
           && applySite.getKind() != ApplySiteKind::PartialApplyInst
@@ -1012,8 +1031,10 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
         arg = borrowBuilder.createBeginBorrow(applySite.getLoc(), arg);
         borrowedArgs.push_back(arg);
       }
-      arg = castValueToABICompatibleType(&argBuilder, applySite.getLoc(), arg,
-                                         arg->getType(), paramType);
+      auto argCastRes = castValueToABICompatibleType(
+          &argBuilder, applySite.getLoc(), arg, arg->getType(), paramType);
+      arg = argCastRes.first;
+      changedCFG |= argCastRes.second;
     }
     arguments.push_back(arg);
   }
@@ -1026,10 +1047,11 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
   auto *fri = applyBuilder.createFunctionRefFor(loc, f);
 
   ApplySite newApplySite;
-  bool modifiedCFG;
-  std::tie(newApplySite, modifiedCFG) =
+  bool neededCFGChange = false;
+  std::tie(newApplySite, neededCFGChange) =
       replaceApplySite(applyBuilder, loc, applySite, fri, subMap, arguments,
                        substConv, borrowedArgs);
+  changedCFG |= neededCFGChange;
 
   if (ore)
     ore->emit([&]() {
@@ -1039,7 +1061,7 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
              << "Devirtualized call to " << NV("Method", f);
     });
   NumWitnessDevirt++;
-  return {newApplySite, modifiedCFG};
+  return {newApplySite, changedCFG};
 }
 
 static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
@@ -1147,8 +1169,15 @@ swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
-    if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha))
-      return tryDevirtualizeClassMethod(fas, instance, cd, ore);
+    if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha)) {
+      // Update the classDecl, because we are stripping casts more aggressively
+      // in getInstanceWithExactDynamicType than in stripUpCasts.
+      CanType classType = getSelfInstanceType(instance->getType().getASTType());
+      // This should never be null - make the check just to be on the safe side.
+      if (ClassDecl *cd = classType.getClassOrBoundGenericClass())
+        return tryDevirtualizeClassMethod(fas, instance, cd, ore);
+      return {ApplySite(), false};
+    }
 
     if (auto exactTy = getExactDynamicType(cmi->getOperand(), cha)) {
       if (exactTy == cmi->getOperand()->getType())
@@ -1207,8 +1236,11 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
-    if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha))
-      return canDevirtualizeClassMethod(applySite, cd);
+    if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha)) {
+      CanType classType = getSelfInstanceType(instance->getType().getASTType());
+      ClassDecl *cd = classType.getClassOrBoundGenericClass();
+      return cd && canDevirtualizeClassMethod(applySite, cd);
+    }
 
     if (auto exactTy = getExactDynamicType(cmi->getOperand(), cha)) {
       if (exactTy == cmi->getOperand()->getType())
