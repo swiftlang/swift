@@ -4030,8 +4030,7 @@ public:
   /// Add '#file', '#line', et at.
   void addPoundLiteralCompletions(bool needPound) {
     auto addFromProto = [&](StringRef name, CodeCompletionKeywordKind kwKind,
-                            CodeCompletionLiteralKind literalKind,
-                            StringRef defaultTypeName) {
+                            CodeCompletionLiteralKind literalKind) {
       if (!needPound)
         name = name.substr(1);
 
@@ -4045,17 +4044,17 @@ public:
     };
 
     addFromProto("#function", CodeCompletionKeywordKind::pound_function,
-                 CodeCompletionLiteralKind::StringLiteral, "String");
+                 CodeCompletionLiteralKind::StringLiteral);
     addFromProto("#file", CodeCompletionKeywordKind::pound_file,
-                 CodeCompletionLiteralKind::StringLiteral, "String");
+                 CodeCompletionLiteralKind::StringLiteral);
     if (Ctx.LangOpts.EnableConcisePoundFile) {
       addFromProto("#filePath", CodeCompletionKeywordKind::pound_file,
-                   CodeCompletionLiteralKind::StringLiteral, "String");
+                   CodeCompletionLiteralKind::StringLiteral);
     }
     addFromProto("#line", CodeCompletionKeywordKind::pound_line,
-                 CodeCompletionLiteralKind::IntegerLiteral, "Int");
+                 CodeCompletionLiteralKind::IntegerLiteral);
     addFromProto("#column", CodeCompletionKeywordKind::pound_column,
-                 CodeCompletionLiteralKind::IntegerLiteral, "Int");
+                 CodeCompletionLiteralKind::IntegerLiteral);
 
     addKeyword(needPound ? "#dsohandle" : "dsohandle", "UnsafeRawPointer",
                CodeCompletionKeywordKind::pound_dsohandle);
@@ -4065,7 +4064,7 @@ public:
     auto &context = CurrDeclContext->getASTContext();
 
     auto addFromProto = [&](
-        CodeCompletionLiteralKind kind, StringRef defaultTypeName,
+        CodeCompletionLiteralKind kind,
         llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
         bool isKeyword = false) {
 
@@ -4083,29 +4082,29 @@ public:
     using Builder = CodeCompletionResultBuilder;
 
     // Add literal completions that conform to specific protocols.
-    addFromProto(LK::IntegerLiteral, "Int", [](Builder &builder) {
+    addFromProto(LK::IntegerLiteral, [](Builder &builder) {
       builder.addTextChunk("0");
     });
-    addFromProto(LK::BooleanLiteral, "Bool", [](Builder &builder) {
+    addFromProto(LK::BooleanLiteral, [](Builder &builder) {
       builder.addBaseName("true");
     }, /*isKeyword=*/true);
-    addFromProto(LK::BooleanLiteral, "Bool", [](Builder &builder) {
+    addFromProto(LK::BooleanLiteral, [](Builder &builder) {
       builder.addBaseName("false");
     }, /*isKeyword=*/true);
-    addFromProto(LK::NilLiteral, "", [](Builder &builder) {
+    addFromProto(LK::NilLiteral, [](Builder &builder) {
       builder.addBaseName("nil");
     }, /*isKeyword=*/true);
-    addFromProto(LK::StringLiteral, "String", [&](Builder &builder) {
+    addFromProto(LK::StringLiteral, [&](Builder &builder) {
       builder.addTextChunk("\"");
       builder.addSimpleNamedParameter("abc");
       builder.addTextChunk("\"");
     });
-    addFromProto(LK::ArrayLiteral, "Array", [&](Builder &builder) {
+    addFromProto(LK::ArrayLiteral, [&](Builder &builder) {
       builder.addLeftBracket();
       builder.addSimpleNamedParameter("values");
       builder.addRightBracket();
     });
-    addFromProto(LK::DictionaryLiteral, "Dictionary", [&](Builder &builder) {
+    addFromProto(LK::DictionaryLiteral, [&](Builder &builder) {
       builder.addLeftBracket();
       builder.addSimpleNamedParameter("key");
       builder.addTextChunk(": ");
@@ -4114,7 +4113,7 @@ public:
     });
 
     auto floatType = context.getFloatDecl()->getDeclaredType();
-    addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
+    addFromProto(LK::ColorLiteral, [&](Builder &builder) {
       builder.addBaseName("#colorLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("red"), floatType);
@@ -4128,7 +4127,7 @@ public:
     });
 
     auto stringType = context.getStringDecl()->getDeclaredType();
-    addFromProto(LK::ImageLiteral, "", [&](Builder &builder) {
+    addFromProto(LK::ImageLiteral, [&](Builder &builder) {
       builder.addBaseName("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
