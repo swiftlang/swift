@@ -27,6 +27,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Error.h"
 
 namespace swift {
 
@@ -386,6 +387,68 @@ public:
 
   /// Get the underlying nominal type declaration of the tangent space type.
   NominalTypeDecl *getNominal() const;
+};
+
+/// A derivative function type calculation error.
+class DerivativeFunctionTypeError
+    : public llvm::ErrorInfo<DerivativeFunctionTypeError> {
+public:
+  enum class Kind {
+    NoSemanticResults,
+    MultipleSemanticResults,
+    NonDifferentiableParameters,
+    NonDifferentiableResult
+  };
+
+  static const char ID;
+  /// The original function type.
+  AnyFunctionType *functionType;
+  /// The error kind.
+  Kind kind;
+
+private:
+  union Value {
+    IndexSubset *indices;
+    Type type;
+    Value(IndexSubset *indices) : indices(indices) {}
+    Value(Type type) : type(type) {}
+    Value() {}
+  } value;
+
+public:
+  explicit DerivativeFunctionTypeError(AnyFunctionType *functionType, Kind kind)
+      : functionType(functionType), kind(kind), value(Value()) {
+    assert(kind == Kind::NoSemanticResults ||
+           kind == Kind::MultipleSemanticResults);
+  };
+
+  explicit DerivativeFunctionTypeError(AnyFunctionType *functionType, Kind kind,
+                                       IndexSubset *nonDiffParameterIndices)
+      : functionType(functionType), kind(kind), value(nonDiffParameterIndices) {
+    assert(kind == Kind::NonDifferentiableParameters);
+  };
+
+  explicit DerivativeFunctionTypeError(AnyFunctionType *functionType, Kind kind,
+                                       Type nonDiffResultType)
+      : functionType(functionType), kind(kind), value(nonDiffResultType) {
+    assert(kind == Kind::NonDifferentiableResult);
+  };
+
+  IndexSubset *getNonDifferentiableParameterIndices() const {
+    assert(kind == Kind::NonDifferentiableParameters);
+    return value.indices;
+  }
+
+  Type getNonDifferentiableResultType() const {
+    assert(kind == Kind::NonDifferentiableResult);
+    return value.type;
+  }
+
+  void log(raw_ostream &OS) const override;
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
 };
 
 /// The key type used for uniquing `SILDifferentiabilityWitness` in
