@@ -1954,6 +1954,7 @@ public:
 
   void setCompletionKind(UIdent kind) override;
   void setReusingASTContext(bool flag) override;
+  void setAnnotatedTypename(bool flag) override;
   bool handleResult(const CodeCompletionInfo &Info) override;
 };
 } // end anonymous namespace
@@ -1988,6 +1989,11 @@ void SKCodeCompletionConsumer::setCompletionKind(UIdent kind) {
 void SKCodeCompletionConsumer::setReusingASTContext(bool flag) {
   if (flag)
     RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
+}
+
+void SKCodeCompletionConsumer::setAnnotatedTypename(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyAnnotatedTypename, flag);
 }
 
 bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
@@ -2048,6 +2054,7 @@ public:
   void endGroup() override;
   void setNextRequestStart(unsigned offset) override;
   void setReusingASTContext(bool flag) override;
+  void setAnnotatedTypename(bool flag) override;
 };
 } // end anonymous namespace
 
@@ -2250,6 +2257,10 @@ void SKGroupedCodeCompletionConsumer::setNextRequestStart(unsigned offset) {
 void SKGroupedCodeCompletionConsumer::setReusingASTContext(bool flag) {
   if (flag)
     RespBuilder.getDictionary().setBool(KeyReusingASTContext, flag);
+}
+void SKGroupedCodeCompletionConsumer::setAnnotatedTypename(bool flag) {
+  if (flag)
+    RespBuilder.getDictionary().setBool(KeyAnnotatedTypename, flag);
 }
 
 //===----------------------------------------------------------------------===//
