@@ -345,6 +345,8 @@ def create_argument_parser():
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
            help='the path to use as the filesystem root for the installation')
+    option('--install-all', toggle_true,
+           help='Assume all built products should be installed')
 
     option(['-j', '--jobs'], store_int('build_jobs'),
            default=multiprocessing.cpu_count(),

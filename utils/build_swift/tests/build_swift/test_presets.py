@@ -39,6 +39,7 @@ PRESET_DEFAULTS = {
     'extra_swift_args': '',
     'install_destdir': '/tmp/install',
     'install_symroot': '/tmp/install/symroot',
+    'install_all': False,
     'install_toolchain_dir': '/tmp/install/toolchain',
     'install_prefix': '/usr',
     'installable_package': '/tmp/install/pkg',

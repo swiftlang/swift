@@ -541,20 +541,36 @@ class BuildScriptInvocation(object):
         # Currently we do not build external benchmarks by default.
         if args.build_external_benchmarks:
             impl_args += ["--skip-build-external-benchmarks=0"]
-        if not args.build_foundation:
-            impl_args += ["--skip-build-foundation"]
-        if not args.build_xctest:
-            impl_args += ["--skip-build-xctest"]
-        if not args.build_lldb:
-            impl_args += ["--skip-build-lldb"]
-        if not args.build_llbuild:
-            impl_args += ["--skip-build-llbuild"]
-        if not args.build_libcxx:
-            impl_args += ["--skip-build-libcxx"]
-        if not args.build_libdispatch:
-            impl_args += ["--skip-build-libdispatch"]
-        if not args.build_libicu:
-            impl_args += ["--skip-build-libicu"]
+
+        # If install_all is set, then products that we /always/ build (not by
+        # design) need to have their install flag set.
+        if args.install_all:
+            non_conditional_subprojects = [
+                'cmark',
+                'llvm',
+                'swift',
+            ]
+            for proj_name in non_conditional_subprojects:
+                impl_args += ["--install-{}".format(proj_name)]
+
+        # Then add subproject install flags that either skip building them /or/
+        # if we are going to build them and install_all is set, we also instlal
+        # them.
+        conditional_subproject_configs = [
+            (args.build_foundation, "foundation"),
+            (args.build_xctest, "xctest"),
+            (args.build_lldb, "lldb"),
+            (args.build_llbuild, "llbuild"),
+            (args.build_libcxx, "libcxx"),
+            (args.build_libdispatch, "libdispatch"),
+            (args.build_libicu, "libicu")
+        ]
+        for (should_build, string_name) in conditional_subproject_configs:
+            if not should_build:
+                impl_args += ["--skip-build-{}".format(string_name)]
+            elif args.install_all:
+                impl_args += ["--install-{}".format(string_name)]
+
         if args.build_swift_dynamic_stdlib:
             impl_args += ["--build-swift-dynamic-stdlib"]
         if args.build_swift_static_stdlib:
@@ -932,7 +948,8 @@ class BuildScriptInvocation(object):
                     print("--- Running tests for %s ---" % product_name)
                     product.test(host_target)
                     print("--- Finished tests for %s ---" % product_name)
-                if product.should_install(host_target):
+                if product.should_install(host_target) or \
+                   (self.args.install_all and product.should_build(host_target)):
                     print("--- Installing %s ---" % product_name)
                     product.install(host_target)
 
