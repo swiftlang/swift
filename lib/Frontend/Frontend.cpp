@@ -731,6 +731,24 @@ ModuleDecl *CompilerInstance::getMainModule() const {
   return MainModule;
 }
 
+void CompilerInstance::performParseOnly(bool EvaluateConditionals,
+                                        bool CanDelayBodies) {
+  const InputFileKind Kind = Invocation.getInputKind();
+  assert((Kind == InputFileKind::Swift || Kind == InputFileKind::SwiftLibrary ||
+          Kind == InputFileKind::SwiftModuleInterface) &&
+         "only supports parsing .swift files");
+  (void)Kind;
+
+  SourceFile::ParsingOptions parsingOpts;
+  if (!EvaluateConditionals)
+    parsingOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
+  if (!CanDelayBodies)
+    parsingOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+  performSemaUpTo(SourceFile::Unprocessed, parsingOpts);
+  assert(Context->LoadedModules.size() == 1 &&
+         "Loaded a module during parse-only");
+}
+
 void CompilerInstance::performParseAndResolveImportsOnly() {
   performSemaUpTo(SourceFile::ImportsResolved);
 }
@@ -739,33 +757,55 @@ void CompilerInstance::performSema() {
   performSemaUpTo(SourceFile::TypeChecked);
 }
 
-void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
-  assert(LimitStage > SourceFile::Unprocessed);
-
+void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage,
+                                       SourceFile::ParsingOptions POpts) {
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
   ModuleDecl *mainModule = getMainModule();
   Context->LoadedModules[mainModule->getName()] = mainModule;
 
-  if (Invocation.getImplicitStdlibKind() == ImplicitStdlibKind::Stdlib) {
-    if (!loadStdlib())
-      return;
+  // If we aren't in a parse-only context, load the standard library.
+  if (LimitStage > SourceFile::Unprocessed &&
+      Invocation.getImplicitStdlibKind() == ImplicitStdlibKind::Stdlib
+      && !loadStdlib()) {
+    return;
   }
-
-  // Force loading implicit imports. This is currently needed to allow
-  // deserialization to resolve cross references into bridging headers.
-  // FIXME: Once deserialization loads all the modules it needs for cross
-  // references, this can be removed.
-  (void)MainModule->getImplicitImports();
 
   // Make sure the main file is the first file in the module, so do this now.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    (void)createSourceFileForMainModule(Invocation.getSourceFileKind(),
-                                        MainBufferID);
+    auto *mainFile = createSourceFileForMainModule(
+        Invocation.getSourceFileKind(), MainBufferID, POpts);
+    mainFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
   }
 
-  bool hadLoadError = parsePartialModulesAndInputFiles();
-  if (hadLoadError)
+  // If we aren't in a parse-only context, load the remaining serialized inputs
+  // and resolve implicit imports.
+  if (LimitStage > SourceFile::Unprocessed &&
+      loadPartialModulesAndImplicitImports())
+    return;
+
+  // Then parse all the input files.
+  // FIXME: This is the only demand point for InputSourceCodeBufferIDs. We
+  // should compute this list of source files lazily.
+  for (auto BufferID : InputSourceCodeBufferIDs) {
+    SourceFile *SF;
+    if (BufferID == MainBufferID) {
+      // If this is the main file, we've already created it.
+      SF = &getMainModule()->getMainSourceFile(Invocation.getSourceFileKind());
+    } else {
+      // Otherwise create a library file.
+      SF = createSourceFileForMainModule(SourceFileKind::Library,
+                                         BufferID, POpts);
+    }
+    // Trigger parsing of the file.
+    if (LimitStage == SourceFile::Unprocessed) {
+      (void)SF->getTopLevelDecls();
+    } else {
+      performImportResolution(*SF);
+    }
+  }
+
+  if (LimitStage == SourceFile::Unprocessed)
     return;
 
   assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
@@ -808,9 +848,15 @@ bool CompilerInstance::loadStdlib() {
   return true;
 }
 
-bool CompilerInstance::parsePartialModulesAndInputFiles() {
+bool CompilerInstance::loadPartialModulesAndImplicitImports() {
   FrontendStatsTracer tracer(getStatsReporter(),
-                             "parse-partial-modules-and-input-files");
+                             "load-partial-modules-and-implicit-imports");
+  // Force loading implicit imports. This is currently needed to allow
+  // deserialization to resolve cross references into bridging headers.
+  // FIXME: Once deserialization loads all the modules it needs for cross
+  // references, this can be removed.
+  (void)MainModule->getImplicitImports();
+
   bool hadLoadError = false;
   // Parse all the partial modules first.
   for (auto &PM : PartialModules) {
@@ -820,20 +866,6 @@ bool CompilerInstance::parsePartialModulesAndInputFiles() {
                       std::move(PM.ModuleSourceInfoBuffer), /*isFramework*/false,
                       /*treatAsPartialModule*/true))
       hadLoadError = true;
-  }
-
-  // Then parse all the input files.
-  for (auto BufferID : InputSourceCodeBufferIDs) {
-    SourceFile *SF;
-    if (BufferID == MainBufferID) {
-      // If this is the main file, we've already created it.
-      SF = &getMainModule()->getMainSourceFile(Invocation.getSourceFileKind());
-    } else {
-      // Otherwise create a library file.
-      SF = createSourceFileForMainModule(SourceFileKind::Library, BufferID);
-    }
-    // Import resolution will lazily trigger parsing of the file.
-    performImportResolution(*SF);
   }
   return hadLoadError;
 }
@@ -901,52 +933,6 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   }
 
   return inputFile;
-}
-
-void CompilerInstance::performParseOnly(bool EvaluateConditionals,
-                                        bool CanDelayBodies) {
-  const InputFileKind Kind = Invocation.getInputKind();
-  ModuleDecl *const MainModule = getMainModule();
-  Context->LoadedModules[MainModule->getName()] = MainModule;
-
-  assert((Kind == InputFileKind::Swift ||
-          Kind == InputFileKind::SwiftLibrary ||
-          Kind == InputFileKind::SwiftModuleInterface) &&
-         "only supports parsing .swift files");
-  (void)Kind;
-
-  SourceFile::ParsingOptions parsingOpts;
-  if (!EvaluateConditionals)
-    parsingOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
-  if (!CanDelayBodies)
-    parsingOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
-
-  // Make sure the main file is the first file in the module.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == InputFileKind::Swift ||
-           Kind == InputFileKind::SwiftModuleInterface);
-    auto *mainFile = createSourceFileForMainModule(
-        Invocation.getSourceFileKind(), MainBufferID, parsingOpts);
-    mainFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
-  }
-
-  // Parse all of the input files.
-  for (auto bufferID : InputSourceCodeBufferIDs) {
-    SourceFile *SF;
-    if (bufferID == MainBufferID) {
-      // If this is the main file, we've already created it.
-      SF = &MainModule->getMainSourceFile(Invocation.getSourceFileKind());
-    } else {
-      // Otherwise create a library file.
-      SF = createSourceFileForMainModule(SourceFileKind::Library, bufferID,
-                                         parsingOpts);
-    }
-    // Force the parsing of the top level decls.
-    (void)SF->getTopLevelDecls();
-  }
-
-  assert(Context->LoadedModules.size() == 1 &&
-         "Loaded a module during parse-only");
 }
 
 void CompilerInstance::freeASTContext() {
