@@ -126,7 +126,7 @@
 ///     let temperatureData = ["21.5", "19.25", "27", "no data", "28.25", "no data", "23"]
 ///     let tempsCelsius = temperatureData.map { Double($0) ?? .nan }
 ///     print(tempsCelsius)
-///     // Prints "[21.5, 19.25, 27, .nan, 28.25, .nan, 23.0]"
+///     // Prints "[21.5, 19.25, 27, nan, 28.25, nan, 23.0]"
 ///
 ///
 /// Note that some elements in the `temperatureData ` array are not valid
