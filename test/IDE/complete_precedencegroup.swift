@@ -98,8 +98,8 @@ infix operator ---: #^PRECEDENCE_GROUP_CURRFILE^#
 // ASSIGNMENT: Keyword[true]/None: true;   name=true
 
 // PRECEDENCE_GROUP: Begin completions
-// PRECEDENCE_GROUP-DAG: Decl[PrecedenceGroup]/OtherModule[Swift]: AssignmentPrecedence; name=AssignmentPrecedence
-// PRECEDENCE_GROUP-DAG: Decl[PrecedenceGroup]/OtherModule[Swift]: ComparisonPrecedence; name=ComparisonPrecedence
+// PRECEDENCE_GROUP-DAG: Decl[PrecedenceGroup]/OtherModule[Swift]/IsSystem: AssignmentPrecedence; name=AssignmentPrecedence
+// PRECEDENCE_GROUP-DAG: Decl[PrecedenceGroup]/OtherModule[Swift]/IsSystem: ComparisonPrecedence; name=ComparisonPrecedence
 
 /* FIXME: SR-8898 We only see precedence groups that are earlier in life! */
 // PRECEDENCE_GROUP_CURRFILE-DAG: Begin completions
