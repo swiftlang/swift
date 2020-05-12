@@ -730,6 +730,10 @@ namespace {
       case clang::Type::ExtInt:
         llvm_unreachable("ExtInt type in ABI lowering?");
 
+      case clang::Type::ConstantMatrix: {
+        llvm_unreachable("ConstantMatrix type in ABI lowering?");
+      }
+
       case clang::Type::ConstantArray: {
         auto array = Ctx.getAsConstantArrayType(type);
         auto elt = Ctx.getCanonicalType(array->getElementType());
