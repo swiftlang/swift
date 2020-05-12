@@ -1,3 +1,4 @@
+import ArgumentParser
 import SwiftRemoteMirror
 
 
@@ -11,47 +12,6 @@ func machErrStr(_ kr: kern_return_t) -> String {
     let errHex = String(kr, radix: 16)
     return "\(errStr) (0x\(errHex))"
 }
-
-
-var argv = ArraySlice(CommandLine.arguments)
-guard let executableName = argv.popFirst() else {
-  argFail("Command line arguments are completely empty!")
-}
-
-struct Command {
-  var name: String
-  var help: String
-  var call: (inout ArraySlice<String>) throws -> Void
-  
-  init(name: String, help: String,
-       call: @escaping (inout ArraySlice<String>) -> Void) {
-    self.name = name
-    self.help = help
-    self.call = call
-  }
-  
-  init(name: String, help: String,
-       call: @escaping (SwiftReflectionContextRef) throws -> Void) {
-    self.name = name
-    self.help = help
-    self.call = { try withReflectionContext(args: &$0, call: call) }
-  }
-}
-
-let commands = [
-  Command(
-    name: "dump-conformance-cache",
-    help: "Print the contents of the target's protocol conformance cache.",
-    call: dumpConformanceCache),
-  Command(
-    name: "dump-metadata-allocations",
-    help: "Print the target's metadata allocations.",
-    call: dumpMetadataAllocations),
-  Command(
-    name: "help",
-    help: "Print this help.",
-    call: printUsage),
-]
 
 func dumpConformanceCache(context: SwiftReflectionContextRef) throws {
   try context.iterateConformanceCache(call: { type, proto in
@@ -90,29 +50,10 @@ func dumpMetadataAllocations(context: SwiftReflectionContextRef) throws {
   }
 }
 
-func printUsage(args: inout ArraySlice<String>) {
-  print("Usage: \(executableName) <command>", to: &Std.err)
-  print("", to: &Std.err)
-  print("Available commands:", to: &Std.err)
-  
-  let maxWidth = commands.map({ $0.name.count }).max() ?? 0
-  for command in commands {
-    var paddedName = command.name
-    while paddedName.count < maxWidth {
-      paddedName = " " + paddedName
-    }
-    print("  \(paddedName) - \(command.help)", to: &Std.err)
-  }
-}
-
-func makeReflectionContext(args: inout ArraySlice<String>)
+func makeReflectionContext(nameOrPid: String)
   -> (Inspector, SwiftReflectionContextRef) {
-  guard let pidStr = args.popFirst() else {
-    argFail("Must specify a pid or process name")
-  }
-
-  guard let pid = pidFromHint(pidStr) else {
-    argFail("Cannot find pid/process \(pidStr)")
+  guard let pid = pidFromHint(nameOrPid) else {
+    argFail("Cannot find pid/process \(nameOrPid)")
   }
 
   guard let inspector = Inspector(pid: pid) else {
@@ -133,9 +74,9 @@ func makeReflectionContext(args: inout ArraySlice<String>)
 }
 
 func withReflectionContext(
-  args: inout ArraySlice<String>,
+  nameOrPid: String,
   call: (SwiftReflectionContextRef) throws -> Void) throws {
-  let (inspector, context) = makeReflectionContext(args: &args)
+  let (inspector, context) = makeReflectionContext(nameOrPid: nameOrPid)
   defer {
     swift_reflection_destroyReflectionContext(context)
     inspector.destroyContext()
@@ -143,26 +84,41 @@ func withReflectionContext(
   try call(context)
 }
 
-let commandName = argv.popFirst()
-for command in commands {
-  if command.name == commandName {
-    do {
-      try command.call(&argv)
-    } catch let error as SwiftReflectionContextRef.Error {
-      print("Error: \(error.description)", to: &Std.err)
-      exit(1)
-    } catch {
-      print("Unknown error: \(error)")
+struct Swiftdt: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Swift runtime debug tool",
+    subcommands: [
+      DumpConformanceCache.self,
+      DumpMetadataAllocations.self,
+    ])
+}
+
+struct DumpConformanceCache: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Print the contents of the target's protocol conformance cache.")
+
+  @Argument(help: "The pid or partial name of the target process")
+  var nameOrPid: String
+
+  func run() throws {
+    try withReflectionContext(nameOrPid: nameOrPid) {
+      try dumpConformanceCache(context: $0)
     }
-    exit(0)
   }
 }
 
-if let commandName = commandName {
-  print("error: \(executableName): unknown command \(commandName)", to: &Std.err)
-} else {
-  print("error: \(executableName): missing command", to: &Std.err)
+struct DumpMetadataAllocations: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Print the target's metadata allocations.")
+  @Argument(help: "The pid or partial name of the target process")
+
+  var nameOrPid: String
+
+  func run() throws {
+    try withReflectionContext(nameOrPid: nameOrPid) {
+      try dumpMetadataAllocations(context: $0)
+    }
+  }
 }
-print("", to: &Std.err)
-printUsage(args: &argv)
-exit(EX_USAGE)
+
+Swiftdt.main()

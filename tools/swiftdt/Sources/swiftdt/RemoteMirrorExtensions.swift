@@ -1,7 +1,7 @@
 import SwiftRemoteMirror
 
 extension SwiftReflectionContextRef {
-  struct Error: Swift.Error {
+  struct Error: Swift.Error, CustomStringConvertible {
     var description: String
 
     init(cString: UnsafePointer<CChar>) {
