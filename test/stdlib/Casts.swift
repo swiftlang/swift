@@ -167,8 +167,12 @@ CastsTests.test("Any.Protocol") {
   class C {}
   struct S {}
   func isAnyProtocol<T>(_ type: T.Type) -> Bool {
-    blackhole(T.self as! Any.Protocol)
-    return T.self is Any.Protocol
+    let result = T.self is Any.Protocol
+		if result {
+			// `as!` should succeed if `is` does
+			blackhole(T.self as! Any.Protocol)
+		}
+    return result
   }
   func isAnyType<T>(_ type: T.Type) -> Bool {
     return T.self is Any.Type
