@@ -20,6 +20,7 @@
 #include <iterator>
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <functional>
 #include <pthread.h>
 #include <stdint.h>
