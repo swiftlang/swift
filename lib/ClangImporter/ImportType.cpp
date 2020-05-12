@@ -352,6 +352,11 @@ namespace {
       return Type();
     }
 
+    ImportResult VisitMatrixType(const clang::MatrixType *ty) {
+      // Matrix types are not supported in Swift.
+      return Type();
+    }
+
     ImportResult VisitComplexType(const clang::ComplexType *type) {
       // FIXME: Implement once Complex is in the library.
       return Type();
