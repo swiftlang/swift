@@ -407,3 +407,26 @@ NominalTypeDecl *TangentSpace::getNominal() const {
   assert(isTangentVector());
   return getTangentVector()->getNominalOrBoundGenericNominal();
 }
+
+const char DerivativeFunctionTypeError::ID = '\0';
+
+void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
+  OS << "original function type '";
+  functionType->print(OS);
+  OS << "' ";
+  switch (kind) {
+  case Kind::NoSemanticResults:
+    OS << "has no semantic results ('Void' result)";
+    break;
+  case Kind::MultipleSemanticResults:
+    OS << "has multiple semantic results";
+    break;
+  case Kind::NonDifferentiableParameters:
+    OS << "has non-differentiable parameters: ";
+    value.indices->print(OS);
+    break;
+  case Kind::NonDifferentiableResult:
+    OS << "has non-differentiable result: " << value.type;
+    break;
+  }
+}
