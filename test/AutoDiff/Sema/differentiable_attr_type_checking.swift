@@ -384,7 +384,6 @@ struct TF_521<T: FloatingPoint> {
   var real: T
   var imaginary: T
 
-  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'TF_521<T>' does not conform to 'Differentiable'}}
   @differentiable(where T: Differentiable, T == T.TangentVector)
   init(real: T = 0, imaginary: T = 0) {
     self.real = real
