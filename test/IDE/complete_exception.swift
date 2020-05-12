@@ -76,7 +76,7 @@ func test001() {
 // CATCH1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
 // CATCH1-DAG:  Keyword[let]/None:                  let{{; name=.+$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
-// CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]: NSError[#NSError#]{{; name=.+$}}
+// CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]/IsSystem: NSError[#NSError#]{{; name=.+$}}
 }
 
 func test002() {
@@ -210,13 +210,13 @@ func test014() {
     e.#^INSIDE_CATCH_ERR_DOT3^#
   }
 // NSERROR_DOT: Begin completions
-// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      domain[#String#]; name=domain
-// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      code[#Int#]; name=code
-// NSERROR_DOT-DAG: Decl[InstanceVar]/Super:            hashValue[#Int#]; name=hashValue
-// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super:         myClass()[#AnyClass!#]; name=myClass()
-// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super:         isEqual({#(other): NSObject!#})[#Bool#]; name=isEqual(other: NSObject!)
-// NSERROR_DOT-DAG: Decl[InstanceVar]/Super:            hash[#Int#]; name=hash
-// NSERROR_DOT-DAG: Decl[InstanceVar]/Super:            description[#String#]; name=description
+// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: domain[#String#]; name=domain
+// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: code[#Int#]; name=code
+// NSERROR_DOT-DAG: Decl[InstanceVar]/Super:                hashValue[#Int#]; name=hashValue
+// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem:    myClass()[#AnyClass!#]; name=myClass()
+// NSERROR_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem:    isEqual({#(other): NSObject!#})[#Bool#]; name=isEqual(other: NSObject!)
+// NSERROR_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       hash[#Int#]; name=hash
+// NSERROR_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       description[#String#]; name=description
 // NSERROR_DOT: End completions
 }
 func test015() {
@@ -227,8 +227,8 @@ func test015() {
 }
 // Check that we can complete on the bound value; Not exhaustive..
 // INT_DOT: Begin completions
-// INT_DOT-DAG: Decl[InstanceVar]/Super:            bigEndian[#(Int32)#]; name=bigEndian
-// INT_DOT-DAG: Decl[InstanceVar]/Super:            littleEndian[#(Int32)#]; name=littleEndian
+// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: bigEndian[#(Int32)#]; name=bigEndian
+// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: littleEndian[#(Int32)#]; name=littleEndian
 // INT_DOT: End completions
 
 //===--- Inside catch body top-level

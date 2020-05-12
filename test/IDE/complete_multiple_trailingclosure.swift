@@ -51,7 +51,7 @@ func testMethod(value: MyStruct) {
 // METHOD_SAMELINE: Begin completions, 4 items
 // METHOD_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)? {() -> String in|}#}[#(() -> String)?#];
 // METHOD_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .enumFunc()[#Void#];
-// METHOD_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#SimpleEnum#}[#SimpleEnum#];
+// METHOD_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#SimpleEnum#}[#SimpleEnum#];
 // METHOD_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#SimpleEnum#];
 // METHOD_SAMELINE: End completions
 

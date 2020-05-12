@@ -289,8 +289,8 @@ class C4 {
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Keyword[nil]/None/Erase[1]: nil[#SomeEnum1?#]; name=nil
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal: none[#Optional<SomeEnum1>#]; name=none
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<SomeEnum1>#]; name=none
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
 // UNRESOLVED_3_OPT-NOT: init({#(some):
 // UNRESOLVED_3_OPT-NOT: init({#nilLiteral:
 
@@ -298,8 +298,8 @@ class C4 {
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/None/Erase[1]: nil[#SomeEnum1???#]; name=nil
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal:     none[#Optional<SomeEnum1??>#]; name=none
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal:     some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<SomeEnum1??>#]; name=none
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#(some):
 // UNRESOLVED_3_OPTOPTOPT-NOT: init({#nilLiteral:
 
@@ -316,9 +316,9 @@ func testOptionalWithCustomExtension() {
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     earth[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     mars[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Keyword[nil]/None/Erase[1]: nil[#Somewhere?#]; name=nil
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal:     none[#Optional<Somewhere>#]; name=none
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal:     some({#Somewhere#})[#Optional<Somewhere>#];
-// UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal:      init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem: none[#Optional<Somewhere>#]; name=none
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem: some({#Somewhere#})[#Optional<Somewhere>#];
+// UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal: init({#str: String#})[#Optional<Somewhere>#]; name=init(str: String)
 // UNRESOLVED_OPT_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: nowhere[#Optional<Somewhere>#]; name=nowhere
 // UNRESOLVED_OPT_4-NOT: init({#(some):
 // UNRESOLVED_OPT_4-NOT: init({#nilLiteral:
@@ -780,6 +780,6 @@ func testTernaryOperator2(cond: Bool) {
   func sync(){}
   let _: SomeEnum1 = .#^TERNARY_CONDITION^# ? .bogus : .bogus
 // TERNARY_CONDITION: Begin completions
-// TERNARY_CONDITION-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#Bool#]; name=init()
+// TERNARY_CONDITION-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Identical]: init()[#Bool#]; name=init()
 // TERNARY_CONDITION: End completions
 }
