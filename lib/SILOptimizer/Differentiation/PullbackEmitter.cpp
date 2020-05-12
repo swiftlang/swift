@@ -1331,6 +1331,7 @@ void PullbackEmitter::visitSILInstruction(SILInstruction *inst) {
 AllocStackInst *
 PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
                                               int eltIndex, SILLocation loc) {
+  auto &ctx = builder.getASTContext();
   auto arrayTanType = cast<StructType>(arrayAdjoint->getType().getASTType());
   auto arrayType = arrayTanType->getParent()->castTo<BoundGenericStructType>();
   auto eltTanType = arrayType->getGenericArgs().front()->getCanonicalType();
@@ -1340,7 +1341,19 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
   auto *arrayTanStructDecl = arrayTanType->getStructOrBoundGenericStruct();
   auto subscriptLookup =
       arrayTanStructDecl->lookupDirect(DeclBaseName::createSubscript());
-  auto *subscriptDecl = cast<SubscriptDecl>(subscriptLookup.front());
+  SubscriptDecl *subscriptDecl = nullptr;
+  for (auto *candidate : subscriptLookup) {
+    auto candidateModule = candidate->getModuleContext();
+    if (candidateModule->getName() == ctx.Id_Differentiation ||
+        candidateModule->isStdlibModule()) {
+      assert(!subscriptDecl && "Multiple `Array.TangentVector.subscript`s");
+      subscriptDecl = cast<SubscriptDecl>(candidate);
+#ifdef NDEBUG
+      break;
+#endif
+    }
+  }
+  assert(subscriptDecl && "No `Array.TangentVector.subscript`");
   auto *subscriptGetterDecl = subscriptDecl->getAccessor(AccessorKind::Get);
   assert(subscriptGetterDecl && "No `Array.TangentVector.subscript` getter");
   SILOptFunctionBuilder fb(getContext().getTransform());
@@ -1352,7 +1365,6 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
       subscriptGetterFn->getLoweredFunctionType()->getSubstGenericSignature();
   // Apply `Array.TangentVector.subscript.getter` to get array element adjoint
   // buffer.
-  auto &ctx = builder.getASTContext();
   // %index_literal = integer_literal $Builtin.IntXX, <index>
   auto builtinIntType =
       SILType::getPrimitiveObjectType(ctx.getIntDecl()

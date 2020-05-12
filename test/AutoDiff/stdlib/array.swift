@@ -8,6 +8,15 @@ var ArrayAutoDiffTests = TestSuite("ArrayAutoDiff")
 
 typealias FloatArrayTan = Array<Float>.TangentVector
 
+extension Array.DifferentiableView {
+  /// A subscript that always fatal errors.
+  ///
+  /// The differentiation transform should never emit calls to this.
+  subscript(alwaysFatalError: Int) -> Element {
+    fatalError("wrong subscript")
+  }
+}
+
 ArrayAutoDiffTests.test("ArrayIdentity") {
   func arrayIdentity(_ x: [Float]) -> [Float] {
     return x
