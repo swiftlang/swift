@@ -922,3 +922,35 @@ func internal_original_fileprivate_derivative(_ x: Float) -> Float { x }
 fileprivate func _internal_original_fileprivate_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
+
+// MARK: - Original vs derivative `@usableFromInline` mismatch
+
+// expected-note @+1 {{consider adding '@usableFromInline' to the original function 'internal_original_usablefrominline_derivative'}}
+func internal_original_usablefrominline_derivative(_ x: Float) -> Float { x }
+@usableFromInline
+// expected-error @+1 {{non-'@usableFromInline' original function must not have a '@usableFromInline' derivative function}}
+@derivative(of: internal_original_usablefrominline_derivative)
+// expected-note @+1 {{consider removing '@usableFromInline' from the derivative function '_internal_original_usablefrominline_derivative'}}
+func _internal_original_usablefrominline_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+// expected-note @+1 {{consider adding '@usableFromInline' to the original function 'internal_original_inlinable_derivative'}}
+func internal_original_inlinable_derivative(_ x: Float) -> Float { x }
+@inlinable
+// expected-error @+1 {{non-'@usableFromInline' original function must not have a '@usableFromInline' derivative function}}
+@derivative(of: internal_original_inlinable_derivative)
+// expected-note @+1 {{consider removing '@usableFromInline' from the derivative function '_internal_original_inlinable_derivative'}}
+func _internal_original_inlinable_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+// expected-note @+1 {{consider adding '@usableFromInline' to the original function 'internal_original_alwaysemitintoclient_derivative'}}
+func internal_original_alwaysemitintoclient_derivative(_ x: Float) -> Float { x }
+@inlinable
+// expected-error @+1 {{non-'@usableFromInline' original function must not have a '@usableFromInline' derivative function}}
+@derivative(of: internal_original_alwaysemitintoclient_derivative)
+// expected-note @+1 {{consider removing '@usableFromInline' from the derivative function '_internal_original_alwaysemitintoclient_derivative'}}
+func _internal_original_alwaysemitintoclient_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}

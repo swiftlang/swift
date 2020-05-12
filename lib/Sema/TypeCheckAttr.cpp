@@ -4540,11 +4540,22 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   }
   attr->setOriginalFunction(originalAFD);
 
+  bool usableFromInlineMismatch =
+      originalAFD->getFormalAccess() <= AccessLevel::Internal &&
+      derivative->getFormalAccess() <= AccessLevel::Internal &&
+      !originalAFD->isUsableFromInline() && derivative->isUsableFromInline();
+
+  bool sameAccessLevel =
+      originalAFD->getFormalAccess() == derivative->getFormalAccess();
+
   // Returns true if:
-  // - Original function and derivative function have the same access level.
+  // - Original function and derivative function have the same access level and
+  //   the same `@usableFromInline` status.
   // - Original function is public and derivative function is internal
   //   `@usableFromInline`. This is the only special case.
   auto compatibleAccessLevels = [&]() {
+    if (usableFromInlineMismatch)
+      return false;
     if (originalAFD->getFormalAccess() == derivative->getFormalAccess())
       return true;
     return originalAFD->getFormalAccess() == AccessLevel::Public &&
@@ -4553,6 +4564,23 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Check access level compatibility for original and derivative functions.
   if (!compatibleAccessLevels()) {
+    // Diagnose if access levels match, but derivative is `@usableFromInline`
+    // while original is not.
+    if (sameAccessLevel && usableFromInlineMismatch) {
+      diags.diagnose(originalName.Loc,
+                     diag::derivative_attr_usable_from_inline_mismatch);
+      // Suggest adding `@usableFromInline` to original.
+      originalAFD
+          ->diagnose(diag::derivative_attr_fix_add_usable_from_inline,
+                     originalAFD->getName())
+          .fixItInsert(
+              originalAFD->getAttributeInsertionLoc(/*forModifier*/ false),
+              "@usableFromInline ");
+      // Suggest remove `@usableFromInline` from derivative.
+      derivative->diagnose(diag::derivative_attr_fix_remove_usable_from_inline,
+                           derivative->getName());
+      return true;
+    }
     auto originalAccess = originalAFD->getFormalAccess();
     auto derivativeAccess =
         derivative->getFormalAccessScope().accessLevelForDiagnostics();
