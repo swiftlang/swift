@@ -1705,6 +1705,13 @@ ERROR(spi_attribute_on_non_public,none,
       "cannot be declared '@_spi' because only public and open "
       "declarations can be '@_spi'",
       (AccessLevel, DescriptiveDeclKind))
+ERROR(spi_attribute_on_protocol_requirement,none,
+      "protocol requirement %0 cannot be declared '@_spi' without "
+      "a default implementation in a protocol extension",
+      (DeclName))
+ERROR(spi_attribute_on_frozen_stored_properties,none,
+      "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
+      (DeclName))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
