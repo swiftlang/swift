@@ -3942,14 +3942,17 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
 
   auto loc = customDerivativeFn->getLocation();
   SILGenFunctionBuilder fb(*this);
-  // This thunk is publicly exposed and cannot be transparent.
-  // Instead, mark it as "always inline" for optimization.
+  // Derivative thunks have the same linkage as the original function, stripping
+  // external.
+  auto linkage = stripExternalFromLinkage(originalFn->getLinkage());
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, customDerivativeFn->getLinkage(), thunkFnTy, IsBare,
-      IsNotTransparent, customDerivativeFn->isSerialized(),
+      loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
+      customDerivativeFn->isSerialized(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->getEntryCount(), IsThunk,
       customDerivativeFn->getClassSubclassScope());
+  // This thunk may be publicly exposed and cannot be transparent.
+  // Instead, mark it as "always inline" for optimization.
   thunk->setInlineStrategy(AlwaysInline);
   if (!thunk->empty())
     return thunk;

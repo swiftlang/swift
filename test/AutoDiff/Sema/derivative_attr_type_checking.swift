@@ -847,6 +847,27 @@ fileprivate func _fileprivate_original_fileprivate_derivative(_ x: Float) -> (va
   fatalError()
 }
 
+func internal_original_usablefrominline_derivative(_ x: Float) -> Float { x }
+@usableFromInline
+@derivative(of: internal_original_usablefrominline_derivative)
+func _internal_original_usablefrominline_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_inlinable_derivative(_ x: Float) -> Float { x }
+@inlinable
+@derivative(of: internal_original_inlinable_derivative)
+func _internal_original_inlinable_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_alwaysemitintoclient_derivative(_ x: Float) -> Float { x }
+@_alwaysEmitIntoClient
+@derivative(of: internal_original_alwaysemitintoclient_derivative)
+func _internal_original_alwaysemitintoclient_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
 // MARK: - Original function visibility < derivative function visibility
 
 @usableFromInline
