@@ -839,8 +839,8 @@ void SILGenModule::emitDifferentiabilityWitness(
   SILDifferentiabilityWitnessKey key{originalFunction->getName(), silConfig};
   auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
   if (!diffWitness) {
-    // Strip external from linkage of original function.
-    // Necessary for Clang-imported functions, which have external linkage.
+    // Differentiability witnesses have the same linkage as the original
+    // function, stripping external.
     auto linkage = stripExternalFromLinkage(originalFunction->getLinkage());
     diffWitness = SILDifferentiabilityWitness::createDefinition(
         M, linkage, originalFunction, silConfig.parameterIndices,
