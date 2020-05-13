@@ -112,7 +112,7 @@ struct StructWithSubobjectPrivateDefaultedDestructor {
   StructWithPrivateDefaultedDestructor subobject;
 };
 
-// Tests for common sets of special subobjects
+// Tests for common sets of special member functions.
 
 struct StructTriviallyCopyableMovable {
   StructTriviallyCopyableMovable(const StructTriviallyCopyableMovable &) =
