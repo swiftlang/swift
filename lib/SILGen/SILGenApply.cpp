@@ -3818,7 +3818,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
                                                   resultFnType.getParams(),
                                                   /*canonicalVararg*/ true);
     auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
-    payload = ArgumentSource(element, std::move(arg));
+    payload = ArgumentSource(uncurriedLoc, std::move(arg));
     formalResultType = cast<FunctionType>(formalResultType).getResult();
     origFormalType = origFormalType.getFunctionResultType();
   } else {
