@@ -558,10 +558,12 @@ protected:
     IsIncompatibleWithWeakReferences : 1
   );
 
-  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1+1,
     /// True if this struct has storage for fields that aren't accessible in
     /// Swift.
-    HasUnreferenceableStorage : 1
+    HasUnreferenceableStorage : 1,
+    /// True if this struct is imported from C++ and not trivially copyable.
+    IsCxxNotTriviallyCopyable : 1
   );
   
   SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
@@ -3835,6 +3837,14 @@ public:
 
   void setHasUnreferenceableStorage(bool v) {
     Bits.StructDecl.HasUnreferenceableStorage = v;
+  }
+
+  bool isCxxNotTriviallyCopyable() const {
+    return Bits.StructDecl.IsCxxNotTriviallyCopyable;
+  }
+
+  void setIsCxxNotTriviallyCopyable(bool v) {
+    Bits.StructDecl.IsCxxNotTriviallyCopyable = v;
   }
 };
 
