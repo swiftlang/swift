@@ -167,7 +167,7 @@ bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
 
-bool CanType::isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
+bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
                                   bool functionsCount) {
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -253,7 +253,7 @@ bool CanType::isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
 ///   - existentials with class or class protocol bounds
 /// But not:
 ///   - function types
-bool TypeBase::allowsOwnership(GenericSignatureImpl *sig) {
+bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
