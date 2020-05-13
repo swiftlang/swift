@@ -71,6 +71,11 @@ ERROR(could_not_find_value_dynamic_member_corrected,none,
 ERROR(could_not_find_value_dynamic_member,none,
       "value of type %0 has no dynamic member %2 using key path from root type %1",
       (Type, Type, DeclNameRef))
+ERROR(cannot_infer_contextual_keypath_type_specify_root,none,
+      "cannot infer key path type from context; consider explicitly specifying a root type", ())
+ERROR(cannot_infer_keypath_root_anykeypath_context,none,
+     "'AnyKeyPath' does not provide enough context for root type to be inferred; "
+     "consider explicitly specifying a root type", ())
 
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclNameRef))
@@ -1705,6 +1710,13 @@ ERROR(spi_attribute_on_non_public,none,
       "cannot be declared '@_spi' because only public and open "
       "declarations can be '@_spi'",
       (AccessLevel, DescriptiveDeclKind))
+ERROR(spi_attribute_on_protocol_requirement,none,
+      "protocol requirement %0 cannot be declared '@_spi' without "
+      "a default implementation in a protocol extension",
+      (DeclName))
+ERROR(spi_attribute_on_frozen_stored_properties,none,
+      "stored property %0 cannot be declared '@_spi' in a '@frozen' struct",
+      (DeclName))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,

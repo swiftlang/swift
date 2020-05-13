@@ -59,51 +59,15 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
   }
 }
 
-struct InterfaceSubASTContextDelegate: SubASTContextDelegate {
-  bool runInSubContext(ASTContext &ctx, StringRef interfacePath,
-                       llvm::function_ref<bool(ASTContext&)> action) override {
-    // Parse the interface file using the current context to get the additional
-    // compiler arguments we should use when creating a sub-ASTContext.
-    // These arguments are in "swift-module-flags:"
-    version::Version Vers;
-    StringRef CompilerVersion;
-    llvm::BumpPtrAllocator Allocator;
-    llvm::StringSaver SubArgSaver(Allocator);
-    SmallVector<const char *, 64> SubArgs;
-    if (extractSwiftInterfaceVersionAndArgs(ctx.SourceMgr, ctx.Diags,
-                                            interfacePath, Vers, CompilerVersion,
-                                            SubArgSaver, SubArgs)) {
-      return true;
-    }
-    CompilerInvocation invok;
-
-    // Inherit options from the parent ASTContext so we have all search paths, etc.
-    inheritOptionsForBuildingInterface(invok, ctx.SearchPathOpts, ctx.LangOpts);
-    CompilerInstance inst;
-    // Use the additional flags to setup the compiler instance.
-    if (invok.parseArgs(SubArgs, ctx.Diags)) {
-      return true;
-    }
-    if (inst.setup(invok)) {
-      return true;
-    }
-    // Add the diag consumers to the sub context to make sure we don't lose
-    // diagnostics.
-    for (auto *consumer: ctx.Diags.getConsumers()) {
-      inst.getDiags().addConsumer(*consumer);
-    }
-    // Run the action under the sub-ASTContext.
-    return action(inst.getASTContext());
-  }
-};
-
 /// Resolve the direct dependencies of the given module.
 static std::vector<ModuleDependencyID> resolveDirectDependencies(
     ASTContext &ctx, ModuleDependencyID module,
     ModuleDependenciesCache &cache) {
   auto knownDependencies = *cache.findDependencies(module.first, module.second);
   auto isSwift = knownDependencies.isSwiftModule();
-  InterfaceSubASTContextDelegate ASTDelegate;
+  InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
+                                              ctx.SearchPathOpts, ctx.LangOpts,
+                                              ctx.getClangModuleLoader());
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {

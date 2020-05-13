@@ -39,6 +39,7 @@
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -557,7 +558,7 @@ public:
   
   /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
-  bool allowsOwnership(GenericSignatureImpl *sig = nullptr);
+  bool allowsOwnership(const GenericSignatureImpl *sig = nullptr);
 
   /// Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
@@ -3350,7 +3351,7 @@ public:
   /// first. `makeSelfParamFirst` should be true when working with user-facing
   /// derivative function types, e.g. when type-checking `@differentiable` and
   /// `@derivative` attributes.
-  AnyFunctionType *getAutoDiffDerivativeFunctionLinearMapType(
+  llvm::Expected<AnyFunctionType *> getAutoDiffDerivativeFunctionLinearMapType(
       IndexSubset *parameterIndices, AutoDiffLinearMapKind kind,
       LookupConformanceFn lookupConformance, bool makeSelfParamFirst = false);
 

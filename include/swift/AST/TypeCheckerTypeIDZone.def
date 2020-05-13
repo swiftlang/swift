@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
-              GenericSignature (GenericSignatureImpl *,
+              GenericSignature (const GenericSignatureImpl *,
                                 SmallVector<GenericTypeParamType *, 2>,
                                 SmallVector<Requirement, 2>),
               Cached, NoLocationInfo)
@@ -92,7 +92,7 @@ SWIFT_REQUEST(TypeChecker, HasDynamicCallableAttributeRequest,
 SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
               bool(SourceFile *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
-              GenericSignature (ModuleDecl *, GenericSignatureImpl *,
+              GenericSignature (ModuleDecl *, const GenericSignatureImpl *,
                                  GenericParamSource,
                                  SmallVector<Requirement, 2>,
                                  SmallVector<TypeLoc, 2>, bool),
