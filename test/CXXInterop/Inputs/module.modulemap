@@ -1,3 +1,0 @@
-module CxxConstructors {
-  header "cxx_constructors.h"
-}

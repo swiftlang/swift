@@ -6,6 +6,10 @@ module TypeClassification {
   header "type-classification.h"
 }
 
+module CxxConstructors {
+  header "cxx-constructors.h"
+}
+
 module MemberwiseInitializer {
   header "memberwise-initializer.h"
 }
