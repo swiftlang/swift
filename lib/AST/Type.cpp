@@ -3548,6 +3548,11 @@ operator()(CanType dependentType, Type conformingReplacementType,
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
+  // Lookup conformances for opened existential.
+  if (conformingReplacementType->isOpenedExistential()) {
+    return conformedProtocol->getModuleContext()->lookupConformance(
+        conformingReplacementType, conformedProtocol);
+  }
   return Subs.lookupConformance(dependentType, conformedProtocol);
 }
 
@@ -3559,12 +3564,23 @@ operator()(CanType dependentType, Type conformingReplacementType,
           || conformingReplacementType->is<DependentMemberType>()
           || conformingReplacementType->is<TypeVariableType>())
          && "replacement requires looking up a concrete conformance");
+  // Lookup conformances for opened existential.
+  if (conformingReplacementType->isOpenedExistential()) {
+    return conformedProtocol->getModuleContext()->lookupConformance(
+        conformingReplacementType, conformedProtocol);
+  }
   return ProtocolConformanceRef(conformedProtocol);
 }
 
 ProtocolConformanceRef LookUpConformanceInSignature::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
+  // Lookup conformances for opened existential.
+  if (conformingReplacementType->isOpenedExistential()) {
+    return conformedProtocol->getModuleContext()->lookupConformance(
+        conformingReplacementType, conformedProtocol);
+  }
+
   // FIXME: Should pass dependentType instead, once
   // GenericSignature::lookupConformance() does the right thing
   return Sig->lookupConformance(conformingReplacementType->getCanonicalType(),

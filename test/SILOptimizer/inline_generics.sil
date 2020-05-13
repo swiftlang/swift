@@ -1,5 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-generics=true | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-print-generic-specialization-info | %FileCheck %s
 // RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-generics=false | %FileCheck --check-prefix=DISABLED-GENERIC-INLINING-CHECK %s
+// RUN: %target-swift-frontend -O -emit-ir %s
 
 sil_stage canonical
 
@@ -177,4 +178,49 @@ bb0(%0 : $*T, %1 : $*T):
 
 sil_default_witness_table P {
   no_default
+}
+
+protocol SomeProto : class {}
+protocol OtherProto {}
+
+class MyObject {}
+extension MyObject : OtherProto {}
+
+class MyNumber : MyObject {}
+extension MyNumber : SomeProto {}
+
+sil_vtable MyObject {}
+sil_vtable MyNumber {}
+
+// Make sure we subsitute the correct conformance when inlining. When
+// substituting we need to pick up the normal_conformance.
+
+// CHECK-LABEL: sil @test_inlining : $@convention(objc_method) (@owned MyNumber) -> () {
+// CHECK-NOT: Generic specialization information for call-site dootherstuff <MyNumber & SomeProto> conformances <(abstract_conformance protocol=OtherProto)>
+// CHECK: Generic specialization information
+// CHECK: (normal_conformance type=MyObject protocol=OtherProto)
+// CHECK: end sil function 'test_inlining'
+
+sil @test_inlining : $@convention(objc_method) (@owned MyNumber) -> () {
+bb0(%0 : $MyNumber):
+  %12 = init_existential_ref %0 : $MyNumber : $MyNumber, $MyNumber & SomeProto
+  %14 = open_existential_ref %12 : $MyNumber & SomeProto to $@opened("B9711AE4-946E-11EA-A871-ACDE48001122") MyNumber & SomeProto
+  %15 = alloc_stack $OtherProto
+  %16 = init_existential_addr %15 : $*OtherProto, $@opened("B9711AE4-946E-11EA-A871-ACDE48001122") MyNumber & SomeProto
+  store %14 to %16 : $*@opened("B9711AE4-946E-11EA-A871-ACDE48001122") MyNumber & SomeProto
+  %18 = function_ref @doStuff : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
+  %20 = apply %18<@opened("B9711AE4-946E-11EA-A871-ACDE48001122") MyNumber & SomeProto>(%16) : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %15 : $*OtherProto
+  dealloc_stack %15 : $*OtherProto
+  %27 = tuple ()
+  return %27 : $()
+}
+
+sil @dootherstuff : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
+
+sil shared [signature_optimized_thunk] [always_inline] @doStuff : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> () {
+bb0(%0 : $*τ_0_0):
+  %2 = function_ref @dootherstuff : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<τ_0_0>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
+  return %3 : $()
 }
