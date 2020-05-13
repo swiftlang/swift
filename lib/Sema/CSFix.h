@@ -1809,7 +1809,7 @@ public:
 ///   bar[keyPath: keyPath]
 /// }
 /// \endcode
-class AllowKeyPathRootTypeMismatch : public ContextualMismatch {
+class AllowKeyPathRootTypeMismatch final : public ContextualMismatch {
 protected:
   AllowKeyPathRootTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                                ConstraintLocator *locator)
@@ -1827,7 +1827,7 @@ public:
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
 };
 
-class SpecifyKeyPathRootType : public ConstraintFix {
+class SpecifyKeyPathRootType final : public ConstraintFix {
     SpecifyKeyPathRootType(ConstraintSystem &cs, ConstraintLocator *locator)
         : ConstraintFix(cs, FixKind::SpecifyKeyPathRootType, locator) {}
 
