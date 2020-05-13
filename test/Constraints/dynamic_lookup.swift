@@ -371,6 +371,10 @@ class C1 {
   @objc subscript(unambiguousSubscript _: String) -> Int { return 0 } // expected-note {{found this candidate}}
 }
 
+class C2 {
+  @objc subscript(singleCandidate _: Int) -> Int { return 0 }
+}
+
 func testAnyObjectAmbiguity(_ x: AnyObject) {
   _ = x.ambiguousProperty // expected-error {{ambiguous use of 'ambiguousProperty'}}
   _ = x.unambiguousProperty
@@ -383,6 +387,9 @@ func testAnyObjectAmbiguity(_ x: AnyObject) {
 
   _ = x.ambiguousMethodParam // expected-error {{ambiguous use of 'ambiguousMethodParam'}}
   _ = x.unambiguousMethodParam
+
+  // SR-12799: Don't emit a "single-element" tuple error.
+  _ = x[singleCandidate: 0]
 
   _ = x[ambiguousSubscript: 0] // expected-error {{ambiguous use of 'subscript(ambiguousSubscript:)'}}
 
