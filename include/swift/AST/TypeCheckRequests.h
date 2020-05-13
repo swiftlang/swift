@@ -1114,7 +1114,7 @@ void simple_display(llvm::raw_ostream &out, AncestryFlags value);
 
 class AbstractGenericSignatureRequest :
     public SimpleRequest<AbstractGenericSignatureRequest,
-                         GenericSignature (GenericSignatureImpl *,
+                         GenericSignature (const GenericSignatureImpl *,
                                            SmallVector<GenericTypeParamType *, 2>,
                                            SmallVector<Requirement, 2>),
                          RequestFlags::Cached> {
@@ -1127,7 +1127,7 @@ private:
   // Evaluation.
   GenericSignature
   evaluate(Evaluator &evaluator,
-           GenericSignatureImpl *baseSignature,
+           const GenericSignatureImpl *baseSignature,
            SmallVector<GenericTypeParamType *, 2> addedParameters,
            SmallVector<Requirement, 2> addedRequirements) const;
 
@@ -1144,7 +1144,7 @@ public:
 class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
                          GenericSignature (ModuleDecl *,
-                                            GenericSignatureImpl *,
+                                            const GenericSignatureImpl *,
                                             GenericParamSource,
                                             SmallVector<Requirement, 2>,
                                             SmallVector<TypeLoc, 2>,
@@ -1160,7 +1160,7 @@ private:
   GenericSignature
   evaluate(Evaluator &evaluator,
            ModuleDecl *module,
-           GenericSignatureImpl *baseSignature,
+           const GenericSignatureImpl *baseSignature,
            GenericParamSource paramSource,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,

@@ -558,7 +558,7 @@ public:
   
   /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
-  bool allowsOwnership(GenericSignatureImpl *sig = nullptr);
+  bool allowsOwnership(const GenericSignatureImpl *sig = nullptr);
 
   /// Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
