@@ -21,7 +21,6 @@
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Config.h"
@@ -39,7 +38,6 @@
 #include "swift/Runtime/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/Support/Compiler.h"
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #include "SwiftObject.h"
@@ -248,7 +246,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
 // This is noinline to preserve this frame in stack traces.
 // We want "dynamicCastFailure" to appear in crash logs even we crash 
 // during the diagnostic because some Metadata is invalid.
-LLVM_ATTRIBUTE_NORETURN SWIFT_NOINLINE void
+SWIFT_NORETURN SWIFT_NOINLINE void
 swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                                 const void *targetType, const char *targetName,
                                 const char *message) {
@@ -260,11 +258,9 @@ swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                     message ? message : "");
 }
 
-LLVM_ATTRIBUTE_NORETURN
-void 
-swift::swift_dynamicCastFailure(const Metadata *sourceType,
-                                const Metadata *targetType, 
-                                const char *message) {
+SWIFT_NORETURN void swift::swift_dynamicCastFailure(const Metadata *sourceType,
+                                                    const Metadata *targetType,
+                                                    const char *message) {
   std::string sourceName = nameForMetadata(sourceType);
   std::string targetName = nameForMetadata(targetType);
 
@@ -896,7 +892,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         maybeDeallocateSource(result);
         return result;
       }
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
 
     case MetadataKind::Enum:
     case MetadataKind::Optional:
@@ -912,7 +908,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         maybeDeallocateSource(success);
         return success;
       }
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
 
     default:
       return fallbackForNonClass();
@@ -1129,7 +1125,7 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
     // Get the actual class object.
     targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
       ->Class;
-    LLVM_FALLTHROUGH;
+    SWIFT_FALLTHROUGH;
   case MetadataKind::Class:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
@@ -1137,7 +1133,7 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
 #if SWIFT_OBJC_INTEROP
@@ -1173,7 +1169,7 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     case MetadataKind::Class:
     case MetadataKind::ForeignClass:
       // Check if the source is a subclass of the target.
@@ -1216,7 +1212,7 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
     // Get the actual class object.
     targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
       ->Class;
-    LLVM_FALLTHROUGH;
+    SWIFT_FALLTHROUGH;
   case MetadataKind::Class:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
@@ -1224,7 +1220,7 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
 #if SWIFT_OBJC_INTEROP
@@ -1263,7 +1259,7 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
     case MetadataKind::Class:
     case MetadataKind::ForeignClass:
       // Check if the source is a subclass of the target.
@@ -2412,7 +2408,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
         return _dynamicCastFromAnyHashable(dest, src, srcType,
                                            targetType, flags);
       }
-      LLVM_FALLTHROUGH;
+      SWIFT_FALLTHROUGH;
 
     case MetadataKind::Enum:
     case MetadataKind::Optional: {
@@ -2527,7 +2523,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
       break;
     }
 
-    LLVM_FALLTHROUGH;
+    SWIFT_FALLTHROUGH;
 
   // The non-polymorphic types.
   default:
@@ -2963,7 +2959,7 @@ findBridgeWitness(const Metadata *T) {
   }
 
   auto w = swift_conformsToObjectiveCBridgeable(T);
-  if (LLVM_LIKELY(w))
+  if (SWIFT_LIKELY(w))
     return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
   // Class and ObjC existential metatypes can be bridged, but metatypes can't
   // directly conform to protocols yet. Use a stand-in conformance for a type

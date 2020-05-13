@@ -2589,8 +2589,106 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
   llvm_unreachable("bad kind");
 }
 
+// A "simple" partial_apply is one where the argument can be directly
+// adopted as the context of the result closure.
+static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
+  // The callee type must use the `method` convention.
+  auto calleeTy = i->getCallee()->getType().castTo<SILFunctionType>();
+  auto resultTy = i->getFunctionType();
+  
+  if (calleeTy->getRepresentation() != SILFunctionTypeRepresentation::Method)
+    return false;
+  
+  // There should be one applied argument.
+  // (This is a bit stricter than necessary, because empty arguments could be
+  // ignored, and for noescape closures, any amount of data less than a pointer
+  // in size can be blobbed into a single context word, but those will be
+  // handled by a simplification pass in SIL.)
+  if (i->getNumArguments() != 1)
+    return false;
+  
+  auto appliedParam = calleeTy->getParameters().back();
+  if (resultTy->isNoEscape()) {
+    // A trivial closure accepts an unowned or guaranteed argument, possibly
+    // direct or indirect.
+    switch (appliedParam.getConvention()) {
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_In_Constant:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_InoutAliasable:
+      // Indirect arguments are trivially word sized.
+      return true;
+        
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Unowned: {
+      // Is the direct argument a single word-sized value?
+      auto argSchema = IGF.IGM.getTypeInfo(i->getArgument(0)->getType())
+                          .getSchema();
+      if (argSchema.size() != 1)
+        return false;
+        
+      if (argSchema[0].getScalarType()->getPrimitiveSizeInBits()
+            != IGF.IGM.getPointerSize().getValueInBits())
+        return false;
+      
+      return true;
+    }
+    default:
+      return false;
+    }
+  } else {
+    // An escaping closure argument's convention should match the callee
+    // convention of the result.
+    if (resultTy->getCalleeConvention() != appliedParam.getConvention()) {
+      return false;
+    }
+    assert(!isIndirectFormalParameter(resultTy->getCalleeConvention()));
+    
+    auto &argInfo = IGF.IGM.getTypeInfo(i->getArgument(0)->getType());
+    
+    if (!argInfo.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal))
+      return false;
+    
+    return true;
+  }
+}
+
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   SILValue v(i);
+
+  if (isSimplePartialApply(*this, i)) {
+    Explosion function;
+    
+    auto schema = IGM.getTypeInfo(v->getType()).getSchema();
+    assert(schema.size() == 2);
+    auto calleeTy = schema[0].getScalarType();
+    auto contextTy = schema[1].getScalarType();
+    
+    auto callee = getLoweredExplosion(i->getCallee());
+    auto calleeValue = callee.claimNext();
+    assert(callee.empty());
+    calleeValue = Builder.CreateBitOrPointerCast(calleeValue, calleeTy);
+    function.add(calleeValue);
+
+    Explosion context;
+    for (auto arg : i->getArguments()) {
+      auto &value = getLoweredValue(arg);
+      
+      if (value.isAddress()) {
+        context.add(value.getAnyAddress().getAddress());
+      } else {
+        getLoweredExplosion(arg, context);
+      }
+    }
+    auto contextValue = context.claimNext();
+    assert(context.empty());
+    contextValue = Builder.CreateBitOrPointerCast(contextValue, contextTy);
+    function.add(contextValue);
+    
+    setLoweredExplosion(v, function);
+    return;
+  }
+  
 
   // NB: We collect the arguments under the substituted type.
   auto args = i->getArguments();

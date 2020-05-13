@@ -3018,11 +3018,6 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
       cast<llvm::GlobalValue>(entry), entity);
     return {gotEquivalent, ConstantReference::Indirect};
   };
-  
-  // The integrated REPL incrementally adds new definitions, so always use
-  // indirect references in this mode.
-  if (IRGen.Opts.IntegratedREPL)
-    return indirect();
 
   // Dynamically replaceable function keys are stored in the GlobalVars
   // table, but they don't have an associated Decl, so they require

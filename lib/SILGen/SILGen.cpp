@@ -840,8 +840,8 @@ void SILGenModule::emitDifferentiabilityWitness(
   SILDifferentiabilityWitnessKey key{originalFunction->getName(), silConfig};
   auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
   if (!diffWitness) {
-    // Strip external from linkage of original function.
-    // Necessary for Clang-imported functions, which have external linkage.
+    // Differentiability witnesses have the same linkage as the original
+    // function, stripping external.
     auto linkage = stripExternalFromLinkage(originalFunction->getLinkage());
     diffWitness = SILDifferentiabilityWitness::createDefinition(
         M, linkage, originalFunction, silConfig.parameterIndices,
@@ -1861,6 +1861,11 @@ public:
 std::unique_ptr<SILModule>
 SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
                                   SILGenDescriptor desc) const {
+  // If we have a .sil file to parse, defer to the parsing request.
+  if (desc.getSourceFileToParse()) {
+    return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
+  }
+
   auto *unit = desc.context.get<FileUnit *>();
   auto *mod = unit->getParentModule();
   auto M = std::unique_ptr<SILModule>(
@@ -1880,6 +1885,11 @@ SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
 std::unique_ptr<SILModule>
 SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
                                    SILGenDescriptor desc) const {
+  // If we have a .sil file to parse, defer to the parsing request.
+  if (desc.getSourceFileToParse()) {
+    return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
+  }
+
   auto *mod = desc.context.get<ModuleDecl *>();
   auto M = std::unique_ptr<SILModule>(
       new SILModule(mod, desc.conv, desc.opts, mod, /*wholeModule*/ true));

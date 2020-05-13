@@ -279,6 +279,7 @@ extension Array where Element: Differentiable {
 //===----------------------------------------------------------------------===//
 
 extension Array where Element: Differentiable {
+  @inlinable
   @differentiable(wrt: (self, initialResult))
   public func differentiableReduce<Result: Differentiable>(
     _ initialResult: Result,
@@ -287,7 +288,7 @@ extension Array where Element: Differentiable {
     reduce(initialResult, nextPartialResult)
   }
 
-  @usableFromInline
+  @inlinable
   @derivative(of: differentiableReduce)
   internal func _vjpDifferentiableReduce<Result: Differentiable>(
     _ initialResult: Result,
@@ -327,6 +328,7 @@ extension Array where Element: Differentiable {
 }
 
 extension Array where Element: Differentiable {
+  @inlinable
   @differentiable(wrt: self)
   public func differentiableMap<Result: Differentiable>(
     _ body: @differentiable (Element) -> Result
@@ -334,7 +336,7 @@ extension Array where Element: Differentiable {
     map(body)
   }
 
-  @usableFromInline
+  @inlinable
   @derivative(of: differentiableMap)
   internal func _vjpDifferentiableMap<Result: Differentiable>(
     _ body: @differentiable (Element) -> Result

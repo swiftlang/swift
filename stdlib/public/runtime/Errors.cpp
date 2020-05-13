@@ -40,7 +40,6 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 
 #if defined(_MSC_VER)
@@ -150,7 +149,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   // library name here. Avoid using StringRef::rsplit because its definition
   // is not provided in the header so that it requires linking with
   // libSupport.a.
-  StringRef libraryName = StringRef(syminfo.fileName);
+  llvm::StringRef libraryName{syminfo.fileName};
   libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.
@@ -376,10 +375,7 @@ static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
 }
 
 // Report a fatal error to system console, stderr, and crash logs, then abort.
-LLVM_ATTRIBUTE_NORETURN
-void
-swift::fatalError(uint32_t flags, const char *format, ...)
-{
+SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
   va_list args;
   va_start(args, format);
 
@@ -419,14 +415,10 @@ swift::warning(uint32_t flags, const char *format, ...)
 }
 
 // Crash when a deleted method is called by accident.
-SWIFT_RUNTIME_EXPORT
-LLVM_ATTRIBUTE_NORETURN
-void
-swift_deletedMethodError() {
+SWIFT_RUNTIME_EXPORT SWIFT_NORETURN void swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "Fatal error: Call of deleted method\n");
 }
-
 
 // Crash due to a retain count overflow.
 // FIXME: can't pass the object's address from InlineRefCounts without hacks

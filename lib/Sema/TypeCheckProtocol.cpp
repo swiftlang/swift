@@ -5582,6 +5582,7 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return nullptr;
   // SWIFT_ENABLE_TENSORFLOW END
   }
+  llvm_unreachable("unknown derivable protocol kind");
 }
 
 Type TypeChecker::deriveTypeWitness(DeclContext *DC,

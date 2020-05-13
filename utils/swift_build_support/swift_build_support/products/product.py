@@ -61,7 +61,7 @@ class Product(object):
     def is_swiftpm_unified_build_product(cls):
         """is_swiftpm_unified_build_product -> bool
 
-        Whether this product should be build in the unified build of SwiftPM
+        Whether this product should be built in the unified build of SwiftPM
         products.
         """
         return False

@@ -25,6 +25,7 @@ struct LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::ErrorBehaviorKind {
     PrintMessage = 2,
     Assert = 4,
     ReturnFalseOnLeak = 8,
+    StoreNonConsumingUsesOutsideLifetime = 16,
     PrintMessageAndReturnFalse = PrintMessage | ReturnFalse,
     PrintMessageAndAssert = PrintMessage | Assert,
     ReturnFalseOnLeakAssertOtherwise = ReturnFalseOnLeak | Assert,
@@ -32,6 +33,14 @@ struct LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::ErrorBehaviorKind {
 
   ErrorBehaviorKind() : Value(Invalid) {}
   ErrorBehaviorKind(inner_t Inner) : Value(Inner) { assert(Value != Invalid); }
+  ErrorBehaviorKind(unsigned Inner) : Value(inner_t(Inner)) {
+    assert(Value != Invalid);
+  }
+
+  bool shouldStoreNonConsumingUsesOutsideLifetime() const {
+    assert(Value != Invalid);
+    return Value & StoreNonConsumingUsesOutsideLifetime;
+  }
 
   bool shouldAssert() const {
     assert(Value != Invalid);
@@ -60,12 +69,14 @@ class LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::Error {
   bool foundUseAfterFree = false;
   bool foundLeak = false;
   bool foundOverConsume = false;
+  bool foundUseOutsideOfLifetime = false;
 
 public:
   Error() {}
 
   bool getFoundError() const {
-    return foundUseAfterFree || foundLeak || foundOverConsume;
+    return foundUseAfterFree || foundLeak || foundOverConsume ||
+           foundUseOutsideOfLifetime;
   }
 
   bool getFoundLeak() const { return foundLeak; }
@@ -73,6 +84,10 @@ public:
   bool getFoundUseAfterFree() const { return foundUseAfterFree; }
 
   bool getFoundOverConsume() const { return foundOverConsume; }
+
+  bool getFoundUseOutsideOfLifetime() const {
+    return foundUseOutsideOfLifetime;
+  }
 };
 
 class LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::ErrorBuilder {
@@ -160,6 +175,15 @@ public:
   bool
   handleMalformedSIL(llvm::function_ref<void()> &&messagePrinterFunc) const {
     return handleError(std::move(messagePrinterFunc));
+  }
+
+  /// Handle a case where we either found a use-after-free due to a
+  /// non-consuming use after our lifetime has ended /or/ if we found a use
+  /// before def of a non consuming value.
+  void
+  handleUseOutsideOfLifetime(llvm::function_ref<void()> &&messagePrinterFunc) {
+    error->foundUseOutsideOfLifetime = true;
+    handleError(std::move(messagePrinterFunc));
   }
 
 private:

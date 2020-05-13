@@ -125,6 +125,7 @@ KNOWN_SETTINGS=(
     skip-build-benchmarks                         ""                "set to skip building Swift Benchmark Suite"
     skip-build-clang-tools-extra                  ""                "set to skip building clang-tools-extra as part of llvm"
     skip-build-compiler-rt                        ""                "set to skip building Compiler-RT"
+    skip-build-lld                                ""                "set to skip building lld as part of llvm (linux only)"
     skip-build-cygwin                             ""                "set to skip building Swift stdlibs for Cygwin"
     skip-build-external-benchmarks                "1"               "set to skip building the external Swift Benchmark Suite. (skipped by default)"
     skip-build-freebsd                            ""                "set to skip building Swift stdlibs for FreeBSD"
@@ -1492,6 +1493,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
+                    -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     -DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON
@@ -1508,12 +1510,20 @@ for host in "${ALL_HOSTS[@]}"; do
                     llvm_enable_projects+=("clang-tools-extra")
                 fi
 
-                cmake_options+=(
-                    -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
-                )
+                # On non-Darwin platforms, build lld so we can always have a
+                # linker that is compatible with the swift we are using to
+                # compile the stdlib.
+                #
+                # This makes it easier to build target stdlibs on systems that
+                # have old toolchains without more modern linker features.
+                if [[ "$(uname -s)" != "Darwin" ]] ; then
+                    if [[ ! "${SKIP_BUILD_LLD}" ]]; then
+                        llvm_enable_projects+=("lld")
+                    fi
+                fi
 
                 cmake_options+=(
-                  -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
+                    -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
                 )
 
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
@@ -1614,7 +1624,6 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     # Don't build benchmarks and tests when building cross compiler.
                     build_perf_testsuite_this_time=false
-                    build_external_perf_testsuite_this_time=false
                     build_tests_this_time=false
 
                     native_llvm_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
@@ -1623,7 +1632,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 else
                     # FIXME: Why is the next line not using false_true?
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
-                    build_external_perf_testsuite_this_time=$(false_true "${SKIP_BUILD_EXTERNAL_BENCHMARKS}")
                     build_tests_this_time=${SWIFT_INCLUDE_TESTS}
                 fi
 
@@ -1691,7 +1699,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_SDK_OVERLAY}")
                     -DSWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_STATIC_SDK_OVERLAY}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
-                    -DSWIFT_BUILD_EXTERNAL_PERF_TESTSUITE:BOOL=$(true_false "${build_external_perf_testsuite_this_time}")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")

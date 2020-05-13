@@ -353,10 +353,6 @@ Type getIntType(ASTContext &ctx);
 Type getInt8Type(ASTContext &ctx);
 Type getUInt8Type(ASTContext &ctx);
 
-/// Try to resolve an IdentTypeRepr, returning either the referenced
-/// Type or an ErrorType in case of error.
-Type resolveIdentifierType(TypeResolution resolution, IdentTypeRepr *IdType);
-
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
@@ -573,8 +569,6 @@ Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
                                Type paramType, bool isAutoClosure);
 
 void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
-
-void processREPLTopLevel(SourceFile &SF);
 
 void typeCheckDecl(Decl *D);
 

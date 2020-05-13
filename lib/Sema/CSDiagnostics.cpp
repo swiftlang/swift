@@ -5882,6 +5882,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
     case PTK_AutoreleasingUnsafeMutablePointer:
       return None;
     }
+    llvm_unreachable("invalid pointer kind");
   };
 
   // First emit a note about the implicit conversion only lasting for the
@@ -6263,5 +6264,12 @@ bool KeyPathRootTypeMismatchFailure::diagnoseAsError() {
 
   emitDiagnostic(diag::expr_keypath_root_type_mismatch,
                  rootType, baseType);
+  return true;
+}
+
+bool MultiArgFuncKeyPathFailure::diagnoseAsError() {
+  // Diagnose use a keypath where a function with multiple arguments is expected
+  emitDiagnostic(diag::expr_keypath_multiparam_func_conversion,
+                 resolveType(functionType));
   return true;
 }

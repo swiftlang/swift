@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/Debug.h"
 
 namespace swift {
 namespace autodiff {
@@ -165,6 +166,7 @@ public:
       break;
     }
   }
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); };
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

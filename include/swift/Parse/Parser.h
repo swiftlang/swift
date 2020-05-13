@@ -494,13 +494,7 @@ public:
     ~BacktrackingScope();
     bool willBacktrack() const { return Backtrack; }
 
-    void cancelBacktrack() {
-      Backtrack = false;
-      SynContext->setTransparent();
-      SynContext.reset();
-      DT.commit();
-      TempReceiver.shouldTransfer = true;
-    }
+    void cancelBacktrack();
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -888,7 +882,8 @@ public:
   void parseTopLevel(SmallVectorImpl<Decl *> &decls);
 
   /// Parse the top-level SIL decls into the SIL module.
-  void parseTopLevelSIL();
+  /// \returns \c true if there was a parsing error.
+  bool parseTopLevelSIL();
 
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {

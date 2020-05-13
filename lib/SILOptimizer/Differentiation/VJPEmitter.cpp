@@ -174,7 +174,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     SILParameterInfo inoutParamTanParam(
         origResult.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()->getCanonicalType(witnessCanGenSig),
+            ->getType()
+            ->getCanonicalType(witnessCanGenSig),
         inoutParamTanConvention);
     pbParams.push_back(inoutParamTanParam);
   } else {
@@ -184,7 +185,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     pbParams.push_back(getTangentParameterInfoForOriginalResult(
         origResult.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()->getCanonicalType(witnessCanGenSig),
+            ->getType()
+            ->getCanonicalType(witnessCanGenSig),
         origResult.getConvention()));
   }
 
@@ -192,7 +194,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // returned pullback's closure context.
   auto *origExit = &*original->findReturnBB();
   auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
-  auto pbStructType = pbStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
+  auto pbStructType =
+      pbStruct->getDeclaredInterfaceType()->getCanonicalType(witnessCanGenSig);
   pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
 
   // Add pullback results for the requested wrt parameters.
@@ -205,7 +208,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
     adjResults.push_back(getTangentResultInfoForOriginalParameter(
         origParam.getInterfaceType()
             ->getAutoDiffTangentSpace(lookupConformance)
-            ->getType()->getCanonicalType(witnessCanGenSig),
+            ->getType()
+            ->getCanonicalType(witnessCanGenSig),
         origParam.getConvention()));
   }
 
@@ -275,8 +279,8 @@ void VJPEmitter::visitSILInstruction(SILInstruction *inst) {
 
 SILType VJPEmitter::getLoweredType(Type type) {
   auto vjpGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
-  Lowering::AbstractionPattern pattern(
-      vjpGenSig, type->getCanonicalType(vjpGenSig));
+  Lowering::AbstractionPattern pattern(vjpGenSig,
+                                       type->getCanonicalType(vjpGenSig));
   return vjp->getLoweredType(pattern, type);
 }
 
@@ -490,9 +494,8 @@ void VJPEmitter::visitSwitchEnumInstBase(SwitchEnumInstBase *sei) {
                                   newDefaultBB, caseBBs);
     break;
   case SILInstructionKind::SwitchEnumAddrInst:
-    getBuilder().createSwitchEnumAddr(sei->getLoc(),
-                                      getOpValue(sei->getOperand()),
-                                      newDefaultBB, caseBBs);
+    getBuilder().createSwitchEnumAddr(
+        sei->getLoc(), getOpValue(sei->getOperand()), newDefaultBB, caseBBs);
     break;
   default:
     llvm_unreachable("Expected `switch_enum` or `switch_enum_addr`");
@@ -508,14 +511,35 @@ void VJPEmitter::visitSwitchEnumAddrInst(SwitchEnumAddrInst *seai) {
 }
 
 void VJPEmitter::visitApplyInst(ApplyInst *ai) {
-  // If the function should not be differentiated or its the array literal
-  // initialization intrinsic, just do standard cloning.
-  if (!pullbackInfo.shouldDifferentiateApplySite(ai) ||
-      isArrayLiteralIntrinsic(ai)) {
+  // If callee should not be differentiated, do standard cloning.
+  if (!pullbackInfo.shouldDifferentiateApplySite(ai)) {
     LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
     TypeSubstCloner::visitApplyInst(ai);
     return;
   }
+  // If callee is the array literal initialization intrinsic, do standard
+  // cloning. Array literal differentiation is handled separately.
+  if (isArrayLiteralIntrinsic(ai)) {
+    LLVM_DEBUG(getADDebugStream() << "Cloning array literal intrinsic `apply`\n"
+                                  << *ai << '\n');
+    TypeSubstCloner::visitApplyInst(ai);
+    return;
+  }
+  // If the original function is a semantic member accessor, do standard
+  // cloning. Semantic member accessors have special pullback generation logic,
+  // so all `apply` instructions can be directly cloned to the VJP.
+  if (isSemanticMemberAccessor(original)) {
+    LLVM_DEBUG(getADDebugStream()
+               << "Cloning `apply` in semantic member accessor:\n"
+               << *ai << '\n');
+    TypeSubstCloner::visitApplyInst(ai);
+    return;
+  }
+
+  auto loc = ai->getLoc();
+  auto &builder = getBuilder();
+  auto origCallee = getOpValue(ai->getCallee());
+  auto originalFnTy = origCallee->getType().castTo<SILFunctionType>();
 
   LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *ai << '\n');
 
@@ -555,31 +579,27 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
                        activeParamIndices));
 
   // Emit the VJP.
-  auto loc = ai->getLoc();
-  auto &builder = getBuilder();
-  auto original = getOpValue(ai->getCallee());
   SILValue vjpValue;
   // If functionSource is a `@differentiable` function, just extract it.
-  auto originalFnTy = original->getType().castTo<SILFunctionType>();
   if (originalFnTy->isDifferentiable()) {
     auto paramIndices = originalFnTy->getDifferentiabilityParameterIndices();
     for (auto i : indices.parameters->getIndices()) {
       if (!paramIndices->contains(i)) {
         context.emitNondifferentiabilityError(
-            original, invoker,
+            origCallee, invoker,
             diag::autodiff_function_noderivative_parameter_not_differentiable);
         errorOccurred = true;
         return;
       }
     }
-    auto origFnType = original->getType().castTo<SILFunctionType>();
+    auto origFnType = origCallee->getType().castTo<SILFunctionType>();
     auto origFnUnsubstType = origFnType->getUnsubstitutedType(getModule());
     if (origFnType != origFnUnsubstType) {
-      original = builder.createConvertFunction(
-          loc, original, SILType::getPrimitiveObjectType(origFnUnsubstType),
+      origCallee = builder.createConvertFunction(
+          loc, origCallee, SILType::getPrimitiveObjectType(origFnUnsubstType),
           /*withoutActuallyEscaping*/ false);
     }
-    auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, original);
+    auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, origCallee);
     vjpValue = builder.createDifferentiableFunctionExtract(
         loc, NormalDifferentiableFunctionTypeComponent::VJP, borrowedDiffFunc);
     vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
@@ -621,7 +641,7 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
         }
         if (!remappedResultType.isDifferentiable(getModule())) {
           context.emitNondifferentiabilityError(
-              original, invoker, diag::autodiff_nondifferentiable_result);
+              origCallee, invoker, diag::autodiff_nondifferentiable_result);
           errorOccurred = true;
           return true;
         }
@@ -642,7 +662,7 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     /*
     DifferentiationInvoker indirect(ai, attr);
     auto insertion =
-        context.getInvokers().try_emplace({this->original, attr}, indirect);
+        context.getInvokers().try_emplace({original, attr}, indirect);
     auto &invoker = insertion.first->getSecond();
     invoker = indirect;
     */
@@ -653,21 +673,21 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
     // function operand is specialized with a remapped version of same
     // substitution map using an argument-less `partial_apply`.
     if (ai->getSubstitutionMap().empty()) {
-      original = builder.emitCopyValueOperation(loc, original);
+      origCallee = builder.emitCopyValueOperation(loc, origCallee);
     } else {
       auto substMap = getOpSubstitutionMap(ai->getSubstitutionMap());
       auto vjpPartialApply = getBuilder().createPartialApply(
-          ai->getLoc(), original, substMap, {},
+          ai->getLoc(), origCallee, substMap, {},
           ParameterConvention::Direct_Guaranteed);
-      original = vjpPartialApply;
-      originalFnTy = original->getType().castTo<SILFunctionType>();
+      origCallee = vjpPartialApply;
+      originalFnTy = origCallee->getType().castTo<SILFunctionType>();
       // Diagnose if new original function type is non-differentiable.
       if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy))
         return;
     }
 
     auto *diffFuncInst = context.createDifferentiableFunction(
-        getBuilder(), loc, indices.parameters, original);
+        getBuilder(), loc, indices.parameters, origCallee);
 
     // Record the `differentiable_function` instruction.
     context.addDifferentiableFunctionInstToWorklist(diffFuncInst);

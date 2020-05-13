@@ -106,6 +106,7 @@ ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) {
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
+  llvm_unreachable("invalid dependency kind");
 }
 
 const llvm::StringMap<ModuleDependencies> &
@@ -117,6 +118,7 @@ ModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) const {
   case ModuleDependenciesKind::Clang:
     return ClangModuleDependencies;
   }
+  llvm_unreachable("invalid dependency kind");
 }
 
 bool ModuleDependenciesCache::hasDependencies(

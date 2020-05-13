@@ -549,6 +549,13 @@ constructCacheValue(SILValue initialValue,
       continue;
     }
 
+    if (auto *si = dyn_cast<StoreInst>(user)) {
+      // We must be the dest since addresses can not be stored.
+      assert(si->getDest() == op->get());
+      wellBehavedWriteAccumulator.push_back(op);
+      continue;
+    }
+
     // Add any destroy_addrs to the resultAccumulator.
     if (isa<DestroyAddrInst>(user)) {
       wellBehavedWriteAccumulator.push_back(op);
@@ -560,14 +567,18 @@ constructCacheValue(SILValue initialValue,
       continue;
     }
 
-    // Look through immutable begin_access.
+    // Look through begin_access and mark them/their end_borrow as users.
     if (auto *bai = dyn_cast<BeginAccessInst>(user)) {
-      // If we do not have a read, mark this as a write.
+      // If we do not have a read, mark this as a write. Also, insert our
+      // end_access as well.
       if (bai->getAccessKind() != SILAccessKind::Read) {
         wellBehavedWriteAccumulator.push_back(op);
+        transform(bai->getUsersOfType<EndAccessInst>(),
+                  std::back_inserter(wellBehavedWriteAccumulator),
+                  [](EndAccessInst *eai) { return &eai->getAllOperands()[0]; });
       }
 
-      // Otherwise, add the users to the worklist and continue.
+      // And then add the users to the worklist and continue.
       llvm::copy(bai->getUses(), std::back_inserter(worklist));
       continue;
     }
@@ -580,17 +591,31 @@ constructCacheValue(SILValue initialValue,
       continue;
     }
 
-    // If we have a FullApplySite, see if we use the value as an
-    // indirect_guaranteed parameter. If we use it as inout, we need
-    // interprocedural analysis that we do not perform here.
+    // If we have a FullApplySite, we need to do per convention/inst logic.
     if (auto fas = FullApplySite::isa(user)) {
+      // Begin by seeing if we have an in_guaranteed use. If we do, we are done.
       if (fas.getArgumentConvention(*op) ==
           SILArgumentConvention::Indirect_In_Guaranteed) {
         continue;
       }
 
+      // Then see if we have an apply site that is not a coroutine apply
+      // site. In such a case, without further analysis, we can treat it like an
+      // instantaneous write and validate that it doesn't overlap with our load
+      // [copy].
+      if (!fas.beginsCoroutineEvaluation() &&
+          fas.getArgumentConvention(*op).isInoutConvention()) {
+        wellBehavedWriteAccumulator.push_back(op);
+        continue;
+      }
+
       // Otherwise, be conservative and return that we had a write that we did
       // not understand.
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Function: " << user->getFunction()->getName() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Value: " << op->get());
+      LLVM_DEBUG(llvm::dbgs() << "Unhandled apply site!: " << *user);
+
       return false;
     }
 
@@ -1695,7 +1720,15 @@ public:
     // If we have a modify, check if our value is /ever/ written to. If it is
     // never actually written to, then we convert to a load_borrow.
     auto result = ARCOpt.addressToExhaustiveWriteListCache.get(access);
-    return answer(!result.hasValue() || result.getValue().size());
+    if (!result.hasValue()) {
+      return answer(true);
+    }
+
+    if (result.getValue().empty()) {
+      return answer(false);
+    }
+
+    return answer(true);
   }
   
   void visitArgumentAccess(SILFunctionArgument *arg) {
@@ -1708,8 +1741,63 @@ public:
     // If we have an inout parameter that isn't ever actually written to, return
     // false.
     if (arg->getKnownParameterInfo().isIndirectMutating()) {
-      auto result = ARCOpt.addressToExhaustiveWriteListCache.get(arg);
-      return answer(!result.hasValue() || result.getValue().size());
+      auto wellBehavedWrites =
+          ARCOpt.addressToExhaustiveWriteListCache.get(arg);
+      if (!wellBehavedWrites.hasValue()) {
+        return answer(true);
+      }
+
+      // No writes.
+      if (wellBehavedWrites->empty()) {
+        return answer(false);
+      }
+
+      // Ok, we have some writes. See if any of them are within our live
+      // range. If any are, we definitely can not promote to load_borrow.
+      SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+      SmallVector<BeginAccessInst *, 16> foundBeginAccess;
+      LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+      SILValue introducerValue = liveRange.getIntroducer().value;
+      if (!checker.usesNotContainedWithinLifetime(introducerValue,
+                                                  liveRange.getDestroyingUses(),
+                                                  *wellBehavedWrites)) {
+        return answer(true);
+      }
+
+      // Finally, check if our live range is strictly contained within any of
+      // our scoped writes.
+      SmallVector<Operand *, 16> endAccessList;
+      for (Operand *use : *wellBehavedWrites) {
+        auto *bai = dyn_cast<BeginAccessInst>(use->getUser());
+        if (!bai) {
+          continue;
+        }
+
+        endAccessList.clear();
+        llvm::transform(
+            bai->getUsersOfType<EndAccessInst>(),
+            std::back_inserter(endAccessList),
+            [](EndAccessInst *eai) { return &eai->getAllOperands()[0]; });
+        visitedBlocks.clear();
+
+        // We know that our live range is based on a load [copy], so we know
+        // that our value must have a defining inst.
+        auto *definingInst =
+            cast<LoadInst>(introducerValue->getDefiningInstruction());
+
+        // Then if our defining inst is not in our bai, endAccessList region, we
+        // know that the two ranges must be disjoint, so continue.
+        if (!checker.validateLifetime(bai, endAccessList,
+                                      &definingInst->getAllOperands()[0])) {
+          continue;
+        }
+
+        // Otherwise, we do have an overlap, return true.
+        return answer(true);
+      }
+
+      // Otherwise, there isn't an overlap, so we don't write to it.
+      return answer(false);
     }
 
     // TODO: This should be extended:

@@ -155,6 +155,7 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   case AnyFunctionType::Representation::Thin:
     llvm_unreachable("Expected a C-compatible representation.");
   }
+  llvm_unreachable("invalid representation");
 }
 
 clang::QualType ClangTypeConverter::convertMemberType(NominalTypeDecl *DC,

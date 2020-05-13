@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -127,7 +127,7 @@ public struct Slice<Base: Collection> {
   ///
   ///     print(singleNonZeroDigits.count)
   ///     // Prints "9"
-  ///     prints(singleNonZeroDigits.base.count)
+  ///     print(singleNonZeroDigits.base.count)
   ///     // Prints "10"
   ///     print(singleDigits == singleNonZeroDigits.base)
   ///     // Prints "true"
@@ -337,7 +337,7 @@ extension Slice: RangeReplaceableCollection
     let newSliceCount =
       _base.distance(from: _startIndex, to: subRange.lowerBound)
       + _base.distance(from: subRange.upperBound, to: _endIndex)
-      + (numericCast(newElements.count) as Int)
+      + newElements.count
     _base.replaceSubrange(subRange, with: newElements)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -400,7 +400,7 @@ extension Slice
       let newSliceCount =
         _base.distance(from: _startIndex, to: subRange.lowerBound)
         + _base.distance(from: subRange.upperBound, to: _endIndex)
-        + (numericCast(newElements.count) as Int)
+        + newElements.count
       _base.replaceSubrange(subRange, with: newElements)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -409,7 +409,7 @@ extension Slice
       let lastValidIndex = _base.index(before: subRange.lowerBound)
       let newEndIndexOffset =
         _base.distance(from: subRange.upperBound, to: _endIndex)
-        + (numericCast(newElements.count) as Int) + 1
+        + newElements.count + 1
       _base.replaceSubrange(subRange, with: newElements)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
@@ -443,7 +443,7 @@ extension Slice
   where S: Collection, S.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
-      let newSliceCount = count + numericCast(newElements.count)
+      let newSliceCount = count + newElements.count
       _base.insert(contentsOf: newElements, at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -452,7 +452,7 @@ extension Slice
       let lastValidIndex = _base.index(before: i)
       let newEndIndexOffset =
         _base.distance(from: i, to: _endIndex)
-        + numericCast(newElements.count) + 1
+        + newElements.count + 1
       _base.insert(contentsOf: newElements, at: i)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)

@@ -1059,6 +1059,10 @@ public:
 
   /// Retrieve the IRGen specific SIL passes.
   SILTransformCtors getIRGenSILTransforms() const;
+  
+  /// Check whether a given string would be considered "pure ASCII" by the
+  /// standard library's String implementation.
+  bool isASCIIString(StringRef s) const;
 
 private:
   friend Decl;

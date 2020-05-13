@@ -126,8 +126,8 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   auto originalFnTy = original->getLoweredFunctionType();
   auto numResults = originalFnTy->getNumResults() +
                     originalFnTy->getNumIndirectMutatingParameters();
-  auto *resultIndices = IndexSubset::get(
-      original->getASTContext(), numResults, indices.source);
+  auto *resultIndices =
+      IndexSubset::get(original->getASTContext(), numResults, indices.source);
   auto *parameterIndices = indices.parameters;
   AutoDiffConfig config(parameterIndices, resultIndices, genericSig);
   auto enumName = mangler.mangleAutoDiffGeneratedDeclaration(
@@ -199,8 +199,8 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   auto originalFnTy = original->getLoweredFunctionType();
   auto numResults = originalFnTy->getNumResults() +
                     originalFnTy->getNumIndirectMutatingParameters();
-  auto *resultIndices = IndexSubset::get(
-      original->getASTContext(), numResults, indices.source);
+  auto *resultIndices =
+      IndexSubset::get(original->getASTContext(), numResults, indices.source);
   auto *parameterIndices = indices.parameters;
   AutoDiffConfig config(parameterIndices, resultIndices, genericSig);
   auto structName = mangler.mangleAutoDiffGeneratedDeclaration(
@@ -407,6 +407,11 @@ void LinearMapInfo::generateDifferentiationDataStructures(
         traceEnum->getDeclaredInterfaceType());
     linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
   }
+
+  // Do not add linear map fields for semantic member accessors, which have
+  // special-case pullback generation. Linear map structs should be empty.
+  if (isSemanticMemberAccessor(original))
+    return;
 
   // Add linear map fields to the linear map structs.
   for (auto &origBB : *original) {

@@ -888,7 +888,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.setInputKind(InputFileKind::SwiftREPL);
+  Invocation.setInputKind(InputFileKind::Swift);
 
   CompilerInstance CI;
 
@@ -897,13 +897,21 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  auto &ctx = CI.getASTContext();
+  registerIDERequestFunctions(ctx.evaluator);
 
-  SourceFile &SF = CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL);
+  // Create an initial empty SourceFile. This only exists to feed in the
+  // implicit stdlib import.
+  ImplicitImportInfo importInfo;
+  importInfo.StdlibKind = ImplicitStdlibKind::Stdlib;
+  auto *M = ModuleDecl::create(ctx.getIdentifier(Invocation.getModuleName()),
+                               ctx, importInfo);
+  auto *SF = new (ctx) SourceFile(*M, SourceFileKind::Main, /*BufferID*/ None);
+  M->addFile(*SF);
+  performImportResolution(*SF);
 
   REPLCompletions REPLCompl;
-  REPLCompl.populate(SF, BufferText);
+  REPLCompl.populate(*SF, BufferText);
   llvm::outs() << "Begin completions\n";
   for (StringRef S : REPLCompl.getCompletionList()) {
     llvm::outs() << S << "\n";
@@ -1656,7 +1664,7 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
   if (isSourceInputComplete(std::move(FileBuf),
-                            SourceFileKind::REPL).IsComplete) {
+                            SourceFileKind::Main).IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";

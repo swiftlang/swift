@@ -1132,11 +1132,10 @@ bb0(%0 : $*NativeObjectPair):
   return %9999 : $()
 }
 
-// We should be able to handle this, but we can not until we teach the ARC
-// optimizer to avoid writes not within the load [copy] region.
+// We can handle this since the store is outside of our region.
 //
 // CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_3 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
-// CHECK: load [copy]
+// CHECK: load_borrow
 // CHECK: } // end sil function 'inout_argument_never_written_to_3'
 sil [ossa] @inout_argument_never_written_to_3 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
@@ -1146,6 +1145,322 @@ bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
   apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %3 : $Builtin.NativeObject
   store %1 to [assign] %2 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We cannot handle this since the store is inside of our region.
+//
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_4 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_4'
+sil [ossa] @inout_argument_never_written_to_4 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  store %1 to [assign] %2 : $*Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We cannot handle this since the store is inside of our region.
+//
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_4a : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_4a'
+sil [ossa] @inout_argument_never_written_to_4a : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  store %1 to [assign] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can handle this since the store is outside of our region.
+//
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_5 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+// CHECK: load_borrow
+// CHECK: } // end sil function 'inout_argument_never_written_to_5'
+sil [ossa] @inout_argument_never_written_to_5 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  store %1 to [assign] %2 : $*Builtin.NativeObject
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can handle this since the store is outside of our region.
+//
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_6 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+// CHECK: load_borrow
+// CHECK: } // end sil function 'inout_argument_never_written_to_6'
+sil [ossa] @inout_argument_never_written_to_6 : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  store %1 to [assign] %2 : $*Builtin.NativeObject
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can handle this since the store is outside of our region.
+//
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_6a : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+// CHECK: load_borrow
+// CHECK: } // end sil function 'inout_argument_never_written_to_6a'
+sil [ossa] @inout_argument_never_written_to_6a : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  br bb0a
+
+bb0a:
+  store %1 to [assign] %2 : $*Builtin.NativeObject
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can handle this since the store is outside of our region.
+//
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_6b : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+// CHECK: load_borrow
+// CHECK: } // end sil function 'inout_argument_never_written_to_6b'
+sil [ossa] @inout_argument_never_written_to_6b : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  store %1 to [assign] %2 : $*Builtin.NativeObject
+  br bb0a
+
+bb0a:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can handle this since the store is outside of our region.
+//
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_6c : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+// CHECK: load_borrow
+// CHECK: } // end sil function 'inout_argument_never_written_to_6c'
+sil [ossa] @inout_argument_never_written_to_6c : $@convention(thin) (@inout NativeObjectPair, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @owned $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %1a = copy_value %1 : $Builtin.NativeObject
+  store %1 to [assign] %2 : $*Builtin.NativeObject
+  br bb0a
+
+bb0a:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %3 : $Builtin.NativeObject
+  store %1a to [assign] %2 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This case, we can not optimize since the write scope is created around our entire load [copy].
+//
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_begin_access_1 : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_begin_access_1'
+sil [ossa] @inout_argument_never_written_to_begin_access_1 : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %2a = begin_access [modify] [static] %2 : $*Builtin.NativeObject
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  end_access %2a : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_begin_access_1a : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_begin_access_1a'
+sil [ossa] @inout_argument_never_written_to_begin_access_1a : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %2a = begin_access [modify] [static] %2 : $*Builtin.NativeObject
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_access %2a : $*Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_begin_access_1b : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_begin_access_1b'
+sil [ossa] @inout_argument_never_written_to_begin_access_1b : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %2a = begin_access [modify] [static] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_access %2a : $*Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_begin_access_1c : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_begin_access_1c'
+sil [ossa] @inout_argument_never_written_to_begin_access_1c : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  %2a = begin_access [modify] [static] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  end_access %2a : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_begin_access_2a : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_begin_access_2a'
+sil [ossa] @inout_argument_never_written_to_begin_access_2a : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2a = begin_access [modify] [static] %2 : $*Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  end_access %2a : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %3 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_begin_access_2b : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_begin_access_2b'
+sil [ossa] @inout_argument_never_written_to_begin_access_2b : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  br bb0a
+
+bb0a:
+  %2a = begin_access [modify] [static] %2 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %3 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  end_access %2a : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inout_argument_never_written_to_begin_access_2c : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'inout_argument_never_written_to_begin_access_2c'
+sil [ossa] @inout_argument_never_written_to_begin_access_2c : $@convention(thin) (@inout NativeObjectPair, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*NativeObjectPair, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = struct_element_addr %0 : $*NativeObjectPair, #NativeObjectPair.obj1
+  %2a = begin_access [modify] [static] %2 : $*Builtin.NativeObject
+  br bb0a
+
+bb0a:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %3 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %3 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  end_access %2a : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

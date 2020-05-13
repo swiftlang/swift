@@ -74,8 +74,6 @@ static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #endif
 #include <limits>
 #include <thread>
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/SwiftDtoa.h"
 #include "swift/Basic/Lazy.h"
@@ -83,6 +81,8 @@ static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
 #include "../SwiftShims/LibcShims.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "../SwiftShims/RuntimeStubs.h"
+
+#include "llvm/ADT/StringExtras.h"
 
 static uint64_t uint64ToStringImpl(char *Buffer, uint64_t Value,
                                    int64_t Radix, bool Uppercase,
@@ -310,8 +310,8 @@ swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
   if (LinePtr == nullptr)
     return -1;
 
-  ssize_t Capacity = 0;
-  ssize_t Pos = 0;
+  __swift_ssize_t Capacity = 0;
+  __swift_ssize_t Pos = 0;
   unsigned char *ReadBuf = nullptr;
 
   _lock_file(stdin);
