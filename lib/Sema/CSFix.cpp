@@ -1323,3 +1323,17 @@ AllowKeyPathRootTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator())
       AllowKeyPathRootTypeMismatch(cs, lhs, rhs, locator);
 }
+
+SpecifyKeyPathRootType *
+SpecifyKeyPathRootType::create(ConstraintSystem &cs,
+                               ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      SpecifyKeyPathRootType(cs, locator);
+}
+
+bool SpecifyKeyPathRootType::diagnose(const Solution &solution,
+                                      bool asNote) const {
+  UnableToInferKeyPathRootFailure failure(solution, getLocator());
+  
+  return failure.diagnose(asNote);
+}
