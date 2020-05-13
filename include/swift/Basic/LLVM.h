@@ -34,7 +34,9 @@ namespace llvm {
   class Twine;
   template <typename T> class SmallPtrSetImpl;
   template <typename T, unsigned N> class SmallPtrSet;
+#if !defined(swiftCore_EXPORTS)
   template <typename T> class SmallVectorImpl;
+#endif
   template <typename T, unsigned N> class SmallVector;
   template <unsigned N> class SmallString;
   template <typename T, unsigned N> class SmallSetVector;
@@ -79,7 +81,9 @@ namespace swift {
   using llvm::SmallSetVector;
   using llvm::SmallString;
   using llvm::SmallVector;
+#if !defined(swiftCore_EXPORTS)
   using llvm::SmallVectorImpl;
+#endif
   using llvm::StringLiteral;
   using llvm::StringRef;
   using llvm::TinyPtrVector;
