@@ -157,7 +157,7 @@ func pass(s: StructWithSubobjectPrivateDefaultedDestructor) {
   // CHECK: bb0(%0 : $*StructWithSubobjectPrivateDefaultedDestructor):
 }
 
-// Tests for common sets of special subobjects
+// Tests for common sets of special member functions.
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructTriviallyCopyableMovable)
 func pass(s: StructTriviallyCopyableMovable) {
