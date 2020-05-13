@@ -6273,3 +6273,25 @@ bool MultiArgFuncKeyPathFailure::diagnoseAsError() {
                  resolveType(functionType));
   return true;
 }
+
+bool UnableToInferKeyPathRootFailure::diagnoseAsError() {
+  assert(isExpr<KeyPathExpr>(getAnchor()) && "Expected key path expression");
+  auto &ctx = getASTContext();
+  auto contextualType = getContextualType(getAnchor());
+  auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
+
+  auto emitKeyPathDiagnostic = [&]() {
+    if (contextualType &&
+        contextualType->getAnyNominal() == ctx.getAnyKeyPathDecl()) {
+      return emitDiagnostic(
+          diag::cannot_infer_keypath_root_anykeypath_context);
+    }
+    return emitDiagnostic(
+        diag::cannot_infer_contextual_keypath_type_specify_root);
+  };
+
+  emitKeyPathDiagnostic()
+      .highlight(keyPathExpr->getLoc())
+      .fixItInsertAfter(keyPathExpr->getStartLoc(), "<#Root#>");
+  return true;
+}
