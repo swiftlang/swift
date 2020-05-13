@@ -80,7 +80,7 @@ struct StructWithSubobjectMoveAssignment {
 };
 
 struct StructWithDestructor {
-  ~StructWithDestructor(){};
+  ~StructWithDestructor(){}
 };
 
 struct StructWithInheritedDestructor : StructWithDestructor {};
