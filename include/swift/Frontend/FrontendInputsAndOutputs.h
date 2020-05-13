@@ -174,7 +174,7 @@ public:
 
 private:
   friend class ArgsToFrontendOptionsConverter;
-  friend class ModuleInterfaceBuilder;
+  friend struct InterfaceSubContextDelegateImpl;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);

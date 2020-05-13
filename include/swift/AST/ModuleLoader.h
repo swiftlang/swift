@@ -48,6 +48,7 @@ class ModuleDependenciesCache;
 class NominalTypeDecl;
 class SourceFile;
 class TypeDecl;
+class CompilerInstance;
 
 enum class KnownProtocolKind : uint8_t;
 
@@ -85,13 +86,25 @@ public:
   std::shared_ptr<clang::DependencyCollector> getClangCollector();
 };
 
+struct SubCompilerInstanceInfo {
+  StringRef CompilerVersion;
+  CompilerInstance* Instance;
+};
+
 /// Abstract interface to run an action in a sub ASTContext.
-struct SubASTContextDelegate {
-  virtual bool runInSubContext(ASTContext &ctx, StringRef interfacePath,
-    llvm::function_ref<bool(ASTContext&)> action) {
-    llvm_unreachable("function should be overriden");
-  }
-  virtual ~SubASTContextDelegate() = default;
+struct InterfaceSubContextDelegate {
+  virtual bool runInSubContext(StringRef moduleName,
+                               StringRef interfacePath,
+                               StringRef outputPath,
+                               SourceLoc diagLoc,
+                               llvm::function_ref<bool(ASTContext&)> action) = 0;
+  virtual bool runInSubCompilerInstance(StringRef moduleName,
+                                        StringRef interfacePath,
+                                        StringRef outputPath,
+                                        SourceLoc diagLoc,
+                    llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) = 0;
+
+  virtual ~InterfaceSubContextDelegate() = default;
 };
 
 /// Abstract interface that loads named modules into the AST.
@@ -196,7 +209,8 @@ public:
   /// if no such module exists.
   virtual Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName,
-      ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) = 0;
+      ModuleDependenciesCache &cache,
+      InterfaceSubContextDelegate &delegate) = 0;
 };
 
 } // namespace swift
