@@ -1631,7 +1631,7 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
-    ModuleDependenciesCache &cache, SubASTContextDelegate &delegate) {
+    ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate) {
   for (auto &loader : getImpl().ModuleLoaders) {
     if (isUnderlyingClangModule &&
         loader.get() != getImpl().TheClangModuleLoader)

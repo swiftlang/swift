@@ -371,7 +371,7 @@ public:
 
   Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
-      SubASTContextDelegate &delegate) override;
+      InterfaceSubContextDelegate &delegate) override;
 
   /// Add dependency information for the bridging header.
   ///

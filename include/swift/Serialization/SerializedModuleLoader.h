@@ -195,7 +195,7 @@ public:
 
   virtual Optional<ModuleDependencies> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
-      SubASTContextDelegate &delegate) override;
+      InterfaceSubContextDelegate &delegate) override;
 };
 
 /// Imports serialized Swift modules into an ASTContext.
