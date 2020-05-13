@@ -7663,6 +7663,12 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
     return true;
   };
+  
+  // We have a hole, the solver can't infer the key path type. So let's
+  // just assume this is solved.
+  if (shouldAttemptFixes() && keyPathTy->isHole()) {
+    return SolutionKind::Solved;
+  }
 
   // If we're fixed to a bound generic type, trying harvesting context from it.
   // However, we don't want a solution that fixes the expression type to
@@ -9482,7 +9488,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
   case FixKind::AllowKeyPathRootTypeMismatch:
-  case FixKind::AllowCoercionToForceCast: {
+  case FixKind::AllowCoercionToForceCast:
+  case FixKind::SpecifyKeyPathRootType: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
