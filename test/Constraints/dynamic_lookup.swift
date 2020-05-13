@@ -354,7 +354,11 @@ func dynamicInitCrash(ao: AnyObject.Type) {
   func unambiguousMethodParam(_ x: Int)
 
   subscript(ambiguousSubscript _: Int) -> String { get } // expected-note {{found this candidate}}
-  subscript(unambiguousSubscript _: String) -> Int { get } // expected-note {{found this candidate}}
+  subscript(unambiguousSubscript _: String) -> Int { get }
+
+  subscript(differentSelectors _: Int) -> Int { // expected-note {{found this candidate}}
+    @objc(differentSelector1:) get
+  }
 }
 
 class C1 {
@@ -368,7 +372,11 @@ class C1 {
   @objc func unambiguousMethodParam(_ x: Int) {}
 
   @objc subscript(ambiguousSubscript _: Int) -> Int { return 0 } // expected-note {{found this candidate}}
-  @objc subscript(unambiguousSubscript _: String) -> Int { return 0 } // expected-note {{found this candidate}}
+  @objc subscript(unambiguousSubscript _: String) -> Int { return 0 }
+
+  @objc subscript(differentSelectors _: Int) -> Int { // expected-note {{found this candidate}}
+    @objc(differentSelector2:) get { return 0 }
+  }
 }
 
 class C2 {
@@ -392,9 +400,15 @@ func testAnyObjectAmbiguity(_ x: AnyObject) {
   _ = x[singleCandidate: 0]
 
   _ = x[ambiguousSubscript: 0] // expected-error {{ambiguous use of 'subscript(ambiguousSubscript:)'}}
+  _ = x[ambiguousSubscript: 0] as Int
+  _ = x[ambiguousSubscript: 0] as String
 
-  // FIX-ME(SR-8611): This is currently ambiguous but shouldn't be.
-  _ = x[unambiguousSubscript: ""] // expected-error {{ambiguous use of 'subscript(unambiguousSubscript:)'}}
+  // SR-8611: Make sure we can coalesce subscripts with the same types and
+  // selectors through AnyObject lookup.
+  _ = x[unambiguousSubscript: ""]
+
+  // But not if they have different selectors.
+  _ = x[differentSelectors: 0] // expected-error {{ambiguous use of 'subscript(differentSelectors:)}}
 }
 
 // SR-11648
