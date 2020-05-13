@@ -58,7 +58,7 @@ cd $TMP_DIR/$TOOLCHAIN_NAME
 
 # Merge wasi-sdk and toolchain
 cp -r $WASI_SDK_PATH/lib/clang usr/lib
-cp -a $WASI_SDK_PATH/bin/*ld usr/bin
+cp -a $WASI_SDK_PATH/bin/{*ld,llvm-ar} usr/bin
 cp -r $WASI_SDK_PATH/share/wasi-sysroot usr/share
 
 # Build SwiftPM and install it into toolchain
