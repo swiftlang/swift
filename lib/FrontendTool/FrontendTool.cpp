@@ -653,9 +653,6 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
-static void emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
-                                  const CompilerInstance &Instance);
-
 static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
                                    const CompilerInstance &Instance,
                                    SourceFile *SF) {
@@ -1115,13 +1112,16 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   return result;
 }
 
+static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
+                                       const CompilerInstance &Instance);
+
 /// Emits index data for all primary inputs, or the main module.
 static void emitIndexData(const CompilerInstance &Instance) {
   if (Instance.getPrimarySourceFiles().empty()) {
-    emitIndexDataIfNeeded(nullptr, Instance);
+    emitIndexDataForSourceFile(nullptr, Instance);
   } else {
     for (SourceFile *SF : Instance.getPrimarySourceFiles())
-      emitIndexDataIfNeeded(SF, Instance);
+      emitIndexDataForSourceFile(SF, Instance);
   }
 }
 
@@ -1288,12 +1288,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   SWIFT_DEFER {
     // We might have freed the ASTContext already, but in that case we must have
-    // emitted the dependencies first.
-    if (Instance.hasASTContext())
+    // emitted the dependencies and index first.
+    if (Instance.hasASTContext()) {
       emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+      emitIndexData(Instance);
+    }
   };
 
-  emitIndexData(Instance);
 
   if (Context.hadError())
     return true;
@@ -1489,9 +1490,10 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
     return;
   }
 
-  // Make sure we emit dependencies now, because we can't do it after the
-  // context is gone.
+  // Make sure we emit dependencies and index now, because we can't do it after
+  // the context is gone.
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Instance);
+  emitIndexData(Instance);
 
   Instance.freeASTContext();
 }
@@ -1664,8 +1666,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
          HadError;
 }
 
-static void emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
-                                  const CompilerInstance &Instance) {
+static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
+                                       const CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
 
