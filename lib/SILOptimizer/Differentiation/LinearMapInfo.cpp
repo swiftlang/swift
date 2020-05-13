@@ -408,6 +408,11 @@ void LinearMapInfo::generateDifferentiationDataStructures(
     linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
   }
 
+  // Do not add linear map fields for semantic member accessors, which have
+  // special-case pullback generation. Linear map structs should be empty.
+  if (isSemanticMemberAccessor(original))
+    return;
+
   // Add linear map fields to the linear map structs.
   for (auto &origBB : *original) {
     for (auto &inst : origBB) {
