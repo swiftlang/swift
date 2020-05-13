@@ -346,11 +346,11 @@ class OpaqueArchetypeTypeRef final : public TypeRef {
   // Each ArrayRef in ArgumentLists references into the buffer owned by this
   // vector, which must not be modified after construction.
   std::vector<const TypeRef *> AllArgumentsBuf;
-  std::vector<ArrayRef<const TypeRef *>> ArgumentLists;
-  
-  static TypeRefID Profile(StringRef idString,
-                           StringRef description, unsigned ordinal,
-                           ArrayRef<ArrayRef<const TypeRef *>> argumentLists) {
+  std::vector<llvm::ArrayRef<const TypeRef *>> ArgumentLists;
+
+  static TypeRefID
+  Profile(StringRef idString, StringRef description, unsigned ordinal,
+          llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> argumentLists) {
     TypeRefID ID;
     ID.addString(idString.str());
     ID.addInteger(ordinal);
@@ -362,14 +362,13 @@ class OpaqueArchetypeTypeRef final : public TypeRef {
     
     return ID;
   }
-  
+
 public:
-  OpaqueArchetypeTypeRef(StringRef id,
-                         StringRef description, unsigned ordinal,
-                         ArrayRef<ArrayRef<const TypeRef *>> argumentLists)
-    : TypeRef(TypeRefKind::OpaqueArchetype),
-      ID(id), Description(description), Ordinal(ordinal)
-  {
+  OpaqueArchetypeTypeRef(
+      StringRef id, StringRef description, unsigned ordinal,
+      llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> argumentLists)
+      : TypeRef(TypeRefKind::OpaqueArchetype), ID(id), Description(description),
+        Ordinal(ordinal) {
     std::vector<unsigned> argumentListLengths;
     
     for (auto argList : argumentLists) {
@@ -379,25 +378,24 @@ public:
     }
     auto *data = AllArgumentsBuf.data();
     for (auto length : argumentListLengths) {
-      ArgumentLists.push_back(ArrayRef<const TypeRef *>(data, length));
+      ArgumentLists.push_back(llvm::ArrayRef<const TypeRef *>(data, length));
       data += length;
     }
     assert(data == AllArgumentsBuf.data() + AllArgumentsBuf.size());
   }
-  
+
   template <typename Allocator>
-  static const OpaqueArchetypeTypeRef *create(Allocator &A,
-                                     StringRef id, StringRef description,
-                                     unsigned ordinal,
-                                     ArrayRef<ArrayRef<const TypeRef *>> arguments) {
+  static const OpaqueArchetypeTypeRef *
+  create(Allocator &A, StringRef id, StringRef description, unsigned ordinal,
+         llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> arguments) {
     FIND_OR_CREATE_TYPEREF(A, OpaqueArchetypeTypeRef,
                            id, description, ordinal, arguments);
   }
 
-  ArrayRef<ArrayRef<const TypeRef *>> getArgumentLists() const {
+  llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> getArgumentLists() const {
     return ArgumentLists;
   }
-  
+
   unsigned getOrdinal() const {
     return Ordinal;
   }

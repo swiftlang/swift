@@ -519,11 +519,7 @@ public:
 
     ProtocolConformanceRef operator()(CanType dependentType,
                                       Type conformingReplacementType,
-                                      ProtocolDecl *conformedProtocol) const {
-      return builder->lookupConformance(dependentType,
-                                        conformingReplacementType,
-                                        conformedProtocol);
-    }
+                                      ProtocolDecl *conformedProtocol) const;
   };
 
   /// Retrieve a function that can perform conformance lookup for this

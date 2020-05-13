@@ -120,12 +120,6 @@ ProtocolConformanceRef::subst(Type origType,
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(subs, conformances, options);
 
-  // Opened existentials trivially conform and do not need to go through
-  // substitution map lookup.
-  if (substType->isOpenedExistential() &&
-      !options.contains(SubstFlags::ForceSubstituteOpenedExistentials))
-    return *this;
-
   auto *proto = getRequirement();
 
   // If the type is an existential, it must be self-conforming.
