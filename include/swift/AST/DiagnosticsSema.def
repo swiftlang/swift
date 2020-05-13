@@ -4331,8 +4331,8 @@ ERROR(objc_invalid_on_subscript,none,
 ERROR(objc_invalid_on_static_subscript,none,
       "%0 cannot be %" OBJC_ATTR_SELECT "1", (DescriptiveDeclKind, unsigned))
 ERROR(objc_invalid_with_generic_params,none,
-      "method cannot be %" OBJC_ATTR_SELECT "0 because it has generic "
-      "parameters", (unsigned))
+      "%0 cannot be %" OBJC_ATTR_SELECT "1 because it has generic parameters",
+      (DescriptiveDeclKind, unsigned))
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
