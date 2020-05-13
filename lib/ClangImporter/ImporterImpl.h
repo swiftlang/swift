@@ -255,7 +255,7 @@ public:
   /// API is now unavailable.
   std::string deprecatedAsUnavailableMessage;
 
-  PlatformAvailability(LangOptions &opts);
+  PlatformAvailability(const LangOptions &opts);
 
 private:
   PlatformAvailability(const PlatformAvailability&) = delete;

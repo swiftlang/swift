@@ -575,7 +575,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -601,7 +601,10 @@ protected:
 
     /// Whether the module was imported from Clang (or, someday, maybe another
     /// language).
-    IsNonSwiftModule : 1
+    IsNonSwiftModule : 1,
+
+    /// Whether this module is the main module.
+    IsMainModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,

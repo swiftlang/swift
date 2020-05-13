@@ -238,10 +238,10 @@ public:
   UnifiedStatsReporter *Stats = nullptr;
 
   /// The language options used for translation.
-  LangOptions &LangOpts;
+  const LangOptions &LangOpts;
 
   /// The type checker options.
-  TypeCheckerOptions &TypeCheckerOpts;
+  const TypeCheckerOptions &TypeCheckerOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
