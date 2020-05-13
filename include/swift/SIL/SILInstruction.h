@@ -1162,8 +1162,7 @@ public:
   }
 };
 
-/// A template base class for instructions that take a single SILValue operand
-/// and has no result or a single value result.
+/// A template base class for instructions that take a single SILValue operand.
 template<SILInstructionKind Kind, typename Base>
 class UnaryInstructionBase : public InstructionBase<Kind, Base> {
   // Space for 1 operand.
