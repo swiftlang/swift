@@ -892,9 +892,9 @@ public:
 
 #pragma mark Metadata lookup via mangled name
 
-Optional<unsigned> swift::_depthIndexToFlatIndex(
-                                              unsigned depth, unsigned index,
-                                              ArrayRef<unsigned> paramCounts) {
+Optional<unsigned>
+swift::_depthIndexToFlatIndex(unsigned depth, unsigned index,
+                              llvm::ArrayRef<unsigned> paramCounts) {
   // Out-of-bounds depth.
   if (depth >= paramCounts.size()) return None;
 
@@ -945,8 +945,8 @@ bool swift::_gatherGenericParameterCounts(
 }
 
 /// Retrieve the generic parameters introduced in this context.
-static ArrayRef<GenericParamDescriptor> getLocalGenericParams(
-    const ContextDescriptor *context) {
+static llvm::ArrayRef<GenericParamDescriptor>
+getLocalGenericParams(const ContextDescriptor *context) {
   if (!context->isGeneric())
     return { };
 
@@ -961,13 +961,13 @@ static ArrayRef<GenericParamDescriptor> getLocalGenericParams(
   return genericContext->getGenericParams().slice(startParamIndex);
 }
 
-static bool _gatherGenericParameters(
-                          const ContextDescriptor *context,
-                          ArrayRef<const Metadata *> genericArgs,
-                          const Metadata *parent,
-                          SmallVectorImpl<unsigned> &genericParamCounts,
-                          SmallVectorImpl<const void *> &allGenericArgsVec,
-                          Demangler &demangler) {
+static bool
+_gatherGenericParameters(const ContextDescriptor *context,
+                         llvm::ArrayRef<const Metadata *> genericArgs,
+                         const Metadata *parent,
+                         llvm::SmallVectorImpl<unsigned> &genericParamCounts,
+                         llvm::SmallVectorImpl<const void *> &allGenericArgsVec,
+                         Demangler &demangler) {
   // Figure out the various levels of generic parameters we have in
   // this type.
   (void)_gatherGenericParameterCounts(context,
@@ -1176,9 +1176,10 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
-  BuiltType resolveOpaqueType(NodePointer opaqueDecl,
-                              ArrayRef<ArrayRef<BuiltType>> genericArgs,
-                              unsigned ordinal) {
+  BuiltType
+  resolveOpaqueType(NodePointer opaqueDecl,
+                    llvm::ArrayRef<llvm::ArrayRef<BuiltType>> genericArgs,
+                    unsigned ordinal) {
     auto descriptor = _findOpaqueTypeDescriptor(opaqueDecl, demangler);
     if (!descriptor)
       return BuiltType();
@@ -1212,7 +1213,7 @@ public:
         return substitutions.getWitnessTable(type, index);
       }).getMetadata();
   }
-  
+
   BuiltTypeDecl createTypeDecl(NodePointer node,
                                bool &typeAlias) const {
     // Look for a nominal type descriptor based on its mangled name.
@@ -1255,8 +1256,9 @@ public:
 #endif
   }
 
-  BuiltType createBoundGenericObjCClassType(const std::string &mangledName,
-                                            ArrayRef<BuiltType> args) const {
+  BuiltType
+  createBoundGenericObjCClassType(const std::string &mangledName,
+                                  llvm::ArrayRef<BuiltType> args) const {
     // Generic arguments of lightweight Objective-C generic classes are not
     // reified in the metadata.
     return createObjCClassType(mangledName);
@@ -1278,7 +1280,7 @@ public:
   }
 
   BuiltType createBoundGenericType(BuiltTypeDecl anyTypeDecl,
-                                   ArrayRef<BuiltType> genericArgs,
+                                   llvm::ArrayRef<BuiltType> genericArgs,
                                    BuiltType parent) const {
     auto typeDecl = dyn_cast<TypeContextDescriptor>(anyTypeDecl);
     if (!typeDecl) {
@@ -1326,9 +1328,9 @@ public:
     return swift_getExistentialMetatypeMetadata(instance);
   }
 
-  BuiltType createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
-                                          BuiltType superclass,
-                                          bool isClassBound) const {
+  BuiltType
+  createProtocolCompositionType(llvm::ArrayRef<BuiltProtocolDecl> protocols,
+                                BuiltType superclass, bool isClassBound) const {
     // Determine whether we have a class bound.
     ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
     if (isClassBound || superclass) {
@@ -1360,9 +1362,9 @@ public:
     return BuiltType();
   }
 
-  BuiltType createFunctionType(
-                           ArrayRef<Demangle::FunctionParam<BuiltType>> params,
-                           BuiltType result, FunctionTypeFlags flags) const {
+  BuiltType
+  createFunctionType(llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
+                     BuiltType result, FunctionTypeFlags flags) const {
     SmallVector<BuiltType, 8> paramTypes;
     SmallVector<uint32_t, 8> paramFlags;
 
@@ -1384,18 +1386,17 @@ public:
   }
 
   BuiltType createImplFunctionType(
-    Demangle::ImplParameterConvention calleeConvention,
-    ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
-    ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
-    Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
-    ImplFunctionTypeFlags flags) {
+      Demangle::ImplParameterConvention calleeConvention,
+      llvm::ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
+      llvm::ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
+      Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
+      ImplFunctionTypeFlags flags) {
     // We can't realize the metadata for a SILFunctionType.
     return BuiltType();
   }
 
-  BuiltType createTupleType(ArrayRef<BuiltType> elements,
-                            std::string labels,
-                            bool variadic) const {
+  BuiltType createTupleType(llvm::ArrayRef<BuiltType> elements,
+                            std::string labels, bool variadic) const {
     // TODO: 'variadic' should no longer exist
     auto flags = TupleTypeFlags().withNumElements(elements.size());
     if (!labels.empty())
@@ -2195,8 +2196,8 @@ class AutomaticDynamicReplacements
                                   AutomaticDynamicReplacementEntry>;
   friend TrailingObjects;
 
-
-  ArrayRef<AutomaticDynamicReplacementEntry> getReplacementEntries() const {
+  llvm::ArrayRef<AutomaticDynamicReplacementEntry>
+  getReplacementEntries() const {
     return {
         this->template getTrailingObjects<AutomaticDynamicReplacementEntry>(),
         numScopes};
@@ -2239,8 +2240,8 @@ class AutomaticDynamicReplacementsSome
                                   DynamicReplacementSomeDescriptor>;
   friend TrailingObjects;
 
-
-  ArrayRef<DynamicReplacementSomeDescriptor> getReplacementEntries() const {
+  llvm::ArrayRef<DynamicReplacementSomeDescriptor>
+  getReplacementEntries() const {
     return {
         this->template getTrailingObjects<DynamicReplacementSomeDescriptor>(),
         numEntries};

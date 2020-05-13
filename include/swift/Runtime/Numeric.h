@@ -44,9 +44,9 @@ public:
   /// Return the chunks of data making up this value, arranged starting from
   /// the least-significant chunk.  The value is sign-extended to fill the
   /// final chunk.
-  ArrayRef<UnsignedChunk> getData() const {
-    return ArrayRef<UnsignedChunk>(Data,
-                      (Flags.getBitWidth() + BitsPerChunk - 1) / BitsPerChunk);
+  llvm::ArrayRef<UnsignedChunk> getData() const {
+    return llvm::makeArrayRef(Data, (Flags.getBitWidth() + BitsPerChunk - 1) /
+                                        BitsPerChunk);
   }
 
   /// The flags for this value.

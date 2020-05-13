@@ -286,7 +286,7 @@ public:
     /// An element in the descriptor path.
     struct PathElement {
       /// The generic parameters local to this element.
-      ArrayRef<GenericParamDescriptor> localGenericParams;
+      llvm::ArrayRef<GenericParamDescriptor> localGenericParams;
 
       /// The total number of generic parameters.
       unsigned numTotalGenericParams;
