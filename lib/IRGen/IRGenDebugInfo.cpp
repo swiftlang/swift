@@ -564,7 +564,8 @@ private:
       // Create a Forward-declared type.
       auto Loc = getDebugLoc(*this, NTD);
       auto File = getOrCreateFile(Loc.Filename);
-      auto Line = Loc.Line;
+      // No line numbers are attached to type forward declarations.
+      auto Line = 0;
       auto FwdDecl = DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, NTD->getName().str(),
           getOrCreateContext(DC->getParent()), File, Line,
@@ -1301,14 +1302,19 @@ private:
       auto *Decl = StructTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createStructType(DbgTy, Decl, StructTy, Scope, File, L.Line,
-                                SizeInBits, AlignInBits, Flags,
-                                nullptr, // DerivedFrom
+                                SizeInBits, AlignInBits, Flags, nullptr,
                                 llvm::dwarf::DW_LANG_Swift, MangledName);
       else
-        return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
-                                  SizeInBits, AlignInBits, Flags, MangledName);
+        // No line numbers are attached to type forward declarations.  This is
+        // intentional: It interfers with the efficacy of incremental builds. We
+        // don't want a whitespace change to an secondary file trigger a
+        // recompilation of the debug info of a primary source file.
+        return createOpaqueStruct(Scope, Decl->getName().str(), File,
+                                  FwdDeclLine, SizeInBits, AlignInBits, Flags,
+                                  MangledName);
     }
 
     case TypeKind::Class: {
@@ -1318,10 +1324,11 @@ private:
       auto *ClassTy = BaseTy->castTo<ClassType>();
       auto *Decl = ClassTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
+      auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
       assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
-      return createPointerSizedStruct(Scope, Decl->getNameStr(),
-                                      getOrCreateFile(L.Filename), L.Line,
-                                      Flags, MangledName);
+      return createPointerSizedStruct(Scope, Decl->getNameStr(), File,
+                                      FwdDeclLine, Flags, MangledName);
     }
 
     case TypeKind::Protocol: {
@@ -1329,40 +1336,43 @@ private:
       auto *Decl = ProtocolTy->getDecl();
       // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
       auto L = getDebugLoc(*this, Decl);
-      auto File = getOrCreateFile(L.Filename);
+      auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
       return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                                File, L.Line, SizeInBits, AlignInBits, Flags,
-                                MangledName);
+                                File, FwdDeclLine, SizeInBits, AlignInBits,
+                                Flags, MangledName);
     }
 
     case TypeKind::ProtocolComposition: {
       auto *Decl = DbgTy.getDecl();
       auto L = getDebugLoc(*this, Decl);
-      auto File = getOrCreateFile(L.Filename);
-
-      // FIXME: emit types
-      // auto ProtocolCompositionTy = BaseTy->castTo<ProtocolCompositionType>();
+      auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
       return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                                File, L.Line, SizeInBits, AlignInBits, Flags,
-                                MangledName);
+                                File, FwdDeclLine, SizeInBits, AlignInBits,
+                                Flags, MangledName);
     }
 
     case TypeKind::UnboundGeneric: {
       auto *UnboundTy = BaseTy->castTo<UnboundGenericType>();
       auto *Decl = UnboundTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
+      auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
       assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
       return createPointerSizedStruct(Scope,
                                       Decl ? Decl->getNameStr() : MangledName,
-                                      File, L.Line, Flags, MangledName);
+                                      File, FwdDeclLine, Flags, MangledName);
     }
 
     case TypeKind::BoundGenericStruct: {
       auto *StructTy = BaseTy->castTo<BoundGenericStructType>();
       auto *Decl = StructTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
+      auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
       return createOpaqueStructWithSizedContainer(
-          Scope, Decl ? Decl->getNameStr() : "", File, L.Line, SizeInBits,
+          Scope, Decl ? Decl->getNameStr() : "", File, FwdDeclLine, SizeInBits,
           AlignInBits, Flags, MangledName, collectGenericParams(StructTy));
     }
 
@@ -1370,16 +1380,20 @@ private:
       auto *ClassTy = BaseTy->castTo<BoundGenericClassType>();
       auto *Decl = ClassTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
+      auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
+
       // TODO: We may want to peek at Decl->isObjC() and set this
       // attribute accordingly.
       assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
       return createPointerSizedStruct(Scope,
                                       Decl ? Decl->getNameStr() : MangledName,
-                                      File, L.Line, Flags, MangledName);
+                                      File, FwdDeclLine, Flags, MangledName);
     }
 
     case TypeKind::Tuple: {
-      // Tuples are also represented as structs.
+      // Tuples are also represented as structs.  Since tuples are ephemeral
+      // (not nominal) they don't have a source location.
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createTuple(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
                            MangledName);
@@ -1400,14 +1414,16 @@ private:
       if (auto nested = dyn_cast<NestedArchetypeType>(Archetype))
         assocType = nested->getAssocType();
       auto L = getDebugLoc(*this, assocType);
+      auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
       auto Superclass = Archetype->getSuperclass();
       auto DerivedFrom = Superclass.isNull()
                              ? nullptr
                              : getOrCreateDesugaredType(Superclass, DbgTy);
       auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
-          llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
-          llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-          MangledName));
+          llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File,
+          FwdDeclLine, llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits,
+          Flags, MangledName));
 
       // Emit the protocols the archetypes conform to.
       SmallVector<llvm::Metadata *, 4> Protocols;
@@ -1421,7 +1437,7 @@ private:
             DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, 0, Flags));
       }
       auto DITy = DBuilder.createStructType(
-          Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
+          Scope, MangledName, File, FwdDeclLine, SizeInBits, AlignInBits, Flags,
           DerivedFrom, DBuilder.getOrCreateArray(Protocols),
           llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
 
@@ -1435,9 +1451,11 @@ private:
       // storage.
       Flags |= llvm::DINode::FlagArtificial;
       auto L = getDebugLoc(*this, DbgTy.getDecl());
-      auto File = getOrCreateFile(L.Filename);
+      auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
+
       return DBuilder.createStructType(
-          Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
+          Scope, MangledName, File, FwdDeclLine, SizeInBits, AlignInBits, Flags,
           nullptr, nullptr, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
     }
 
@@ -1457,12 +1475,15 @@ private:
       auto *Decl = EnumTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
+
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
                               Flags);
       else
-        return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
-                                  SizeInBits, AlignInBits, Flags, MangledName);
+        return createOpaqueStruct(Scope, Decl->getName().str(), File,
+                                  FwdDeclLine, SizeInBits, AlignInBits, Flags,
+                                  MangledName);
     }
 
     case TypeKind::BoundGenericEnum: {
@@ -1470,21 +1491,24 @@ private:
       auto *Decl = EnumTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto *File = getOrCreateFile(L.Filename);
+      unsigned FwdDeclLine = 0;
+
       return createOpaqueStructWithSizedContainer(
-          Scope, Decl->getName().str(), File, L.Line, SizeInBits, AlignInBits,
-          Flags, MangledName, collectGenericParams(EnumTy));
+          Scope, Decl->getName().str(), File, FwdDeclLine, SizeInBits,
+          AlignInBits, Flags, MangledName, collectGenericParams(EnumTy));
     }
 
     case TypeKind::BuiltinVector: {
-      (void)MangledName; // FIXME emit the name somewhere.
+      // FIXME: Emit the name somewhere.
+      (void)MangledName;
       auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
       auto ElemTy = BuiltinVectorTy->getElementType();
       auto ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
           ElemTy, IGM.getTypeInfoForUnlowered(ElemTy));
       unsigned Count = BuiltinVectorTy->getNumElements();
       auto Subscript = DBuilder.getOrCreateSubrange(0, Count ? Count : -1);
-      return DBuilder.createVectorType(SizeInBits,
-                                       AlignInBits, getOrCreateType(ElemDbgTy),
+      return DBuilder.createVectorType(SizeInBits, AlignInBits,
+                                       getOrCreateType(ElemDbgTy),
                                        DBuilder.getOrCreateArray(Subscript));
     }
 
@@ -1496,9 +1520,12 @@ private:
       auto *ReferenceTy = cast<ReferenceStorageType>(BaseTy);
       auto CanTy = ReferenceTy->getReferentType();
       auto L = getDebugLoc(*this, DbgTy.getDecl());
-      auto File = getOrCreateFile(L.Filename);
+      auto *File = getOrCreateFile(L.Filename);
+      unsigned CompilerGeneratedLine = 0;
+
       return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy),
-                                    MangledName, File, L.Line, File);
+                                    MangledName, File, CompilerGeneratedLine,
+                                    File);
     }
 
     // Sugared types.
@@ -1508,14 +1535,15 @@ private:
       auto *Decl = TypeAliasTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto AliasedTy = TypeAliasTy->getSinglyDesugaredType();
-      auto File = getOrCreateFile(L.Filename);
+      auto *File = getOrCreateFile(L.Filename);
+
       // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.getStorageType(),
                                  DbgTy.getSize(), DbgTy.getAlignment(),
                                  DbgTy.hasDefaultAlignment(), false);
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
-                                    File, L.Line, Scope);
+                                    File, 0, Scope);
     }
 
     case TypeKind::Paren: {
