@@ -911,9 +911,9 @@ swift::_depthIndexToFlatIndex(unsigned depth, unsigned index,
 ///
 /// \returns true if the innermost descriptor is generic.
 bool swift::_gatherGenericParameterCounts(
-                                 const ContextDescriptor *descriptor,
-                                 SmallVectorImpl<unsigned> &genericParamCounts,
-                                 Demangler &BorrowFrom) {
+    const ContextDescriptor *descriptor,
+    llvm::SmallVectorImpl<unsigned> &genericParamCounts,
+    Demangler &BorrowFrom) {
   DemanglerForRuntimeTypeResolution<> demangler;
   demangler.providePreallocatedMemory(BorrowFrom);
 
@@ -1974,10 +1974,9 @@ demangleToGenericParamRef(StringRef typeName) {
 }
 
 void swift::gatherWrittenGenericArgs(
-                             const Metadata *metadata,
-                             const TypeContextDescriptor *description,
-                             SmallVectorImpl<const Metadata *> &allGenericArgs,
-                             Demangler &BorrowFrom) {
+    const Metadata *metadata, const TypeContextDescriptor *description,
+    llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+    Demangler &BorrowFrom) {
   if (!description)
     return;
   auto generics = description->getGenericContext();
