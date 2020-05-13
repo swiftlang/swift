@@ -81,9 +81,6 @@ public:
   /// If the module or file contains SIL that needs parsing, returns the file
   /// to be parsed, or \c nullptr if parsing isn't required.
   SourceFile *getSourceFileToParse() const;
-
-  /// Whether the SIL is being emitted for a whole module.
-  bool isWholeModule() const;
 };
 
 void simple_display(llvm::raw_ostream &out, const SILGenDescriptor &d);

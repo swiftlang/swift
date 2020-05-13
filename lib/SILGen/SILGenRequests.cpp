@@ -65,10 +65,6 @@ ArrayRef<FileUnit *> SILGenDescriptor::getFiles() const {
   return llvm::makeArrayRef(*context.getAddrOfPtr1());
 }
 
-bool SILGenDescriptor::isWholeModule() const {
-  return context.is<ModuleDecl *>();
-}
-
 SourceFile *SILGenDescriptor::getSourceFileToParse() const {
 #ifndef NDEBUG
   auto sfCount = llvm::count_if(getFiles(), [](FileUnit *file) {
