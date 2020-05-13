@@ -1455,7 +1455,8 @@ public:
   bool isOptionalSomePatternInit() const {
     return kind == Kind::expression &&
         expression.contextualPurpose == CTP_Initialization &&
-        isa<OptionalSomePattern>(expression.pattern);
+        isa<OptionalSomePattern>(expression.pattern) &&
+        !expression.pattern->isImplicit();
   }
 
   /// Whether to bind the types of any variables within the pattern via
