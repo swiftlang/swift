@@ -30,11 +30,11 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/ExternalASTSource.h"
@@ -140,7 +140,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DenseSet<UUSTuple> PreviousLineEntries;
   SILLocation::DebugLoc PreviousDebugLoc;
 #endif
-  
+
 public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
                      IRGenModule &IGM, llvm::Module &M,
@@ -484,8 +484,8 @@ private:
         }
 
         SmallVector<char, 64> Buf;
-        StringRef Name = (VD->getBaseName().userFacingName() +
-                          Twine(Kind)).toStringRef(Buf);
+        StringRef Name =
+            (VD->getBaseName().userFacingName() + Twine(Kind)).toStringRef(Buf);
         return BumpAllocatedString(Name);
       }
 
@@ -518,8 +518,7 @@ private:
     auto FnTy = SILTy.getAs<SILFunctionType>();
     if (!FnTy) {
       LLVM_DEBUG(llvm::dbgs() << "Unexpected function type: ";
-                 SILTy.print(llvm::dbgs());
-                 llvm::dbgs() << "\n");
+                 SILTy.print(llvm::dbgs()); llvm::dbgs() << "\n");
       return CanSILFunctionType();
     }
 
@@ -582,7 +581,8 @@ private:
   void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
                            SILType type) {
     auto RealType = type.getASTType();
-    auto DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, IGM.getTypeInfo(type));
+    auto DbgTy =
+        DebugTypeInfo::getFromTypeInfo(RealType, IGM.getTypeInfo(type));
     Parameters.push_back(getOrCreateType(DbgTy));
   }
 
@@ -721,7 +721,7 @@ private:
           return Desc;
     return None;
   }
-  
+
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
     ModuleDecl *M = IM.importedModule;
     if (Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
@@ -795,15 +795,15 @@ private:
 
       break;
     }
-    
+
     // TODO: Eliminate substitutions in SILFunctionTypes for now.
     // On platforms where the substitutions affect representation, we will need
     // to preserve this info and teach type reconstruction about it.
-    Ty = Ty->replaceSubstitutedSILFunctionTypesWithUnsubstituted(IGM.getSILModule());
+    Ty = Ty->replaceSubstitutedSILFunctionTypesWithUnsubstituted(
+        IGM.getSILModule());
 
     Mangle::ASTMangler Mangler;
-    std::string Result = Mangler.mangleTypeForDebugger(
-        Ty, nullptr);
+    std::string Result = Mangler.mangleTypeForDebugger(Ty, nullptr);
 
     if (!Opts.DisableRoundTripDebugTypes) {
       // Make sure we can reconstruct mangled types for the debugger.
@@ -845,17 +845,17 @@ private:
     return DITy;
   }
 
-  llvm::DINodeArray
-  getTupleElements(TupleType *TupleTy, llvm::DIScope *Scope, llvm::DIFile *File,
-                   llvm::DINode::DIFlags Flags, unsigned &SizeInBits) {
+  llvm::DINodeArray getTupleElements(TupleType *TupleTy, llvm::DIScope *Scope,
+                                     llvm::DIFile *File,
+                                     llvm::DINode::DIFlags Flags,
+                                     unsigned &SizeInBits) {
     SmallVector<llvm::Metadata *, 16> Elements;
     unsigned OffsetInBits = 0;
     auto genericSig = IGM.getCurGenericContext();
     for (auto ElemTy : TupleTy->getElementTypes()) {
       auto &elemTI = IGM.getTypeInfoForUnlowered(
           AbstractionPattern(genericSig, ElemTy->getCanonicalType()), ElemTy);
-      auto DbgTy =
-          DebugTypeInfo::getFromTypeInfo(ElemTy, elemTI);
+      auto DbgTy = DebugTypeInfo::getFromTypeInfo(ElemTy, elemTI);
       Elements.push_back(createMemberType(DbgTy, StringRef(), OffsetInBits,
                                           Scope, File, Flags));
     }
@@ -1017,14 +1017,14 @@ private:
   /// anchor any typedefs that may appear in parameters so they can be
   /// resolved in the debugger without needing to query the Swift module.
   llvm::DINodeArray collectGenericParams(BoundGenericType *BGT) {
-      SmallVector<llvm::Metadata *, 16> TemplateParams;
-      for (auto Param : BGT->getGenericArgs()) {
-        TemplateParams.push_back(DBuilder.createTemplateTypeParameter(
-            TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param))));
-      }
-      return DBuilder.getOrCreateArray(TemplateParams);
+    SmallVector<llvm::Metadata *, 16> TemplateParams;
+    for (auto Param : BGT->getGenericArgs()) {
+      TemplateParams.push_back(DBuilder.createTemplateTypeParameter(
+          TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param))));
+    }
+    return DBuilder.getOrCreateArray(TemplateParams);
   }
-  
+
   /// Create a sized container for a sizeless type. Used to represent
   /// BoundGenericEnums that may have different sizes depending on what they are
   /// bound to, but still share a mangled name.
@@ -1048,9 +1048,8 @@ private:
       InnerTypeCache[UID] = llvm::TrackingMDNodeRef(UniqueType);
     }
 
-    llvm::Metadata *Elements[] = {
-        DBuilder.createMemberType(Scope, "", File, 0, SizeInBits,
-                                  AlignInBits, 0, Flags, UniqueType)};
+    llvm::Metadata *Elements[] = {DBuilder.createMemberType(
+        Scope, "", File, 0, SizeInBits, AlignInBits, 0, Flags, UniqueType)};
     return DBuilder.createStructType(
         Scope, "", File, Line, SizeInBits, AlignInBits, Flags,
         /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
@@ -1230,8 +1229,7 @@ private:
 
     if (!BaseTy) {
       LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: ";
-                 DbgTy.getType()->dump(llvm::dbgs());
-                 llvm::dbgs() << "\n");
+                 DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
       if (!InternalType) {
         StringRef Name = "<internal>";
         InternalType = DBuilder.createForwardDecl(
@@ -1428,8 +1426,8 @@ private:
       // Emit the protocols the archetypes conform to.
       SmallVector<llvm::Metadata *, 4> Protocols;
       for (auto *ProtocolDecl : Archetype->getConformsTo()) {
-        auto PTy = IGM.getLoweredType(ProtocolDecl->getInterfaceType())
-                       .getASTType();
+        auto PTy =
+            IGM.getLoweredType(ProtocolDecl->getInterfaceType()).getASTType();
         auto PDbgTy = DebugTypeInfo::getFromTypeInfo(
             ProtocolDecl->getInterfaceType(), IGM.getTypeInfoForLowered(PTy));
         auto PDITy = getOrCreateType(PDbgTy);
@@ -1513,22 +1511,21 @@ private:
     }
 
     // Reference storage types.
-#define REF_STORAGE(Name, ...) \
-    case TypeKind::Name##Storage:
+#define REF_STORAGE(Name, ...) case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
-    {
-      auto *ReferenceTy = cast<ReferenceStorageType>(BaseTy);
-      auto CanTy = ReferenceTy->getReferentType();
-      auto L = getDebugLoc(*this, DbgTy.getDecl());
-      auto *File = getOrCreateFile(L.Filename);
-      unsigned CompilerGeneratedLine = 0;
+      {
+        auto *ReferenceTy = cast<ReferenceStorageType>(BaseTy);
+        auto CanTy = ReferenceTy->getReferentType();
+        auto L = getDebugLoc(*this, DbgTy.getDecl());
+        auto *File = getOrCreateFile(L.Filename);
+        unsigned CompilerGeneratedLine = 0;
 
-      return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy),
-                                    MangledName, File, CompilerGeneratedLine,
-                                    File);
-    }
+        return DBuilder.createTypedef(getOrCreateDesugaredType(CanTy, DbgTy),
+                                      MangledName, File, CompilerGeneratedLine,
+                                      File);
+      }
 
-    // Sugared types.
+      // Sugared types.
 
     case TypeKind::TypeAlias: {
       auto *TypeAliasTy = cast<TypeAliasType>(BaseTy);
@@ -1564,9 +1561,8 @@ private:
     case TypeKind::GenericTypeParam: {
       // FIXME: Provide a more meaningful debug type.
       return DBuilder.createStructType(
-          Scope, MangledName, File, 0, SizeInBits, AlignInBits, Flags,
-          nullptr, nullptr,
-          llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+          Scope, MangledName, File, 0, SizeInBits, AlignInBits, Flags, nullptr,
+          nullptr, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
     }
 
     // The following types exist primarily for internal use by the type
@@ -1582,8 +1578,7 @@ private:
     case TypeKind::BuiltinUnsafeValueBuffer:
 
       LLVM_DEBUG(llvm::dbgs() << "Unhandled type: ";
-                 DbgTy.getType()->dump(llvm::dbgs());
-                 llvm::dbgs() << "\n");
+                 DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
       MangledName = "<unknown>";
     }
     return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);
@@ -1704,7 +1699,7 @@ private:
           llvm::dwarf::DW_LANG_Swift, 0, 0, llvm::DINode::FlagFwdDecl,
           MangledName);
       ReplaceMap.emplace_back(
-        std::piecewise_construct, std::make_tuple(DbgTy.getType()),
+          std::piecewise_construct, std::make_tuple(DbgTy.getType()),
           std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
       return FwdDecl;
     }
@@ -1779,12 +1774,11 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   }
 
   TheCU = DBuilder.createCompileUnit(
-      Lang, MainFile,
-      Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
+      Lang, MainFile, Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
       MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
-      : llvm::DICompileUnit::LineTablesOnly,
+          : llvm::DICompileUnit::LineTablesOnly,
       /* DWOId */ 0, /* SplitDebugInlining */ true,
       /* DebugInfoForProfiling */ false,
       llvm::DICompileUnit::DebugNameTableKind::Default,
@@ -1820,9 +1814,14 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
     OS << '"';
     for (char c : Macro)
       switch (c) {
-      case '\\': OS << "\\\\"; break;
-      case '"':  OS << "\\\""; break;
-      default: OS << c;
+      case '\\':
+        OS << "\\\\";
+        break;
+      case '"':
+        OS << "\\\"";
+        break;
+      default:
+        OS << c;
       }
     OS << '"';
   }
@@ -1954,20 +1953,20 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
   FuncName += failureMsg;
 
   llvm::DISubprogram *TrapSP = DBuilder.createFunction(
-     MainModule, FuncName, StringRef(), TrapLoc->getFile(), 0, DIFnTy, 0,
-     llvm::DINode::FlagArtificial, llvm::DISubprogram::SPFlagDefinition,
-     nullptr, nullptr, nullptr);
+      MainModule, FuncName, StringRef(), TrapLoc->getFile(), 0, DIFnTy, 0,
+      llvm::DINode::FlagArtificial, llvm::DISubprogram::SPFlagDefinition,
+      nullptr, nullptr, nullptr);
 
   ScopeCache[TrapSc] = llvm::TrackingMDNodeRef(TrapSP);
   LastScope = TrapSc;
-  
+
   assert(parentScopesAreSane(TrapSc) && "parent scope sanity check failed");
-  
+
   // Wrap the existing TrapLoc into the failure function.
   auto DL = llvm::DebugLoc::get(0, 0, TrapSP, TrapLoc);
   Builder.SetCurrentDebugLocation(DL);
 }
-  
+
 void IRGenDebugInfoImpl::clearLoc(IRBuilder &Builder) {
   LastDebugLoc = {};
   LastScope = nullptr;
@@ -2287,7 +2286,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
-  
+
   // This could be Opts.Optimize if we would also unique DIVariables here.
   bool Optimized = false;
   // Create the descriptor for the variable.
@@ -2413,8 +2412,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
 
 void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
                                           llvm::Value *Metadata, unsigned Depth,
-                                          unsigned Index,
-                                          StringRef Name) {
+                                          unsigned Index, StringRef Name) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
@@ -2452,11 +2450,9 @@ std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
     llvm::Module &M, StringRef MainOutputFilenameForDebugInfo,
     StringRef PrivateDiscriminator) {
-  return std::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
-                                               MainOutputFilenameForDebugInfo,
-                                               PrivateDiscriminator);
+  return std::make_unique<IRGenDebugInfoImpl>(
+      Opts, CI, IGM, M, MainOutputFilenameForDebugInfo, PrivateDiscriminator);
 }
-
 
 IRGenDebugInfo::~IRGenDebugInfo() {}
 
@@ -2472,8 +2468,8 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
 
 void IRGenDebugInfo::addFailureMessageToCurrentLoc(IRBuilder &Builder,
                                                    StringRef failureMsg) {
-  static_cast<IRGenDebugInfoImpl *>(this)->
-    addFailureMessageToCurrentLoc(Builder, failureMsg);
+  static_cast<IRGenDebugInfoImpl *>(this)->addFailureMessageToCurrentLoc(
+      Builder, failureMsg);
 }
 
 void IRGenDebugInfo::clearLoc(IRBuilder &Builder) {
@@ -2513,10 +2509,9 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 llvm::DISubprogram *
 IRGenDebugInfo::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
                              SILFunctionTypeRepresentation Rep, SILType Ty,
-                             DeclContext *DeclCtx,
-                             GenericEnvironment *GE) {
+                             DeclContext *DeclCtx, GenericEnvironment *GE) {
   return static_cast<IRGenDebugInfoImpl *>(this)->emitFunction(DS, Fn, Rep, Ty,
-                                                        DeclCtx);
+                                                               DeclCtx);
 }
 
 llvm::DISubprogram *IRGenDebugInfo::emitFunction(SILFunction &SILFn,
@@ -2525,10 +2520,9 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(SILFunction &SILFn,
 }
 
 void IRGenDebugInfo::emitArtificialFunction(IRBuilder &Builder,
-                                            llvm::Function *Fn,
-                                            SILType SILTy) {
-  static_cast<IRGenDebugInfoImpl *>(this)->emitArtificialFunction(Builder,
-                                                                  Fn, SILTy);
+                                            llvm::Function *Fn, SILType SILTy) {
+  static_cast<IRGenDebugInfoImpl *>(this)->emitArtificialFunction(Builder, Fn,
+                                                                  SILTy);
 }
 
 void IRGenDebugInfo::emitVariableDeclaration(
@@ -2559,8 +2553,8 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                                       unsigned Depth, unsigned Index,
                                       StringRef Name) {
-  static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(
-    IGF, Metadata, Depth, Index, Name);
+  static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(IGF, Metadata,
+                                                            Depth, Index, Name);
 }
 
 llvm::DIBuilder &IRGenDebugInfo::getBuilder() {
