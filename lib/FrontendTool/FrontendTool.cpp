@@ -1200,12 +1200,7 @@ static bool performCompile(CompilerInstance &Instance,
                            FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
-  FrontendOptions::ActionType Action = opts.RequestedAction;
-
-  if (Action == FrontendOptions::ActionType::EmitSyntax) {
-    Instance.getASTContext().LangOpts.BuildSyntaxTree = true;
-    Instance.getASTContext().LangOpts.VerifySyntaxTree = true;
-  }
+  const FrontendOptions::ActionType Action = opts.RequestedAction;
 
   // We've been asked to precompile a bridging header or module; we want to
   // avoid touching any other inputs and just parse, emit and exit.

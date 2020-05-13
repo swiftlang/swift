@@ -717,7 +717,8 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
 ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    MainModule = ModuleDecl::create(ID, *Context, getImplicitImportInfo());
+    MainModule = ModuleDecl::createMainModule(*Context, ID,
+                                              getImplicitImportInfo());
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
     if (Invocation.getFrontendOptions().EnablePrivateImports)

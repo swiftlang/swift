@@ -629,6 +629,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::EmitSyntax) {
+    Opts.BuildSyntaxTree = true;
+    Opts.VerifySyntaxTree = true;
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -676,6 +681,17 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // If asked to perform InstallAPI, go ahead and enable non-inlinable function
   // body skipping.
   Opts.SkipNonInlinableFunctionBodies |= Args.hasArg(OPT_tbd_is_installapi);
+
+  if (Opts.SkipNonInlinableFunctionBodies &&
+      FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT) {
+    // Disable this optimization if we're compiling SwiftOnoneSupport, because
+    // we _definitely_ need to look inside every declaration to figure out
+    // what gets prespecialized.
+    Opts.SkipNonInlinableFunctionBodies = false;
+    Diags.diagnose(SourceLoc(),
+                   diag::module_incompatible_with_skip_function_bodies,
+                   SWIFT_ONONE_SUPPORT);
+  }
 
   Opts.DisableConstraintSolverPerformanceHacks |=
       Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
@@ -903,12 +919,14 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          IRGenOptions &IRGenOpts,
-                         FrontendOptions &FEOpts,
+                         const FrontendOptions &FEOpts,
+                         const TypeCheckerOptions &TCOpts,
                          DiagnosticEngine &Diags,
                          const llvm::Triple &Triple,
                          ClangImporterOptions &ClangOpts) {
   using namespace options;
 
+  
   if (const Arg *A = Args.getLastArg(OPT_sil_inline_threshold)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.InlineThreshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -951,8 +969,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
-  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies))
-    Opts.SkipNonInlinableFunctionBodies = true;
+  // Propagate the typechecker's understanding of
+  // -experimental-skip-non-inlinable-function-bodies to SIL.
+  Opts.SkipNonInlinableFunctionBodies = TCOpts.SkipNonInlinableFunctionBodies;
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
@@ -1624,7 +1643,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags,
+  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts,
+                   TypeCheckerOpts, Diags,
                    LangOpts.Target, ClangImporterOpts)) {
     return true;
   }
