@@ -23,6 +23,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
 #include "swift/Strings.h"
+#include "llvm/ADT/ArrayRef.h"
 #include <vector>
 
 namespace swift {
@@ -876,7 +877,7 @@ class TypeDecoder {
         }
       }
       genericArgsLevels.push_back(genericArgsBuf.size());
-      std::vector<ArrayRef<BuiltType>> genericArgs;
+      std::vector<llvm::ArrayRef<BuiltType>> genericArgs;
       for (unsigned i = 0; i < genericArgsLevels.size() - 1; ++i) {
         auto start = genericArgsLevels[i], end = genericArgsLevels[i+1];
         genericArgs.emplace_back(genericArgsBuf.data() + start,

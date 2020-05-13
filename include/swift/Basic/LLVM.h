@@ -38,8 +38,10 @@ namespace llvm {
   template <typename T, unsigned N> class SmallVector;
   template <unsigned N> class SmallString;
   template <typename T, unsigned N> class SmallSetVector;
+#if !defined(swiftCore_EXPORTS)
   template<typename T> class ArrayRef;
   template<typename T> class MutableArrayRef;
+#endif
   template<typename T> class TinyPtrVector;
   template<typename T> class Optional;
   template <typename ...PTs> class PointerUnion;
@@ -63,9 +65,11 @@ namespace swift {
   using llvm::cast_or_null;
 
   // Containers.
+#if !defined(swiftCore_EXPORTS)
   using llvm::ArrayRef;
-  using llvm::iterator_range;
   using llvm::MutableArrayRef;
+#endif
+  using llvm::iterator_range;
   using llvm::None;
   using llvm::Optional;
   using llvm::PointerUnion;

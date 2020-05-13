@@ -5311,7 +5311,7 @@ checkTransitiveCompleteness(const Metadata *initialType) {
 /// Diagnose a metadata dependency cycle.
 SWIFT_NORETURN static void
 diagnoseMetadataDependencyCycle(const Metadata *start,
-                                ArrayRef<MetadataDependency> links) {
+                                llvm::ArrayRef<MetadataDependency> links) {
   assert(start == links.back().Value);
 
   std::string diagnostic =
