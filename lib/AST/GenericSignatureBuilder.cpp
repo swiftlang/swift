@@ -3502,6 +3502,19 @@ GenericSignatureBuilder::getLookupConformanceFn()
 }
 
 ProtocolConformanceRef
+GenericSignatureBuilder::LookUpConformanceInBuilder::operator()(
+    CanType dependentType, Type conformingReplacementType,
+    ProtocolDecl *conformedProtocol) const {
+  // Lookup conformances for opened existential.
+  if (conformingReplacementType->isOpenedExistential()) {
+    return conformedProtocol->getModuleContext()->lookupConformance(
+        conformingReplacementType, conformedProtocol);
+  }
+  return builder->lookupConformance(dependentType, conformingReplacementType,
+                                    conformedProtocol);
+}
+
+ProtocolConformanceRef
 GenericSignatureBuilder::lookupConformance(CanType dependentType,
                                            Type conformingReplacementType,
                                            ProtocolDecl *conformedProtocol) {
