@@ -127,12 +127,6 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Private declarations are inaccessible from different files unless
     // this is WMO and we're in the same module.
     case FormalLinkage::Private: {
-      // The only time we don't have an associated DC is in the
-      // integrated REPL, where we also don't have a concept of other
-      // source files within the current module.
-      if (!AssociatedDeclContext)
-        return (decl->getModuleContext() != getSwiftModule());
-
       // The associated DC should be either a SourceFile or, in WMO mode,
       // a ModuleDecl.  In the WMO modes, IRGen will ensure that private
       // declarations are usable throughout the module.  Therefore, in
