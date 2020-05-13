@@ -304,16 +304,17 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
 
 /// Check whether the given declaration contains its own generic parameters,
 /// and therefore is not representable in Objective-C.
-static bool checkObjCWithGenericParams(const AbstractFunctionDecl *AFD,
-                                       ObjCReason Reason) {
-  bool Diagnose = shouldDiagnoseObjCReason(Reason, AFD->getASTContext());
+static bool checkObjCWithGenericParams(const ValueDecl *VD, ObjCReason Reason) {
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, VD->getASTContext());
 
-  if (AFD->getGenericParams()) {
+  auto *GC = VD->getAsGenericContext();
+  assert(GC);
+  if (GC->getGenericParams()) {
     // Diagnose this problem, if asked to.
     if (Diagnose) {
-      AFD->diagnose(diag::objc_invalid_with_generic_params,
-                    getObjCDiagnosticAttrKind(Reason));
-      describeObjCReason(AFD, Reason);
+      VD->diagnose(diag::objc_invalid_with_generic_params,
+                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason));
+      describeObjCReason(VD, Reason);
     }
 
     return true;
@@ -854,6 +855,8 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
 
   if (checkObjCInForeignClassContext(SD, Reason))
+    return false;
+  if (checkObjCWithGenericParams(SD, Reason))
     return false;
 
   // ObjC doesn't support class subscripts.
