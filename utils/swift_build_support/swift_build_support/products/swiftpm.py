@@ -53,6 +53,25 @@ class SwiftPM(product.Product):
             "--build-dir", self.build_dir,
             "--llbuild-build-dir", llbuild_build_dir
         ]
+
+        # Pass Dispatch directory down if we built it
+        dispatch_build_dir = os.path.join(
+            build_root, '%s-%s' % ("libdispatch", host_target))
+
+        if os.path.exists(dispatch_build_dir):
+            helper_cmd += [
+                "--dispatch-build-dir", dispatch_build_dir
+            ]
+
+        # Pass Foundation directory down if we built it
+        foundation_build_dir = os.path.join(
+            build_root, '%s-%s' % ("foundation", host_target))
+
+        if os.path.exists(foundation_build_dir):
+            helper_cmd += [
+                "--foundation-build-dir", foundation_build_dir
+            ]
+
         helper_cmd.extend(additional_params)
 
         shell.call(helper_cmd)

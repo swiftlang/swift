@@ -195,9 +195,9 @@ func testKeyPath(sub: Sub, optSub: OptSub,
 
   let _: AnyKeyPath = \A.property
   let _: AnyKeyPath = \C<A>.value
-  let _: AnyKeyPath = \.property // expected-error{{ambiguous}}
+  let _: AnyKeyPath = \.property // expected-error {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{24-24=<#Root#>}}
   let _: AnyKeyPath = \C.value // expected-error{{generic parameter 'T' could not be inferred}}
-  let _: AnyKeyPath = \.value // expected-error{{ambiguous}}
+  let _: AnyKeyPath = \.value // expected-error {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{24-24=<#Root#>}}
 
   let _ = \Prop.[nonHashableSub] // expected-error{{subscript index of type 'NonHashableSub' in a key path must be Hashable}}
   let _ = \Prop.[sub, sub]
@@ -891,6 +891,15 @@ struct SR_12290 {
     foo4(\.property.count) // Ok
     foo4(\SR_12290.property.count) // Ok
   }
+}
+
+func testKeyPathHole() {
+  _ = \.x // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{8-8=<#Root#>}}
+  let _ : AnyKeyPath = \.x 
+  // expected-error@-1 {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{25-25=<#Root#>}}
+
+  func f(_ i: Int) {}
+  f(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
 }
 
 func testSyntaxErrors() { // expected-note{{}}

@@ -182,6 +182,10 @@ public:
     /// This chunk should not be inserted into the editor buffer.
     TypeAnnotation,
 
+    /// Structured group version of 'TypeAnnotation'.
+    /// This grouped chunks should not be inserted into the editor buffer.
+    TypeAnnotationBegin,
+
     /// A brace statement -- left brace and right brace.  The preferred
     /// position to put the cursor after the completion result is inserted
     /// into the editor buffer is between the braces.
@@ -195,7 +199,8 @@ public:
     return Kind == ChunkKind::CallParameterBegin ||
            Kind == ChunkKind::GenericParameterBegin ||
            Kind == ChunkKind::OptionalBegin ||
-           Kind == ChunkKind::CallParameterTypeBegin;
+           Kind == ChunkKind::CallParameterTypeBegin ||
+           Kind == ChunkKind::TypeAnnotationBegin;
   }
 
   static bool chunkHasText(ChunkKind Kind) {
@@ -884,7 +889,7 @@ public:
       : Cache(Cache) {}
 
   void setAnnotateResult(bool flag) { CurrentResults.annotateResult = flag; }
-  bool getAnnnoateResult() { return CurrentResults.annotateResult; }
+  bool getAnnotateResult() { return CurrentResults.annotateResult; }
 
   /// Allocate a string owned by the code completion context.
   StringRef copyString(StringRef Str);

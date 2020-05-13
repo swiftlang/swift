@@ -7421,7 +7421,7 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
 GenericSignature
 AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
-         GenericSignatureImpl *baseSignature,
+         const GenericSignatureImpl *baseSignature,
          SmallVector<GenericTypeParamType *, 2> addedParameters,
          SmallVector<Requirement, 2> addedRequirements) const {
   // If nothing is added to the base signature, just return the base
@@ -7534,7 +7534,7 @@ AbstractGenericSignatureRequest::evaluate(
 GenericSignature
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator, ModuleDecl *parentModule,
-        GenericSignatureImpl *parentSig,
+        const GenericSignatureImpl *parentSig,
         GenericParamSource paramSource,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,
