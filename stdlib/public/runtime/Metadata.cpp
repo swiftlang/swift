@@ -4654,6 +4654,8 @@ static StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
   return StringRef();
 }
 
+using AssociatedTypeWitness = std::atomic<const Metadata *>;
+
 SWIFT_CC(swift)
 static MetadataResponse
 swift_getAssociatedTypeWitnessSlowImpl(
@@ -4677,8 +4679,8 @@ swift_getAssociatedTypeWitnessSlowImpl(
 
   // Retrieve the witness.
   unsigned witnessIndex = assocType - reqBase;
-  auto *witnessAddr = &((const Metadata **)wtable)[witnessIndex];
-  auto witness = *witnessAddr;
+  auto *witnessAddr = &((AssociatedTypeWitness*)wtable)[witnessIndex];
+  auto witness = witnessAddr->load(std::memory_order_acquire);
 
 #if SWIFT_PTRAUTH
   uint16_t extraDiscriminator = assocType->Flags.getExtraDiscriminator();
@@ -4781,8 +4783,14 @@ swift_getAssociatedTypeWitnessSlowImpl(
   if (response.State == MetadataState::Complete) {
     // We pass type metadata around as unsigned pointers, but we sign them
     // in witness tables, which doesn't provide all that much extra security.
-    initAssociatedTypeProtocolWitness(witnessAddr, assocTypeMetadata,
-                                      *assocType);
+    auto valueToStore = assocTypeMetadata;
+#if SWIFT_PTRAUTH
+    valueToStore = ptrauth_sign_unauthenticated(valueToStore,
+                       swift_ptrauth_key_associated_type,
+                       ptrauth_blend_discriminator(witnessAddr,
+                                                   extraDiscriminator));
+#endif
+    witnessAddr->store(valueToStore, std::memory_order_release);
   }
 
   return response;
@@ -4799,8 +4807,8 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
 
   // If the low bit of the witness is clear, it's already a metadata pointer.
   unsigned witnessIndex = assocType - reqBase;
-  auto *witnessAddr = &((const void* *)wtable)[witnessIndex];
-  auto witness = *witnessAddr;
+  auto *witnessAddr = &((const AssociatedTypeWitness *)wtable)[witnessIndex];
+  auto witness = witnessAddr->load(std::memory_order_acquire);
 
 #if SWIFT_PTRAUTH
   uint16_t extraDiscriminator = assocType->Flags.getExtraDiscriminator();
@@ -4818,6 +4826,8 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   return swift_getAssociatedTypeWitnessSlow(request, wtable, conformingType,
                                             reqBase, assocType);
 }
+
+using AssociatedConformanceWitness = std::atomic<void *>;
 
 SWIFT_CC(swift)
 static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
@@ -4844,8 +4854,8 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
 
   // Retrieve the witness.
   unsigned witnessIndex = assocConformance - reqBase;
-  auto *witnessAddr = &((void**)wtable)[witnessIndex];
-  auto witness = *witnessAddr;
+  auto *witnessAddr = &((AssociatedConformanceWitness*)wtable)[witnessIndex];
+  auto witness = witnessAddr->load(std::memory_order_acquire);
 
 #if SWIFT_PTRAUTH
   // For associated protocols, the witness is signed with address
@@ -4903,9 +4913,18 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
 
     // The access function returns an unsigned pointer for now.
 
-    // We can't just use initAssociatedConformanceProtocolWitness because we
-    // also use this function for base protocols.
-    initProtocolWitness(witnessAddr, assocWitnessTable, *assocConformance);
+    auto valueToStore = assocWitnessTable;
+#if SWIFT_PTRAUTH
+    if (assocConformance->Flags.isSignedWithAddress()) {
+      uint16_t extraDiscriminator =
+        assocConformance->Flags.getExtraDiscriminator();
+      valueToStore = ptrauth_sign_unauthenticated(valueToStore,
+                         swift_ptrauth_key_associated_conformance,
+                         ptrauth_blend_discriminator(witnessAddr,
+                                                     extraDiscriminator));
+    }
+#endif
+    witnessAddr->store(valueToStore, std::memory_order_release);
 
     return assocWitnessTable;
   }
@@ -4926,8 +4945,8 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
 
   // Retrieve the witness.
   unsigned witnessIndex = assocConformance - reqBase;
-  auto *witnessAddr = &((const void* *)wtable)[witnessIndex];
-  auto witness = *witnessAddr;
+  auto *witnessAddr = &((AssociatedConformanceWitness*)wtable)[witnessIndex];
+  auto witness = witnessAddr->load(std::memory_order_acquire);
 
 #if SWIFT_PTRAUTH
   uint16_t extraDiscriminator = assocConformance->Flags.getExtraDiscriminator();
