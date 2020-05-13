@@ -92,7 +92,7 @@ func invalidDiffWrtClass(_ x: Class) -> Class {
 }
 
 protocol Proto {}
-// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Proto' does not conform to 'Differentiable'}}
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Proto' does not conform to 'Differentiable'}}
 @differentiable(wrt: x)
 func invalidDiffWrtExistential(_ x: Proto) -> Proto {
   return x
@@ -382,6 +382,7 @@ struct TF_521<T: FloatingPoint> {
   var real: T
   var imaginary: T
 
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'TF_521<T>' does not conform to 'Differentiable'}}
   @differentiable(where T: Differentiable, T == T.TangentVector)
   init(real: T = 0, imaginary: T = 0) {
     self.real = real

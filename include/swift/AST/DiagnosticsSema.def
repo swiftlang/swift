@@ -3007,8 +3007,6 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
       "attribute for transpose registration instead", ())
-ERROR(differentiable_attr_void_result,none,
-      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclNameRef, Type))
 // TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
@@ -3027,9 +3025,6 @@ ERROR(differentiable_attr_invalid_access,none,
       "derivative function %0 is required to either be public or "
       "'@usableFromInline' because the original function %1 is public or "
       "'@usableFromInline'", (DeclNameRef, DeclName))
-ERROR(differentiable_attr_result_not_differentiable,none,
-      "can only differentiate functions with results that conform to "
-      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 ERROR(differentiable_attr_protocol_req_where_clause,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'where' clause", ())
@@ -3140,6 +3135,9 @@ ERROR(autodiff_attr_original_void_result,none,
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
       "cannot differentiate functions with both an 'inout' parameter and a "
       "result", ())
+ERROR(autodiff_attr_result_not_differentiable,none,
+      "can only differentiate functions with results that conform to "
+      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
