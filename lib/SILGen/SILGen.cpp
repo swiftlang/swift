@@ -1868,8 +1868,7 @@ SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
 
   auto *unit = desc.context.get<FileUnit *>();
   auto *mod = unit->getParentModule();
-  auto M = std::unique_ptr<SILModule>(
-      new SILModule(mod, desc.conv, desc.opts, unit, /*wholeModule*/ false));
+  auto M = SILModule::createEmptyModule(desc.context, desc.conv, desc.opts);
   SILGenModuleRAII scope(*M, mod);
 
   if (auto *file = dyn_cast<SourceFile>(unit)) {
@@ -1891,8 +1890,7 @@ SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
   }
 
   auto *mod = desc.context.get<ModuleDecl *>();
-  auto M = std::unique_ptr<SILModule>(
-      new SILModule(mod, desc.conv, desc.opts, mod, /*wholeModule*/ true));
+  auto M = SILModule::createEmptyModule(desc.context, desc.conv, desc.opts);
   SILGenModuleRAII scope(*M, mod);
 
   for (auto file : mod->getFiles()) {

@@ -107,8 +107,6 @@ enum class SILStage {
 /// when a Swift compilation context is lowered to SIL.
 class SILModule {
   friend class SILFunctionBuilder;
-  friend class SILGenSourceFileRequest;
-  friend class SILGenWholeModuleRequest;
 
 public:
   using FunctionListType = llvm::ilist<SILFunction>;
@@ -265,10 +263,6 @@ private:
   /// The indexed profile data to be used for PGO, or nullptr.
   std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
 
-  /// True if this SILModule really contains the whole module, i.e.
-  /// optimizations can assume that they see the whole module.
-  bool wholeModule;
-
   /// The options passed into this SILModule.
   const SILOptions &Options;
 
@@ -283,11 +277,8 @@ private:
   /// invalidation message is sent.
   llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
 
-  // Intentionally marked private so that we need to use 'constructSIL()'
-  // to construct a SILModule.
-  SILModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-            const SILOptions &Options, const DeclContext *associatedDC,
-            bool wholeModule);
+  SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+            Lowering::TypeConverter &TC, const SILOptions &Options);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -358,23 +349,14 @@ public:
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
 
-  /// Construct a SIL module from an AST module.
+  /// Create and return an empty SIL module suitable for generating or parsing
+  /// SIL into.
   ///
-  /// The module will be constructed in the Raw stage. The provided AST module
-  /// should contain source files.
-  ///
-  /// If a source file is provided, SIL will only be emitted for decls in that
-  /// source file.
+  /// \param context The associated decl context. This should be a FileUnit in
+  /// single-file mode, and a ModuleDecl in whole-module mode.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, Lowering::TypeConverter &TC,
-               const SILOptions &Options, FileUnit *sf = nullptr);
-
-  /// Create and return an empty SIL module that we can
-  /// later parse SIL bodies directly into, without converting from an AST.
-  static std::unique_ptr<SILModule>
-  createEmptyModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-                    const SILOptions &Options,
-                    bool WholeModule = false);
+  createEmptyModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
+                    Lowering::TypeConverter &TC, const SILOptions &Options);
 
   /// Get the Swift module associated with this SIL module.
   ModuleDecl *getSwiftModule() const { return TheSwiftModule; }
@@ -382,15 +364,15 @@ public:
   ASTContext &getASTContext() const;
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
 
-  /// Get the Swift DeclContext associated with this SIL module.
+  /// Get the Swift DeclContext associated with this SIL module. This is never
+  /// null.
   ///
   /// All AST declarations within this context are assumed to have been fully
   /// processed as part of generating this module. This allows certain passes
   /// to make additional assumptions about these declarations.
   ///
   /// If this is the same as TheSwiftModule, the entire module is being
-  /// compiled as a single unit. If this is null, no context-based assumptions
-  /// can be made.
+  /// compiled as a single unit.
   const DeclContext *getAssociatedContext() const {
     return AssociatedDeclContext;
   }
@@ -398,7 +380,7 @@ public:
   /// Returns true if this SILModule really contains the whole module, i.e.
   /// optimizations can assume that they see the whole module.
   bool isWholeModule() const {
-    return wholeModule;
+    return isa<ModuleDecl>(AssociatedDeclContext);
   }
 
   bool isStdlibModule() const;

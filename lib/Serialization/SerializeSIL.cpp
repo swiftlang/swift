@@ -2645,9 +2645,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // Go through all SILVTables in SILMod and write them if we should
   // serialize everything.
   // FIXME: Resilience: could write out vtable for fragile classes.
-  const DeclContext *assocDC = SILMod->getAssociatedContext();
-  assert(assocDC && "cannot serialize SIL without an associated DeclContext");
-  (void)assocDC;
   for (const SILVTable &vt : SILMod->getVTables()) {
     if ((ShouldSerializeAll || vt.isSerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(vt.getClass()))
