@@ -201,36 +201,31 @@ extension Array where Element: Differentiable {
   func _vjpSubscript(index: Int) -> (
     value: Element, pullback: (Element.TangentVector) -> TangentVector
   ) {
-    func pullback(_ gradientIn: Element.TangentVector) -> TangentVector {
-      var gradientOut = [Element.TangentVector](
+    func pullback(_ v: Element.TangentVector) -> TangentVector {
+      var dSelf = [Element.TangentVector](
         repeating: .zero,
         count: count)
-      gradientOut[index] = gradientIn
-      return TangentVector(gradientOut)
+      dSelf[index] = v
+      return TangentVector(dSelf)
     }
     return (self[index], pullback)
   }
 
   @usableFromInline
   @derivative(of: +)
-  static func _vjpConcatenate(_ lhs: [Element], _ rhs: [Element]) -> (
-    value: [Element],
+  static func _vjpConcatenate(_ lhs: Self, _ rhs: Self) -> (
+    value: Self,
     pullback: (TangentVector) -> (TangentVector, TangentVector)
   ) {
-    func pullback(_ gradientIn: TangentVector) -> (TangentVector, TangentVector)
-    {
+    func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
       precondition(
-        gradientIn.base.count == lhs.count + rhs.count,
+        v.base.count == lhs.count + rhs.count,
         "+ should receive gradient with count equal to sum of operand "
-          + "counts, but counts are: gradient \(gradientIn.base.count), "
+          + "counts, but counts are: gradient \(v.base.count), "
           + "lhs \(lhs.count), rhs \(rhs.count)")
       return (
-        TangentVector(
-          [Element.TangentVector](
-            gradientIn.base[0..<lhs.count])),
-        TangentVector(
-          [Element.TangentVector](
-            gradientIn.base[lhs.count...]))
+        TangentVector([Element.TangentVector](v.base[0..<lhs.count])),
+        TangentVector([Element.TangentVector](v.base[lhs.count...]))
       )
     }
     return (lhs + rhs, pullback)
@@ -244,8 +239,11 @@ extension Array where Element: Differentiable {
     value: Void, pullback: (inout TangentVector) -> Element.TangentVector
   ) {
     let appendedElementIndex = count
-    defer { append(element) }
-    return ((), { dself in dself.base[appendedElementIndex] })
+    append(element)
+    return ((), { v in
+      defer { v.base.removeLast() }
+      return v.base[appendedElementIndex]
+    })
   }
 
   @usableFromInline
@@ -307,6 +305,37 @@ extension Array where Element: Differentiable {
 
 extension Array where Element: Differentiable {
   @inlinable
+  @differentiable(wrt: self)
+  public func differentiableMap<Result: Differentiable>(
+    _ body: @differentiable (Element) -> Result
+  ) -> [Result] {
+    map(body)
+  }
+
+  @inlinable
+  @derivative(of: differentiableMap)
+  internal func _vjpDifferentiableMap<Result: Differentiable>(
+    _ body: @differentiable (Element) -> Result
+  ) -> (
+    value: [Result],
+    pullback: (Array<Result>.TangentVector) -> Array.TangentVector
+  ) {
+    var values: [Result] = []
+    var pullbacks: [(Result.TangentVector) -> Element.TangentVector] = []
+    for x in self {
+      let (y, pb) = valueWithPullback(at: x, in: body)
+      values.append(y)
+      pullbacks.append(pb)
+    }
+    func pullback(_ tans: Array<Result>.TangentVector) -> Array.TangentVector {
+      .init(zip(tans.base, pullbacks).map { tan, pb in pb(tan) })
+    }
+    return (value: values, pullback: pullback)
+  }
+}
+
+extension Array where Element: Differentiable {
+  @inlinable
   @differentiable(wrt: (self, initialResult))
   public func differentiableReduce<Result: Differentiable>(
     _ initialResult: Result,
@@ -351,36 +380,5 @@ extension Array where Element: Differentiable {
         return (TangentVector(elementTangents.base.reversed()), resultTangent)
       }
     )
-  }
-}
-
-extension Array where Element: Differentiable {
-  @inlinable
-  @differentiable(wrt: self)
-  public func differentiableMap<Result: Differentiable>(
-    _ body: @differentiable (Element) -> Result
-  ) -> [Result] {
-    map(body)
-  }
-
-  @inlinable
-  @derivative(of: differentiableMap)
-  internal func _vjpDifferentiableMap<Result: Differentiable>(
-    _ body: @differentiable (Element) -> Result
-  ) -> (
-    value: [Result],
-    pullback: (Array<Result>.TangentVector) -> Array.TangentVector
-  ) {
-    var values: [Result] = []
-    var pullbacks: [(Result.TangentVector) -> Element.TangentVector] = []
-    for x in self {
-      let (y, pb) = valueWithPullback(at: x, in: body)
-      values.append(y)
-      pullbacks.append(pb)
-    }
-    func pullback(_ tans: Array<Result>.TangentVector) -> Array.TangentVector {
-      .init(zip(tans.base, pullbacks).map { tan, pb in pb(tan) })
-    }
-    return (value: values, pullback: pullback)
   }
 }

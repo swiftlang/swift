@@ -372,6 +372,17 @@ ArrayAutoDiffTests.test("Array.+=") {
 }
 
 ArrayAutoDiffTests.test("Array.append") {
+  func appending(_ array: [Float], _ element: Float) -> [Float] {
+    var result = array
+    result.append(element)
+    return result
+  }
+  do {
+    let v = FloatArrayTan([1, 2, 3, 4])
+    expectEqual((.init([1, 2, 3]), 4),
+                pullback(at: [0, 0, 0], 0, in: appending)(v))
+  }
+
   func identity(_ array: [Float]) -> [Float] {
     var results: [Float] = []
     for i in withoutDerivative(at: array.indices) {
@@ -379,8 +390,10 @@ ArrayAutoDiffTests.test("Array.append") {
     }
     return results
   }
-  let v = FloatArrayTan([4, -5, 6])
-  expectEqual(v, pullback(at: [1, 2, 3], in: identity)(v))
+  do {
+    let v = FloatArrayTan([4, -5, 6])
+    expectEqual(v, pullback(at: [1, 2, 3], in: identity)(v))
+  }
 }
 
 ArrayAutoDiffTests.test("Array.init(repeating:count:)") {
