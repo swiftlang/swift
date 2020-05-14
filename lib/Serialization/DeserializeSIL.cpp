@@ -1837,6 +1837,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
 
+  case SILInstructionKind::BeginCOWMutationInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    unsigned isNative = Attr;
+    ResultVal = Builder.createBeginCOWMutation(
+        Loc,
+        getLocalValue(ValID,
+            getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn)),
+        isNative != 0);
+    break;
+  }
+
+  case SILInstructionKind::EndCOWMutationInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    unsigned keepUnique = Attr;
+    ResultVal = Builder.createEndCOWMutation(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID),
+                                        (SILValueCategory)TyCategory, Fn)),
+        keepUnique != 0);
+    break;
+  }
+
   case SILInstructionKind::DestructureTupleInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     SILValue Operand = getLocalValue(
@@ -2298,19 +2320,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto ResultTy = Val->getType().getFieldType(
         Field, SILMod, Builder.getTypeExpansionContext());
     ResultVal = Builder.createRefElementAddr(Loc, Val, Field,
-                                             ResultTy);
+                                          ResultTy, /*Immutable*/ Attr & 0x1);
     break;
   }
   case SILInstructionKind::RefTailAddrInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
-    assert(Attr == 0);
     assert((SILValueCategory)TyCategory == SILValueCategory::Address);
     ResultVal = Builder.createRefTailAddr(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                         (SILValueCategory)TyCategory2, Fn)),
-        getSILType(MF->getType(TyID), SILValueCategory::Address, Fn));
+        getSILType(MF->getType(TyID), SILValueCategory::Address, Fn),
+        /*Immutable*/ Attr & 0x1);
     break;
   }
   case SILInstructionKind::ClassMethodInst:
