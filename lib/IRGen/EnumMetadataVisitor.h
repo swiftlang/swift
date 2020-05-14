@@ -44,6 +44,9 @@ protected:
 
 public:
   void layout() {
+    static_assert(MetadataAdjustmentIndex::ValueType == 1,
+                  "Adjustment index must be synchronized with this layout");
+
     // Metadata header.
     super::layout();
 

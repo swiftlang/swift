@@ -49,6 +49,9 @@ protected:
 
 public:
   void layout() {
+    static_assert(MetadataAdjustmentIndex::Class == 2,
+                  "Adjustment index must be synchronized with this layout");
+
     // HeapMetadata header.
     asImpl().addDestructorFunction();
 
