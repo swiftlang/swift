@@ -47,11 +47,7 @@
 
 using namespace swift;
 
-#ifdef __wasm__
-bool swift::_swift_disableExclusivityChecking = true;
-#else
 bool swift::_swift_disableExclusivityChecking = false;
-#endif
 
 static const char *getAccessName(ExclusivityFlags flags) {
   switch (flags) {
