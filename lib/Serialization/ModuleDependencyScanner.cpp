@@ -102,13 +102,17 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> modulePath = moduleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
-  ModuleDependencies Result = ModuleDependencies::forSwiftInterface(
-      modulePath.str().str(), moduleInterfacePath.str());
+  Optional<ModuleDependencies> Result;
   std::error_code code;
   auto hasError = astDelegate.runInSubContext(moduleName.str(),
                                               moduleInterfacePath.str(),
-                                              StringRef(), SourceLoc(),
-                                              [&](ASTContext &Ctx) {
+                                              StringRef(),
+                                              SourceLoc(),
+                [&](ASTContext &Ctx, ArrayRef<StringRef> Args, StringRef Hash) {
+    Result = ModuleDependencies::forSwiftInterface(modulePath.str().str(),
+                                                   moduleInterfacePath.str(),
+                                                   Args,
+                                                   Hash);
     // Open the interface file.
     auto &fs = *Ctx.SourceMgr.getFileSystem();
     auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
@@ -125,14 +129,14 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
 
     // Walk the source file to find the import declarations.
     llvm::StringSet<> alreadyAddedModules;
-    Result.addModuleDependencies(*sourceFile, alreadyAddedModules);
+    Result->addModuleDependencies(*sourceFile, alreadyAddedModules);
     return false;
   });
 
   if (hasError) {
     return code;
   }
-  return Result;
+  return *Result;
 }
 
 Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(

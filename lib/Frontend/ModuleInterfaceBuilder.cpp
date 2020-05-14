@@ -163,8 +163,10 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
       llvm::RestorePrettyStackState(savedInnerPrettyStackState);
     };
 
-    SubError = subASTDelegate.runInSubCompilerInstance(moduleName, interfacePath,
-                                                       OutPath, diagnosticLoc,
+    SubError = subASTDelegate.runInSubCompilerInstance(moduleName,
+                                                       interfacePath,
+                                                       OutPath,
+                                                       diagnosticLoc,
                                            [&](SubCompilerInstanceInfo &info) {
     auto &SubInstance = *info.Instance;
     auto subInvocation = SubInstance.getInvocation();
