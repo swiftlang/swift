@@ -222,8 +222,11 @@ extension Array where Element: Differentiable {
     value: Void, pullback: (inout TangentVector) -> Element.TangentVector
   ) {
     let appendedElementIndex = count
-    defer { append(element) }
-    return ((), { dself in dself.base[appendedElementIndex] })
+    append(element)
+    return ((), { v in
+      defer { v.base.removeLast() }
+      return v.base[appendedElementIndex]
+    })
   }
 
   @usableFromInline
