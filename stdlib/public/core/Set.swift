@@ -116,13 +116,10 @@
 /// collection wrapper instead of a set. To restore efficient set operations,
 /// create a new set from the result.
 ///
-///     let morePrimes = primes.union([11, 13, 17, 19])
-///
-///     let laterPrimes = morePrimes.filter { $0 > 10 }
-///     // 'laterPrimes' is of type Array<Int>
-///
-///     let laterPrimesSet = Set(morePrimes.filter { $0 > 10 })
-///     // 'laterPrimesSet' is of type Set<Int>
+///     let primesStrings = primes.map(String.init)
+///     // 'primesStrings' is of type Array<String>
+///     let primesStringsSet = Set(primes.map(String.init))
+///     // 'primesStringsSet' is of type Set<String>
 ///
 /// Bridging Between Set and NSSet
 /// ==============================
@@ -522,14 +519,14 @@ extension Set: SetAlgebra {
   ///
   ///     var classDays: Set<DayOfTheWeek> = [.wednesday, .friday]
   ///     print(classDays.insert(.monday))
-  ///     // Prints "(true, .monday)"
+  ///     // Prints "(inserted: true, memberAfterInsert: DayOfTheWeek.monday)"
   ///     print(classDays)
-  ///     // Prints "[.friday, .wednesday, .monday]"
+  ///     // Prints "[DayOfTheWeek.friday, DayOfTheWeek.wednesday, DayOfTheWeek.monday]"
   ///
   ///     print(classDays.insert(.friday))
-  ///     // Prints "(false, .friday)"
+  ///     // Prints "(inserted: false, memberAfterInsert: DayOfTheWeek.friday)"
   ///     print(classDays)
-  ///     // Prints "[.friday, .wednesday, .monday]"
+  ///     // Prints "[DayOfTheWeek.friday, DayOfTheWeek.wednesday, DayOfTheWeek.monday]"
   ///
   /// - Parameter newMember: An element to insert into the set.
   /// - Returns: `(true, newMember)` if `newMember` was not contained in the
@@ -559,7 +556,7 @@ extension Set: SetAlgebra {
   ///
   ///     var classDays: Set<DayOfTheWeek> = [.monday, .wednesday, .friday]
   ///     print(classDays.update(with: .monday))
-  ///     // Prints "Optional(.monday)"
+  ///     // Prints "Optional(DayOfTheWeek.monday)"
   ///
   /// - Parameter newMember: An element to insert into the set.
   /// - Returns: An element equal to `newMember` if the set already contained
