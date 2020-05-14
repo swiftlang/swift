@@ -407,8 +407,9 @@ enum Color {
   static var svar: Color { return .Red }
 }
 
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
-// expected-error@-1 {{cannot infer contextual base in reference to member 'Unknown'}}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) })
+// expected-error@-1 {{no 'map' candidates produce the expected contextual result type '(Int, Color)'}}
+// expected-note@-2 {{found candidate with type '((Int) throws -> (Int, _)) throws -> Array<(Int, _)>'}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
@@ -1248,10 +1249,9 @@ func f11(_ n: Int) {}
 func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
 f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
 
-// FIXME: Arguably we should also prefer the conformance failure in this case.
-let f12: (Int) -> Void = { _ in }
-func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}
-f12(3, f4)// expected-error {{extra argument in call}}
+let f12: (Int) -> Void = { _ in } // expected-note {{candidate '(Int) -> Void' requires 1 argument, but 2 were provided}}
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' == 'P2')}}
+f12(3, f4)// expected-error {{no exact matches in call to global function 'f12'}}
 
 // SR-12242
 struct SR_12242_R<Value> {}

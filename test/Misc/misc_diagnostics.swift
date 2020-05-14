@@ -114,11 +114,11 @@ func test17875634() {
   var col = 2
   var coord = (row, col)
 
-  match += (1, 2) // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
+  match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
-  match += (row, col) // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
+  match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
-  match += coord // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
+  match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
   match.append(row, col) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 
