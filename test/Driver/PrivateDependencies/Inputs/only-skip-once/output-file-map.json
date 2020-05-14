@@ -1,0 +1,23 @@
+{
+  "": {
+    "swift-dependencies": "master.swiftdeps"
+  },
+  "main.swift": {
+    "dependencies": "main.d",
+    "object": "main.o",
+    "swiftmodule": "main~partial.swiftmodule",
+    "swift-dependencies": "main.swiftdeps"
+  },
+  "file1.swift": {
+    "dependencies": "file1.d",
+    "object": "file1.o",
+    "swiftmodule": "file1~partial.swiftmodule",
+    "swift-dependencies": "file1.swiftdeps"
+  },
+  "file2.swift": {
+    "dependencies": "file2.d",
+    "object": "file2.o",
+    "swiftmodule": "file2~partial.swiftmodule",
+    "swift-dependencies": "file2.swiftdeps"
+  }
+}
