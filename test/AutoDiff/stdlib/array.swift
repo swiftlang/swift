@@ -317,42 +317,53 @@ ArrayAutoDiffTests.test("ExpressibleByArrayLiteralIndirect") {
 }
 
 ArrayAutoDiffTests.test("Array.+") {
-  struct TwoArrays : Differentiable {
-    var a: [Float]
-    var b: [Float]
-  }
-
-  func sumFirstThreeConcatenated(_ arrs: TwoArrays) -> Float {
-    let c = arrs.a + arrs.b
+  func sumFirstThreeConcatenating(_ a: [Float], _ b: [Float]) -> Float {
+    let c = a + b
     return c[0] + c[1] + c[2]
   }
 
   expectEqual(
-    TwoArrays.TangentVector(
-      a: FloatArrayTan([1, 1]),
-      b: FloatArrayTan([1, 0])),
-    gradient(
-      at: TwoArrays(a: [0, 0], b: [0, 0]),
-      in: sumFirstThreeConcatenated))
+    (.init([1, 1]), .init([1, 0])),
+    gradient(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating))
   expectEqual(
-    TwoArrays.TangentVector(
-      a: FloatArrayTan([1, 1, 1, 0]),
-      b: FloatArrayTan([0, 0])),
-    gradient(
-      at: TwoArrays(a: [0, 0, 0, 0], b: [0, 0]),
-      in: sumFirstThreeConcatenated))
+    (.init([1, 1, 1, 0]), .init([0, 0])),
+    gradient(at: [0, 0, 0, 0], [0, 0], in: sumFirstThreeConcatenating))
   expectEqual(
-    TwoArrays.TangentVector(
-      a: FloatArrayTan([]),
-      b: FloatArrayTan([1, 1, 1, 0])),
-    gradient(
-      at: TwoArrays(a: [], b: [0, 0, 0, 0]),
-      in: sumFirstThreeConcatenated))
+    (.init([]), .init([1, 1, 1, 0])),
+    gradient(at: [], [0, 0, 0, 0], in: sumFirstThreeConcatenating))
 
   func identity(_ array: [Float]) -> [Float] {
     var results: [Float] = []
     for i in withoutDerivative(at: array.indices) {
       results = results + [array[i]]
+    }
+    return results
+  }
+  let v = FloatArrayTan([4, -5, 6])
+  expectEqual(v, pullback(at: [1, 2, 3], in: identity)(v))
+}
+
+ArrayAutoDiffTests.test("Array.+=") {
+  func sumFirstThreeConcatenating(_ a: [Float], _ b: [Float]) -> Float {
+    var c = a
+    c += b
+    return c[0] + c[1] + c[2]
+  }
+
+  expectEqual(
+    (.init([1, 1]), .init([1, 0])),
+    gradient(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating))
+  expectEqual(
+    (.init([1, 1, 1, 0]), .init([0, 0])),
+    gradient(at: [0, 0, 0, 0], [0, 0], in: sumFirstThreeConcatenating))
+  expectEqual(
+    (.init([]), .init([1, 1, 1, 0])),
+    gradient(at: [], [0, 0, 0, 0], in: sumFirstThreeConcatenating))
+
+  func identity(_ array: [Float]) -> [Float] {
+    var results: [Float] = []
+    for i in withoutDerivative(at: array.indices) {
+      results += [array[i]]
     }
     return results
   }

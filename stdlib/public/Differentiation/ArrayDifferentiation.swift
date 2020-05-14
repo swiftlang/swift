@@ -261,6 +261,33 @@ extension Array where Element: Differentiable {
 
 extension Array where Element: Differentiable {
   @usableFromInline
+  @derivative(of: +=)
+  static func _vjpAppend(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, pullback: (inout TangentVector) -> TangentVector
+  ) {
+    let lhsCount = lhs.count
+    lhs += rhs
+    return ((), { v in
+      let drhs =
+        TangentVector(.init(v.base.dropFirst(lhsCount)))
+      let rhsCount = drhs.base.count
+      v.base.removeLast(rhsCount)
+      return drhs
+    })
+  }
+
+  @usableFromInline
+  @derivative(of: +=)
+  static func _jvpAppend(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, differential: (inout TangentVector, TangentVector) -> Void
+  ) {
+    lhs += rhs
+    return ((), { $0.base += $1.base })
+  }
+}
+
+extension Array where Element: Differentiable {
+  @usableFromInline
   @derivative(of: init(repeating:count:))
   static func _vjpInit(repeating repeatedValue: Element, count: Int) -> (
     value: Self, pullback: (TangentVector) -> Element.TangentVector
