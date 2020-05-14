@@ -896,7 +896,7 @@ class TypeDecoder {
 private:
   template <typename T>
   bool decodeImplFunctionPart(Demangle::NodePointer node,
-                              SmallVectorImpl<T> &results) {
+                              llvm::SmallVectorImpl<T> &results) {
     if (node->getNumChildren() != 2)
       return true;
     
@@ -919,7 +919,7 @@ private:
 
   bool decodeImplFunctionParam(
       Demangle::NodePointer node,
-      SmallVectorImpl<ImplFunctionParam<BuiltType>> &results) {
+      llvm::SmallVectorImpl<ImplFunctionParam<BuiltType>> &results) {
     // Children: `convention, differentiability?, type`
     if (node->getNumChildren() != 2 && node->getNumChildren() != 3)
       return true;
@@ -1021,7 +1021,7 @@ private:
 
   bool decodeMangledFunctionInputType(
       Demangle::NodePointer node,
-      SmallVectorImpl<FunctionParam<BuiltType>> &params,
+      llvm::SmallVectorImpl<FunctionParam<BuiltType>> &params,
       bool &hasParamFlags) {
     // Look through a couple of sugar nodes.
     if (node->getKind() == NodeKind::Type ||

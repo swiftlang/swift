@@ -54,11 +54,11 @@ StringRef prettyPlatformString(PlatformKind platform);
 /// If ForTargetVariant is true then for zippered builds the target-variant
 /// triple will be used rather than the target to determine whether the
 /// platform is active.
-bool isPlatformActive(PlatformKind Platform, LangOptions &LangOpts,
+bool isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                       bool ForTargetVariant = false);
 
 /// Returns the target platform for the given language options.
-PlatformKind targetPlatform(LangOptions &LangOpts);
+PlatformKind targetPlatform(const LangOptions &LangOpts);
 
 /// Returns true when availability attributes from the "parent" platform
 /// should also apply to the "child" platform for declarations without

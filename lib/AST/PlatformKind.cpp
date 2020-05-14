@@ -92,7 +92,7 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
   llvm_unreachable("bad PlatformKind");
 }
 
-bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts,
+bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                              bool ForTargetVariant) {
   llvm::Triple TT = LangOpts.Target;
 
@@ -105,7 +105,7 @@ bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts,
                                    LangOpts.EnableAppExtensionRestrictions);
 }
 
-PlatformKind swift::targetPlatform(LangOptions &LangOpts) {
+PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
   if (LangOpts.Target.isMacOSX()) {
     return (LangOpts.EnableAppExtensionRestrictions
                 ? PlatformKind::OSXApplicationExtension

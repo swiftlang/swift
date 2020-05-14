@@ -1815,12 +1815,8 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl) {
 /// knowable based on the Decl and the compilation mode?
 bool swift::calleesAreStaticallyKnowable(SILModule &module,
                                          AbstractFunctionDecl *afd) {
-  const DeclContext *assocDC = module.getAssociatedContext();
-  if (!assocDC)
-    return false;
-
   // Only handle members defined within the SILModule's associated context.
-  if (!afd->isChildContextOf(assocDC))
+  if (!afd->isChildContextOf(module.getAssociatedContext()))
     return false;
 
   if (afd->isDynamic()) {
@@ -1859,12 +1855,8 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module,
 // FIXME: Merge this with calleesAreStaticallyKnowable above
 bool swift::calleesAreStaticallyKnowable(SILModule &module,
                                          EnumElementDecl *eed) {
-  const DeclContext *assocDC = module.getAssociatedContext();
-  if (!assocDC)
-    return false;
-
   // Only handle members defined within the SILModule's associated context.
-  if (!eed->isChildContextOf(assocDC))
+  if (!eed->isChildContextOf(module.getAssociatedContext()))
     return false;
 
   if (eed->isDynamic()) {

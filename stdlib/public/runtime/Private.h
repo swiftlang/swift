@@ -387,10 +387,10 @@ public:
   /// Use with \c _getTypeByMangledName to decode potentially-generic types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
     /// The complete set of generic arguments.
-    const SmallVectorImpl<const Metadata *> &allGenericArgs;
+    const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs;
 
     /// The counts of generic parameters at each level.
-    const SmallVectorImpl<unsigned> &genericParamCounts;
+    const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
 
   public:
     /// Initialize a new function object to handle substitutions. Both
@@ -404,10 +404,10 @@ public:
     /// \param genericParamCounts The count of generic parameters at each
     /// generic level, typically gathered by _gatherGenericParameterCounts.
     explicit SubstGenericParametersFromWrittenArgs(
-        const SmallVectorImpl<const Metadata *> &allGenericArgs,
-        const SmallVectorImpl<unsigned> &genericParamCounts)
-      : allGenericArgs(allGenericArgs), genericParamCounts(genericParamCounts) {
-    }
+        const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+        const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
+        : allGenericArgs(allGenericArgs),
+          genericParamCounts(genericParamCounts) {}
 
     const Metadata *getMetadata(unsigned depth, unsigned index) const;
     const WitnessTable *getWitnessTable(const Metadata *type,

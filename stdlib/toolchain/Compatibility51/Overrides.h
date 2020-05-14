@@ -14,20 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Metadata.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
 using ConformsToSwiftProtocol_t =
   const ProtocolConformanceDescriptor *(const Metadata * const type,
                                         const ProtocolDescriptor *protocol,
-                                        StringRef moduleName);
+                                        llvm::StringRef moduleName);
 
 const ProtocolConformanceDescriptor *
 swift51override_conformsToSwiftProtocol(const Metadata * const type,
                                         const ProtocolDescriptor *protocol,
-                                        StringRef moduleName,
+                                        llvm::StringRef moduleName,
                                         ConformsToSwiftProtocol_t *original);
 
 } // end namespace swift

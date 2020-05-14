@@ -1881,7 +1881,7 @@ ClangImporter::getWrapperForModule(const clang::Module *mod,
   return clangUnit->getParentModule();
 }
 
-PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
+PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     : platformKind(targetPlatform(langOpts)) {
   switch (platformKind) {
   case PlatformKind::iOS:

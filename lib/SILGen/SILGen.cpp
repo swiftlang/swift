@@ -1817,6 +1817,8 @@ class SILGenModuleRAII {
 
 public:
   void emitSourceFile(SourceFile *sf) {
+    assert(sf->ASTStage == SourceFile::TypeChecked);
+
     SourceFileScope scope(SGM, sf);
     for (Decl *D : sf->getTopLevelDecls()) {
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
@@ -1835,7 +1837,7 @@ public:
     }
   }
 
-  SILGenModuleRAII(SILModule &M, ModuleDecl *SM) : SGM{M, SM} {}
+  explicit SILGenModuleRAII(SILModule &M) : SGM{M, M.getSwiftModule()} {}
 
   ~SILGenModuleRAII() {
     // Emit any delayed definitions that were forced.
@@ -1858,60 +1860,35 @@ public:
 } // end anonymous namespace
 
 std::unique_ptr<SILModule>
-SILGenSourceFileRequest::evaluate(Evaluator &evaluator,
-                                  SILGenDescriptor desc) const {
+SILGenerationRequest::evaluate(Evaluator &evaluator,
+                               SILGenDescriptor desc) const {
   // If we have a .sil file to parse, defer to the parsing request.
   if (desc.getSourceFileToParse()) {
     return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
   }
 
-  auto *unit = desc.context.get<FileUnit *>();
-  auto *mod = unit->getParentModule();
-  auto M = std::unique_ptr<SILModule>(
-      new SILModule(mod, desc.conv, desc.opts, unit, /*wholeModule*/ false));
-  SILGenModuleRAII scope(*M, mod);
+  // Otherwise perform SIL generation of the passed SourceFiles.
+  auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
+                                             desc.opts);
+  SILGenModuleRAII scope(*silMod);
 
-  if (auto *file = dyn_cast<SourceFile>(unit)) {
-    scope.emitSourceFile(file);
-  } else if (auto *file = dyn_cast<SerializedASTFile>(unit)) {
-    if (file->isSIB())
-      M->getSILLoader()->getAllForModule(mod->getName(), file);
+  for (auto file : desc.getFiles()) {
+    if (auto *nextSF = dyn_cast<SourceFile>(file))
+      scope.emitSourceFile(nextSF);
   }
 
-  return M;
-}
-
-std::unique_ptr<SILModule>
-SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
-                                   SILGenDescriptor desc) const {
-  // If we have a .sil file to parse, defer to the parsing request.
-  if (desc.getSourceFileToParse()) {
-    return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
-  }
-
-  auto *mod = desc.context.get<ModuleDecl *>();
-  auto M = std::unique_ptr<SILModule>(
-      new SILModule(mod, desc.conv, desc.opts, mod, /*wholeModule*/ true));
-  SILGenModuleRAII scope(*M, mod);
-
-  for (auto file : mod->getFiles()) {
-    auto nextSF = dyn_cast<SourceFile>(file);
-    if (!nextSF || nextSF->ASTStage != SourceFile::TypeChecked)
-      continue;
-    scope.emitSourceFile(nextSF);
-  }
-
-  // Also make sure to process any intermediate files that may contain SIL
-  bool hasSIB = std::any_of(mod->getFiles().begin(),
-                            mod->getFiles().end(),
-                            [](const FileUnit *File) -> bool {
+  // Also make sure to process any intermediate files that may contain SIL.
+  bool hasSIB = llvm::any_of(desc.getFiles(), [](const FileUnit *File) -> bool {
     auto *SASTF = dyn_cast<SerializedASTFile>(File);
     return SASTF && SASTF->isSIB();
   });
-  if (hasSIB)
-    M->getSILLoader()->getAllForModule(mod->getName(), nullptr);
+  if (hasSIB) {
+    auto primary = desc.context.dyn_cast<FileUnit *>();
+    silMod->getSILLoader()->getAllForModule(silMod->getSwiftModule()->getName(),
+                                            primary);
+  }
 
-  return M;
+  return silMod;
 }
 
 std::unique_ptr<SILModule>
@@ -1919,7 +1896,7 @@ swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
                             const SILOptions &options) {
   auto desc = SILGenDescriptor::forWholeModule(mod, tc, options);
   return llvm::cantFail(
-      mod->getASTContext().evaluator(SILGenWholeModuleRequest{desc}));
+      mod->getASTContext().evaluator(SILGenerationRequest{desc}));
 }
 
 std::unique_ptr<SILModule>
@@ -1927,5 +1904,5 @@ swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
                             const SILOptions &options) {
   auto desc = SILGenDescriptor::forFile(sf, tc, options);
   return llvm::cantFail(
-      sf.getASTContext().evaluator(SILGenSourceFileRequest{desc}));
+      sf.getASTContext().evaluator(SILGenerationRequest{desc}));
 }

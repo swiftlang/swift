@@ -1224,14 +1224,9 @@ static bool isFirstObjectFileInModule(IRGenModule &IGM) {
   if (IGM.getSILModule().isWholeModule())
     return IGM.IRGen.getPrimaryIGM() == &IGM;
 
-  const DeclContext *DC = IGM.getSILModule().getAssociatedContext();
-  if (!DC)
-    return false;
-
-  assert(!isa<ModuleDecl>(DC) && "that would be a whole module build");
-  assert(isa<FileUnit>(DC) && "compiling something smaller than a file?");
-  ModuleDecl *containingModule = cast<FileUnit>(DC)->getParentModule();
-  return containingModule->getFiles().front() == DC;
+  auto *file = cast<FileUnit>(IGM.getSILModule().getAssociatedContext());
+  auto *containingModule = file->getParentModule();
+  return containingModule->getFiles().front() == file;
 }
 
 void IRGenModule::emitAutolinkInfo() {
