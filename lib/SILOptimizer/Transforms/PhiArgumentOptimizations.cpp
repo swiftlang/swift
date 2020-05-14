@@ -1,4 +1,4 @@
-//===--- RedundantPhiElimination.cpp - Remove redundant phi arguments -----===//
+//===--- PhiArgumentOptimizations.cpp - phi argument optimizations --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass eliminates redundant basic block arguments.
+// This file contains optimizations for basic block phi arguments.
 //
 //===----------------------------------------------------------------------===//
 
@@ -200,8 +200,186 @@ bool RedundantPhiEliminationPass::valuesAreEqual(SILValue val1, SILValue val2) {
   return true;
 }
 
+/// Replaces struct phi-arguments by a struct field.
+///
+/// If only a single field of a struct phi-argument is used, replace the
+/// argument by the field value.
+///
+/// \code
+///     br bb(%str)
+///   bb(%phi):
+///     %f = struct_extract %phi, #Field // the only use of %phi
+///     use %f
+/// \endcode
+///
+/// is replaced with
+///
+/// \code
+///     %f = struct_extract %str, #Field
+///     br bb(%f)
+///   bb(%phi):
+///     use %phi
+/// \endcode
+///
+/// This also works if the phi-argument is in a def-use cycle.
+///
+/// TODO: Handle tuples (but this is not so important).
+///
+/// The PhiExpansionPass is not part of SimplifyCFG because
+/// * no other SimplifyCFG optimization depends on it.
+/// * compile time: it doesn't need to run every time SimplifyCFG runs.
+///
+class PhiExpansionPass : public SILFunctionTransform {
+public:
+  PhiExpansionPass() {}
+
+  void run() override;
+
+private:
+  bool optimizeArg(SILPhiArgument *initialArg);
+};
+
+void PhiExpansionPass::run() {
+  SILFunction *F = getFunction();
+  if (!F->shouldOptimize())
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "*** PhiReduction on function: "
+                          << F->getName() << " ***\n");
+
+  bool changed = false;
+  for (SILBasicBlock &block : *getFunction()) {
+    for (auto argAndIdx : enumerate(block.getArguments())) {
+      if (!argAndIdx.value()->isPhiArgument())
+        continue;
+      
+      unsigned idx = argAndIdx.index();
+      
+      // Try multiple times on the same argument to handle nested structs.
+      while (optimizeArg(cast<SILPhiArgument>(block.getArgument(idx)))) {
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  }
+}
+
+bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
+  llvm::SmallVector<const SILPhiArgument *, 8> collectedPhiArgs;
+  llvm::SmallPtrSet<const SILPhiArgument *, 8> handled;
+  collectedPhiArgs.push_back(initialArg);
+  handled.insert(initialArg);
+
+  VarDecl *field = nullptr;
+  SILType newType;
+  Optional<SILLocation> loc;
+  
+  // First step: collect all phi-arguments which can be transformed.
+  unsigned workIdx = 0;
+  while (workIdx < collectedPhiArgs.size()) {
+    const SILArgument *arg = collectedPhiArgs[workIdx++];
+    for (Operand *use : arg->getUses()) {
+      SILInstruction *user = use->getUser();
+      if (isa<DebugValueInst>(user))
+        continue;
+      
+      if (auto *extr = dyn_cast<StructExtractInst>(user)) {
+        if (field && extr->getField() != field)
+          return false;
+        field = extr->getField();
+        newType = extr->getType();
+        loc = extr->getLoc();
+        continue;
+      }
+      if (auto *branch = dyn_cast<BranchInst>(user)) {
+        const SILPhiArgument *destArg = branch->getArgForOperand(use);
+        assert(destArg);
+        if (handled.insert(destArg).second)
+          collectedPhiArgs.push_back(destArg);
+        continue;
+      }
+      if (auto *branch = dyn_cast<CondBranchInst>(user)) {
+        const SILPhiArgument *destArg = branch->getArgForOperand(use);
+
+        // destArg is null if the use is the condition and not a block argument.
+        if (!destArg)
+          return false;
+
+        if (handled.insert(destArg).second)
+          collectedPhiArgs.push_back(destArg);
+        continue;
+      }
+      // An unexpected use -> bail.
+      return false;
+    }
+  }
+
+  if (!field)
+    return false;
+
+  // Second step: do the transformation.
+  for (const SILPhiArgument *arg : collectedPhiArgs) {
+    SILBasicBlock *block = arg->getParent();
+    SILArgument *newArg = block->replacePhiArgumentAndReplaceAllUses(
+                             arg->getIndex(), newType, arg->getOwnershipKind());
+
+    // First collect all users, then do the transformation.
+    // We don't want to modify the use list while iterating over it.
+    llvm::SmallVector<DebugValueInst *, 8> debugValueUsers;
+    llvm::SmallVector<StructExtractInst *, 8> structExtractUsers;
+
+    for (Operand *use : newArg->getUses()) {
+      SILInstruction *user = use->getUser();
+      if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
+        debugValueUsers.push_back(dvi);
+        continue;
+      }
+      if (auto *sei = dyn_cast<StructExtractInst>(user)) {
+        structExtractUsers.push_back(sei);
+        continue;
+      }
+      // Branches are handled below by handling incoming phi operands.
+      assert(isa<BranchInst>(user) || isa<CondBranchInst>(user));
+    }
+  
+    for (DebugValueInst *dvi : debugValueUsers) {
+      dvi->eraseFromParent();
+    }
+    for (StructExtractInst *sei : structExtractUsers) {
+      sei->replaceAllUsesWith(sei->getOperand());
+      sei->eraseFromParent();
+    }
+
+    // "Move" the struct_extract to the predecessors.
+    llvm::SmallVector<Operand *, 8> incomingOps;
+    bool success = newArg->getIncomingPhiOperands(incomingOps);
+    (void)success;
+    assert(success && "could not get all incoming phi values");
+
+    for (Operand *op : incomingOps) {
+      // Did we already handle the operand?
+      if (op->get()->getType() == newType)
+        continue;
+
+      SILInstruction *branchInst = op->getUser();
+      SILBuilder builder(branchInst);
+      auto *strExtract = builder.createStructExtract(loc.getValue(),
+                                                     op->get(), field, newType);
+      op->set(strExtract);
+    }
+  }
+  return true;
+}
+
 } // end anonymous namespace
 
 SILTransform *swift::createRedundantPhiElimination() {
   return new RedundantPhiEliminationPass();
+}
+
+SILTransform *swift::createPhiExpansion() {
+  return new PhiExpansionPass();
 }
