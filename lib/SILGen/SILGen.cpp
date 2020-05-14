@@ -1817,6 +1817,8 @@ class SILGenModuleRAII {
 
 public:
   void emitSourceFile(SourceFile *sf) {
+    assert(sf->ASTStage == SourceFile::TypeChecked);
+
     SourceFileScope scope(SGM, sf);
     for (Decl *D : sf->getTopLevelDecls()) {
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
@@ -1893,10 +1895,8 @@ SILGenWholeModuleRequest::evaluate(Evaluator &evaluator,
   SILGenModuleRAII scope(*M, mod);
 
   for (auto file : mod->getFiles()) {
-    auto nextSF = dyn_cast<SourceFile>(file);
-    if (!nextSF || nextSF->ASTStage != SourceFile::TypeChecked)
-      continue;
-    scope.emitSourceFile(nextSF);
+    if (auto *nextSF = dyn_cast<SourceFile>(file))
+      scope.emitSourceFile(nextSF);
   }
 
   // Also make sure to process any intermediate files that may contain SIL
