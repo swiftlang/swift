@@ -54,7 +54,9 @@ namespace llvm {
   class raw_ostream;
   class APInt;
   class APFloat;
+#if !defined(swiftCore_EXPORTS)
   template <typename Fn> class function_ref;
+#endif
 } // end namespace llvm
 
 
@@ -92,7 +94,9 @@ namespace swift {
   // Other common classes.
   using llvm::APFloat;
   using llvm::APInt;
+#if !defined(swiftCore_EXPORTS)
   using llvm::function_ref;
+#endif
   using llvm::NoneType;
   using llvm::raw_ostream;
 } // end namespace swift
