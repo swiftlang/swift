@@ -707,6 +707,24 @@ bb0(%0 : $Class1, %1 : $Builtin.Word):
   return %0 : $Class1
 }
 
+// CHECK-LABEL: sil public_external [transparent] [serialized] @test_cow_mutation
+sil [transparent] [serialized] @test_cow_mutation : $@convention(thin) (@owned Class1) -> @owned Class1 {
+bb0(%0 : $Class1):
+  // CHECK: (%1, %2) = begin_cow_mutation %0 : $Class1
+  (%1, %2) = begin_cow_mutation %0 : $Class1
+  // CHECK: %3 = end_cow_mutation [keep_unique] %2 : $Class1
+  %3 = end_cow_mutation [keep_unique] %2 : $Class1
+  // CHECK: (%4, %5) = begin_cow_mutation [native] %0 : $Class1
+  (%4, %5) = begin_cow_mutation [native] %0 : $Class1
+  // CHECK: %6 = end_cow_mutation %5 : $Class1
+  %6 = end_cow_mutation %5 : $Class1
+  // CHECK: [[T:%[0-9]+]] = ref_tail_addr [immutable] %3 : $Class1, $Val
+  %7 = ref_tail_addr [immutable] %3 : $Class1, $Val
+  // CHECK: ref_element_addr [immutable] %3 : $Class1, #Class1.a
+  %8 = ref_element_addr [immutable] %3 : $Class1, #Class1.a
+  return %0 : $Class1
+}
+
 // CHECK-LABEL: @closure_test
 sil [transparent] [serialized] @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
 sil [transparent] [serialized] @closure0 : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, @inout Int) -> ()
@@ -1489,7 +1507,8 @@ bb0:
   %87 = function_ref @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> ()
   %88 = function_ref @test_tail_elems_dynamic : $@convention(thin) (Builtin.Word, Builtin.Word, @thick Class1.Type) -> ()
   %89 = function_ref @test_tail_addr : $@convention(thin) (@owned Class1, Builtin.Word) -> @owned Class1
-  %90 = function_ref @closure_test : $@convention(thin) () -> ()
+  %90 = function_ref @test_cow_mutation : $@convention(thin) (@owned Class1) -> @owned Class1
+  %91 = function_ref @closure_test : $@convention(thin) () -> ()
   %97 = function_ref @test_switch_union : $@convention(thin) (MaybePair) -> ()
   %99 = function_ref @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
   %101 = function_ref @test_switch_value : $@convention(thin) (Builtin.Word) -> ()

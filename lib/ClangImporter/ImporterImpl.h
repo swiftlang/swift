@@ -135,10 +135,9 @@ enum class ImportTypeKind {
 
   /// Import the type of a function parameter.
   ///
-  /// Special handling:
-  /// * C and C++ pointers become `UnsafePointer?` or `UnsafeMutablePointer?`
-  /// * C++ references become `UnsafePointer` or `UnsafeMutablePointer`
-  /// * Bridging that requires type conversions is allowed.
+  /// This provides special treatment for C++ references (which become
+  /// [inout] parameters) and C pointers (which become magic [inout]-able types),
+  /// among other things, and enables the conversion of bridged types.
   /// Parameters are always considered CF-audited.
   Parameter,
 

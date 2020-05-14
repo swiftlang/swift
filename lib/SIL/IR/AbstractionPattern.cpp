@@ -319,8 +319,6 @@ getClangFunctionType(const clang::Type *clangType) {
     clangType = ptrTy->getPointeeType().getTypePtr();
   } else if (auto blockTy = clangType->getAs<clang::BlockPointerType>()) {
     clangType = blockTy->getPointeeType().getTypePtr();
-  } else if (auto refTy = clangType->getAs<clang::ReferenceType>()) {
-    clangType = refTy->getPointeeType().getTypePtr();
   }
   return clangType->castAs<clang::FunctionType>();
 }

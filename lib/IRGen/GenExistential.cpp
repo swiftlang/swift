@@ -1075,6 +1075,10 @@ public:
     (void)e.claim(getNumStoredProtocols());
   }
 
+  virtual ReferenceCounting getReferenceCountingType() const override {
+    return Refcounting;
+  }
+
 // We can just re-use the reference storage types.
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
   void name##LoadStrong(IRGenFunction &IGF, Address existential, \
