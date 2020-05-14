@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
-// TODO(hlopko): Remove -D_DLL and ensure it's present in target-clang
-// RUN: %target-clang -c %S/Inputs/reference.cpp -I %S/Inputs -o %t/reference.o -std=c++17 -D_DLL
+// RUN: %target-clang -c %S/Inputs/reference.cpp -I %S/Inputs -o %t/reference.o -std=c++17
 // RUN: %target-build-swift %s -I %S/Inputs -o %t/reference %t/reference.o -Xfrontend -enable-cxx-interop -Xcc -std=c++17
 // RUN: %target-codesign %t/reference
 // RUN: %target-run %t/reference
