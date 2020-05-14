@@ -104,6 +104,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_1 | %FileCheck %s -check-prefix=TUPLEELEM_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_2 | %FileCheck %s -check-prefix=TUPLEELEM_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYPATH_THUNK_BASE | %FileCheck %s -check-prefix=KEYPATH_THUNK_BASE
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -828,4 +830,21 @@ func testTupleElement(arg: (SimpleEnum, SimpleEnum)) {
 // TUPLEELEM_1: End completions
   testTupleElement(arg: (.foo, .bar, .#^TUPLEELEM_2^#))
 // TUPLEELEM_2-NOT: Begin completions
+}
+
+func testKeyPathThunkInBase() {
+    struct TestKP {
+        var value: Int { 1 }
+    }
+    struct TestKPResult {
+        func testFunc(_ arg: SimpleEnum) {}
+    }
+    func foo(_ fn: (TestKP) -> Int) -> TestKPResult { TestKPResult() }
+
+    foo(\.value).testFunc(.#^KEYPATH_THUNK_BASE^#)
+// KEYPATH_THUNK_BASE: Begin completions, 3 items
+// KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     foo[#SimpleEnum#]; name=foo
+// KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
+// KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
+// KEYPATH_THUNK_BASE: End completions
 }
