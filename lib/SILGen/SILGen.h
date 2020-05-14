@@ -60,19 +60,16 @@ public:
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
   llvm::DenseMap<NormalProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
 
-  struct DelayedFunction {
-    /// Insert the entity after the given function when it's emitted.
-    SILDeclRef insertAfter;
-    /// Code that generates the function.
-    std::function<void (SILFunction *)> emitter;
-  };
-
-  /// Mapping from SILDeclRefs to delayed SILFunction generators for
-  /// non-externally-visible symbols.
-  llvm::DenseMap<SILDeclRef, DelayedFunction> delayedFunctions;
+  /// Mapping from SILDeclRefs to where the given function will be inserted
+  /// when it's emitted. Used for non-externally visible symbols.
+  llvm::DenseMap<SILDeclRef, SILDeclRef> delayedFunctions;
 
   /// Queue of delayed SILFunctions that need to be forced.
-  std::deque<std::pair<SILDeclRef, DelayedFunction>> forcedFunctions;
+  std::deque<SILDeclRef> forcedFunctions;
+
+  /// Mapping global VarDecls to their onceToken and onceFunc, respectively.
+  llvm::DenseMap<VarDecl *, std::pair<SILGlobalVariable *,
+                                      SILFunction *>> delayedGlobals;
 
   /// The most recent declaration we considered for emission.
   SILDeclRef lastEmittedFunction;
