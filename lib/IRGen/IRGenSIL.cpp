@@ -2659,16 +2659,20 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   if (isSimplePartialApply(*this, i)) {
     Explosion function;
     
-    auto schema = IGM.getTypeInfo(v->getType()).getSchema();
+    auto &ti = IGM.getTypeInfo(v->getType());
+    auto schema = ti.getSchema();
     assert(schema.size() == 2);
     auto calleeTy = schema[0].getScalarType();
     auto contextTy = schema[1].getScalarType();
-    
     auto callee = getLoweredExplosion(i->getCallee());
     auto calleeValue = callee.claimNext();
     assert(callee.empty());
     calleeValue = Builder.CreateBitOrPointerCast(calleeValue, calleeTy);
-    function.add(calleeValue);
+    
+    // Re-sign the implementation pointer as a closure entry point.
+    auto calleeFn = FunctionPointer::forExplosionValue(*this, calleeValue,
+                                                       i->getOrigCalleeType());
+    function.add(calleeFn.getExplosionValue(*this, i->getFunctionType()));
 
     Explosion context;
     for (auto arg : i->getArguments()) {
