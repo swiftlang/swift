@@ -104,6 +104,19 @@ import G
 // CHECK-NEXT: "swift": "G"
 // CHECK-NEXT: }
 
+// CHECK: "contextHash": "{{.*}}",
+// CHECK: "commandLine": [
+// CHECK: "-compile-module-from-interface"
+// CHECK: "-target"
+// CHECK: "-sdk"
+// CHECK: "-o"
+// CHECK: /clang-module-cache/G-{{.*}}.swiftmodule"
+// CHECK: "-module-name"
+// CHECK: "G"
+// CHECK: "-swift-version"
+// CHECK: "5"
+// CHECK: ]
+
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "Swift.swiftmodule",
 
