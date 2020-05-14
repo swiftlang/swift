@@ -1288,6 +1288,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::BeginCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::ReturnInst:
@@ -1309,6 +1311,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());
     } else if (auto *IEC = dyn_cast<IsEscapingClosureInst>(&SI)) {
       Attr = IEC->getVerificationType();
+    } else if (auto *BCMI = dyn_cast<BeginCOWMutationInst>(&SI)) {
+      Attr = BCMI->isNative();
+    } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
+      Attr = ECMI->doKeepUnique();
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
@@ -1794,11 +1800,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // where the field decl is streamed as a ValueID.
     SILValue operand;
     Decl *tDecl;
+    unsigned attr = 0;
     switch (SI.getKind()) {
     default: llvm_unreachable("Out of sync with parent switch");
     case SILInstructionKind::RefElementAddrInst:
       operand = cast<RefElementAddrInst>(&SI)->getOperand();
       tDecl = cast<RefElementAddrInst>(&SI)->getField();
+      attr = unsigned(cast<RefElementAddrInst>(&SI)->isImmutable());
       break;
     case SILInstructionKind::StructElementAddrInst:
       operand = cast<StructElementAddrInst>(&SI)->getOperand();
@@ -1827,7 +1835,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneValueOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0, S.addDeclRef(tDecl),
+        (unsigned)SI.getKind(), attr, S.addDeclRef(tDecl),
         S.addTypeRef(operand->getType().getASTType()),
         (unsigned)operand->getType().getCategory(),
         addValueRef(operand));
@@ -1835,7 +1843,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::RefTailAddrInst: {
     auto *RTAI = cast<RefTailAddrInst>(&SI);
-    writeOneTypeOneOperandLayout(RTAI->getKind(), 0,
+    writeOneTypeOneOperandLayout(RTAI->getKind(), unsigned(RTAI->isImmutable()),
                                  RTAI->getType(),
                                  RTAI->getOperand());
     break;

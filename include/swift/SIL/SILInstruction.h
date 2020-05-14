@@ -1162,8 +1162,7 @@ public:
   }
 };
 
-/// A template base class for instructions that take a single SILValue operand
-/// and has no result or a single value result.
+/// A template base class for instructions that take a single SILValue operand.
 template<SILInstructionKind Kind, typename Base>
 class UnaryInstructionBase : public InstructionBase<Kind, Base> {
   // Space for 1 operand.
@@ -5806,11 +5805,24 @@ class RefElementAddrInst
   friend SILBuilder;
 
   RefElementAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
-                     VarDecl *Field, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy, Field) {}
+                     VarDecl *Field, SILType ResultTy, bool IsImmutable)
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy, Field) {
+    setImmutable(IsImmutable);
+  }
 
 public:
   ClassDecl *getClassDecl() const { return cast<ClassDecl>(getParentDecl()); }
+
+  /// Returns true if all loads of the same instance variable from the same
+  /// class reference operand are guaranteed to yield the same value.
+  bool isImmutable() const {
+    return SILInstruction::Bits.RefElementAddrInst.Immutable;
+  }
+
+  /// Sets the immutable flag.
+  void setImmutable(bool immutable = true) {
+    SILInstruction::Bits.RefElementAddrInst.Immutable = immutable;
+  }
 };
 
 /// RefTailAddrInst - Derive the address of the first element of the first
@@ -5821,8 +5833,11 @@ class RefTailAddrInst
 {
   friend SILBuilder;
 
-  RefTailAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy) {}
+  RefTailAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILType ResultTy,
+                  bool IsImmutable)
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy) {
+    setImmutable(IsImmutable);
+  }
 
 public:
   ClassDecl *getClassDecl() const {
@@ -5832,6 +5847,17 @@ public:
   }
 
   SILType getTailType() const { return getType().getObjectType(); }
+
+  /// Returns true if all loads of the same instance variable from the same
+  /// class reference operand are guaranteed to yield the same value.
+  bool isImmutable() const {
+    return SILInstruction::Bits.RefTailAddrInst.Immutable;
+  }
+
+  /// Sets the immutable flag.
+  void setImmutable(bool immutable = true) {
+    SILInstruction::Bits.RefTailAddrInst.Immutable = immutable;
+  }
 };
 
 /// MethodInst - Abstract base for instructions that implement dynamic
@@ -6560,6 +6586,106 @@ class IsUniqueInst
 
   IsUniqueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType BoolTy)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
+};
+
+class BeginCOWMutationInst;
+
+/// A result for the begin_cow_mutation instruction. See documentation for
+/// begin_cow_mutation for more information.
+class BeginCOWMutationResult final : public MultipleValueInstructionResult {
+public:
+  BeginCOWMutationResult(unsigned index, SILType type,
+                         ValueOwnershipKind ownershipKind)
+      : MultipleValueInstructionResult(ValueKind::BeginCOWMutationResult,
+                                       index, type, ownershipKind) {}
+
+  BeginCOWMutationInst *getParent(); // inline below
+  const BeginCOWMutationInst *getParent() const {
+    return const_cast<BeginCOWMutationResult *>(this)->getParent();
+  }
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::BeginCOWMutationResult;
+  }
+};
+
+/// Performs a uniqueness check of the operand for the purpose of modifying
+/// a copy-on-write object.
+///
+/// Returns two results: the first result is an Int1 which is the result of the
+/// uniqueness check. The second result is the class reference operand, which
+/// can be used for mutation.
+class BeginCOWMutationInst final
+    : public UnaryInstructionBase<SILInstructionKind::BeginCOWMutationInst,
+                                  MultipleValueInstruction>,
+      public MultipleValueInstructionTrailingObjects<
+          BeginCOWMutationInst, BeginCOWMutationResult>
+{
+  friend SILBuilder;
+  friend TrailingObjects;
+
+  bool native;
+
+  BeginCOWMutationInst(SILDebugLocation loc, SILValue operand,
+                       ArrayRef<SILType> resultTypes,
+                       ArrayRef<ValueOwnershipKind> resultOwnerships,
+                       bool isNative);
+
+  static BeginCOWMutationInst *
+  create(SILDebugLocation loc, SILValue operand, SILType BoolTy, SILFunction &F,
+         bool isNative);
+
+public:
+  using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
+
+  /// Returns the result of the uniqueness check.
+  SILValue getUniquenessResult() const {
+    return &getAllResultsBuffer()[0];
+  }
+
+  /// Returns the class reference which can be used for mutation.
+  SILValue getBufferResult() const {
+    return &getAllResultsBuffer()[1];
+  }
+
+  bool isNative() const {
+    return SILInstruction::Bits.BeginCOWMutationInst.Native;
+  }
+  
+  void setNative(bool native = true) {
+    SILInstruction::Bits.BeginCOWMutationInst.Native = native;
+  }
+};
+
+// Out of line to work around forward declaration issues.
+inline BeginCOWMutationInst *BeginCOWMutationResult::getParent() {
+  auto *Parent = MultipleValueInstructionResult::getParent();
+  return cast<BeginCOWMutationInst>(Parent);
+}
+
+/// Marks the end of the mutation of a reference counted object.
+class EndCOWMutationInst
+    : public UnaryInstructionBase<SILInstructionKind::EndCOWMutationInst,
+                                  SingleValueInstruction>
+{
+  friend SILBuilder;
+
+  bool keepUnique;
+
+  EndCOWMutationInst(SILDebugLocation DebugLoc, SILValue Operand,
+                     bool keepUnique)
+      : UnaryInstructionBase(DebugLoc, Operand, Operand->getType()) {
+    setKeepUnique(keepUnique);
+  }
+
+public:
+  bool doKeepUnique() const {
+    return SILInstruction::Bits.EndCOWMutationInst.KeepUnique;
+  }
+
+  void setKeepUnique(bool keepUnique = true) {
+    SILInstruction::Bits.EndCOWMutationInst.KeepUnique = keepUnique;
+  }
 };
 
 /// Given an escaping closure return true iff it has a non-nil context and the
