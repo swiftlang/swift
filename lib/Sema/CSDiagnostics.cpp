@@ -6125,6 +6125,28 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
   return true;
 }
 
+bool UnableToInferClosureParameterType::diagnoseAsError() {
+  auto *closure = castToExpr<ClosureExpr>(getRawAnchor());
+  auto paramIdx = getLocator()
+                      ->castLastElementTo<LocatorPathElt::TupleElement>()
+                      .getIndex();
+
+  auto *PD = closure->getParameters()->get(paramIdx);
+
+  llvm::SmallString<16> id;
+  llvm::raw_svector_ostream OS(id);
+
+  if (PD->isAnonClosureParam()) {
+    OS << "$" << paramIdx;
+  } else {
+    OS << "'" << PD->getParameterName() << "'";
+  }
+
+  auto loc = PD->isAnonClosureParam() ? getLoc() : PD->getLoc();
+  emitDiagnosticAt(loc, diag::cannot_infer_closure_parameter_type, OS.str());
+  return true;
+}
+
 bool UnableToInferClosureReturnType::diagnoseAsError() {
   auto *closure = castToExpr<ClosureExpr>(getRawAnchor());
 
