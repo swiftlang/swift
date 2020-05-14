@@ -1605,3 +1605,26 @@ struct rdar49990484Struct {
     }
   }
 }
+
+enum ProtocolAndTrivial {
+    case a(P)
+    case b(Int)
+}
+
+// Make sure "e" is destroyed in both cases.
+// CHECK-LABEL: sil hidden [ossa] @$s6switch30testEnumWithProtocolAndTrivialySbAA0efG0OF
+// CHECK: bb0(
+// CHECK: [[TMP:%[0-9]+]] = alloc_stack
+// CHECK: bb1:
+// CHECK: [[P:%[0-9]+]] = unchecked_take_enum_data_addr
+// CHECK: destroy_addr [[P]]
+// CHECK: bb2:
+// CHECK: destroy_addr [[TMP]]
+// CHECK-LABEL: end sil function '$s6switch30testEnumWithProtocolAndTrivialySbAA0efG0OF'
+func testEnumWithProtocolAndTrivial(_ e: ProtocolAndTrivial) -> Bool {
+    switch (e) {
+    case .a(_): return true
+    case .b(_): return true
+    }
+}
+

@@ -2048,9 +2048,12 @@ void PatternMatchEmission::emitEnumElementDispatch(
     break;
   }
 
+  CleanupCloner srcValueCleanupCloner(SGF, src.getFinalManagedValue());
+
   // Emit the switch_enum_addr instruction.
-  SILValue srcValue = src.getFinalManagedValue().forward(SGF);
-  SGF.B.createSwitchEnumAddr(loc, srcValue, blocks.getDefaultBlock(),
+  ManagedValue srcValue =
+      ManagedValue::forUnmanaged(src.getFinalManagedValue().forward(SGF));
+  SGF.B.createSwitchEnumAddr(loc, srcValue.getValue(), blocks.getDefaultBlock(),
                              blocks.getCaseBlocks(), blocks.getCounts(),
                              defaultCaseCount);
 
@@ -2074,6 +2077,13 @@ void PatternMatchEmission::emitEnumElementDispatch(
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M,
                                                SGF.getTypeExpansionContext());
       hasElt = !eltTy.getASTType()->isVoid();
+    }
+
+    // If the element type is trivial, the enum won't be consumed. In this case,
+    // make sure we emit a cleanup for the enum itself (not the data, which is
+    // trivial).
+    if (!hasElt || eltTy.isTrivial(SGF.getFunction())) {
+      srcValueCleanupCloner.clone(srcValue.getValue());
     }
 
     ConsumableManagedValue eltCMV, origCMV;
@@ -2124,8 +2134,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
       // nondestructively from an enum.
       switch (eltConsumption) {
       case CastConsumptionKind::TakeAlways:
-        eltValue =
-            SGF.B.createUncheckedTakeEnumDataAddr(loc, srcValue, elt, eltTy);
+        eltValue = SGF.B.createUncheckedTakeEnumDataAddr(
+            loc, srcValue.getValue(), elt, eltTy);
         break;
       case CastConsumptionKind::BorrowAlways:
         // If we reach this point, we know that we have a loadable
@@ -2135,9 +2145,14 @@ void PatternMatchEmission::emitEnumElementDispatch(
         // address only types do not support BorrowAlways.
         llvm_unreachable("not allowed");
       case CastConsumptionKind::CopyOnSuccess: {
-        auto copy = SGF.emitTemporaryAllocation(loc, srcValue->getType());
-        SGF.B.createCopyAddr(loc, srcValue, copy, IsNotTake, IsInitialization);
-        // We can always take from the copy.
+        auto copy = SGF.emitTemporaryAllocation(loc, srcValue.getType());
+        // If the element is trivial it won't be destroyed so we need to make
+        // sure we destroy the enum here.
+        if (eltTL->isTrivial())
+          copy = SGF.emitManagedBufferWithCleanup(copy).getValue();
+        SGF.B.createCopyAddr(loc, srcValue.getValue(), copy, IsNotTake,
+                             IsInitialization);
+        // We can always take from the managedCopy.
         eltConsumption = CastConsumptionKind::TakeAlways;
         eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, copy, elt, eltTy);
         break;
