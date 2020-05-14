@@ -20,6 +20,7 @@
 
 #include "GenericRequirement.h"
 #include "GenProto.h"
+#include "GenMeta.h"
 #include "IRGenModule.h"
 #include "MetadataVisitor.h"
 
