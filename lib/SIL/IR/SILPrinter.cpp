@@ -1775,13 +1775,15 @@ public:
     *this << EI->getField()->getName().get();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
-    *this << getIDAndType(EI->getOperand()) << ", #";
+    *this << (EI->isImmutable() ? "[immutable] " : "")
+          << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
   }
 
   void visitRefTailAddrInst(RefTailAddrInst *RTAI) {
-    *this << getIDAndType(RTAI->getOperand()) << ", " << RTAI->getTailType();
+    *this << (RTAI->isImmutable() ? "[immutable] " : "")
+          << getIDAndType(RTAI->getOperand()) << ", " << RTAI->getTailType();
   }
 
   void visitDestructureStructInst(DestructureStructInst *DSI) {
@@ -1938,6 +1940,16 @@ public:
   }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
+  }
+  void visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI) {
+    if (BCMI->isNative())
+      *this << "[native] ";
+    *this << getIDAndType(BCMI->getOperand());
+  }
+  void visitEndCOWMutationInst(EndCOWMutationInst *ECMI) {
+    if (ECMI->doKeepUnique())
+      *this << "[keep_unique] ";
+    *this << getIDAndType(ECMI->getOperand());
   }
   void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
     if (CUI->getVerificationType())
