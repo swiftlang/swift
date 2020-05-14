@@ -461,7 +461,19 @@ clang::QualType ClangTypeConverter::visitProtocolType(ProtocolType *type) {
 // Metatypes can be converted to Class when they are metatypes for concrete
 // classes. https://github.com/apple/swift/pull/27479#discussion_r344418131
 clang::QualType ClangTypeConverter::visitMetatypeType(MetatypeType *type) {
-  return getClangMetatypeType(ClangASTContext);
+  assert(type->hasRepresentation() &&
+         "metatype should have been assigned a representation");
+  switch (type->getRepresentation()) {
+  case MetatypeRepresentation::Thin:
+    return ClangASTContext.VoidTy;
+
+  case MetatypeRepresentation::Thick:
+    llvm_unreachable("thick metatypes don't have a corresponding Clang type");
+
+  case MetatypeRepresentation::ObjC:
+    return getClangMetatypeType(ClangASTContext);
+  }
+  llvm_unreachable("bad representation");
 }
 
 // TODO: [stronger-checking-in-clang-type-conversion]
