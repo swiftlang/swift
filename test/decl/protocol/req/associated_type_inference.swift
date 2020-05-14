@@ -527,3 +527,38 @@ extension S30 {
     T.bar()
   }
 }
+
+protocol P32 {
+  associatedtype A
+  associatedtype B
+  associatedtype C
+
+  func foo(arg: A) -> C
+  var bar: B { get }
+}
+protocol P33 {
+  associatedtype A
+
+  var baz: A { get } // expected-note {{protocol requires property 'baz' with type 'S31<T>.A' (aka 'Never'); do you want to add a stub?}}
+}
+protocol P34 {
+  associatedtype A
+
+  func boo() -> A // expected-note {{protocol requires function 'boo()' with type '() -> S31<T>.A' (aka '() -> Never'); do you want to add a stub?}}
+}
+struct S31<T> {}
+extension S31: P32 where T == Int {} // OK
+extension S31 where T == Int {
+  func foo(arg: Never) {}
+}
+extension S31 where T: Equatable {
+  var bar: Bool { true }
+}
+extension S31: P33 where T == Never {} // expected-error {{type 'S31<T>' does not conform to protocol 'P33'}}
+extension S31 where T == String {
+  var baz: Bool { true } // expected-note {{candidate has non-matching type 'Bool' [with A = S31<T>.A]}}
+}
+extension S31: P34 {} // expected-error {{type 'S31<T>' does not conform to protocol 'P34'}}
+extension S31 where T: P32 {
+  func boo() -> Void {} // expected-note {{candidate has non-matching type '<T> () -> Void' [with A = S31<T>.A]}}
+}
