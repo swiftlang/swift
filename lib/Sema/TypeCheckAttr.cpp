@@ -2750,7 +2750,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     ParamDecl *param = *init->getParameters()->begin();
     if (param->getArgumentName() != ctx.Id_erasing ||
         !param->getInterfaceType()->isEqual(genericParamType) ||
-        !genericSignature->conformsToProtocol(genericParamType, protocol))
+        !genericSignature->requiresProtocol(genericParamType, protocol))
       return false;
 
     // Allow other constraints as long as the init can be called with any

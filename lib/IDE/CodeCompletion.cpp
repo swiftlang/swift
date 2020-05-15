@@ -2344,7 +2344,7 @@ public:
       }
 
       if (t->isTypeParameter()) {
-        auto protos = genericSig->getConformsTo(t);
+        const auto protos = genericSig->getRequiredProtocols(t);
         if (!protos.empty())
           return buildProtocolComposition(protos);
       }
@@ -4729,7 +4729,7 @@ public:
     bool hasExplicitAnyObject = false;
     if (auto superTy = genericSig->getSuperclassBound(ResultT))
       opaqueTypes.push_back(superTy);
-    for (auto proto : genericSig->getConformsTo(ResultT))
+    for (const auto proto : genericSig->getRequiredProtocols(ResultT))
       opaqueTypes.push_back(proto->getDeclaredInterfaceType());
     if (auto layout = genericSig->getLayoutConstraint(ResultT))
       hasExplicitAnyObject = layout->isClass();

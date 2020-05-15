@@ -2416,7 +2416,7 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
     if (auto *generic = genericTy->getDecl()) {
       auto genericSig =
         generic->getDeclContext()->getGenericSignatureOfContext();
-      if (genericSig && genericSig->getConformsTo(type).empty()) {
+      if (genericSig && genericSig->getRequiredProtocols(type).empty()) {
         type = genericSig->getSuperclassBound(type);
         if (!type)
           return false;

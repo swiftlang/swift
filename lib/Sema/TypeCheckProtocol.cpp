@@ -3707,7 +3707,7 @@ CheckTypeWitnessResult swift::checkTypeWitness(DeclContext *dc,
   auto *module = dc->getParentModule();
 
   // Check protocol conformances.
-  for (auto reqProto : genericSig->getConformsTo(depTy)) {
+  for (const auto reqProto : genericSig->getRequiredProtocols(depTy)) {
     if (module->lookupConformance(contextType, reqProto)
             .isInvalid())
       return CheckTypeWitnessResult(reqProto->getDeclaredType());
