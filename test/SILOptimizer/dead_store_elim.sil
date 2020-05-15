@@ -231,21 +231,6 @@ bb0:
   return %4 : $()
 }
 
-// CHECK-LABEL: sil @store_after_store
-// CHECK: bb0
-// CHECK: {{ store}}
-// CHECK-NOT: {{ store}}
-// CHECK: return
-sil @store_after_store : $@convention(thin) (@owned B) -> () {
-bb0(%0 : $B):
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
-  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
-  store %0 to %1a : $*B
-  store %0 to %1a : $*B
-  %4 = tuple()
-  return %4 : $()
-}
-
 // CHECK-LABEL: sil @dead_store_elimination_over_noread_builtins
 // CHECK: bb0
 // CHECK-NEXT: load
@@ -1518,4 +1503,39 @@ bb0:
   dealloc_ref %1 : $foo
   dealloc_ref [stack] %1 : $foo
   return %3 : $Int
+}
+
+class F { }
+
+struct S {
+   var f : F
+}
+
+struct U {
+  var s : S
+}
+
+// Test that the second store is recorded as a read of the source.
+// Otherwise the first store will be removed.
+// CHECK-LABEL: @store_is_read_of_src
+// CHECK: store {{%[0-9]+}} to {{%[0-9]+}} : $*S
+// CHECK: store {{%[0-9]+}} to {{%[0-9]+}} : $*Builtin.RawPointer
+// CHECK: store {{%[0-9]+}} to {{%[0-9]+}} : $*F
+// CHECK-LABEL: end sil function 'store_is_read_of_src'
+sil @store_is_read_of_src : $@convention(thin) (S, @inout F) -> () {
+bb0(%0 : $S, %f : $*F):
+  %2 = alloc_stack $S, var, name "vs"
+  store %0 to %2 : $*S
+  %4 = address_to_pointer %2 : $*S to $Builtin.RawPointer
+  %9 = alloc_stack $U
+  %10 = unchecked_addr_cast %9 : $*U to $*Builtin.RawPointer
+  store %4 to %10 : $*Builtin.RawPointer
+  %12 = load %9 : $*U
+  %15 = struct_extract %12 : $U, #U.s
+  %16 = struct_extract %15 : $S, #S.f
+  dealloc_stack %9 : $*U
+  store %16 to %f : $*F
+  dealloc_stack %2 : $*S
+  %19 = tuple ()
+  return %19 : $()
 }

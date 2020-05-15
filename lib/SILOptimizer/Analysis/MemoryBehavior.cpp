@@ -250,21 +250,33 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
 }
 
 MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
+  MemBehavior srcBehabior = MemBehavior::None;
+  if (SI->getSrc()->getType().hasReferenceSemantics())
+    srcBehabior = MemBehavior::MayRead;
+
+  // TODO: Is there any other possible type that has reference/pointer semantics
+  // but isn't a reference or pointer?
+  if (SI->getSrc()->getType().getASTType() ==
+      SI->getSrc()->getType().getASTContext().TheRawPointerType)
+    srcBehabior = MemBehavior::MayRead;
+
   // No store besides the initialization of a "let"-variable
   // can have any effect on the value of this "let" variable.
   if (isLetValue()
       && (getAccessedAddress(SI->getDest()) != getValueAddress())) {
-    return MemBehavior::None;
+    return srcBehabior;
   }
   // If the store dest cannot alias the pointer in question, then the
   // specified value cannot be modified by the store.
   if (!mayAlias(SI->getDest()))
-    return MemBehavior::None;
+    return srcBehabior;
 
   // Otherwise, a store just writes.
   LLVM_DEBUG(llvm::dbgs() << "  Could not prove store does not alias inst. "
                              "Returning MayWrite.\n");
-  return MemBehavior::MayWrite;
+  if (srcBehabior == MemBehavior::None)
+    return MemBehavior::MayWrite;
+  return MemBehavior::MayReadWrite;
 }
 
 MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {

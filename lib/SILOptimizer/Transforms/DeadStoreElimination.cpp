@@ -984,6 +984,11 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
     S->DeadStores.push_back(I);
     ++NumDeadStores;
     return;
+  } else {
+    // If the store isn't dead there's a possibility that the store reads memory
+    // because the source is some kind of pointer or reference. Make sure we
+    // process this.
+    processUnknownReadInstForDSE(I);
   }
 
   // Partial dead store - stores to some locations are dead, but not all. This
