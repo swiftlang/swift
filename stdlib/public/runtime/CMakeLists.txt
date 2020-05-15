@@ -52,7 +52,6 @@ set(swift_runtime_sources
     ImageInspectionCOFF.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
-    LLVMSupport.cpp
     Metadata.cpp
     MetadataLookup.cpp
     MutexPThread.cpp
@@ -64,6 +63,12 @@ set(swift_runtime_sources
     RefCount.cpp
     RuntimeInvocationsTracking.cpp
     SwiftDtoa.cpp
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/ErrorHandling.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/Hashing.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/MemAlloc.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallPtrSet.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallVector.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/StringRef.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
@@ -87,7 +92,7 @@ set(LLVM_OPTIONAL_SOURCES
 
 set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
-list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/include)
+list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include/llvm/Support -I${SWIFT_SOURCE_DIR}/include)
 
 set(sdk "${SWIFT_HOST_VARIANT_SDK}")
 if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
