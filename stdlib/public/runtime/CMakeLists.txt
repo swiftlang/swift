@@ -269,34 +269,44 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
     if(${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF)
       string(TOLOWER "${sdk}" lowercase_sdk)
       if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
-        set(ICU_STATICLIB "TRUE")
+        set(libicu_i18n_a -licui18nswift)
+        set(libicu_uc_a -licuucswift)
+        set(libicu_data_a -licudataswift)
       else()
-        set(ICU_STATICLIB "FALSE")
         find_package(ICU REQUIRED COMPONENTS uc i18n)
         get_filename_component(ICU_UC_LIBDIR "${ICU_UC_LIBRARIES}" DIRECTORY)
         get_filename_component(ICU_I18N_LIBDIR "${ICU_I18N_LIBRARIES}" DIRECTORY)
-      endif()
-      set(linkfile "${lowercase_sdk}/static-stdlib-args.lnk")
-      add_custom_command_target(swift_static_stdlib_${sdk}_args
-        COMMAND
-          "${SWIFT_SOURCE_DIR}/utils/gen-static-stdlib-link-args"
-          "${sdk}"
-          "${SWIFTSTATICLIB_DIR}/${linkfile}"
-          "${ICU_STATICLIB}"
-          "${ICU_UC_LIBDIR}"
-          "${ICU_I18N_LIBDIR}"
-        OUTPUT
-          "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        DEPENDS
-          "${SWIFT_SOURCE_DIR}/utils/gen-static-stdlib-link-args")
 
-      list(APPEND static_stdlib_lnk_file_list ${swift_static_stdlib_${sdk}_args})
+        set(libicu_i18n_a -licui18n)
+        set(libicu_uc_a -licuuc)
+        set(libicu_data_a)
+        if(EXISTS ${ICU_I18N_LIBDIR}/libicui18n.a AND
+            EXISTS ${ICU_UC_LIBDIR}/libicuuc.a AND
+            EXISTS ${ICU_UC_LIBDIR}/libicudata.a)
+          set(libicu_i18n_a ${ICU_I18N_LIBDIR}/libicui18n.a)
+          set(libicu_uc_a ${ICU_UC_LIBDIR}/libicuuc.a)
+          set(libicu_data_a ${ICU_UC_LIBDIR}/libicudata.a)
+        endif()
+      endif()
+
+      set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
+      file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
+-ldl
+-lpthread
+-lswiftCore
+-lswiftImageInspectionShared
+${libicu_i18n_a}
+${libicu_uc_a}
+${libicu_data_a}
+-lstdc++
+-lm
+-Xlinker -export-dynamic
+-Xlinker --exclude-libs
+-Xlinker ALL")
+
       swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
                                  DESTINATION "lib/swift_static/${lowercase_sdk}"
                                  COMPONENT stdlib)
     endif()
   endforeach()
 endforeach()
-add_custom_target(swift_static_lnk_args ALL DEPENDS ${static_stdlib_lnk_file_list})
-add_dependencies(stdlib swift_static_lnk_args)
-
