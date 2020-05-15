@@ -3385,7 +3385,8 @@ void AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType(
 void
 AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
 #ifndef NDEBUG
-  if (!(type->isFunctionPointerType() || type->isBlockPointerType())) {
+  if (!(type->isFunctionPointerType() || type->isBlockPointerType() ||
+        type->isFunctionReferenceType())) {
     SmallString<256> buf;
     llvm::raw_svector_ostream os(buf);
     os << "Expected a Clang function type wrapped in a pointer type or "
