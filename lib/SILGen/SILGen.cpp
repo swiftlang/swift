@@ -955,13 +955,6 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   if (isa<ProtocolDecl>(decl->getDeclContext()))
     return;
 
-  // Always-unavailable imported constructors are factory methods
-  // that have been imported as constructors and then hidden by an
-  // imported init method.
-  if (decl->hasClangNode() &&
-      decl->getAttrs().isUnavailable(decl->getASTContext()))
-    return;
-
   SILDeclRef constant(decl);
   DeclContext *declCtx = decl->getDeclContext();
 
