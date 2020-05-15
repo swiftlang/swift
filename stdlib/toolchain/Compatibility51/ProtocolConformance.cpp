@@ -22,15 +22,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../../public/runtime/Private.h"
 #include "Concurrent.h"
 #include "Overrides.h"
 #include "swift/Basic/Lazy.h"
-#include "../../public/runtime/Private.h"
+#include <assert.h>
+#include <dlfcn.h>
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
 #include <objc/runtime.h>
-#include <assert.h>
-#include <dlfcn.h>
 
 using namespace swift;
 using swift::overrides::ConcurrentMap;

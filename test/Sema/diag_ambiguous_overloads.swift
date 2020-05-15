@@ -15,15 +15,15 @@ fe(.baz) // expected-error {{reference to member 'baz' cannot be resolved withou
 fe(.nope, .nyet) // expected-error {{type 'Int' has no member 'nope'}}
 // expected-error@-1 {{reference to member 'nyet' cannot be resolved without a contextual type}}
 
-func fg<T>(_ f: (T) -> T) -> Void {} // expected-note {{in call to function 'fg'}}
-fg({x in x}) // expected-error {{generic parameter 'T' could not be inferred}}
+func fg<T>(_ f: (T) -> T) -> Void {}
+fg({x in x}) // expected-error {{unable to infer type of a closure parameter 'x' in the current context}}
 
 
 struct S {
-  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {} // expected-note {{in call to function 'f'}}
+  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {}
   func f(_ d: (Double) -> Double) -> Void {}
   func test() -> Void {
-    f({x in x}, 2) // expected-error {{generic parameter 'T' could not be inferred}}
+    f({x in x}, 2) // expected-error {{unable to infer type of a closure parameter 'x' in the current context}}
   }
   
   func g<T>(_ a: T, _ b: Int) -> Void {}

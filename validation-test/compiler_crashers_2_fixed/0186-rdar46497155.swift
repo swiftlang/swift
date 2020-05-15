@@ -20,10 +20,9 @@ struct E {
 
 func foo(arr: [E], other: P) -> Bool {
   return arr.compactMap { i in
-    // expected-error@-1 {{generic parameter 'ElementOfResult' could not be inferred}}
     var flag = false
     return try? i.getB(&flag)
-  }.compactMap { u -> P? in
+  }.compactMap { u -> P? in // expected-error {{nable to infer type of a closure parameter 'u' in the current context}}
     guard let a = try? u.foo() else { return nil }
     return a.value!
   }.contains {
