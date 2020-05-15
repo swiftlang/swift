@@ -3181,6 +3181,22 @@ public:
 };
 } // end anonymous namespace
 
+static UIdent getUIDForOperationKind(trace::OperationKind OpKind) {
+  static UIdent CompileOperationPerformSema("source.compile.operation.perform-sema");
+  static UIdent CompileOperationIndexSource("source.compile.operation.index-source");
+  static UIdent CompileOperationCodeCompletion("source.compile.operation.code-completion");
+  switch (OpKind) {
+    case trace::OperationKind::PerformSema:
+      return CompileOperationPerformSema;
+    case trace::OperationKind::IndexSource:
+      return CompileOperationIndexSource;
+    case trace::OperationKind::CodeCompletion:
+      return CompileOperationCodeCompletion;
+    case trace::OperationKind::All:
+      return CompileOperationPerformSema;
+  }
+}
+
 void CompileTrackingConsumer::operationStarted(
     uint64_t OpId, trace::OperationKind OpKind,
     const trace::SwiftInvocation &Inv, const trace::StringPairs &OpArgs) {
@@ -3193,7 +3209,7 @@ void CompileTrackingConsumer::operationStarted(
   Dict.set(KeyNotification, CompileWillStartUID);
   Dict.set(KeyCompileID, std::to_string(OpId));
   Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
-  // FIXME: OperationKind
+  Dict.set(KeyCompileOperation, getUIDForOperationKind(OpKind));
   Dict.set(KeyCompilerArgsString, Inv.Args.Arguments);
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
@@ -3209,6 +3225,7 @@ void CompileTrackingConsumer::operationFinished(
   auto Dict = RespBuilder.getDictionary();
   Dict.set(KeyNotification, CompileDidFinishUID);
   Dict.set(KeyCompileID, std::to_string(OpId));
+  Dict.set(KeyCompileOperation, getUIDForOperationKind(OpKind));
   auto DiagArray = Dict.setArray(KeyDiagnostics);
   for (const auto &DiagInfo : Diagnostics) {
     fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);

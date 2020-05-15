@@ -4,10 +4,12 @@
 // COMPILE_1: {
 // COMPILE_1:  key.notification: source.notification.compile-will-start,
 // COMPILE_1:  key.compileid: [[CID1:".*"]]
+// COMPILE_1:  key.compileoperation: source.compile.operation.perform-sema
 // COMPILE_1: }
 // COMPILE_1: {
 // COMPILE_1:   key.notification: source.notification.compile-did-finish,
 // COMPILE_1:   key.compileid: [[CID1]]
+// COMPILE_1:   key.compileoperation: source.compile.operation.perform-sema
 // COMPILE_1: }
 // COMPILE_1-NOT: compile-will-start
 // COMPILE_1-NOT: compile-did-finish
@@ -19,26 +21,32 @@
 // COMPILE_3: {
 // COMPILE_3:  key.notification: source.notification.compile-will-start,
 // COMPILE_3:  key.compileid: [[CID1:".*"]]
+// COMPILE_3:  key.compileoperation: source.compile.operation.perform-sema
 // COMPILE_3: }
 // COMPILE_3: {
 // COMPILE_3:   key.notification: source.notification.compile-did-finish,
 // COMPILE_3:   key.compileid: [[CID1]]
+// COMPILE_3:   key.compileoperation: source.compile.operation.perform-sema
 // COMPILE_3: }
 // COMPILE_3: {
 // COMPILE_3:  key.notification: source.notification.compile-will-start,
 // COMPILE_3:  key.compileid: [[CID2:".*"]]
+// COMPILE_3:  key.compileoperation: source.compile.operation.perform-sema
 // COMPILE_3: }
 // COMPILE_3: {
 // COMPILE_3:   key.notification: source.notification.compile-did-finish,
 // COMPILE_3:   key.compileid: [[CID2]]
+// COMPILE_3:   key.compileoperation: source.compile.operation.perform-sema
 // COMPILE_3: }
 // COMPILE_3: {
 // COMPILE_3:  key.notification: source.notification.compile-will-start,
 // COMPILE_3:  key.compileid: [[CID3:".*"]]
+// COMPILE_3:  key.compileoperation: source.compile.operation.perform-sema
 // COMPILE_3: }
 // COMPILE_3: {
 // COMPILE_3:   key.notification: source.notification.compile-did-finish,
 // COMPILE_3:   key.compileid: [[CID3]]
+// COMPILE_3:   key.compileoperation: source.compile.operation.perform-sema
 // COMPILE_3: }
 // COMPILE_3-NOT: compile-will-start
 // COMPILE_3-NOT: compile-did-finish
