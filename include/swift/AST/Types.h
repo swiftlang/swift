@@ -1806,7 +1806,7 @@ public:
   /// Get the direct generic arguments, which correspond to the generic
   /// arguments that are directly applied to the typealias declaration
   /// this type references.
-  SmallVector<Type, 2> getDirectGenericArgs() const;
+  ArrayRef<Type> getDirectGenericArgs() const;
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;

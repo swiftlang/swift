@@ -150,6 +150,10 @@ public:
   /// generic parameters.
   ArrayRef<Type> getReplacementTypes() const;
 
+  /// Retrieve the array of replacement types for the innermost generic
+  /// parameters.
+  ArrayRef<Type> getInnermostReplacementTypes() const;
+
   /// Query whether any replacement types in the map contain archetypes.
   bool hasArchetypes() const;
 
