@@ -3521,24 +3521,28 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     // Retrieve the type witness.
     auto witness =
-        conformance.getConcrete()->getTypeWitness(assocType, options);
-    if (!witness || witness->hasError())
+        conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
+
+    auto witnessTy = witness.getWitnessType();
+    if (!witnessTy || witnessTy->hasError())
       return failed();
 
     // This is a hacky feature allowing code completion to migrate to
     // using Type::subst() without changing output.
     if (options & SubstFlags::DesugarMemberTypes) {
-      if (auto *aliasType =
-                   dyn_cast<TypeAliasType>(witness.getPointer())) {
-        if (!aliasType->is<ErrorType>())
-          witness = aliasType->getSinglyDesugaredType();
-      }
+      if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+        witnessTy = aliasType->getSinglyDesugaredType();
+
+      // Another hack. If the type witness is a opaque result type. They can
+      // only be referred using the name of the associated type.
+      if (witnessTy->is<OpaqueTypeArchetypeType>())
+        witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
     }
 
-    if (witness->is<ErrorType>())
+    if (witnessTy->is<ErrorType>())
       return failed();
 
-    return witness;
+    return witnessTy;
   }
 
   return failed();
