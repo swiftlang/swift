@@ -60,25 +60,30 @@ func pidFromHint(_ hint: String) -> pid_t? {
 }
 
 func CSSymbolicatorCreateWithTask(_ task: task_t) -> CSTypeRef {
-  return Sym.CSSymbolicatorCreateWithTask(task)
+  Sym.CSSymbolicatorCreateWithTask(task)
 }
 
-func CSSymbolicatorGetSymbolOwnerWithNameAtTime(_ symbolicator: CSTypeRef,
-                                                _ name: String,
-                                                _ time: CSMachineTime)
-                                                -> CSTypeRef {
-  return Sym.CSSymbolicatorGetSymbolOwnerWithNameAtTime(symbolicator, name, time)
+func CSSymbolicatorGetSymbolOwnerWithNameAtTime(
+	_ symbolicator: CSTypeRef,
+  _ name: String,
+  _ time: CSMachineTime
+) -> CSTypeRef {
+  Sym.CSSymbolicatorGetSymbolOwnerWithNameAtTime(symbolicator, name, time)
 }
 
 @discardableResult
-func CSSymbolOwnerForeachSymbol(_ symbolOwner: CSTypeRef,
-                                _ iterator: (CSTypeRef) -> Void) -> UInt {
-  return Sym.CSSymbolOwnerForeachSymbol(symbolOwner, iterator)
+func CSSymbolOwnerForeachSymbol(
+  _ symbolOwner: CSTypeRef,
+  _ iterator: (CSTypeRef) -> Void
+) -> UInt {
+  Sym.CSSymbolOwnerForeachSymbol(symbolOwner, iterator)
 }
 
-func CSSymbolOwnerGetSymbolWithMangledName(_ owner: CSTypeRef, _ name: String)
-  -> CSTypeRef {
-  return Sym.CSSymbolOwnerGetSymbolWithMangledName(owner, name)
+func CSSymbolOwnerGetSymbolWithMangledName(
+  _ owner: CSTypeRef, 
+  _ name: String
+) -> CSTypeRef {
+  Sym.CSSymbolOwnerGetSymbolWithMangledName(owner, name)
 }
 
 func CSSymbolGetName(_ sym: CSTypeRef) -> String? {
@@ -92,11 +97,11 @@ func CSSymbolGetMangledName(_ sym: CSTypeRef) -> String? {
 }
 
 func CSSymbolIsFunction(_ sym: CSTypeRef) -> Bool {
-  return Sym.CSSymbolIsFunction(sym)
+  Sym.CSSymbolIsFunction(sym)
 }
 
 func CSSymbolGetRange(_ sym: CSTypeRef) -> Range {
-  return Sym.CSSymbolGetRange(sym)
+  Sym.CSSymbolGetRange(sym)
 }
 
 func task_start_peeking(_ task: task_t) -> Bool {
@@ -109,8 +114,9 @@ func task_start_peeking(_ task: task_t) -> Bool {
   return false
 }
 
-func task_peek(_ task: task_t, _ start: mach_vm_address_t, _ size: mach_vm_size_t) ->
-  UnsafeRawPointer? {
+func task_peek(
+  _ task: task_t, _ start: mach_vm_address_t, _ size: mach_vm_size_t
+) -> UnsafeRawPointer? {
   var ptr: UnsafeRawPointer? = nil
   let result = Sym.task_peek(task, start, size, &ptr)
   if result != KERN_SUCCESS {
@@ -120,9 +126,10 @@ func task_peek(_ task: task_t, _ start: mach_vm_address_t, _ size: mach_vm_size_
   return ptr
 }
 
-func task_peek_string(_ task: task_t, _ addr: mach_vm_address_t) ->
-  UnsafeMutablePointer<CChar>? {
-  return Sym.task_peek_string(task, addr)
+func task_peek_string(
+  _ task: task_t, _ addr: mach_vm_address_t
+) -> UnsafeMutablePointer<CChar>? {
+  Sym.task_peek_string(task, addr)
 }
 
 func task_stop_peeking(_ task: task_t) {

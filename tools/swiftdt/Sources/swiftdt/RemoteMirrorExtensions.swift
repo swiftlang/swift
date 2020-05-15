@@ -27,31 +27,34 @@ extension SwiftReflectionContextRef {
   }
 
   func iterateConformanceCache(
-    call: (swift_reflection_ptr_t, swift_reflection_ptr_t) -> Void) throws {
-    var call = call
+    _ body: (swift_reflection_ptr_t, swift_reflection_ptr_t) -> Void
+  ) throws {
+    var body = body
     let errStr = swift_reflection_iterateConformanceCache(self, {
       let callPtr = $2!.bindMemory(to:
         ((swift_reflection_ptr_t, swift_reflection_ptr_t) -> Void).self,
         capacity: 1)
       callPtr.pointee($0, $1)
-    }, &call)
+    }, &body)
     try throwError(str: errStr)
   }
 
   func iterateMetadataAllocations(
-    call: (swift_metadata_allocation_t) -> Void) throws {
-    var call = call
+    _ body: (swift_metadata_allocation_t) -> Void
+  ) throws {
+    var body = body
     let errStr = swift_reflection_iterateMetadataAllocations(self, {
       let callPtr = $1!.bindMemory(to:
         ((swift_metadata_allocation_t) -> Void).self, capacity: 1)
       callPtr.pointee($0)
-    }, &call)
+    }, &body)
     try throwError(str: errStr)
   }
 
-  func metadataPointer(allocation: swift_metadata_allocation_t)
-    -> swift_reflection_ptr_t {
-    return swift_reflection_allocationMetadataPointer(self, allocation)
+  func metadataPointer(
+    allocation: swift_metadata_allocation_t
+  ) -> swift_reflection_ptr_t {
+    swift_reflection_allocationMetadataPointer(self, allocation)
   }
 
   private func throwError(str: UnsafePointer<CChar>?) throws {

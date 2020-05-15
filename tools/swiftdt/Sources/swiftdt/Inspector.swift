@@ -9,9 +9,8 @@ class Inspector {
   
   init?(pid: pid_t) {
     task = Self.findTask(pid, tryForkCorpse: false)
-    if task == 0 {
-      return nil
-    }
+    if task == 0 { return nil }
+
     symbolicator = CSSymbolicatorCreateWithTask(task)
     swiftCore = CSSymbolicatorGetSymbolOwnerWithNameAtTime(
       symbolicator, "libswiftCore.dylib", kCSNow)
@@ -95,7 +94,7 @@ class Inspector {
 }
 
 private func instance(_ context: UnsafeMutableRawPointer?) -> Inspector {
-  return Unmanaged.fromOpaque(context!).takeUnretainedValue()
+  Unmanaged.fromOpaque(context!).takeUnretainedValue()
 }
 
 private func QueryDataLayoutFn(context: UnsafeMutableRawPointer?,
@@ -116,25 +115,29 @@ private func ReadBytesFn(
   context: UnsafeMutableRawPointer?,
   address: swift_addr_t,
   size: UInt64,
-  outContext: UnsafeMutablePointer<UnsafeMutableRawPointer?>?) ->
-  UnsafeRawPointer? {
-  return task_peek(instance(context).task, address, size)
+  outContext: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+) -> UnsafeRawPointer? {
+  task_peek(instance(context).task, address, size)
 }
 
-private func GetStringLengthFn(context: UnsafeMutableRawPointer?,
-                               address: swift_addr_t) -> UInt64 {
+private func GetStringLengthFn(
+  context: UnsafeMutableRawPointer?,
+  address: swift_addr_t
+) -> UInt64 {
   let maybeStr = task_peek_string(instance(context).task, address)
   guard let str = maybeStr else { return 0 }
   return UInt64(strlen(str))
 }
 
-private func GetSymbolAddressFn(context: UnsafeMutableRawPointer?,
-                                name: UnsafePointer<CChar>?,
-                                length: UInt64) -> swift_addr_t {
+private func GetSymbolAddressFn(
+  context: UnsafeMutableRawPointer?,
+  name: UnsafePointer<CChar>?,
+  length: UInt64
+) -> swift_addr_t {
   let nameStr: String = name!.withMemoryRebound(to: UInt8.self,
-                                                capacity: Int(length), {
+                                                capacity: Int(length)) {
     let buffer = UnsafeBufferPointer(start: $0, count: Int(length))
     return String(decoding: buffer, as: UTF8.self)
-  })
+  }
   return instance(context).getAddr(symbolName: nameStr)
 }
