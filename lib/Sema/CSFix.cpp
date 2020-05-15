@@ -22,6 +22,7 @@
 #include "ConstraintSystem.h"
 #include "OverloadChoice.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
@@ -1224,6 +1225,38 @@ SpecifyBaseTypeForContextualMember *SpecifyBaseTypeForContextualMember::create(
     ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator) {
   return new (cs.getAllocator())
       SpecifyBaseTypeForContextualMember(cs, member, locator);
+}
+
+std::string SpecifyClosureParameterType::getName() const {
+  std::string name;
+  llvm::raw_string_ostream OS(name);
+
+  auto *closure = cast<ClosureExpr>(getAnchor());
+  auto paramLoc =
+      getLocator()->castLastElementTo<LocatorPathElt::TupleElement>();
+
+  auto *PD = closure->getParameters()->get(paramLoc.getIndex());
+
+  OS << "specify type for parameter ";
+  if (PD->isAnonClosureParam()) {
+    OS << "$" << paramLoc.getIndex();
+  } else {
+    OS << "'" << PD->getParameterName() << "'";
+  }
+
+  return OS.str();
+}
+
+bool SpecifyClosureParameterType::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  UnableToInferClosureParameterType failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyClosureParameterType *
+SpecifyClosureParameterType::create(ConstraintSystem &cs,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyClosureParameterType(cs, locator);
 }
 
 bool SpecifyClosureReturnType::diagnose(const Solution &solution,

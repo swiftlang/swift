@@ -41,6 +41,12 @@
 using namespace swift;
 using namespace constraints;
 
+static bool hasFixFor(const Solution &solution, ConstraintLocator *locator) {
+  return llvm::any_of(solution.Fixes, [&locator](const ConstraintFix *fix) {
+    return fix->getLocator() == locator;
+  });
+}
+
 FailureDiagnostic::~FailureDiagnostic() {}
 
 bool FailureDiagnostic::diagnose(bool asNote) {
@@ -6124,6 +6130,74 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
                         : diag::unresolved_member_no_inference;
 
   emitDiagnostic(diagnostic, MemberName).highlight(getSourceRange());
+  return true;
+}
+
+bool UnableToInferClosureParameterType::diagnoseAsError() {
+  auto *closure = castToExpr<ClosureExpr>(getRawAnchor());
+
+  // Let's check whether this closure is an argument to
+  // a call which couldn't be properly resolved e.g.
+  // missing  member or invalid contextual reference and
+  // if so let's not diagnose this problem because main
+  // issue here is inability to establish context for
+  // closure inference.
+  //
+  // TODO(diagnostics): Once we gain an ability to determine
+  // originating source of type holes this check could be
+  // significantly simplified.
+  {
+    auto &solution = getSolution();
+
+    // If there is a contextual mismatch associated with this
+    // closure, let's not diagnose any parameter type issues.
+    if (hasFixFor(solution, getConstraintLocator(
+                                closure, LocatorPathElt::ContextualType())))
+      return false;
+
+    if (auto *parentExpr = findParentExpr(closure)) {
+      while (parentExpr &&
+             (isa<TupleExpr>(parentExpr) || isa<ParenExpr>(parentExpr))) {
+        parentExpr = findParentExpr(parentExpr);
+      }
+
+      if (parentExpr) {
+        // Missing or invalid member reference in call.
+        if (auto *AE = dyn_cast<ApplyExpr>(parentExpr)) {
+          if (getType(AE->getFn())->isHole())
+            return false;
+        }
+
+        // Any fix anchored on parent expression makes it unnecessary
+        // to diagnose unability to infer parameter type because it's
+        // an indication that proper context couldn't be established to
+        // resolve the closure.
+        if (llvm::any_of(solution.Fixes,
+                         [&parentExpr](const ConstraintFix *fix) -> bool {
+                           return fix->getAnchor() == parentExpr;
+                         }))
+          return false;
+      }
+    }
+  }
+
+  auto paramIdx = getLocator()
+                      ->castLastElementTo<LocatorPathElt::TupleElement>()
+                      .getIndex();
+
+  auto *PD = closure->getParameters()->get(paramIdx);
+
+  llvm::SmallString<16> id;
+  llvm::raw_svector_ostream OS(id);
+
+  if (PD->isAnonClosureParam()) {
+    OS << "$" << paramIdx;
+  } else {
+    OS << "'" << PD->getParameterName() << "'";
+  }
+
+  auto loc = PD->isAnonClosureParam() ? getLoc() : PD->getLoc();
+  emitDiagnosticAt(loc, diag::cannot_infer_closure_parameter_type, OS.str());
   return true;
 }
 

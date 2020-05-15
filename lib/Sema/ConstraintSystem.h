@@ -300,6 +300,10 @@ public:
   /// Determine whether this type variable represents a closure type.
   bool isClosureType() const;
 
+  /// Determine whether this type variable represents one of the
+  /// parameter types associated with a closure.
+  bool isClosureParameterType() const;
+
   /// Determine whether this type variable represents a closure result type.
   bool isClosureResultType() const;
 
