@@ -619,9 +619,9 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
                                           DeclNameLoc(), /*Implicit=*/true);
 
     // CodingKeys.x
-    auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit=*/true);
     auto *metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
-    auto *keyExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+    auto *memberRef = new (C) MemberRefExpr(metaTyRef, SourceLoc(), elt,
+                                            DeclNameLoc(), /*Implicit=*/true);
 
     // encode(_:forKey:)/encodeIfPresent(_:forKey:)
     auto methodName = useIfPresentVariant ? C.Id_encodeIfPresent : C.Id_encode;
@@ -631,7 +631,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
                                                          methodName, argNames);
 
     // container.encode(self.x, forKey: CodingKeys.x)
-    Expr *args[2] = {varExpr, keyExpr};
+    Expr *args[2] = {varExpr, memberRef};
     auto *callExpr = CallExpr::createImplicit(C, encodeCall,
                                               C.AllocateCopy(args),
                                               C.AllocateCopy(argNames));
@@ -647,31 +647,24 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   if (classDecl && superclassIsEncodable(classDecl)) {
     // Need to generate `try super.encode(to: container.superEncoder())`
 
-    // superEncoder()
-    auto *method = UnresolvedDeclRefExpr::createImplicit(C, C.Id_superEncoder);
-
-    // container.superEncoder()
-    auto *superEncoderRef = new (C) DotSyntaxCallExpr(containerExpr,
-                                                      SourceLoc(), method);
-
-    // encode(to:) expr
-    auto *encodeDeclRef = new (C) DeclRefExpr(ConcreteDeclRef(encodeDecl),
-                                              DeclNameLoc(), /*Implicit=*/true);
+    // container.superEncoder
+    auto *superEncoderRef = new (C) UnresolvedDotExpr(
+        containerExpr, SourceLoc(), DeclNameRef(C.Id_superEncoder),
+        DeclNameLoc(), /*Implicit=*/true);
 
     // super
     auto *superRef = new (C) SuperRefExpr(encodeDecl->getImplicitSelfDecl(),
                                           SourceLoc(), /*Implicit=*/true);
 
     // super.encode(to:)
-    auto *encodeCall = new (C) DotSyntaxCallExpr(superRef, SourceLoc(),
-                                                 encodeDeclRef);
+    auto *encodeRef = new (C) MemberRefExpr(superRef, SourceLoc(), encodeDecl,
+                                            DeclNameLoc(), /*Implicit=*/true);
 
     // super.encode(to: container.superEncoder())
     Expr *args[1] = {superEncoderRef};
     Identifier argLabels[1] = {C.Id_to};
-    auto *callExpr = CallExpr::createImplicit(C, encodeCall,
-                                              C.AllocateCopy(args),
-                                              C.AllocateCopy(argLabels));
+    auto *callExpr = CallExpr::createImplicit(
+        C, encodeRef, C.AllocateCopy(args), C.AllocateCopy(argLabels));
 
     // try super.encode(to: container.superEncoder())
     auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
@@ -901,9 +894,9 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
                                              SourceLoc(), varType);
 
       // CodingKeys.x
-      auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit=*/true);
       metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
-      auto *keyExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+      auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), elt,
+                                            DeclNameLoc(), /*Implicit=*/true);
 
       // decode(_:forKey:)/decodeIfPresent(_:forKey:)
       SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};

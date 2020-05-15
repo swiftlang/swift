@@ -48,10 +48,10 @@ deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl, void *) {
 
   SmallVector<Expr *, 8> elExprs;
   for (EnumElementDecl *elt : parentEnum->getAllElements()) {
-    auto *ref = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto *base = TypeExpr::createImplicit(enumTy, C);
-    auto *apply = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base);
-    elExprs.push_back(apply);
+    auto *ref = new (C)
+        MemberRefExpr(base, SourceLoc(), elt, DeclNameLoc(), /*Implicit=*/true);
+    elExprs.push_back(ref);
   }
   auto *arrayExpr = ArrayExpr::create(C, SourceLoc(), elExprs, {}, SourceLoc());
 

@@ -74,23 +74,16 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
   FuncDecl *cmpFunc = C.getLessThanIntDecl();
   assert(cmpFunc && "should have a < for int as we already checked for it");
 
-  auto fnType = cmpFunc->getInterfaceType()->castTo<FunctionType>();
-
   Expr *cmpFuncExpr;
   if (cmpFunc->getDeclContext()->isTypeContext()) {
     auto contextTy = cmpFunc->getDeclContext()->getSelfInterfaceType();
     Expr *base = TypeExpr::createImplicitHack(SourceLoc(), contextTy, C);
-    Expr *ref = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(), /*Implicit*/ true,
-                                    AccessSemantics::Ordinary, fnType);
-
-    fnType = fnType->getResult()->castTo<FunctionType>();
-    cmpFuncExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
-    cmpFuncExpr->setImplicit();
+    cmpFuncExpr = new (C) MemberRefExpr(base, SourceLoc(), cmpFunc,
+                                        DeclNameLoc(), /*Implicit=*/true);
   } else {
-    cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
-                                      /*implicit*/ true,
-                                      AccessSemantics::Ordinary,
-                                      fnType);
+    cmpFuncExpr =
+        new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
+                            /*Implicit=*/true, AccessSemantics::Ordinary);
   }
 
   TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
@@ -100,13 +93,11 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
                                          /*Implicit*/ true,
                                          TupleType::get(abTupleElts, C));
 
-  auto *cmpExpr = new (C) BinaryExpr(
-      cmpFuncExpr, abTuple, /*implicit*/ true,
-      fnType->castTo<FunctionType>()->getResult());
+  auto *cmpExpr = new (C) BinaryExpr(cmpFuncExpr, abTuple, /*Implicit*/ true);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return { body, /*isTypeChecked=*/true };
+  return {body, /*isTypeChecked=*/false};
 }
 
 /// Derive the body for an '==' operator for an enum where at least one of the

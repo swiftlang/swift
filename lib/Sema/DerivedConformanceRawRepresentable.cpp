@@ -332,15 +332,15 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     // Create a statement which assigns the case to self.
 
     // valueExpr = "\(enumType).\(elt)"
-    auto eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
-    auto valueExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
-    
+    auto memberRef = new (C) MemberRefExpr(metaTyRef, SourceLoc(), elt,
+                                           DeclNameLoc(), /*Implicit=*/true);
+
     // assignment = "self = \(valueExpr)"
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/true,
                                        AccessSemantics::DirectToStorage);
-    auto assignment = new (C) AssignExpr(selfRef, SourceLoc(), valueExpr,
+    auto assignment = new (C) AssignExpr(selfRef, SourceLoc(), memberRef,
                                          /*implicit*/ true);
 
     stmts.push_back(ASTNode(assignment));

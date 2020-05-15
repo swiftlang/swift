@@ -386,19 +386,15 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
-    auto aPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                            /*implicit*/ true);
     auto aParamRef = new (C) DeclRefExpr(aParam, DeclNameLoc(),
                                          /*implicit*/ true);
-    auto aPropertyExpr = new (C) DotSyntaxCallExpr(aPropertyRef, SourceLoc(),
-                                                   aParamRef);
+    auto aPropertyExpr = new (C) MemberRefExpr(
+        aParamRef, SourceLoc(), propertyDecl, DeclNameLoc(), /*Implicit=*/true);
 
-    auto bPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                            /*implicit*/ true);
     auto bParamRef = new (C) DeclRefExpr(bParam, DeclNameLoc(),
                                          /*implicit*/ true);
-    auto bPropertyExpr = new (C) DotSyntaxCallExpr(bPropertyRef, SourceLoc(),
-                                                   bParamRef);
+    auto bPropertyExpr = new (C) MemberRefExpr(
+        bParamRef, SourceLoc(), propertyDecl, DeclNameLoc(), /*Implicit=*/true);
 
     auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C,
       aPropertyExpr, bPropertyExpr);
@@ -874,12 +870,11 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
-    auto propertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
-                                           /*implicit*/ true);
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                       /*implicit*/ true);
-    auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
-                                                      selfRef);
+                                       /*Implicit=*/true);
+    auto selfPropertyExpr = new (C) MemberRefExpr(
+        selfRef, SourceLoc(), propertyDecl, DeclNameLoc(), /*Implicit=*/true);
+
     // Generate: hasher.combine(self.<property>)
     auto combineExpr = createHasherCombineCall(C, hasherParam, selfPropertyExpr);
     statements.emplace_back(ASTNode(combineExpr));

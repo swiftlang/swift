@@ -1870,10 +1870,6 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
 
   bool mainFunctionThrows = mainFunction->hasThrows();
 
-  auto voidToVoidFunctionType =
-      FunctionType::get({}, context.TheEmptyTupleType,
-                        FunctionType::ExtInfo().withThrows(mainFunctionThrows));
-  auto nominalToVoidToVoidFunctionType = FunctionType::get({AnyFunctionType::Param(nominal->getInterfaceType())}, voidToVoidFunctionType);
   auto *func = FuncDecl::create(
       context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::KeywordStatic,
       /*FuncLoc*/ SourceLoc(),
@@ -1899,21 +1895,12 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
     substitutionMap = SubstitutionMap();
   }
 
-  auto funcDeclRef = ConcreteDeclRef(mainFunction, substitutionMap);
-  auto *funcDeclRefExpr = new (context) DeclRefExpr(
-      funcDeclRef, DeclNameLoc(location), /*Implicit*/ true);
-  funcDeclRefExpr->setImplicit(true);
-  funcDeclRefExpr->setType(mainFunction->getInterfaceType());
+  auto *mainRef = new (context) MemberRefExpr(
+      typeExpr, SourceLoc(), ConcreteDeclRef(mainFunction, substitutionMap),
+      DeclNameLoc(location), /*Implicit=*/true);
 
-  auto *dotSyntaxCallExpr = new (context) DotSyntaxCallExpr(
-      funcDeclRefExpr, /*DotLoc*/ SourceLoc(), typeExpr, voidToVoidFunctionType);
-  dotSyntaxCallExpr->setImplicit(true);
-  dotSyntaxCallExpr->setThrows(mainFunctionThrows);
-
-  auto *callExpr = CallExpr::createImplicit(context, dotSyntaxCallExpr, {}, {});
-  callExpr->setImplicit(true);
+  auto *callExpr = CallExpr::createImplicit(context, mainRef, {}, {});
   callExpr->setThrows(mainFunctionThrows);
-  callExpr->setType(context.TheEmptyTupleType);
 
   Expr *returnedExpr;
 
@@ -1933,7 +1920,6 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   auto *body = BraceStmt::create(context, SourceLoc(), stmts,
                                 SourceLoc(), /*Implicit*/true);
   func->setBodyParsed(body);
-  func->setInterfaceType(nominalToVoidToVoidFunctionType);
 
   iterableDeclContext->addMember(func);
 

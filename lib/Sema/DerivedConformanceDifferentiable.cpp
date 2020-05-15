@@ -231,16 +231,14 @@ deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     if (confRef.isConcrete())
       memberMethodDecl = confRef.getConcrete()->getWitnessDecl(methodReq);
     assert(memberMethodDecl && "Member method declaration must exist");
-    auto *memberMethodDRE =
-        new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
-    memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `x.move(along:)`.
     Expr *memberExpr =
         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                               /*Implicit*/ true);
     auto *memberMethodExpr =
-        new (C) DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberExpr);
+        new (C) MemberRefExpr(memberExpr, SourceLoc(), memberMethodDecl,
+                              DeclNameLoc(), /*Implicit=*/true);
 
     // Create reference to parameter member: `direction.x`.
     VarDecl *paramMember = nullptr;

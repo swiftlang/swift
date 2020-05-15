@@ -126,11 +126,10 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
               confRef.getConcrete()->getWitnessDecl(operatorReq))
         memberOpDecl = concreteMemberMethodDecl;
     assert(memberOpDecl && "Member operator declaration must exist");
-    auto memberOpDRE =
-        new (C) DeclRefExpr(memberOpDecl, DeclNameLoc(), /*Implicit*/ true);
     auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
     auto memberOpExpr =
-        new (C) DotSyntaxCallExpr(memberOpDRE, SourceLoc(), memberTypeExpr);
+        new (C) MemberRefExpr(memberTypeExpr, SourceLoc(), memberOpDecl,
+                              DeclNameLoc(), /*Implicit=*/true);
 
     // Create expression `lhs.member <op> rhs.member`.
     // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
