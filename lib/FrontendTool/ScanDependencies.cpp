@@ -61,13 +61,24 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
 
 /// Resolve the direct dependencies of the given module.
 static std::vector<ModuleDependencyID> resolveDirectDependencies(
-    ASTContext &ctx, ModuleDependencyID module,
+    CompilerInstance &instance, ModuleDependencyID module,
     ModuleDependenciesCache &cache) {
+  auto &ctx = instance.getASTContext();
   auto knownDependencies = *cache.findDependencies(module.first, module.second);
   auto isSwift = knownDependencies.isSwiftModule();
+  auto ModuleCachePath = getModuleCachePathFromClang(ctx
+    .getClangModuleLoader()->getClangInstance());
+  auto &FEOpts = instance.getInvocation().getFrontendOptions();
   InterfaceSubContextDelegateImpl ASTDelegate(ctx.SourceMgr, ctx.Diags,
                                               ctx.SearchPathOpts, ctx.LangOpts,
-                                              ctx.getClangModuleLoader());
+                                              ctx.getClangModuleLoader(),
+                                              /*buildModuleCacheDirIfAbsent*/false,
+                                              ModuleCachePath,
+                                              FEOpts.PrebuiltModuleCachePath,
+                                              FEOpts.SerializeModuleInterfaceDependencyHashes,
+                                              FEOpts.TrackSystemDeps,
+                                              FEOpts.RemarkOnRebuildFromModuleInterface,
+                                              FEOpts.DisableInterfaceFileLock);
   // Find the dependencies of every module this module directly depends on.
   std::vector<ModuleDependencyID> result;
   for (auto dependsOn : knownDependencies.getModuleDependencies()) {
@@ -212,7 +223,7 @@ namespace {
 }
 
 static void writeJSON(llvm::raw_ostream &out,
-                      ASTContext &ctx,
+                      CompilerInstance &instance,
                       ModuleDependenciesCache &cache,
                       ArrayRef<ModuleDependencyID> allModules) {
   // Write out a JSON description of all of the dependencies.
@@ -232,7 +243,7 @@ static void writeJSON(llvm::raw_ostream &out,
   };
   for (const auto &module : allModules) {
     auto directDependencies = resolveDirectDependencies(
-        ctx, ModuleDependencyID(module.first, module.second), cache);
+        instance, ModuleDependencyID(module.first, module.second), cache);
 
     // Grab the completed module dependencies.
     auto moduleDeps = *cache.findDependencies(module.first, module.second);
@@ -279,7 +290,21 @@ static void writeJSON(llvm::raw_ostream &out,
         writeJSONSingleField(
             out, "moduleInterfacePath",
             *swiftDeps->swiftInterfaceFile, 5,
-            /*trailingComma=*/swiftDeps->bridgingHeaderFile.hasValue());
+            /*trailingComma=*/true);
+        writeJSONSingleField(out, "contextHash",
+                             swiftDeps->contextHash, 5,
+                             /*trailingComma=*/true);
+        out.indent(5 * 2);
+        out << "\"commandLine\": [\n";
+        for (auto &arg :swiftDeps->buildCommandLine) {
+          out.indent(6 * 2);
+          out << "\"" << arg << "\"";
+          if (&arg != &swiftDeps->buildCommandLine.back())
+            out << ",";
+          out << "\n";
+        }
+        out.indent(5 * 2);
+        out << "]\n";
       }
 
       /// Bridging header and its source file dependencies, if any.
@@ -426,12 +451,12 @@ bool swift::scanDependencies(CompilerInstance &instance) {
        ++currentModuleIdx) {
     auto module = allModules[currentModuleIdx];
     auto discoveredModules =
-        resolveDirectDependencies(Context, module, cache);
+        resolveDirectDependencies(instance, module, cache);
     allModules.insert(discoveredModules.begin(), discoveredModules.end());
   }
 
   // Write out the JSON description.
-  writeJSON(out, Context, cache, allModules.getArrayRef());
+  writeJSON(out, instance, cache, allModules.getArrayRef());
 
   // Update the dependency tracker.
   if (auto depTracker = instance.getDependencyTracker()) {
