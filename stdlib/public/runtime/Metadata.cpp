@@ -4333,7 +4333,6 @@ static bool doesNotRequireInstantiation(
 #if SWIFT_PTRAUTH
 static const unsigned swift_ptrauth_key_associated_type =
   ptrauth_key_process_independent_code;
-#endif
 
 /// Given an unsigned pointer to an associated-type protocol witness,
 /// fill in the appropriate slot in the witness table we're building.
@@ -4347,7 +4346,6 @@ static void initAssociatedTypeProtocolWitness(const Metadata **slot,
   swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
 }
 
-#if SWIFT_PTRAUTH
 static const unsigned swift_ptrauth_key_associated_conformance =
   ptrauth_key_process_independent_code;
 
