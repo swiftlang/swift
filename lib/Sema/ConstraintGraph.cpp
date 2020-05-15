@@ -1126,6 +1126,10 @@ bool ConstraintGraph::contractEdges() {
     if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
       if (auto bindings = CS.getPotentialBindings(tyvar1)) {
+        // Holes can't be contracted.
+        if (bindings.IsHole)
+          continue;
+
         for (auto &binding : bindings.Bindings) {
           auto type = binding.BindingType;
           isNotContractable = type.findIf([&](Type nestedType) -> bool {

@@ -2196,8 +2196,12 @@ namespace {
             auto declaredTy = param->getType();
             externalType = CS.openUnboundGenericType(declaredTy, paramLoc);
           } else {
+            // Let's allow parameters which haven't been explicitly typed
+            // to become holes by default, this helps in situations like
+            // `foo { a in }` where `foo` doesn't exist.
             externalType = CS.createTypeVariable(
-                paramLoc, TVO_CanBindToInOut | TVO_CanBindToNoEscape);
+                paramLoc,
+                TVO_CanBindToInOut | TVO_CanBindToNoEscape | TVO_CanBindToHole);
           }
 
           closureParams.push_back(param->toFunctionParam(externalType));

@@ -1973,6 +1973,15 @@ public:
   bool diagnoseAsError();
 };
 
+class UnableToInferClosureParameterType final : public FailureDiagnostic {
+public:
+  UnableToInferClosureParameterType(const Solution &solution,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError();
+};
+
 class UnableToInferClosureReturnType final : public FailureDiagnostic {
 public:
   UnableToInferClosureReturnType(const Solution &solution,

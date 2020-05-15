@@ -90,6 +90,14 @@ bool TypeVariableType::Implementation::isClosureType() const {
   return isa<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
 }
 
+bool TypeVariableType::Implementation::isClosureParameterType() const {
+  if (!(locator && locator->getAnchor()))
+    return false;
+
+  return isa<ClosureExpr>(locator->getAnchor()) &&
+         locator->isLastElement<LocatorPathElt::TupleElement>();
+}
+
 bool TypeVariableType::Implementation::isClosureResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;

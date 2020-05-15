@@ -9603,6 +9603,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTupleSplatForSingleParameter:
   case FixKind::AllowInvalidUseOfTrailingClosure:
   case FixKind::AllowNonClassTypeToConvertToAnyObject:
+  case FixKind::SpecifyClosureParameterType:
   case FixKind::SpecifyClosureReturnType:
   case FixKind::AddQualifierToAccessTopLevelName:
     llvm_unreachable("handled elsewhere");

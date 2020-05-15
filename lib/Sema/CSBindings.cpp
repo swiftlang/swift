@@ -1090,27 +1090,25 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       // resolved and had to be bound to a placeholder "hole" type.
       cs.increaseScore(SK_Hole);
 
+      ConstraintFix *fix = nullptr;
       if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
         auto path = dstLocator->getPath();
         // Drop `generic parameter` locator element so that all missing
         // generic parameters related to the same path can be coalesced later.
-        auto *fix = DefaultGenericArgument::create(
+        fix = DefaultGenericArgument::create(
             cs, GP,
             cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
-        if (cs.recordFix(fix))
-          return true;
+      } else if (TypeVar->getImpl().isClosureParameterType()) {
+        fix = SpecifyClosureParameterType::create(cs, dstLocator);
       } else if (TypeVar->getImpl().isClosureResultType()) {
-        auto *fix = SpecifyClosureReturnType::create(
-            cs, TypeVar->getImpl().getLocator());
-        if (cs.recordFix(fix))
-          return true;
+        fix = SpecifyClosureReturnType::create(cs, dstLocator);
       } else if (srcLocator->getAnchor() &&
                  isa<ObjectLiteralExpr>(srcLocator->getAnchor())) {
-        auto *fix = SpecifyObjectLiteralTypeImport::create(
-            cs, TypeVar->getImpl().getLocator());
-        if (cs.recordFix(fix))
-          return true;
+        fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
       }
+
+      if (fix && cs.recordFix(fix))
+        return true;
     }
   }
 
