@@ -284,10 +284,6 @@ public:
   /// SILDeclRef(cd, Destructor).
   void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
 
-  /// Generates the enum constructor for the given
-  /// EnumElementDecl under the name SILDeclRef(decl).
-  void emitEnumConstructor(EnumElementDecl *decl);
-
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, ParamDecl *param);
 
