@@ -159,6 +159,30 @@ namespace {
     explicit operator bool() const { return (bool) AbstractType; }
   };
 
+  static ImportResult importFunctionPointerLikeType(const clang::Type &type,
+                                                    const Type &pointeeType) {
+    auto funcTy = pointeeType->castTo<FunctionType>();
+    return {FunctionType::get(
+                funcTy->getParams(), funcTy->getResult(),
+                funcTy->getExtInfo()
+                    .withRepresentation(
+                        AnyFunctionType::Representation::CFunctionPointer)
+                    .withClangFunctionType(&type)),
+            type.isReferenceType() ? ImportHint::None
+                                    : ImportHint::CFunctionPointer};
+  }
+
+  static ImportResult importOverAlignedFunctionPointerLikeType(
+      const clang::Type &type, ClangImporter::Implementation &Impl) {
+    auto opaquePointer = Impl.SwiftContext.getOpaquePointerDecl();
+    if (!opaquePointer) {
+      return Type();
+    }
+    return {opaquePointer->getDeclaredType(),
+            type.isReferenceType() ? ImportHint::None
+                                    : ImportHint::OtherPointer};
+  }
+
   class SwiftTypeConverter :
     public clang::TypeVisitor<SwiftTypeConverter, ImportResult>
   {
@@ -406,23 +430,11 @@ namespace {
       // alignment is greater than the maximum Swift alignment, import as
       // OpaquePointer.
       if (!pointeeType || Impl.isOverAligned(pointeeQualType)) {
-        auto opaquePointer = Impl.SwiftContext.getOpaquePointerDecl();
-        if (!opaquePointer)
-          return Type();
-        return {opaquePointer->getDeclaredType(),
-                ImportHint::OtherPointer};
+        return importOverAlignedFunctionPointerLikeType(*type, Impl);
       }
-      
+
       if (pointeeQualType->isFunctionType()) {
-        auto funcTy = pointeeType->castTo<FunctionType>();
-        return {
-          FunctionType::get(funcTy->getParams(), funcTy->getResult(),
-            funcTy->getExtInfo()
-              .withRepresentation(
-                AnyFunctionType::Representation::CFunctionPointer)
-              .withClangFunctionType(type)),
-          ImportHint::CFunctionPointer
-        };
+        return importFunctionPointerLikeType(*type, pointeeType);
       }
 
       PointerTypeKind pointerKind;
@@ -472,7 +484,29 @@ namespace {
     }
 
     ImportResult VisitReferenceType(const clang::ReferenceType *type) {
-      return Type();
+      auto pointeeQualType = type->getPointeeType();
+      auto quals = pointeeQualType.getQualifiers();
+      Type pointeeType =
+          Impl.importTypeIgnoreIUO(pointeeQualType, ImportTypeKind::Value,
+                                   AllowNSUIntegerAsInt, Bridgeability::None);
+
+      if (pointeeQualType->isFunctionType()) {
+        return importFunctionPointerLikeType(*type, pointeeType);
+      }
+
+      if (Impl.isOverAligned(pointeeQualType)) {
+        return importOverAlignedFunctionPointerLikeType(*type, Impl);
+      }
+
+      PointerTypeKind pointerKind;
+      if (quals.hasConst()) {
+        pointerKind = PTK_UnsafePointer;
+      } else {
+        pointerKind = PTK_UnsafeMutablePointer;
+      }
+
+      return {pointeeType->wrapInPointer(pointerKind),
+              ImportHint::None};
     }
 
     ImportResult VisitMemberPointer(const clang::MemberPointerType *type) {
@@ -2416,7 +2450,7 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
     if (auto *generic = genericTy->getDecl()) {
       auto genericSig =
         generic->getDeclContext()->getGenericSignatureOfContext();
-      if (genericSig && genericSig->getConformsTo(type).empty()) {
+      if (genericSig && genericSig->getRequiredProtocols(type).empty()) {
         type = genericSig->getSuperclassBound(type);
         if (!type)
           return false;

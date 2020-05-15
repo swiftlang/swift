@@ -3683,23 +3683,30 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 
 # pragma mark Type witness resolution
 
-CheckTypeWitnessResult swift::checkTypeWitness(DeclContext *dc,
-                                               ProtocolDecl *proto,
+CheckTypeWitnessResult swift::checkTypeWitness(Type type,
                                                AssociatedTypeDecl *assocType,
-                                               Type type) {
-  auto genericSig = proto->getGenericSignature();
-  auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
-                                         assocType);
-
+                                               NormalProtocolConformance *Conf) {
   if (type->hasError())
-    return ErrorType::get(proto->getASTContext());
+    return ErrorType::get(assocType->getASTContext());
+
+  const auto proto = Conf->getProtocol();
+  const auto dc = Conf->getDeclContext();
+  const auto genericSig = proto->getGenericSignature();
+  const auto depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
+                                              assocType);
 
   Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
                                               : type;
 
-  // FIXME: This is incorrect; depTy is written in terms of the protocol's
-  // associated types, and we need to substitute in known type witnesses.
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
+    // If the superclass has a type parameter, substitute in known type
+    // witnesses.
+    if (superclass->hasTypeParameter()) {
+      const auto subMap = SubstitutionMap::getProtocolSubstitutions(
+          proto, Conf->getType(), ProtocolConformanceRef(Conf));
+
+      superclass = superclass.subst(subMap);
+    }
     if (!superclass->isExactSuperclassOf(contextType))
       return superclass;
   }
@@ -3707,7 +3714,7 @@ CheckTypeWitnessResult swift::checkTypeWitness(DeclContext *dc,
   auto *module = dc->getParentModule();
 
   // Check protocol conformances.
-  for (auto reqProto : genericSig->getConformsTo(depTy)) {
+  for (const auto reqProto : genericSig->getRequiredProtocols(depTy)) {
     if (module->lookupConformance(contextType, reqProto)
             .isInvalid())
       return CheckTypeWitnessResult(reqProto->getDeclaredType());
@@ -3796,7 +3803,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
     // Check this type against the protocol requirements.
     if (auto checkResult =
-            checkTypeWitness(DC, Proto, assocType, candidate.MemberType)) {
+            checkTypeWitness(candidate.MemberType, assocType, Conformance)) {
       nonViable.push_back({candidate.Member, checkResult});
     } else {
       viable.push_back(candidate);

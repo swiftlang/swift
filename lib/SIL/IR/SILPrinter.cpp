@@ -3532,6 +3532,9 @@ ID SILPrintContext::getID(const SILNode *node) {
     return {ID::SILUndef, 0};
   
   SILBasicBlock *BB = node->getParentBlock();
+  if (!BB) {
+    return { ID::Null, 0 };
+  }
   if (SILFunction *F = BB->getParent()) {
     setContext(F);
     // Lazily initialize the instruction -> ID mapping.

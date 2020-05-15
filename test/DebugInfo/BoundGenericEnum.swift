@@ -59,14 +59,13 @@ y.g()
 // CASE_0-DAG: !DISubprogram(name: "map", {{.*}}line: 11, type: ![[SBTY:[0-9]+]]
 // CASE_0-DAG: ![[SBTY]] = !DISubroutineType(types: ![[SBTYS:[0-9]+]])
 // CASE_0-DAG: ![[SBTYS]] = !{!{{[0-9]+}}, !{{[0-9]+}}, ![[SELFTY:[0-9]+]]}
-// CASE_0-DAG: ![[SELFTY]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}line: 5, {{.*}}elements: ![[UNSIZED_ELTS:[0-9]+]]
+// CASE_0-DAG: ![[SELFTY]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}elements: ![[UNSIZED_ELTS:[0-9]+]]
 // CASE_0-DAG: ![[UNSIZED_ELTS]] = !{![[UNSIZED_MEM:[0-9]+]]}
 // CASE_0-DAG: ![[UNSIZED_MEM]] = !DIDerivedType(tag: DW_TAG_member, {{.*}} baseType: ![[UNIQ:[0-9]+]]
 
 // The unique unsized type.
 // CASE_0: ![[UNIQ]] = !DICompositeType(
 // CASE_0-SAME:            tag: DW_TAG_structure_type, name: "Result",
-// CASE_0-SAME:            line: 5,
 // CASE_0-NOT:             size:
 // CASE_0-SAME:            runtimeLang: DW_LANG_Swift,
 // CASE_0-SAME:            identifier: "$s1a6ResultOyxGD")
@@ -75,10 +74,10 @@ y.g()
 // CASE_1-DAG: ![[F:[0-9]+]] = distinct !DISubprogram(name: "f", 
 // CASE_1-DAG: !DILocalVariable(name: "self", arg: 1, scope: ![[F]],{{.*}} line: 31,{{.*}} type: ![[C_CLASS:[0-9]+]]
 // CASE_1-DAG: ![[C_CLASS]] = !DIDerivedType(tag: DW_TAG_const_type,{{.*}} baseType: ![[CLASS:[0-9]+]])
-// CASE_1-DAG: ![[CLASS]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} line: 5, size: {{40|72}}
+// CASE_1-DAG: ![[CLASS]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} size: {{40|72}}
 
 // (2)
 // CASE_2-DAG: ![[G:[0-9]+]] = distinct !DISubprogram(name: "g", 
 // CASE_2-DAG: !DILocalVariable(name: "self", arg: 1, scope: ![[G]],{{.*}} line: 38,{{.*}} type: ![[C_TUP:[0-9]+]]
 // CASE_2-DAG: ![[C_TUP]] = !DIDerivedType(tag: DW_TAG_const_type,{{.*}} baseType: ![[TUP:[0-9]+]])
-// CASE_2-DAG: ![[TUP]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} line: 5, size: {{264|512}},
+// CASE_2-DAG: ![[TUP]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} size: {{264|512}},

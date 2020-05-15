@@ -238,6 +238,7 @@ class Builder(object):
             "-DLLVM_ENABLE_LIBXML2=FALSE",
             "-DLLVM_ENABLE_LIBEDIT=FALSE",
             "-DLLVM_ENABLE_TERMINFO=FALSE",
+            "-DLLVM_ENABLE_ZLIB=FALSE",
         ]
         # We are not using cmark but initialize the CMARK variables to something so
         # that configure can succeed.

@@ -424,10 +424,10 @@ Type GenericSignatureImpl::getSuperclassBound(Type type) const {
   return equivClass->superclass;
 }
 
-/// Determine the set of protocols to which the given dependent type
-/// must conform.
-SmallVector<ProtocolDecl *, 2>
-GenericSignatureImpl::getConformsTo(Type type) const {
+/// Determine the set of protocols to which the given type parameter is
+/// required to conform.
+GenericSignature::RequiredProtocols
+GenericSignatureImpl::getRequiredProtocols(Type type) const {
   if (!type->isTypeParameter()) return { };
 
   auto &builder = *getGenericSignatureBuilder();
@@ -437,12 +437,12 @@ GenericSignatureImpl::getConformsTo(Type type) const {
                                   ArchetypeResolutionKind::CompleteWellFormed);
   if (!equivClass) return { };
 
-  // If this type was mapped to a concrete type, then there are no
-  // requirements.
+  // If this type parameter was mapped to a concrete type, then there
+  // are no requirements.
   if (equivClass->concreteType) return { };
 
   // Retrieve the protocols to which this type conforms.
-  SmallVector<ProtocolDecl *, 2> result;
+  GenericSignature::RequiredProtocols result;
   for (const auto &conforms : equivClass->conformsTo)
     result.push_back(conforms.first);
 
@@ -452,8 +452,8 @@ GenericSignatureImpl::getConformsTo(Type type) const {
   return result;
 }
 
-bool GenericSignatureImpl::conformsToProtocol(Type type,
-                                              ProtocolDecl *proto) const {
+bool GenericSignatureImpl::requiresProtocol(Type type,
+                                            ProtocolDecl *proto) const {
   assert(type->isTypeParameter() && "Expected a type parameter");
 
   auto &builder = *getGenericSignatureBuilder();
@@ -463,7 +463,11 @@ bool GenericSignatureImpl::conformsToProtocol(Type type,
                                   ArchetypeResolutionKind::CompleteWellFormed);
   if (!equivClass) return false;
 
-  // FIXME: Deal with concrete conformances here?
+  // FIXME: Optionally deal with concrete conformances here
+  // or have a separate method do that additionally?
+  //
+  // If this type parameter was mapped to a concrete type, then there
+  // are no requirements.
   if (equivClass->concreteType) return false;
 
   // Check whether the representative conforms to this protocol.
@@ -541,7 +545,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(
     auto protocol = protocolType->getDecl();
 
     if (canFirstType->isTypeParameter())
-      return conformsToProtocol(canFirstType, protocol);
+      return requiresProtocol(canFirstType, protocol);
     else
       return (bool)GSB->lookupConformance(/*dependentType=*/CanType(),
                                           canFirstType, protocol);

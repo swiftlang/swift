@@ -55,6 +55,7 @@
 #include "ConformanceDescription.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
+#include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
@@ -338,6 +339,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
+  static_assert(MetadataAdjustmentIndex::ValueType == 1,
+                "Adjustment index must be synchronized with this layout");
   FullTypeMetadataStructTy = createStructType(*this, "swift.full_type", {
     WitnessTablePtrTy,
     TypeMetadataStructTy
@@ -350,6 +353,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.
+  static_assert(MetadataAdjustmentIndex::Class == 2,
+                "Adjustment index must be synchronized with this layout");
   FullHeapMetadataStructTy =
                   createStructType(*this, "swift.full_heapmetadata", {
     dtorPtrTy,
