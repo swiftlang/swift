@@ -1252,7 +1252,8 @@ std::string SpecifyClosureParameterType::getName() const {
 
 bool SpecifyClosureParameterType::diagnose(const Solution &solution,
                                            bool asNote) const {
-  return false;
+  UnableToInferClosureParameterType failure(solution, getLocator());
+  return failure.diagnose(asNote);
 }
 
 SpecifyClosureParameterType *
