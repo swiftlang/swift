@@ -72,8 +72,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
     if (sig->getSuperclassBound(paramTy))
       return true;
 
-    auto conformsTo = sig->getConformsTo(paramTy);
-    return !conformsTo.empty();
+    return !sig->getRequiredProtocols(paramTy).empty();
   }
 
   Action visitBoundGenericType(BoundGenericType *boundGeneric) override {

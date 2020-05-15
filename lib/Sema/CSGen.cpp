@@ -915,6 +915,35 @@ namespace {
 } // end anonymous namespace
 
 namespace {
+// Check if \p E is a call expression to curried thunk of "KeyPath as function".
+// i.e. '{ `$kp$` in { $0[keyPath: $kp$] } }(keypath)'
+static bool isKeyPathCurriedThunkCallExpr(Expr *E) {
+  auto CE = dyn_cast<CallExpr>(E);
+  if (!CE)
+    return false;
+  auto thunk = dyn_cast<AutoClosureExpr>(CE->getFn());
+  if (!thunk)
+    return false;
+  if (thunk->getParameters()->size() != 1 ||
+      thunk->getParameters()->get(0)->getParameterName().str() != "$kp$")
+    return false;
+
+  auto PE = dyn_cast<ParenExpr>(CE->getArg());
+  if (!PE)
+    return false;
+  return isa<KeyPathExpr>(PE->getSubExpr());
+}
+
+// Extract the keypath expression from the curried thunk expression.
+static Expr *extractKeyPathFromCurryThunkCall(Expr *E) {
+  assert(isKeyPathCurriedThunkCallExpr(E));
+  auto call = cast<CallExpr>(E);
+  auto arg = cast<ParenExpr>(call->getArg());
+  return arg->getSubExpr();
+}
+} // end anonymous namespace
+
+namespace {
 
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
@@ -2162,8 +2191,12 @@ namespace {
             auto declaredTy = param->getType();
             externalType = CS.openUnboundGenericType(declaredTy, paramLoc);
           } else {
+            // Let's allow parameters which haven't been explicitly typed
+            // to become holes by default, this helps in situations like
+            // `foo { a in }` where `foo` doesn't exist.
             externalType = CS.createTypeVariable(
-                paramLoc, TVO_CanBindToInOut | TVO_CanBindToNoEscape);
+                paramLoc,
+                TVO_CanBindToInOut | TVO_CanBindToNoEscape | TVO_CanBindToHole);
           }
 
           closureParams.push_back(param->toFunctionParam(externalType));
@@ -3787,6 +3820,12 @@ namespace {
           continue;
         }
 
+        // Extract keypath from '{ `$kp$` in { $0[keyPath: $kp$] } }(keypath)'
+        if (isKeyPathCurriedThunkCallExpr(expr)) {
+          expr = extractKeyPathFromCurryThunkCall(expr);
+          continue;
+        }
+
         // Restore '@autoclosure'd value.
         if (auto ACE = dyn_cast<AutoClosureExpr>(expr)) {
           // This is only valid if the closure doesn't have parameters.
@@ -3794,6 +3833,7 @@ namespace {
             expr = ACE->getSingleExpressionBody();
             continue;
           }
+          llvm_unreachable("other AutoClosureExpr must be handled specially");
         }
 
         // Remove any semantic expression injected by typechecking.

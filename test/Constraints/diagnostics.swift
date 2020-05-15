@@ -255,8 +255,7 @@ struct Toe {
   let toenail: Nail // expected-error {{cannot find type 'Nail' in scope}}
 
   func clip() {
-    // TODO(diagnostics): Solver should stop once it has detected that `toenail` doesn't exist and report that.
-    toenail.inspect { x in // expected-error {{type of expression is ambiguous without more context}}
+    toenail.inspect { x in
       toenail.inspect { y in }
     }
   }
@@ -297,7 +296,7 @@ func r18800223(_ i : Int) {
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
-_ = { $0 }  // expected-error {{unable to infer closure type in the current context}}
+_ = { $0 }  // expected-error {{unable to infer type of a closure parameter $0 in the current context}}
 
 
 
