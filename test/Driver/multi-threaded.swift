@@ -48,9 +48,9 @@
 // BITCODE-DAG: -frontend -c -primary-file {{.*[/\\]}}multi-threaded.bc {{.*}} -o {{[^ ]*}}multi-threaded.o
 // BITCODE-NOT: {{ld|clang}}
 
-// PARSEABLE: "outputs": [
-// PARSEABLE: "path": "main.o"
-// PARSEABLE: "path": "multi-threaded.o"
+// PARSEABLE: "outputs"{{ ?}}: [
+// PARSEABLE: "path"{{ ?}}: "main.o"
+// PARSEABLE: "path"{{ ?}}: "multi-threaded.o"
 
 // EXEC: -frontend
 // EXEC-DAG: -num-threads 4
@@ -62,31 +62,31 @@
 // DEPENDENCIES-DAG: {{.*}}multi-threaded.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift
 // DEPENDENCIES-DAG: {{.*}}main.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift
 
-// PARSEABLE2: "name": "compile"
-// PARSEABLE2: "outputs": [
-// PARSEABLE2: "path": "{{.*[/\\]}}main.bc"
-// PARSEABLE2: "path": "{{.*[/\\]}}multi-threaded.bc"
-// PARSEABLE2: "name": "backend"
-// PARSEABLE2: "inputs": [
+// PARSEABLE2: "name"{{ ?}}: "compile"
+// PARSEABLE2: "outputs"{{ ?}}: [
+// PARSEABLE2: "path"{{ ?}}: "{{.*[/\\]}}main.bc"
+// PARSEABLE2: "path"{{ ?}}: "{{.*[/\\]}}multi-threaded.bc"
+// PARSEABLE2: "name"{{ ?}}: "backend"
+// PARSEABLE2: "inputs"{{ ?}}: [
 // PARSEABLE2:   "{{.*[/\\]}}main.bc"
-// PARSEABLE2: "outputs": [
-// PARSEABLE2:   "path": "{{.*[/\\]}}main.o"
-// PARSEABLE2: "name": "backend"
-// PARSEABLE2: "inputs": [
+// PARSEABLE2: "outputs"{{ ?}}: [
+// PARSEABLE2:   "path"{{ ?}}: "{{.*[/\\]}}main.o"
+// PARSEABLE2: "name"{{ ?}}: "backend"
+// PARSEABLE2: "inputs"{{ ?}}: [
 // PARSEABLE2:   "{{.*[/\\]}}multi-threaded.bc"
-// PARSEABLE2: "outputs": [
-// PARSEABLE2:   "path": "{{.*[/\\]}}multi-threaded.o"
+// PARSEABLE2: "outputs"{{ ?}}: [
+// PARSEABLE2:   "path"{{ ?}}: "{{.*[/\\]}}multi-threaded.o"
 
-// PARSEABLE3: "name": "compile"
-// PARSEABLE3: "outputs": [
-// PARSEABLE3:   "path": "{{.*}}main.o"
-// PARSEABLE3:   "path": "{{.*}}multi-threaded.o"
-// PARSEABLE3: "name": "link"
-// PARSEABLE3: "inputs": [
+// PARSEABLE3: "name"{{ ?}}: "compile"
+// PARSEABLE3: "outputs"{{ ?}}: [
+// PARSEABLE3:   "path"{{ ?}}: "{{.*}}main.o"
+// PARSEABLE3:   "path"{{ ?}}: "{{.*}}multi-threaded.o"
+// PARSEABLE3: "name"{{ ?}}: "link"
+// PARSEABLE3: "inputs"{{ ?}}: [
 // PARSEABLE3-NEXT:   "{{.*}}main.o"
 // PARSEABLE3-NEXT:   "{{.*}}multi-threaded.o"
-// PARSEABLE3: "outputs": [
-// PARSEABLE3:   "path": "a.out"
+// PARSEABLE3: "outputs"{{ ?}}: [
+// PARSEABLE3:   "path"{{ ?}}: "a.out"
 
 func libraryFunction() {}
 
