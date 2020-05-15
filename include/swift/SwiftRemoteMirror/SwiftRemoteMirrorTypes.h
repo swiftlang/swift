@@ -141,6 +141,7 @@ typedef struct swift_childinfo {
   swift_typeref_t TR;
 } swift_childinfo_t;
 
+// Values here match the values from MetadataAllocatorTags in Metadata.h.
 enum swift_metadata_allocation_tag {
   SWIFT_GENERIC_METADATA_CACHE_ALLOCATION = 14,
 };

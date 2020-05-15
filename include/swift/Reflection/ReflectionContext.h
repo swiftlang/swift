@@ -24,7 +24,6 @@
 #include "llvm/Object/COFF.h"
 
 #include "swift/ABI/Enum.h"
-#include "swift/Basic/TaggedUnion.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
