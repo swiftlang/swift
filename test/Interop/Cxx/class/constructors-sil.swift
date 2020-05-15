@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -I %S/Inputs -enable-cxx-interop -emit-sil %s | %FileCheck %s
 
-import CxxConstructors
+import Constructors
 
 // The most important thing to test here is that the constructor result is returned
 // with an @out attribute.

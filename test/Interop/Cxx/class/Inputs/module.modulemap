@@ -6,8 +6,8 @@ module TypeClassification {
   header "type-classification.h"
 }
 
-module CxxConstructors {
-  header "cxx-constructors.h"
+module Constructors {
+  header "constructors.h"
 }
 
 module MemberwiseInitializer {

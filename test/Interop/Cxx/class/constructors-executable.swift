@@ -3,7 +3,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import CxxConstructors
+import Constructors
 
 var CxxConstructorTestSuite = TestSuite("CxxConstructors")
 
