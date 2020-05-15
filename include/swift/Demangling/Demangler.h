@@ -564,8 +564,7 @@ protected:
   NodePointer demangleValueWitness();
 
   NodePointer demangleTypeMangling();
-  NodePointer demangleSymbolicReference(unsigned char rawKind,
-                                        const void *at);
+  NodePointer demangleSymbolicReference(unsigned char rawKind);
 
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);
