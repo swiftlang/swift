@@ -606,6 +606,8 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
 
     break;
   }
+  case SILDeclRef::Kind::EnumElement:
+    return true;
   default:
     break;
   }
@@ -828,7 +830,16 @@ static void emitDelayedFunction(SILGenModule &SGM,
     break;
   }
 
-  case SILDeclRef::Kind::EnumElement:
+  case SILDeclRef::Kind::EnumElement: {
+    auto *decl = cast<EnumElementDecl>(constant.getDecl());
+
+    SGM.preEmitFunction(constant, decl, f, decl);
+    PrettyStackTraceSILFunction X("silgen enum constructor", f);
+    SILGenFunction(SGM, *f, decl->getDeclContext()).emitEnumConstructor(decl);
+    SGM.postEmitFunction(constant, f);
+    break;
+  }
+
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::IVarInitializer:
@@ -1141,17 +1152,6 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   if (decl->hasBody()) {
     emitOrDelayFunction(*this, constant);
   }
-}
-
-void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
-  // Enum element constructors are always emitted by need, so don't need
-  // delayed emission.
-  SILDeclRef constant(decl);
-  SILFunction *f = getFunction(constant, ForDefinition);
-  preEmitFunction(constant, decl, f, decl);
-  PrettyStackTraceSILFunction X("silgen enum constructor", f);
-  SILGenFunction(*this, *f, decl->getDeclContext()).emitEnumConstructor(decl);
-  postEmitFunction(constant, f);
 }
 
 SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
