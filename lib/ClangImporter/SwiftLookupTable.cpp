@@ -72,17 +72,15 @@ class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
   ASTContext &swiftCtx;
   importer::ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
-  const bool inferImportAsMember;
 
 public:
   SwiftLookupTableWriter(
       clang::ModuleFileExtension *extension, clang::ASTWriter &writer,
       ASTContext &ctx,
       importer::ClangSourceBufferImporter &buffersForDiagnostics,
-      const PlatformAvailability &avail, bool inferIAM)
-    : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
-      buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-      inferImportAsMember(inferIAM) {}
+      const PlatformAvailability &avail)
+      : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   void writeExtensionContents(clang::Sema &sema,
                               llvm::BitstreamWriter &stream) override;
@@ -1260,7 +1258,7 @@ namespace {
 void SwiftLookupTableWriter::writeExtensionContents(
        clang::Sema &sema,
        llvm::BitstreamWriter &stream) {
-  NameImporter nameImporter(swiftCtx, availability, sema, inferImportAsMember);
+  NameImporter nameImporter(swiftCtx, availability, sema);
 
   // Populate the lookup table.
   SwiftLookupTable table(nullptr);
@@ -1826,7 +1824,6 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            inferImportAsMember,
                             version::getSwiftFullVersion());
 }
 
@@ -2065,10 +2062,8 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {
-  return std::make_unique<SwiftLookupTableWriter>(this, writer, swiftCtx,
-                                                  buffersForDiagnostics,
-                                                  availability,
-                                                  inferImportAsMember);
+  return std::make_unique<SwiftLookupTableWriter>(
+      this, writer, swiftCtx, buffersForDiagnostics, availability);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionReader>

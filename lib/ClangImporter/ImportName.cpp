@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "CFTypeInfo.h"
-#include "IAMInference.h"
 #include "ImporterImpl.h"
 #include "ClangDiagnosticConsumer.h"
 #include "swift/Subsystems.h"
@@ -444,34 +443,6 @@ StringRef importer::stripNotification(StringRef name) {
   if (name.size() <= notification.size() || !name.endswith(notification))
     return {};
   return name.drop_back(notification.size());
-}
-
-/// Whether the decl is from a module who requested import-as-member inference
-static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
-                                        clang::Sema &clangSema) {
-  clang::Module *submodule;
-  if (auto m = decl->getImportedOwningModule()) {
-    submodule = m;
-  } else if (auto m = decl->getLocalOwningModule()) {
-    submodule = m;
-  } else if (auto m = clangSema.getPreprocessor().getCurrentModule()) {
-    submodule = m;
-  } else if (auto m = clangSema.getPreprocessor().getCurrentLexerSubmodule()) {
-    submodule = m;
-  } else {
-    return false;
-  }
-
-  while (submodule) {
-    if (submodule->IsSwiftInferImportAsMember) {
-      // HACK HACK HACK: This is a workaround for some module invalidation issue
-      // and inconsistency. This will go away soon.
-      return submodule->Name == "CoreGraphics";
-    }
-    submodule = submodule->Parent;
-  }
-
-  return false;
 }
 
 /// Match the name of the given Objective-C method to its enclosing class name
@@ -1359,35 +1330,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           result.info.errorInfo = *errorInfo;
         }
       }
-
-      return result;
-    }
-  } else if (swift3OrLaterName && (inferImportAsMember ||
-                                   moduleIsInferImportAsMember(D, clangSema)) &&
-             (isa<clang::VarDecl>(D) || isa<clang::FunctionDecl>(D)) &&
-             dc->isTranslationUnit()) {
-    auto inference = IAMResult::infer(swiftCtx, clangSema, D);
-    if (inference.isImportAsMember()) {
-      result.info.importAsMember = true;
-      result.declName = inference.name;
-      result.effectiveContext = inference.effectiveDC;
-
-      // Instance or static
-      if (inference.selfIndex) {
-        result.info.hasSelfIndex = true;
-        result.info.selfIndex = *inference.selfIndex;
-      }
-
-      // Property
-      if (inference.isGetter())
-        result.info.accessorKind = ImportedAccessorKind::PropertyGetter;
-      else if (inference.isSetter())
-        result.info.accessorKind = ImportedAccessorKind::PropertySetter;
-
-      // Inits are factory. These C functions are neither convenience nor
-      // designated, as they return a fully formed object of that type.
-      if (inference.isInit())
-        result.info.initKind = CtorInitializerKind::Factory;
 
       return result;
     }

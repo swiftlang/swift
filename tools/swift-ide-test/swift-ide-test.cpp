@@ -373,12 +373,6 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-InferImportAsMember("enable-infer-import-as-member",
-    llvm::cl::desc("Infer when a global could be imported as a member"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 EnableSwift3ObjCInference("enable-swift3-objc-inference",
     llvm::cl::desc("Enable Swift 3's @objc inference rules"),
     llvm::cl::cat(Category),
@@ -3426,14 +3420,10 @@ int main(int argc, char *argv[]) {
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=
       options::CodeCompleteCallPatternHeuristics;
-  InitInvok.getLangOptions().InferImportAsMember |=
-    options::InferImportAsMember;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
-  InitInvok.getClangImporterOptions().InferImportAsMember |=
-    options::InferImportAsMember;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }

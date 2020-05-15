@@ -54,11 +54,6 @@ module IAMError {
   header "ImportAsMemberError.h"
 }
 
-module InferImportAsMember {
-  export *
-  header "InferImportAsMember.h"
-}
-
 module CompatibilityAlias {
   header "CompatibilityAlias.h"
   export *

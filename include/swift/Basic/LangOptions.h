@@ -274,13 +274,6 @@ namespace swift {
     /// on once we start serializing clang function types.
     bool UseClangFunctionTypes = false;
 
-    /// Whether to use the import as member inference system
-    ///
-    /// When importing a global, try to infer whether we can import it as a
-    /// member of some type instead. This includes inits, computed properties,
-    /// and methods.
-    bool InferImportAsMember = false;
-
     /// If set to true, compile with the SIL Opaque Values enabled.
     /// This is for bootstrapping. It can't be in SILOptions because the
     /// TypeChecker uses it to set resolve the ParameterConvention.
