@@ -191,6 +191,7 @@ SIL Stage
 
   sil-stage ::= 'raw'
   sil-stage ::= 'canonical'
+  sil-stage ::= 'lowered'
 
 There are different invariants on SIL depending on what stage of processing
 has been applied to it.
@@ -208,9 +209,22 @@ has been applied to it.
   code generation are derived from this form, and a module can be distributed
   containing SIL in this (or later) forms.
 
+* **Lowered SIL** is SIL as it exists after "large" SIL value types have been
+  materialized onto the stack by the 'SIL Address Lowering' IRGen SIL
+  pass.
+
 SIL files declare the processing stage of the included SIL with one of the
-declarations ``sil_stage raw`` or ``sil_stage canonical`` at top level. Only
-one such declaration may appear in a file.
+declarations ``sil_stage raw``, ``sil_stage canonical``, ``sil_stage lowered``
+at top level. Only one such declaration may appear in a file.
+
+NOTE: The reason why we convert from canonical SIL to lowered SIL is as follows:
+IRGen emits value type argument passing by passing each of the leaf types of a
+SILType's hierarchical type tree as separate arguments. This can result
+in /large amounts/ of marshalling code emitted by LLVM since the number of
+arguments can be comically large. This is avoided by the 'SIL Address Lowering'
+IRGen SIL pass. This Pass transforms the IR such that large types are moved onto
+the stack and are worked with indirectly. This also results in changed calling
+conventions, meaning that the resulting transformation is part of Swift's ABI.
 
 SIL Types
 ~~~~~~~~~
