@@ -12,7 +12,6 @@ add_swift_target_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BU
   CheckRangeReplaceableSliceType.swift
   CheckSequenceInstance.swift
   CheckSequenceType.swift
-  COWLoggingArray.swift
   LoggingWrappers.swift
   MinimalCollections.swift
   RangeSelection.swift
