@@ -4151,7 +4151,7 @@ namespace {
 static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
                                     DeclContext *DC) {
   // Remove implicit conversions from the expression.
-  expr = expr->walk(SanitizeExpr(cs));
+  // expr = expr->walk(SanitizeExpr(cs));
 
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(cs, DC);
