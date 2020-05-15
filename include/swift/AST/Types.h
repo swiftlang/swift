@@ -2696,10 +2696,10 @@ enum class FunctionTypeRepresentation : uint8_t {
   /// A "thin" function that needs no context.
   Thin,
   
-  /// A C function pointer, which is thin and also uses the C calling
-  /// convention.
+  /// A C function pointer (or reference), which is thin and also uses the C
+  /// calling convention.
   CFunctionPointer,
-  
+
   /// The value of the greatest AST function representation.
   Last = CFunctionPointer,
 };
@@ -2980,8 +2980,8 @@ public:
       // We preserve a full clang::Type *, not a clang::FunctionType * as:
       // 1. We need to keep sugar in case we need to present an error to the user.
       // 2. The actual type being stored is [ignoring sugar] either a
-      //    clang::PointerType or a clang::BlockPointerType which points to a
-      //    clang::FunctionType.
+      //    clang::PointerType, a clang::BlockPointerType, or a
+      //    clang::ReferenceType which points to a clang::FunctionType.
       const clang::Type *ClangFunctionType;
 
       bool empty() const { return !ClangFunctionType; }
