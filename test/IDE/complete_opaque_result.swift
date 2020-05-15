@@ -22,6 +22,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_TestProtocol_DOT | %FileCheck %s -check-prefix=POSTFIX_TestProtocol_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_TestProtocol_NODOT | %FileCheck %s -check-prefix=POSTFIX_TestProtocol_NODOT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_TestProtocol2 | %FileCheck %s -check-prefix=OVERRIDE_TestProtocol2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_ConcreteTestProtocol2 | %FileCheck %s -check-prefix=POSTFIX_ConcreteTestProtocol2
+
 protocol MyProtocol {
   associatedtype Mistery
 }
@@ -200,3 +203,36 @@ func postfixExpr() {
 // POSTFIX_TestProtocol_NODOT-DAG: BuiltinOperator/None:                = {#TestProtocol#}[#Void#]; name={{.*$}}
 // POSTFIX_TestProtocol_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#TestProtocol#]; name={{.*$}}
 // POSTFIX_TestProtocol_NODOT-DAG: End completions
+
+protocol TestProtocol2 {
+  associatedtype Assoc: Comparable
+  func foo() -> Assoc
+  func bar() -> Assoc
+  func baz(x: @autoclosure () -> Assoc) -> (Assoc) -> Assoc
+}
+extension TestProtocol2 {
+  func inExt() -> Assoc { fatalError() }
+}
+struct ConcreteTestProtocol2: TestProtocol2 {
+  func foo() -> some Comparable { 1 }
+  #^OVERRIDE_TestProtocol2^#
+// OVERRIDE_TestProtocol2: Begin completions
+// OVERRIDE_TestProtocol2-NOT: foo()
+// OVERRIDE_TestProtocol2-NOT: inExt()
+// OVERRIDE_TestProtocol2-DAG: Decl[InstanceMethod]/Super:         func bar() -> Assoc {|};
+// OVERRIDE_TestProtocol2-DAG: Decl[InstanceMethod]/Super:         func baz(x: @autoclosure () -> Assoc) -> (Assoc) -> Assoc {|};
+// OVERRIDE_TestProtocol2-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#};
+// OVERRIDE_TestProtocol2-NOT: foo()
+// OVERRIDE_TestProtocol2-NOT: inExt()
+// OVERRIDE_TestProtocol2: End completions
+}
+func testUseTestProtocol2(value: ConcreteTestProtocol2) {
+  value.#^POSTFIX_ConcreteTestProtocol2^#
+// POSTFIX_ConcreteTestProtocol2: Begin completions
+// POSTFIX_ConcreteTestProtocol2-DAG: Keyword[self]/CurrNominal:          self[#ConcreteTestProtocol2#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/CurrNominal:   foo()[#Comparable#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         bar()[#ConcreteTestProtocol2.Assoc#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         baz({#x: ConcreteTestProtocol2.Assoc#})[#(ConcreteTestProtocol2.Assoc) -> ConcreteTestProtocol2.Assoc#];
+// POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         inExt()[#ConcreteTestProtocol2.Assoc#];
+// POSTFIX_ConcreteTestProtocol2: End completions
+}
