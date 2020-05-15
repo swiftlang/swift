@@ -50,10 +50,6 @@ func initCallToAllocInit(i i: CInt) {
 // CHECK-LABEL: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfC"
 // CHECK: call [[OPAQUE:%.*]]* @objc_allocWithZone
 
-// CHECK: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfcTO"
-// CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
-// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
-
 // Indexed subscripting
 // CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir19indexedSubscripting1b3idx1aySo1BC_SiSo1ACtF"
 func indexedSubscripting(b b: B, idx: Int, a: A) {
@@ -356,6 +352,10 @@ func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
   return hba.blockArray
 }
 
+
+// CHECK-LABEL: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfcTO"
+// CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
+// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
 
 // CHECK: attributes [[NOUNWIND]] = { nounwind }
 

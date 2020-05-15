@@ -578,18 +578,37 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
     return false;
 
   auto *d = constant.getDecl();
-  auto *dc = d->getDeclContext()->getModuleScopeContext();
+  auto *dc = d->getDeclContext();
 
-  if (isa<ClangModuleUnit>(dc))
-    return true;
+  switch (constant.kind) {
+  case SILDeclRef::Kind::Func: {
+    auto *fd = cast<FuncDecl>(d);
+    if (!fd->hasBody())
+      return false;
 
-  if (auto *func = dyn_cast<FuncDecl>(d))
-    if (func->hasForcedStaticDispatch())
+    if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
       return true;
 
-  if (auto *sf = dyn_cast<SourceFile>(dc))
-    if (M.isWholeModule() || M.getAssociatedContext() == dc)
-      return false;
+    if (fd->hasForcedStaticDispatch())
+      return true;
+
+    break;
+  }
+  case SILDeclRef::Kind::Allocator: {
+    auto *cd = cast<ConstructorDecl>(d);
+    // For factories, we don't need to emit a special thunk; the normal
+    // foreign-to-native thunk is sufficient.
+    if (isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
+        !cd->isFactoryInit() &&
+        (dc->getSelfClassDecl() ||
+         cd->hasBody()))
+      return true;
+
+    break;
+  }
+  default:
+    break;
+  }
 
   return false;
 }
@@ -618,18 +637,10 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   emittedFunctions[constant] = F;
 
-  if (isEmittedOnDemand(M, constant) &&
-      !delayedFunctions.count(constant)) {
-    auto *d = constant.getDecl();
-    if (auto *func = dyn_cast<FuncDecl>(d)) {
-      if (constant.kind == SILDeclRef::Kind::Func)
-        emitFunction(func);
-    } else if (auto *ctor = dyn_cast<ConstructorDecl>(d)) {
-      // For factories, we don't need to emit a special thunk; the normal
-      // foreign-to-native thunk is sufficient.
-      if (!ctor->isFactoryInit() &&
-          constant.kind == SILDeclRef::Kind::Allocator)
-        emitConstructor(ctor);
+  if (!delayedFunctions.count(constant)) {
+    if (isEmittedOnDemand(M, constant)) {
+      forcedFunctions.push_back(constant);
+      return F;
     }
   }
 
@@ -832,23 +843,18 @@ static void emitDelayedFunction(SILGenModule &SGM,
 static void emitOrDelayFunction(SILGenModule &SGM,
                                 SILDeclRef constant,
                                 bool forceEmission = false) {
+  assert(!constant.isThunk());
+  assert(!constant.isClangImported());
+
   auto emitAfter = SGM.lastEmittedFunction;
 
   SILFunction *f = nullptr;
 
-  // If the function is explicit or may be externally referenced, or if we're
-  // forcing emission, we must emit it.
-  bool mayDelay;
-  // Shared thunks and Clang-imported definitions can always be delayed.
-  if (constant.isThunk() || constant.isClangImported()) {
-    mayDelay = !forceEmission;
   // Implicit decls may be delayed if they can't be used externally.
-  } else {
-    auto linkage = constant.getLinkage(ForDefinition);
-    mayDelay = !forceEmission &&
-               (constant.isImplicit() &&
-                !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule()));
-  }
+  auto linkage = constant.getLinkage(ForDefinition);
+  bool mayDelay = !forceEmission &&
+             (constant.isImplicit() &&
+              !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule()));
 
   // Avoid emitting a delayable definition if it hasn't already been referenced.
   if (mayDelay)
