@@ -114,7 +114,9 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
   // isn't Swift metadata but a plain old ObjC class instead.
   if (metadata->getKind() == MetadataKind::Class) {
     auto *classMetadata = static_cast<ClassMetadata*>(metadata);
+#if SWIFT_OBJC_INTEROP
     classMetadata->setAsTypeMetadata();
+#endif
     auto *fullMetadata = asFullMetadata(metadata);
 
     // Begin by initializing the value witness table; everything else is
@@ -537,8 +539,6 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
   auto classRO = metadataExtraData + pattern->ClassRODataOffset;
   metadata->Data =
     reinterpret_cast<uintptr_t>(classRO) | SWIFT_CLASS_IS_SWIFT_MASK;
-#else
-  metadata->Data = SWIFT_CLASS_IS_SWIFT_MASK;
 #endif
 
   // Class flags.
@@ -2201,8 +2201,6 @@ _swift_relocateClassMetadata(const ClassDescriptor *description,
   auto classRO = pattern->Data.get();
   metadata->Data =
     reinterpret_cast<uintptr_t>(classRO) | SWIFT_CLASS_IS_SWIFT_MASK;
-#else
-  metadata->Data = SWIFT_CLASS_IS_SWIFT_MASK;
 #endif
 
   // Class flags.

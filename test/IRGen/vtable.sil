@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s --check-prefixes=CHECK,CHECK-objc
+// RUN: %target-swift-frontend -disable-objc-interop -emit-ir %s | %FileCheck %s --check-prefixes=CHECK,CHECK-native
 // REQUIRES: executable_test
 
 // REQUIRES: CPU=x86_64
@@ -37,11 +38,8 @@ sil @$s6vtable1CCfD : $@convention(method) (@owned C) -> ()
 // CHECK-native: i8** {{@"\$sBoWV"|null}},
 // CHECK-native: i64 0,
 // CHECK-native: %swift.type* null,
-// CHECK-native: %swift.opaque* null,
-// CHECK-native: %swift.opaque* null,
-// CHECK-native: i64 1,
 // CHECK-native: i32 {{3|2}}, i32 0, i32 16, i16 7, i16 0,
-// CHECK-native: i32 104, i32 16,
+// CHECK-native: i32 80, i32 16,
 // CHECK-native: @"$s6vtable1CCMn"
 // CHECK-native: [[C]]* (%swift.type*)* @"$s6vtable1CCACycACmcfC"
 // CHECK-native: }>
