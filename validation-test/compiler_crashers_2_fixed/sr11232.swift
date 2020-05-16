@@ -1,6 +1,4 @@
-// RUN: not --crash %target-swift-emit-silgen %s
-
-// REQUIRES: asserts
+// RUN: not %target-swift-emit-silgen %s
 
 protocol Pub {
   associatedtype Other
