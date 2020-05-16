@@ -39,7 +39,8 @@ HOST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/host-toolchain-sdk
 HOST_TOOLCHAIN_SDK=$HOST_TOOLCHAIN_DESTDIR/$TOOLCHAIN_NAME
 
 # Build the host toolchain and SDK first.
-$SOURCE_PATH/swift/utils/build-script --preset=webassembly-host \
+$SOURCE_PATH/swift/utils/build-script \
+  --preset=webassembly-host \
   INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
   TOOLCHAIN_NAME="$TOOLCHAIN_NAME" \
   C_CXX_LAUNCHER="$(which sccache)"
