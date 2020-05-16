@@ -2522,7 +2522,13 @@ static void concretizeNestedTypeFromConcreteParent(
     GenericSignatureBuilder &builder) {
   auto parentEquiv = parent->getEquivalenceClassIfPresent();
   assert(parentEquiv && "can't have a concrete type without an equiv class");
+
+  bool isSuperclassConstrained = false;
   auto concreteParent = parentEquiv->concreteType;
+  if (!concreteParent) {
+    isSuperclassConstrained = true;
+    concreteParent = parentEquiv->superclass;
+  }
   assert(concreteParent &&
          "attempting to resolve concrete nested type of non-concrete PA");
 
@@ -2544,8 +2550,14 @@ static void concretizeNestedTypeFromConcreteParent(
          "No conformance requirement");
   const RequirementSource *parentConcreteSource = nullptr;
   for (const auto &constraint : parentEquiv->conformsTo.find(proto)->second) {
-    if (constraint.source->kind == RequirementSource::Concrete) {
-      parentConcreteSource = constraint.source;
+    if (!isSuperclassConstrained) {
+      if (constraint.source->kind == RequirementSource::Concrete) {
+        parentConcreteSource = constraint.source;
+      }
+    } else {
+      if (constraint.source->kind == RequirementSource::Superclass) {
+        parentConcreteSource = constraint.source;
+      }
     }
   }
 
@@ -4263,6 +4275,15 @@ bool GenericSignatureBuilder::updateSuperclass(
   auto updateSuperclassConformances = [&] {
     for (const auto &conforms : equivClass->conformsTo) {
       (void)resolveSuperConformance(type, conforms.first);
+    }
+
+    // Eagerly resolve any existing nested types to their concrete forms (others
+    // will be "concretized" as they are constructed, in getNestedType).
+    for (auto equivT : equivClass->members) {
+      for (auto nested : equivT->getNestedTypes()) {
+        concretizeNestedTypeFromConcreteParent(equivT, nested.second.front(),
+                                               *this);
+      }
     }
   };
 
@@ -7154,6 +7175,12 @@ void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
   out << "Potential archetypes:\n";
   for (auto pa : Impl->PotentialArchetypes) {
     pa->dump(out, &Context.SourceMgr, 2);
+  }
+  out << "\n";
+
+  out << "Equivalence classes:\n";
+  for (auto &equiv : Impl->EquivalenceClasses) {
+    equiv.dump(out, this);
   }
   out << "\n";
 }
