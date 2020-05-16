@@ -1527,17 +1527,23 @@ void IRGenerator::emitDynamicReplacements() {
   llvm::SmallSet<OpaqueTypeArchetypeType *, 8> newUniqueOpaqueTypes;
   llvm::SmallSet<OpaqueTypeArchetypeType *, 8> origUniqueOpaqueTypes;
   for (auto *newFunc : DynamicReplacements) {
-    if (!newFunc->getLoweredFunctionType()->hasOpaqueArchetype())
+    auto newResultTy = newFunc->getLoweredFunctionType()
+             ->getAllResultsInterfaceType()
+             .getASTType();
+    if (!newResultTy->hasOpaqueArchetype())
       continue;
-    CanType(newFunc->getLoweredFunctionType()).visit([&](CanType ty) {
+    newResultTy.visit([&](CanType ty) {
       if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
         if (newUniqueOpaqueTypes.insert(opaque).second)
           newFuncTypes.push_back(opaque);
     });
     auto *origFunc = newFunc->getDynamicallyReplacedFunction();
     assert(origFunc);
-    assert(origFunc->getLoweredFunctionType()->hasOpaqueArchetype());
-    CanType(origFunc->getLoweredFunctionType()).visit([&](CanType ty) {
+    auto origResultTy = origFunc->getLoweredFunctionType()
+                            ->getAllResultsInterfaceType()
+                            .getASTType();
+    assert(origResultTy->hasOpaqueArchetype());
+    origResultTy.visit([&](CanType ty) {
       if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
         if (origUniqueOpaqueTypes.insert(opaque).second)
           origFuncTypes.push_back(opaque);

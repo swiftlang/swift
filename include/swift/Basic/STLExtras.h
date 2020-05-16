@@ -71,6 +71,7 @@ struct function_traits<R (T::*)(Args...) const> {
 
 } // end namespace swift
 
+#if !defined(swiftCore_EXPORTS)
 namespace llvm {
 
 /// @{
@@ -109,6 +110,7 @@ inline void interleave(const Container &c, UnaryFunctor each_fn,
 /// @}
 
 } // end namespace llvm
+#endif
 
 namespace swift {
 

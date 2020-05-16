@@ -207,9 +207,9 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // we got this far it is legal to perform the transformation (since
   // otherwise, we would be creating malformed SIL).
   bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
-  SILInstruction *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
-                                            Args, setNonThrowing);
-  assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsSubstType(
+  ApplyInst *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
+                                       Args, setNonThrowing);
+  assert(FullApplySite(NAI).getSubstCalleeType()->getAllResultsSubstType(
              AI.getModule(), AI.getFunction()->getTypeExpansionContext()) ==
              AI.getSubstCalleeType()->getAllResultsSubstType(
                  AI.getModule(), AI.getFunction()->getTypeExpansionContext()) &&

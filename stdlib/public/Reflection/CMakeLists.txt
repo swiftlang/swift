@@ -3,14 +3,19 @@ set(swiftReflection_SOURCES
   TypeLowering.cpp
   TypeRef.cpp
   TypeRefBuilder.cpp
-  "${SWIFT_SOURCE_DIR}/stdlib/public/runtime/LLVMSupport.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
+  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
+  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/ErrorHandling.cpp"
+  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/Hashing.cpp"
+  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/MemAlloc.cpp"
+  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallPtrSet.cpp"
+  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallVector.cpp"
+  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/StringRef.cpp")
 
 # When we're building with assertions, include the demangle node dumper to aid
 # in debugging.
