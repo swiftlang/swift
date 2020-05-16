@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_EVALUATOR_DEPENDENCIES_H
 #define SWIFT_AST_EVALUATOR_DEPENDENCIES_H
 
+#include "swift/AST/AnyRequest.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/SourceFile.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -113,6 +114,70 @@ private:
   /// A stack of dependency sources in the order they were evaluated.
   llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
 
+  struct Reference {
+  public:
+    enum class Kind {
+      Empty,
+      Tombstone,
+      UsedMember,
+      PotentialMember,
+      TopLevel,
+      Dynamic,
+    } kind;
+
+    NominalTypeDecl *subject;
+    DeclBaseName name;
+
+  private:
+    Reference(Kind kind, NominalTypeDecl *subject, DeclBaseName name)
+        : kind(kind), subject(subject), name(name) {}
+
+  public:
+    static Reference empty() {
+      return {Kind::Empty, llvm::DenseMapInfo<NominalTypeDecl *>::getEmptyKey(),
+              llvm::DenseMapInfo<DeclBaseName>::getEmptyKey()};
+    }
+
+    static Reference tombstone() {
+      return {Kind::Empty,
+              llvm::DenseMapInfo<NominalTypeDecl *>::getTombstoneKey(),
+              llvm::DenseMapInfo<DeclBaseName>::getTombstoneKey()};
+    }
+
+  public:
+    static Reference usedMember(NominalTypeDecl *subject, DeclBaseName name) {
+      return {Kind::UsedMember, subject, name};
+    }
+
+    static Reference potentialMember(NominalTypeDecl *subject) {
+      return {Kind::PotentialMember, subject, DeclBaseName()};
+    }
+
+    static Reference topLevel(DeclBaseName name) {
+      return {Kind::TopLevel, nullptr, name};
+    }
+
+    static Reference dynamic(DeclBaseName name) {
+      return {Kind::Dynamic, nullptr, name};
+    }
+
+  public:
+    struct Info {
+      static inline Reference getEmptyKey() { return Reference::empty(); }
+      static inline Reference getTombstoneKey() {
+        return Reference::tombstone();
+      }
+      static inline unsigned getHashValue(const Reference &Val) {
+        return llvm::hash_combine(Val.kind, Val.subject,
+                                  Val.name.getAsOpaquePointer());
+      }
+      static bool isEqual(const Reference &LHS, const Reference &RHS) {
+        return LHS.kind == RHS.kind && LHS.subject == RHS.subject &&
+               LHS.name == RHS.name;
+      }
+    };
+  };
+
 public:
   enum class Mode {
     // Enables the current "status quo" behavior of the dependency collector.
@@ -128,8 +193,21 @@ public:
     ExperimentalPrivateDependencies,
   };
   Mode mode;
+  llvm::DenseMap<AnyRequest, llvm::DenseSet<Reference, Reference::Info>>
+      requestReferences;
+  llvm::DenseSet<Reference, Reference::Info> scratch;
+  bool isRecording;
 
-  explicit DependencyCollector(Mode mode) : mode{mode} {};
+  explicit DependencyCollector(Mode mode)
+      : mode{mode}, requestReferences{}, scratch{}, isRecording{false} {};
+
+private:
+  void realizeOrRecord(const Reference &ref);
+
+public:
+  void replay(const swift::ActiveRequest &req);
+  void record(const llvm::SetVector<swift::ActiveRequest> &stack,
+              llvm::function_ref<void(DependencyCollector &)> rec);
 
 public:
   /// Registers a named reference from the current dependency scope to a member

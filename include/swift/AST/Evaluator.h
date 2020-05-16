@@ -431,19 +431,22 @@ private:
   }
 
 private:
-  // Report the result of evaluating a request that is not a dependency sink -
-  // which is to say do nothing.
-  template <typename Request,
-            typename std::enable_if<!Request::isDependencySink>::type * = nullptr>
+  // Report the result of evaluating a request that is not a dependency sink.
+  template <typename Request, typename std::enable_if<
+                                  !Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
-                             const typename Request::OutputType &o) {}
+                             const typename Request::OutputType &o) {
+    collector.replay(ActiveRequest(r));
+  }
 
   // Report the result of evaluating a request that is a dependency sink.
   template <typename Request,
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
                              const typename Request::OutputType &o) {
-    r.writeDependencySink(collector, o);
+    return collector.record(activeRequests, [&r, &o](auto &c) {
+      return r.writeDependencySink(c, o);
+    });
   }
 
 public:

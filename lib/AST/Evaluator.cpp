@@ -21,6 +21,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 
@@ -378,24 +379,93 @@ void Evaluator::dumpDependenciesGraphviz() const {
   printDependenciesGraphviz(llvm::dbgs());
 }
 
+void evaluator::DependencyCollector::realizeOrRecord(const Reference &ref) {
+  if (isRecording) {
+    scratch.insert(std::move(ref));
+    return;
+  }
+
+  auto *tracker = getActiveDependencyTracker();
+  if (!tracker) {
+    return;
+  }
+
+  switch (ref.kind) {
+  case Reference::Kind::Empty:
+  case Reference::Kind::Tombstone:
+    llvm_unreachable("cannot record empty dependency");
+  case Reference::Kind::UsedMember:
+    tracker->addUsedMember({ref.subject, ref.name}, isActiveSourceCascading());
+    break;
+  case Reference::Kind::PotentialMember:
+    tracker->addUsedMember({ref.subject, Identifier()},
+                           isActiveSourceCascading());
+    break;
+  case Reference::Kind::TopLevel:
+    tracker->addTopLevelName(ref.name, isActiveSourceCascading());
+    break;
+  case Reference::Kind::Dynamic:
+    tracker->addDynamicLookupName(ref.name, isActiveSourceCascading());
+    break;
+  }
+}
+
 void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
                                                    DeclBaseName name) {
-  if (auto *tracker = getActiveDependencyTracker())
-    tracker->addUsedMember({subject, name}, isActiveSourceCascading());
+  return realizeOrRecord(Reference::usedMember(subject, name));
 }
 
 void evaluator::DependencyCollector::addPotentialMember(
     NominalTypeDecl *subject) {
-  if (auto *tracker = getActiveDependencyTracker())
-    tracker->addUsedMember({subject, Identifier()}, isActiveSourceCascading());
+  return realizeOrRecord(Reference::potentialMember(subject));
 }
 
 void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
-  if (auto *tracker = getActiveDependencyTracker())
-    tracker->addTopLevelName(name, isActiveSourceCascading());
+  return realizeOrRecord(Reference::topLevel(name));
 }
 
 void evaluator::DependencyCollector::addDynamicLookupName(DeclBaseName name) {
-  if (auto *tracker = getActiveDependencyTracker())
-    tracker->addDynamicLookupName(name, isActiveSourceCascading());
+  return realizeOrRecord(Reference::dynamic(name));
+}
+
+void evaluator::DependencyCollector::record(
+    const llvm::SetVector<swift::ActiveRequest> &stack,
+    llvm::function_ref<void(DependencyCollector &)> rec) {
+  assert(!isRecording && "Probably not a good idea to allow nested recording");
+  if (mode == Mode::StatusQuo) {
+    return rec(*this);
+  }
+
+  llvm::SaveAndRestore<bool> restore(isRecording, true);
+  scratch = {};
+  rec(*this);
+  for (const auto &request : stack) {
+    if (!request.isCached()) {
+      continue;
+    }
+
+    auto entry = requestReferences.find_as(request);
+    if (entry == requestReferences.end()) {
+      requestReferences.insert({AnyRequest(request), scratch});
+      continue;
+    }
+
+    entry->second.insert(scratch.begin(), scratch.end());
+  }
+}
+
+void evaluator::DependencyCollector::replay(const swift::ActiveRequest &req) {
+  if (mode == Mode::StatusQuo) {
+    return;
+  }
+
+  assert(!isRecording && "Probably not a good idea to allow nested recording");
+  auto entry = requestReferences.find_as(req);
+  if (entry == requestReferences.end()) {
+    return;
+  }
+
+  for (const auto &ref : entry->second) {
+    realizeOrRecord(ref);
+  }
 }
