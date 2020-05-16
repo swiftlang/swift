@@ -5034,6 +5034,76 @@ LookupAllConformancesInContextRequest::evaluate(
   return DC->getLocalConformances(ConformanceLookupKind::All);
 }
 
+static void diagnoseObjCUnsatisfiedOptReqConflict(AbstractFunctionDecl *req,
+                                                  DeclContext *dc) {
+  auto &Ctx = dc->getASTContext();
+
+  // Check whether there is a conflict here.
+  auto *classDecl = dc->getSelfClassDecl();
+  auto selector = req->getObjCSelector();
+  bool isInstanceMethod = req->isObjCInstanceMethod();
+
+  // FIXME: Also look in superclasses?
+  auto conflicts = classDecl->lookupDirect(selector, isInstanceMethod);
+  if (conflicts.empty())
+    return;
+
+  // Diagnose the conflict.
+  auto reqDiagInfo = getObjCMethodDiagInfo(req);
+  auto conflictDiagInfo = getObjCMethodDiagInfo(conflicts[0]);
+  auto protocolName = cast<ProtocolDecl>(req->getDeclContext())->getName();
+  Ctx.Diags.diagnose(conflicts[0], diag::objc_optional_requirement_conflict,
+                     conflictDiagInfo.first, conflictDiagInfo.second,
+                     reqDiagInfo.first, reqDiagInfo.second, selector,
+                     protocolName);
+
+  // Fix the name of the witness, if we can.
+  if (req->getName() != conflicts[0]->getName() &&
+      req->getKind() == conflicts[0]->getKind() &&
+      isa<AccessorDecl>(req) == isa<AccessorDecl>(conflicts[0])) {
+    // They're of the same kind: fix the name.
+    unsigned kind;
+    if (isa<ConstructorDecl>(req))
+      kind = 1;
+    else if (auto accessor = dyn_cast<AccessorDecl>(req))
+      kind = isa<SubscriptDecl>(accessor->getStorage()) ? 3 : 2;
+    else if (isa<FuncDecl>(req))
+      kind = 0;
+    else {
+      llvm_unreachable("unhandled @objc declaration kind");
+    }
+
+    auto diag = Ctx.Diags.diagnose(conflicts[0],
+                                   diag::objc_optional_requirement_swift_rename,
+                                   kind, req->getName());
+
+    // Fix the Swift name.
+    fixDeclarationName(diag, conflicts[0], req->getName());
+
+    // Fix the '@objc' attribute, if needed.
+    if (!conflicts[0]->canInferObjCFromRequirement(req))
+      fixDeclarationObjCName(diag, conflicts[0],
+                             conflicts[0]->getObjCRuntimeName(),
+                             req->getObjCRuntimeName(),
+                             /*ignoreImpliedName=*/true);
+  }
+
+  // @nonobjc will silence this warning.
+  bool hasExplicitObjCAttribute = false;
+  if (auto objcAttr = conflicts[0]->getAttrs().getAttribute<ObjCAttr>())
+    hasExplicitObjCAttribute = !objcAttr->isImplicit();
+  if (!hasExplicitObjCAttribute)
+    Ctx.Diags.diagnose(conflicts[0], diag::req_near_match_nonobjc, true)
+        .fixItInsert(
+            conflicts[0]->getAttributeInsertionLoc(/*forModifier=*/false),
+            "@nonobjc ");
+
+  Ctx.Diags.diagnose(dc->getAsDecl(), diag::protocol_conformance_here, true,
+                     classDecl->getName(), protocolName);
+  Ctx.Diags.diagnose(req, diag::kind_declname_declared_here,
+                     DescriptiveDeclKind::Requirement, reqDiagInfo.second);
+}
+
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                              IterableDeclContext *idc) {
   // For anything imported from Clang, lazily check conformances.
@@ -5310,13 +5380,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
         // Record this requirement.
         if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
-          sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, funcReq);
+          diagnoseObjCUnsatisfiedOptReqConflict(funcReq, dc);
         } else {
           auto storageReq = cast<AbstractStorageDecl>(req);
           if (auto getter = storageReq->getParsedAccessor(AccessorKind::Get))
-            sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, getter);
+            diagnoseObjCUnsatisfiedOptReqConflict(getter, dc);
           if (auto setter = storageReq->getParsedAccessor(AccessorKind::Set))
-            sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, setter);
+            diagnoseObjCUnsatisfiedOptReqConflict(setter, dc);
         }
       }
     }

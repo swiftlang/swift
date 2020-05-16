@@ -97,3 +97,7 @@ SWIFT_REQUEST(NameLookup, LookupPostfixOperatorRequest,
 SWIFT_REQUEST(NameLookup, LookupPrecedenceGroupRequest,
               PrecedenceGroupDecl *(OperatorLookupDescriptor),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, ObjCMethodDirectLookupRequest,
+              TinyPtrVector<AbstractFunctionDecl *>(ClassDecl *, ObjCSelector,
+                                                    bool),
+              Uncached, NoLocationInfo)

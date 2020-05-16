@@ -954,25 +954,56 @@ public:
   }
 };
 
-namespace {
+/// Class member lookup table, which is a member lookup table with a second
+/// table for lookup based on Objective-C selector.
+class ClassDecl::ObjCMethodLookupTable {
+  using Key = std::pair<ObjCSelector, /*isInstanceMethod*/ char>;
+
   /// Stores the set of Objective-C methods with a given selector within the
   /// Objective-C method lookup table.
-  struct StoredObjCMethods {
+  struct StoredMethods {
     /// The generation count at which this list was last updated.
     unsigned Generation = 0;
 
     /// The set of methods with the given selector.
     llvm::TinyPtrVector<AbstractFunctionDecl *> Methods;
   };
-} // end anonymous namespace
 
-/// Class member lookup table, which is a member lookup table with a second
-/// table for lookup based on Objective-C selector.
-class ClassDecl::ObjCMethodLookupTable
-        : public llvm::DenseMap<std::pair<ObjCSelector, char>,
-                                StoredObjCMethods>
-{
+  llvm::DenseMap<Key, StoredMethods> Table;
+  llvm::DenseSet<Key> LazilyCompleteNames;
+
 public:
+  /// Create a new Obj-C method lookup table.
+  explicit ObjCMethodLookupTable(ASTContext &ctx) {
+    // Make sure the destructor is called when the AST context is torn down.
+    ctx.addCleanup([this]() {
+      this->~ObjCMethodLookupTable();
+    });
+  }
+
+  /// Returns \c true if the lookup table has a complete accounting of the
+  /// given name.
+  bool isLazilyComplete(ObjCSelector selector, bool isInstanceMethod) const {
+    return LazilyCompleteNames.count({selector, isInstanceMethod});
+  }
+
+  /// Mark a given lazily-loaded name as being complete.
+  void markLazilyComplete(ObjCSelector selector, bool isInstanceMethod) {
+    LazilyCompleteNames.insert({selector, isInstanceMethod});
+  }
+
+  /// Clears the cache of lazily-complete names.  This _must_ be called when
+  /// new extensions with lazy members are added to the type, or lookups will
+  /// return inconsistent or stale results.
+  void clearLazilyCompleteCache() {
+    LazilyCompleteNames.clear();
+  }
+
+  void addMember(Decl *member);
+  void addMembers(DeclRange members);
+
+  StoredMethods &operator[](Key key) { return Table[key]; }
+
   // Only allow allocation of member lookup tables using the allocator in
   // ASTContext or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
@@ -1045,13 +1076,22 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
 }
 
 void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
-  if (!LookupTable) return;
+  ClassDecl::ObjCMethodLookupTable *ObjCLookupTable = nullptr;
+  if (auto *CD = dyn_cast<ClassDecl>(this))
+    ObjCLookupTable = CD->ObjCMethodLookup;
 
   if (ext->hasLazyMembers()) {
-    LookupTable->addMembers(ext->getCurrentMembersWithoutLoading());
-    LookupTable->clearLazilyCompleteCache();
+    if (LookupTable) {
+      LookupTable->addMembers(ext->getCurrentMembersWithoutLoading());
+      LookupTable->clearLazilyCompleteCache();
+    }
+    if (ObjCLookupTable)
+      ObjCLookupTable->clearLazilyCompleteCache();
   } else {
-    LookupTable->addMembers(ext->getMembers());
+    if (LookupTable)
+      LookupTable->addMembers(ext->getMembers());
+    if (ObjCLookupTable)
+      ObjCLookupTable->addMembers(ext->getMembers());
   }
 }
 
@@ -1297,63 +1337,80 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
                                       includeAttrImplements);
 }
 
-void ClassDecl::createObjCMethodLookup() {
-  assert(!ObjCMethodLookup && "Already have an Objective-C member table");
-  auto &ctx = getASTContext();
-  ObjCMethodLookup = new (ctx) ObjCMethodLookupTable();
-
-  // Register a cleanup with the ASTContext to call the lookup table
-  // destructor.
-  ctx.addCleanup([this]() {
-    this->ObjCMethodLookup->~ObjCMethodLookupTable();
-  });
-}
-
-MutableArrayRef<AbstractFunctionDecl *>
-ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
-  if (!ObjCMethodLookup) {
-    createObjCMethodLookup();
+void ClassDecl::ObjCMethodLookupTable::addMember(Decl *member) {
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
+    // If this is an @objc var, make sure to add the necessary accessors.
+    if (storage->isObjC()) {
+      storage->visitEmittedAccessors(
+          [&](AccessorDecl *accessor) { addMember(accessor); });
+    }
+    return;
   }
 
-  // If any modules have been loaded since we did the search last (or if we
-  // hadn't searched before), look in those modules, too.
-  auto &stored = (*ObjCMethodLookup)[{selector, isInstance}];
-  ASTContext &ctx = getASTContext();
-  if (ctx.getCurrentGeneration() > stored.Generation) {
-    ctx.loadObjCMethods(this, selector, isInstance, stored.Generation,
-                        stored.Methods);
-    stored.Generation = ctx.getCurrentGeneration();
-  }
-
-  return { stored.Methods.begin(), stored.Methods.end() };
-}
-
-void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
-                                 ObjCSelector selector) {
-  if (!ObjCMethodLookup) {
-    createObjCMethodLookup();
-  }
-
-  // Record the method.
-  bool isInstanceMethod = method->isObjCInstanceMethod();
-  auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
-
-  // Check whether we have a duplicate. This only checks more than one
-  // element in ill-formed code, so the linear search is acceptable.
-  if (std::find(vec.begin(), vec.end(), method) != vec.end())
+  // We're only interested in tracking @objc functions.
+  auto *afd = dyn_cast<AbstractFunctionDecl>(member);
+  if (!afd || !afd->isObjC())
     return;
 
-  if (auto *sf = method->getParentSourceFile()) {
-    if (vec.size() == 1) {
-      // We have a conflict.
-      sf->ObjCMethodConflicts.push_back(std::make_tuple(this, selector,
-                                                        isInstanceMethod));
-    } if (vec.empty()) {
-      sf->ObjCMethodList.push_back(method);
-    }
+  auto &stored = Table[{afd->getObjCSelector(), afd->isObjCInstanceMethod()}];
+  stored.Methods.push_back(afd);
+}
+
+void ClassDecl::ObjCMethodLookupTable::addMembers(DeclRange members) {
+  for (auto *member : members)
+    addMember(member);
+}
+
+void ClassDecl::prepareObjCMethodLookup() {
+  if (ObjCMethodLookup) {
+    // Make sure the list of extensions is up-to-date, which may trigger the
+    // clearing of the lazily-complete cache.
+    (void)getExtensions();
+    return;
   }
 
-  vec.push_back(method);
+  auto &ctx = getASTContext();
+  ObjCMethodLookup = new (ctx) ObjCMethodLookupTable(ctx);
+
+  // Pre-populate the table with any entries from the main module.
+  if (!hasLazyMembers())
+    ObjCMethodLookup->addMembers(getMembers());
+
+  for (auto *ext : getExtensions()) {
+    if (ext->wasDeserialized() || ext->hasClangNode())
+      continue;
+
+    ObjCMethodLookup->addMembers(ext->getMembers());
+  }
+}
+
+TinyPtrVector<AbstractFunctionDecl *>
+ObjCMethodDirectLookupRequest::evaluate(Evaluator &evaluator, ClassDecl *CD,
+                                        ObjCSelector selector,
+                                        bool isInstance) const {
+  CD->prepareObjCMethodLookup();
+  auto &stored = (*CD->ObjCMethodLookup)[{selector, isInstance}];
+
+  // If we haven't seen this name before, or additional imported extensions have
+  // been bound since we last did a lookup, ask the module loaders to update the
+  // lookup table.
+  if (!CD->ObjCMethodLookup->isLazilyComplete(selector, isInstance)) {
+    auto &ctx = CD->getASTContext();
+    ctx.loadObjCMethods(CD, selector, isInstance, /*ignoreClang*/ false,
+                        stored.Generation, stored.Methods);
+    stored.Generation = ctx.getCurrentGeneration();
+    CD->ObjCMethodLookup->markLazilyComplete(selector, isInstance);
+  }
+  return stored.Methods;
+}
+
+TinyPtrVector<AbstractFunctionDecl *>
+ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<ClassDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      ObjCMethodDirectLookupRequest{mutableThis, selector, isInstance}, {});
 }
 
 /// Determine whether the given declaration is an acceptable lookup

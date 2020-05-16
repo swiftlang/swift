@@ -1486,14 +1486,16 @@ void ASTContext::loadExtensions(NominalTypeDecl *nominal,
 }
 
 void ASTContext::loadObjCMethods(
-       ClassDecl *classDecl,
-       ObjCSelector selector,
-       bool isInstanceMethod,
-       unsigned previousGeneration,
-       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+    ClassDecl *classDecl, ObjCSelector selector, bool isInstanceMethod,
+    bool swiftOnly, unsigned previousGeneration,
+    llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
   PrettyStackTraceSelector stackTraceSelector("looking for", selector);
   PrettyStackTraceDecl stackTraceDecl("...in", classDecl);
   for (auto &loader : getImpl().ModuleLoaders) {
+    // Ignore the Clang importer if we've been asked for Swift-only results.
+    if (swiftOnly && loader.get() == getClangModuleLoader())
+      continue;
+
     loader->loadObjCMethods(classDecl, selector, isInstanceMethod,
                             previousGeneration, methods);
   }

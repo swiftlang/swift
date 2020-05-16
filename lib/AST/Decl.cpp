@@ -4274,9 +4274,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
 
   // Mark DD as ObjC, as all dtors are.
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
-  if (ctx.LangOpts.EnableObjCInterop)
-    CD->recordObjCMethod(DD, DD->getObjCSelector());
-
   return DD;
 }
 

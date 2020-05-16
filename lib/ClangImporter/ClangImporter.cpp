@@ -3045,11 +3045,6 @@ void ClangImporter::loadObjCMethods(
        bool isInstanceMethod,
        unsigned previousGeneration,
        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
-  // If we're currently looking for this selector, don't load any Objective-C
-  // methods.
-  if (Impl.ActiveSelectors.count({selector, isInstanceMethod}))
-    return;
-
   const auto *objcClass =
       dyn_cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
   if (!objcClass)
@@ -3082,10 +3077,7 @@ void ClangImporter::loadObjCMethods(
   // earlier, because we aren't tracking generation counts for Clang modules.
   // Filter out the duplicates.
   // FIXME: We shouldn't need to do this.
-  llvm::SmallPtrSet<AbstractFunctionDecl *, 4> known;
-  known.insert(methods.begin(), methods.end());
-
-  if (known.insert(method).second)
+  if (!llvm::is_contained(methods, method))
     methods.push_back(method);
 }
 

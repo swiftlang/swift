@@ -1397,19 +1397,11 @@ bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);
 
 /// Diagnose any Objective-C method overrides that aren't reflected
 /// as overrides in Swift.
-bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
+void diagnoseUnintendedObjCMethodOverrides(AbstractFunctionDecl *afd);
 
 /// Diagnose all conflicts between members that have the same
 /// Objective-C selector in the same class.
-///
-/// \param sf The source file for which we are diagnosing conflicts.
-///
-/// \returns true if there were any conflicts diagnosed.
-bool diagnoseObjCMethodConflicts(SourceFile &sf);
-
-/// Diagnose any unsatisfied @objc optional requirements of
-/// protocols that conflict with methods.
-bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
+void diagnoseObjCMethodConflicts(AbstractFunctionDecl *afd);
 
 /// Retrieve information about the given Objective-C method for
 /// diagnostic purposes, to be used with OBJC_DIAG_SELECT in

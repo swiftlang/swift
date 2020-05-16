@@ -847,7 +847,7 @@ class infer_instanceVar1 {
   }
 
   var observingAccessorsVar1: Int {
-  // CHECK: @_hasStorage @objc var observingAccessorsVar1: Int {
+  // CHECK: @objc @_hasStorage var observingAccessorsVar1: Int {
     willSet {}
     // CHECK-NEXT: {{^}} @objc get {
     // CHECK-NEXT:    return

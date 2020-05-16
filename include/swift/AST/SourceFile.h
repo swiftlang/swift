@@ -263,22 +263,6 @@ public:
   llvm::DenseMap<ObjCSelector, llvm::TinyPtrVector<AbstractFunctionDecl *>>
     ObjCMethods;
 
-  /// List of Objective-C methods, which is used for checking unintended
-  /// Objective-C overrides.
-  std::vector<AbstractFunctionDecl *> ObjCMethodList;
-
-  /// An unsatisfied, optional @objc requirement in a protocol conformance.
-  using ObjCUnsatisfiedOptReq = std::pair<DeclContext *, AbstractFunctionDecl *>;
-
-  /// List of optional @objc protocol requirements that have gone
-  /// unsatisfied, which might conflict with other Objective-C methods.
-  std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
-
-  using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
-
-  /// List of Objective-C member conflicts we have found during type checking.
-  std::vector<ObjCMethodConflict> ObjCMethodConflicts;
-
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
   const SourceFileKind Kind;

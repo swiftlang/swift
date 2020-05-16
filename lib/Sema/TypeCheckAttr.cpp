@@ -934,10 +934,6 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
   auto *SF = decl->getDeclContext()->getParentSourceFile();
   assert(SF);
 
-  // We only care about explicitly written @objc attributes.
-  if (attr->isImplicit())
-    return;
-
   auto &ctx = SF->getASTContext();
   if (ctx.LangOpts.EnableObjCInterop) {
     // Don't diagnose in a SIL file.
@@ -966,6 +962,10 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
 }
 
 void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
+  // We only care about explicitly written @objc attributes.
+  if (attr->isImplicit())
+    return;
+
   // Only certain decls can be ObjC.
   Optional<Diag<>> error;
   if (isa<ClassDecl>(D) ||
@@ -1033,12 +1033,6 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
       const_cast<ObjCAttr *>(attr)->clearName();
     } else {
       auto func = cast<AbstractFunctionDecl>(D);
-
-      // Trigger lazy loading of any imported members with the same selector.
-      // This ensures we correctly diagnose selector conflicts.
-      if (auto *CD = D->getDeclContext()->getSelfClassDecl()) {
-        (void) CD->lookupDirect(*objcName, !func->isStatic());
-      }
 
       // We have a function. Make sure that the number of parameters
       // matches the "number of colons" in the name.

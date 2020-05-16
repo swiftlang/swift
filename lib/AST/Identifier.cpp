@@ -271,4 +271,6 @@ void ObjCSelector::dump() const {
   llvm::errs() << *this << "\n";
 }
 
-
+void swift::simple_display(llvm::raw_ostream &out, ObjCSelector selector) {
+  out << "'" << selector << "'";
+}

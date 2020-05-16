@@ -745,6 +745,9 @@ public:
   /// \param isInstanceMethod Whether we are looking for an instance method
   /// (vs. a class method).
   ///
+  /// \param swiftOnly If true, only loads methods from imported Swift modules,
+  /// skipping the Clang importer.
+  ///
   /// \param previousGeneration The previous generation with which this
   /// callback was invoked. The list of methods will already contain all of
   /// the results from generations up and including \c previousGeneration.
@@ -752,9 +755,8 @@ public:
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested. This list will be
   /// extended with any methods found in subsequent generations.
-  void loadObjCMethods(ClassDecl *classDecl,
-                       ObjCSelector selector,
-                       bool isInstanceMethod,
+  void loadObjCMethods(ClassDecl *classDecl, ObjCSelector selector,
+                       bool isInstanceMethod, bool swiftOnly,
                        unsigned previousGeneration,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
 

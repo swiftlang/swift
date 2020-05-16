@@ -3874,13 +3874,16 @@ using AncestryOptions = OptionSet<AncestryFlags>;
 /// The type of the decl itself is a MetatypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
 class ClassDecl final : public NominalTypeDecl {
+  friend class NominalTypeDecl;
+  friend class ObjCMethodDirectLookupRequest;
+
   class ObjCMethodLookupTable;
 
   SourceLoc ClassLoc;
   ObjCMethodLookupTable *ObjCMethodLookup = nullptr;
 
-  /// Create the Objective-C member lookup table.
-  void createObjCMethodLookup();
+  /// Prepare the Objective-C member lookup table.
+  void prepareObjCMethodLookup();
 
   struct {
     /// The superclass decl and a bit to indicate whether the
@@ -4117,11 +4120,8 @@ public:
   ///
   /// \param isInstance Whether we are looking for an instance method
   /// (vs. a class method).
-  MutableArrayRef<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
-                                                       bool isInstance);
-
-  /// Record the presence of an @objc method with the given selector.
-  void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
+  TinyPtrVector<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
+                                                     bool isInstance) const;
 
   /// Get all the members of this class, synthesizing any implicit members
   /// that appear in the vtable if needed.

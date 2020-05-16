@@ -891,7 +891,14 @@ public:
   friend bool operator>=(ObjCSelector lhs, ObjCSelector rhs) {
     return lhs.compare(rhs) >= 0;
   }
+
+  friend llvm::hash_code hash_value(ObjCSelector selector) {
+    using llvm::hash_value;
+    return hash_value(selector.getOpaqueValue());
+  }
 };
+
+void simple_display(llvm::raw_ostream &out, ObjCSelector selector);
 
 } // end namespace swift
 
