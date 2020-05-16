@@ -68,6 +68,13 @@ public:
   /// The Swift interface file, if it can be used to generate the module file.
   const Optional<std::string> swiftInterfaceFile;
 
+  /// The Swift frontend invocation arguments to build the Swift module from the
+  /// interface.
+  const std::vector<std::string> buildCommandLine;
+
+  /// The hash value that will be used for the generated module
+  const std::string contextHash;
+
   /// Bridging header file, if there is one.
   Optional<std::string> bridgingHeaderFile;
 
@@ -82,9 +89,13 @@ public:
 
   SwiftModuleDependenciesStorage(
       const std::string &compiledModulePath,
-      const Optional<std::string> &swiftInterfaceFile
+      const Optional<std::string> &swiftInterfaceFile,
+      ArrayRef<StringRef> buildCommandLine,
+      StringRef contextHash
   ) : ModuleDependenciesStorageBase(/*isSwiftModule=*/true, compiledModulePath),
-      swiftInterfaceFile(swiftInterfaceFile) { }
+      swiftInterfaceFile(swiftInterfaceFile),
+      buildCommandLine(buildCommandLine.begin(), buildCommandLine.end()),
+      contextHash(contextHash) { }
 
   ModuleDependenciesStorageBase *clone() const override {
     return new SwiftModuleDependenciesStorage(*this);
@@ -162,10 +173,12 @@ public:
   /// built from a Swift interface file (\c .swiftinterface).
   static ModuleDependencies forSwiftInterface(
       const std::string &compiledModulePath,
-      const std::string &swiftInterfaceFile) {
+      const std::string &swiftInterfaceFile,
+      ArrayRef<StringRef> buildCommands,
+      StringRef contextHash) {
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, swiftInterfaceFile));
+          compiledModulePath, swiftInterfaceFile, buildCommands, contextHash));
   }
 
   /// Describe the module dependencies for a serialized or parsed Swift module.
@@ -173,7 +186,7 @@ public:
       const std::string &compiledModulePath) {
     return ModuleDependencies(
         std::make_unique<SwiftModuleDependenciesStorage>(
-          compiledModulePath, None));
+          compiledModulePath, None, ArrayRef<StringRef>(), StringRef()));
   }
 
   /// Describe the module dependencies for a Clang module that can be
