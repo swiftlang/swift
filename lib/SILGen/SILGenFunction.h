@@ -1188,9 +1188,9 @@ public:
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
 
-  CleanupHandle enterDelegateInitSelfWritebackCleanup(SILLocation loc,
-                                                      SILValue address,
-                                                      SILValue newValue);
+  CleanupHandle enterOwnedValueWritebackCleanup(SILLocation loc,
+                                                SILValue address,
+                                                SILValue newValue);
 
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);
