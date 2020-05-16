@@ -1653,7 +1653,7 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
   // If we didn't manage to perform the insertion, free the memory associated
   // with the copy of the labels: nobody else can reference it.
   if (cast<TupleTypeMetadata>(result.Value)->Labels != newLabels) {
-    cache.getAllocator().Deallocate(newLabels, labelsAllocSize);
+    cache.getAllocator().Deallocate(newLabels, labelsAllocSize, alignof(char));
   }
 
   // Done.
@@ -4333,7 +4333,6 @@ static bool doesNotRequireInstantiation(
 #if SWIFT_PTRAUTH
 static const unsigned swift_ptrauth_key_associated_type =
   ptrauth_key_process_independent_code;
-#endif
 
 /// Given an unsigned pointer to an associated-type protocol witness,
 /// fill in the appropriate slot in the witness table we're building.
@@ -4347,7 +4346,6 @@ static void initAssociatedTypeProtocolWitness(const Metadata **slot,
   swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
 }
 
-#if SWIFT_PTRAUTH
 static const unsigned swift_ptrauth_key_associated_conformance =
   ptrauth_key_process_independent_code;
 
@@ -5518,7 +5516,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   }
 }
 
-void MetadataAllocator::Deallocate(const void *allocation, size_t size) {
+void MetadataAllocator::Deallocate(const void *allocation, size_t size,
+                                   size_t Alignment) {
   __asan_poison_memory_region(allocation, size);
 
   if (size > PoolRange::MaxPoolAllocationSize) {

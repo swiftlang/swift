@@ -52,7 +52,6 @@ set(swift_runtime_sources
     ImageInspectionCOFF.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
-    LLVMSupport.cpp
     Metadata.cpp
     MetadataLookup.cpp
     MutexPThread.cpp
@@ -65,6 +64,12 @@ set(swift_runtime_sources
     RefCount.cpp
     RuntimeInvocationsTracking.cpp
     SwiftDtoa.cpp
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/ErrorHandling.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/Hashing.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/MemAlloc.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallPtrSet.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallVector.cpp"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/StringRef.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
@@ -89,7 +94,7 @@ set(LLVM_OPTIONAL_SOURCES
 
 set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
-list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/include)
+list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include/llvm/Support -I${SWIFT_SOURCE_DIR}/include)
 
 set(static_binary_lnk_file_list)
 set(static_binary_dependencies_list)
@@ -327,48 +332,63 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
     # 'GenericUnix' (eg linux)
     if(${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF)
       if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
-        set(ICU_STATICLIB "TRUE")
+        set(libicu_i18n_a -licui18nswift)
+        set(libicu_uc_a -licuucswift)
+        set(libicu_data_a -licudataswift)
       else()
-        set(ICU_STATICLIB "FALSE")
         find_package(ICU REQUIRED COMPONENTS uc i18n)
         get_filename_component(ICU_UC_LIBDIR "${ICU_UC_LIBRARIES}" DIRECTORY)
         get_filename_component(ICU_I18N_LIBDIR "${ICU_I18N_LIBRARIES}" DIRECTORY)
-      endif()
-      set(linkfile "${lowercase_sdk}/static-stdlib-args.lnk")
-      add_custom_command_target(swift_static_stdlib_${sdk}_args
-        COMMAND
-          "${SWIFT_SOURCE_DIR}/utils/gen-static-stdlib-link-args"
-          "${sdk}"
-          "${SWIFTSTATICLIB_DIR}/${linkfile}"
-          "${ICU_STATICLIB}"
-          "${ICU_UC_LIBDIR}"
-          "${ICU_I18N_LIBDIR}"
-        OUTPUT
-          "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        DEPENDS
-          "${SWIFT_SOURCE_DIR}/utils/gen-static-stdlib-link-args")
 
-      list(APPEND static_stdlib_lnk_file_list ${swift_static_stdlib_${sdk}_args})
+        set(libicu_i18n_a -licui18n)
+        set(libicu_uc_a -licuuc)
+        set(libicu_data_a)
+        if(EXISTS ${ICU_I18N_LIBDIR}/libicui18n.a AND
+            EXISTS ${ICU_UC_LIBDIR}/libicuuc.a AND
+            EXISTS ${ICU_UC_LIBDIR}/libicudata.a)
+          set(libicu_i18n_a ${ICU_I18N_LIBDIR}/libicui18n.a)
+          set(libicu_uc_a ${ICU_UC_LIBDIR}/libicuuc.a)
+          set(libicu_data_a ${ICU_UC_LIBDIR}/libicudata.a)
+        endif()
+      endif()
+
+      set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
+      file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
+-ldl
+-lpthread
+-lswiftCore
+-lswiftImageInspectionShared
+${libicu_i18n_a}
+${libicu_uc_a}
+${libicu_data_a}
+-lstdc++
+-lm
+-Xlinker -export-dynamic
+-Xlinker --exclude-libs
+-Xlinker ALL")
+
       swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
                                  DESTINATION "lib/swift_static/${lowercase_sdk}"
                                  COMPONENT stdlib)
     elseif("${sdk}" STREQUAL "WASI")
-      set(linkfile_src "${SWIFT_SOURCE_DIR}/utils/webassembly/static-stdlib-args.lnk")
       set(linkfile "${lowercase_sdk}/static-stdlib-args.lnk")
-      add_custom_command_target(swift_static_stdlib_${sdk}_args
-        COMMAND
-          "${CMAKE_COMMAND}" -E copy
-            "${linkfile_src}"
-            "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        OUTPUT
-          "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        DEPENDS
-          "${linkfile_src}")
+      file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
+-ldl
+-latomic
+-lswiftWasiPthread
+-lswiftCore
+-lswiftImageInspectionShared
+-licuuc
+-licudata
+-lstdc++
+-lm
+-Xlinker --exclude-libs
+-Xlinker ALL")
 
-      list(APPEND static_stdlib_lnk_file_list ${swift_static_stdlib_${sdk}_args})
       swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
                                 DESTINATION "lib/swift_static/${lowercase_sdk}"
                                 COMPONENT stdlib)
+
       set(swift_icu_libs_wasi_list)
       set(icu_modules UC I18N DATA)
       foreach(module IN LISTS icu_modules)
@@ -393,6 +413,3 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
     endif()
   endforeach()
 endforeach()
-add_custom_target(swift_static_lnk_args ALL DEPENDS ${static_stdlib_lnk_file_list})
-add_dependencies(stdlib swift_static_lnk_args)
-

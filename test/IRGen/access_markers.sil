@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir | %FileCheck %s --check-prefix=CHECK
 
+sil_stage canonical
+
 import Builtin
 import Swift
 

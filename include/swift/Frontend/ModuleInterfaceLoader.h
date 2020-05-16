@@ -208,7 +208,11 @@ struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
 private:
   SourceManager &SM;
   DiagnosticEngine &Diags;
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver ArgSaver;
+  std::vector<StringRef> GenericArgs;
   CompilerInvocation subInvocation;
+  std::vector<SupplementaryOutputPaths> ModuleOutputPaths;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
@@ -222,45 +226,43 @@ private:
     }
     return Diags.diagnose(loc, ID, std::move(Args)...);
   }
-
-  bool extractSwiftInterfaceVersionAndArgs(llvm::StringSaver &SubArgSaver,
-                                           SmallVectorImpl<const char *> &SubArgs,
+  void inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
+                                          const LangOptions &LangOpts);
+  bool extractSwiftInterfaceVersionAndArgs(SmallVectorImpl<const char *> &SubArgs,
                                            std::string &CompilerVersion,
                                            StringRef interfacePath,
                                            SourceLoc diagnosticLoc);
-  SubCompilerInstanceInfo createInstance(StringRef moduleName,
-                                         StringRef interfacePath,
-                                         StringRef outputPath,
-                                         SourceLoc diagLoc);
 public:
   InterfaceSubContextDelegateImpl(SourceManager &SM,
                                   DiagnosticEngine &Diags,
                                   const SearchPathOptions &searchPathOpts,
                                   const LangOptions &langOpts,
-                                  ClangModuleLoader *clangImporter = nullptr,
-                                  StringRef moduleCachePath = StringRef(),
-                                  StringRef prebuiltCachePath = StringRef(),
-                                  bool serializeDependencyHashes = false,
-                                  bool trackSystemDependencies = false,
-                                  bool remarkOnRebuildFromInterface = false,
-                                  bool disableInterfaceFileLock = false);
+                                  ClangModuleLoader *clangImporter,
+                                  bool buildModuleCacheDirIfAbsent,
+                                  StringRef moduleCachePath,
+                                  StringRef prebuiltCachePath,
+                                  bool serializeDependencyHashes,
+                                  bool trackSystemDependencies,
+                                  bool remarkOnRebuildFromInterface,
+                                  bool disableInterfaceFileLock);
   bool runInSubContext(StringRef moduleName,
                        StringRef interfacePath,
                        StringRef outputPath,
                        SourceLoc diagLoc,
-                       llvm::function_ref<bool(ASTContext&)> action) override;
+    llvm::function_ref<bool(ASTContext&, ArrayRef<StringRef>, StringRef)> action) override;
   bool runInSubCompilerInstance(StringRef moduleName,
                                 StringRef interfacePath,
                                 StringRef outputPath,
                                 SourceLoc diagLoc,
-                                llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) override;
+            llvm::function_ref<bool(SubCompilerInstanceInfo&)> action) override;
 
   ~InterfaceSubContextDelegateImpl() = default;
 
   /// includes a hash of relevant key data.
-  void computeCachedOutputPath(StringRef moduleName,
-                               StringRef UseInterfacePath,
-                               llvm::SmallString<256> &OutPath);
+  StringRef computeCachedOutputPath(StringRef moduleName,
+                                    StringRef UseInterfacePath,
+                                    llvm::SmallString<256> &OutPath,
+                                    StringRef &CacheHash);
   std::string getCacheHash(StringRef useInterfacePath);
 };
 }
