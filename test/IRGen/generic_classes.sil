@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_classes.sil
-// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -enable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-objc,CHECK-%target-import-type
-// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -disable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-native,CHECK-%target-import-type
+// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=CHECK --check-prefix=CHECK-%target-runtime -check-prefix CHECK-%target-import-type
 // RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE
 
 // REQUIRES: CPU=x86_64
@@ -53,20 +52,21 @@ import Swift
 // --       flags
 // CHECK_SAME:   i32 3,
 // --       immediate pattern size
-// CHECK-native-SAME:   i16 0,
-// CHECK-objc-SAME:     i16 5,
+// CHECK-SAME:   i16 0,
 // --       immediate pattern target offset
-// CHECK-SAME:          i16 0,
+// CHECK-SAME:   i16 0,
 // --       extra data size
-// CHECK-native-SAME:   i16 0,
-// CHECK-objc-SAME:     i16 14,
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 23,
 // --       class ro-data offset
-// CHECK-native-SAME:   i16 0
-// CHECK-objc-SAME:     i16 0,
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 5,
 // --       metaclass object offset
-// CHECK-objc-SAME:     i16 0,
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 0,
 // --       class ro-data offset
-// CHECK-objc-SAME:     i16 23
+// CHECK-SAME-native:   i16 0
+// CHECK-SAME-objc:     i16 14,
 // CHECK-SAME: }>
 
 // -- Check that offset vars are emitted for fixed-layout generics
@@ -94,15 +94,15 @@ import Swift
 // CHECK-SAME:   void (%T15generic_classes14RootNonGenericC*)* @"$s15generic_classes14RootNonGenericCfD",
 // CHECK-DIRECT-SAME:   i8** @"$sBoWV",
 // CHECK-INDIRECT-SAME:   i8** null,
-// CHECK-native-SAME: i64 0,
-// CHECK-native-SAME: %swift.type* null,
-// CHECK-native-SAME: %swift.opaque* null,
-// CHECK-objc-SAME:   i64 ptrtoint (%objc_class* @"$s15generic_classes14RootNonGenericCMm" to i64),
-// CHECK-objc-SAME:   %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
-// CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
+// CHECK-SAME-native: i64 0,
+// CHECK-SAME-native: %swift.type* null,
+// CHECK-SAME-native: %swift.opaque* null,
+// CHECK-SAME-objc:   i64 ptrtoint (%objc_class* @"$s15generic_classes14RootNonGenericCMm" to i64),
+// CHECK-SAME-objc:   %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
+// CHECK-SAME-objc:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
-// CHECK-native-SAME: i64 1,
-// CHECK-objc-SAME:   @_DATA__TtC15generic_classes14RootNonGeneric
+// CHECK-SAME-native: i64 1,
+// CHECK-SAME-objc:   @_DATA__TtC15generic_classes14RootNonGeneric
 // CHECK-SAME:   i32 33,
 // CHECK-SAME:   i16 7,
 // CHECK-SAME:   i16 0,
@@ -117,8 +117,8 @@ import Swift
 // --       template instantiation function
 // CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8*)* @"$s15generic_classes015GenericInheritsC0CMi"
 // --       pattern flags (1 == has extra data pattern)
-// CHECK-native-SAME: i32 0,
-// CHECK-objc-SAME:   i32 1,
+// CHECK-SAME-native: i32 0,
+// CHECK-SAME-objc:   i32 1,
 // --       heap destructor
 // CHECK-SAME:   @"$s15generic_classes015GenericInheritsC0CfD"
 // --       ivar destroyer
@@ -126,21 +126,20 @@ import Swift
 // --       class flags
 // CHECK_SAME:   i32 3,
 // --       extra data pattern offset
-// CHECK-objc-SAME:     i16 5,
+// CHECK-SAME-objc:     i16 0,
 // --       extra data pattern size
-// CHECK-objc-SAME:     i16 0,
+// CHECK-SAME-objc:     i16 23,
 // --       class ro-data offset
-// CHECK-native-SAME:   i16 0,
-// CHECK-objc-SAME:     i16 14,
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 5,
 // --       metaclass object offset
-// CHECK-native-SAME:   i16 0,
-// CHECK-objc-SAME:     i16 0,
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 0,
 // --       class ro-data offset
-// CHECK-native-SAME:   i16 0,
-// CHECK-objc-SAME:     i16 0,
+// CHECK-SAME-native:   i16 0,
+// CHECK-SAME-objc:     i16 14,
 // --       reserved
-// CHECK-native-SAME:   i16 0
-// CHECK-objc-SAME:     i16 23
+// CHECK-SAME:          i16 0
 // CHECK-SAME: }
 
 // CHECK: @"$s15generic_classes018GenericInheritsNonC0CMP"
