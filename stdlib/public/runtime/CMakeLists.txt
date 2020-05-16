@@ -371,22 +371,24 @@ ${libicu_data_a}
                                  DESTINATION "lib/swift_static/${lowercase_sdk}"
                                  COMPONENT stdlib)
     elseif("${sdk}" STREQUAL "WASI")
-      set(linkfile_src "${SWIFT_SOURCE_DIR}/utils/webassembly/static-stdlib-args.lnk")
       set(linkfile "${lowercase_sdk}/static-stdlib-args.lnk")
-      add_custom_command_target(swift_static_stdlib_${sdk}_args
-        COMMAND
-          "${CMAKE_COMMAND}" -E copy
-            "${linkfile_src}"
-            "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        OUTPUT
-          "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        DEPENDS
-          "${linkfile_src}")
+      file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
+-ldl
+-latomic
+-lswiftWasiPthread
+-lswiftCore
+-lswiftImageInspectionShared
+-licuuc
+-licudata
+-lstdc++
+-lm
+-Xlinker --exclude-libs
+-Xlinker ALL")
 
-      list(APPEND static_stdlib_lnk_file_list ${swift_static_stdlib_${sdk}_args})
       swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
                                 DESTINATION "lib/swift_static/${lowercase_sdk}"
                                 COMPONENT stdlib)
+
       set(swift_icu_libs_wasi_list)
       set(icu_modules UC I18N DATA)
       foreach(module IN LISTS icu_modules)
