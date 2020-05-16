@@ -38,6 +38,9 @@ DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 HOST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/host-toolchain-sdk
 HOST_TOOLCHAIN_SDK=$HOST_TOOLCHAIN_DESTDIR/$TOOLCHAIN_NAME
 
+# Avoid clang headers symlink issues
+mkdir -p $HOST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0
+
 # Build the host toolchain and SDK first.
 $SOURCE_PATH/swift/utils/build-script \
   --preset=webassembly-host \
