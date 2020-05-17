@@ -73,6 +73,28 @@ namespace Lowering {
 class SILGenModule;
 } // namespace Lowering
 
+struct AlignedAllocator {
+  void *allocate(size_t size, size_t align) const;
+  void deallocate(void *ptr) const;
+};
+
+template <size_t Kbs> class InstStackAllocator {
+  SmallVector<char *, ((Kbs * 1024) / 4) / 64> openBlocks64;
+  SmallVector<char *, ((Kbs * 1024) / 4) / 96> openBlocks96;
+  SmallVector<char *, ((Kbs * 1024) / 2) / 128> openBlocks128;
+  const AlignedAllocator fallbackAllocator;
+  char buff[Kbs * 1024];
+  char *begin;
+  char *end;
+
+public:
+  InstStackAllocator();
+
+  void *allocate(size_t size, size_t align);
+  void deallocate(void *ptr);
+  unsigned short isBufferPointer(void *ptr) const;
+};
+
 /// A stage of SIL processing.
 enum class SILStage {
   /// "Raw" SIL, emitted by SILGen, but not yet run through guaranteed
@@ -152,6 +174,9 @@ private:
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
+
+  /// Stack allocator that manages instructino allocation when possible.
+  mutable InstStackAllocator<8000> instAllocator;
 
   /// The swift Module associated with this SILModule.
   ModuleDecl *TheSwiftModule;

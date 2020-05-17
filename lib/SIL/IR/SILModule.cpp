@@ -35,6 +35,82 @@
 using namespace swift;
 using namespace Lowering;
 
+void *AlignedAllocator::allocate(size_t size, size_t align) const {
+  return AlignedAlloc(size, align);
+}
+
+void AlignedAllocator::deallocate(void *ptr) const { AlignedFree(ptr); }
+
+template <size_t Kbs> InstStackAllocator<Kbs>::InstStackAllocator() {
+  // Make sure the starting alignment is 8.
+  size_t offset = ((~reinterpret_cast<uintptr_t>(buff)) + 1) & 7;
+  begin = buff + offset;
+  end = buff + (Kbs * 1024);
+
+  // Fill the open blocks.
+  char *begin1 = begin;
+  char *end64 = begin + (std::distance(begin, end) / 4);
+  for (; begin1 < end64; begin1 += 64) {
+    openBlocks64.push_back(begin1);
+  }
+  char *end96 = end64 + (std::distance(begin, end) / 4);
+  for (; begin1 < end96; begin1 += 96) {
+    openBlocks96.push_back(begin1);
+  }
+  // Make sure we don't give away end.
+  for (; begin1 < end - 128; begin1 += 128) {
+    openBlocks128.push_back(begin1);
+  }
+}
+
+template <size_t Kbs>
+void *InstStackAllocator<Kbs>::allocate(size_t size, size_t align) {
+  // If align is eight figure out if we can use the stack memory in of the
+  // buckets.
+  const bool alignIsEight = align == 8;
+  if (size == 64 && alignIsEight && !openBlocks64.empty())
+    return static_cast<void *>(openBlocks64.pop_back_val());
+  if (size == 96 && alignIsEight && !openBlocks96.empty())
+    return static_cast<void *>(openBlocks96.pop_back_val());
+  if (size == 128 && alignIsEight && !openBlocks128.empty())
+    return static_cast<void *>(openBlocks128.pop_back_val());
+  // If the buckets are empty or its not the right size, fallback to the other
+  // allocator.
+  return fallbackAllocator.allocate(size, align);
+}
+
+template <size_t Kbs> void InstStackAllocator<Kbs>::deallocate(void *voidPtr) {
+  char *ptr = static_cast<char *>(voidPtr);
+  // Check if this address came from one of the stack buckets.
+  if (auto bucket = isBufferPointer(ptr)) {
+    // If so, freeing it is as easy as putting that memory back into the bucket.
+    if (bucket == 64)
+      openBlocks64.push_back(ptr);
+    else if (bucket == 96)
+      openBlocks96.push_back(ptr);
+    else if (bucket == 128)
+      openBlocks128.push_back(ptr);
+    else
+      llvm_unreachable("Unkown bucket");
+  } else {
+    // Otherwise it came from the heap. Use the fallback deallocator.
+    fallbackAllocator.deallocate(voidPtr);
+  }
+}
+
+template <size_t Kbs>
+unsigned short InstStackAllocator<Kbs>::isBufferPointer(void *ptr) const {
+  char *end64 = begin + (std::distance(begin, end) / 4);
+  if (ptr >= begin && ptr < end64)
+    return 64;
+  char *end96 = end64 + (std::distance(begin, end) / 4);
+  if (ptr >= end64 && ptr < end96)
+    return 96;
+  if (ptr >= end96 && ptr < end)
+    return 128;
+  return 0;
+}
+
 class SILModule::SerializationCallback final
     : public DeserializationNotificationHandler {
   void didDeserialize(ModuleDecl *M, SILFunction *fn) override {
@@ -141,11 +217,11 @@ void *SILModule::allocate(unsigned Size, unsigned Align) const {
 }
 
 void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
-  return AlignedAlloc(Size, Align);
+  return instAllocator.allocate(Size, Align);
 }
 
 void SILModule::deallocateInst(SILInstruction *I) {
-  AlignedFree(I);
+  instAllocator.deallocate(static_cast<void *>(I));
 }
 
 SILWitnessTable *
