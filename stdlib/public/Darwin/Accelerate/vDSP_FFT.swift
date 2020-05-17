@@ -392,26 +392,31 @@ extension Array where Element == Float {
     public init(fromSplitComplex splitComplex: DSPSplitComplex,
                 scale: Float,
                 count: Int) {
-        var complexPairs = [DSPComplex](repeating: DSPComplex(real: 0, imag: 0),
-                                        count: count / 2)
-        
-        withUnsafePointer(to: splitComplex) {
-            vDSP_ztoc($0, 1,
-                      &complexPairs, 2,
-                      vDSP_Length(count / 2))
-        }
-        
-        self = [Float](repeating: 0, count: count)
-        
-        complexPairs.withUnsafeBytes {
-            guard let complexPairsUnsafePointer = $0.bindMemory(to: Float.self).baseAddress else {
-                fatalError("Internal error")
+        let complexPairs = [DSPComplex](unsafeUninitializedCapacity: count / 2) {
+            complexPairsBuffer, initializedCount in
+            withUnsafePointer(to: splitComplex) {
+                splitComplexUnsafePointer in
+                vDSP_ztoc(splitComplexUnsafePointer, 1,
+                          complexPairsBuffer.baseAddress!, 2,
+                          vDSP_Length(count / 2))
             }
-            
-            vDSP_vsmul(complexPairsUnsafePointer, 1,
-                       [scale],
-                       &self, 1,
-                       vDSP_Length(count))
+            initializedCount = count / 2
+        }
+
+        self = [Float](unsafeUninitializedCapacity: count) { selfBuffer, initializedCount in
+            complexPairs.withUnsafeBytes {
+                guard let complexPairsUnsafePointer = $0.bindMemory(to: Float.self).baseAddress else {
+                    fatalError("Internal error")
+                }
+
+                withUnsafePointer(to: scale) { scaleUnsafePointer in
+                    vDSP_vsmul(complexPairsUnsafePointer, 1,
+                               scaleUnsafePointer,
+                               selfBuffer.baseAddress!, 1,
+                               vDSP_Length(count))
+                }
+            }
+            initializedCount = count
         }
     }
 }
@@ -425,26 +430,31 @@ extension Array where Element == Double {
     public init(fromSplitComplex splitComplex: DSPDoubleSplitComplex,
                 scale: Double,
                 count: Int) {
-        var complexPairs = [DSPDoubleComplex](repeating: DSPDoubleComplex(real: 0, imag: 0),
-                                              count: count / 2)
-        
-        withUnsafePointer(to: splitComplex) {
-            vDSP_ztocD($0, 1,
-                       &complexPairs, 2,
-                       vDSP_Length(count / 2))
+        let complexPairs = [DSPDoubleComplex](unsafeUninitializedCapacity: count / 2) {
+            complexPairsBuffer, initializedCount in
+            withUnsafePointer(to: splitComplex) {
+                splitComplexUnsafePointer in
+                vDSP_ztocD(splitComplexUnsafePointer, 1,
+                           complexPairsBuffer.baseAddress!, 2,
+                           vDSP_Length(count / 2))
+            }
+            initializedCount = count / 2
         }
         
-        self = [Double](repeating: 0, count: count)
-        
-        complexPairs.withUnsafeBytes {
-            guard let complexPairsUnsafePointer = $0.bindMemory(to: Double.self).baseAddress else {
-                fatalError("Internal error")
+        self = [Double](unsafeUninitializedCapacity: count) { selfBuffer, initializedCount in
+            complexPairs.withUnsafeBytes {
+                guard let complexPairsUnsafePointer = $0.bindMemory(to: Double.self).baseAddress else {
+                    fatalError("Internal error")
+                }
+
+                withUnsafePointer(to: scale) { scaleUnsafePointer in
+                    vDSP_vsmulD(complexPairsUnsafePointer, 1,
+                                scaleUnsafePointer,
+                                selfBuffer.baseAddress!, 1,
+                                vDSP_Length(count))
+                }
             }
-            
-            vDSP_vsmulD(complexPairsUnsafePointer, 1,
-                        [scale],
-                        &self, 1,
-                        vDSP_Length(count))
+            initializedCount = count
         }
     }
 }
