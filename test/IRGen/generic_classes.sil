@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_classes.sil
-// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -enable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-objc,CHECK-%target-import-type
+// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -enable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-objc,CHECK-%target-import-type,CHECK-%target-import-type-objc
 // RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -disable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-native,CHECK-%target-import-type
 // RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE
 
@@ -91,22 +91,23 @@ import Swift
 // CHECK-SAME: }>
 
 // CHECK: @"$s15generic_classes14RootNonGenericCMf" = internal global <{ {{.*}} }> <{
-// CHECK-SAME:   void (%T15generic_classes14RootNonGenericC*)* @"$s15generic_classes14RootNonGenericCfD",
-// CHECK-DIRECT-SAME:   i8** @"$sBoWV",
-// CHECK-INDIRECT-SAME:   i8** null,
-// CHECK-native-SAME: i64 0,
-// CHECK-native-SAME: %swift.type* null,
-// CHECK-native-SAME: %swift.opaque* null,
-// CHECK-objc-SAME:   i64 ptrtoint (%objc_class* @"$s15generic_classes14RootNonGenericCMm" to i64),
-// CHECK-objc-SAME:   %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
-// CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
-// CHECK-SAME:   %swift.opaque* null,
-// CHECK-native-SAME: i64 1,
-// CHECK-objc-SAME:   @_DATA__TtC15generic_classes14RootNonGeneric
-// CHECK-SAME:   i32 33,
-// CHECK-SAME:   i16 7,
-// CHECK-SAME:   i16 0,
-// CHECK-SAME:   {{.*}}* @"$s15generic_classes14RootNonGenericCMn"
+// CHECK-SAME:                void (%T15generic_classes14RootNonGenericC*)* @"$s15generic_classes14RootNonGenericCfD",
+// CHECK-DIRECT-SAME:         i8** @"$sBoWV",
+// CHECK-INDIRECT-SAME:       i8** null,
+// CHECK-native-SAME:         i64 0,
+// CHECK-native-SAME:         %swift.type* null,
+// CHECK-native-SAME:         %swift.opaque* null,
+// CHECK-objc-SAME:           i64 ptrtoint (%objc_class* @"$s15generic_classes14RootNonGenericCMm" to i64),
+// CHECK-DIRECT-objc-SAME:    %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
+// CHECK-INDIRECT-objc-SAME:  %swift.type* null,
+// CHECK-objc-SAME:           %swift.opaque* @_objc_empty_cache,
+// CHECK-SAME:                %swift.opaque* null,
+// CHECK-native-SAME:         i64 1,
+// CHECK-objc-SAME:           @_DATA__TtC15generic_classes14RootNonGeneric
+// CHECK-SAME:                i32 33,
+// CHECK-SAME:                i16 7,
+// CHECK-SAME:                i16 0,
+// CHECK-SAME:                {{.*}}* @"$s15generic_classes14RootNonGenericCMn"
 // CHECK-SAME: }>
 
 // CHECK: @"$s15generic_classes015GenericInheritsC0CMn" = hidden constant
