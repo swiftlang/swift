@@ -22,28 +22,23 @@ func dumpConformanceCache(context: SwiftReflectionContextRef) throws {
 }
 
 func dumpMetadataAllocations(context: SwiftReflectionContextRef) throws {
-  var allocations: [swift_metadata_allocation_t] = []
-  var metadatas: [swift_reflection_ptr_t] = []
-  try context.iterateMetadataAllocations { allocation in
-    allocations.append(allocation)
-    print("Metadata allocation at: \(hex: allocation.Ptr) " + 
-          "size: \(allocation.Size) tag: \(allocation.Tag)")
-    let ptr = context.metadataPointer(allocation: allocation)
-    if ptr != 0 {
-      metadatas.append(ptr)
-    }
+  var allocations = context.allocations
+  for allocation in allocations {
+    print("Metadata allocation at: \(hex: allocation.ptr) " +
+          "size: \(allocation.size) tag: \(allocation.tag)")
   }
+  
+  allocations.sort()
+  let metadatas = allocations.compactMap { $0.metadata(in: context) }
 
-  allocations.sort { $0.Ptr < $1.Ptr }
   for metadata in metadatas {
-    let name = context.name(metadata: metadata) ?? "<unknown>"
-    print("Metadata \(hex: metadata)")
-    print("    Name: \(name)")
+    print("Metadata \(hex: metadata.ptr)")
+    print("    Name: \(metadata.name)")
 
-    if let allocation = allocations.last(where: { metadata >= $0.Ptr }) {
-      let offset = metadata - allocation.Ptr
-      print("    In allocation \(hex: allocation.Ptr) " +
-            "size \(allocation.Size) at offset \(offset)")
+    if let allocation = allocations.last(where: { metadata.ptr >= $0.ptr }) {
+      let offset = metadata.ptr - allocation.ptr
+      print("    In allocation \(hex: allocation.ptr) " +
+            "size \(allocation.size) at offset \(offset)")
     } else {
       print("    Not in any known metadata allocation. How strange.")
     }

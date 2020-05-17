@@ -62,4 +62,12 @@ extension SwiftReflectionContextRef {
       throw Error(cString: str)
     }
   }
+  
+  var allocations: [Allocation] {
+    var allocations: [Allocation] = []
+    try! iterateMetadataAllocations { allocation_t in
+      allocations.append(.init(allocation_t: allocation_t))
+    }
+    return allocations
+  }
 }
