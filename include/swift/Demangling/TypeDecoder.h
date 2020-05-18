@@ -94,7 +94,7 @@ enum class ImplParameterDifferentiability {
   NotDifferentiable
 };
 
-static inline Optional<ImplParameterDifferentiability>
+static inline llvm::Optional<ImplParameterDifferentiability>
 getDifferentiabilityFromString(StringRef string) {
   if (string.empty())
     return ImplParameterDifferentiability::DifferentiableOrNotApplicable;
@@ -115,7 +115,7 @@ public:
   using ConventionType = ImplParameterConvention;
   using DifferentiabilityType = ImplParameterDifferentiability;
 
-  static Optional<ConventionType>
+  static llvm::Optional<ConventionType>
   getConventionFromString(StringRef conventionString) {
     if (conventionString == "@in")
       return ConventionType::Indirect_In;
@@ -168,7 +168,7 @@ class ImplFunctionResult {
 public:
   using ConventionType = ImplResultConvention;
 
-  static Optional<ConventionType>
+  static llvm::Optional<ConventionType>
   getConventionFromString(StringRef conventionString) {
     if (conventionString == "@out")
       return ConventionType::Indirect;
@@ -268,8 +268,8 @@ public:
 #if SWIFT_OBJC_INTEROP
 /// For a mangled node that refers to an Objective-C class or protocol,
 /// return the class or protocol name.
-static inline Optional<StringRef> getObjCClassOrProtocolName(
-    NodePointer node) {
+static inline llvm::Optional<StringRef>
+getObjCClassOrProtocolName(NodePointer node) {
   if (node->getKind() != Demangle::Node::Kind::Class &&
       node->getKind() != Demangle::Node::Kind::Protocol)
     return None;
@@ -435,7 +435,7 @@ class TypeDecoder {
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
       unsigned i = 0;
-      Optional<ImplMetatypeRepresentation> repr;
+      llvm::Optional<ImplMetatypeRepresentation> repr;
 
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
@@ -650,7 +650,7 @@ class TypeDecoder {
         }
       }
 
-      Optional<ImplFunctionResult<BuiltType>> errorResult;
+      llvm::Optional<ImplFunctionResult<BuiltType>> errorResult;
       switch (errorResults.size()) {
       case 0:
         break;
@@ -905,7 +905,7 @@ private:
       return true;
 
     StringRef conventionString = node->getChild(0)->getText();
-    Optional<typename T::ConventionType> convention =
+    llvm::Optional<typename T::ConventionType> convention =
         T::getConventionFromString(conventionString);
     if (!convention)
       return true;
@@ -1072,8 +1072,8 @@ private:
       return true;
     };
 
-    auto decodeParam = [&](NodePointer paramNode)
-        -> Optional<FunctionParam<BuiltType>> {
+    auto decodeParam =
+        [&](NodePointer paramNode) -> llvm::Optional<FunctionParam<BuiltType>> {
       if (paramNode->getKind() != NodeKind::TupleElement)
         return None;
 
