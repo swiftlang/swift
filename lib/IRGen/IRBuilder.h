@@ -135,7 +135,7 @@ public:
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr,
                                Alignment align) {
     llvm::StoreInst *store = IRBuilderBase::CreateStore(value, addr);
-    store->setAlignment(llvm::MaybeAlign(align.getValue()));
+    store->setAlignment(llvm::MaybeAlign(align.getValue()).valueOrOne());
     return store;
   }
   llvm::StoreInst *CreateStore(llvm::Value *value, Address addr) {
