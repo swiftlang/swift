@@ -496,7 +496,8 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             addSymbolIfNecessary(reqtAccessor, witnessAccessor);
           });
         } else if (isa<EnumElementDecl>(witnessDecl)) {
-          addSymbolIfNecessary(valueReq, witnessDecl);
+          auto getter = storage->getSynthesizedAccessor(AccessorKind::Get);
+          addSymbolIfNecessary(getter, witnessDecl);
         }
       }
     });
@@ -1016,13 +1017,12 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
 void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
   visitNominalTypeDecl(ED);
-
-  if (!ED->isResilient())
-    return;
 }
 
 void TBDGenVisitor::visitEnumElementDecl(EnumElementDecl *EED) {
-  addSymbol(LinkEntity::forEnumCase(EED));
+  if (EED->getParentEnum()->isResilient())
+    addSymbol(LinkEntity::forEnumCase(EED));
+
   if (auto *PL = EED->getParameterList())
     visitDefaultArguments(EED, PL);
 }
