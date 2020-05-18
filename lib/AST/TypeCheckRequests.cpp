@@ -1390,20 +1390,16 @@ void CheckRedeclarationRequest::writeDependencySink(
 evaluator::DependencySource
 LookupAllConformancesInContextRequest::readDependencySource(
     const evaluator::DependencyCollector &collector) const {
-  auto *dc = std::get<0>(getStorage());
-  AccessLevel defaultAccess;
-  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    const NominalTypeDecl *nominal = ext->getExtendedNominal();
-    if (!nominal) {
-      return {collector.getActiveDependencySourceOrNull(),
-              evaluator::DependencyScope::Cascading};
-    }
-    defaultAccess = nominal->getFormalAccess();
-  } else {
-    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
+  const auto *nominal = std::get<0>(getStorage())
+                            ->getAsGenericContext()
+                            ->getSelfNominalTypeDecl();
+  if (!nominal) {
+    return {collector.getActiveDependencySourceOrNull(),
+            evaluator::DependencyScope::Cascading};
   }
+
   return {collector.getActiveDependencySourceOrNull(),
-          evaluator::getScopeForAccessLevel(defaultAccess)};
+          evaluator::getScopeForAccessLevel(nominal->getFormalAccess())};
 }
 
 void LookupAllConformancesInContextRequest::writeDependencySink(
