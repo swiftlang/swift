@@ -462,6 +462,10 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());
   }
 
+  if (locator->isLastElement<LocatorPathElt::ArgumentAttribute>()) {
+    return getConstraintLocator(anchor, path.drop_back());
+  }
+
   // If we have a locator that starts with a key path component element, we
   // may have a callee given by a property or subscript component.
   if (auto componentElt =
@@ -3525,6 +3529,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
       // Key path dynamic member lookup should be completely transparent.
       path = path.slice(1);
       continue;
+    }
+
+    case ConstraintLocator::ArgumentAttribute: {
+      // At this point we should have already found argument expression
+      // this attribute belogs to, so we can leave this element in place
+      // because it points out exact location useful for diagnostics.
+      break;
     }
 
     default:
