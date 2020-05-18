@@ -53,7 +53,7 @@ $SOURCE_PATH/swift/utils/build-script \
 # Clean up the host toolchain build directory so that the next
 # `build-script` invocation doesn't pick up wrong CMake config files.
 # For some reason passing `--reconfigure` to `build-script` won't do this.
-rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/swift-macosx-x86_64
+rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/swift-*
 
 # build the cross-compilled toolchain
 $SOURCE_PATH/swift/utils/build-script \
