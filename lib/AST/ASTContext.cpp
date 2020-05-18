@@ -2554,48 +2554,58 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   return result;
 }
 
-void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
-                               NominalTypeDecl *TheDecl, Type Parent,
-                               ArrayRef<Type> GenericArgs) {
-  ID.AddPointer(TheDecl);
-  ID.AddPointer(Parent.getPointer());
-  ID.AddInteger(GenericArgs.size());
-  for (Type Arg : GenericArgs) {
-    ID.AddPointer(Arg.getPointer());
-  }
-}
+BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
+                                        Type Parent,
+                                        ArrayRef<Type> GenericArgs,
+                                        ModuleDecl *M) {
+  assert(GenericArgs.size() == TheDecl->getGenericParams()->size() &&
+         "generic parameter and argument count mismatch");
 
-BoundGenericType::BoundGenericType(TypeKind theKind,
-                                   NominalTypeDecl *theDecl,
-                                   Type parent,
-                                   ArrayRef<Type> genericArgs,
-                                   const ASTContext *context,
-                                   RecursiveTypeProperties properties)
-    : NominalOrBoundGenericNominalType(theDecl, parent, theKind, context,
-                                       properties) {
-  Bits.BoundGenericType.GenericArgCount = genericArgs.size();
-  // Subtypes are required to provide storage for the generic arguments
-  std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
-                          getTrailingObjectsPointer());
+  const auto Sig = TheDecl->getGenericSignature();
+  assert(Sig);
+
+  // Add any substitutions from the parent type.
+  TypeSubstitutionMap Subs;
+  if (Parent)
+    Subs = Parent->getContextSubstitutions(TheDecl->getDeclContext());
+
+  // Now, map the declaration's own generic parameters to
+  // the provided arguments.
+  const auto GenParams = Sig->getInnermostGenericParams();
+  for (const auto I : indices(GenericArgs)) {
+    Subs[GenParams[I]->getCanonicalType()->castTo<GenericTypeParamType>()] =
+        GenericArgs[I];
+  }
+
+  // If we haven't been given a module for conformance lookup,
+  // use the parent module of the referenced decl.
+  if (M == nullptr)
+    M = TheDecl->getParentModule();
+
+  // Form the substitution map.
+  const auto SubMap = SubstitutionMap::get(
+      Sig, QueryTypeSubstitutionMap{Subs}, LookUpConformanceInModule(M));
+
+  return get(TheDecl, Parent, SubMap);
 }
 
 BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                         Type Parent,
-                                        ArrayRef<Type> GenericArgs) {
-  assert(TheDecl->getGenericParams() && "must be a generic type decl");
+                                        SubstitutionMap Substitutions) {
+  assert(Substitutions && "must have non-empty substitutions");
+  assert(TheDecl->isGeneric() && "must be a generic type decl");
   assert((!Parent || Parent->is<NominalType>() ||
           Parent->is<BoundGenericType>() ||
           Parent->is<UnboundGenericType>()) &&
          "parent must be a nominal type");
 
-  ASTContext &C = TheDecl->getDeclContext()->getASTContext();
+  const ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
-  BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs);
+  BoundGenericType::Profile(ID, TheDecl, Parent, Substitutions);
   RecursiveTypeProperties Properties;
   if (Parent) Properties |= Parent->getRecursiveProperties();
-  for (Type Arg : GenericArgs) {
-    Properties |= Arg->getRecursiveProperties();
-  }
+  for (const auto &substGP : Substitutions.getReplacementTypes())
+    Properties |= substGP->getRecursiveProperties();
 
   const auto Arena = getArena(Properties);
 
@@ -2605,38 +2615,40 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                                                      InsertPos))
     return BGT;
 
-  bool IsCanonical = !Parent || Parent->isCanonical();
-  if (IsCanonical) {
-    for (Type Arg : GenericArgs) {
-      if (!Arg->isCanonical()) {
-        IsCanonical = false;
-        break;
-      }
-    }
-  }
+  const bool IsCanonical =
+      (!Parent || Parent->isCanonical()) && Substitutions.isCanonical();
 
   BoundGenericType *BGT;
+  void *const Mem = C.Allocate(sizeof(BoundGenericType),
+                               alignof(BoundGenericType), Arena);
+  const ASTContext *CanContext = IsCanonical ? &C : nullptr;
   if (auto *const CD = dyn_cast<ClassDecl>(TheDecl)) {
-    auto sz = BoundGenericClassType::totalSizeToAlloc<Type>(GenericArgs.size());
-    auto Mem = C.Allocate(sz, alignof(BoundGenericClassType), Arena);
-    BGT = new (Mem) BoundGenericClassType(
-        CD, Parent, GenericArgs, IsCanonical ? &C : nullptr, Properties);
+    BGT = new (Mem) BoundGenericClassType(CD, Parent, Substitutions,
+                                          CanContext, Properties);
   } else if (auto *const SD = dyn_cast<StructDecl>(TheDecl)) {
-    auto sz =BoundGenericStructType::totalSizeToAlloc<Type>(GenericArgs.size());
-    auto Mem = C.Allocate(sz, alignof(BoundGenericStructType), Arena);
-    BGT = new (Mem) BoundGenericStructType(
-        SD, Parent, GenericArgs, IsCanonical ? &C : nullptr, Properties);
+    BGT = new (Mem) BoundGenericStructType(SD, Parent, Substitutions,
+                                           CanContext, Properties);
   } else if (auto *const ED = dyn_cast<EnumDecl>(TheDecl)) {
-    auto sz = BoundGenericEnumType::totalSizeToAlloc<Type>(GenericArgs.size());
-    auto Mem = C.Allocate(sz, alignof(BoundGenericEnumType), Arena);
-    BGT = new (Mem) BoundGenericEnumType(
-        ED, Parent, GenericArgs, IsCanonical ? &C : nullptr, Properties);
+    BGT = new (Mem) BoundGenericEnumType(ED, Parent, Substitutions,
+                                         CanContext, Properties);
   } else {
     llvm_unreachable("Unhandled NominalTypeDecl");
   }
   C.getImpl().getArena(Arena).BoundGenericTypes.InsertNode(BGT, InsertPos);
 
   return BGT;
+}
+
+ArrayRef<Type> BoundGenericType::getDirectGenericArgs() const {
+  return getSubstitutionMap().getInnermostReplacementTypes();
+}
+
+void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
+                               NominalTypeDecl *TheDecl, Type Parent,
+                               SubstitutionMap Substitutions) {
+  ID.AddPointer(TheDecl);
+  ID.AddPointer(Parent.getPointer());
+  Substitutions.profile(ID);
 }
 
 NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext &C) {
@@ -2990,7 +3002,8 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
     if (!arrayDecl)
       type = ErrorType::get(*ctx);
     else if (forCanonical)
-      type = BoundGenericType::get(arrayDecl, Type(), {type});
+      type =
+          BoundGenericType::get(arrayDecl, Type(), {type})->getCanonicalType();
     else
       type = ArraySliceType::get(type);
   }

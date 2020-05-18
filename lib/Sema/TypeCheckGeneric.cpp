@@ -523,11 +523,11 @@ static Type formExtensionInterfaceType(
 
   // Form the result.
   Type resultType;
-  SmallVector<Type, 2> genericArgs;
   if (!nominal->isGeneric() || isa<ProtocolDecl>(nominal)) {
     resultType = NominalType::get(nominal, parentType,
                                   nominal->getASTContext());
   } else {
+    SmallVector<Type, 2> genericArgs;
     auto currentBoundType = type->getAs<BoundGenericType>();
 
     // Form the bound generic type with the type parameters provided.
@@ -539,9 +539,8 @@ static Type formExtensionInterfaceType(
       genericArgs.push_back(gpType);
 
       if (currentBoundType) {
-        sameTypeReqs.emplace_back(
-            RequirementKind::SameType, gpType,
-            currentBoundType->getDirectGenericArgs()[gpIndex]);
+        sameTypeReqs.emplace_back(RequirementKind::SameType, gpType,
+                                  currentBoundType->getDirectGenericArgs()[gpIndex]);
       }
     }
 

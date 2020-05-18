@@ -292,8 +292,10 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   if (!validateParentType(decl, parent))
     return Type();
 
+  // FIXME: This is the wrong module
+  auto *moduleDecl = decl->getParentModule();
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
-    return BoundGenericType::get(nominalDecl, parent, args);
+    return BoundGenericType::get(nominalDecl, parent, args, moduleDecl);
 
   // Combine the substitutions from our parent type with our generic
   // arguments.
@@ -312,8 +314,6 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
       substTy;
   }
 
-  // FIXME: This is the wrong module
-  auto *moduleDecl = decl->getParentModule();
   auto subMap = SubstitutionMap::get(genericSig,
                                      QueryTypeSubstitutionMap{subs},
                                      LookUpConformanceInModule(moduleDecl));

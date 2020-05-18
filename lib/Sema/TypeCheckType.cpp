@@ -809,7 +809,7 @@ Type TypeChecker::applyUnboundGenericArguments(GenericTypeDecl *decl,
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   auto genericSig = decl->getGenericSignature();
-  assert(!genericSig.isNull());
+  assert(genericSig);
 
   TypeSubstitutionMap subs;
 

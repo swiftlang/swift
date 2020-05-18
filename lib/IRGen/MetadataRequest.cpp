@@ -2913,9 +2913,9 @@ public:
       auto payloadTy = visit(objectTy);
       if (payloadTy == objectTy)
         return ty;
-      auto &C = ty->getASTContext();
-      auto optDecl = C.getOptionalDecl();
-      return CanType(BoundGenericType::get(optDecl, Type(), payloadTy));
+      auto *const optDecl = ty->getASTContext().getOptionalDecl();
+      return BoundGenericType::get(optDecl, Type(), payloadTy)
+          ->getCanonicalType();
     }
 
     // Otherwise, generic arguments are not lowered.

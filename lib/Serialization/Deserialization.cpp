@@ -5291,10 +5291,10 @@ public:
                                              StringRef blobData) {
     DeclID declID;
     TypeID parentID;
-    ArrayRef<uint64_t> rawArgumentIDs;
+    SubstitutionMapID substitutionsID;
 
     decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
-                                                    rawArgumentIDs);
+                                                    substitutionsID);
 
     auto nominalOrError = MF.getDeclChecked(declID);
     if (!nominalOrError)
@@ -5304,16 +5304,12 @@ public:
     // FIXME: Check this?
     auto parentTy = MF.getType(parentID);
 
-    SmallVector<Type, 8> genericArgs;
-    for (TypeID ID : rawArgumentIDs) {
-      auto argTy = MF.getTypeChecked(ID);
-      if (!argTy)
-        return argTy.takeError();
+    // Read the substitutions.
+    auto subMapOrError = MF.getSubstitutionMapChecked(substitutionsID);
+    if (!subMapOrError)
+      return subMapOrError.takeError();
 
-      genericArgs.push_back(argTy.get());
-    }
-
-    return BoundGenericType::get(nominal, parentTy, genericArgs);
+    return BoundGenericType::get(nominal, parentTy, subMapOrError.get());
   }
 
   Expected<Type> deserializeSILBlockStorageType(ArrayRef<uint64_t> scratch,

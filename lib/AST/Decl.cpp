@@ -3759,15 +3759,9 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, ParentTy, ctx);
     case DeclTypeKind::DeclaredInterfaceType: {
-      // Note that here, we need to be able to produce a type
-      // before the decl has been validated, so we rely on
-      // the generic parameter list directly instead of looking
-      // at the signature.
-      SmallVector<Type, 4> args;
-      for (auto param : decl->getGenericParams()->getParams())
-        args.push_back(param->getDeclaredInterfaceType());
-
-      return BoundGenericType::get(decl, ParentTy, args);
+      const auto sig = decl->getGenericSignature();
+      return BoundGenericType::get(decl, ParentTy,
+                                   sig->getIdentitySubstitutionMap());
     }
     }
 

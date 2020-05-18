@@ -1264,14 +1264,12 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
-    BoundGenericType *BGT = cast<BoundGenericType>(this);
-    Type parentTy;
-    if (BGT->getParent())
-      parentTy = BGT->getParent()->getCanonicalType();
-    SmallVector<Type, 4> CanGenericArgs;
-    for (const Type Arg : BGT->getDirectGenericArgs())
-      CanGenericArgs.push_back(Arg->getCanonicalType());
-    Result = BoundGenericType::get(BGT->getDecl(), parentTy, CanGenericArgs);
+    const auto *const BGT = cast<BoundGenericType>(this);
+    Result = BoundGenericType::get(BGT->getDecl(),
+                                   BGT->getParent()
+                                     ? BGT->getParent()->getCanonicalType()
+                                     : Type(),
+                                   BGT->getSubstitutionMap().getCanonical());
     break;
   }
   }
@@ -3763,6 +3761,17 @@ static Type substType(Type derivedType,
       return None;
     }
 
+    // Special-case BoundGenericType; we need to substitute conformances.
+    if (const auto *bgt = dyn_cast<BoundGenericType>(type)) {
+      Type parentTy;
+      if (const auto origParentTy = bgt->getParent())
+        parentTy = substType(origParentTy,
+                             substitutions, lookupConformances, options);
+      const auto subMap = bgt->getSubstitutionMap()
+          .subst(substitutions, lookupConformances, options);
+      return Type(BoundGenericType::get(bgt->getDecl(), parentTy, subMap));
+    }
+
     // Special-case TypeAliasType; we need to substitute conformances.
     if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
       Type parentTy;
@@ -4409,8 +4418,7 @@ case TypeKind::Id:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
-    auto bound = cast<BoundGenericType>(base);
-    SmallVector<Type, 4> substArgs;
+    const auto *const bound = cast<BoundGenericType>(base);
     bool anyChanged = false;
     Type substParentTy;
     if (auto parentTy = bound->getParent()) {
@@ -4422,6 +4430,8 @@ case TypeKind::Id:
         anyChanged = true;
     }
 
+    // Attempt to transform only the direct generic arguments.
+    SmallVector<Type, 4> substArgs;
     for (const auto &arg : bound->getDirectGenericArgs()) {
       Type substArg = arg.transformRec(fn);
       if (!substArg)

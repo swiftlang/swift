@@ -3327,7 +3327,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
     base = copyOptionalityFromDerivedToBase(tc, derived, base);
 
     auto optDecl = tc.Context.getOptionalDecl();
-    return CanType(BoundGenericType::get(optDecl, Type(), base));
+    return BoundGenericType::get(optDecl, Type(), base)->getCanonicalType();
   }
 
   // (T1, T2, ...) +> (S1, S2, ...) = (T1 +> S1, T2 +> S2, ...)
@@ -3809,8 +3809,8 @@ public:
 
     const CanType origObjectType = origType.getDirectGenericArgs()[0];
     const CanType substObjectType = visit(origObjectType);
-    return CanType(BoundGenericType::get(origType->getDecl(), Type(),
-                                         substObjectType));
+    return BoundGenericType::get(origType->getDecl(), Type(), substObjectType)
+        ->getCanonicalType();
   }
 
   /// Any other type would be a valid type in the AST. Just apply the
