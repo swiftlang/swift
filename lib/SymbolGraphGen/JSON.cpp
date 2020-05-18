@@ -66,21 +66,20 @@ void swift::symbolgraphgen::serialize(const ExtensionDecl *Extension,
         OS.attribute("extendedModule", ExtendedModule->getNameStr());
       }
     }
-    if (const auto Generics = Extension->getAsGenericContext()) {
-      SmallVector<Requirement, 4> FilteredRequirements;
 
-      filterGenericRequirements(Generics->getGenericRequirements(),
-          Extension->getExtendedNominal()
-              ->getDeclContext()->getSelfNominalTypeDecl(),
-                                FilteredRequirements);
+    SmallVector<Requirement, 4> FilteredRequirements;
 
-      if (!FilteredRequirements.empty()) {
-        OS.attributeArray("constraints", [&](){
-          for (const auto &Requirement : FilteredRequirements) {
-            serialize(Requirement, OS);
-          }
-        }); // end constraints:
-      }
+    filterGenericRequirements(Extension->getGenericRequirements(),
+        Extension->getExtendedNominal()
+            ->getDeclContext()->getSelfNominalTypeDecl(),
+                              FilteredRequirements);
+
+    if (!FilteredRequirements.empty()) {
+      OS.attributeArray("constraints", [&](){
+        for (const auto &Requirement : FilteredRequirements) {
+          serialize(Requirement, OS);
+        }
+      }); // end constraints:
     }
   }); // end swiftExtension:
 }

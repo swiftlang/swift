@@ -1313,11 +1313,12 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 }
 
 SmallVector<ProtocolDecl *, 2>
-DeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
+IterableDeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   SmallVector<ProtocolDecl *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
+  const auto dc = getAsGenericContext();
+  const auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal) {
     return result;
   }
@@ -1326,7 +1327,7 @@ DeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
     nominal,
-    const_cast<DeclContext *>(this),
+    const_cast<GenericContext *>(dc),
     lookupKind,
     &result,
     nullptr,
@@ -1336,11 +1337,13 @@ DeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
 }
 
 SmallVector<ProtocolConformance *, 2>
-DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
+IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
+    const {
   SmallVector<ProtocolConformance *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
+  const auto dc = getAsGenericContext();
+  const auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal) {
     return result;
   }
@@ -1359,7 +1362,7 @@ DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
   nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
     nominal,
-    const_cast<DeclContext *>(this),
+    const_cast<GenericContext *>(dc),
     lookupKind,
     nullptr,
     &result,
@@ -1369,25 +1372,27 @@ DeclContext::getLocalConformances(ConformanceLookupKind lookupKind) const {
 }
 
 SmallVector<ConformanceDiagnostic, 4>
-DeclContext::takeConformanceDiagnostics() const {
+IterableDeclContext::takeConformanceDiagnostics() const {
   SmallVector<ConformanceDiagnostic, 4> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
+  const auto dc = getAsGenericContext();
+  const auto nominal = dc->getSelfNominalTypeDecl();
+
   if (!nominal) {
-    return { };
+    return result;
   }
 
   // Protocols are not subject to the checks for supersession.
   if (isa<ProtocolDecl>(nominal)) {
-    return { };
+    return result;
   }
 
   // Update to record all potential conformances.
   nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
     nominal,
-    const_cast<DeclContext *>(this),
+    const_cast<GenericContext *>(dc),
     ConformanceLookupKind::All,
     nullptr,
     nullptr,
