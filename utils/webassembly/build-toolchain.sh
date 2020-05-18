@@ -69,7 +69,7 @@ $SOURCE_PATH/swift/utils/build-script \
 
 # Merge wasi-sdk and the toolchain
 cp -a $WASI_SDK_PATH/lib/clang $HOST_TOOLCHAIN_SDK/usr/lib
-cp -a $WASI_SDK_PATH/bin/{clang*,*ld,llvm-ar} $HOST_TOOLCHAIN_SDK/usr/bin
+cp -a $WASI_SDK_PATH/bin/{*ld,llvm-ar} $HOST_TOOLCHAIN_SDK/usr/bin
 cp -r $WASI_SDK_PATH/share/wasi-sysroot $HOST_TOOLCHAIN_SDK/usr/share
 
 # Replace absolute sysroot path with relative path
