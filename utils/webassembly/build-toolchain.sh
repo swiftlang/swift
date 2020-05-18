@@ -9,11 +9,13 @@ WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
 case $(uname -s) in
   Darwin)
     OS_SUFFIX=osx
-    PRESET_NAME=webassembly-macos
+    HOST_PRESET=webassembly-host
+    TARGET_PRESET=webassembly-macos-target
   ;;
   Linux)
     OS_SUFFIX=linux
-    PRESET_NAME=webassembly-linux
+    HOST_PRESET=webassembly-linux-host
+    TARGET_PRESET=webassembly-linux-target
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
@@ -43,7 +45,7 @@ mkdir -p $HOST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0
 
 # Build the host toolchain and SDK first.
 $SOURCE_PATH/swift/utils/build-script \
-  --preset=webassembly-host \
+  --preset=$HOST_PRESET \
   INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
   TOOLCHAIN_NAME="$TOOLCHAIN_NAME" \
   C_CXX_LAUNCHER="$(which sccache)"
@@ -55,7 +57,7 @@ rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/swift-macosx-x86_64
 
 # build the cross-compilled toolchain
 $SOURCE_PATH/swift/utils/build-script \
-  --preset=$PRESET_NAME \
+  --preset=$TARGET_PRESET \
   INSTALL_DESTDIR="$SOURCE_PATH/install" \
   SOURCE_PATH="$SOURCE_PATH" \
   BUNDLE_IDENTIFIER="${BUNDLE_IDENTIFIER}" \
