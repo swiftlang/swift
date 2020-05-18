@@ -54,6 +54,9 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
+  class InfixOperatorDecl;
+  class InfixOperatorLookupResult;
+  class PrecedenceGroupDecl;
   class ProtocolDecl;
   class Requirement;
   class SourceFile;
@@ -61,6 +64,9 @@ namespace swift {
   class ModuleDecl;
   class GenericTypeDecl;
   class NominalTypeDecl;
+  class PrecedenceGroupLookupResult;
+  class PostfixOperatorDecl;
+  class PrefixOperatorDecl;
   class ProtocolConformance;
   class ValueDecl;
   class Initializer;
@@ -560,6 +566,29 @@ public:
   void lookupAllObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
+
+  /// Looks up an infix operator with a given \p name.
+  ///
+  /// This returns a vector of results, as it's possible to find multiple infix
+  /// operators with different precedence groups.
+  InfixOperatorLookupResult lookupInfixOperator(Identifier name) const;
+
+  /// Looks up an prefix operator with a given \p name.
+  ///
+  /// If multiple results are found, one is chosen in a stable manner, as
+  /// prefix operator decls cannot differ other than in name. If no results are
+  /// found, returns \c nullptr.
+  PrefixOperatorDecl *lookupPrefixOperator(Identifier name) const;
+
+  /// Looks up an postfix operator with a given \p name.
+  ///
+  /// If multiple results are found, one is chosen in a stable manner, as
+  /// postfix operator decls cannot differ other than in name. If no results are
+  /// found, returns \c nullptr.
+  PostfixOperatorDecl *lookupPostfixOperator(Identifier name) const;
+
+  /// Looks up a precedence group with a given \p name.
+  PrecedenceGroupLookupResult lookupPrecedenceGroup(Identifier name) const;
 
   /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.

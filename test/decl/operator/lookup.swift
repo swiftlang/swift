@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/lookup_moduleB.swift -module-name B -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %S/Inputs/lookup_moduleA.swift -module-name A -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %S/Inputs/lookup_module_exportsAC.swift -module-name ExportsAC -o %t -I %t
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/lookup_other.swift %S/Inputs/lookup_other2.swift %S/Inputs/lookup_other_compat.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/lookup_other.swift %S/Inputs/lookup_other2.swift %S/Inputs/lookup_other_noncompat.swift -I %t -enable-new-operator-lookup
 
 import ExportsAC
 import B
@@ -15,13 +15,10 @@ func ^^^ (lhs: Int, rhs: Int) -> Int { 0 }
 func &&& (lhs: Int, rhs: Int) -> Int { 0 }
 
 // The operator decl >>> is declared in module A, which we should be able to
-// see through ExportsAC. Note that this is possible even with the compatibility
-// behavior as we can use the new lookup logic when the result is unambiguous.
+// see through ExportsAC.
 prefix func >>> (rhs: Double) {}
 
 // Make sure we can also see precedencegroups in module A through ExportsAC.
-// Note that this is possible even with the compatibility behavior as we can use
-// the new lookup logic when the result is unambiguous.
 infix operator ^^^^ : DeclaredInModuleA
 
 // The operator decl for ??? is declared in both modules A and B, but has the
@@ -33,26 +30,22 @@ func ??? (lhs: Int, rhs: Int) {}
 func ???! (lhs: Int, rhs: Int) {}
 
 // The operator decl for ???? is declared in both modules A and B, and has a
-// different precedence group in each. This should therefore be ambiguous.
-// However, for compatibility, we don't look through exports in other modules,
-// so we don't see the one in module A.
-func ???? (lhs: Int, rhs: Int) {}
+// different precedence group in each. Therefore ambiguous.
+func ???? (lhs: Int, rhs: Int) {} // expected-error {{ambiguous operator declarations found for operator}}
 
-// The operator decl for ????! is declared in both modules ExportsAC and B, and
-// has a different precedence group in each. Therefore ambiguous.
+// Same for ????!, declared in both modules ExportsAC and B, and has a different
+// precedence group in each. Therefore ambiguous.
 func ????! (lhs: Int, rhs: Int) {} // expected-error {{ambiguous operator declarations found for operator}}
 
-// Same as ????, the precedencegroup is declared in both modules A and B, but
-// we don't look into module A for compatibility.
-infix operator <?> : DeclaredInModulesAB
+// The precedencegroup is declared in both modules A and B, therefore ambiguous.
+infix operator <?> : DeclaredInModulesAB // expected-error {{multiple precedence groups found}}
 
 // The precedencegroup is declared in both modules ExportsAC and B, therefore
 // ambiguous.
 infix operator <!> : DeclaredInModulesBExportsAC // expected-error {{multiple precedence groups found}}
 
-// This precedencegroup is declared in this module as well as in both modules A
-// and B. The decl in this module should shadow the imported ones, but for
-// compatibility we don't see module A's decl and take module B's decl.
+// While this precedencegroup is declared in both modules A and B, it's also
+// declared in this module, which therefore shadows those decls.
 infix operator <??> : DeclaredInModulesABShadowed
 
 // The operator decl for <? is declared in both modules A and B, but there's no
@@ -84,22 +77,20 @@ func ?????? (lhs: Int, rhs: Int) {}
 // Make sure we correctly handle visiting the same module twice.
 infix operator <> : DeclaredInModuleD
 
-// Also declared in lookup_other. To preserve compatibility, we allow an
-// unambiguous lookup that will favor this declaration over lookup_other.
-precedencegroup RedeclaredInModule {} 
-infix operator *** : RedeclaredInModule // Okay.
+// Also declared in lookup_other.
+precedencegroup RedeclaredInModule {}
+// expected-error@-1 {{precedence group redeclared}}
+// expected-note@-2 {{found this matching precedence group}}
+
+infix operator *** : RedeclaredInModule // expected-error {{multiple precedence groups found}}
 
 func testOperatorLookup() {
   // In lookup_other, DeclaredAcrossFiles is left associative, whereas in
-  // module B it is non-associative. Make sure we use module B's for
-  // compatibility.
-  _ = 5 ^^^ 5 ^^^ 5
-  // expected-error@-1 {{adjacent operators are in unordered precedence groups 'AssignmentPrecedence' and 'DeclaredAcrossFiles'}}
-  // expected-error@-2 {{adjacent operators are in non-associative precedence group 'DeclaredAcrossFiles'}}
-  // expected-error@-3 {{cannot convert value of type '()' to expected argument type 'Int'}}
+  // module B it is non-associative. Make sure we use lookup_other's.
+  _ = 5 ^^^ 5 ^^^ 5 // Okay.
 
   // Same for &&&, in lookup_other it is declared as left associative.
-  _ = 5 &&& 5 &&& 5 // expected-error {{adjacent operators are in non-associative precedence group 'DefaultPrecedence'}}
+  _ = 5 &&& 5 &&& 5
 
   // The operator >>> is declared in module A, which we should be able to see
   // through ExportsAC.

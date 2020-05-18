@@ -35,6 +35,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1321,21 +1322,6 @@ static void checkPrecedenceCircularity(DiagnosticEngine &D,
   } while (!stack.empty());
 }
 
-static PrecedenceGroupDecl *
-lookupPrecedenceGroup(const PrecedenceGroupDescriptor &descriptor) {
-  auto *dc = descriptor.dc;
-  if (auto sf = dc->getParentSourceFile()) {
-    auto desc = OperatorLookupDescriptor::forFile(
-        sf, descriptor.ident, dc->isCascadingContextForLookup(false),
-        descriptor.nameLoc);
-    return evaluateOrDefault(sf->getASTContext().evaluator,
-                             LookupPrecedenceGroupRequest{desc}, nullptr);
-  } else {
-    return dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
-                                                        descriptor.nameLoc);
-  }
-}
-
 static PrecedenceGroupDecl *lookupPrecedenceGroupForRelation(
     DeclContext *dc, PrecedenceGroupDecl::Relation rel,
     PrecedenceGroupDescriptor::PathDirection direction) {
@@ -1350,10 +1336,8 @@ static PrecedenceGroupDecl *lookupPrecedenceGroupForRelation(
     llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
     return nullptr;
   }
-  if (!result.get()) {
-    ctx.Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
-  }
-  return result.get();
+  return PrecedenceGroupLookupResult(dc, rel.Name, std::move(*result))
+      .getSingleOrDiagnose(rel.NameLoc);
 }
 
 void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
@@ -1392,10 +1376,8 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     // If we didn't find anything, try doing a raw lookup for the group before
     // diagnosing the 'lowerThan' within the same-module restriction. This can
     // allow us to diagnose even if we have a precedence group cycle.
-    if (!group) {
-      group = lookupPrecedenceGroup(PrecedenceGroupDescriptor{
-          dc, rel.Name, rel.NameLoc, PrecedenceGroupDescriptor::LowerThan});
-    }
+    if (!group)
+      group = dc->lookupPrecedenceGroup(rel.Name).getSingle();
 
     if (group &&
         group->getDeclContext()->getParentModule() == dc->getParentModule()) {
@@ -1416,22 +1398,25 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     checkPrecedenceCircularity(Diags, PGD);
 }
 
-PrecedenceGroupDecl * ValidatePrecedenceGroupRequest::evaluate(
+TinyPtrVector<PrecedenceGroupDecl *> ValidatePrecedenceGroupRequest::evaluate(
     Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
-  if (auto *group = lookupPrecedenceGroup(descriptor)) {
+  auto groups = descriptor.dc->lookupPrecedenceGroup(descriptor.ident);
+  for (auto *group : groups)
     validatePrecedenceGroup(group);
-    return group;
-  }
 
-  return nullptr;
+  // Return the raw results vector, which will get wrapped back in a
+  // PrecedenceGroupLookupResult by the TypeChecker entry point. This dance
+  // avoids unnecessarily caching the name and context for the lookup.
+  return std::move(groups).get();
 }
 
-PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
-                                                        Identifier name,
-                                                        SourceLoc nameLoc) {
-  return evaluateOrDefault(
+PrecedenceGroupLookupResult
+TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
+                                   SourceLoc nameLoc) {
+  auto groups = evaluateOrDefault(
       dc->getASTContext().evaluator,
-      ValidatePrecedenceGroupRequest({dc, name, nameLoc, None}), nullptr);
+      ValidatePrecedenceGroupRequest({dc, name, nameLoc, None}), {});
+  return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
 static NominalTypeDecl *resolveSingleNominalTypeDecl(
@@ -1480,7 +1465,6 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
   auto enableOperatorDesignatedTypes =
       ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
 
-  auto &Diags = ctx.Diags;
   PrecedenceGroupDecl *group = nullptr;
 
   auto identifiers = IOD->getIdentifiers();
@@ -1488,20 +1472,18 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
     auto name = identifiers[0].Item;
     auto loc = identifiers[0].Loc;
 
-    group = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
+    auto canResolveType = [&]() -> bool {
+      return enableOperatorDesignatedTypes &&
+             resolveSingleNominalTypeDecl(dc, loc, name, ctx,
+                                          TypeResolutionFlags::SilenceErrors);
+    };
 
-    if (group) {
+    // Make sure not to diagnose in the case where we failed to find a
+    // precedencegroup, but we could resolve a type instead.
+    auto groups = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
+    if (groups.hasResults() || !canResolveType()) {
+      group = groups.getSingleOrDiagnose(loc);
       identifiers = identifiers.slice(1);
-    } else {
-      // If we're either not allowing types, or we are allowing them
-      // and this identifier is not a type, emit an error as if it's
-      // a precedence group.
-      if (!(enableOperatorDesignatedTypes &&
-            resolveSingleNominalTypeDecl(dc, loc, name, ctx,
-                                         TypeResolutionFlags::SilenceErrors))) {
-        Diags.diagnose(loc, diag::unknown_precedence_group, name);
-        identifiers = identifiers.slice(1);
-      }
     }
   }
 
@@ -1511,13 +1493,9 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
   assert(identifiers.empty() || enableOperatorDesignatedTypes);
 
   if (!group) {
-    group = TypeChecker::lookupPrecedenceGroup(dc, ctx.Id_DefaultPrecedence,
-                                               SourceLoc());
-  }
-
-  if (!group) {
-    Diags.diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
-                   ctx.Id_DefaultPrecedence);
+    auto groups = TypeChecker::lookupPrecedenceGroup(
+        dc, ctx.Id_DefaultPrecedence, SourceLoc());
+    group = groups.getSingleOrDiagnose(IOD->getLoc(), /*forBuiltin*/ true);
   }
 
   auto nominalTypes = IOD->getDesignatedNominalTypes();
@@ -1797,24 +1775,15 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     FD->diagnose(diag::operator_in_local_scope);
   }
 
-  auto desc = OperatorLookupDescriptor::forFile(
-      FD->getDeclContext()->getParentSourceFile(), operatorName,
-      FD->isCascadingContextForLookup(false), FD->getLoc());
-  OperatorDecl *op = nullptr;
+  NullablePtr<OperatorDecl> op;
   if (FD->isUnaryOperator()) {
     if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
-      op = evaluateOrDefault(evaluator,
-                             LookupPrefixOperatorRequest{desc}, nullptr);
+      op = FD->lookupPrefixOperator(operatorName);
     } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
-      op = evaluateOrDefault(evaluator,
-                             LookupPostfixOperatorRequest{desc}, nullptr);
+      op = FD->lookupPostfixOperator(operatorName);
     } else {
-      auto prefixOp = evaluateOrDefault(evaluator,
-                                        LookupPrefixOperatorRequest{desc},
-                                        nullptr);
-      auto postfixOp = evaluateOrDefault(evaluator,
-                                         LookupPostfixOperatorRequest{desc},
-                                         nullptr);
+      auto *prefixOp = FD->lookupPrefixOperator(operatorName);
+      auto *postfixOp = FD->lookupPostfixOperator(operatorName);
 
       // If we found both prefix and postfix, or neither prefix nor postfix,
       // complain. We can't fix this situation.
@@ -1823,9 +1792,11 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 
         // If we found both, point at them.
         if (prefixOp) {
-          diags.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
+          diags.diagnose(prefixOp, diag::unary_operator_declaration_here,
+                         /*isPostfix*/ false)
             .fixItInsert(FD->getLoc(), "prefix ");
-          diags.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
+          diags.diagnose(postfixOp, diag::unary_operator_declaration_here,
+                         /*isPostfix*/ true)
             .fixItInsert(FD->getLoc(), "postfix ");
         } else {
           // FIXME: Introduce a Fix-It that adds the operator declaration?
@@ -1842,7 +1813,8 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       // Fix the AST and determine the insertion text.
       const char *insertionText;
       auto &C = FD->getASTContext();
-      if (postfixOp) {
+      auto isPostfix = static_cast<bool>(postfixOp);
+      if (isPostfix) {
         insertionText = "postfix ";
         op = postfixOp;
         FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
@@ -1854,15 +1826,20 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 
       // Emit diagnostic with the Fix-It.
       diags.diagnose(FD->getFuncLoc(), diag::unary_op_missing_prepos_attribute,
-                  static_cast<bool>(postfixOp))
+                     isPostfix)
         .fixItInsert(FD->getFuncLoc(), insertionText);
-      diags.diagnose(op, diag::unary_operator_declaration_here,
-                  static_cast<bool>(postfixOp));
+      op.get()->diagnose(diag::unary_operator_declaration_here, isPostfix);
     }
   } else if (FD->isBinaryOperator()) {
-    op = evaluateOrDefault(evaluator,
-                           LookupInfixOperatorRequest{desc},
-                           nullptr);
+    auto results = FD->lookupInfixOperator(operatorName);
+
+    // If we have an ambiguity, diagnose and return. Otherwise fall through, as
+    // we have a custom diagnostic for missing operator decls.
+    if (results.isAmbiguous()) {
+      results.diagnoseAmbiguity(FD->getLoc());
+      return nullptr;
+    }
+    op = results.getSingle();
   } else {
     diags.diagnose(FD, diag::invalid_arg_count_for_operator);
     return nullptr;
@@ -1910,8 +1887,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       opDiagnostic.fixItInsert(insertionLoc, insertion);
     return nullptr;
   }
-
-  return op;
+  return op.get();
 }
 
 bool swift::isMemberOperator(FuncDecl *decl, Type type) {

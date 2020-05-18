@@ -592,21 +592,6 @@ public:
   /// FIXME: Remove the integrated REPL.
   void clearLookupCache();
 
-  /// @{
-
-  /// Look up the given operator in this module.
-  ///
-  /// If the operator is not found, or if there is an ambiguity, returns null.
-  InfixOperatorDecl *lookupInfixOperator(Identifier name,
-                                         SourceLoc diagLoc = {});
-  PrefixOperatorDecl *lookupPrefixOperator(Identifier name,
-                                           SourceLoc diagLoc = {});
-  PostfixOperatorDecl *lookupPostfixOperator(Identifier name,
-                                             SourceLoc diagLoc = {});
-  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name,
-                                             SourceLoc diagLoc = {});
-  /// @}
-
   /// Finds all class members defined in this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
