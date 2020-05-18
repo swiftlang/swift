@@ -784,6 +784,9 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   default:
     return Optional<RequirementMatch>();
   }
+  
+  if (missingType->hasTypeVariable())
+    return Optional<RequirementMatch>();
 
   auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
     Requirement requirement(requirementKind, type, missingType);
