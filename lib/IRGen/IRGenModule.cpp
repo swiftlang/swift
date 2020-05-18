@@ -271,6 +271,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     MetadataKindTy          // MetadataKind Kind;
   });
   TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(DefaultAS);
+  TypeMetadataPtrPtrTy = TypeMetadataPtrTy->getPointerTo(DefaultAS);
 
   TypeMetadataResponseTy = createStructType(*this, "swift.metadata_response", {
     TypeMetadataPtrTy,
@@ -666,6 +667,16 @@ namespace RuntimeConstants {
     auto featureAvailability =
         Context.getCompareProtocolConformanceDescriptorsAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  GetCanonicalSpecializedMetadataAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getIntermodulePrespecializedGenericMetadataAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
