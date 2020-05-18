@@ -4,7 +4,7 @@
 // ARG_PARSE_0:  key.notification: source.notification.compile-will-start
 // ARG_PARSE_0:  key.compileid: [[CID1:".*"]]
 // ARG_PARSE_0:  key.compilerargs-string: "{{.*}}.swift -no-such-arg"
-// ARG_PARSE_0:  key.compileoperation: source.compile.operation.code-completion
+// ARG_PARSE_0:  key.compile_operation: source.compile.operation.code-completion
 // ARG_PARSE_0: }
 // ARG_PARSE_0: {
 // ARG_PARSE_0:   key.notification: source.notification.compile-did-finish
@@ -16,7 +16,7 @@
 // ARG_PARSE_0:     }
 // ARG_PARSE_0:   ]
 // ARG_PARSE_0:   key.compileid: [[CID1]]
-// ARG_PARSE_0:   key.compileoperation: source.compile.operation.code-completion
+// ARG_PARSE_0:   key.compile_operation: source.compile.operation.code-completion
 // ARG_PARSE_0: }
 // ARG_PARSE_0-NOT: compile-will-start
 // ARG_PARSE_0-NOT: compile-did-finish
@@ -27,7 +27,6 @@
 // ARG_PARSE_1:  key.notification: source.notification.compile-will-start
 // ARG_PARSE_1:  key.compileid: [[CID1:".*"]]
 // ARG_PARSE_1:  key.compilerargs-string: "{{.*}}.swift -no-such-arg"
-// ARG_PARSE_1:  key.compileoperation: source.compile.operation.perform-sema
 // ARG_PARSE_1: }
 // ARG_PARSE_1: {
 // ARG_PARSE_1:   key.notification: source.notification.compile-did-finish
@@ -39,7 +38,6 @@
 // ARG_PARSE_1:     }
 // ARG_PARSE_1:   ]
 // ARG_PARSE_1:   key.compileid: [[CID1]]
-// ARG_PARSE_1:   key.compileoperation: source.compile.operation.perform-sema
 // ARG_PARSE_1: }
 // ARG_PARSE_1-NOT: compile-will-start
 // ARG_PARSE_1-NOT: compile-did-finish
