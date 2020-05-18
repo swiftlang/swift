@@ -1364,19 +1364,35 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     Identifier opName = getIdentifier(IID);
     pathTrace.addOperator(opName);
 
+    auto &ctx = getContext();
+    auto desc = OperatorLookupDescriptor::forModule(baseModule, opName);
     switch (rawOpKind) {
     case OperatorKind::Infix:
-      return baseModule->lookupInfixOperator(opName);
     case OperatorKind::Prefix:
-      return baseModule->lookupPrefixOperator(opName);
-    case OperatorKind::Postfix:
-      return baseModule->lookupPostfixOperator(opName);
-    case OperatorKind::PrecedenceGroup:
-      return baseModule->lookupPrecedenceGroup(opName);
+    case OperatorKind::Postfix: {
+      auto req = DirectOperatorLookupRequest{
+          desc, getASTOperatorFixity(static_cast<OperatorKind>(rawOpKind))};
+      auto results = evaluateOrDefault(ctx.evaluator, req, {});
+      if (results.size() != 1) {
+        return llvm::make_error<XRefError>("operator not found", pathTrace,
+                                           opName);
+      }
+      return results[0];
+    }
+    case OperatorKind::PrecedenceGroup: {
+      auto results = evaluateOrDefault(
+          ctx.evaluator, DirectPrecedenceGroupLookupRequest{desc}, {});
+      if (results.size() != 1) {
+        return llvm::make_error<XRefError>("precedencegroup not found",
+                                           pathTrace, opName);
+      }
+      return results[0];
+    }
     default:
       // Unknown operator kind.
       fatal();
     }
+    llvm_unreachable("Unhandled case in switch!");
   }
 
   case XREF_GENERIC_PARAM_PATH_PIECE:
