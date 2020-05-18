@@ -48,7 +48,7 @@ public struct S<A: P> where A.T == S<A> { // expected-error {{circular reference
 // expected-error@-2 {{generic struct 'S' references itself}}
   func f(a: A.T) {
     g(a: id(t: a))
-    // expected-error@-1 {{cannot convert value of type 'A.T' to expected argument type 'S<A>'}}
+    // expected-error@-1 {{type of expression is ambiguous without more context}}
     _ = A.T.self
   }
 

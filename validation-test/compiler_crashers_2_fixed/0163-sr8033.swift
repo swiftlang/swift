@@ -7,3 +7,4 @@ protocol P1 {
 }
 extension Foo: P1 where A : P1 {} // expected-error {{unsupported recursion for reference to associated type 'A' of type 'Foo<T>'}}
 // expected-error@-1 {{type 'Foo<T>' does not conform to protocol 'P1'}}
+// expected-error@-2 {{type 'Foo<T>' in conformance requirement does not refer to a generic parameter or associated type}}
