@@ -351,6 +351,12 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     typeCheckDelayedFunctions(*SF);
   }
 
+  // Check to see if there's any inconsistent @_implementationOnly imports.
+  evaluateOrDefault(
+      Ctx.evaluator,
+      CheckInconsistentImplementationOnlyImportsRequest{SF->getParentModule()},
+      {});
+
   // Checking that benefits from having the whole module available.
   if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking) {
     performWholeModuleTypeChecking(*SF);

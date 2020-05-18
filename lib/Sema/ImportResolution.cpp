@@ -674,18 +674,20 @@ void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
   attr->setInvalid();
 }
 
-void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
+evaluator::SideEffect
+CheckInconsistentImplementationOnlyImportsRequest::evaluate(
+    Evaluator &evaluator, ModuleDecl *mod) const {
   bool hasAnyImplementationOnlyImports =
-      llvm::any_of(MainModule->getFiles(), [](const FileUnit *F) -> bool {
-    auto *SF = dyn_cast<SourceFile>(F);
-    return SF && SF->hasImplementationOnlyImports();
-  });
+      llvm::any_of(mod->getFiles(), [](const FileUnit *F) -> bool {
+        auto *SF = dyn_cast<SourceFile>(F);
+        return SF && SF->hasImplementationOnlyImports();
+      });
   if (!hasAnyImplementationOnlyImports)
-    return;
+    return {};
 
-  auto diagnose = [MainModule](const ImportDecl *normalImport,
-                               const ImportDecl *implementationOnlyImport) {
-    auto &diags = MainModule->getDiags();
+  auto diagnose = [mod](const ImportDecl *normalImport,
+                        const ImportDecl *implementationOnlyImport) {
+    auto &diags = mod->getDiags();
     {
       InFlightDiagnostic warning =
           diags.diagnose(normalImport, diag::warn_implementation_only_conflict,
@@ -706,7 +708,7 @@ void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
   llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> normalImports;
   llvm::DenseMap<ModuleDecl *, const ImportDecl *> implementationOnlyImports;
 
-  for (const FileUnit *file : MainModule->getFiles()) {
+  for (const FileUnit *file : mod->getFiles()) {
     auto *SF = dyn_cast<SourceFile>(file);
     if (!SF)
       continue;
@@ -750,6 +752,7 @@ void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
       normalImports[module].push_back(nextImport);
     }
   }
+  return {};
 }
 
 //===----------------------------------------------------------------------===//
