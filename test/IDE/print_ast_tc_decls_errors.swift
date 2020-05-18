@@ -192,7 +192,7 @@ protocol AssociatedType1 {
 // TYREPR: {{^}}  associatedtype AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol{{$}}
 
   associatedtype AssociatedTypeDecl5 : FooClass
-// CHECK: {{^}}  associatedtype AssociatedTypeDecl5 : FooClass{{$}}
+// CHECK: {{^}}  associatedtype AssociatedTypeDecl5{{$}}
 }
 
 //===---
