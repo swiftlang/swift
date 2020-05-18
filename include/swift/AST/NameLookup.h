@@ -455,6 +455,26 @@ bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                          const DeclContext *dc);
 
+/// Remove any operators in the given set that are shadowed by
+/// other operators in that set.
+///
+/// \param decls The set of operators being considered.
+/// \param dc The DeclContext from which the lookup was performed.
+///
+/// \returns true if any shadowed declarations were removed.
+bool removeShadowedDecls(TinyPtrVector<OperatorDecl *> &decls,
+                         const DeclContext *dc);
+
+/// Remove any precedence groups in the given set that are shadowed by
+/// other precedence groups in that set.
+///
+/// \param decls The set of precedence groups being considered.
+/// \param dc The DeclContext from which the lookup was performed.
+///
+/// \returns true if any shadowed declarations were removed.
+bool removeShadowedDecls(TinyPtrVector<PrecedenceGroupDecl *> &decls,
+                         const DeclContext *dc);
+
 /// Finds decls visible in the given context and feeds them to the given
 /// VisibleDeclConsumer.  If the current DeclContext is nested in a function,
 /// the SourceLoc is used to determine which declarations in that function

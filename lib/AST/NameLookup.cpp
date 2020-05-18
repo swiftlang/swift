@@ -247,10 +247,10 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
 
 /// Given a set of declarations whose names and signatures have matched,
 /// figure out which of these declarations have been shadowed by others.
-static void recordShadowedDeclsAfterSignatureMatch(
-                              ArrayRef<ValueDecl *> decls,
-                              const DeclContext *dc,
-                              llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
+template <typename T>
+static void
+recordShadowedDeclsAfterSignatureMatch(ArrayRef<T> decls, const DeclContext *dc,
+                                       llvm::SmallPtrSetImpl<T> &shadowed) {
   assert(decls.size() > 1 && "Nothing collided");
 
   // Compare each declaration to every other declaration. This is
@@ -354,9 +354,9 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // This is due to the fact that in Swift 4, we only gave custom overload
       // types to properties in extensions of generic types, otherwise we
       // used the null type.
-      if (!ctx.isSwiftVersionAtLeast(5)) {
-        auto secondSig = secondDecl->getOverloadSignature();
-        auto firstSig = firstDecl->getOverloadSignature();
+      if (!ctx.isSwiftVersionAtLeast(5) && isa<ValueDecl>(firstDecl)) {
+        auto secondSig = cast<ValueDecl>(secondDecl)->getOverloadSignature();
+        auto firstSig = cast<ValueDecl>(firstDecl)->getOverloadSignature();
         if (firstSig.IsVariable && secondSig.IsVariable)
           if (firstSig.InExtensionOfGenericType !=
               secondSig.InExtensionOfGenericType)
@@ -583,8 +583,8 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
 
   // Check whether we have shadowing for signature collisions.
   for (auto signature : collisionTypes) {
-    recordShadowedDeclsAfterSignatureMatch(collisions[signature], dc,
-                                           shadowed);
+    ArrayRef<ValueDecl *> collidingDecls = collisions[signature];
+    recordShadowedDeclsAfterSignatureMatch(collidingDecls, dc, shadowed);
   }
 
   // Check whether we have shadowing for imported initializer collisions.
@@ -594,11 +594,25 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
   }
 }
 
-bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                const DeclContext *dc) {
+static void
+recordShadowedDecls(ArrayRef<OperatorDecl *> decls, const DeclContext *dc,
+                    llvm::SmallPtrSetImpl<OperatorDecl *> &shadowed) {
+  // Always considered to have the same signature.
+  recordShadowedDeclsAfterSignatureMatch(decls, dc, shadowed);
+}
+
+static void
+recordShadowedDecls(ArrayRef<PrecedenceGroupDecl *> decls,
+                    const DeclContext *dc,
+                    llvm::SmallPtrSetImpl<PrecedenceGroupDecl *> &shadowed) {
+  // Always considered to have the same signature.
+  recordShadowedDeclsAfterSignatureMatch(decls, dc, shadowed);
+}
+
+template <typename T, typename Container>
+static bool removeShadowedDeclsImpl(Container &decls, const DeclContext *dc) {
   // Collect declarations with the same (full) name.
-  llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
-    collidingDeclGroups;
+  llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<T>> collidingDeclGroups;
   bool anyCollisions = false;
   for (auto decl : decls) {
     // Record this declaration based on its full name.
@@ -614,7 +628,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     return false;
 
   // Walk through the declarations again, marking any declarations that shadow.
-  llvm::SmallPtrSet<ValueDecl *, 4> shadowed;
+  llvm::SmallPtrSet<T, 4> shadowed;
   for (auto decl : decls) {
     auto known = collidingDeclGroups.find(decl->getName());
     if (known == collidingDeclGroups.end()) {
@@ -633,8 +647,8 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
   // Remove shadowed declarations from the list of declarations.
   bool anyRemoved = false;
   decls.erase(std::remove_if(decls.begin(), decls.end(),
-                             [&](ValueDecl *vd) {
-                               if (shadowed.count(vd) > 0) {
+                             [&](T decl) {
+                               if (shadowed.count(decl) > 0) {
                                  anyRemoved = true;
                                  return true;
                                }
@@ -644,6 +658,28 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
               decls.end());
 
   return anyRemoved;
+}
+
+bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl *> &decls,
+                                const DeclContext *dc) {
+  return removeShadowedDeclsImpl<ValueDecl *>(decls, dc);
+}
+
+bool swift::removeShadowedDecls(TinyPtrVector<OperatorDecl *> &decls,
+                                const DeclContext *dc) {
+#ifndef NDEBUG
+  // Make sure all the operators have the same fixity.
+  if (decls.size() > 1) {
+    for (auto *op : decls)
+      assert(op->getFixity() == decls[0]->getFixity());
+  }
+#endif
+  return removeShadowedDeclsImpl<OperatorDecl *>(decls, dc);
+}
+
+bool swift::removeShadowedDecls(TinyPtrVector<PrecedenceGroupDecl *> &decls,
+                                const DeclContext *dc) {
+  return removeShadowedDeclsImpl<PrecedenceGroupDecl *>(decls, dc);
 }
 
 namespace {

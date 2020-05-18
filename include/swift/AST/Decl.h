@@ -7048,6 +7048,10 @@ public:
     return Name;
   }
 
+  // This is needed to allow templated code to work with both ValueDecls and
+  // PrecedenceGroupDecls.
+  DeclBaseName getBaseName() const { return Name; }
+
   SourceLoc getLBraceLoc() const { return LBraceLoc; }
   SourceLoc getRBraceLoc() const { return RBraceLoc; }
 
@@ -7204,6 +7208,10 @@ public:
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
+
+  // This is needed to allow templated code to work with both ValueDecls and
+  // OperatorDecls.
+  DeclBaseName getBaseName() const { return name; }
 
   /// Get the list of identifiers after the colon in the operator declaration.
   ///
