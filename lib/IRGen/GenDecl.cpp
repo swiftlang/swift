@@ -913,9 +913,9 @@ IRGenModule::getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto) {
                                      LinkEntity::forProtocolDescriptor(proto));
 }
 
-void IRGenModule::addLazyConformances(DeclContext *dc) {
+void IRGenModule::addLazyConformances(const IterableDeclContext *idc) {
   for (const ProtocolConformance *conf :
-         dc->getLocalConformances(ConformanceLookupKind::All)) {
+         idc->getLocalConformances(ConformanceLookupKind::All)) {
     IRGen.addLazyWitnessTable(conf);
   }
 }

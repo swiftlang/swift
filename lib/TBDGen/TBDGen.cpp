@@ -444,8 +444,8 @@ void TBDGenVisitor::addBaseConformanceDescriptor(
   addSymbol(entity);
 }
 
-void TBDGenVisitor::addConformances(DeclContext *DC) {
-  for (auto conformance : DC->getLocalConformances(
+void TBDGenVisitor::addConformances(const IterableDeclContext *IDC) {
+  for (auto conformance : IDC->getLocalConformances(
                             ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
     auto needsWTable =
@@ -462,8 +462,9 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     // We cannot emit the witness table symbol if the protocol is imported from
     // another module and it's resilient, because initialization of that protocol
     // is necessary in this case
-    if (!rootConformance->getProtocol()->isResilient(DC->getParentModule(),
-                                                     ResilienceExpansion::Maximal))
+    if (!rootConformance->getProtocol()->isResilient(
+            IDC->getAsGenericContext()->getParentModule(),
+            ResilienceExpansion::Maximal))
       addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
     addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
