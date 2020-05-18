@@ -3327,7 +3327,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
     base = copyOptionalityFromDerivedToBase(tc, derived, base);
 
     auto optDecl = tc.Context.getOptionalDecl();
-    return CanType(BoundGenericEnumType::get(optDecl, Type(), base));
+    return CanType(BoundGenericType::get(optDecl, Type(), base));
   }
 
   // (T1, T2, ...) +> (S1, S2, ...) = (T1 +> S1, T2 +> S2, ...)
@@ -3807,8 +3807,8 @@ public:
       return visitType(origType);
     }
 
-    CanType origObjectType = origType.getGenericArgs()[0];
-    CanType substObjectType = visit(origObjectType);
+    const CanType origObjectType = origType.getDirectGenericArgs()[0];
+    const CanType substObjectType = visit(origObjectType);
     return CanType(BoundGenericType::get(origType->getDecl(), Type(),
                                          substObjectType));
   }

@@ -1508,7 +1508,7 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
 
   // Handle the case where Type has sub-types.
   if (auto BGT = T->getAs<BoundGenericType>()) {
-    for (auto Arg : BGT->getGenericArgs()) {
+    for (auto Arg : BGT->getDirectGenericArgs()) {
       Root->addChild(constructTypeNode(Arg));
     }
   } else if (auto Tup = T->getAs<TupleType>()) {

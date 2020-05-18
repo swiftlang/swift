@@ -4290,7 +4290,7 @@ public:
     using namespace decls_block;
     SmallVector<TypeID, 8> genericArgIDs;
 
-    for (auto next : generic->getGenericArgs())
+    for (const auto next : generic->getDirectGenericArgs())
       genericArgIDs.push_back(S.addTypeRef(next));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[BoundGenericTypeLayout::Code];

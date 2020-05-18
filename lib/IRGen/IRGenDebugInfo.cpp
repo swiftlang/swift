@@ -1018,7 +1018,7 @@ private:
   /// resolved in the debugger without needing to query the Swift module.
   llvm::DINodeArray collectGenericParams(BoundGenericType *BGT) {
     SmallVector<llvm::Metadata *, 16> TemplateParams;
-    for (auto Param : BGT->getGenericArgs()) {
+    for (auto Param : BGT->getDirectGenericArgs()) {
       TemplateParams.push_back(DBuilder.createTemplateTypeParameter(
           TheCU, "", getOrCreateType(DebugTypeInfo::getForwardDecl(Param))));
     }

@@ -284,11 +284,10 @@ class TypeMatcher {
                          sugaredFirstBGT->getParent()))
           return false;
 
-        for (unsigned i = 0, n = firstBGT->getGenericArgs().size();
-             i != n; ++i) {
-          if (!this->visit(firstBGT.getGenericArgs()[i],
-                           secondBGT->getGenericArgs()[i],
-                           sugaredFirstBGT->getGenericArgs()[i]))
+        for (const auto i: indices(firstBGT->getDirectGenericArgs())) {
+          if (!this->visit(firstBGT.getDirectGenericArgs()[i],
+                           secondBGT->getDirectGenericArgs()[i],
+                           sugaredFirstBGT->getDirectGenericArgs()[i]))
             return false;
         }
 

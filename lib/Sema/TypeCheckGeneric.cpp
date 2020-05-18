@@ -539,8 +539,9 @@ static Type formExtensionInterfaceType(
       genericArgs.push_back(gpType);
 
       if (currentBoundType) {
-        sameTypeReqs.emplace_back(RequirementKind::SameType, gpType,
-                                  currentBoundType->getGenericArgs()[gpIndex]);
+        sameTypeReqs.emplace_back(
+            RequirementKind::SameType, gpType,
+            currentBoundType->getDirectGenericArgs()[gpIndex]);
       }
     }
 

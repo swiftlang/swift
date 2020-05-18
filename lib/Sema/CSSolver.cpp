@@ -940,8 +940,8 @@ void ConstraintSystem::shrink(Expr *expr) {
           return boundGeneric;
 
         llvm::SmallVector<TupleTypeElt, 2> params;
-        for (auto &type : boundGeneric->getGenericArgs()) {
-          // One of the generic arguments in invalid or unresolved.
+        for (const auto &type : boundGeneric->getDirectGenericArgs()) {
+          // One of the generic arguments is invalid or unresolved.
           if (isInvalidType(type))
             return type;
 

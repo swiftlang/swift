@@ -590,14 +590,14 @@ Type TypeBase::getRValueType() {
 Type TypeBase::getOptionalObjectType() {
   if (auto boundTy = getAs<BoundGenericEnumType>())
     if (boundTy->getDecl()->isOptionalDecl())
-      return boundTy->getGenericArgs()[0];
+      return boundTy->getDirectGenericArgs()[0];
   return Type();
 }
 
 CanType CanType::getOptionalObjectTypeImpl(CanType type) {
   if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
     if (boundTy->getDecl()->isOptionalDecl())
-      return boundTy.getGenericArgs()[0];
+      return boundTy.getDirectGenericArgs()[0];
   return CanType();
 }
 
@@ -625,7 +625,7 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
     } else {
       return Type();
     }
-    return boundTy->getGenericArgs()[0];
+    return boundTy->getDirectGenericArgs()[0];
   }
   return Type();
 }
@@ -671,7 +671,7 @@ Type TypeBase::getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK) {
     } else {
       return Type();
     }
-    return boundTy->getGenericArgs()[0];
+    return boundTy->getDirectGenericArgs()[0];
   }
   return Type();
 }
@@ -1269,7 +1269,7 @@ CanType TypeBase::computeCanonicalType() {
     if (BGT->getParent())
       parentTy = BGT->getParent()->getCanonicalType();
     SmallVector<Type, 4> CanGenericArgs;
-    for (Type Arg : BGT->getGenericArgs())
+    for (const Type Arg : BGT->getDirectGenericArgs())
       CanGenericArgs.push_back(Arg->getCanonicalType());
     Result = BoundGenericType::get(BGT->getDecl(), parentTy, CanGenericArgs);
     break;
@@ -1292,8 +1292,8 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
   auto Func = [Recursive](Type Ty) -> Type {
     if (auto boundGeneric = dyn_cast<BoundGenericType>(Ty.getPointer())) {
 
-      auto getGenericArg = [&](unsigned i) -> Type {
-        auto arg = boundGeneric->getGenericArgs()[i];
+      const auto getGenericArg = [&](unsigned i) -> Type {
+        auto arg = boundGeneric->getDirectGenericArgs()[i];
         if (Recursive)
           arg = arg->reconstituteSugar(Recursive);
         return arg;
@@ -1921,12 +1921,14 @@ public:
     
     SmallVector<Type, 4> newParams;
     bool didChange = newParent != substBGT.getParent();
-    
-    auto depthStart =
-      genericSig->getGenericParams().size() - bgt->getGenericArgs().size();
-    for (auto i : indices(bgt->getGenericArgs())) {
-      auto orig = bgt->getGenericArgs()[i]->getCanonicalType();
-      auto subst = substBGT.getGenericArgs()[i];
+
+    const auto origGenericArgs = bgt->getDirectGenericArgs();
+    const auto substGenericArgs = substBGT.getDirectGenericArgs();
+    const auto depthStart =
+        genericSig->getGenericParams().size() - origGenericArgs.size();
+    for (const auto i : range(origGenericArgs.size())) {
+      auto orig = origGenericArgs[i]->getCanonicalType();
+      auto subst = substGenericArgs[i];
       auto gp = genericSig->getGenericParams()[depthStart + i];
       
       // The new type is upper-bounded by the constraints the nominal type
@@ -2316,10 +2318,11 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     auto boundGenericType = type->getAs<BoundGenericType>();
 
     // Note: works around a broken Unmanaged<> definition.
-    if (!boundGenericType || boundGenericType->getGenericArgs().size() != 1)
+    if (!boundGenericType ||
+        boundGenericType->getDirectGenericArgs().size() != 1)
       return failure();
     
-    auto typeArgument = boundGenericType->getGenericArgs()[0];
+    const auto typeArgument = boundGenericType->getDirectGenericArgs()[0];
     if (typeArgument->isTriviallyRepresentableIn(language, dc))
       return { ForeignRepresentableKind::Trivial, nullptr };
 
@@ -2407,7 +2410,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // translated separately, whether they are trivially representable
   // or bridged representable doesn't impact our final result.
   if (auto boundGenericType = type->getAs<BoundGenericType>()) {
-    for (auto typeArg : boundGenericType->getGenericArgs()) {
+    for (const auto &typeArg : boundGenericType->getDirectGenericArgs()) {
       // Type arguments cannot be optional.
       if (typeArg->getOptionalObjectType())
         return failure();
@@ -3984,7 +3987,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
     if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
-      auto args = boundGeneric->getGenericArgs();
+      const auto args = boundGeneric->getDirectGenericArgs();
       for (unsigned i = 0, e = args.size(); i < e; ++i) {
         substitutions[params[n - e + i]->getCanonicalType()
                         ->castTo<GenericTypeParamType>()] = args[i];
@@ -4419,7 +4422,7 @@ case TypeKind::Id:
         anyChanged = true;
     }
 
-    for (auto arg : bound->getGenericArgs()) {
+    for (const auto &arg : bound->getDirectGenericArgs()) {
       Type substArg = arg.transformRec(fn);
       if (!substArg)
         return Type();

@@ -5878,7 +5878,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::KeyPathExprSwift: {
     auto KPE = dyn_cast<KeyPathExpr>(ParsedExpr);
     auto BGT = (*ExprType)->getAs<BoundGenericType>();
-    if (!KPE || !BGT || BGT->getGenericArgs().size() != 2)
+    if (!KPE || !BGT || BGT->getDirectGenericArgs().size() != 2)
       break;
     assert(!KPE->isObjC());
 
@@ -5888,7 +5888,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     bool OnRoot = !KPE->getComponents().front().isValid();
     Lookup.setIsSwiftKeyPathExpr(OnRoot);
 
-    Type baseType = BGT->getGenericArgs()[OnRoot ? 0 : 1];
+    Type baseType = BGT->getDirectGenericArgs()[OnRoot ? 0 : 1];
     if (OnRoot && baseType->is<UnresolvedType>()) {
       // Infer the root type of the keypath from the context type.
       ExprContextInfo ContextInfo(CurDeclContext, ParsedExpr);
@@ -5899,7 +5899,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         // If the context type is any of the KeyPath types, use it.
         if (T->getAnyNominal() && T->getAnyNominal()->getKeyPathTypeKind() &&
             !T->hasUnresolvedType() && T->is<BoundGenericType>()) {
-          baseType = T->castTo<BoundGenericType>()->getGenericArgs()[0];
+          baseType =
+              T->castTo<BoundGenericType>()->getDirectGenericArgs()[0];
           break;
         }
 

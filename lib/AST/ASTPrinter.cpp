@@ -2785,7 +2785,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   // to strip off the added array type.
   if (param->isVariadic() && TheTypeLoc.getType()) {
     if (auto *BGT = TheTypeLoc.getType()->getAs<BoundGenericType>())
-      TheTypeLoc.setType(BGT->getGenericArgs()[0]);
+      TheTypeLoc.setType(BGT->getDirectGenericArgs()[0]);
   }
 
   if (!param->isVariadic() &&
@@ -3870,26 +3870,26 @@ public:
       auto &Ctx = T->getASTContext();
       if (NT == Ctx.getArrayDecl()) {
         Printer << "[";
-        visit(T->getGenericArgs()[0]);
+        visit(T->getDirectGenericArgs()[0]);
         Printer << "]";
         return;
       }
       if (NT == Ctx.getDictionaryDecl()) {
         Printer << "[";
-        visit(T->getGenericArgs()[0]);
+        visit(T->getDirectGenericArgs()[0]);
         Printer << " : ";
-        visit(T->getGenericArgs()[1]);
+        visit(T->getDirectGenericArgs()[1]);
         Printer << "]";
         return;
       }
       if (NT == Ctx.getOptionalDecl()) {
-        printWithParensIfNotSimple(T->getGenericArgs()[0]);
+        printWithParensIfNotSimple(T->getDirectGenericArgs()[0]);
         Printer << "?";
         return;
       }
     }
     printQualifiedType(T);
-    printGenericArgs(T->getGenericArgs());
+    printGenericArgs(T->getDirectGenericArgs());
   }
 
   void visitParentType(Type T) {

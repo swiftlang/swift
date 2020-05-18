@@ -170,7 +170,8 @@ public:
       return asImpl().visitDifferentTypeStructure(type1, type2);
 
     return visitComponentArray(type1, type2,
-                               type1.getGenericArgs(), type2.getGenericArgs());
+                               type1.getDirectGenericArgs(),
+                               type2.getDirectGenericArgs());
   }
 
   bool visitAnyMetatypeType(CanAnyMetatypeType type1,

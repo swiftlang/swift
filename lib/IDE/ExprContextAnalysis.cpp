@@ -484,7 +484,8 @@ static void collectPossibleCalleesByQualifiedLookup(
 
     auto *kpDecl = Ctx.getKeyPathDecl();
     Type kpTy = kpDecl->mapTypeIntoContext(kpDecl->getDeclaredInterfaceType());
-    Type kpValueTy = kpTy->castTo<BoundGenericType>()->getGenericArgs()[1];
+    Type kpValueTy =
+        kpTy->castTo<BoundGenericType>()->getDirectGenericArgs()[1];
     kpTy = BoundGenericType::get(kpDecl, Type(), {baseTy, kpValueTy});
 
     Type fnTy = FunctionType::get(
@@ -787,12 +788,12 @@ class ExprContextAnalyzer {
           // let _: [Element] = [#HERE#]
           // In this case, 'Element' is the expected type.
           if (boundGenericT->getDecl() == Context.getArrayDecl())
-            recordPossibleType(boundGenericT->getGenericArgs()[0]);
+            recordPossibleType(boundGenericT->getDirectGenericArgs()[0]);
 
           // let _: [Key : Value] = [#HERE#]
           // In this case, 'Key' is the expected type.
           if (boundGenericT->getDecl() == Context.getDictionaryDecl())
-            recordPossibleType(boundGenericT->getGenericArgs()[0]);
+            recordPossibleType(boundGenericT->getDirectGenericArgs()[0]);
         }
       }
       break;
@@ -812,14 +813,14 @@ class ExprContextAnalyzer {
               // '(Key,Value)' here, 'ExprKind::Tuple' branch can decide which
               // type in the tuple type is the exprected type.
               SmallVector<TupleTypeElt, 2> elts;
-              for (auto genericArg : boundGenericT->getGenericArgs())
-                elts.emplace_back(genericArg);
+              for (const auto &arg : boundGenericT->getDirectGenericArgs())
+                elts.emplace_back(arg);
               recordPossibleType(TupleType::get(elts, DC->getASTContext()));
             } else {
               // let _: [Key : Value] = [key: val, #HERE#]
               // In this case, assume 'Key' is the expected type.
               if (boundGenericT->getDecl() == Context.getDictionaryDecl())
-                recordPossibleType(boundGenericT->getGenericArgs()[0]);
+                recordPossibleType(boundGenericT->getDirectGenericArgs()[0]);
             }
           }
         }

@@ -2203,7 +2203,7 @@ public:
       } else if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
         if (bgt->getDecl() == Ctx.getPartialKeyPathDecl()) {
           // PartialKeyPath<T> application is rvalue T -> rvalue Any
-          if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
+          if (!baseTy->isEqual(bgt->getDirectGenericArgs()[0])) {
             Out << "PartialKeyPath application base doesn't match type\n";
             abort();
           }
@@ -2214,11 +2214,11 @@ public:
           return;
         } else if (bgt->getDecl() == Ctx.getKeyPathDecl()) {
           // KeyPath<T, U> application is rvalue T -> rvalue U
-          if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
+          if (!baseTy->isEqual(bgt->getDirectGenericArgs()[0])) {
             Out << "KeyPath application base doesn't match type\n";
             abort();
           }
-          if (!resultTy->isEqual(bgt->getGenericArgs()[1])) {
+          if (!resultTy->isEqual(bgt->getDirectGenericArgs()[1])) {
             Out << "KeyPath application result doesn't match type\n";
             abort();
           }
@@ -2236,11 +2236,11 @@ public:
             resultTy = resultTy->getRValueType();
           }
           
-          if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
+          if (!baseTy->isEqual(bgt->getDirectGenericArgs()[0])) {
             Out << "WritableKeyPath application base doesn't match type\n";
             abort();
           }
-          if (!resultTy->isEqual(bgt->getGenericArgs()[1])) {
+          if (!resultTy->isEqual(bgt->getDirectGenericArgs()[1])) {
             Out << "WritableKeyPath application result doesn't match type\n";
             abort();
           }
@@ -2262,12 +2262,12 @@ public:
             resultTy = resultTy->getRValueType();
           }
 
-          if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
+          if (!baseTy->isEqual(bgt->getDirectGenericArgs()[0])) {
             Out << "ReferenceWritableKeyPath application base doesn't "
                    "match type\n";
             abort();
           }
-          if (!resultTy->isEqual(bgt->getGenericArgs()[1])) {
+          if (!resultTy->isEqual(bgt->getDirectGenericArgs()[1])) {
             Out << "ReferenceWritableKeyPath application result doesn't "
                    "match type\n";
             abort();

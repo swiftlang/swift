@@ -1116,7 +1116,8 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
           return;
 
         if (Decl->isStdlibDecl() && Decl->getName().str() == "Optional") {
-          auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
+          const auto GenArgs =
+              type->castTo<BoundGenericType>()->getDirectGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0], forDecl);
           appendOperator("Sg");
@@ -1433,7 +1434,7 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
       appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
-    genericArgs = boundType->getGenericArgs();
+    genericArgs = boundType->getDirectGenericArgs();
     if (Type parent = boundType->getParent()) {
       GenericTypeDecl *decl = boundType->getAnyGeneric();
       if (!getSpecialManglingContext(decl, UseObjCRuntimeNames))

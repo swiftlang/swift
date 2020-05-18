@@ -3629,8 +3629,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   SmallVector<KeyPathPatternComponent, 4> loweredComponents;
   auto loweredTy = SGF.getLoweredType(E->getType());
 
-  CanType rootTy = E->getType()->castTo<BoundGenericType>()->getGenericArgs()[0]
-    ->getCanonicalType();
+  CanType rootTy = E->getType()->castTo<BoundGenericType>()
+    ->getDirectGenericArgs()[0]->getCanonicalType();
   
   bool needsGenericContext = false;
   if (rootTy->hasArchetype()) {
@@ -3829,7 +3829,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     arrayType = E->getType()->getCanonicalType();
     auto genericType = cast<BoundGenericStructType>(arrayType);
     assert(genericType->getDecl() == SGF.getASTContext().getArrayDecl());
-    elementType = genericType.getGenericArgs()[0];
+    elementType = genericType.getDirectGenericArgs()[0];
   }
 
   VarargsInfo varargsInfo =

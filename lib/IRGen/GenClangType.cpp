@@ -480,7 +480,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     .StartsWith("SIMD", StructKind::SIMD)
     .Default(StructKind::Invalid);
   
-  auto args = type.getGenericArgs();
+  const auto args = type.getDirectGenericArgs();
   assert(args.size() == 1 &&
          "should have a single generic argument!");
   auto loweredArgTy = IGM.getLoweredType(args[0]).getASTType();

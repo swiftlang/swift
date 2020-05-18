@@ -4571,14 +4571,14 @@ public:
             || kpBGT->getDecl() == C.getReferenceWritableKeyPathDecl(),
             "keypath result must be a key path type");
     
-    auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
+    auto baseTy = CanType(kpBGT->getDirectGenericArgs()[0]);
     auto pattern = KPI->getPattern();
     SubstitutionMap patternSubs = KPI->getSubstitutions();
     requireSameType(
         baseTy, pattern->getRootType().subst(patternSubs)->getCanonicalType(),
         "keypath root type should match root type of keypath pattern");
 
-    auto leafTy = CanType(kpBGT->getGenericArgs()[1]);
+    const auto leafTy = CanType(kpBGT->getDirectGenericArgs()[1]);
     requireSameType(
         leafTy, pattern->getValueType().subst(patternSubs)->getCanonicalType(),
         "keypath value type should match value type of keypath pattern");

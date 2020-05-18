@@ -2497,7 +2497,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       // accessor.
       //
       // TODO: Also need to count the parent type's generic arguments.
-      for (auto arg : bgt->getGenericArgs()) {
+      for (const auto arg : bgt->getDirectGenericArgs()) {
         visit(arg);
       }
       NumCalls += 1;

@@ -84,7 +84,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
     bool isObjCGeneric = decl->hasClangNode();
     auto sig = decl->getGenericSignature();
 
-    for_each(boundGeneric->getGenericArgs(),
+    for_each(boundGeneric->getDirectGenericArgs(),
              sig->getInnermostGenericParams(),
              [&](Type argTy, GenericTypeParamType *paramTy) {
       // FIXME: I think there's a bug here with recursive generic types.

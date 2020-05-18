@@ -2223,12 +2223,12 @@ public:
                                ArrayRef<Type> GenericArgs);
 
   /// Retrieve the set of generic arguments provided at this level.
-  ArrayRef<Type> getGenericArgs() const {
+  ArrayRef<Type> getDirectGenericArgs() const {
     return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent(), getGenericArgs());
+    Profile(ID, getDecl(), getParent(), getDirectGenericArgs());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
                       Type Parent, ArrayRef<Type> GenericArgs);
@@ -2240,8 +2240,8 @@ public:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, NominalOrBoundGenericNominalType)
-  CanTypeArrayRef getGenericArgs() const {
-    return CanTypeArrayRef(getPointer()->getGenericArgs());
+  CanTypeArrayRef getDirectGenericArgs() const {
+    return CanTypeArrayRef(getPointer()->getDirectGenericArgs());
   }
 END_CAN_TYPE_WRAPPER(BoundGenericType, NominalOrBoundGenericNominalType)
 
@@ -6413,7 +6413,7 @@ inline Type TupleTypeElt::getVarargBaseTy() const {
     return AT->getBaseType();
   if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
     // It's the stdlib Array<T>.
-    return BGT->getGenericArgs()[0];
+    return BGT->getDirectGenericArgs()[0];
   }
   assert(T->hasError());
   return T;

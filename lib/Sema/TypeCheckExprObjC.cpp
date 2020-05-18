@@ -101,7 +101,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       if (nominal == Context.getArrayDecl()) {
         // Further lookups into the element type.
         state = ResolvingArray;
-        currentType = boundGeneric->getGenericArgs()[0];
+        currentType = boundGeneric->getDirectGenericArgs()[0];
         return;
       }
 
@@ -109,7 +109,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       if (nominal == Context.getSetDecl()) {
         // Further lookups into the element type.
         state = ResolvingSet;
-        currentType = boundGeneric->getGenericArgs()[0];
+        currentType = boundGeneric->getDirectGenericArgs()[0];
         return;
       }
 
@@ -118,7 +118,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         // Key paths look into the keys of a dictionary; further
         // lookups into the value type.
         state = ResolvingDictionary;
-        currentType = boundGeneric->getGenericArgs()[1];
+        currentType = boundGeneric->getDirectGenericArgs()[1];
         return;
       }
     }

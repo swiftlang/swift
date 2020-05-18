@@ -5618,8 +5618,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // to determine whether to use this new_type, or an Unmanaged<CF...> type.
   if (auto genericType = storedUnderlyingType->getAs<BoundGenericType>()) {
     if (genericType->getDecl() == Impl.SwiftContext.getUnmanagedDecl()) {
-      assert(genericType->getGenericArgs().size() == 1 && "other args?");
-      storedUnderlyingType = genericType->getGenericArgs()[0];
+      assert(genericType->getDirectGenericArgs().size() == 1
+             && "other args?");
+      storedUnderlyingType = genericType->getDirectGenericArgs()[0];
     }
   }
 

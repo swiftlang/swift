@@ -473,7 +473,7 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
   // The only possibilities are *Pointer<T>, SIMD*<T> and Optional<T>.
 
   if (type->getDecl()->isOptionalDecl()) {
-    auto args = type->getGenericArgs();
+    const auto args = type->getDirectGenericArgs();
     assert((args.size() == 1) && "Optional should have 1 generic argument.");
     clang::QualType innerTy = convert(args[0]);
     if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()))
@@ -501,7 +501,7 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
     .StartsWith("SIMD", StructKind::SIMD)
     .Default(StructKind::Invalid);
 
-  auto args = type->getGenericArgs();
+  const auto args = type->getDirectGenericArgs();
   if (args.size() != 1)
     // Must've got something other than *Pointer or SIMD*
     return clang::QualType();

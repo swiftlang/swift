@@ -819,7 +819,7 @@ extractStringOrStaticStringValue(SymbolicValue stringValue) {
 static Type getArrayElementType(Type ty) {
   if (auto bgst = ty->getAs<BoundGenericStructType>())
     if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
-      return bgst->getGenericArgs()[0];
+      return bgst->getDirectGenericArgs()[0];
   return Type();
 }
 

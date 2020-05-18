@@ -4496,7 +4496,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     // If we have a collection, get the element type.
     if (auto bound = type->getAs<BoundGenericType>()) {
       ASTContext &ctx = nominal->getASTContext();
-      auto args = bound->getGenericArgs();
+      const auto args = bound->getDirectGenericArgs();
       if (!args.empty() &&
           (bound->getDecl() == ctx.getArrayDecl() ||
            bound->getDecl() == ctx.getSetDecl())) {

@@ -686,8 +686,8 @@ swift::classifyDynamicCast(ModuleDecl *M,
       // Both types have to be the same kind of collection.
       auto typeDecl = sourceStruct->getDecl();
       if (typeDecl == targetStruct->getDecl()) {
-        auto sourceArgs = sourceStruct.getGenericArgs();
-        auto targetArgs = targetStruct.getGenericArgs();
+        const auto sourceArgs = sourceStruct.getDirectGenericArgs();
+        const auto targetArgs = targetStruct.getDirectGenericArgs();
 
         // Note that we can never say that a collection cast is impossible:
         // a cast can always succeed on an empty collection.

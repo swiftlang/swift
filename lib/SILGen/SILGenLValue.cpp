@@ -1924,7 +1924,7 @@ emitUpcastToKeyPath(SILGenFunction &SGF, SILLocation loc,
   auto derivedKeyPathTy = keyPath.getType().castTo<BoundGenericType>();
   auto baseKeyPathTy =
     BoundGenericType::get(SGF.getASTContext().getKeyPathDecl(),
-                          Type(), derivedKeyPathTy->getGenericArgs())
+                          Type(), derivedKeyPathTy->getDirectGenericArgs())
       ->getCanonicalType();
   return SGF.B.createUpcast(loc, keyPath,
                             SILType::getPrimitiveObjectType(baseKeyPathTy));
@@ -1966,11 +1966,13 @@ namespace {
                  TypeKind == KPTK_ReferenceWritableKeyPath) {
         projectFn = SGF.getASTContext().getGetAtKeyPath();
 
-        auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
-        assert(keyPathTy->getGenericArgs().size() == 2);
-        assert(keyPathTy->getGenericArgs()[0]->getCanonicalType() ==
+        const auto genericArgs = keyPathValue.getType()
+            .castTo<BoundGenericType>()
+            ->getDirectGenericArgs();
+        assert(genericArgs.size() == 2);
+        assert(genericArgs[0]->getCanonicalType() ==
                BaseFormalType->getCanonicalType());
-        typeArgs.push_back(keyPathTy->getGenericArgs()[1]);
+        typeArgs.push_back(genericArgs[1]);
 
         keyPathValue = emitUpcastToKeyPath(SGF, loc, TypeKind, keyPathValue);
       } else {
@@ -2005,7 +2007,7 @@ namespace {
 
       auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
       auto subs = SubstitutionMap::get(setFn->getGenericSignature(),
-                                       keyPathTy->getGenericArgs(),
+                                       keyPathTy->getDirectGenericArgs(),
                                        ArrayRef<ProtocolConformanceRef>());
 
       auto origType = AbstractionPattern::getOpaque();
@@ -2078,10 +2080,10 @@ namespace {
       auto projectFnRef = SGF.B.createManagedFunctionRef(loc, projectFn);
       auto projectFnType = projectFn->getLoweredFunctionType();
 
-      auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
-      auto subs = SubstitutionMap::get(
-                                 projectFnType->getInvocationGenericSignature(),
-                                 keyPathTy->getGenericArgs(), {});
+      const auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
+      const auto subs = SubstitutionMap::get(
+          projectFnType->getInvocationGenericSignature(),
+          ArrayRef<Type>(keyPathTy->getDirectGenericArgs()), {});
 
       auto substFnType = projectFnType->substGenericArgs(
           SGF.SGM.M, subs, SGF.getTypeExpansionContext());

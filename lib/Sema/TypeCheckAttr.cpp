@@ -550,7 +550,7 @@ isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
 
     // Handle Array<T>. T must be an Objective-C class or protocol.
     auto boundTy = type->castTo<BoundGenericStructType>();
-    auto boundArgs = boundTy->getGenericArgs();
+    const auto boundArgs = boundTy->getDirectGenericArgs();
     assert(boundArgs.size() == 1 && "invalid Array declaration");
     Type elementTy = boundArgs.front();
     return isAcceptableOutletType(elementTy, isArray, ctx);

@@ -2213,8 +2213,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return result;
   }
 
-  auto args1 = bound1->getGenericArgs();
-  auto args2 = bound2->getGenericArgs();
+  const auto args1 = bound1->getDirectGenericArgs();
+  const auto args2 = bound2->getDirectGenericArgs();
 
   // Match up the generic arguments, exactly.
 
@@ -7694,7 +7694,8 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       if (auto fromBGT = unwrappedToType->getAs<BoundGenericType>()) {
         if (fromBGT->getDecl() == ctx.getArrayDecl()) {
           // [AnyObject]
-          addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
+          addConstraint(ConstraintKind::Bind,
+                        fromBGT->getDirectGenericArgs()[0],
                         ctx.getAnyObjectType(),
                         getConstraintLocator(locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
@@ -7706,13 +7707,15 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
             return SolutionKind::Error;
           }
 
-          addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
+          addConstraint(ConstraintKind::Bind,
+                        fromBGT->getDirectGenericArgs()[0],
                         nsObjectType,
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
 
-          addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[1],
+          addConstraint(ConstraintKind::Bind,
+                        fromBGT->getDirectGenericArgs()[1],
                         ctx.getAnyObjectType(),
                         getConstraintLocator(
                           locator.withPathElement(
@@ -7723,7 +7726,8 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
             // Not a bridging case. Should we detect this earlier?
             return SolutionKind::Error;
           }
-          addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
+          addConstraint(ConstraintKind::Bind,
+                        fromBGT->getDirectGenericArgs()[0],
                         nsObjectType,
                         getConstraintLocator(
                           locator.withPathElement(
@@ -7863,14 +7867,14 @@ ConstraintSystem::simplifyKeyPathConstraint(
       if (bgt->getDecl() == getASTContext().getKeyPathDecl() ||
           bgt->getDecl() == getASTContext().getWritableKeyPathDecl() ||
           bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
-        boundRoot = bgt->getGenericArgs()[0];
-        boundValue = bgt->getGenericArgs()[1];
+        boundRoot = bgt->getDirectGenericArgs()[0];
+        boundValue = bgt->getDirectGenericArgs()[1];
       } else if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
         if (!allowPartial)
           return false;
 
         // We can still get the root from a PartialKeyPath.
-        boundRoot = bgt->getGenericArgs()[0];
+        boundRoot = bgt->getDirectGenericArgs()[0];
       }
     }
 
@@ -8145,7 +8149,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   
   if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
     // We have the key path type. Match it to the other ends of the constraint.
-    auto kpRootTy = bgt->getGenericArgs()[0];
+    const auto kpRootTy = bgt->getDirectGenericArgs()[0];
     
     // Try to match the root type.
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
@@ -8177,9 +8181,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                         ConstraintKind::Bind, subflags, locator);
     }
 
-    if (bgt->getGenericArgs().size() < 2)
+    if (bgt->getDirectGenericArgs().size() < 2)
       return SolutionKind::Error;
-    auto kpValueTy = bgt->getGenericArgs()[1];
+    const auto kpValueTy = bgt->getDirectGenericArgs()[1];
 
     /// Solve for an rvalue base.
     auto solveRValue = [&]() -> ConstraintSystem::SolutionKind {
@@ -9205,7 +9209,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (auto generic2 = type2->getAs<BoundGenericType>()) {
       if (generic2->getDecl()->isOptionalDecl()) {
         auto result = matchTypes(
-            type1, generic2->getGenericArgs()[0], matchKind, subflags,
+            type1, generic2->getDirectGenericArgs()[0], matchKind, subflags,
             locator.withPathElement(ConstraintLocator::OptionalPayload));
 
         if (!(shouldAttemptFixes() && result.isFailure()))
@@ -9233,7 +9237,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         if (generic1->getDecl()->isOptionalDecl() &&
             generic2->getDecl()->isOptionalDecl()) {
           auto result = matchTypes(
-              generic1->getGenericArgs()[0], generic2->getGenericArgs()[0],
+              generic1->getDirectGenericArgs()[0],
+              generic2->getDirectGenericArgs()[0],
               matchKind, subflags,
               locator.withPathElement(LocatorPathElt::GenericArgument(0)));
 
