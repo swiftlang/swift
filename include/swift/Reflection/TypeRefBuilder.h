@@ -248,8 +248,9 @@ class TypeRefBuilder {
 
 public:
   using BuiltType = const TypeRef *;
-  using BuiltTypeDecl = Optional<std::string>;
-  using BuiltProtocolDecl = Optional<std::pair<std::string, bool /*isObjC*/>>;
+  using BuiltTypeDecl = llvm::Optional<std::string>;
+  using BuiltProtocolDecl =
+      llvm::Optional<std::pair<std::string, bool /*isObjC*/>>;
 
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
@@ -295,8 +296,7 @@ public:
     return BuiltinTypeRef::create(*this, mangledName);
   }
 
-  Optional<std::string>
-  createTypeDecl(Node *node, bool &typeAlias) {
+  llvm::Optional<std::string> createTypeDecl(Node *node, bool &typeAlias) {
     return Demangle::mangleNode(node);
   }
 
@@ -310,25 +310,25 @@ public:
     return std::make_pair(name, true);
   }
 
-  Optional<std::string> createTypeDecl(std::string &&mangledName,
-                                       bool &typeAlias) {
+  llvm::Optional<std::string> createTypeDecl(std::string &&mangledName,
+                                             bool &typeAlias) {
     return std::move(mangledName);
   }
-  
-  const NominalTypeRef *createNominalType(
-                                    const Optional<std::string> &mangledName) {
+
+  const NominalTypeRef *
+  createNominalType(const llvm::Optional<std::string> &mangledName) {
     return NominalTypeRef::create(*this, *mangledName, nullptr);
   }
 
-  const NominalTypeRef *createNominalType(
-                                    const Optional<std::string> &mangledName,
-                                    const TypeRef *parent) {
+  const NominalTypeRef *
+  createNominalType(const llvm::Optional<std::string> &mangledName,
+                    const TypeRef *parent) {
     return NominalTypeRef::create(*this, *mangledName, parent);
   }
 
-  const TypeRef *createTypeAliasType(
-                                    const Optional<std::string> &mangledName,
-                                    const TypeRef *parent) {
+  const TypeRef *
+  createTypeAliasType(const llvm::Optional<std::string> &mangledName,
+                      const TypeRef *parent) {
     // TypeRefs don't contain sugared types
     return nullptr;
   }
@@ -354,13 +354,13 @@ public:
   }
 
   const BoundGenericTypeRef *
-  createBoundGenericType(const Optional<std::string> &mangledName,
+  createBoundGenericType(const llvm::Optional<std::string> &mangledName,
                          const std::vector<const TypeRef *> &args) {
     return BoundGenericTypeRef::create(*this, *mangledName, args, nullptr);
   }
 
   const BoundGenericTypeRef *
-  createBoundGenericType(const Optional<std::string> &mangledName,
+  createBoundGenericType(const llvm::Optional<std::string> &mangledName,
                          llvm::ArrayRef<const TypeRef *> args,
                          const TypeRef *parent) {
     return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
@@ -420,7 +420,7 @@ public:
       Demangle::ImplParameterConvention calleeConvention,
       llvm::ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
       llvm::ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
-      Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
+      llvm::Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
       ImplFunctionTypeFlags flags) {
     // Minimal support for lowered function types. These come up in
     // reflection as capture types. For the reflection library's
@@ -467,14 +467,15 @@ public:
                                               isClassBound);
   }
 
-  const ExistentialMetatypeTypeRef *
-  createExistentialMetatypeType(const TypeRef *instance,
-                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
+  const ExistentialMetatypeTypeRef *createExistentialMetatypeType(
+      const TypeRef *instance,
+      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) {
     return ExistentialMetatypeTypeRef::create(*this, instance);
   }
 
-  const MetatypeTypeRef *createMetatypeType(const TypeRef *instance,
-                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
+  const MetatypeTypeRef *createMetatypeType(
+      const TypeRef *instance,
+      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) {
     bool WasAbstract = (repr && *repr != ImplMetatypeRepresentation::Thin);
     return MetatypeTypeRef::create(*this, instance, WasAbstract);
   }

@@ -550,7 +550,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
     default:
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
-        Optional<ParsedTypeIdentity> _identity;
+        llvm::Optional<ParsedTypeIdentity> _identity;
         auto getIdentity = [&]() -> const ParsedTypeIdentity & {
           if (_identity) return *_identity;
           _identity = ParsedTypeIdentity::parse(type);
@@ -892,7 +892,7 @@ public:
 
 #pragma mark Metadata lookup via mangled name
 
-Optional<unsigned>
+llvm::Optional<unsigned>
 swift::_depthIndexToFlatIndex(unsigned depth, unsigned index,
                               llvm::ArrayRef<unsigned> paramCounts) {
   // Out-of-bounds depth.
@@ -1054,9 +1054,8 @@ namespace {
 
 /// Find the offset of the protocol requirement for an associated type with
 /// the given name in the given protocol descriptor.
-Optional<const ProtocolRequirement *> findAssociatedTypeByName(
-                                        const ProtocolDescriptor *protocol,
-                                        StringRef name) {
+llvm::Optional<const ProtocolRequirement *>
+findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
   if (!associatedTypeNamesPtr) return None;
@@ -1318,13 +1317,15 @@ public:
     return BuiltType();
   }
 
-  BuiltType createMetatypeType(BuiltType instance,
-              Optional<Demangle::ImplMetatypeRepresentation> repr=None) const {
+  BuiltType createMetatypeType(
+      BuiltType instance,
+      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
     return swift_getMetatypeMetadata(instance);
   }
 
-  BuiltType createExistentialMetatypeType(BuiltType instance,
-              Optional<Demangle::ImplMetatypeRepresentation> repr=None) const {
+  BuiltType createExistentialMetatypeType(
+      BuiltType instance,
+      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
     return swift_getExistentialMetatypeMetadata(instance);
   }
 
@@ -1389,7 +1390,7 @@ public:
       Demangle::ImplParameterConvention calleeConvention,
       llvm::ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
       llvm::ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
-      Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
+      llvm::Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
       ImplFunctionTypeFlags flags) {
     // We can't realize the metadata for a SILFunctionType.
     return BuiltType();
@@ -1956,7 +1957,7 @@ SubstGenericParametersFromWrittenArgs::getWitnessTable(const Metadata *type,
 
 /// Demangle the given type name to a generic parameter reference, which
 /// will be returned as (depth, index).
-static Optional<std::pair<unsigned, unsigned>>
+static llvm::Optional<std::pair<unsigned, unsigned>>
 demangleToGenericParamRef(StringRef typeName) {
   StackAllocatedDemangler<1024> demangler;
   NodePointer node = demangler.demangleType(typeName);
