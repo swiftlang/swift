@@ -436,18 +436,23 @@ static void checkOperatorOrPrecedenceGroupRedeclaration(
     if (other == decl || other->isInvalid())
       continue;
 
-    // Emit a redeclaration error if the two declarations occur in the same
-    // source file. We currently allow redeclarations across source files to
-    // allow the user to shadow operator decls from imports, as we currently
-    // favor those decls over ones from other files.
-    // FIXME: Once we prefer operator decls from the same module, start
-    // diagnosing redeclarations across files.
+    bool shouldDiagnose = false;
     if (currentFile == other->getDeclContext()->getParentSourceFile()) {
-      // Make sure we get the diagnostic ordering to be sensible.
+      // For a same-file redeclaration, make sure we get the diagnostic ordering
+      // to be sensible.
       if (decl->getLoc().isValid() && other->getLoc().isValid() &&
           ctx.SourceMgr.isBeforeInBuffer(decl->getLoc(), other->getLoc())) {
         std::swap(decl, other);
       }
+      shouldDiagnose = true;
+    } else {
+      // If the declarations are in different files, only diagnose if we've
+      // enabled the new operator lookup behaviour where decls in the current
+      // module are now favored over imports.
+      shouldDiagnose = ctx.LangOpts.EnableNewOperatorLookup;
+    }
+
+    if (shouldDiagnose) {
       ctx.Diags.diagnose(decl, diagID);
       ctx.Diags.diagnose(other, noteID);
       decl->setInvalid();
