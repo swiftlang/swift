@@ -61,12 +61,13 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-static evaluator::DependencyCollector::Mode
+static evaluator::DependencyRecorder::Mode
 computeDependencyModeFromFlags(bool enableExperimentalPrivateDeps) {
-  using Mode = evaluator::DependencyCollector::Mode;
+  using Mode = evaluator::DependencyRecorder::Mode;
   if (enableExperimentalPrivateDeps) {
     return Mode::ExperimentalPrivateDependencies;
   }
+
   return Mode::StatusQuo;
 }
 
@@ -75,8 +76,7 @@ Evaluator::Evaluator(DiagnosticEngine &diags, bool debugDumpCycles,
                      bool enableExperimentalPrivateDeps)
     : diags(diags), debugDumpCycles(debugDumpCycles),
       buildDependencyGraph(buildDependencyGraph),
-      collector{computeDependencyModeFromFlags(enableExperimentalPrivateDeps)} {
-}
+      recorder{computeDependencyModeFromFlags(enableExperimentalPrivateDeps)} {}
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -379,32 +379,27 @@ void Evaluator::dumpDependenciesGraphviz() const {
   printDependenciesGraphviz(llvm::dbgs());
 }
 
-void evaluator::DependencyCollector::realizeOrRecord(const Reference &ref) {
-  if (isRecording) {
-    scratch.insert(std::move(ref));
-    return;
-  }
-
+void evaluator::DependencyRecorder::realize(
+    const DependencyCollector::Reference &ref) {
   auto *tracker = getActiveDependencyTracker();
-  if (!tracker) {
-    return;
-  }
+  assert(tracker && "cannot realize dependency without name tracker!");
 
+  using Kind = evaluator::DependencyCollector::Reference::Kind;
   switch (ref.kind) {
-  case Reference::Kind::Empty:
-  case Reference::Kind::Tombstone:
+  case Kind::Empty:
+  case Kind::Tombstone:
     llvm_unreachable("cannot record empty dependency");
-  case Reference::Kind::UsedMember:
+  case Kind::UsedMember:
     tracker->addUsedMember({ref.subject, ref.name}, isActiveSourceCascading());
     break;
-  case Reference::Kind::PotentialMember:
+  case Kind::PotentialMember:
     tracker->addUsedMember({ref.subject, Identifier()},
                            isActiveSourceCascading());
     break;
-  case Reference::Kind::TopLevel:
+  case Kind::TopLevel:
     tracker->addTopLevelName(ref.name, isActiveSourceCascading());
     break;
-  case Reference::Kind::Dynamic:
+  case Kind::Dynamic:
     tracker->addDynamicLookupName(ref.name, isActiveSourceCascading());
     break;
   }
@@ -412,33 +407,55 @@ void evaluator::DependencyCollector::realizeOrRecord(const Reference &ref) {
 
 void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
                                                    DeclBaseName name) {
-  return realizeOrRecord(Reference::usedMember(subject, name));
+  if (parent.mode ==
+      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+    scratch.insert(Reference::usedMember(subject, name));
+  }
+  return parent.realize(Reference::usedMember(subject, name));
 }
 
 void evaluator::DependencyCollector::addPotentialMember(
     NominalTypeDecl *subject) {
-  return realizeOrRecord(Reference::potentialMember(subject));
+  if (parent.mode ==
+      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+    scratch.insert(Reference::potentialMember(subject));
+  }
+  return parent.realize(Reference::potentialMember(subject));
 }
 
 void evaluator::DependencyCollector::addTopLevelName(DeclBaseName name) {
-  return realizeOrRecord(Reference::topLevel(name));
+  if (parent.mode ==
+      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+    scratch.insert(Reference::topLevel(name));
+  }
+  return parent.realize(Reference::topLevel(name));
 }
 
 void evaluator::DependencyCollector::addDynamicLookupName(DeclBaseName name) {
-  return realizeOrRecord(Reference::dynamic(name));
+  if (parent.mode ==
+      DependencyRecorder::Mode::ExperimentalPrivateDependencies) {
+    scratch.insert(Reference::dynamic(name));
+  }
+  return parent.realize(Reference::dynamic(name));
 }
 
-void evaluator::DependencyCollector::record(
+void evaluator::DependencyRecorder::record(
     const llvm::SetVector<swift::ActiveRequest> &stack,
     llvm::function_ref<void(DependencyCollector &)> rec) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
-  if (mode == Mode::StatusQuo) {
-    return rec(*this);
+  if (!getActiveDependencyTracker()) {
+    return;
   }
 
   llvm::SaveAndRestore<bool> restore(isRecording, true);
-  scratch = {};
-  rec(*this);
+
+  DependencyCollector collector{*this};
+  rec(collector);
+  if (collector.empty()) {
+    return;
+  }
+
+  assert(mode != Mode::StatusQuo);
   for (const auto &request : stack) {
     if (!request.isCached()) {
       continue;
@@ -446,26 +463,31 @@ void evaluator::DependencyCollector::record(
 
     auto entry = requestReferences.find_as(request);
     if (entry == requestReferences.end()) {
-      requestReferences.insert({AnyRequest(request), scratch});
+      requestReferences.insert({AnyRequest(request), collector.scratch});
       continue;
     }
 
-    entry->second.insert(scratch.begin(), scratch.end());
+    entry->second.insert(collector.scratch.begin(), collector.scratch.end());
   }
 }
 
-void evaluator::DependencyCollector::replay(const swift::ActiveRequest &req) {
-  if (mode == Mode::StatusQuo) {
+void evaluator::DependencyRecorder::replay(const swift::ActiveRequest &req) {
+  assert(!isRecording && "Probably not a good idea to allow nested recording");
+
+  if (mode == Mode::StatusQuo || !getActiveDependencyTracker()) {
     return;
   }
 
-  assert(!isRecording && "Probably not a good idea to allow nested recording");
+  if (!req.isCached()) {
+    return;
+  }
+
   auto entry = requestReferences.find_as(req);
   if (entry == requestReferences.end()) {
     return;
   }
 
   for (const auto &ref : entry->second) {
-    realizeOrRecord(ref);
+    realize(ref);
   }
 }

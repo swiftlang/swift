@@ -225,7 +225,7 @@ class Evaluator {
   /// so all clients must cope with cycles.
   llvm::DenseMap<AnyRequest, std::vector<AnyRequest>> dependencies;
 
-  evaluator::DependencyCollector collector;
+  evaluator::DependencyRecorder recorder;
 
   /// Retrieve the request function for the given zone and request IDs.
   AbstractRequestFunction *getAbstractRequestFunction(uint8_t zoneID,
@@ -268,8 +268,8 @@ public:
            typename std::enable_if<Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
-    evaluator::DependencyCollector::StackRAII<Request> incDeps{collector,
-                                                               request};
+    evaluator::DependencyRecorder::StackRAII<Request> incDeps{recorder,
+                                                              request};
     // The request can be cached, but check a predicate to determine
     // whether this particular instance is cached. This allows more
     // fine-grained control over which instances get cache.
@@ -285,8 +285,8 @@ public:
            typename std::enable_if<!Request::isEverCached>::type * = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
-    evaluator::DependencyCollector::StackRAII<Request> incDeps{collector,
-                                                               request};
+    evaluator::DependencyRecorder::StackRAII<Request> incDeps{recorder,
+                                                              request};
     return getResultUncached(request);
   }
 
@@ -436,7 +436,7 @@ private:
                                   !Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
                              const typename Request::OutputType &o) {
-    collector.replay(ActiveRequest(r));
+    recorder.replay(ActiveRequest(r));
   }
 
   // Report the result of evaluating a request that is a dependency sink.
@@ -444,7 +444,7 @@ private:
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
   void reportEvaluatedResult(const Request &r,
                              const typename Request::OutputType &o) {
-    return collector.record(activeRequests, [&r, &o](auto &c) {
+    return recorder.record(activeRequests, [&r, &o](auto &c) {
       return r.writeDependencySink(c, o);
     });
   }

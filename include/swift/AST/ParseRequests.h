@@ -103,7 +103,7 @@ public:
 
 public:
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 void simple_display(llvm::raw_ostream &out,
@@ -125,7 +125,7 @@ private:
 
 public:
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// The zone number for the parser.
