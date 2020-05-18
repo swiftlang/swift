@@ -5461,7 +5461,7 @@ unconditional_checked_cast_addr
                        sil-type 'in' sil-operand 'to'
                        sil-type 'in' sil-operand
 
-  unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in $*@thick B
+  unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in %1 : $*@thick B
   // $A and $B must be both addresses
   // %1 will be of type $*B
   // $A is destroyed during the conversion. There is no implicit copy.

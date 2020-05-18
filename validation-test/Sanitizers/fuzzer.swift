@@ -17,9 +17,10 @@ import MSVCRT
 #endif
 
 @_cdecl("LLVMFuzzerTestOneInput")
-public func test(_ start: UnsafeRawPointer, _ count: Int) -> CInt {
+public func testHexDigits(_ start: UnsafeRawPointer, _ count: Int) -> CInt {
   let bytes = UnsafeRawBufferPointer(start: start, count: count)
-  if bytes.starts(with: "ABC".utf8) {
+  let string = String(decoding: bytes, as: Unicode.UTF8.self)
+  if let number = Int(string, radix: 16), (0x10...0xFF).contains(number) {
     print("Crash!")
     fflush(stdout)
     exit(EXIT_FAILURE)
