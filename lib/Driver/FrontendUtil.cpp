@@ -25,7 +25,8 @@ using namespace swift::driver;
 
 bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
     ArrayRef<const char *> Argv, DiagnosticEngine &Diags,
-    llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action) {
+    llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action,
+    bool ForceNoOutputs) {
   SmallVector<const char *, 16> Args;
   Args.push_back("<swiftc>"); // FIXME: Remove dummy argument.
   Args.insert(Args.end(), Argv.begin(), Argv.end());
@@ -56,6 +57,25 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
     TheDriver.parseArgStrings(ArrayRef<const char *>(Args).slice(1));
   if (Diags.hadAnyError())
     return true;
+
+  if (ForceNoOutputs) {
+    // Clear existing output modes.
+    ArgList->eraseArg(options::OPT_modes_Group);
+    // Disable other output options that conflict with -typecheck.
+    ArgList->eraseArg(options::OPT_emit_module);
+    ArgList->eraseArg(options::OPT_emit_module_path);
+    ArgList->eraseArg(options::OPT_emit_module_source_info_path);
+    ArgList->eraseArg(options::OPT_emit_module_interface);
+    ArgList->eraseArg(options::OPT_emit_module_interface_path);
+    ArgList->eraseArg(options::OPT_emit_objc_header);
+    ArgList->eraseArg(options::OPT_emit_objc_header_path);
+
+    unsigned index = ArgList->MakeIndex("-typecheck");
+    // Takes ownership of the Arg.
+    ArgList->append(new llvm::opt::Arg(
+        TheDriver.getOpts().getOption(options::OPT_typecheck),
+        ArgList->getArgString(index), index));
+  }
 
   std::unique_ptr<ToolChain> TC = TheDriver.buildToolChain(*ArgList);
   if (Diags.hadAnyError())
