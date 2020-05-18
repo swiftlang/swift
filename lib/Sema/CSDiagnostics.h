@@ -2069,6 +2069,21 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose a failure to infer a KeyPath type by context.
+///
+/// ```swift
+/// _ = \.x
+/// let _ : AnyKeyPath = \.x
+/// ```
+class UnableToInferKeyPathRootFailure final : public FailureDiagnostic {
+public:
+  UnableToInferKeyPathRootFailure(const Solution &solution,
+                                  ConstraintLocator *locator)
+  : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

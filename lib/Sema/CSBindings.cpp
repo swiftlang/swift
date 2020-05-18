@@ -1105,6 +1105,8 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       } else if (srcLocator->getAnchor() &&
                  isa<ObjectLiteralExpr>(srcLocator->getAnchor())) {
         fix = SpecifyObjectLiteralTypeImport::create(cs, dstLocator);
+      } else if (srcLocator->isKeyPathRoot()) {
+        fix = SpecifyKeyPathRootType::create(cs, dstLocator);
       }
 
       if (fix && cs.recordFix(fix))

@@ -7696,6 +7696,32 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
     return true;
   };
+  
+  // If we have a hole somewhere in the key path, the solver won't be able to
+  // infer the key path type. So let's just assume this is solved.
+  if (shouldAttemptFixes()) {
+    if (keyPathTy->isHole())
+      return SolutionKind::Solved;
+
+    // If the root type has been bound to a hole, we cannot infer it.
+    if (getFixedTypeRecursive(rootTy, /*wantRValue*/ true)->isHole())
+      return SolutionKind::Solved;
+
+    // If we have e.g a missing member somewhere, a component type variable
+    // will have been marked as a potential hole.
+    // FIXME: This relies on the fact that we only mark an overload type
+    // variable as a potential hole once we've added a corresponding fix. We
+    // can't use 'isHole' instead, as that doesn't handle cases where the
+    // overload type variable gets bound to another type from the context rather
+    // than a hole. We need to come up with a better way of handling the
+    // relationship between key paths and overloads.
+    if (llvm::any_of(componentTypeVars, [&](TypeVariableType *tv) {
+          return tv->getImpl().getLocator()->isForKeyPathComponent() &&
+                 tv->getImpl().canBindToHole();
+        })) {
+      return SolutionKind::Solved;
+    }
+  }
 
   // If we're fixed to a bound generic type, trying harvesting context from it.
   // However, we don't want a solution that fixes the expression type to
@@ -7745,34 +7771,11 @@ ConstraintSystem::simplifyKeyPathConstraint(
       // to determine whether the result will be a function type vs BGT KeyPath
       // type, so continue through components to create new constraint at the
       // end.
-      if (!overload || anyComponentsUnresolved) {
+      if (!overload) {
         if (flags.contains(TMF_GenerateConstraints)) {
           anyComponentsUnresolved = true;
           continue;
         }
-
-        if (shouldAttemptFixes()) {
-          auto typeVar =
-              llvm::find_if(componentTypeVars, [&](TypeVariableType *typeVar) {
-                auto *locator = typeVar->getImpl().getLocator();
-                auto elt = locator->findLast<LocatorPathElt::KeyPathComponent>();
-                return elt && elt->getIndex() == i;
-              });
-
-          // If one of the components haven't been resolved, let's check
-          // whether it has been determined to be a "hole" and if so,
-          // let's allow component validation to contiunue.
-          //
-          // This helps to, for example, diagnose problems with missing
-          // members used as part of a key path.
-          if (typeVar != componentTypeVars.end() &&
-              (*typeVar)->getImpl().canBindToHole()) {
-            anyComponentsUnresolved = true;
-            capability = ReadOnly;
-            continue;
-          }
-        }
-
         return SolutionKind::Unsolved;
       }
 
@@ -9502,7 +9505,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
   case FixKind::AllowKeyPathRootTypeMismatch:
-  case FixKind::AllowCoercionToForceCast: {
+  case FixKind::AllowCoercionToForceCast:
+  case FixKind::SpecifyKeyPathRootType: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
