@@ -510,7 +510,6 @@ extension _ArrayBuffer {
 
   @inlinable
   internal var _nonNative: _CocoaArrayWrapper {
-    @inline(__always)
     get {
       _internalInvariant(_isClassOrObjCExistential(Element.self))
       return _CocoaArrayWrapper(_storage.objCInstance)
