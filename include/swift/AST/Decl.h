@@ -7289,12 +7289,6 @@ public:
 
   PrecedenceGroupDecl *getPrecedenceGroup() const;
 
-  /// True if this decl's attributes conflict with those declared by another
-  /// operator.
-  bool conflictsWith(InfixOperatorDecl *other) {
-    return getPrecedenceGroup() != other->getPrecedenceGroup();
-  }
-  
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::InfixOperator;
   }
@@ -7323,12 +7317,6 @@ public:
     return { getOperatorLoc(), getNameLoc() };
   }
 
-  /// True if this decl's attributes conflict with those declared by another
-  /// PrefixOperatorDecl.
-  bool conflictsWith(PrefixOperatorDecl *other) {
-    return false;
-  }
-  
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PrefixOperator;
   }
@@ -7355,12 +7343,6 @@ public:
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
-  }
-
-  /// True if this decl's attributes conflict with those declared by another
-  /// PostfixOperatorDecl.
-  bool conflictsWith(PostfixOperatorDecl *other) {
-    return false;
   }
   
   static bool classof(const Decl *D) {

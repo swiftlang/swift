@@ -30,7 +30,6 @@ class SourceFile final : public FileUnit {
   friend class ParseSourceFileRequest;
 
 public:
-  class Impl;
   struct SourceFileSyntaxInfo;
 
   /// Possible attributes for imports in source files.
@@ -205,7 +204,6 @@ private:
       ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
   friend ASTContext;
-  friend Impl;
 
 public:
   /// Appends the given declaration to the end of the top-level decls list. Do

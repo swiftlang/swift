@@ -430,9 +430,7 @@ static void checkOperatorOrPrecedenceGroupRedeclaration(
 
   auto *module = currentFile->getParentModule();
   auto &ctx = module->getASTContext();
-  auto desc = OperatorLookupDescriptor::forModule(module, decl->getName(),
-                                                  /*cascades*/ true,
-                                                  /*diagLoc*/ SourceLoc());
+  auto desc = OperatorLookupDescriptor::forModule(module, decl->getName());
   auto otherDecls = lookupOthers(desc);
   for (auto *other : otherDecls) {
     if (other == decl || other->isInvalid())
