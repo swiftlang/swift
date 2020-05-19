@@ -80,7 +80,7 @@ sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $SOURCE_PA
 if [[ "$(uname)" == "Linux" ]]; then
   # Avoid copying usr/lib/swift/clang because our toolchain's one is a directory
   # but nightly's one is symbolic link. A simple copy fails to merge them.
-  rsync -v -a $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib $HOST_TOOLCHAIN_SDK/usr/lib --exclude 'swift/clang'
+  rsync -v -a $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib/ $HOST_TOOLCHAIN_SDK/usr/lib/ --exclude 'swift/clang'
 else
   cp -v -a $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib/swift_static $HOST_TOOLCHAIN_SDK/usr/lib/swift_static
   cp -v -a $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib/swift/wasi $HOST_TOOLCHAIN_SDK/usr/lib/swift
