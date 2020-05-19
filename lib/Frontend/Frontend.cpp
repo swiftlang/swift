@@ -883,11 +883,9 @@ void CompilerInstance::forEachFileToTypeCheck(
 }
 
 void CompilerInstance::finishTypeChecking() {
-  if (getASTContext().TypeCheckerOpts.DelayWholeModuleChecking) {
-    forEachSourceFileIn(MainModule, [&](SourceFile &SF) {
-      performWholeModuleTypeChecking(SF);
-    });
-  }
+  forEachSourceFileIn(MainModule, [&](SourceFile &SF) {
+    performWholeModuleTypeChecking(SF);
+  });
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
