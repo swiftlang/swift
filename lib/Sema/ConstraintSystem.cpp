@@ -2417,8 +2417,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   if (isDebugMode()) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log.indent(solverState ? solverState->depth * 2 : 2)
+    llvm::errs().indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
       << boundType->getString(PO) << " := "
       << refType->getString(PO) << ")\n";
@@ -2576,10 +2575,8 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
 }
 
 SolutionResult ConstraintSystem::salvage() {
-  auto &ctx = getASTContext();
   if (isDebugMode()) {
-    auto &log = ctx.TypeCheckerDebug->getStream();
-    log << "---Attempting to salvage and emit diagnostics---\n";
+    llvm::errs() << "---Attempting to salvage and emit diagnostics---\n";
   }
 
   setPhase(ConstraintSystemPhase::Diagnostics);
@@ -2626,7 +2623,7 @@ SolutionResult ConstraintSystem::salvage() {
     // If there are multiple solutions, try to diagnose an ambiguity.
     if (viable.size() > 1) {
       if (isDebugMode()) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        auto &log = llvm::errs();
         log << "---Ambiguity error: " << viable.size()
             << " solutions found---\n";
         int i = 0;
