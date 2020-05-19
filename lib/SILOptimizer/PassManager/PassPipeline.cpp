@@ -366,6 +366,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addRedundantLoadElimination();
   }
 
+  P.addCOWOpts();
   P.addPerformanceConstantPropagation();
   // Remove redundant arguments right before CSE and DCE, so that CSE and DCE
   // can cleanup redundant and dead instructions.
@@ -595,6 +596,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addLICM();
+  P.addCOWOpts();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
   // LICM might have added new merging potential by hoisting
