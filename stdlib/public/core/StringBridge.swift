@@ -175,7 +175,7 @@ private func _NSStringCopyUTF8(
   let success = 0 != o._getCString(
     ptr,
     maxLength: bufPtr.count,
-    encoding: _cocoaUTF8Encoding,
+    encoding: _cocoaUTF8Encoding
   )
   if !success {
     return nil
