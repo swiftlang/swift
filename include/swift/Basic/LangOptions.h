@@ -497,11 +497,6 @@ namespace swift {
     /// dumped to llvm::errs().
     bool DebugTimeExpressions = false;
 
-    /// Indicate that the type checker is checking code that will be
-    /// immediately executed. This will suppress certain warnings
-    /// when executing scripts.
-    bool InImmediateMode = false;
-
     /// Indicate that the type checker should skip type-checking non-inlinable
     /// function bodies.
     bool SkipNonInlinableFunctionBodies = false;
