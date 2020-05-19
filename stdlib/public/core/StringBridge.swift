@@ -52,6 +52,11 @@ internal typealias _CocoaString = AnyObject
      options: UInt,
        range: _SwiftNSRange,
        remaining leftover: UnsafeMutablePointer<_SwiftNSRange>?) -> Int8
+  
+  @objc(_getCString:maxLength:encoding:)
+  func _getCString(_ buffer: UnsafeMutableRawPointer?,
+   maxLength maxBufferCount: Int,
+    encoding: UInt) -> Int8
 
   @objc(compare:options:range:locale:)
   func compare(_ string: _CocoaString,
