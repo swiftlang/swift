@@ -44,7 +44,6 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -557,7 +556,6 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
-    TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(
       new (*this, AllocationArena::Permanent)
         ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
@@ -3831,45 +3829,6 @@ CanType OpenedArchetypeType::getAny(Type existential) {
 
 void TypeLoc::setInvalidType(ASTContext &C) {
   Ty = ErrorType::get(C);
-}
-
-namespace {
-class raw_capturing_ostream : public raw_ostream {
-  std::string Message;
-  uint64_t Pos;
-  CapturingTypeCheckerDebugConsumer &Listener;
-
-public:
-  raw_capturing_ostream(CapturingTypeCheckerDebugConsumer &Listener)
-      : Listener(Listener) {}
-
-  ~raw_capturing_ostream() override {
-    flush();
-  }
-
-  void write_impl(const char *Ptr, size_t Size) override {
-    Message.append(Ptr, Size);
-    Pos += Size;
-
-    // Check if we have at least one complete line.
-    size_t LastNewline = StringRef(Message).rfind('\n');
-    if (LastNewline == StringRef::npos)
-      return;
-    Listener.handleMessage(StringRef(Message.data(), LastNewline + 1));
-    Message.erase(0, LastNewline + 1);
-  }
-
-  uint64_t current_pos() const override {
-    return Pos;
-  }
-};
-} // unnamed namespace
-
-TypeCheckerDebugConsumer::~TypeCheckerDebugConsumer() { }
-
-CapturingTypeCheckerDebugConsumer::CapturingTypeCheckerDebugConsumer()
-    : Log(new raw_capturing_ostream(*this)) {
-  Log->SetUnbuffered();
 }
 
 void SubstitutionMap::Storage::Profile(
