@@ -1,0 +1,2 @@
+// RUN: %llvm-nm --defined-only -C %platform-module-dir/%target-library-name(swiftCore) | %FileCheck --allow-empty %s
+// CHECK-NOT: [^:]llvm::

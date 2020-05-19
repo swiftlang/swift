@@ -197,18 +197,20 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       bool requireTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
       forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
         auto pathExt = llvm::sys::path::extension(path);
-        if (requireTargetSpecificModule) {
-          if (pathExt != moduleSuffix)
+
+        if (pathExt != moduleSuffix)
+          if (requireTargetSpecificModule || pathExt != suffix)
             return;
-          if (!checkTargetFiles(path))
+
+        if (!checkTargetFiles(path)) {
+          if (requireTargetSpecificModule)
             return;
-        } else {
-          if (suffix != pathExt)
-            return;
+
           auto stat = fs.status(path);
           if (!stat || stat->isDirectory())
             return;
         }
+
         // Extract module name.
         auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
         names.push_back(Ctx.getIdentifier(name));
