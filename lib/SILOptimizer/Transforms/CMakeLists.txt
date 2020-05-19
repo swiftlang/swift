@@ -1,4 +1,4 @@
-silopt_register_sources(
+target_sources(swiftSILOptimizer PRIVATE
   ARCCodeMotion.cpp
   AccessEnforcementDom.cpp
   AccessEnforcementOpts.cpp
@@ -37,5 +37,4 @@ silopt_register_sources(
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
   TempRValueElimination.cpp
-  UnsafeGuaranteedPeephole.cpp
-)
+  UnsafeGuaranteedPeephole.cpp)

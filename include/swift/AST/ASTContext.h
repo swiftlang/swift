@@ -111,7 +111,6 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
   class SILBoxType;
@@ -275,9 +274,6 @@ public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
-
-  /// A consumer of type checker debug output.
-  std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
 
   /// Cache for names of canonical GenericTypeParamTypes.
   mutable llvm::DenseMap<unsigned, Identifier>

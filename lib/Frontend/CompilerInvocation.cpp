@@ -621,6 +621,23 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
 
+  // If we are asked to emit a module documentation file, configure lexing and
+  // parsing to remember comments.
+  if (FrontendOpts.InputsAndOutputs.hasModuleDocOutputPath()) {
+    Opts.AttachCommentsToDecls = true;
+  }
+
+  // If we are doing index-while-building, configure lexing and parsing to
+  // remember comments.
+  if (!FrontendOpts.IndexStorePath.empty()) {
+    Opts.AttachCommentsToDecls = true;
+  }
+
+  // If we're parsing SIL, access control doesn't make sense to enforce.
+  if (FrontendOpts.InputKind == InputFileKind::SIL) {
+    Opts.EnableAccessControl = false;
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 

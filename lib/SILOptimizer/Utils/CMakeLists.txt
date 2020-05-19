@@ -1,4 +1,4 @@
-silopt_register_sources(
+target_sources(swiftSILOptimizer PRIVATE
   BasicBlockOptUtils.cpp
   CFGOptUtils.cpp
   CanonicalizeInstruction.cpp
@@ -21,5 +21,4 @@ silopt_register_sources(
   SILSSAUpdater.cpp
   SpecializationMangler.cpp
   StackNesting.cpp
-  ValueLifetime.cpp
-)
+  ValueLifetime.cpp)

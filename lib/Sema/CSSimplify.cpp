@@ -8144,10 +8144,8 @@ retry_after_fail:
 
   // If we have a common result type, bind the expected result type to it.
   if (commonResultType && !commonResultType->is<ErrorType>()) {
-    ASTContext &ctx = getASTContext();
     if (isDebugMode()) {
-      auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(solverState ? solverState->depth * 2 : 0)
+      llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
         << "(common result type for $T" << fnTypeVar->getID() << " is "
         << commonResultType.getString()
         << ")\n";
@@ -9286,9 +9284,8 @@ static bool isAugmentingFix(ConstraintFix *fix) {
 }
 
 bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
-  auto &ctx = getASTContext();
   if (isDebugMode()) {
-    auto &log = ctx.TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     log.indent(solverState ? solverState->depth * 2 : 0)
       << "(attempting fix ";
     fix->print(log);

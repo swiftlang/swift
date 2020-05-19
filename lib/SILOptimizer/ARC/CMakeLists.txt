@@ -1,4 +1,4 @@
-silopt_register_sources(
+target_sources(swiftSILOptimizer PRIVATE
   ARCBBState.cpp
   ARCLoopOpts.cpp
   ARCMatchingSet.cpp
@@ -8,5 +8,4 @@ silopt_register_sources(
   GlobalLoopARCSequenceDataflow.cpp
   RCStateTransition.cpp
   RCStateTransitionVisitors.cpp
-  RefCountState.cpp
-)
+  RefCountState.cpp)
