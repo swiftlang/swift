@@ -226,9 +226,10 @@ SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
   // any uses.
   SmallVector<Operand *, 16> operands;
   SILValue undef = SILUndef::get(ty, *getParent());
-  for (auto *use : getArgument(i)->getUses()) {
+  while (!getArgument(i)->use_empty()) {
+    auto use = getArgument(i)->use_begin();
     use->set(undef);
-    operands.push_back(use);
+    operands.push_back(*use);
   }
 
   // Perform the replacement.
