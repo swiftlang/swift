@@ -473,10 +473,11 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
         rootConformance);
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
-      auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
+      auto witnessRef = SILDeclRef(witnessDecl);
+      auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
       if (conformanceIsFixed &&
           (isa<SelfProtocolConformance>(rootConformance) ||
-           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage))) {
+           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef))) {
         Mangle::ASTMangler Mangler;
         addSymbol(
             Mangler.mangleWitnessThunk(rootConformance, requirementDecl));
@@ -496,7 +497,8 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             addSymbolIfNecessary(reqtAccessor, witnessAccessor);
           });
         } else if (isa<EnumElementDecl>(witnessDecl)) {
-          addSymbolIfNecessary(valueReq, witnessDecl);
+          auto getter = storage->getSynthesizedAccessor(AccessorKind::Get);
+          addSymbolIfNecessary(getter, witnessDecl);
         }
       }
     });
@@ -1016,13 +1018,12 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
 void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
   visitNominalTypeDecl(ED);
-
-  if (!ED->isResilient())
-    return;
 }
 
 void TBDGenVisitor::visitEnumElementDecl(EnumElementDecl *EED) {
-  addSymbol(LinkEntity::forEnumCase(EED));
+  if (EED->getParentEnum()->isResilient())
+    addSymbol(LinkEntity::forEnumCase(EED));
+
   if (auto *PL = EED->getParameterList())
     visitDefaultArguments(EED, PL);
 }
