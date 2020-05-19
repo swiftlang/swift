@@ -1272,6 +1272,10 @@ SourceRange TupleExpr::getSourceRange() const {
     } else {
       // Scan backwards for a valid source loc.
       for (Expr *expr : llvm::reverse(getElements())) {
+        // Default arguments are located at the start of their parent tuple, so
+        // skip over them.
+        if (isa<DefaultArgumentExpr>(expr))
+          continue;
         end = expr->getEndLoc();
         if (end.isValid()) {
           break;
