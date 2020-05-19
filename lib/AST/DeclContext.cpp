@@ -773,7 +773,7 @@ IterableDeclContext::getDecl() const {
   llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
 }
 
-const GenericContext *IterableDeclContext::getAsGenericContext() const {
+GenericContext *IterableDeclContext::getAsGenericContext() {
   switch (getIterableContextKind()) {
   case IterableDeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(this);
