@@ -95,7 +95,7 @@ private:
 
   void addSymbol(LinkEntity entity);
 
-  void addConformances(DeclContext *DC);
+  void addConformances(const IterableDeclContext *IDC);
 
   void addDispatchThunk(SILDeclRef declRef);
 

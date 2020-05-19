@@ -539,7 +539,7 @@ static void
 // wrappers.
 static void
 synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC) {
-  auto SF = IDC->getDecl()->getDeclContext()->getParentSourceFile();
+  auto SF = IDC->getAsGenericContext()->getParentSourceFile();
   if (!SF || SF->Kind == SourceFileKind::Interface)
     return;
 

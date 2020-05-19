@@ -45,7 +45,9 @@ namespace llvm {
   template<typename T> class MutableArrayRef;
 #endif
   template<typename T> class TinyPtrVector;
+#if !defined(swiftCore_EXPORTS)
   template<typename T> class Optional;
+#endif
   template <typename ...PTs> class PointerUnion;
   template <typename IteratorT> class iterator_range;
   class SmallBitVector;
@@ -75,7 +77,9 @@ namespace swift {
 #endif
   using llvm::iterator_range;
   using llvm::None;
+#if !defined(swiftCore_EXPORTS)
   using llvm::Optional;
+#endif
   using llvm::PointerUnion;
   using llvm::SmallBitVector;
   using llvm::SmallPtrSet;

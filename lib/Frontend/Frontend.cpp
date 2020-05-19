@@ -311,15 +311,6 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  // Set up the type checker options.
-  auto &typeCkOpts = Invocation.getTypeCheckerOptions();
-  if (isWholeModuleCompilation()) {
-    typeCkOpts.DelayWholeModuleChecking = true;
-  }
-  if (FrontendOptions::isActionImmediate(frontendOpts.RequestedAction)) {
-    typeCkOpts.InImmediateMode = true;
-  }
-
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
   if (isInSILMode())
@@ -871,19 +862,16 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports() {
   return hadLoadError;
 }
 
-static void
-forEachSourceFileIn(ModuleDecl *module,
-                    llvm::function_ref<void(SourceFile &)> fn) {
-  for (auto fileName : module->getFiles()) {
-    if (auto SF = dyn_cast<SourceFile>(fileName))
-      fn(*SF);
-  }
-}
-
 void CompilerInstance::forEachFileToTypeCheck(
     llvm::function_ref<void(SourceFile &)> fn) {
   if (isWholeModuleCompilation()) {
-    forEachSourceFileIn(MainModule, [&](SourceFile &SF) { fn(SF); });
+    for (auto fileName : MainModule->getFiles()) {
+      auto *SF = dyn_cast<SourceFile>(fileName);
+      if (!SF) {
+        continue;
+      }
+      fn(*SF);
+    }
   } else {
     for (auto *SF : PrimarySourceFiles) {
       fn(*SF);
@@ -892,13 +880,9 @@ void CompilerInstance::forEachFileToTypeCheck(
 }
 
 void CompilerInstance::finishTypeChecking() {
-  if (getASTContext().TypeCheckerOpts.DelayWholeModuleChecking) {
-    forEachSourceFileIn(MainModule, [&](SourceFile &SF) {
-      performWholeModuleTypeChecking(SF);
-    });
-  }
-
-  checkInconsistentImplementationOnlyImports(MainModule);
+  forEachFileToTypeCheck([](SourceFile &SF) {
+    performWholeModuleTypeChecking(SF);
+  });
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(

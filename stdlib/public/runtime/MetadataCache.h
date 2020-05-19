@@ -230,7 +230,7 @@ public:
 
   /// If an entry already exists, await it; otherwise report failure.
   template <class KeyType, class... ArgTys>
-  Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&...args) {
+  llvm::Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
     EntryType *entry = Storage.find(key);
     if (!entry) return None;
     return entry->await(Storage.getConcurrency(),
@@ -324,8 +324,8 @@ public:
   }
 
   template <class... ArgTys>
-  Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
-                                   ArgTys &&...args) {
+  llvm::Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
+                                         ArgTys &&... args) {
     // Delegate to the implementation class.
     ValueType origValue = asImpl().allocate(std::forward<ArgTys>(args)...);
 
@@ -849,9 +849,9 @@ public:
 
   /// Perform the allocation operation.
   template <class... Args>
-  Optional<Status>
-  beginAllocation(ConcurrencyControl &concurrency, MetadataRequest request,
-                  Args &&...args) {
+  llvm::Optional<Status> beginAllocation(ConcurrencyControl &concurrency,
+                                         MetadataRequest request,
+                                         Args &&... args) {
     // Returning a non-None value here will preempt initialization, so we
     // should only do it if we're reached PrivateMetadataState::Complete.
 

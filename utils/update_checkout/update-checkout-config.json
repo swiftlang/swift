@@ -117,7 +117,7 @@
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "master",
-                "swift-argument-parser": "0.0.5",
+                "swift-argument-parser": "0.0.6",
                 "swift-driver": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
@@ -139,6 +139,7 @@
         },
         "next" : {
             "aliases": ["next", "master-next",
+                        "swift/master-next",
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
@@ -148,7 +149,7 @@
                 "llbuild": "master",
                 "swift-tools-support-core": "master",
                 "swiftpm": "master",
-                "swift-argument-parser": "0.0.5",
+                "swift-argument-parser": "0.0.6",
                 "swift-driver": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
