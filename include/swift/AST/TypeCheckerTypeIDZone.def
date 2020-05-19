@@ -29,6 +29,8 @@ SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CallerSideDefaultArgExprRequest,
               Expr *(DefaultArgumentExpr *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckInconsistentImplementationOnlyImportsRequest,
+              evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
               evaluator::SideEffect(ValueDecl *),
               Uncached, NoLocationInfo)
@@ -256,7 +258,7 @@ SWIFT_REQUEST(TypeChecker, ScopedImportLookupRequest,
 SWIFT_REQUEST(TypeChecker, ClosureHasExplicitResultRequest,
               bool(ClosureExpr *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LookupAllConformancesInContextRequest,
-              ProtocolConformanceLookupResult(const DeclContext *),
+              ProtocolConformanceLookupResult(const IterableDeclContext *),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest, 
               bool(AccessorDecl *), Cached, NoLocationInfo)
