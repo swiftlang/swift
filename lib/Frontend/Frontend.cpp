@@ -298,23 +298,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
-  const auto &frontendOpts = Invocation.getFrontendOptions();
-
-  // If we are asked to emit a module documentation file, configure lexing and
-  // parsing to remember comments.
-  if (frontendOpts.InputsAndOutputs.hasModuleDocOutputPath())
-    Invocation.getLangOptions().AttachCommentsToDecls = true;
-
-  // If we are doing index-while-building, configure lexing and parsing to
-  // remember comments.
-  if (!frontendOpts.IndexStorePath.empty()) {
-    Invocation.getLangOptions().AttachCommentsToDecls = true;
-  }
-
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
-
-  if (isInSILMode())
-    Invocation.getLangOptions().EnableAccessControl = false;
 
   if (setUpInputs())
     return true;
