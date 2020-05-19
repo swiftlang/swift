@@ -95,6 +95,7 @@
         },
         "next" : {
             "aliases": ["next", "master-next",
+                        "swift/master-next",
                         "stable-next", "upstream",
                         "next-upstream", "upstream-with-swift"],
             "repos": {
