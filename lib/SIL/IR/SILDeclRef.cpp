@@ -233,7 +233,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
 
   // Native function-local declarations have shared linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
-  // of marking them "used" other than making them external. 
+  // of marking them "used" other than making them external.
   ValueDecl *d = getDecl();
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
@@ -333,6 +333,10 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     if (fn->hasForcedStaticDispatch()) {
       limit = Limit::OnDemand;
     }
+  }
+
+  if (isEnumElement()) {
+    limit = Limit::OnDemand;
   }
 
   auto effectiveAccess = d->getEffectiveAccess();
