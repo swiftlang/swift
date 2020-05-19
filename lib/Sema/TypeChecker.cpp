@@ -357,11 +357,6 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       CheckInconsistentImplementationOnlyImportsRequest{SF->getParentModule()},
       {});
 
-  // Checking that benefits from having the whole module available.
-  if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking) {
-    performWholeModuleTypeChecking(*SF);
-  }
-
   // Perform various AST transforms we've been asked to perform.
   if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)
     performDebuggerTestingTransform(*SF);
