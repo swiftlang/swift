@@ -30,7 +30,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -2978,7 +2977,7 @@ public:
       failedConstraint = constraint;
 
     if (isDebugMode()) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      auto &log = llvm::errs();
       log.indent(solverState ? solverState->depth * 2 : 0)
           << "(failed constraint ";
       constraint->print(log, &getASTContext().SourceMgr);
@@ -4422,7 +4421,7 @@ private:
 
     void dump(ConstraintSystem *cs,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
-      dump(cs->getASTContext().TypeCheckerDebug->getStream());
+      dump(llvm::errs());
     }
 
     void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
