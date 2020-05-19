@@ -1,4 +1,4 @@
-silopt_register_sources(
+target_sources(swiftSILOptimizer PRIVATE
   ADContext.cpp
   Common.cpp
   DifferentiationInvoker.cpp
@@ -6,5 +6,4 @@ silopt_register_sources(
   LinearMapInfo.cpp
   PullbackEmitter.cpp
   Thunk.cpp
-  VJPEmitter.cpp
-)
+  VJPEmitter.cpp)
