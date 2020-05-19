@@ -1456,24 +1456,6 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
     FrontendStatsTracer tracer(Ctx.Stats, "AST verification");
     // Verify the SourceFile.
     swift::verify(*SF);
-
-    // Verify imported modules.
-    //
-    // Skip per-file verification in whole-module mode. Verifying imports
-    // between files could cause the importer to cache declarations without
-    // adding them to the ASTContext. This happens when the importer registers a
-    // declaration without a valid TypeChecker instance, as is the case during
-    // verification. A subsequent file may require that declaration to be fully
-    // imported (e.g. to synthesized a function body), but since it has already
-    // been cached, it will never be added to the ASTContext. The solution is to
-    // skip verification and avoid caching it.
-#ifndef NDEBUG
-    if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
-        SF->Kind != SourceFileKind::SIL &&
-        !Ctx.LangOpts.DebuggerSupport) {
-      Ctx.verifyAllLoadedModules();
-    }
-#endif
   }
 }
 

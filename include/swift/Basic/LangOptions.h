@@ -489,11 +489,7 @@ namespace swift {
     /// 4.2 GHz Intel Core i7.
     /// (It's arbitrary, but will keep the compiler from taking too much time.)
     unsigned SwitchCheckingInvocationThreshold = 200000;
-
-    /// Whether to delay checking that benefits from having the entire
-    /// module parsed, e.g., Objective-C method override checking.
-    bool DelayWholeModuleChecking = false;
-
+    
     /// If true, the time it takes to type-check each function will be dumped
     /// to llvm::errs().
     bool DebugTimeFunctionBodies = false;
@@ -501,11 +497,6 @@ namespace swift {
     /// If true, the time it takes to type-check each expression will be
     /// dumped to llvm::errs().
     bool DebugTimeExpressions = false;
-
-    /// Indicate that the type checker is checking code that will be
-    /// immediately executed. This will suppress certain warnings
-    /// when executing scripts.
-    bool InImmediateMode = false;
 
     /// Indicate that the type checker should skip type-checking non-inlinable
     /// function bodies.
