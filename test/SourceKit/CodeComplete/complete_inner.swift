@@ -1,5 +1,3 @@
-// XFAIL: broken_std_regex
-
 class Foo {}
 class Base {
   init() {}
@@ -30,18 +28,18 @@ func test010(x: E1, y: FooBar) {
   }
 }
 
-// RUN: %sourcekitd-test -req=complete.open -pos=26:11 -req-opts=filtertext=on %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0a
+// RUN: %sourcekitd-test -req=complete.open -pos=24:11 -req-opts=filtertext=on %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0a
 // INNER_POSTFIX_0a-NOT: key.description: "one{{.+}}"
 // INNER_POSTFIX_0a: key.description: "one",{{$}}
 // INNER_POSTFIX_0a-NOT: key.description: "one{{.+}}"
 
-// RUN: %sourcekitd-test -req=complete.open -pos=26:11 -req-opts=filtertext=one %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0b
+// RUN: %sourcekitd-test -req=complete.open -pos=24:11 -req-opts=filtertext=one %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0b
 // INNER_POSTFIX_0b-NOT: key.description: "one{{.+}}"
 // INNER_POSTFIX_0b: key.description: "one",{{$}}
 // INNER_POSTFIX_0b: key.description: "one.",{{$}}
 // INNER_POSTFIX_0b-NOT: key.description: "one{{.+}}"
 
-// RUN: %sourcekitd-test -req=complete.open -pos=29:9 -req-opts=filtertext=pro %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_1
+// RUN: %sourcekitd-test -req=complete.open -pos=27:9 -req-opts=filtertext=pro %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_1
 // INNER_POSTFIX_1-NOT: key.description: "prop{{.+}}"
 // INNER_POSTFIX_1: key.description: "prop",{{$}}
 // INNER_POSTFIX_1-NOT: key.description: "prop{{.+}}"
