@@ -1241,6 +1241,14 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   if (auto callExpr = dyn_cast<ApplyExpr>(diagExpr)) {
     Expr *argExpr = callExpr->getArg();
     loc = callExpr->getFn()->getLoc();
+    auto *locator = getLocator();
+
+    // `argument attribute` is used for identification purposes
+    // only, so it could be looked through in this situation.
+    if (locator->isLastElement<LocatorPathElt::ArgumentAttribute>()) {
+      auto path = locator->getPath();
+      locator = getConstraintLocator(getRawAnchor(), path.drop_back());
+    }
 
     if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
       subElementDiagID = diag::cannot_apply_lvalue_unop_to_subelement;
@@ -1249,16 +1257,14 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     } else if (isa<BinaryExpr>(callExpr)) {
       subElementDiagID = diag::cannot_apply_lvalue_binop_to_subelement;
       rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
-      auto argTuple = dyn_cast<TupleExpr>(argExpr);
-      diagExpr = argTuple->getElement(0);
-    } else if (getLocator()->getPath().size() > 0) {
-      auto argElt =
-          getLocator()->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
-
+      diagExpr = castToExpr(simplifyLocatorToAnchor(locator));
+    } else if (auto argElt =
+                   locator
+                       ->getLastElementAs<LocatorPathElt::ApplyArgToParam>()) {
       subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
       rvalueDiagID = diag::cannot_pass_rvalue_inout;
       if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
-        diagExpr = argTuple->getElement(argElt.getArgIdx());
+        diagExpr = argTuple->getElement(argElt->getArgIdx());
       else if (auto parens = dyn_cast<ParenExpr>(argExpr))
         diagExpr = parens->getSubExpr();
     } else {

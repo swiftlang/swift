@@ -86,6 +86,7 @@ public:
     case SynthesizedArgument:
     case KeyPathDynamicMember:
     case TernaryBranch:
+    case ArgumentAttribute:
       return 1;
 
     case TypeParameterRequirement:
@@ -844,6 +845,31 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::PatternMatch;
+  }
+};
+
+class LocatorPathElt::ArgumentAttribute final : public LocatorPathElt {
+public:
+  enum Attribute : uint8_t { InOut, Escaping };
+
+private:
+  ArgumentAttribute(Attribute attr)
+      : LocatorPathElt(ConstraintLocator::ArgumentAttribute,
+                       static_cast<uint8_t>(attr)) {}
+
+public:
+  Attribute getAttr() const { return static_cast<Attribute>(getValue(0)); }
+
+  static ArgumentAttribute forInOut() {
+    return ArgumentAttribute(Attribute::InOut);
+  }
+
+  static ArgumentAttribute forEscaping() {
+    return ArgumentAttribute(Attribute::Escaping);
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ArgumentAttribute;
   }
 };
 
