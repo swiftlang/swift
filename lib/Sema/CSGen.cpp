@@ -4209,26 +4209,35 @@ static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
 static Type generateWrappedPropertyTypeConstraints(
    ConstraintSystem &cs, Type initializerType,
    VarDecl *wrappedVar, ConstraintLocator *locator) {
-  Type valueType = LValueType::get(initializerType);
   auto dc = wrappedVar->getInnermostDeclContext();
 
+  Type wrapperType = LValueType::get(initializerType);
+  Type wrappedValueType;
+
   for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
+    Type rawWrapperType = wrappedVar->getAttachedPropertyWrapperType(i);
+    if (!rawWrapperType || rawWrapperType->hasError())
+      return Type();
+
+    // The former wrappedValue type must be equal to the current wrapper type
+    if (wrappedValueType) {
+      wrapperType = cs.openUnboundGenericTypes(rawWrapperType, locator);
+      cs.addConstraint(ConstraintKind::Equal, wrappedValueType, wrapperType,
+                       locator);
+    }
+
     auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
     if (!wrapperInfo)
-      break;
+      return Type();
 
-    locator = cs.getConstraintLocator(locator, ConstraintLocator::Member);
-    Type memberType = cs.createTypeVariable(locator, TVO_CanBindToLValue);
-    cs.addValueMemberConstraint(
-        valueType, wrapperInfo.valueVar->createNameRef(),
-        memberType, dc, FunctionRefKind::Unapplied, { }, locator);
-    valueType = memberType;
+    wrappedValueType = wrapperType->getTypeOfMember(
+        dc->getParentModule(), wrapperInfo.valueVar);
   }
 
   // Set up an equality constraint to drop the lvalue-ness of the value
   // type we produced.
   Type propertyType = cs.createTypeVariable(locator, 0);
-  cs.addConstraint(ConstraintKind::Equal, propertyType, valueType, locator);
+  cs.addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType, locator);
   return propertyType;
 }
 
@@ -4245,10 +4254,13 @@ static bool generateInitPatternConstraints(
   assert(patternType && "All patterns have a type");
 
   if (auto wrappedVar = target.getInitializationWrappedVar()) {
-    // Add an equal constraint between the pattern type and the
-    // property wrapper's "value" type.
     Type propertyType = generateWrappedPropertyTypeConstraints(
         cs, cs.getType(target.getAsExpr()), wrappedVar, locator);
+    if (!propertyType)
+      return true;
+
+    // Add an equal constraint between the pattern type and the
+    // property wrapper's "value" type.
     cs.addConstraint(ConstraintKind::Equal, patternType,
                      propertyType, locator, /*isFavored*/ true);
   } else if (!patternType->is<OpaqueTypeArchetypeType>()) {
