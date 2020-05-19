@@ -897,8 +897,6 @@ void CompilerInstance::finishTypeChecking() {
       performWholeModuleTypeChecking(SF);
     });
   }
-
-  checkInconsistentImplementationOnlyImports(MainModule);
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
