@@ -18,7 +18,12 @@ set(LLVM_USE_PERF NO)
 configure_file(${PROJECT_SOURCE_DIR}/include/llvm/Config/llvm-config.h.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/llvm/Config/llvm-config.h)
 
-add_library(swiftLLVMSupport INTERFACE)
-target_include_directories(swiftLLVMSupport INTERFACE
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${CMAKE_PROJECT_SOURCE_DIR}/include)
+add_swift_target_library(swiftLLVMSupport OBJECT_LIBRARY
+    ErrorHandling.cpp
+    Hashing.cpp
+    MemAlloc.cpp
+    SmallPtrSet.cpp
+    SmallVector.cpp
+    StringRef.cpp
+  INSTALL_IN_COMPONENT
+    never_install)

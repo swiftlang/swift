@@ -9,13 +9,7 @@ set(swiftReflection_SOURCES
   "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/ErrorHandling.cpp"
-  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/Hashing.cpp"
-  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/MemAlloc.cpp"
-  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallPtrSet.cpp"
-  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallVector.cpp"
-  "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/StringRef.cpp")
+  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
 
 # When we're building with assertions, include the demangle node dumper to aid
 # in debugging.
@@ -28,5 +22,6 @@ add_swift_target_library(swiftReflection STATIC
   ${swiftReflection_SOURCES}
   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftCore_EXPORTS
   LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
+  INCORPORATE_OBJECT_LIBRARIES swiftLLVMSupport
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT dev)
