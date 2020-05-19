@@ -2430,6 +2430,32 @@ private:
 void simple_display(llvm::raw_ostream &out, const TypeResolution *resolution);
 SourceLoc extractNearestSourceLoc(const TypeRepr *repr);
 
+/// Checks to see if any of the imports in a module use `@_implementationOnly`
+/// in one file and not in another.
+///
+/// Like redeclaration checking, but for imports.
+///
+/// This is a request purely to ensure that we don't need to perform the same
+/// checking for each file we resolve imports for.
+/// FIXME: Once import resolution operates at module-level, this checking can
+/// integrated into it.
+class CheckInconsistentImplementationOnlyImportsRequest
+    : public SimpleRequest<CheckInconsistentImplementationOnlyImportsRequest,
+                           evaluator::SideEffect(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
