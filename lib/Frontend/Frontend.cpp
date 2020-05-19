@@ -862,19 +862,16 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports() {
   return hadLoadError;
 }
 
-static void
-forEachSourceFileIn(ModuleDecl *module,
-                    llvm::function_ref<void(SourceFile &)> fn) {
-  for (auto fileName : module->getFiles()) {
-    if (auto SF = dyn_cast<SourceFile>(fileName))
-      fn(*SF);
-  }
-}
-
 void CompilerInstance::forEachFileToTypeCheck(
     llvm::function_ref<void(SourceFile &)> fn) {
   if (isWholeModuleCompilation()) {
-    forEachSourceFileIn(MainModule, [&](SourceFile &SF) { fn(SF); });
+    for (auto fileName : MainModule->getFiles()) {
+      auto *SF = dyn_cast<SourceFile>(fileName);
+      if (!SF) {
+        continue;
+      }
+      fn(*SF);
+    }
   } else {
     for (auto *SF : PrimarySourceFiles) {
       fn(*SF);
@@ -883,7 +880,7 @@ void CompilerInstance::forEachFileToTypeCheck(
 }
 
 void CompilerInstance::finishTypeChecking() {
-  forEachSourceFileIn(MainModule, [&](SourceFile &SF) {
+  forEachFileToTypeCheck([](SourceFile &SF) {
     performWholeModuleTypeChecking(SF);
   });
 }
