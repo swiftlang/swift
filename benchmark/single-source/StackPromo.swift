@@ -14,7 +14,7 @@ import TestsUtils
 public let StackPromo = BenchmarkInfo(
   name: "StackPromo",
   runFunction: run_StackPromo,
-  tags: [.regression],
+  tags: [.regression, .cpubench],
   legacyFactor: 100)
 
 protocol Proto {
