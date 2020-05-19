@@ -1,4 +1,4 @@
-silopt_register_sources(
+target_sources(swiftSILOptimizer PRIVATE
   CapturePromotion.cpp
   CapturePropagation.cpp
   ClosureSpecializer.cpp
