@@ -779,7 +779,7 @@ struct SomeType : Proto2 {
 
 sil @foo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
 
-// CHECK-64-LABEL: define swiftcc void @empty_followed_by_non_fixed(%T13partial_apply8SomeTypeV* noalias nocapture %0)
+// CHECK-64-LABEL: define{{.*}} swiftcc void @empty_followed_by_non_fixed(%T13partial_apply8SomeTypeV* noalias nocapture %0)
 // CHECK-64:  [[FLAGS:%.*]] = load i32, i32*
 // CHECK-64:  [[FLAGS2:%.*]] = zext i32 [[FLAGS]] to i64
 // CHECK-64:  [[ALIGNMASK:%.*]] = and i64 [[FLAGS2]], 255
