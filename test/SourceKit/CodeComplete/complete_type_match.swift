@@ -1,4 +1,3 @@
-// XFAIL: broken_std_regex
 // RUN: %complete-test -top=0 -tok=TOP_LEVEL_0 %s | %FileCheck %s -check-prefix=TOP_LEVEL_0
 // RUN: %complete-test -top=0 -tok=TOP_LEVEL_1 %s | %FileCheck %s -check-prefix=TOP_LEVEL_1
 // RUN: %complete-test -top=0 -tok=TOP_LEVEL_2 %s | %FileCheck %s -check-prefix=TOP_LEVEL_2

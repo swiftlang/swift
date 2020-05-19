@@ -1,5 +1,4 @@
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | %FileCheck %s
-// XFAIL: broken_std_regex
 
 // CHECK: <comment-block>/* foo is the best */</comment-block>
 /* foo is the best */

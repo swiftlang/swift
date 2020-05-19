@@ -579,9 +579,6 @@ if(XCODE)
   swift_common_xcode_cxx_config()
 endif()
 
-include(SwiftCheckCXXNativeRegex)
-check_cxx_native_regex(SWIFT_HAVE_WORKING_STD_REGEX)
-
 # If SWIFT_HOST_VARIANT_SDK not given, try to detect from the CMAKE_SYSTEM_NAME.
 if(SWIFT_HOST_VARIANT_SDK)
   set(SWIFT_HOST_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
