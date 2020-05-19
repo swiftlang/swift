@@ -48,9 +48,9 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.FunctionDefinitions = false;
   Opts.ArgAndParamPrinting =
     PrintOptions::ArgAndParamPrintingMode::MatchSource;
-  Opts.PrintGetSetOnRWProperties = false;
-  Opts.PrintPropertyAccessors = false;
-  Opts.PrintSubscriptAccessors = false;
+  Opts.PrintGetSetOnRWProperties = true;
+  Opts.PrintPropertyAccessors = true;
+  Opts.PrintSubscriptAccessors = true;
   Opts.SkipUnderscoredKeywords = true;
   Opts.SkipAttributes = true;
   Opts.PrintOverrideKeyword = true;
@@ -76,6 +76,16 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
   auto Options = getDeclarationFragmentsPrintOptions();
   Options.ArgAndParamPrinting =
     PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
+
+  //--------------------------------------------------------------------------//
+  // Although we want these in the full declaration presentation,
+  // particularly for protocol requirements,
+  // we don't want to show these in subheadings.
+  Options.PrintGetSetOnRWProperties = false;
+  Options.PrintPropertyAccessors = false;
+  Options.PrintSubscriptAccessors = false;
+  //--------------------------------------------------------------------------//
+
   Options.VarInitializers = false;
   Options.PrintDefaultArgumentValue = false;
   Options.PrintEmptyArgumentNames = false;
