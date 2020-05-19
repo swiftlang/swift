@@ -7,7 +7,6 @@ func test() {
 
 }
 
-// XFAIL: broken_std_regex
 // RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0 -pos=7:1 %s -- %s > %t.orig
 // RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0,sort.byname=0 -pos=7:1 %s -- %s > %t.orig.off
 // RUN: %FileCheck -check-prefix=NAME_SORTED %s < %t.orig

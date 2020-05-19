@@ -1,7 +1,6 @@
 ()
 let var1 = 1
 let var2: Int = 1
-// XFAIL: broken_std_regex
 // RUN: %sourcekitd-test -req=complete -pos=1:2 %s -- %s | %FileCheck %s -check-prefix=COMPLETE_1
 // RUN: %sourcekitd-test -req=complete -pos=2:12 %s -- %s | %FileCheck %s -check-prefix=COMPLETE_1
 // RUN: %sourcekitd-test -req=complete -pos=3:17 %s -- %s | %FileCheck %s -check-prefix=COMPLETE_2
