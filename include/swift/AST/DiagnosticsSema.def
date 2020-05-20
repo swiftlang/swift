@@ -1136,8 +1136,14 @@ ERROR(argument_out_of_order_binary_op,none,
       "operator argument #%0 must precede operator argument #%1",
       (unsigned, unsigned))
 NOTE(candidate_expected_different_labels,none,
-     "incorrect labels for candidate (have: '%0', expected: '%1')",
-     (StringRef, StringRef))
+     "incorrect label%select{|s}0 for candidate (have: '%1', expected: '%2')",
+     (bool, StringRef, StringRef))
+NOTE(candidate_expected_unlabeled,none,
+     "extraneous label%select{|s}0 '%1' for candidate unnamed parameter%select{|s}0",
+     (bool, StringRef))
+NOTE(candidate_expected_labeled,none,
+     "missing label%select{|s}0 for candidate parameter%select{|s}0 '%1'",
+     (bool, StringRef))
 
 ERROR(member_shadows_function,none,
       "use of %0 refers to %1 rather than %2 %3",
