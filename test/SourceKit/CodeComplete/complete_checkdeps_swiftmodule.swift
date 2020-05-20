@@ -5,6 +5,7 @@ func foo() {
   /*HERE*/
 }
 
+// REQUIRES: rdar62923248
 // REQUIRES: shell
 
 // RUN: %empty-directory(%t/Frameworks)
