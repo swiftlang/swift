@@ -465,15 +465,31 @@ protected:
 /// Call to `foo` is going to be diagnosed as missing `q:`
 /// and having extraneous `a:` labels, with appropriate fix-its added.
 class LabelingFailure final : public FailureDiagnostic {
-  ArrayRef<Identifier> CorrectLabels;
+  using ParamBinding = SmallVector<unsigned, 1>;
+
+  SmallVector<const RelabelArgument *, 4> RelabelFixes;
+  unsigned NumOutOfOrder;
+
+  // computed in diagnose
+  bool IsComplex;
 
 public:
   LabelingFailure(const Solution &solution, ConstraintLocator *locator,
-                  ArrayRef<Identifier> labels)
-      : FailureDiagnostic(solution, locator), CorrectLabels(labels) {}
+                  ArrayRef<const RelabelArgument *> relabelFixes,
+                  unsigned numOutOfOrder)
+      : FailureDiagnostic(solution, locator),
+        RelabelFixes(relabelFixes.begin(), relabelFixes.end()),
+        NumOutOfOrder(numOutOfOrder), IsComplex(false) {}
+
+  bool isComplex() const { return IsComplex; }
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+
+private:
+  bool diagnoseAsError(bool asNote);
+
+  Type getCalleeParamTypeForObjectLiteralExpr(ObjectLiteralExpr *expr) const;
 };
 
 /// Diagnose failures related to attempting member access on optional base

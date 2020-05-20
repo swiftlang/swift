@@ -32,6 +32,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -740,52 +741,271 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   return true;
 }
 
-bool LabelingFailure::diagnoseAsError() {
-  auto *argExpr = getArgumentListExprFor(getLocator());
-  if (!argExpr)
-    return false;
+bool LabelingFailure::diagnoseAsError() { return diagnoseAsError(false); }
 
-  return diagnoseArgumentLabelError(getASTContext(), argExpr, CorrectLabels,
-                                    isExpr<SubscriptExpr>(getRawAnchor()));
-}
+bool LabelingFailure::diagnoseAsNote() { return diagnoseAsError(true); }
 
-bool LabelingFailure::diagnoseAsNote() {
-  auto *argExpr = getArgumentListExprFor(getLocator());
-  if (!argExpr)
-    return false;
-
-  SmallVector<Identifier, 4> argLabels;
-  if (isa<ParenExpr>(argExpr)) {
-    argLabels.push_back(Identifier());
-  } else if (auto *tuple = dyn_cast<TupleExpr>(argExpr)) {
-    argLabels.append(tuple->getElementNames().begin(),
-                     tuple->getElementNames().end());
-  } else {
-    return false;
-  }
-
-  auto stringifyLabels = [](ArrayRef<Identifier> labels) -> std::string {
-    std::string str;
-    for (auto label : labels) {
-      str += label.empty() ? "_" : label.str();
-      str += ':';
+bool LabelingFailure::diagnoseAsError(bool asNote) {
+  auto appendLabelStr = [](SmallString<16> &str, Identifier label) {
+    if (label.empty()) {
+      str += '_';
+    } else {
+      str += label.str();
     }
-    return "(" + str + ")";
+    str += ':';
   };
 
-  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
-  if (!selectedOverload)
+  auto escapeLabel = [](Identifier label) -> SmallString<16> {
+    SmallString<16> str;
+    if (canBeArgumentLabel(label.str())) {
+      return label.str();
+    }
+
+    str += "`";
+    str += label.str();
+    str += "`";
+    return str;
+  };
+
+  auto addFixIts = [&](InFlightDiagnostic diag) {
+    for (const auto *fix : RelabelFixes) {
+      const auto argLabel = fix->getArgLabel();
+      const auto paramLabel = fix->getParamLabel();
+
+      if (paramLabel.empty()) {
+        diag.fixItRemoveChars(fix->getArgLabelLoc(), fix->getArgLoc());
+      } else {
+        auto str = escapeLabel(paramLabel);
+        if (argLabel.empty()) {
+          str += ": ";
+          diag.fixItInsert(fix->getArgLoc(), str);
+        } else {
+          diag.fixItReplace(fix->getArgLabelLoc(), str);
+        }
+      }
+    }
+  };
+
+  IsComplex = false;
+
+  ASTNode callExpr = getLocator()->getAnchor();
+  if (!callExpr)
     return false;
 
-  const auto &choice = selectedOverload->choice;
-  if (auto *decl = choice.getDeclOrNull()) {
-    emitDiagnosticAt(decl, diag::candidate_expected_different_labels,
-                     stringifyLabels(argLabels),
-                     stringifyLabels(CorrectLabels));
-    return true;
+  auto *argExpr = getArgumentListExprFor(getLocator());
+  if (!argExpr)
+    return false;
+
+  SmallString<16> missingsStr;
+  SmallString<16> extrasStr;
+
+  unsigned numMissing = 0;
+  unsigned numExtra = 0;
+  unsigned numWrong = 0;
+  unsigned numErrorKinds = 0;
+
+  for (const auto *fix : RelabelFixes) {
+    const auto argLabel = fix->getArgLabel();
+    const auto paramLabel = fix->getParamLabel();
+
+    if (argLabel != paramLabel) {
+      if (argLabel.empty()) {
+        numMissing++;
+        appendLabelStr(missingsStr, paramLabel);
+      } else if (paramLabel.empty()) {
+        numExtra++;
+        appendLabelStr(extrasStr, argLabel);
+      } else {
+        numWrong++;
+      }
+    }
   }
 
-  return false;
+  if (numWrong > 0)
+    numErrorKinds++;
+  if (numMissing > 0)
+    numErrorKinds++;
+  if (numExtra > 0)
+    numErrorKinds++;
+  if (NumOutOfOrder > 0)
+    numErrorKinds++;
+
+  if (numErrorKinds >= 2 || numWrong >= 2) {
+    IsComplex = true;
+  }
+
+  bool plural = (numMissing + numExtra + numWrong) > 1;
+  bool isSubscript = isExpr<SubscriptExpr>(callExpr);
+
+  SourceLoc diagLoc = argExpr->getLoc();
+
+  if (numMissing + numExtra + numWrong == 1) {
+    const auto *fix = RelabelFixes.front();
+
+    if (numMissing == 1) {
+      diagLoc = fix->getArgLoc();
+    } else {
+      diagLoc = fix->getArgLabelLoc();
+    }
+  }
+
+  ConstraintLocator *calleeLocator =
+      getSolution().getCalleeLocator(getLocator());
+  if (!calleeLocator)
+    return false;
+
+  Decl *calleeDecl = nullptr;
+  ParameterList *calleeParamList;
+  SmallVector<AnyFunctionType::Param, 4> calleeParams;
+
+  Optional<SelectedOverload> calleeChoice =
+      getOverloadChoiceIfAvailable(calleeLocator);
+  if (calleeChoice) {
+    calleeDecl = calleeChoice->choice.getDeclOrNull();
+
+    if (auto valueDecl = dyn_cast_or_null<AbstractFunctionDecl>(calleeDecl)) {
+      if (auto paramList = getParameterList(valueDecl)) {
+        calleeParamList = paramList;
+        paramList->getParams(calleeParams);
+      }
+    }
+  }
+  /// If callee is an expression which has function type, there is no decl.
+  /// ```swift
+  /// func f() -> (Int) -> Void {
+  ///   return { (a) in }
+  /// }
+  /// f()(a: 3)
+  /// ```
+
+  if (!calleeDecl) {
+    // ObjectLiteralExpr doesn't have resolved overload.
+    if (auto objLit =
+            getAsExpr<ObjectLiteralExpr>(calleeLocator->getAnchor())) {
+      auto paramType = getCalleeParamTypeForObjectLiteralExpr(objLit);
+      if (paramType) {
+        AnyFunctionType::decomposeInput(paramType, calleeParams);
+      }
+    }
+  }
+
+  if (IsComplex || numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
+    SmallString<16> haveStr;
+    SmallString<16> expectedStr;
+
+    if (IsComplex || plural) {
+      // in aggregated case, report all labels.
+
+      ArrayRef<ParamBinding> Bindings = RelabelFixes.front()->getBindings();
+
+      SmallVector<Optional<unsigned>, 4> argToParamMap;
+      for (auto paramIdx : indices(Bindings)) {
+        if (Bindings[paramIdx].empty())
+          continue;
+        unsigned argIdx = Bindings[paramIdx].front();
+        if (argToParamMap.size() <= argIdx)
+          argToParamMap.resize(argIdx + 1);
+        argToParamMap[argIdx] = paramIdx;
+      }
+
+      TupleExpr *tupleExpr = dyn_cast<TupleExpr>(argExpr);
+      if (tupleExpr) {
+        for (unsigned argIdx = 0; argIdx < tupleExpr->getNumElements();) {
+          // trailing closure
+          if (tupleExpr->hasTrailingClosure() &&
+              argIdx + 1 == tupleExpr->getNumElements()) {
+            if (auto paramIdx = argToParamMap[argIdx]) {
+              // treat label of trailing closure as same with parameter.
+              appendLabelStr(haveStr, calleeParams[*paramIdx].getLabel());
+            }
+
+            argIdx++;
+            continue;
+          }
+
+          appendLabelStr(haveStr, tupleExpr->getElementName(argIdx));
+
+          if (auto paramIdx = argToParamMap[argIdx]) {
+            if (Bindings[*paramIdx].size() > 1) {
+              // skip variadic tails
+              argIdx += Bindings[*paramIdx].size();
+              continue;
+            }
+          }
+
+          argIdx++;
+        }
+      } else if (ParenExpr *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
+        appendLabelStr(haveStr, Identifier());
+      }
+
+      for (auto paramIdx : indices(calleeParams)) {
+        auto param = calleeParams[paramIdx];
+
+        if (Bindings[paramIdx].empty()) {
+          if (param.isVariadic() ||
+              (calleeParamList &&
+               calleeParamList->get(paramIdx)->isDefaultArgument())) {
+            // skip omitted optional parameter
+            continue;
+          }
+        }
+
+        appendLabelStr(expectedStr, param.getLabel());
+      }
+    } else {
+      for (const auto *fix : RelabelFixes) {
+        appendLabelStr(haveStr, fix->getArgLabel());
+        appendLabelStr(expectedStr, fix->getParamLabel());
+      }
+    }
+
+    if (asNote) {
+      emitDiagnosticAt(calleeDecl, diag::candidate_expected_different_labels,
+                       plural, haveStr, expectedStr);
+    } else {
+      auto diag = emitDiagnosticAt(diagLoc, diag::wrong_argument_labels, plural,
+                                   haveStr, expectedStr, isSubscript);
+      if (!IsComplex) {
+        addFixIts(std::move(diag));
+      }
+    }
+  } else if (numMissing > 0) {
+    if (asNote) {
+      emitDiagnosticAt(calleeDecl, diag::candidate_expected_labeled, plural,
+                       missingsStr);
+    } else {
+      addFixIts(emitDiagnosticAt(diagLoc, diag::missing_argument_labels, plural,
+                                 missingsStr, isSubscript));
+    }
+  } else {
+    assert(numExtra > 0);
+    if (asNote) {
+      emitDiagnosticAt(calleeDecl, diag::candidate_expected_unlabeled, plural,
+                       extrasStr);
+    } else {
+      addFixIts(emitDiagnosticAt(diagLoc, diag::extra_argument_labels, plural,
+                                 extrasStr, isSubscript));
+    }
+  }
+
+  return true;
+}
+
+Type LabelingFailure::getCalleeParamTypeForObjectLiteralExpr(
+    ObjectLiteralExpr *expr) const {
+  auto protocol = TypeChecker::getLiteralProtocol(getASTContext(), expr);
+  if (!protocol)
+    return nullptr;
+  auto ctorName =
+      TypeChecker::getObjectLiteralConstructorName(getASTContext(), expr);
+  if (!ctorName)
+    return nullptr;
+  auto ctorDecl = dyn_cast_or_null<ConstructorDecl>(
+      protocol->getSingleRequirement(ctorName));
+  if (!ctorDecl)
+    return nullptr;
+  return TypeChecker::getObjectLiteralParameterType(expr, ctorDecl);
 }
 
 bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
