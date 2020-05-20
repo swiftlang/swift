@@ -41,6 +41,9 @@
 /// Matching an argument to a parameter.
 CUSTOM_LOCATOR_PATH_ELT(ApplyArgToParam)
 
+/// Argument label of function application.
+CUSTOM_LOCATOR_PATH_ELT(ArgumentLabel)
+
 /// The argument of function application.
 SIMPLE_LOCATOR_PATH_ELT(ApplyArgument)
 

@@ -77,6 +77,7 @@ public:
       return 0;
 
     case ClosureBody:
+    case ArgumentLabel:
     case ContextualType:
     case OpenedGeneric:
     case GenericArgument:
@@ -599,6 +600,18 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::ApplyArgToParam;
+  }
+};
+
+class LocatorPathElt::ArgumentLabel final : public LocatorPathElt {
+public:
+  ArgumentLabel(unsigned argIdx)
+      : LocatorPathElt(ConstraintLocator::ArgumentLabel, argIdx) {}
+
+  unsigned getArgIdx() const { return getValue(0); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ArgumentLabel;
   }
 };
 
