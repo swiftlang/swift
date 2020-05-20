@@ -4378,7 +4378,7 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   llvm::AllocaInst *alloca =
       new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), name,
                            AllocaIP);
-  alloca->setAlignment(llvm::MaybeAlign(alignment.getValue()));
+  alloca->setAlignment(llvm::MaybeAlign(alignment.getValue()).valueOrOne());
   return Address(alloca, alignment);
 }
 
@@ -4389,7 +4389,7 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
                                     const llvm::Twine &name) {
   llvm::AllocaInst *alloca = new llvm::AllocaInst(
       type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
-      llvm::MaybeAlign(alignment.getValue()), name, AllocaIP);
+      llvm::MaybeAlign(alignment.getValue()).valueOrOne(), name, AllocaIP);
   return Address(alloca, alignment);
 }
 
