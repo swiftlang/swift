@@ -89,6 +89,20 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
   return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
 };
 
+static clang::CodeGenOptions::FramePointerKind
+shouldUseFramePointer(const IRGenOptions &Opts) {
+  if (Opts.DisableFPElim) {
+    // General frame pointer elimination is disabled.
+    // Should we at least eliminate in leaf functions?
+    return Opts.DisableFPElimLeaf
+               ? clang::CodeGenOptions::FramePointerKind::All
+               : clang::CodeGenOptions::FramePointerKind::NonLeaf;
+  }
+
+  return clang::CodeGenOptions::FramePointerKind::None;
+
+}
+
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,
@@ -101,9 +115,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
-  CGO.setFramePointer(Opts.DisableFPElim
-                          ? clang::CodeGenOptions::FramePointerKind::All
-                          : clang::CodeGenOptions::FramePointerKind::None);
+  CGO.setFramePointer(shouldUseFramePointer(Opts));
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -983,7 +995,8 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
 
 void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
                                      bool HasFramePointer) {
-  Attrs.addAttribute("frame-pointer", HasFramePointer ? "all" : "none");
+  auto UseFramePointer = IRGen.Opts.DisableFPElimLeaf ? "all" : "non-leaf";
+  Attrs.addAttribute("frame-pointer", HasFramePointer ? UseFramePointer : "none");
 }
 
 void IRGenModule::setHasFramePointer(llvm::Function *F,
