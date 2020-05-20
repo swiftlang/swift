@@ -3135,6 +3135,39 @@ bool ConstraintSystem::repairFailures(
     return false;
   };
 
+  // Check whether given `rawReprType` does indeed conform to `RawRepresentable`
+  // and if so check that given `valueType` matches its `RawValue` type. If that
+  // condition holds add a tailored fix which is going to suggest to explicitly
+  // construct a raw representable type from a given value type.
+  auto repairByExplicitRawRepresentativeUse =
+      [&](Type origValueType, Type origRawReprType) -> bool {
+    auto rawReprType = origRawReprType;
+    // Let's unwrap a single level of optionality since
+    // diagnostic is going to suggest failable initializer anyway.
+    if (auto objType = rawReprType->getOptionalObjectType())
+      rawReprType = objType;
+
+    auto valueType = origValueType;
+    // If value is optional diagnostic would suggest using `Optional.map` in
+    // combination with `<Type>(rawValue: ...)` initializer.
+    if (auto objType = valueType->getOptionalObjectType())
+      valueType = objType;
+
+    auto rawValue = isRawRepresentable(*this, rawReprType);
+    if (!rawValue)
+      return false;
+
+    auto result = matchTypes(valueType, rawValue, ConstraintKind::Conversion,
+                             TMF_ApplyingFix, locator);
+
+    if (result.isFailure())
+      return false;
+
+    conversionsOrFixes.push_back(ExplicitlyConstructRawRepresentable::create(
+        *this, origRawReprType, origValueType, getConstraintLocator(locator)));
+    return true;
+  };
+
   auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
     return llvm::any_of(conversionsOrFixes,
                         [kind](const RestrictionOrFix correction) {
@@ -3349,6 +3382,10 @@ bool ConstraintSystem::repairFailures(
 
       if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                   conversionsOrFixes, locator))
+        return true;
+
+      // `rhs` - is an assignment destination and `lhs` is its source.
+      if (repairByExplicitRawRepresentativeUse(lhs, rhs))
         return true;
 
       // Let's try to match source and destination types one more
@@ -3583,12 +3620,6 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    if (auto *fix = ExplicitlyConstructRawRepresentable::attempt(
-            *this, lhs, rhs, locator)) {
-      conversionsOrFixes.push_back(fix);
-      break;
-    }
-
     if (auto *fix = UseValueTypeOfRawRepresentative::attempt(*this, lhs, rhs,
                                                              locator)) {
       conversionsOrFixes.push_back(fix);
@@ -3623,6 +3654,10 @@ bool ConstraintSystem::repairFailures(
     // If either type has a hole, consider this fixed.
     if (lhs->hasHole() || rhs->hasHole())
       return true;
+
+    // `lhs` - is an argument and `rhs` is a parameter type.
+    if (repairByExplicitRawRepresentativeUse(lhs, rhs))
+      break;
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
@@ -3852,6 +3887,10 @@ bool ConstraintSystem::repairFailures(
                      [](const RestrictionOrFix &correction) {
                        return bool(correction.getRestriction());
                      }))
+      break;
+
+    // `lhs` - is an result type and `rhs` is a contextual type.
+    if (repairByExplicitRawRepresentativeUse(lhs, rhs))
       break;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
