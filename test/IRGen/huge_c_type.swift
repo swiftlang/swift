@@ -3,6 +3,7 @@
 // llvm::IntegerTypes.
 // RUN: %target-swift-frontend -import-objc-header %S/Inputs/huge_c_type.h %s -c
 
+// REQUIRES: OS=macosx || OS=ios
 
 // CHECK-NOT:i9535616
 
