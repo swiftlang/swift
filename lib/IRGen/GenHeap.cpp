@@ -292,7 +292,7 @@ static llvm::Value *calcInitOffset(swift::irgen::IRGenFunction &IGF,
   auto &prevElt = layout.getElement(i - 1);
   auto prevType = layout.getElementTypes()[i - 1];
   // Start calculating offsets from the last fixed-offset field.
-  Size lastFixedOffset = layout.getElement(i - 1).getByteOffset();
+  Size lastFixedOffset = layout.getElement(i - 1).getByteOffsetDuringLayout();
   if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getType())) {
     // If the last fixed-offset field is also fixed-size, we can
     // statically compute the end of the fixed-offset fields.

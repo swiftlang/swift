@@ -767,3 +767,82 @@ bb0(%x : $*ResilientInt, %y : $SwiftClass):
   %t = tuple()
   return %t : $()
 }
+
+protocol Proto1 {}
+protocol Proto2 {}
+struct EmptyType : Proto1 { }
+
+struct SomeType : Proto2 {
+  var d : ResilientInt // some resilient type
+  var x : Int
+}
+
+sil @foo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
+
+// CHECK-64-LABEL: define{{.*}} swiftcc void @empty_followed_by_non_fixed(%T13partial_apply8SomeTypeV* noalias nocapture %0)
+// CHECK-64:  [[FLAGS:%.*]] = load i32, i32*
+// CHECK-64:  [[FLAGS2:%.*]] = zext i32 [[FLAGS]] to i64
+// CHECK-64:  [[ALIGNMASK:%.*]] = and i64 [[FLAGS2]], 255
+// CHECK-64:  [[NOTALIGNMASK:%.*]] = xor i64 [[ALIGNMASK]], -1
+// Make sure we take the header offset (16) into account.
+// CHECK-64:  [[TMP:%.*]] = add i64 16, [[ALIGNMASK]]
+// CHECK-64:  [[OFFSET:%.*]] = and i64 [[TMP]], [[NOTALIGNMASK]]
+// CHECK-64:  [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject
+// CHECK-64:  [[CAST:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted }>*
+// CHECK-64:  [[CAST2:%.*]] = bitcast <{ %swift.refcounted }>* [[CAST]] to i8*
+// CHECK-64:  [[GEP:%.*]] = getelementptr inbounds i8, i8* [[CAST2]], i64 [[OFFSET]]
+// CHECK-64:  [[CAST3:%.*]] = bitcast i8* [[GEP]] to %T13partial_apply8SomeTypeV*
+// CHECK-64:  call %T13partial_apply8SomeTypeV* @"$s13partial_apply8SomeTypeVWOb"(%T13partial_apply8SomeTypeV* {{.*}}, %T13partial_apply8SomeTypeV* [[CAST3]])
+
+sil @empty_followed_by_non_fixed : $@convention(thin)  (EmptyType, @in_guaranteed SomeType) -> () {
+entry(%0 : $EmptyType, %1: $*SomeType):
+  %5 = alloc_stack $EmptyType
+  store %0 to %5 : $*EmptyType
+  %31 = function_ref @foo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
+  %32 = alloc_stack $EmptyType
+  copy_addr %5 to [initialization] %32 : $*EmptyType
+  %34 = alloc_stack $SomeType
+  copy_addr %1 to [initialization] %34 : $*SomeType // id: %35
+  %36 = partial_apply [callee_guaranteed] %31<EmptyType, SomeType>(%32, %34) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
+  release_value %36: $@callee_guaranteed () ->()
+  dealloc_stack %34 : $*SomeType
+  dealloc_stack %32 : $*EmptyType
+  dealloc_stack %5 : $*EmptyType
+  %40 = tuple()
+  return %40 : $()
+}
+
+struct FixedType {
+  var f: Int32
+}
+// CHECK-64-LABEL: define{{.*}} swiftcc void @fixed_followed_by_empty_followed_by_non_fixed
+// CHECK-64-NOT: ret
+// CHECK-64:  [[FLAGS:%.*]] = load i32, i32*
+// CHECK-64:  [[FLAGS2:%.*]] = zext i32 [[FLAGS]] to i64
+// CHECK-64:  [[ALIGNMASK:%.*]] = and i64 [[FLAGS2]], 255
+// CHECK-64:  [[NOTALIGNMASK:%.*]] = xor i64 [[ALIGNMASK]], -1
+// Make sure we compute the correct offset of the non-fixed field.
+// CHECK-64:  [[TMP:%.*]] = add i64 20, [[ALIGNMASK]]
+// CHECK-64: ret
+
+sil @foo2 : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> ()
+sil @fixed_followed_by_empty_followed_by_non_fixed : $@convention(thin)  (EmptyType, @in_guaranteed SomeType, FixedType) -> () {
+entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
+  %5 = alloc_stack $EmptyType
+  store %0 to %5 : $*EmptyType
+  %7 = alloc_stack $FixedType
+  store %3 to %7 : $*FixedType
+  %31 = function_ref @foo2 : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> ()
+  %32 = alloc_stack $EmptyType
+  copy_addr %5 to [initialization] %32 : $*EmptyType
+  %34 = alloc_stack $SomeType
+  copy_addr %1 to [initialization] %34 : $*SomeType // id: %35
+  %36 = partial_apply [callee_guaranteed] %31<FixedType, EmptyType, SomeType>(%7, %32, %34) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> ()
+  release_value %36: $@callee_guaranteed () ->()
+  dealloc_stack %34 : $*SomeType
+  dealloc_stack %32 : $*EmptyType
+  dealloc_stack %7 : $*FixedType
+  dealloc_stack %5 : $*EmptyType
+  %40 = tuple()
+  return %40 : $()
+}
