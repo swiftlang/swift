@@ -73,9 +73,11 @@ enum class FixKind : uint8_t {
   /// Mark function type as explicitly '@escaping'.
   ExplicitlyEscaping,
 
-  /// Arguments have labeling failures - missing/extraneous or incorrect
-  /// labels attached to the, fix it by suggesting proper labels.
-  RelabelArguments,
+  /// Labeling failure associated with a particular argument, could be a
+  /// missing, extraneous or incorrect label.
+  /// Let fix the problem by suggesting a new label aligned with parameter at
+  /// the same position.
+  RelabelArgument,
 
   /// Treat rvalue as lvalue
   TreatRValueAsLValue,
@@ -372,41 +374,43 @@ public:
                                      ConstraintLocator *locator);
 };
 
-/// Arguments have labeling failures - missing/extraneous or incorrect
-/// labels attached to the, fix it by suggesting proper labels.
-class RelabelArguments final
-    : public ConstraintFix,
-      private llvm::TrailingObjects<RelabelArguments, Identifier> {
-  friend TrailingObjects;
+/// Labeling failure associated with a particular argument, could be a missing,
+/// extraneous or incorrect label. Let fix the problem by suggesting a new label
+/// aligned with parameter at the same position.
+class RelabelArgument final : public ConstraintFix {
+  using ParamBinding = SmallVector<unsigned, 1>;
 
-  unsigned NumLabels;
+  Identifier ArgLabel;
+  SourceLoc ArgLabelLoc;
+  SourceLoc ArgLoc;
+  Identifier ParamLabel;
 
-  RelabelArguments(ConstraintSystem &cs,
-                   llvm::ArrayRef<Identifier> correctLabels,
-                   ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::RelabelArguments, locator),
-        NumLabels(correctLabels.size()) {
-    std::uninitialized_copy(correctLabels.begin(), correctLabels.end(),
-                            getLabelsBuffer().begin());
-  }
+  SmallVector<ParamBinding, 4> Bindings;
+
+  RelabelArgument(ConstraintSystem &cs, Identifier argLabel,
+                  SourceLoc argLabelLoc, SourceLoc argLoc,
+                  Identifier paramLabel, ArrayRef<ParamBinding> bindings,
+                  ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RelabelArgument, locator),
+        ArgLabel(argLabel), ArgLabelLoc(argLabelLoc), ArgLoc(argLoc),
+        ParamLabel(paramLabel), Bindings(bindings.begin(), bindings.end()) {}
 
 public:
-  std::string getName() const override { return "re-label argument(s)"; }
-
-  ArrayRef<Identifier> getLabels() const {
-    return {getTrailingObjects<Identifier>(), NumLabels};
-  }
+  std::string getName() const override { return "re-label argument"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static RelabelArguments *create(ConstraintSystem &cs,
-                                  llvm::ArrayRef<Identifier> correctLabels,
-                                  ConstraintLocator *locator);
+  Identifier getArgLabel() const { return ArgLabel; }
+  SourceLoc getArgLabelLoc() const { return ArgLabelLoc; }
+  SourceLoc getArgLoc() const { return ArgLoc; }
+  Identifier getParamLabel() const { return ParamLabel; }
+  ArrayRef<ParamBinding> getBindings() const { return Bindings; }
 
-private:
-  MutableArrayRef<Identifier> getLabelsBuffer() {
-    return {getTrailingObjects<Identifier>(), NumLabels};
-  }
+  static RelabelArgument *create(ConstraintSystem &cs, Identifier argLabel,
+                                 SourceLoc argLabelLoc, SourceLoc argLoc,
+                                 Identifier paramLabel,
+                                 ArrayRef<ParamBinding> bindings,
+                                 ConstraintLocator *locator);
 };
 
 /// Add a new conformance to the type to satisfy a requirement.

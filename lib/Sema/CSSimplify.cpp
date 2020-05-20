@@ -1975,12 +1975,18 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   if (hasLabelingFailures) {
-    SmallVector<Identifier, 4> correctLabels;
-    for (const auto &param : func2Params)
-      correctLabels.push_back(param.getLabel());
+    // FIXME: This code doesn't work correctly.
+    // Previously `RelabelArguments` takes locator as source of arguments
+    // and pass it to `LabelingFailure` to diagnose.
+    // But `argumentLocator` is `DeclRef -> contextual type -> function
+    // argument` here. So `LabelingFailure::diagnoseAsError` failed
+    // `getArgumentListExprFor` and it didn't diagnose anything.
+    // When I remove `RelabelArguments`,
+    // I make empty `RelabelArgument` to just keep behavior.
 
-    auto *fix = RelabelArguments::create(*this, correctLabels,
-                                         getConstraintLocator(argumentLocator));
+    auto *fix = RelabelArgument::create(
+        *this, Identifier(), SourceLoc(), SourceLoc(), Identifier(),
+        SmallVector<ParamBinding, 1>(), getConstraintLocator(argumentLocator));
     if (recordFix(fix))
       return getTypeMatchFailure(argumentLocator);
   }
@@ -9582,7 +9588,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::UseSubscriptOperator:
   case FixKind::ExplicitlyEscaping:
-  case FixKind::RelabelArguments:
+  case FixKind::RelabelArgument:
   case FixKind::RemoveCall:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
