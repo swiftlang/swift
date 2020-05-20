@@ -238,7 +238,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   // Keep track of which arguments we have claimed from the argument tuple.
   unsigned numArgs = args.size();
   SmallVector<bool, 4> claimedArgs(numArgs, false);
-  SmallVector<Identifier, 4> actualArgNames;
   unsigned numClaimedArgs = 0;
 
   // Indicates whether any of the arguments are potentially out-of-order,
@@ -253,28 +252,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // Make sure we can claim this argument.
     assert(argNumber != numArgs && "Must have a valid index to claim");
     assert(!claimedArgs[argNumber] && "Argument already claimed");
-
-    if (!actualArgNames.empty()) {
-      // We're recording argument names; record this one.
-      actualArgNames[argNumber] = expectedName;
-    } else if (args[argNumber].getLabel() != expectedName && !ignoreNameClash) {
-      // We have an argument name mismatch. Start recording argument names.
-      actualArgNames.resize(numArgs);
-
-      // Figure out previous argument names from the parameter bindings.
-      for (auto i : indices(params)) {
-        const auto &param = params[i];
-        bool firstArg = true;
-
-        for (auto argIdx : parameterBindings[i]) {
-          actualArgNames[argIdx] = firstArg ? param.getLabel() : Identifier();
-          firstArg = false;
-        }
-      }
-
-      // Record this argument name.
-      actualArgNames[argNumber] = expectedName;
-    }
 
     claimedArgs[argNumber] = true;
     ++numClaimedArgs;
