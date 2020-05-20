@@ -722,10 +722,20 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           // 'other' is implicit, we diagnose 'current'.
           const auto *declToDiagnose = currentDC->getAsDecl();
           if (current->isImplicit() && other->isImplicit()) {
-            // Get the nearest non-implicit decl context
-            while (declToDiagnose && declToDiagnose->isImplicit() &&
-                   declToDiagnose->getDeclContext()) {
-              declToDiagnose = declToDiagnose->getDeclContext()->getAsDecl();
+            // If 'current' is a property wrapper backing storage property
+            // or projected value property, then diagnose the wrapped
+            // property instead of the nearest non-implicit DC.
+            if (auto VD = dyn_cast<VarDecl>(current)) {
+              if (auto originalWrappedProperty =
+                      VD->getOriginalWrappedProperty()) {
+                declToDiagnose = originalWrappedProperty;
+              }
+            } else {
+              // Get the nearest non-implicit decl context
+              while (declToDiagnose && declToDiagnose->isImplicit() &&
+                     declToDiagnose->getDeclContext()) {
+                declToDiagnose = declToDiagnose->getDeclContext()->getAsDecl();
+              }
             }
           } else {
             declToDiagnose = current->isImplicit() ? other : current;
@@ -748,7 +758,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           // Emit a specialized note if the one of the declarations is
           // the backing storage property ('_foo') or projected value
           // property ('$foo') for a wrapped property. The backing or
-          // storage var has the same source location as the wrapped
+          // projected var has the same source location as the wrapped
           // property we diagnosed above, so we don't need to extract
           // the original property.
           const VarDecl *varToDiagnose = nullptr;
