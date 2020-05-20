@@ -273,6 +273,11 @@ private:
     else
       return 0;
   }
+
+public:
+  bool isLocInVirtualFile(SourceLoc Loc) const {
+    return getVirtualFile(Loc) != nullptr;
+  }
 };
 
 } // end namespace swift
