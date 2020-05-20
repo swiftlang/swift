@@ -755,12 +755,17 @@ ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 ERROR(invalid_redecl_init,none,
       "invalid redeclaration of synthesized %select{|memberwise }1%0",
       (DeclName, bool))
+ERROR(invalid_redecl_implicit,none,
+      "invalid redeclaration of synthesized %select{%0|witness for protocol requirement}1 %2",
+      (DescriptiveDeclKind, bool, DeclName))
 WARNING(invalid_redecl_swift5_warning,none,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
 
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
+NOTE(invalid_redecl_implicit_wrapper,none,
+     "%0 synthesized for property wrapper %select{projected value|backing storage}1", (DeclName, bool))
 
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (DeclNameRef))

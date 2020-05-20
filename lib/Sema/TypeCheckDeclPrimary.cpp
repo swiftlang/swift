@@ -711,7 +711,69 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
             current->diagnose(diag::invalid_redecl_init,
                               current->getName(),
                               otherInit->isMemberwiseInitializer());
-        } else if (!current->isImplicit() && !other->isImplicit()) {
+        } else if (current->isImplicit() || other->isImplicit()) {
+          // If both declarations are implicit, we diagnose the nearest
+          // non-implicit DC because it is likely that we do not have a
+          // valid source location for the declaration and we want to
+          // avoid emitting it at an unknown location.
+          //
+          // Otherwise, if 'current' is implicit, then we diagnose 'other'
+          // since 'other' is a redeclaration of 'current'. Similarly, if
+          // 'other' is implicit, we diagnose 'current'.
+          const auto *declToDiagnose = currentDC->getAsDecl();
+          if (current->isImplicit() && other->isImplicit()) {
+            // Get the nearest non-implicit decl context
+            while (declToDiagnose && declToDiagnose->isImplicit() &&
+                   declToDiagnose->getDeclContext()) {
+              declToDiagnose = declToDiagnose->getDeclContext()->getAsDecl();
+            }
+          } else {
+            declToDiagnose = current->isImplicit() ? other : current;
+          }
+
+          // Figure out if the the declaration we've redeclared is a synthesized
+          // witness for a protocol requirement.
+          bool isProtocolRequirement = false;
+          if (auto VD = dyn_cast<ValueDecl>(current->isImplicit() ? current
+                                                                  : other)) {
+            isProtocolRequirement = llvm::any_of(
+                VD->getSatisfiedProtocolRequirements(), [&](ValueDecl *req) {
+                  return req->getName() == VD->getName();
+                });
+          }
+          declToDiagnose->diagnose(diag::invalid_redecl_implicit,
+                                   current->getDescriptiveKind(),
+                                   isProtocolRequirement, other->getName());
+
+          // Emit a specialized note if the one of the declarations is
+          // the backing storage property ('_foo') or projected value
+          // property ('$foo') for a wrapped property. The backing or
+          // storage var has the same source location as the wrapped
+          // property we diagnosed above, so we don't need to extract
+          // the original property.
+          const VarDecl *varToDiagnose = nullptr;
+          auto kind = PropertyWrapperSynthesizedPropertyKind::Backing;
+          if (auto currentVD = dyn_cast<VarDecl>(current)) {
+            if (auto currentKind =
+                    currentVD->getPropertyWrapperSynthesizedPropertyKind()) {
+              varToDiagnose = currentVD;
+              kind = *currentKind;
+            }
+          }
+          if (auto otherVD = dyn_cast<VarDecl>(other)) {
+            if (auto otherKind =
+                    otherVD->getPropertyWrapperSynthesizedPropertyKind()) {
+              varToDiagnose = otherVD;
+              kind = *otherKind;
+            }
+          }
+
+          if (varToDiagnose) {
+            varToDiagnose->diagnose(
+                diag::invalid_redecl_implicit_wrapper, varToDiagnose->getName(),
+                kind == PropertyWrapperSynthesizedPropertyKind::Backing);
+          }
+        } else {
           ctx.Diags.diagnoseWithNotes(
             current->diagnose(diag::invalid_redecl,
                               current->getName()), [&]() {

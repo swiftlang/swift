@@ -5217,6 +5217,12 @@ public:
   Optional<PropertyWrapperMutability>
       getPropertyWrapperMutability() const;
 
+  /// Returns whether this property is the backing storage property or a storage
+  /// wrapper for wrapper instance's projectedValue. If this property is
+  /// neither, then it returns `None`.
+  Optional<PropertyWrapperSynthesizedPropertyKind>
+  getPropertyWrapperSynthesizedPropertyKind() const;
+
   /// Retrieve the backing storage property for a property that has an
   /// attached property wrapper.
   ///
