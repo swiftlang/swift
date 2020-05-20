@@ -2262,13 +2262,6 @@ private:
   friend class BoundGenericType;
 
 public:
-  static BoundGenericClassType* get(ClassDecl *theDecl, Type parent,
-                                    ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericClassType>(
-             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
-                                   parent, genericArgs));
-  }
-
   /// Returns the declaration that declares this type.
   ClassDecl *getDecl() const {
     return reinterpret_cast<ClassDecl*>(BoundGenericType::getDecl());
@@ -2296,13 +2289,6 @@ private:
   friend class BoundGenericType;
 
 public:
-  static BoundGenericEnumType* get(EnumDecl *theDecl, Type parent,
-                                    ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericEnumType>(
-             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
-                                   parent, genericArgs));
-  }
-
   /// Returns the declaration that declares this type.
   EnumDecl *getDecl() const {
     return reinterpret_cast<EnumDecl*>(BoundGenericType::getDecl());
@@ -2330,13 +2316,6 @@ private:
   friend class BoundGenericType;
 
 public:
-  static BoundGenericStructType* get(StructDecl *theDecl, Type parent,
-                                    ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericStructType>(
-             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
-                                   parent, genericArgs));
-  }
-
   /// Returns the declaration that declares this type.
   StructDecl *getDecl() const {
     return reinterpret_cast<StructDecl*>(BoundGenericType::getDecl());

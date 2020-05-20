@@ -693,8 +693,7 @@ Type ASTBuilder::createBoundGenericObjCClassType(StringRef name,
     parent = dc->getDeclaredInterfaceType();
   }
 
-  return BoundGenericClassType::get(cast<ClassDecl>(typeDecl),
-                                    parent, args);
+  return BoundGenericType::get(cast<ClassDecl>(typeDecl), parent, args);
 }
 
 ProtocolDecl *ASTBuilder::createObjCProtocolDecl(StringRef name) {

@@ -973,7 +973,7 @@ namespace {
             }
           }
           assert(importedTypeArgs.size() == typeParamCount);
-          importedType = BoundGenericClassType::get(
+          importedType = BoundGenericType::get(
             imported, nullptr, importedTypeArgs);
         } else {
           importedType = imported->getDeclaredType();

@@ -2915,7 +2915,7 @@ public:
         return ty;
       auto &C = ty->getASTContext();
       auto optDecl = C.getOptionalDecl();
-      return CanType(BoundGenericEnumType::get(optDecl, Type(), payloadTy));
+      return CanType(BoundGenericType::get(optDecl, Type(), payloadTy));
     }
 
     // Otherwise, generic arguments are not lowered.
