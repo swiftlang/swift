@@ -179,18 +179,134 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator()) MarkExplicitlyEscaping(cs, lhs, rhs, locator);
 }
 
-bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
-  LabelingFailure failure(solution, getLocator(), getLabels());
-  return failure.diagnose(asNote);
+// Find RelabelArgument and MoveOutOfOrder fixes.
+// Result is sorted by priority for emitting aggregated diagnostics.
+static void
+findLabelingFixes(const Solution &solution, ASTNode applyAnchor,
+                  SmallVectorImpl<const ConstraintFix *> &foundFixes) {
+  auto checkLocatorPrefix = [&](ConstraintLocator *locator) -> bool {
+    if (locator->getAnchor() != applyAnchor)
+      return false;
+
+    if (locator->getPath().size() < 1)
+      return false;
+
+    for (auto element : locator->getPath()) {
+      if (element.getKind() == ConstraintLocator::ApplyArgument) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  for (auto *checkFix : solution.Fixes) {
+    if (!checkLocatorPrefix(checkFix->getLocator()))
+      continue;
+
+    if (auto *fix = checkFix->getAs<RelabelArgument>()) {
+      foundFixes.push_back(fix);
+      continue;
+    }
+    if (auto *fix = checkFix->getAs<MoveOutOfOrderArgument>()) {
+      foundFixes.push_back(fix);
+      continue;
+    }
+  }
+
+  auto typePriority = [](const ConstraintFix *csFix) -> int {
+    if (auto *fix = csFix->getAs<RelabelArgument>())
+      return 2;
+    if (auto *fix = csFix->getAs<MoveOutOfOrderArgument>())
+      return 1;
+    return 0;
+  };
+
+  auto getArgIdx = [](ConstraintLocator *loc) -> unsigned {
+    if (loc->getPath().empty())
+      return 0;
+    auto element = loc->getPath().back();
+    if (auto elem = element.getAs<LocatorPathElt::ArgumentLabel>()) {
+      return elem->getArgIdx();
+    }
+    return 0;
+  };
+
+  auto compare = [&](const ConstraintFix *a, const ConstraintFix *b) -> bool {
+    auto ap = typePriority(a);
+    auto bp = typePriority(b);
+    if (ap != bp)
+      return ap < bp;
+    auto aa = getArgIdx(a->getLocator());
+    auto ba = getArgIdx(b->getLocator());
+    return aa < ba;
+  };
+
+  llvm::sort(foundFixes, compare);
 }
 
-RelabelArguments *
-RelabelArguments::create(ConstraintSystem &cs,
-                         llvm::ArrayRef<Identifier> correctLabels,
-                         ConstraintLocator *locator) {
-  unsigned size = totalSizeToAlloc<Identifier>(correctLabels.size());
-  void *mem = cs.getAllocator().Allocate(size, alignof(RelabelArguments));
-  return new (mem) RelabelArguments(cs, correctLabels, locator);
+static bool diagnoseLabelError(const ConstraintFix *thisFix,
+                               ArrayRef<const ConstraintFix *> fixes,
+                               const Solution &solution,
+                               ConstraintLocator *locator,
+                               ArrayRef<ParamBinding> bindings, bool asNote) {
+  if (fixes.empty())
+    return false;
+  if (thisFix != fixes.front())
+    return false;
+
+  SmallVector<const RelabelArgument *, 4> relabelFixes;
+  SmallVector<const MoveOutOfOrderArgument *, 4> oooFixes;
+
+  for (auto *checkFix : fixes) {
+    if (auto *fix = checkFix->getAs<RelabelArgument>()) {
+      relabelFixes.push_back(fix);
+    } else if (auto *fix = checkFix->getAs<MoveOutOfOrderArgument>()) {
+      oooFixes.push_back(fix);
+    }
+  }
+
+  bool isDiagnosed = false;
+
+  if (!relabelFixes.empty()) {
+    LabelingFailure failure(solution, locator, relabelFixes, oooFixes.size());
+
+    if (failure.diagnose(asNote)) {
+      isDiagnosed = true;
+
+      // In complex case, aggregated dianostic is emitted.
+      // It includes out of ordered label diagnostics.
+      // So it doesn't output more.
+      if (failure.isComplex()) {
+        return true;
+      }
+    }
+  }
+
+  for (auto *fix : oooFixes) {
+    OutOfOrderArgumentFailure failure(solution, fix->getArgIdx(),
+                                      fix->getPrevArgIdx(), bindings, locator);
+    isDiagnosed = failure.diagnose(asNote) || isDiagnosed;
+  }
+
+  return isDiagnosed;
+}
+
+bool RelabelArgument::coalesceAndDiagnose(
+    const Solution &solution, ArrayRef<ConstraintFix *> secondaryFixes,
+    bool asNote) const {
+  SmallVector<const ConstraintFix *, 4> fixes;
+  findLabelingFixes(solution, getLocator()->getAnchor(), fixes);
+  return diagnoseLabelError(this, fixes, solution, getLocator(), Bindings,
+                            asNote);
+}
+
+RelabelArgument *
+RelabelArgument::create(ConstraintSystem &cs, Identifier argLabel,
+                        SourceLoc argLabelLoc, SourceLoc argLoc,
+                        Identifier paramLabel, ArrayRef<ParamBinding> bindings,
+                        ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RelabelArgument(
+      cs, argLabel, argLabelLoc, argLoc, paramLabel, bindings, locator);
 }
 
 bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
@@ -692,11 +808,13 @@ RemoveExtraneousArguments *RemoveExtraneousArguments::create(
       RemoveExtraneousArguments(cs, contextualType, extraArgs, locator);
 }
 
-bool MoveOutOfOrderArgument::diagnose(const Solution &solution,
-                                      bool asNote) const {
-  OutOfOrderArgumentFailure failure(solution, ArgIdx, PrevArgIdx, Bindings,
-                                    getLocator());
-  return failure.diagnose(asNote);
+bool MoveOutOfOrderArgument::coalesceAndDiagnose(
+    const Solution &solution, ArrayRef<ConstraintFix *> secondaryFixes,
+    bool asNote) const {
+  SmallVector<const ConstraintFix *, 4> fixes;
+  findLabelingFixes(solution, getLocator()->getAnchor(), fixes);
+  return diagnoseLabelError(this, fixes, solution, getLocator(), Bindings,
+                            asNote);
 }
 
 MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(

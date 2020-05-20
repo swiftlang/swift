@@ -396,9 +396,19 @@ class RelabelArgument final : public ConstraintFix {
         ParamLabel(paramLabel), Bindings(bindings.begin(), bindings.end()) {}
 
 public:
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::RelabelArgument;
+  }
+
   std::string getName() const override { return "re-label argument"; }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const override;
+  bool coalesceAndDiagnose(const Solution &solution,
+                           ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override {
+    return coalesceAndDiagnose(solution, ArrayRef<ConstraintFix *>(), asNote);
+  }
 
   Identifier getArgLabel() const { return ArgLabel; }
   SourceLoc getArgLabelLoc() const { return ArgLabelLoc; }
@@ -1233,11 +1243,24 @@ class MoveOutOfOrderArgument final : public ConstraintFix {
         Bindings(bindings.begin(), bindings.end()) {}
 
 public:
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::MoveOutOfOrderArgument;
+  }
+
   std::string getName() const override {
     return "move out-of-order argument to correct position";
   }
 
-  bool diagnose(const Solution &solution, bool asNote = false) const override;
+  bool coalesceAndDiagnose(const Solution &solution,
+                           ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override {
+    return coalesceAndDiagnose(solution, ArrayRef<ConstraintFix *>(), asNote);
+  }
+
+  unsigned getArgIdx() const { return ArgIdx; }
+  unsigned getPrevArgIdx() const { return PrevArgIdx; }
 
   static MoveOutOfOrderArgument *create(ConstraintSystem &cs,
                                         unsigned argIdx,
