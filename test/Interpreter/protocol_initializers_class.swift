@@ -1,8 +1,6 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 5 %s -o %t/a.out
-// RUN: %target-codesign %t/a.out
-//
-// RUN: %target-run %t/a.out
+// RUN: %target-run-simple-swift(-swift-version 4)
+// RUN: %target-run-simple-swift(-swift-version 5)
+
 // REQUIRES: executable_test
 
 import StdlibUnittest

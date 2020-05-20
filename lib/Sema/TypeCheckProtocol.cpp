@@ -751,8 +751,8 @@ static const RequirementEnvironment &getOrCreateRequirementEnvironment(
 }
 
 static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
-    constraints::ConstraintFix *fix, ValueDecl *witness,
-    ProtocolConformance *conformance,
+    constraints::Solution &solution, constraints::ConstraintFix *fix,
+    ValueDecl *witness, ProtocolConformance *conformance,
     const RequirementEnvironment &reqEnvironment) {
   Type type, missingType;
   RequirementKind requirementKind;
@@ -784,6 +784,15 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   default:
     return Optional<RequirementMatch>();
   }
+
+  type = solution.simplifyType(type);
+  missingType = solution.simplifyType(missingType);
+
+  missingType = missingType->mapTypeOutOfContext();
+  if (missingType->hasTypeParameter())
+    if (auto env = conformance->getGenericEnvironment())
+      if (auto assocType = env->mapTypeIntoContext(missingType))
+        missingType = assocType;
 
   auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
     Requirement requirement(requirementKind, type, missingType);
@@ -986,7 +995,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     if (solution && conformance && solution->Fixes.size()) {
       for (auto fix : solution->Fixes) {
         if (auto result = findMissingGenericRequirementForSolutionFix(
-                fix, witness, conformance, reqEnvironment))
+                *solution, fix, witness, conformance, reqEnvironment))
           return *result;
       }
     }
@@ -5034,25 +5043,19 @@ LookupAllConformancesInContextRequest::evaluate(
   return IDC->getLocalConformances(ConformanceLookupKind::All);
 }
 
-void TypeChecker::checkConformancesInContext(DeclContext *dc,
-                                             IterableDeclContext *idc) {
+void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
+  auto *const dc = idc->getAsGenericContext();
+
   // For anything imported from Clang, lazily check conformances.
   if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
     return;
 
+  const auto *const nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return;
+
   // Determine the access level of this conformance.
-  Decl *currentDecl = nullptr;
-  AccessLevel defaultAccess;
-  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    const NominalTypeDecl *nominal = ext->getExtendedNominal();
-    if (!nominal)
-      return;
-    defaultAccess = nominal->getFormalAccess();
-    currentDecl = ext;
-  } else {
-    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
-    currentDecl = cast<NominalTypeDecl>(dc);
-  }
+  const auto defaultAccess = nominal->getFormalAccess();
 
   // Check each of the conformances associated with this context.
   auto conformances =

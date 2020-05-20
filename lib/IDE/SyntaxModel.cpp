@@ -1509,7 +1509,6 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
 bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
                                         unsigned &Start,
                                         std::regex &Regex) {
-#ifdef SWIFT_HAVE_WORKING_STD_REGEX
   static const auto MailToPosition = std::find(URLProtocols.begin(),
                                                URLProtocols.end(),
                                                "mailto");
@@ -1541,7 +1540,6 @@ bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
       }
     }
   }
-#endif
   return false;
 }
 

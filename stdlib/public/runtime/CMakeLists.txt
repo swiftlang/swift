@@ -64,12 +64,6 @@ set(swift_runtime_sources
     RefCount.cpp
     RuntimeInvocationsTracking.cpp
     SwiftDtoa.cpp
-    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/ErrorHandling.cpp"
-    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/Hashing.cpp"
-    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/MemAlloc.cpp"
-    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallPtrSet.cpp"
-    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/SmallVector.cpp"
-    "${SWIFT_SOURCE_DIR}/stdlib/public/LLVMSupport/StringRef.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
@@ -224,6 +218,7 @@ add_swift_target_library(swiftRuntime OBJECT_LIBRARY
     ${swift_runtime_library_compile_flags}
     ${_RUNTIME_NONATOMIC_FLAGS}
   LINK_FLAGS ${swift_runtime_linker_flags}
+  INCORPORATE_OBJECT_LIBRARIES swiftLLVMSupport
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install)
 

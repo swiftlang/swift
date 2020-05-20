@@ -57,6 +57,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, ASTNode anchor,
       id.AddPointer(elt.castTo<LocatorPathElt::PatternMatch>().getPattern());
       break;
 
+    case ArgumentAttribute:
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
@@ -125,6 +126,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ImplicitCallAsFunction:
   case ConstraintLocator::TernaryBranch:
   case ConstraintLocator::PatternMatch:
+  case ConstraintLocator::ArgumentAttribute:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -500,6 +502,25 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     case PatternMatch:
       out << "pattern match";
       break;
+
+    case ArgumentAttribute: {
+      using AttrLoc = LocatorPathElt::ArgumentAttribute;
+
+      auto attrElt = elt.castTo<AttrLoc>();
+      out << "argument attribute: ";
+
+      switch (attrElt.getAttr()) {
+      case AttrLoc::Attribute::InOut:
+        out << "inout";
+        break;
+
+      case AttrLoc::Attribute::Escaping:
+        out << "@escaping";
+        break;
+      }
+
+      break;
+    }
     }
   }
   out << ']';
