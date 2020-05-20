@@ -2214,9 +2214,9 @@ class BoundGenericType : public NominalOrBoundGenericNominalType,
   }
 
 protected:
-  BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
-                   ArrayRef<Type> genericArgs, const ASTContext *context,
-                   RecursiveTypeProperties properties);
+  BoundGenericType(TypeKind K, NominalTypeDecl *TheDecl, Type Parent,
+                   ArrayRef<Type> GenericArgs, const ASTContext *C,
+                   RecursiveTypeProperties Properties);
 
 public:
   static BoundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
@@ -2253,12 +2253,12 @@ class BoundGenericClassType final : public BoundGenericType,
   friend TrailingObjects;
 
 private:
-  BoundGenericClassType(ClassDecl *theDecl, Type parent,
-                        ArrayRef<Type> genericArgs, const ASTContext *context,
-                        RecursiveTypeProperties properties)
+  BoundGenericClassType(ClassDecl *TheDecl, Type Parent,
+                        ArrayRef<Type> GenericArgs, const ASTContext *C,
+                        RecursiveTypeProperties Properties)
     : BoundGenericType(TypeKind::BoundGenericClass,
-                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, properties) {}
+                       reinterpret_cast<NominalTypeDecl*>(TheDecl), Parent,
+                       GenericArgs, C, Properties) {}
   friend class BoundGenericType;
 
 public:
@@ -2280,12 +2280,12 @@ class BoundGenericEnumType final : public BoundGenericType,
   friend TrailingObjects;
 
 private:
-  BoundGenericEnumType(EnumDecl *theDecl, Type parent,
-                       ArrayRef<Type> genericArgs, const ASTContext *context,
-                       RecursiveTypeProperties properties)
+  BoundGenericEnumType(EnumDecl *TheDecl, Type Parent,
+                       ArrayRef<Type> GenericArgs, const ASTContext *C,
+                       RecursiveTypeProperties Properties)
     : BoundGenericType(TypeKind::BoundGenericEnum,
-                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, properties) {}
+                       reinterpret_cast<NominalTypeDecl*>(TheDecl), Parent,
+                       GenericArgs, C, Properties) {}
   friend class BoundGenericType;
 
 public:
@@ -2307,12 +2307,12 @@ class BoundGenericStructType final : public BoundGenericType,
   friend TrailingObjects;
 
 private:
-  BoundGenericStructType(StructDecl *theDecl, Type parent,
-                         ArrayRef<Type> genericArgs, const ASTContext *context,
-                         RecursiveTypeProperties properties)
+  BoundGenericStructType(StructDecl *TheDecl, Type Parent,
+                         ArrayRef<Type> GenericArgs, const ASTContext *C,
+                         RecursiveTypeProperties Properties)
     : BoundGenericType(TypeKind::BoundGenericStruct, 
-                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, properties) {}
+                       reinterpret_cast<NominalTypeDecl*>(TheDecl), Parent,
+                       GenericArgs, C, Properties) {}
   friend class BoundGenericType;
 
 public:

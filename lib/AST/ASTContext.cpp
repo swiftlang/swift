@@ -2591,17 +2591,17 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
   BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs);
-  RecursiveTypeProperties properties;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  RecursiveTypeProperties Properties;
+  if (Parent) Properties |= Parent->getRecursiveProperties();
   for (Type Arg : GenericArgs) {
-    properties |= Arg->getRecursiveProperties();
+    Properties |= Arg->getRecursiveProperties();
   }
 
-  auto arena = getArena(properties);
+  const auto Arena = getArena(Properties);
 
   void *InsertPos = nullptr;
   if (BoundGenericType *BGT =
-        C.getImpl().getArena(arena).BoundGenericTypes.FindNodeOrInsertPos(ID,
+        C.getImpl().getArena(Arena).BoundGenericTypes.FindNodeOrInsertPos(ID,
                                                                      InsertPos))
     return BGT;
 
@@ -2615,28 +2615,28 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
     }
   }
 
-  BoundGenericType *newType;
-  if (auto theClass = dyn_cast<ClassDecl>(TheDecl)) {
+  BoundGenericType *BGT;
+  if (auto *const CD = dyn_cast<ClassDecl>(TheDecl)) {
     auto sz = BoundGenericClassType::totalSizeToAlloc<Type>(GenericArgs.size());
-    auto mem = C.Allocate(sz, alignof(BoundGenericClassType), arena);
-    newType = new (mem) BoundGenericClassType(
-        theClass, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
-  } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
+    auto Mem = C.Allocate(sz, alignof(BoundGenericClassType), Arena);
+    BGT = new (Mem) BoundGenericClassType(
+        CD, Parent, GenericArgs, IsCanonical ? &C : nullptr, Properties);
+  } else if (auto *const SD = dyn_cast<StructDecl>(TheDecl)) {
     auto sz =BoundGenericStructType::totalSizeToAlloc<Type>(GenericArgs.size());
-    auto mem = C.Allocate(sz, alignof(BoundGenericStructType), arena);
-    newType = new (mem) BoundGenericStructType(
-        theStruct, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
-  } else if (auto theEnum = dyn_cast<EnumDecl>(TheDecl)) {
+    auto Mem = C.Allocate(sz, alignof(BoundGenericStructType), Arena);
+    BGT = new (Mem) BoundGenericStructType(
+        SD, Parent, GenericArgs, IsCanonical ? &C : nullptr, Properties);
+  } else if (auto *const ED = dyn_cast<EnumDecl>(TheDecl)) {
     auto sz = BoundGenericEnumType::totalSizeToAlloc<Type>(GenericArgs.size());
-    auto mem = C.Allocate(sz, alignof(BoundGenericEnumType), arena);
-    newType = new (mem) BoundGenericEnumType(
-        theEnum, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
+    auto Mem = C.Allocate(sz, alignof(BoundGenericEnumType), Arena);
+    BGT = new (Mem) BoundGenericEnumType(
+        ED, Parent, GenericArgs, IsCanonical ? &C : nullptr, Properties);
   } else {
     llvm_unreachable("Unhandled NominalTypeDecl");
   }
-  C.getImpl().getArena(arena).BoundGenericTypes.InsertNode(newType, InsertPos);
+  C.getImpl().getArena(Arena).BoundGenericTypes.InsertNode(BGT, InsertPos);
 
-  return newType;
+  return BGT;
 }
 
 NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext &C) {
