@@ -4870,27 +4870,31 @@ public:
 
   /// Indicate that there was no label given when one was expected by parameter.
   ///
-  /// \param paramIndex The index of the parameter that is missing a label.
+  /// \param argIdx The index of the argument that is missing a label;
+  /// \param paramIdx The index of the parameter that has expected label.
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
-  virtual bool missingLabel(unsigned paramIndex);
+  virtual bool missingLabel(unsigned argIdx, unsigned paramIdx);
 
   /// Indicate that there was label given when none was expected by parameter.
   ///
-  /// \param paramIndex The index of the parameter that wasn't expecting a label.
+  /// \param argIdx The index of the argument that has an unexpected extraneous
+  /// label; \param paramIdx The index of the parameter that wasn't expecting a
+  /// label.
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
-  virtual bool extraneousLabel(unsigned paramIndex);
+  virtual bool extraneousLabel(unsigned argIdx, unsigned paramIdx);
 
   /// Indicate that there was a label given with a typo(s) in it.
   ///
-  /// \param paramIndex The index of the parameter with misspelled label.
+  /// \param argIdx The index of the argument with misspelled label.
+  /// \param paramIdx The index of the parameter that has expected label.
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
-  virtual bool incorrectLabel(unsigned paramIndex);
+  virtual bool incorrectLabel(unsigned argIdx, unsigned paramIdx);
 
   /// Indicates that an argument is out-of-order with respect to a previously-
   /// seen argument.
@@ -4901,12 +4905,6 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx);
-
-  /// Indicates that the arguments need to be relabeled to match the parameters.
-  ///
-  /// \returns true to indicate that this should cause a failure, false
-  /// otherwise.
-  virtual bool relabelArguments(ArrayRef<Identifier> newNames);
 
   /// Indicates that the trailing closure argument at the given \c argIdx
   /// cannot be passed to the last parameter at \c paramIdx.

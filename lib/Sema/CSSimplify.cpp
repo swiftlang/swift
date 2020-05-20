@@ -43,20 +43,21 @@ MatchCallArgumentListener::missingArgument(unsigned paramIdx) {
   return None;
 }
 
-bool MatchCallArgumentListener::missingLabel(unsigned paramIdx) { return true; }
-bool MatchCallArgumentListener::extraneousLabel(unsigned paramIdx) {
+bool MatchCallArgumentListener::missingLabel(unsigned argIdx,
+                                             unsigned paramIdx) {
   return true;
 }
-bool MatchCallArgumentListener::incorrectLabel(unsigned paramIdx) {
+bool MatchCallArgumentListener::extraneousLabel(unsigned argIdx,
+                                                unsigned paramIdx) {
+  return true;
+}
+bool MatchCallArgumentListener::incorrectLabel(unsigned argIdx,
+                                               unsigned paramIdx) {
   return true;
 }
 
 bool MatchCallArgumentListener::outOfOrderArgument(unsigned argIdx,
                                                    unsigned prevArgIdx) {
-  return true;
-}
-
-bool MatchCallArgumentListener::relabelArguments(ArrayRef<Identifier> newNames){
   return true;
 }
 
@@ -904,16 +905,62 @@ public:
     return false;
   }
 
-  bool missingLabel(unsigned paramIndex) override {
-    return !CS.shouldAttemptFixes();
+  bool incorrectLabel(unsigned argIdx, unsigned paramIdx, unsigned impact) {
+    if (!CS.shouldAttemptFixes())
+      return true;
+
+    // TODO(diagnostics): If re-labeling is mixed with extra arguments,
+    // let's produce a fix only for extraneous arguments for now,
+    // because they'd share a locator path which (currently) means
+    // one fix would overwrite another.
+    if (!ExtraArguments.empty()) {
+      CS.increaseScore(SK_Fix);
+      return false;
+    }
+
+    auto *locator = CS.getConstraintLocator(Locator);
+
+    ASTNode callExpr = locator->getAnchor();
+    if (!callExpr)
+      return true;
+
+    auto locatorExpr = simplifyLocatorToAnchor(locator);
+    TupleExpr *tupleExpr = getAsExpr<TupleExpr>(locatorExpr);
+    ParenExpr *parenExpr = getAsExpr<ParenExpr>(locatorExpr);
+    if (!tupleExpr && !parenExpr)
+      return true;
+
+    const auto argLabel = Arguments[argIdx].getLabel();
+    SourceLoc argLabelLoc;
+    SourceLoc argLoc;
+    if (tupleExpr && (argIdx < tupleExpr->getNumElements())) {
+      argLabelLoc = tupleExpr->getElementNameLoc(argIdx);
+      argLoc = tupleExpr->getElement(argIdx)->getLoc();
+    }
+    if (parenExpr) {
+      argLoc = parenExpr->getSubExpr()->getLoc();
+    }
+
+    const auto paramLabel = Parameters[paramIdx].getLabel();
+
+    auto *labelLocator = CS.getConstraintLocator(
+        Locator.withPathElement(LocatorPathElt::ArgumentLabel(argIdx)));
+
+    auto *fix = RelabelArgument::create(CS, argLabel, argLabelLoc, argLoc,
+                                        paramLabel, Bindings, labelLocator);
+    return CS.recordFix(fix, impact);
   }
 
-  bool extraneousLabel(unsigned paramIndex) override {
-    return !CS.shouldAttemptFixes();
+  bool missingLabel(unsigned argIdx, unsigned paramIdx) override {
+    return incorrectLabel(argIdx, paramIdx, 1);
   }
 
-  bool incorrectLabel(unsigned paramIndex) override {
-    return !CS.shouldAttemptFixes();
+  bool extraneousLabel(unsigned argIdx, unsigned paramIdx) override {
+    return incorrectLabel(argIdx, paramIdx, 3);
+  }
+
+  bool incorrectLabel(unsigned argIdx, unsigned paramIdx) override {
+    return incorrectLabel(argIdx, paramIdx, 4);
   }
 
   bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
@@ -927,72 +974,15 @@ public:
         return false;
       }
 
-      auto *fix = MoveOutOfOrderArgument::create(
-          CS, argIdx, prevArgIdx, Bindings, CS.getConstraintLocator(Locator));
+      auto *labelLocator = CS.getConstraintLocator(
+          Locator.withPathElement(LocatorPathElt::ArgumentLabel(argIdx)));
+
+      auto *fix = MoveOutOfOrderArgument::create(CS, argIdx, prevArgIdx,
+                                                 Bindings, labelLocator);
       return CS.recordFix(fix);
     }
 
     return true;
-  }
-
-  bool relabelArguments(ArrayRef<Identifier> newLabels) override {
-    if (!CS.shouldAttemptFixes())
-      return true;
-
-    // TODO(diagnostics): If re-labeling is mixed with extra arguments,
-    // let's produce a fix only for extraneous arguments for now,
-    // because they'd share a locator path which (currently) means
-    // one fix would overwrite another.
-    if (!ExtraArguments.empty()) {
-      CS.increaseScore(SK_Fix);
-      return false;
-    }
-
-    auto anchor = Locator.getBaseLocator()->getAnchor();
-    if (!anchor)
-      return true;
-
-    unsigned numExtraneous = 0;
-    unsigned numRenames = 0;
-    unsigned numOutOfOrder = 0;
-
-    for (unsigned i : indices(newLabels)) {
-      // It's already known how many arguments are missing,
-      // it would be accounted for in the impact.
-      if (i >= Arguments.size())
-        continue;
-
-      auto argLabel = Arguments[i].getLabel();
-      auto paramLabel = newLabels[i];
-
-      if (argLabel == paramLabel)
-        continue;
-
-      if (!argLabel.empty()) {
-        // Instead of this being a label mismatch which requires
-        // re-labeling, this could be an out-of-order argument
-        // instead which has a completely different impact.
-        if (llvm::count(newLabels, argLabel) == 1) {
-          ++numOutOfOrder;
-        } else if (paramLabel.empty()) {
-          ++numExtraneous;
-        } else {
-          ++numRenames;
-        }
-      }
-    }
-
-    auto *locator = CS.getConstraintLocator(Locator);
-    auto *fix = RelabelArguments::create(CS, newLabels, locator);
-    // Re-labeling fixes with extraneous/incorrect labels should be
-    // lower priority vs. other fixes on same/different overload(s)
-    // where labels did line up correctly.
-    //
-    // If there are not only labeling problems but also some of the
-    // arguments are missing, let's account of that in the impact.
-    auto impact = 1 + numOutOfOrder + numExtraneous * 2 + numRenames * 3 +
-                  MissingArguments.size() * 2;
-    return CS.recordFix(fix, impact);
   }
 
   bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
