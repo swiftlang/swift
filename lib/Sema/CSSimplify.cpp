@@ -267,6 +267,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   // Local function that retrieves the next unclaimed argument with the given
   // name (which may be empty). This routine claims the argument.
   auto claimNextNamed = [&](unsigned &nextArgIdx, Identifier paramLabel,
+                            Optional<unsigned> paramIdx,
                             bool ignoreNameMismatch,
                             bool forVariadic = false) -> Optional<unsigned> {
     // Skip over any claimed arguments.
@@ -275,6 +276,47 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // If we've claimed all of the arguments, there's nothing more to do.
     if (numClaimedArgs == numArgs)
       return None;
+
+    /// When we determine which argument is bound to unlabeled parameter,
+    /// consider still unbounded parameter which is prior to current parameter.
+    /// In order not to intersect binding position that remaining parameter will
+    /// bind later, skip a unlabeled argument as much as it can.
+    ///
+    /// For example:
+    /// @code
+    /// func f(aa: Int, _ bb: Int) {}
+    /// f(0, 1)
+    /// @endcode
+    /// Choice argument[1] for parameter[1] so that parameter[0] will be bounded
+    /// to argument[0] later.
+    ///
+    /// Because variadics parameter can be bounded with more than one arguments,
+    /// they don't this.
+    if (paramLabel.empty() && paramIdx && !forVariadic &&
+        !params[*paramIdx].isVariadic()) {
+      unsigned unboundedParamCount = 0;
+      for (unsigned pi = 0; pi < *paramIdx; pi++) {
+        if (parameterBindings[pi].empty()) {
+          if (params[pi].isVariadic() || paramInfo.hasDefaultArgument(pi))
+            continue;
+
+          unboundedParamCount++;
+        }
+      }
+
+      unsigned keepedArgCount = 0;
+      for (unsigned ai = nextArgIdx; ai < numArgs; ai++) {
+        if (claimedArgs[ai])
+          continue;
+
+        nextArgIdx = std::max(nextArgIdx, ai);
+
+        if (keepedArgCount >= unboundedParamCount) {
+          break;
+        }
+        keepedArgCount++;
+      }
+    }
 
     // Go hunting for an unclaimed argument whose name does match.
     Optional<unsigned> claimedWithSameName;
@@ -368,8 +410,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     // Handle variadic parameters.
     if (param.isVariadic()) {
       // Claim the next argument with the name of this parameter.
-      auto claimed =
-          claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch);
+      auto claimed = claimNextNamed(nextArgIdx, param.getLabel(), paramIdx,
+                                    ignoreNameMismatch);
 
       // If there was no such argument, leave the parameter unfulfilled.
       if (!claimed) {
@@ -390,8 +432,10 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       {
         nextArgIdx = *claimed;
         // Claim any additional unnamed arguments.
-        while (
-            (claimed = claimNextNamed(nextArgIdx, Identifier(), false, true))) {
+        while ((claimed = claimNextNamed(
+                    nextArgIdx, /*paramLabel=*/Identifier(), /*paramIdx=*/None,
+                    /*ignoreNameMismatch=*/false,
+                    /*forVariadic=*/true))) {
           parameterBindings[paramIdx].push_back(*claimed);
         }
       }
@@ -401,8 +445,8 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     }
 
     // Try to claim an argument for this parameter.
-    if (auto claimed =
-            claimNextNamed(nextArgIdx, param.getLabel(), ignoreNameMismatch)) {
+    if (auto claimed = claimNextNamed(nextArgIdx, param.getLabel(), paramIdx,
+                                      ignoreNameMismatch)) {
       parameterBindings[paramIdx].push_back(*claimed);
       return;
     }
