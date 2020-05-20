@@ -712,48 +712,44 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
                               current->getName(),
                               otherInit->isMemberwiseInitializer());
         } else if (current->isImplicit() || other->isImplicit()) {
-          // If both declarations are implicit, we diagnose the nearest
-          // non-implicit DC because it is likely that we do not have a
-          // valid source location for the declaration and we want to
-          // avoid emitting it at an unknown location.
+          // If both declarations are implicit, we do not diagnose anything
+          // as it would lead to misleading diagnostics and it's likely that
+          // there's nothing actionable about it due to its implicit nature.
+          // One special case for this is property wrappers.
           //
           // Otherwise, if 'current' is implicit, then we diagnose 'other'
           // since 'other' is a redeclaration of 'current'. Similarly, if
           // 'other' is implicit, we diagnose 'current'.
-          const auto *declToDiagnose = currentDC->getAsDecl();
+          const Decl *declToDiagnose = nullptr;
           if (current->isImplicit() && other->isImplicit()) {
             // If 'current' is a property wrapper backing storage property
             // or projected value property, then diagnose the wrapped
-            // property instead of the nearest non-implicit DC.
+            // property.
             if (auto VD = dyn_cast<VarDecl>(current)) {
               if (auto originalWrappedProperty =
                       VD->getOriginalWrappedProperty()) {
                 declToDiagnose = originalWrappedProperty;
-              }
-            } else {
-              // Get the nearest non-implicit decl context
-              while (declToDiagnose && declToDiagnose->isImplicit() &&
-                     declToDiagnose->getDeclContext()) {
-                declToDiagnose = declToDiagnose->getDeclContext()->getAsDecl();
               }
             }
           } else {
             declToDiagnose = current->isImplicit() ? other : current;
           }
 
-          // Figure out if the the declaration we've redeclared is a synthesized
-          // witness for a protocol requirement.
-          bool isProtocolRequirement = false;
-          if (auto VD = dyn_cast<ValueDecl>(current->isImplicit() ? current
-                                                                  : other)) {
-            isProtocolRequirement = llvm::any_of(
-                VD->getSatisfiedProtocolRequirements(), [&](ValueDecl *req) {
-                  return req->getName() == VD->getName();
-                });
+          if (declToDiagnose) {
+            // Figure out if the the declaration we've redeclared is a
+            // synthesized witness for a protocol requirement.
+            bool isProtocolRequirement = false;
+            if (auto VD = dyn_cast<ValueDecl>(current->isImplicit() ? current
+                                                                    : other)) {
+              isProtocolRequirement = llvm::any_of(
+                  VD->getSatisfiedProtocolRequirements(), [&](ValueDecl *req) {
+                    return req->getName() == VD->getName();
+                  });
+            }
+            declToDiagnose->diagnose(diag::invalid_redecl_implicit,
+                                     current->getDescriptiveKind(),
+                                     isProtocolRequirement, other->getName());
           }
-          declToDiagnose->diagnose(diag::invalid_redecl_implicit,
-                                   current->getDescriptiveKind(),
-                                   isProtocolRequirement, other->getName());
 
           // Emit a specialized note if the one of the declarations is
           // the backing storage property ('_foo') or projected value
