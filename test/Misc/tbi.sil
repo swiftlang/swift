@@ -19,19 +19,13 @@
 
 // NO_TBI-LABEL: .globl  _testTBI
 // NO_TBI: _testTBI
-// NO_TBI-NEXT: stp
-// NO_TBI-NEXT: mov
 // NO_TBI-NEXT: and
 // NO_TBI-NEXT: ldr
-// NO_TBI-NEXT: ldp
 // NO_TBI-NEXT: ret
 
 // TBI-LABEL: .globl  _testTBI
 // TBI: _testTBI:
-// TBI-NEXT: stp
-// TBI-NEXT: mov
 // TBI-NEXT: ldr
-// TBI-NEXT: ldp
 // TBI-NEXT: ret
 
 sil_stage canonical
