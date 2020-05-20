@@ -9,11 +9,13 @@ WASI_SDK_PATH=$SOURCE_PATH/wasi-sdk
 case $(uname -s) in
   Darwin)
     OS_SUFFIX=osx
-    PRESET_NAME=webassembly-macos-installable
+    HOST_PRESET=webassembly-host
+    TARGET_PRESET=webassembly-macos-target
   ;;
   Linux)
     OS_SUFFIX=linux
-    PRESET_NAME=webassembly-linux-installable
+    HOST_PRESET=webassembly-linux-host
+    TARGET_PRESET=webassembly-linux-target
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
@@ -35,9 +37,29 @@ BUNDLE_IDENTIFIER="swiftwasm.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Swift for WebAssembly Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 
-$SOURCE_PATH/swift/utils/build-script --preset=$PRESET_NAME \
+HOST_TOOLCHAIN_DESTDIR=$SOURCE_PATH/host-toolchain-sdk
+HOST_TOOLCHAIN_SDK=$HOST_TOOLCHAIN_DESTDIR/$TOOLCHAIN_NAME
+
+# Avoid clang headers symlink issues
+mkdir -p $HOST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0
+
+# Build the host toolchain and SDK first.
+$SOURCE_PATH/swift/utils/build-script \
+  --preset=$HOST_PRESET \
+  INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
+  TOOLCHAIN_NAME="$TOOLCHAIN_NAME" \
+  C_CXX_LAUNCHER="$(which sccache)"
+
+# Clean up the host toolchain build directory so that the next
+# `build-script` invocation doesn't pick up wrong CMake config files.
+# For some reason passing `--reconfigure` to `build-script` won't do this.
+rm -rf $SOURCE_PATH/build/Ninja-ReleaseAssert/swift-*
+
+# build the cross-compilled toolchain
+$SOURCE_PATH/swift/utils/build-script \
+  --preset=$TARGET_PRESET \
+  INSTALL_DESTDIR="$SOURCE_PATH/install" \
   SOURCE_PATH="$SOURCE_PATH" \
-  INSTALLABLE_PACKAGE="$INSTALLABLE_PACKAGE" \
   BUNDLE_IDENTIFIER="${BUNDLE_IDENTIFIER}" \
   DISPLAY_NAME="${DISPLAY_NAME}" \
   DISPLAY_NAME_SHORT="${DISPLAY_NAME_SHORT}" \
@@ -45,37 +67,24 @@ $SOURCE_PATH/swift/utils/build-script --preset=$PRESET_NAME \
   TOOLCHAIN_VERSION="${TOOLCHAIN_VERSION}" \
   C_CXX_LAUNCHER="$(which sccache)"
 
-
-NIGHTLY_TOOLCHAIN=$SOURCE_PATH/swift-nightly-toolchain
-if [ ! -e $NIGHTLY_TOOLCHAIN ]; then
-  $UTILS_PATH/install-nightly-toolchain.sh
-fi
-
-TMP_DIR=$(mktemp -d)
-cd $TMP_DIR
-tar xfz $INSTALLABLE_PACKAGE $TOOLCHAIN_NAME
-cd $TMP_DIR/$TOOLCHAIN_NAME
-
-# Merge wasi-sdk and toolchain
-cp -r $WASI_SDK_PATH/lib/clang usr/lib
-cp -a $WASI_SDK_PATH/bin/{*ld,llvm-ar} usr/bin
-cp -r $WASI_SDK_PATH/share/wasi-sysroot usr/share
-
-# Build SwiftPM and install it into toolchain
-$UTILS_PATH/build-swiftpm.sh $TMP_DIR/$TOOLCHAIN_NAME
+# Merge wasi-sdk and the toolchain
+cp -a $WASI_SDK_PATH/lib/clang $HOST_TOOLCHAIN_SDK/usr/lib
+cp -a $WASI_SDK_PATH/bin/{*ld,llvm-ar} $HOST_TOOLCHAIN_SDK/usr/bin
+cp -r $WASI_SDK_PATH/share/wasi-sysroot $HOST_TOOLCHAIN_SDK/usr/share
 
 # Replace absolute sysroot path with relative path
-sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift/wasi/wasm32/glibc.modulemap
+sed -i -e "s@\".*/include@\"../../../../share/wasi-sysroot/include@g" $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib/swift/wasi/wasm32/glibc.modulemap
 
-# Copy nightly-toolchain's host environment stdlib into toolchain
+# Copy the target environment stdlib into the toolchain
 
 if [[ "$(uname)" == "Linux" ]]; then
-  # Avoid to copy usr/lib/swift/clang because our toolchain's one is a directory
-  # but nightly's one is symbolic link, so fail to merge them.
-  rsync -a $NIGHTLY_TOOLCHAIN/usr/lib/ $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/ --exclude 'swift/clang'
+  # Avoid copying usr/lib/swift/clang because our toolchain's one is a directory
+  # but nightly's one is symbolic link. A simple copy fails to merge them.
+  rsync -v -a $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib/ $HOST_TOOLCHAIN_SDK/usr/lib/ --exclude 'swift/clang'
 else
-  cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/macosx $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
+  cp -v -a $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib/swift_static $HOST_TOOLCHAIN_SDK/usr/lib/swift_static
+  cp -v -a $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib/swift/wasi $HOST_TOOLCHAIN_SDK/usr/lib/swift
 fi
 
-cd $TMP_DIR
+cd $HOST_TOOLCHAIN_DESTDIR
 tar cfz $PACKAGE_ARTIFACT $TOOLCHAIN_NAME
