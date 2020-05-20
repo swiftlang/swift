@@ -5,7 +5,7 @@ typedef uint8_t bool;
 #define CREATE_ARRAY(T, N)                                                     \
   struct {                                                                     \
     T data[N];                                                                 \
-    size_t size;                                                               \
+    uint64_t size;                                                             \
   }
 
 typedef struct {
