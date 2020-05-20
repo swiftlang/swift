@@ -44,6 +44,11 @@ internal typealias _CocoaString = AnyObject
   @objc(_fastCharacterContents)
   func _fastCharacterContents() -> UnsafePointer<UInt16>?
 
+  @objc(_getCString:maxLength:encoding:)
+  func _getCString(_ buffer: UnsafeMutableRawPointer?,
+   maxLength maxBufferCount: Int,
+    encoding: UInt) -> Int8
+  
   @objc(getBytes:maxLength:usedLength:encoding:options:range:remainingRange:)
   func getBytes(_ buffer: UnsafeMutableRawPointer?,
    maxLength maxBufferCount: Int,
@@ -198,6 +203,32 @@ internal func _cocoaStringCopyUTF8(
   return _NSStringCopyUTF8(_objc(target), into: bufPtr)
 }
 
+@_effects(releasenone)
+private func _NSStringCopyUTF8Tagged(
+  _ o: _StringSelectorHolder,
+  into bufPtr: UnsafeMutableBufferPointer<UInt8>
+) -> Int? {
+  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+  let success = 0 != o._getCString(
+    ptr,
+    maxLength: bufPtr.count,
+    encoding: _cocoaUTF8Encoding
+  )
+  if !success {
+    return nil
+  }
+  
+  return bufPtr.reversed().firstIndex { $0 != 0 }
+}
+
+@_effects(releasenone)
+internal func _cocoaStringCopyUTF8Tagged(
+  _ target: _CocoaString,
+  into bufPtr: UnsafeMutableBufferPointer<UInt8>
+) -> Int? {
+  return _NSStringCopyUTF8(_objc(target), into: bufPtr)
+}
+
 @_effects(readonly)
 private func _NSStringUTF8Count(
   _ o: _StringSelectorHolder,
@@ -343,7 +374,7 @@ internal func _bridgeTagged(
   intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
   _internalInvariant(_isObjCTaggedPointer(cocoa))
-  return _cocoaStringCopyUTF8(cocoa, into: bufPtr)
+  return _cocoaStringCopyUTF8Tagged(cocoa, into: bufPtr)
 }
 #endif
 
