@@ -82,7 +82,12 @@ import G
 // CHECK-SAME: "{{.*}}"
 
 // CHECK: "commandLine": [
-// CHECK-NEXT: "-remove-preceeding-explicit-module-build-incompatible-options"
+// CHECK-NEXT: "-frontend"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "-Xclang"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "-cc1"
+// CHECK: "-remove-preceeding-explicit-module-build-incompatible-options"
 
 /// --------Swift module E
 // CHECK: "swift": "E"
