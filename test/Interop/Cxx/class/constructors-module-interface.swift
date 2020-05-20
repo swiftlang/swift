@@ -15,10 +15,13 @@
 // CHECK-NEXT:   init(member: ImplicitDefaultConstructor)
 // CHECK-NEXT: }
 // CHECK-NEXT: struct DefaultConstructorDeleted {
+// CHECK-NEXT:   var a: UnsafeMutablePointer<Int32>
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ConstructorWithParam {
 // CHECK-NEXT:   var x: Int32
 // CHECK-NEXT:   init(_ val: Int32)
+// CHECK-NEXT: }
+// CHECK-NEXT: struct CopyAndMoveConstructor {
 // CHECK-NEXT: }
 // CHECK-NEXT: struct Base {
 // CHECK-NEXT:   init()

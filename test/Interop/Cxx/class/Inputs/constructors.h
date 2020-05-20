@@ -21,6 +21,11 @@ struct ConstructorWithParam {
   int x;
 };
 
+struct CopyAndMoveConstructor {
+  CopyAndMoveConstructor(const CopyAndMoveConstructor &) = default;
+  CopyAndMoveConstructor(CopyAndMoveConstructor &&) = default;
+};
+
 struct Base {};
 
 struct ArgType {
