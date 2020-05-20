@@ -172,15 +172,22 @@ private func _NSStringCopyUTF8(
   into bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
   let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  let success = 0 != o._getCString(
+  let len = o.length
+  var remainingRange = _SwiftNSRange(location: 0, length: 0)
+  var usedLen = 0
+  let success = 0 != o.getBytes(
     ptr,
     maxLength: bufPtr.count,
+    usedLength: &usedLen,
     encoding: _cocoaUTF8Encoding,
+    options: 0,
+    range: _SwiftNSRange(location: 0, length: len),
+    remaining: &remainingRange
   )
-  if !success {
-    return nil
+  if success && remainingRange.length == 0 {
+    return usedLen
   }
-  return bufPtr.reversed().lastIndex { $0 != 0 }
+  return nil
 }
 
 @_effects(releasenone)
