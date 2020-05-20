@@ -3191,8 +3191,8 @@ static Optional<UIdent> getUIDForOperationKind(trace::OperationKind OpKind) {
       return CompileOperationIndexSource;
     case trace::OperationKind::CodeCompletion:
       return CompileOperationCodeCompletion;
-    case trace::OperationKind::All:
-      return None;
+    default:
+      llvm_unreachable("Unknown operation kind");
   }
 }
 
