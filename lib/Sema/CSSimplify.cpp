@@ -716,132 +716,74 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   // If any arguments were provided out-of-order, check whether we have
   // violated any of the reordering rules.
   if (potentiallyOutOfOrder) {
-    // If we've seen label failures and now there is an out-of-order
-    // parameter (or even worse - OoO parameter with label re-naming),
-    // we most likely have no idea what would be the best
-    // diagnostic for this situation, so let's just try to re-label.
-    auto isOutOfOrderArgument = [&](unsigned toParamIdx, unsigned fromArgIdx,
-                                    unsigned toArgIdx) {
-      if (fromArgIdx <= toArgIdx) {
-        return false;
-      }
+    // Fix all labeling failures.
 
-      auto newLabel = args[fromArgIdx].getLabel();
-      auto oldLabel = args[toArgIdx].getLabel();
-
-      if (newLabel != params[toParamIdx].getLabel()) {
-        return false;
-      }
-
-      auto paramIdx = toParamIdx + 1;
-      for (; paramIdx < params.size(); ++paramIdx) {
-        // Looks like new position (excluding defaulted parameters),
-        // has a valid label.
-        if (oldLabel == params[paramIdx].getLabel())
-          break;
-
-        // If we are moving the the position with a different label
-        // and there is no default value for it, can't diagnose the
-        // problem as a simple re-ordering.
-        if (!paramInfo.hasDefaultArgument(paramIdx))
-          return false;
-      }
-
-      // label was not found
-      if (paramIdx == params.size()) {
-        return false;
-      }
-
-      return true;
+    auto isTrailingClosureArgument = [&](unsigned argIdx) -> bool {
+      return unlabeledTrailingClosureArgIndex.hasValue() && argIdx == numArgs - 1;
     };
 
-    SmallVector<unsigned, 4> paramToArgMap;
-    paramToArgMap.reserve(params.size());
-    {
-      unsigned argIdx = 0;
-      for (const auto &binding : parameterBindings) {
-        paramToArgMap.push_back(argIdx);
-        argIdx += binding.size();
-      }
+    // Pick arguments mapped to some parameter.
+    // It' used for searching expected destination of label which is out of
+    // order.
+    SmallVector<Optional<unsigned>, 4> argBindings(args.size());
+    for (auto paramIdx : indices(params)) {
+      if (parameterBindings[paramIdx].empty())
+        continue;
+      const auto argIdx = parameterBindings[paramIdx].front();
+      // Skip synthesized argument for missing argument
+      if (argIdx >= numArgs)
+        continue;
+
+      argBindings[argIdx] = paramIdx;
     }
 
-    // Enumerate the parameters and their bindings to see if any arguments are
-    // our of order
-    bool hadLabelMismatch = false;
+    // Emit all label errors
     for (const auto paramIdx : indices(params)) {
-      const auto toArgIdx = paramToArgMap[paramIdx];
-      const auto &binding = parameterBindings[paramIdx];
-      for (const auto paramBindIdx : indices(binding)) {
-        // We've found the parameter that has an out of order
-        // argument, and know the indices of the argument that
-        // needs to move (fromArgIdx) and the argument location
-        // it should move to (toArgIdx).
-        const auto fromArgIdx = binding[paramBindIdx];
+      if (parameterBindings[paramIdx].empty())
+        continue;
 
-        // Does nothing for variadic tail.
-        if (params[paramIdx].isVariadic() && paramBindIdx > 0) {
-          assert(args[fromArgIdx].getLabel().empty());
+      // Skip synthesized argument for missing argument
+      const auto argIdx = parameterBindings[paramIdx].front();
+      if (argIdx >= numArgs)
+        continue;
+
+      // Trailing closure doesn't case label
+      if (isTrailingClosureArgument(argIdx))
+        continue;
+
+      const auto argLabel = args[argIdx].getLabel();
+      const auto paramLabel = params[paramIdx].getLabel();
+
+      if (argLabel != paramLabel) {
+        // emit label wrong/missing/extra
+        if (argLabel.empty()) {
+          if (listener.missingLabel(argIdx, paramIdx))
+            return true;
+        } else if (paramLabel.empty()) {
+          if (listener.extraneousLabel(argIdx, paramIdx))
+            return true;
+        } else {
+          if (listener.incorrectLabel(argIdx, paramIdx))
+            return true;
+        }
+      }
+
+      for (unsigned leftArgIdx = 0; leftArgIdx < argIdx; leftArgIdx++) {
+        const auto leftParamIdx = argBindings[leftArgIdx];
+        if (!leftParamIdx)
           continue;
+
+        if (paramIdx <= *leftParamIdx) {
+          // emit out of order
+          if (listener.outOfOrderArgument(argIdx, leftArgIdx))
+            return true;
+          break;
         }
-
-        // First let's double check if out-of-order argument is nothing
-        // more than a simple label mismatch, because in situation where
-        // one argument requires label and another one doesn't, but caller
-        // doesn't provide either, problem is going to be identified as
-        // out-of-order argument instead of label mismatch.
-        const auto expectedLabel = params[paramIdx].getLabel();
-        const auto argumentLabel = args[fromArgIdx].getLabel();
-
-        if (argumentLabel != expectedLabel) {
-          // - The parameter is unnamed, in which case we try to fix the
-          //   problem by removing the name.
-          if (expectedLabel.empty()) {
-            hadLabelMismatch = true;
-            if (listener.extraneousLabel(paramIdx))
-              return true;
-          // - The argument is unnamed, in which case we try to fix the
-          //   problem by adding the name.
-          } else if (argumentLabel.empty()) {
-            hadLabelMismatch = true;
-            if (listener.missingLabel(paramIdx))
-              return true;
-          // - The argument label has a typo at the same position.
-          } else if (fromArgIdx == toArgIdx) {
-            hadLabelMismatch = true;
-            if (listener.incorrectLabel(paramIdx))
-              return true;
-          }
-        }
-
-        if (fromArgIdx == toArgIdx) {
-          // If the argument is in the right location, just continue
-          continue;
-        }
-
-        // This situation looks like out-of-order argument but it's hard
-        // to say exactly without considering other factors, because it
-        // could be invalid labeling too.
-        if (!hadLabelMismatch &&
-            isOutOfOrderArgument(paramIdx, fromArgIdx, toArgIdx))
-          return listener.outOfOrderArgument(fromArgIdx, toArgIdx);
-
-        SmallVector<Identifier, 8> expectedLabels;
-        llvm::transform(params, std::back_inserter(expectedLabels),
-                        [](const AnyFunctionType::Param &param) {
-                          return param.getLabel();
-                        });
-        return listener.relabelArguments(expectedLabels);
       }
     }
   }
 
-  // If no arguments were renamed, the call arguments match up with the
-  // parameters.
-  if (actualArgNames.empty())
-    return false;
-
-  // The arguments were relabeled; notify the listener.
-  return listener.relabelArguments(actualArgNames);
+  return false;
 }
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
