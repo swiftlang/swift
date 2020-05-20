@@ -338,11 +338,11 @@ public class InputFilter<D: DataProtocol> {
     // Allocate result
     var result = Data(count: count)
 
-    try result.withUnsafeMutableBytes { (dst_ptr: UnsafeMutablePointer<UInt8>) in
+    try result.withUnsafeMutableBytes { (dst_ptr: UnsafeMutableRawBufferPointer) in
 
       // Write to result until full, or end reached
       _stream.dst_size = count
-      _stream.dst_ptr = dst_ptr
+      _stream.dst_ptr = dst_ptr.baseAddress!.bindMemory(to: UInt8.self, capacity: count)
 
       while _stream.dst_size > 0 && !_endReached {
 
