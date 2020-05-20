@@ -1,0 +1,9 @@
+module AutolinkCoffCPragma {
+  header "autolink-coff-c-pragma.h"
+  export *
+}
+
+module AutolinkCoffCPragmaTransitive {
+  header "autolink-coff-c-pragma-transitive.h"
+  export *
+}
