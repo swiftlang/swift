@@ -5043,25 +5043,19 @@ LookupAllConformancesInContextRequest::evaluate(
   return IDC->getLocalConformances(ConformanceLookupKind::All);
 }
 
-void TypeChecker::checkConformancesInContext(DeclContext *dc,
-                                             IterableDeclContext *idc) {
+void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
+  auto *const dc = idc->getAsGenericContext();
+
   // For anything imported from Clang, lazily check conformances.
   if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
     return;
 
+  const auto *const nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return;
+
   // Determine the access level of this conformance.
-  Decl *currentDecl = nullptr;
-  AccessLevel defaultAccess;
-  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    const NominalTypeDecl *nominal = ext->getExtendedNominal();
-    if (!nominal)
-      return;
-    defaultAccess = nominal->getFormalAccess();
-    currentDecl = ext;
-  } else {
-    defaultAccess = cast<NominalTypeDecl>(dc)->getFormalAccess();
-    currentDecl = cast<NominalTypeDecl>(dc);
-  }
+  const auto defaultAccess = nominal->getFormalAccess();
 
   // Check each of the conformances associated with this context.
   auto conformances =

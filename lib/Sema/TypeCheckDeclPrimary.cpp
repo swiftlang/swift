@@ -1759,7 +1759,7 @@ public:
 
     TypeChecker::checkDeclCircularity(ED);
 
-    TypeChecker::checkConformancesInContext(ED, ED);
+    TypeChecker::checkConformancesInContext(ED);
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -1789,7 +1789,7 @@ public:
 
     TypeChecker::checkDeclCircularity(SD);
 
-    TypeChecker::checkConformancesInContext(SD, SD);
+    TypeChecker::checkConformancesInContext(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -2023,7 +2023,7 @@ public:
 
     TypeChecker::checkDeclCircularity(CD);
 
-    TypeChecker::checkConformancesInContext(CD, CD);
+    TypeChecker::checkConformancesInContext(CD);
 
     maybeDiagnoseClassWithoutInitializers(CD);
   }
@@ -2362,7 +2362,7 @@ public:
 
     TypeChecker::checkPatternBindingCaptures(ED);
 
-    TypeChecker::checkConformancesInContext(ED, ED);
+    TypeChecker::checkConformancesInContext(ED);
 
     TypeChecker::checkDeclAttributes(ED);
     checkAccessControl(ED);
