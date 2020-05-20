@@ -751,8 +751,8 @@ static const RequirementEnvironment &getOrCreateRequirementEnvironment(
 }
 
 static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
-    constraints::ConstraintFix *fix, ValueDecl *witness,
-    ProtocolConformance *conformance,
+    constraints::Solution &solution, constraints::ConstraintFix *fix,
+    ValueDecl *witness, ProtocolConformance *conformance,
     const RequirementEnvironment &reqEnvironment) {
   Type type, missingType;
   RequirementKind requirementKind;
@@ -784,6 +784,15 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   default:
     return Optional<RequirementMatch>();
   }
+
+  type = solution.simplifyType(type);
+  missingType = solution.simplifyType(missingType);
+
+  missingType = missingType->mapTypeOutOfContext();
+  if (missingType->hasTypeParameter())
+    if (auto env = conformance->getGenericEnvironment())
+      if (auto assocType = env->mapTypeIntoContext(missingType))
+        missingType = assocType;
 
   auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
     Requirement requirement(requirementKind, type, missingType);
@@ -986,7 +995,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     if (solution && conformance && solution->Fixes.size()) {
       for (auto fix : solution->Fixes) {
         if (auto result = findMissingGenericRequirementForSolutionFix(
-                fix, witness, conformance, reqEnvironment))
+                *solution, fix, witness, conformance, reqEnvironment))
           return *result;
       }
     }
