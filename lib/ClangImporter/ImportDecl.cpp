@@ -2191,10 +2191,13 @@ namespace {
           if (fd->isInstanceMember() != decl->isInstanceProperty())
             continue;
 
-          assert(fd->getName().getArgumentNames().empty());
+          // We only care about methods with no arguments, because they can
+          // shadow imported properties.
+          if (!fd->getName().getArgumentNames().empty())
+            continue;
+
           foundMethod = true;
-        } else {
-          auto *var = cast<VarDecl>(result);
+        } else if (auto *var = dyn_cast<VarDecl>(result)) {
           if (var->isInstanceMember() != decl->isInstanceProperty())
             continue;
 
@@ -2280,7 +2283,7 @@ namespace {
       return getVersion() == getActiveSwiftVersion();
     }
 
-    void recordMemberInContext(DeclContext *dc, ValueDecl *member) {
+    void recordMemberInContext(const DeclContext *dc, ValueDecl *member) {
       assert(member && "Attempted to record null member!");
       auto *nominal = dc->getSelfNominalTypeDecl();
       auto name = member->getBaseName();
@@ -4170,33 +4173,51 @@ namespace {
                                  bool isInstance, const DeclContext *dc,
                     llvm::function_ref<bool(AbstractFunctionDecl *fn)> filter) {
       // We only need to perform this check for classes.
-      auto classDecl
-        = dc->getDeclaredInterfaceType()->getClassOrBoundGenericClass();
+      auto *classDecl = dc->getSelfClassDecl();
       if (!classDecl)
         return false;
 
-      // Make sure we don't search in Clang modules for this method.
-      ++Impl.ActiveSelectors[{selector, isInstance}];
+      auto matchesImportedDecl = [&](Decl *member) -> bool {
+        auto *afd = dyn_cast<AbstractFunctionDecl>(member);
+        if (!afd)
+          return false;
 
-      // Look for a matching imported or deserialized member.
-      bool result = false;
-      for (auto decl : classDecl->lookupDirect(selector, isInstance)) {
-        if ((decl->getClangDecl()
-             || !decl->getDeclContext()->getParentSourceFile())
-            && importedName.getDeclName() == decl->getName()
-            && filter(decl)) {
-          result = true;
-          break;
+        // Instance-ness must match.
+        if (afd->isObjCInstanceMethod() != isInstance)
+          return false;
+
+        // Both the selector and imported name must match.
+        if (afd->getObjCSelector() != selector ||
+            importedName.getDeclName() != afd->getName()) {
+          return false;
+        }
+
+        // Finally, the provided filter must match.
+        return filter(afd);
+      };
+
+      // First check to see if we've already imported a method with the same
+      // selector.
+      auto importedMembers = Impl.MembersForNominal.find(classDecl);
+      if (importedMembers != Impl.MembersForNominal.end()) {
+        auto baseName = importedName.getDeclName().getBaseName();
+        auto membersForName = importedMembers->second.find(baseName);
+        if (membersForName != importedMembers->second.end()) {
+          return llvm::any_of(membersForName->second, matchesImportedDecl);
         }
       }
 
-      // Restore the previous active count in the active-selector mapping.
-      auto activeCount = Impl.ActiveSelectors.find({selector, isInstance});
-      --activeCount->second;
-      if (activeCount->second == 0)
-        Impl.ActiveSelectors.erase(activeCount);
-
-      return result;
+      // Then, for a deserialized Swift class, check to see if it has brought in
+      // any matching @objc methods.
+      if (classDecl->wasDeserialized()) {
+        auto &ctx = Impl.SwiftContext;
+        TinyPtrVector<AbstractFunctionDecl *> deserializedMethods;
+        ctx.loadObjCMethods(classDecl, selector, isInstance,
+                            /*prevGeneration*/ 0, deserializedMethods,
+                            /*swiftOnly*/ true);
+        return llvm::any_of(deserializedMethods, matchesImportedDecl);
+      }
+      return false;
     }
 
     Decl *importObjCMethodDecl(const clang::ObjCMethodDecl *decl,
@@ -4448,6 +4469,9 @@ namespace {
       // If this method overrides another method, mark it as such.
       recordObjCOverride(result);
 
+      // Make a note that we've imported this method into this context.
+      recordMemberInContext(dc, result);
+
       // Record the error convention.
       if (errorConvention) {
         result->setForeignErrorConvention(*errorConvention);
@@ -4484,14 +4508,6 @@ namespace {
             Impl.addAlternateDecl(result, cast<ValueDecl>(imported));
         }
       }
-
-      // We only care about recording methods with no arguments here, because
-      // they can shadow imported properties.
-      if (!isa<AccessorDecl>(result) &&
-          result->getName().getArgumentNames().empty()) {
-        recordMemberInContext(dc, result);
-      }
-
       return result;
     }
 
@@ -6461,6 +6477,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc));
 
   addObjCAttribute(result, selector);
+  recordMemberInContext(dc, result);
 
   Impl.recordImplicitUnwrapForDecl(result,
                                    importedType.isImplicitlyUnwrapped());
@@ -6668,14 +6685,24 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   };
 
   auto findCounterpart = [&](clang::Selector sel) -> FuncDecl * {
-    // If the declaration we're starting from is in a class, first
-    // look for a class member with the appropriate selector.
+    // If the declaration we're starting from is in a class, first check to see
+    // if we've already imported an instance method with a matching selector.
     if (auto classDecl = decl->getDeclContext()->getSelfClassDecl()) {
       auto swiftSel = Impl.importSelector(sel);
-      for (auto found : classDecl->lookupDirect(swiftSel, true)) {
-        if (auto foundFunc = dyn_cast<FuncDecl>(found))
-          if (foundFunc->hasClangNode())
-            return foundFunc;
+      auto importedMembers = Impl.MembersForNominal.find(classDecl);
+      if (importedMembers != Impl.MembersForNominal.end()) {
+        for (auto membersForName : importedMembers->second) {
+          for (auto *member : membersForName.second) {
+            // Must be an instance method.
+            auto *afd = dyn_cast<FuncDecl>(member);
+            if (!afd || !afd->isInstanceMember())
+              continue;
+
+            // Selector must match.
+            if (afd->getObjCSelector() == swiftSel)
+              return afd;
+          }
+        }
       }
     }
 
