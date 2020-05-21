@@ -428,7 +428,7 @@ Type GenericSignatureImpl::getSuperclassBound(Type type) const {
 /// required to conform.
 GenericSignature::RequiredProtocols
 GenericSignatureImpl::getRequiredProtocols(Type type) const {
-  if (!type->isTypeParameter()) return { };
+  assert(type->isTypeParameter() && "Expected a type parameter");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -479,11 +479,11 @@ bool GenericSignatureImpl::isConcreteType(Type type) const {
   return bool(getConcreteType(type));
 }
 
-/// Return the concrete type that the given dependent type is constrained to,
+/// Return the concrete type that the given type parameter is constrained to,
 /// or the null Type if it is not the subject of a concrete same-type
 /// constraint.
 Type GenericSignatureImpl::getConcreteType(Type type) const {
-  if (!type->isTypeParameter()) return Type();
+  assert(type->isTypeParameter() && "Expected a type parameter");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
@@ -496,7 +496,8 @@ Type GenericSignatureImpl::getConcreteType(Type type) const {
 }
 
 LayoutConstraint GenericSignatureImpl::getLayoutConstraint(Type type) const {
-  if (!type->isTypeParameter()) return LayoutConstraint();
+  assert(type->isTypeParameter() &&
+         "Only type parameters can have layout constraints");
 
   auto &builder = *getGenericSignatureBuilder();
   auto equivClass =
