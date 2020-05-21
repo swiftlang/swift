@@ -849,11 +849,28 @@ struct WrapperWithProjectedValue<T> {
   var projectedValue: T { return wrappedValue }
 }
 
-class TestInvalidRedeclaration {
+class TestInvalidRedeclaration1 {
+
   @WrapperWithProjectedValue var i = 17
   // expected-note@-1 {{'i' previously declared here}}
+  // expected-note@-2 {{'$i' synthesized for property wrapper projected value}}
+  // expected-note@-3 {{'_i' synthesized for property wrapper backing storage}}
+
   @WrapperWithProjectedValue var i = 39
   // expected-error@-1 {{invalid redeclaration of 'i'}}
+  // expected-error@-2 {{invalid redeclaration of synthesized property '$i'}}
+  // expected-error@-3 {{invalid redeclaration of synthesized property '_i'}}
+}
+
+// SR-12839
+struct TestInvalidRedeclaration2 {
+  var _foo1 = 123 // expected-error {{invalid redeclaration of synthesized property '_foo1'}}
+  @WrapperWithInitialValue var foo1 = 123 // expected-note {{'_foo1' synthesized for property wrapper backing storage}}
+}
+
+struct TestInvalidRedeclaration3 {
+  @WrapperWithInitialValue var foo1 = 123 // expected-note {{'_foo1' synthesized for property wrapper backing storage}}
+  var _foo1 = 123 // expected-error {{invalid redeclaration of synthesized property '_foo1'}}
 }
 
 // ---------------------------------------------------------------------------
