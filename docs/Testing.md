@@ -38,7 +38,7 @@ uses an iOS 10.3 simulator configuration named "iPhone 5" for 32-bit testing.
     window, or with the command line:
 
     ```sh
-    xcrun simctl create 'iPhone 5' 'com.apple.CoreSimulator.SimDeviceType.iPhone-5'
+    xcrun simctl create 'iPhone 5' com.apple.CoreSimulator.SimDeviceType.iPhone-5 com.apple.CoreSimulator.SimRuntime.iOS-10-3
     ```
 
 3.  Append `--ios` to the `utils/build-script` command line (see below).
