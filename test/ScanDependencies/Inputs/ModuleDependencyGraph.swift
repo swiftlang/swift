@@ -65,6 +65,10 @@ struct SwiftModuleDetails: Codable {
 
   /// The bridging header, if any.
   var bridgingHeader: BridgingHeader?
+
+  /// The Swift command line arguments that need to be passed through
+  /// to the -compile-module-from-interface action to build this module.
+  var commandLine: [String]?
 }
 
 /// Details specific to Clang modules.

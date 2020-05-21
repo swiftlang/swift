@@ -17,6 +17,26 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/deps.json
 
+// RUN: mkdir -p %t/BuildModules
+// RUN: cp %S/Inputs/BuildModulesFromGraph.swift %t/BuildModules/main.swift
+// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift %t/BuildModules/main.swift -o %t/ModuleBuilder
+// RUN: %target-codesign %t/ModuleBuilder
+
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.pcm
+// RUN: ls %t/clang-module-cache/A-*.pcm
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path B.pcm
+// RUN: ls %t/clang-module-cache/B-*.pcm
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path C.pcm
+// RUN: ls %t/clang-module-cache/C-*.pcm
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.swiftmodule
+// RUN: ls %t/clang-module-cache/A-*.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path E.swiftmodule
+// RUN: ls %t/clang-module-cache/E-*.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path F.swiftmodule
+// RUN: ls %t/clang-module-cache/F-*.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path G.swiftmodule
+// RUN: ls %t/clang-module-cache/G-*.swiftmodule
+
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
