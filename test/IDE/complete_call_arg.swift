@@ -106,6 +106,10 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYPATH_THUNK_BASE | %FileCheck %s -check-prefix=KEYPATH_THUNK_BASE
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_1 | %FileCheck %s -check-prefix=VARIADIC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_2 | %FileCheck %s -check-prefix=VARIADIC_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_3 | %FileCheck %s -check-prefix=VARIADIC_2
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -847,4 +851,20 @@ func testKeyPathThunkInBase() {
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     bar[#SimpleEnum#]; name=bar
 // KEYPATH_THUNK_BASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     baz[#SimpleEnum#]; name=baz
 // KEYPATH_THUNK_BASE: End completions
+}
+
+func testVariadic(_ arg: Any..., option1: Int = 0, option2: String = 1) {
+    testVariadic(#^VARIADIC_1^#)
+// VARIADIC_1: Begin completions
+// VARIADIC_1-DAG: Decl[FreeFunction]/CurrModule: ['(']{#(arg): Any...#}, {#option1: Int#}, {#option2: String#}[')'][#Void#];
+// VARIADIC_1-DAG: Decl[GlobalVar]/CurrModule:    i1[#Int#];
+// VARIADIC_1: End completions
+    testVariadic(1, #^VARIADIC_2^#)
+// VARIADIC_2: Begin completions
+// VARIADIC_2-DAG: Pattern/ExprSpecific:          {#option1: Int#}[#Int#];
+// VARIADIC_2-DAG: Pattern/ExprSpecific:          {#option2: String#}[#String#];
+// VARIADIC_2-DAG: Decl[GlobalVar]/CurrModule:    i1[#Int#];
+// VARIADIC_2: End completions
+    testVariadic(1, 2, #^VARIADIC_3^#)
+// Same as VARIADIC_2.
 }

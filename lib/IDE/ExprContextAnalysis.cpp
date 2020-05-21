@@ -656,13 +656,13 @@ class ExprContextAnalyzer {
           if (memberDC && ty->hasTypeParameter())
             ty = memberDC->mapTypeIntoContext(ty);
 
+          bool canSkip =
+              paramList && (paramList->get(Pos)->isDefaultArgument() ||
+                            paramList->get(Pos)->isVariadic());
+
           if (paramType.hasLabel() && MayNeedName) {
-            bool isDefaulted = paramList &&
-                               paramList->get(Pos)->isDefaultArgument();
             if (seenArgs.insert({paramType.getLabel(), ty.getPointer()}).second)
-              recordPossibleParam(&paramType, !isDefaulted);
-            if (isDefaulted)
-              continue;
+              recordPossibleParam(&paramType, !canSkip);
           } else {
             auto argTy = ty;
             if (paramType.isInOut())
@@ -670,7 +670,8 @@ class ExprContextAnalyzer {
             if (seenTypes.insert(argTy.getPointer()).second)
               recordPossibleType(argTy);
           }
-          break;
+          if (!canSkip)
+            break;
         }
         // If the argument position is out of expeceted number, indicate that
         // with optional nullptr param.
@@ -980,11 +981,13 @@ public:
         case ExprKind::Binary:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
-        case ExprKind::Array:
         case ExprKind::Dictionary:
         case ExprKind::If:
         case ExprKind::UnresolvedMember:
           return true;
+        case ExprKind::Array:
+          return (!Parent.getAsExpr() ||
+                  !isa<VarargExpansionExpr>(Parent.getAsExpr()));
         case ExprKind::Tuple: {
           auto ParentE = Parent.getAsExpr();
           return !ParentE ||
