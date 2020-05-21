@@ -11,7 +11,9 @@
 // Check that the JSON parses correctly into the canonical Swift data
 // structures.
 
-// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift -o %t/main
+// RUN: mkdir -p %t/PrintGraph
+// RUN: cp %S/Inputs/PrintGraph.swift %t/main.swift
+// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift %t/main.swift -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/deps.json
 
