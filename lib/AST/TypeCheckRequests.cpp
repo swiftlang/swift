@@ -158,7 +158,7 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
 }
 
 evaluator::DependencySource SuperclassTypeRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   const auto access = std::get<0>(getStorage())->getFormalAccess();
   return {
     e.getActiveDependencySourceOrNull(),
@@ -1349,7 +1349,7 @@ void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
 }
 
 evaluator::DependencySource CheckRedeclarationRequest::readDependencySource(
-    const evaluator::DependencyCollector &eval) const {
+    const evaluator::DependencyRecorder &eval) const {
   auto *current = std::get<0>(getStorage());
   auto *currentDC = current->getDeclContext();
   return {
@@ -1384,7 +1384,7 @@ void CheckRedeclarationRequest::writeDependencySink(
 
 evaluator::DependencySource
 LookupAllConformancesInContextRequest::readDependencySource(
-    const evaluator::DependencyCollector &collector) const {
+    const evaluator::DependencyRecorder &collector) const {
   const auto *nominal = std::get<0>(getStorage())
                             ->getAsGenericContext()
                             ->getSelfNominalTypeDecl();
@@ -1427,7 +1427,7 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
 //----------------------------------------------------------------------------//
 
 evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
 }
 
@@ -1460,7 +1460,7 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
 
 evaluator::DependencySource
 TypeCheckFunctionBodyUntilRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   // We're going under a function body scope, unconditionally flip the scope
   // to private.
   return {

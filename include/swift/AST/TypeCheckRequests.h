@@ -123,7 +123,7 @@ public:
 public:
   // Incremental dependencies
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &e) const;
+  readDependencySource(const evaluator::DependencyRecorder &e) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            Type t) const;
 };
@@ -893,7 +893,7 @@ public:
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// Request to obtain a list of stored properties in a nominal type.
@@ -2034,7 +2034,7 @@ public:
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// Computes whether the specified type or a super-class/super-protocol has the
@@ -2277,7 +2277,7 @@ private:
 public:
   // Incremental dependencies
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  readDependencySource(const evaluator::DependencyRecorder &eval) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceLookupResult r) const;
 };
@@ -2305,7 +2305,7 @@ public:
 
 public:
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  readDependencySource(const evaluator::DependencyRecorder &eval) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            evaluator::SideEffect) const;
 };
