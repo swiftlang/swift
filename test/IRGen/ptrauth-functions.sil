@@ -87,4 +87,4 @@ bb0(%0 : $T):
 
 sil_vtable F {
 }
-// CHECK: #[[ATTRS]] = {{{.*}} "ptrauth-calls" "ptrauth-returns"
+// CHECK: #[[ATTRS]] = {{{.*}} "ptrauth-auth-traps" "ptrauth-calls" "ptrauth-indirect-gotos" "ptrauth-returns"

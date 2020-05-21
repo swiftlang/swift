@@ -176,4 +176,4 @@ func makeGenericMetatypes() {
 // CHECK:   ret %swift.metadata_response
 
 // CHECK-DAG: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
-// CHECK-DAG: attributes [[NOUNWIND_OPT]] = { noinline nounwind "frame-pointer"="none" "target-cpu"
+// CHECK-DAG: attributes [[NOUNWIND_OPT]] = { noinline nounwind "

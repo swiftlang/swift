@@ -32,4 +32,4 @@ public func testCaptureGlobal() {
 }
 
 // CHECK-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
-// CHECK-DAG: attributes [[SWIFT_FUNC_ATTR]] = { "frame-pointer"="all" {{.*}}"target-cpu"
+// CHECK-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
