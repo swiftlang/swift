@@ -3071,7 +3071,7 @@ public:
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
-  /// Finds if the given type variable is representative for a type
+  /// Find if the given type variable is representative for a type
   /// variable which last locator path element is of the specified kind.
   /// If true returns the type variable which it is the representative for.
   TypeVariableType *
