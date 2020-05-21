@@ -1,0 +1,31 @@
+// RUN: %empty-directory(%t)
+// RUN: %build-clang-importer-objc-overlays
+// RUN: %target-sil-opt(mock-sdk: %clang-importer-sdk-nosource -I %t) -function-signature-opts -sil-fso-optimize-if-not-called %s | %FileCheck %s
+
+// Make sure that we do not try to specialize pseudo-generics with FSO.
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import Foundation
+import objc_generics
+
+// CHECK: sil [signature_optimized_thunk] [always_inline] @non_pseudo_method :
+sil @non_pseudo_method : $@convention(thin) <T: AnyObject> (Int64) -> () {
+entry(%0 : $Int64):
+  return undef : $()
+}
+
+// CHECK: sil @method :
+sil @method : $@convention(method) @pseudogeneric <T: AnyObject> (Int64, @guaranteed GenericClass<T>) -> () {
+entry(%0 : $Int64, %1 : $GenericClass<T>):
+  return undef : $()
+}
+
+// CHECK: sil @objcMethod :
+sil @objcMethod : $@convention(objc_method) @pseudogeneric <T: AnyObject> (Int64, @guaranteed GenericClass<T>) -> () {
+entry(%0 : $Int64, %1 : $GenericClass<T>):
+  return undef : $()
+}
