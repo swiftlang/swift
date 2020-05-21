@@ -709,8 +709,10 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
   }
 
   if (IGM.getSILModule().isWholeModule()) {
-    if (nominal.isResilient(IGM.getSwiftModule(),
-                            ResilienceExpansion::Maximal)) {
+    // Canonical prespecializations can only be emitted within the module where
+    // the generic type is itself defined, since it is the module where the 
+    // metadata accessor is defined.
+    if (IGM.getSwiftModule() != nominal.getModuleContext()) {
       return false;
     }
   } else {
@@ -725,6 +727,11 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
         return false;
       }
     }
+  }
+
+  if (nominal.isResilient(IGM.getSwiftModule(),
+                          ResilienceExpansion::Maximal)) {
+    return false;
   }
 
   if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
