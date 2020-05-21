@@ -136,7 +136,7 @@ void Symbol::serializePosition(StringRef Key, SourceLoc Loc,
                                SourceManager &SourceMgr,
                                llvm::json::OStream &OS) const {
   // Note: Line and columns are zero-based in this serialized format.
-  auto LineAndColumn = SourceMgr.getLineAndColumn(Loc);
+  auto LineAndColumn = SourceMgr.getPresumedLineAndColumnForLoc(Loc);
   auto Line = LineAndColumn.first - 1;
   auto Column = LineAndColumn.second - 1;
 

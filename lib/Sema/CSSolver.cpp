@@ -1110,8 +1110,9 @@ static bool debugConstraintSolverForTarget(
   SourceRange range = target.getSourceRange();
   if (range.isValid()) {
     auto charRange = Lexer::getCharSourceRangeFromSourceRange(C.SourceMgr, range);
-    startLine = C.SourceMgr.getLineNumber(charRange.getStart());
-    endLine = C.SourceMgr.getLineNumber(charRange.getEnd());
+    startLine =
+        C.SourceMgr.getLineAndColumnInBuffer(charRange.getStart()).first;
+    endLine = C.SourceMgr.getLineAndColumnInBuffer(charRange.getEnd()).first;
   }
 
   assert(startLine <= endLine && "expr ends before it starts?");

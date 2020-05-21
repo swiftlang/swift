@@ -1532,7 +1532,7 @@ private:
   void printLoc(SourceLoc Loc, raw_ostream &OS) {
     OS << '@';
     if (Loc.isValid() && SM.findBufferContainingLoc(Loc) == BufferID) {
-      auto LineCol = SM.getLineAndColumn(Loc, BufferID);
+      auto LineCol = SM.getPresumedLineAndColumnForLoc(Loc, BufferID);
       OS  << LineCol.first << ':' << LineCol.second;
     }
   }
@@ -2373,7 +2373,8 @@ public:
       SourceCode = SM.extractText({ SR.Start,
                                     SM.getByteDistance(SR.Start, EndCharLoc) });
       unsigned Column;
-      std::tie(Line, Column) = SM.getLineAndColumn(SR.Start, BufferID);
+      std::tie(Line, Column) =
+          SM.getPresumedLineAndColumnForLoc(SR.Start, BufferID);
     }
 
     OS.indent(IndentLevel * 2);
@@ -2597,7 +2598,7 @@ public:
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
-        auto LineAndColumn = SM.getLineAndColumn(Loc);
+        auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << SM.getDisplayNameForLoc(Loc)
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       } else {
@@ -2616,7 +2617,7 @@ public:
     } else if (isa<ExtensionDecl>(D)) {
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
-        auto LineAndColumn = SM.getLineAndColumn(Loc);
+        auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << SM.getDisplayNameForLoc(Loc)
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       } else {
@@ -2895,7 +2896,7 @@ private:
 
   void printLoc(SourceLoc Loc) {
     if (Loc.isValid()) {
-      auto LineCol = SM.getLineAndColumn(Loc, BufferID);
+      auto LineCol = SM.getPresumedLineAndColumnForLoc(Loc, BufferID);
       OS << LineCol.first << ':' << LineCol.second;
     }
   }

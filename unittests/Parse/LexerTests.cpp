@@ -753,7 +753,7 @@ public:
     llvm::raw_string_ostream DiagOS(DiagMsg);
     DiagnosticEngine::formatDiagnosticText(DiagOS, Info.FormatString,
                                            Info.FormatArgs);
-    auto LC = SM.getLineAndColumn(Info.Loc);
+    auto LC = SM.getPresumedLineAndColumnForLoc(Info.Loc);
     std::ostringstream StrOS;
     StrOS << LC.first << ", " << LC.second << ": " << DiagOS.str();
     messages.push_back(StrOS.str());

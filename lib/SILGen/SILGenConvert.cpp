@@ -145,7 +145,8 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
   unsigned column = 0;
   if (sourceLoc.isValid()) {
     filename = getMagicFileString(sourceLoc);
-    std::tie(line, column) = ctx.SourceMgr.getLineAndColumn(sourceLoc);
+    std::tie(line, column) =
+        ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceLoc);
   }
   
   bool isASCII = true;

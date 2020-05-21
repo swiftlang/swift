@@ -864,7 +864,8 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
 
     // To ensure the correctness of position when translated to line & column
     // pair.
-    if (SourceMgr.getLineAndColumn(EndLoc) != AbPos.getLineAndColumn()) {
+    if (SourceMgr.getPresumedLineAndColumnForLoc(EndLoc) !=
+        AbPos.getLineAndColumn()) {
       llvm::outs() << "locations should be identical";
       return EXIT_FAILURE;
     }

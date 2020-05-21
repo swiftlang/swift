@@ -149,7 +149,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
 
     SKInfo.Offset = SM.getLocOffsetInBuffer(Info.Loc, BufferID);
     std::tie(SKInfo.Line, SKInfo.Column) =
-        SM.getLineAndColumn(Info.Loc, BufferID);
+        SM.getPresumedLineAndColumnForLoc(Info.Loc, BufferID);
     SKInfo.Filename = SM.getDisplayNameForLoc(Info.Loc).str();
 
     for (auto R : Info.Ranges) {

@@ -320,7 +320,7 @@ void swift::simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner)
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
   out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
-  auto LC = SM.getLineAndColumn(owner.Loc);
+  auto LC = SM.getPresumedLineAndColumnForLoc(owner.Loc);
   out << ":" << LC.first << ":" << LC.second;
 }
 
@@ -331,7 +331,7 @@ void swift::ide::simple_display(llvm::raw_ostream &out,
   out << "Resolved cursor info at ";
   auto &SM = info.SF->getASTContext().SourceMgr;
   out << SM.getIdentifierForBuffer(*info.SF->getBufferID());
-  auto LC = SM.getLineAndColumn(info.Loc);
+  auto LC = SM.getPresumedLineAndColumnForLoc(info.Loc);
   out << ":" << LC.first << ":" << LC.second;
 }
 
@@ -1052,8 +1052,8 @@ void swift::simple_display(llvm::raw_ostream &out,
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
   out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
-  auto SLC = SM.getLineAndColumn(owner.StartLoc);
-  auto ELC = SM.getLineAndColumn(owner.EndLoc);
+  auto SLC = SM.getPresumedLineAndColumnForLoc(owner.StartLoc);
+  auto ELC = SM.getPresumedLineAndColumnForLoc(owner.EndLoc);
   out << ": (" << SLC.first << ":" << SLC.second << ", "
     << ELC.first << ":" << ELC.second << ")";
 }

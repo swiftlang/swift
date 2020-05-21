@@ -602,7 +602,7 @@ private:
   getLineColAndOffset(SourceLoc Loc) {
     if (Loc.isInvalid())
       return std::make_tuple(0, 0, None);
-    auto lineAndColumn = SrcMgr.getLineAndColumn(Loc, BufferID);
+    auto lineAndColumn = SrcMgr.getPresumedLineAndColumnForLoc(Loc, BufferID);
     unsigned offset = SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
     return std::make_tuple(lineAndColumn.first, lineAndColumn.second, offset);
   }

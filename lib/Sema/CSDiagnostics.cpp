@@ -4426,8 +4426,8 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
   // If this is multi-line closure we'd have to insert new lines
   // in the suggested 'let' to keep the structure of the code intact,
   // otherwise just use ';' to keep everything on the same line.
-  auto inLine = sourceMgr.getLineNumber(inLoc);
-  auto bodyLine = sourceMgr.getLineNumber(bodyLoc);
+  auto inLine = sourceMgr.getLineAndColumnInBuffer(inLoc).first;
+  auto bodyLine = sourceMgr.getLineAndColumnInBuffer(bodyLoc).first;
   auto isMultiLineClosure = bodyLine > inLine;
   auto indent =
       bodyStmts.empty() ? "" : Lexer::getIndentationForLine(sourceMgr, bodyLoc);

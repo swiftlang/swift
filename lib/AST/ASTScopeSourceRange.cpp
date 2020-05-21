@@ -176,9 +176,9 @@ bool ASTScopeImpl::doesRangeMatch(unsigned start, unsigned end, StringRef file,
     return false;
   const auto &SM = getSourceManager();
   const auto r = getSourceRangeOfScope(true);
-  if (start && start != SM.getLineNumber(r.Start))
+  if (start && start != SM.getLineAndColumnInBuffer(r.Start).first)
     return false;
-  if (end && end != SM.getLineNumber(r.End))
+  if (end && end != SM.getLineAndColumnInBuffer(r.End).first)
     return false;
   if (file.empty())
     return true;

@@ -710,13 +710,20 @@ public:
       if (SILPrintSourceInfo) {
         auto CurSourceLoc = I.getLoc().getSourceLoc();
         if (CurSourceLoc.isValid()) {
-          if (!PrevLoc || SM.getLineNumber(CurSourceLoc) > SM.getLineNumber(PrevLoc->getSourceLoc())) {
-              auto Buffer = SM.findBufferContainingLoc(CurSourceLoc);
-              auto Line = SM.getLineNumber(CurSourceLoc);
-              auto LineLength = SM.getLineLength(Buffer, Line);
-              PrintState.OS << "  // " << SM.extractText({SM.getLocForLineCol(Buffer, Line, 0), LineLength.getValueOr(0)}) <<
-              "\tSourceLoc: " << SM.getDisplayNameForLoc(CurSourceLoc) << ":" << Line << "\n";
-              PrevLoc = I.getLoc();
+          if (!PrevLoc ||
+              SM.getLineAndColumnInBuffer(CurSourceLoc).first >
+                  SM.getLineAndColumnInBuffer(PrevLoc->getSourceLoc()).first) {
+            auto Buffer = SM.findBufferContainingLoc(CurSourceLoc);
+            auto Line = SM.getLineAndColumnInBuffer(CurSourceLoc).first;
+            auto LineLength = SM.getLineLength(Buffer, Line);
+            PrintState.OS << "  // "
+                          << SM.extractText(
+                                 {SM.getLocForLineCol(Buffer, Line, 0),
+                                  LineLength.getValueOr(0)})
+                          << "\tSourceLoc: "
+                          << SM.getDisplayNameForLoc(CurSourceLoc) << ":"
+                          << Line << "\n";
+            PrevLoc = I.getLoc();
           }
         }
       }

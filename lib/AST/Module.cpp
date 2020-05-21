@@ -850,7 +850,7 @@ SourceFile::getBasicLocsForDecl(const Decl *D) const {
 
   auto setLineColumn = [&SM](LineColumn &Home, SourceLoc Loc) {
     if (Loc.isValid()) {
-      std::tie(Home.Line, Home.Column) = SM.getLineAndColumn(Loc);
+      std::tie(Home.Line, Home.Column) = SM.getPresumedLineAndColumnForLoc(Loc);
     }
   };
 #define SET(X) setLineColumn(Result.X, D->get##X());

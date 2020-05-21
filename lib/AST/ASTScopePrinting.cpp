@@ -118,8 +118,8 @@ static void printSourceRange(llvm::raw_ostream &out, const SourceRange range,
     return;
   }
 
-  auto startLineAndCol = SM.getLineAndColumn(range.Start);
-  auto endLineAndCol = SM.getLineAndColumn(range.End);
+  auto startLineAndCol = SM.getPresumedLineAndColumnForLoc(range.Start);
+  auto endLineAndCol = SM.getPresumedLineAndColumnForLoc(range.End);
 
   out << "[" << startLineAndCol.first << ":" << startLineAndCol.second << " - "
       << endLineAndCol.first << ":" << endLineAndCol.second << "]";

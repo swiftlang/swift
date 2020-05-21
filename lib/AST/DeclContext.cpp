@@ -613,7 +613,7 @@ static unsigned getLineNumber(DCType *DC) {
     return 0;
 
   const ASTContext &ctx = static_cast<const DeclContext *>(DC)->getASTContext();
-  return ctx.SourceMgr.getLineAndColumn(loc).first;
+  return ctx.SourceMgr.getPresumedLineAndColumnForLoc(loc).first;
 }
 
 unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,

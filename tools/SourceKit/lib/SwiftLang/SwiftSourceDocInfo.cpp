@@ -1295,7 +1295,7 @@ static void resolveCursor(
         std::vector<RefactoringKind> Scratch;
         RangeConfig Range;
         Range.BufferId = BufferID;
-        auto Pair = SM.getLineAndColumn(Loc);
+        auto Pair = SM.getPresumedLineAndColumnForLoc(Loc);
         Range.Line = Pair.first;
         Range.Column = Pair.second;
         Range.Length = Length;
