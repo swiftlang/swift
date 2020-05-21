@@ -110,6 +110,7 @@ set(SWIFTLIB_ESSENTIAL
   Pointer.swift
   Policy.swift
   PrefixWhile.swift
+  Prespecialize.swift
   Print.swift
   PtrAuth.swift
   Random.swift
