@@ -641,13 +641,22 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
       TransformDescriptor.hasOnlyDirectInModuleCallers;
   SILFunction *F = TransformDescriptor.OriginalFunction;
 
-
   // If we are asked to assume a caller for testing purposes, set the flag.
   hasCaller |= FSOOptimizeIfNotCalled;
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
                      canBeCalledIndirectly(F->getRepresentation()))) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
+    return false;
+  }
+
+  // Bail if we have a pseudo-generic function. We do not handle these today. If
+  // we let it through here we crash when attempting to compute the optimized
+  // function type.
+  //
+  // TODO: Add support for this.
+  if (F->getLoweredFunctionType()->isPseudogeneric()) {
+    LLVM_DEBUG(llvm::dbgs() << "  function is pseudo-generic -> abort\n");
     return false;
   }
 
