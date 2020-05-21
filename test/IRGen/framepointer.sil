@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -no-omit-leaf-frame-pointer| %FileCheck %s --check-prefix=CHECK-ALL
 // RUN: %target-swift-frontend -primary-file %s -S | %FileCheck %s  --check-prefix=CHECKASM --check-prefix=CHECKASM-%target-os-%target-cpu
 
 sil_stage canonical
@@ -29,6 +30,19 @@ entry(%i : $Int32):
 // CHECK: }
 
 // CHECK: attributes [[ATTR]] = {{{.*}}"frame-pointer"="non-leaf"
+
+// CHECK-ALL: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
+// CHECK-ALL: entry:
+// CHECK-ALL:   ret i32 %0
+// CHECK-ALL: }
+
+// CHECK-ALL: define{{.*}} swiftcc i32 @non_leaf_function_with_frame_pointer(i32 %0) [[ATTR]] {
+// CHECK-ALL: entry:
+// CHECK-ALL:   %1 = call swiftcc i32 @leaf_function_no_frame_pointer(i32 %0)
+// CHECK-ALL:   ret i32 %1
+// CHECK-ALL: }
+
+// CHECK-ALL: attributes [[ATTR]] = {{{.*}}"frame-pointer"="all"
 
 // Silence other os-archs.
 // CHECKASM: {{.*}}
