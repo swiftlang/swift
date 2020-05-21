@@ -202,6 +202,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE_CALL_RESULT | %FileCheck %s -check-prefix=COMPLETE_CALL_RESULT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-keywords=false -code-completion-token=BROKEN_CONFORMANCE | %FileCheck %s -check-prefix=BROKEN_CONFORMANCE
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLMETA_1 | %FileCheck %s -check-prefix=PROTOCOLMETA_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLMETA_2 | %FileCheck %s -check-prefix=PROTOCOLMETA_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOLMETA_3 | %FileCheck %s -check-prefix=PROTOCOLMETA_3
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -2201,4 +2205,39 @@ func testBrokenConformance(arg: BrokenConformanceS) {
   // BROKEN_CONFORMANCE: Begin completions, 1 items
   // BROKEN_CONFORMANCE: Decl[InstanceMethod]/Super: instanceFunc()[#Void#];
   // BROKEN_CONFORMANCE: End completions
+}
+
+protocol MetaProto {
+  static func staticFunc() -> Int
+  static var staticVar: Int { get }
+  func instanceFunc() -> Int
+  var intanceVar: Int { get }
+}
+extension MetaProto {
+  static func staticFuncExtension() -> Int { 1 }
+  static var staticVarExtension: Int { 1 }
+  func instanceFuncExtension() -> Int { 1 }
+  var intanceVarExtension: Int { 1 }
+}
+func testProtocolMetatype(protoProto: MetaProto.Protocol, protoType: MetaProto.Type) {
+    let _ = BrokenConformanceP.#^PROTOCOLMETA_1^#
+// PROTOCOLMETA_1: Begin completions, 3 items
+// PROTOCOLMETA_1-DAG: Keyword[self]/CurrNominal:          self[#BrokenConformanceP.Protocol#]; name=self
+// PROTOCOLMETA_1-DAG: Keyword/CurrNominal:                Protocol[#BrokenConformanceP.Protocol#]; name=Protocol
+// PROTOCOLMETA_1-DAG: Keyword/CurrNominal:                Type[#BrokenConformanceP.Type#]; name=Type
+// PROTOCOLMETA_1: End completions
+    let _ = protoProto.#^PROTOCOLMETA_2^#
+// PROTOCOLMETA_2: Begin completions, 1 items
+// PROTOCOLMETA_2-DAG: Keyword[self]/CurrNominal:          self[#MetaProto.Protocol#]; name=self
+// PROTOCOLMETA_2: End completions
+    let _ = protoType.#^PROTOCOLMETA_3^#
+// PROTOCOLMETA_3: Begin completions, 7 items
+// PROTOCOLMETA_3-DAG: Keyword[self]/CurrNominal:          self[#MetaProto.Type#]; name=self
+// PROTOCOLMETA_3-DAG: Decl[StaticMethod]/CurrNominal:     staticFunc()[#Int#]; name=staticFunc()
+// PROTOCOLMETA_3-DAG: Decl[StaticVar]/CurrNominal:        staticVar[#Int#]; name=staticVar
+// PROTOCOLMETA_3-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFunc({#(self): Self#})[#() -> Int#]; name=instanceFunc(self: Self)
+// PROTOCOLMETA_3-DAG: Decl[StaticMethod]/CurrNominal:     staticFuncExtension()[#Int#]; name=staticFuncExtension()
+// PROTOCOLMETA_3-DAG: Decl[StaticVar]/CurrNominal:        staticVarExtension[#Int#]; name=staticVarExtension
+// PROTOCOLMETA_3-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFuncExtension({#(self): Self#})[#() -> Int#]; name=instanceFuncExtension(self: Self)
+// PROTOCOLMETA_3: End completions
 }
