@@ -200,7 +200,7 @@ public:
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 class IRGenWholeModuleRequest

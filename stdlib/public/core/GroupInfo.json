@@ -209,6 +209,7 @@
     "OptionSet.swift",
     "OutputStream.swift",
     "Policy.swift",
+    "Prespecialize.swift",
     "Print.swift",
     "REPL.swift",
     "Random.swift",
