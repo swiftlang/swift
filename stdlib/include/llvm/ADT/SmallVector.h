@@ -50,24 +50,43 @@ protected:
   Size_T Size = 0, Capacity;
 
   /// The maximum value of the Size_T used.
+  #if !defined(_WIN32)
+  __attribute__((__visibility__("hidden")))
+  #endif
   static constexpr size_t SizeTypeMax() {
     return std::numeric_limits<Size_T>::max();
   }
 
   SmallVectorBase() = delete;
+  #if !defined(_WIN32)
+  __attribute__((__visibility__("hidden")))
+  #endif
   SmallVectorBase(void *FirstEl, size_t TotalCapacity)
       : BeginX(FirstEl), Capacity(TotalCapacity) {}
 
   /// This is an implementation of the grow() method which only works
   /// on POD-like data types and is out of line to reduce code duplication.
   /// This function will report a fatal error if it cannot increase capacity.
+  #if !defined(_WIN32)
+  __attribute__((__visibility__("hidden")))
+  #endif
   void grow_pod(void *FirstEl, size_t MinCapacity, size_t TSize);
 
 public:
+  #if !defined(_WIN32)
+  __attribute__((__visibility__("hidden")))
+  #endif
   size_t size() const { return Size; }
+  #if !defined(_WIN32)
+  __attribute__((__visibility__("hidden")))
+  #endif
   size_t capacity() const { return Capacity; }
 
-  LLVM_NODISCARD bool empty() const { return !Size; }
+  LLVM_NODISCARD
+  #if !defined(_WIN32)
+  __attribute__((__visibility__("hidden")))
+  #endif
+  bool empty() const { return !Size; }
 
   /// Set the array size to \p N, which the current array must have enough
   /// capacity for.
@@ -78,6 +97,9 @@ public:
   /// of the buffer when they know that more elements are available, and only
   /// update the size later. This avoids the cost of value initializing elements
   /// which will only be overwritten.
+  #if !defined(_WIN32)
+  __attribute__((__visibility__("hidden")))
+  #endif
   void set_size(size_t N) {
     assert(N <= capacity());
     Size = N;
