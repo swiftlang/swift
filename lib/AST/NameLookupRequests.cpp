@@ -89,7 +89,7 @@ void InheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const 
 }
 
 evaluator::DependencySource InheritedProtocolsRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   auto *PD = std::get<0>(getStorage());
   // Ignore context changes for protocols outside our module. This
   // prevents transitive cascading edges when e.g. our private
@@ -184,7 +184,7 @@ void ExtendedNominalRequest::writeDependencySink(
   auto *SF = std::get<0>(getStorage())->getParentSourceFile();
   if (!SF)
     return;
-  if (SF != tracker.getActiveDependencySourceOrNull())
+  if (SF != tracker.getRecorder().getActiveDependencySourceOrNull())
     return;
   tracker.addPotentialMember(value);
 }
@@ -208,7 +208,7 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
 }
 
 evaluator::DependencySource GetDestructorRequest::readDependencySource(
-    const evaluator::DependencyCollector &eval) const {
+    const evaluator::DependencyRecorder &eval) const {
   // Looking up the deinitializer currently always occurs in a private
   // scope because it is impossible to reference 'deinit' in user code, and a
   // valid 'deinit' declaration cannot occur outside of the
@@ -338,7 +338,7 @@ swift::extractNearestSourceLoc(const LookupConformanceDescriptor &desc) {
 //----------------------------------------------------------------------------//
 
 evaluator::DependencySource ModuleQualifiedLookupRequest::readDependencySource(
-    const evaluator::DependencyCollector &eval) const {
+    const evaluator::DependencyRecorder &eval) const {
   auto *DC = std::get<0>(getStorage());
   auto options = std::get<3>(getStorage());
 
@@ -385,7 +385,7 @@ void LookupConformanceInModuleRequest::writeDependencySink(
   if (!Adoptee)
     return;
 
-  auto *source = reqTracker.getActiveDependencySourceOrNull();
+  auto *source = reqTracker.getRecorder().getActiveDependencySourceOrNull();
   if (!source)
     return;
 
@@ -402,7 +402,7 @@ void LookupConformanceInModuleRequest::writeDependencySink(
 //----------------------------------------------------------------------------//
 
 evaluator::DependencySource UnqualifiedLookupRequest::readDependencySource(
-    const evaluator::DependencyCollector &) const {
+    const evaluator::DependencyRecorder &) const {
   auto &desc = std::get<0>(getStorage());
   // FIXME(Evaluator Incremental Dependencies): This maintains compatibility
   // with the existing scheme, but the existing scheme is totally ad-hoc. We
@@ -426,7 +426,7 @@ void UnqualifiedLookupRequest::writeDependencySink(
 //----------------------------------------------------------------------------//
 
 evaluator::DependencySource QualifiedLookupRequest::readDependencySource(
-    const evaluator::DependencyCollector &) const {
+    const evaluator::DependencyRecorder &) const {
   auto *dc = std::get<0>(getStorage());
   auto opts = std::get<3>(getStorage());
   // FIXME(Evaluator Incremental Dependencies): This is an artifact of the
