@@ -2814,6 +2814,9 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
                     operatorName.str());
         return;
       }
+    } else if (operatorName.is("~=")) {
+      DE.diagnose(anchor->getLoc(), diag::cannot_match_expr_pattern_with_value,
+                  lhsType, rhsType);
     } else {
       DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_args,
                   operatorName.str(), lhsType, rhsType)
