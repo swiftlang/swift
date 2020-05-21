@@ -48,13 +48,6 @@ if(CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wexit-time-destructors")
 endif()
 
-# We don't want runtime C++ code to export symbols we didn't explicitly
-# choose to.
-check_cxx_compiler_flag("-fvisibility=hidden" CXX_SUPPORTS_DEFAULT_HIDDEN_VISIBILITY)
-if(CXX_SUPPORTS_DEFAULT_HIDDEN_VISIBILITY)
-  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-fvisibility=hidden")
-endif()
-
 add_subdirectory(SwiftShims)
 
 if(SWIFT_BUILD_STDLIB)
