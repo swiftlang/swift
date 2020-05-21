@@ -56,7 +56,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
   Action visitTypeAliasType(TypeAliasType *aliasTy) override {
     if (aliasTy->getDecl()->hasClangNode() &&
         !aliasTy->getDecl()->isCompatibilityAlias()) {
-      assert(!aliasTy->getGenericSignature());
+      assert(!aliasTy->getDecl()->isGeneric());
       Callback(*this, aliasTy->getDecl());
     } else {
       Type(aliasTy->getSinglyDesugaredType()).walk(*this);
