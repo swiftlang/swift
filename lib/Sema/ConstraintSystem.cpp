@@ -4247,6 +4247,8 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
     if (!outermostWrapperType)
       return;
 
+    bool isImplicit = false;
+
     // Retrieve the outermost wrapper argument. If there isn't one, we're
     // performing default initialization.
     auto outermostArg = outermostWrapperAttr->getArg();
@@ -4254,6 +4256,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
       SourceLoc fakeParenLoc = outermostWrapperAttr->getRange().End;
       outermostArg = TupleExpr::createEmpty(
           ctx, fakeParenLoc, fakeParenLoc, /*Implicit=*/true);
+      isImplicit = true;
     }
 
     auto typeExpr = TypeExpr::createImplicitHack(
@@ -4264,7 +4267,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
         outermostWrapperAttr->getArgumentLabels(),
         outermostWrapperAttr->getArgumentLabelLocs(),
         /*hasTrailingClosure=*/false,
-        /*implicit=*/false);
+        /*implicit=*/isImplicit);
   }
   wrapperAttrs[0]->setSemanticInit(backingInitializer);
 
