@@ -1,0 +1,73 @@
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -emit-ir -no-omit-leaf-frame-pointer| %FileCheck %s --check-prefix=CHECK-ALL
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -S | %FileCheck %s --check-prefix=CHECKASM
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -S -no-omit-leaf-frame-pointer | %FileCheck %s --check-prefix=CHECKASM-ALL
+
+// REQUIRES: CODEGENERATOR=AArch64
+
+// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=windows
+
+sil_stage canonical
+
+import Swift
+
+sil @leaf_function_no_frame_pointer : $@convention(thin) (Int32) -> Int32 {
+entry(%i : $Int32):
+  return %i : $Int32
+}
+
+sil @non_leaf_function_with_frame_pointer : $@convention(thin) (Int32) -> Int32 {
+entry(%i : $Int32):
+  %f = function_ref @leaf_function_no_frame_pointer : $@convention(thin) (Int32) -> Int32
+  %r = apply %f(%i) : $@convention(thin) (Int32) -> Int32
+  return %r : $Int32
+}
+
+// CHECK: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
+// CHECK: entry:
+// CHECK:   ret i32 %0
+// CHECK: }
+
+// CHECK: define{{.*}} swiftcc i32 @non_leaf_function_with_frame_pointer(i32 %0) [[ATTR]] {
+// CHECK: entry:
+// CHECK:   %1 = call swiftcc i32 @leaf_function_no_frame_pointer(i32 %0)
+// CHECK:   ret i32 %1
+// CHECK: }
+
+// CHECK: attributes [[ATTR]] = {{{.*}}"frame-pointer"="non-leaf"
+
+// CHECK-ALL: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
+// CHECK-ALL: entry:
+// CHECK-ALL:   ret i32 %0
+// CHECK-ALL: }
+
+// CHECK-ALL: define{{.*}} swiftcc i32 @non_leaf_function_with_frame_pointer(i32 %0) [[ATTR]] {
+// CHECK-ALL: entry:
+// CHECK-ALL:   %1 = call swiftcc i32 @leaf_function_no_frame_pointer(i32 %0)
+// CHECK-ALL:   ret i32 %1
+// CHECK-ALL: }
+
+// CHECK-ALL: attributes [[ATTR]] = {{{.*}}"frame-pointer"="all"
+
+// CHECKASM-LABEL: _leaf_function_no_frame_pointer:
+// CHECKASM-NOT: stp
+// CHECKASM-NOT: ldp
+// CHECKASM: ret
+
+// CHECKASM-LABEL: _non_leaf_function_with_frame_pointer:
+// CHECKASM: stp
+// CHECKASM: _leaf_function_no_frame_pointer
+// CHECKASM: ldp
+// CHECKASM: ret
+
+// CHECKASM-ALL-LABEL: _leaf_function_no_frame_pointer:
+// CHECKASM-ALL: stp
+// CHECKASM-ALL: ldp
+// CHECKASM-ALL: ret
+
+// CHECKASM-ALL-LABEL: _non_leaf_function_with_frame_pointer:
+// CHECKASM-ALL: stp
+// CHECKASM-ALL: _leaf_function_no_frame_pointer
+// CHECKASM-ALL: ldp
+// CHECKASM-ALL: ret
