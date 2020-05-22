@@ -58,7 +58,6 @@ namespace swift {
   class SerializationOptions;
   class SILOptions;
   class SILModule;
-  class SILParserTUState;
   class SourceFile;
   enum class SourceFileKind;
   class SourceManager;
@@ -73,17 +72,6 @@ namespace swift {
   namespace Lowering {
     class TypeConverter;
   }
-
-  /// Used to optionally maintain SIL parsing context for the parser.
-  ///
-  /// When not parsing SIL, this has no overhead.
-  class SILParserState {
-  public:
-    std::unique_ptr<SILParserTUState> Impl;
-
-    explicit SILParserState(SILModule *M);
-    ~SILParserState();
-  };
 
   /// @{
 
