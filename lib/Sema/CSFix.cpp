@@ -767,6 +767,11 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
     return failure.diagnose(asNote);
   }
 
+  case RefKind::EnumCase: {
+    InvalidEnumCaseRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+
   case RefKind::MutatingGetter: {
     InvalidMemberWithMutatingGetterInKeyPath failure(solution, Member,
                                                      getLocator());
@@ -790,6 +795,12 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
   if (isa<FuncDecl>(member))
     return AllowInvalidRefInKeyPath::create(cs, RefKind::Method, member,
                                             locator);
+
+  // Referencing enum cases in key path is not currently allowed.
+  if (isa<EnumElementDecl>(member)) {
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::EnumCase, member,
+                                            locator);
+  }
 
   // Referencing initializers in key path is not currently allowed.
   if (isa<ConstructorDecl>(member))
