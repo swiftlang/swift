@@ -1,7 +1,11 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -o %t/OtherOS.swiftmodule -module-name OtherOS %S/Inputs/witness_fix_its_other_module.swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -I %t/
 
 prefix operator ^^^
 postfix operator ^^^^
+
+import OtherOS
 
 protocol Foo {
   var bar1: Int { get set } // expected-note {{protocol requires property 'bar1' with type 'Int'; do you want to add a stub?}}
@@ -34,3 +38,12 @@ protocol Foo1 {
 struct ConformsToFoo1: Foo1 { // expected-error {{type 'ConformsToFoo1' does not conform to protocol 'Foo1'}}
   subscript(value: Bool) -> Bool { return false } // expected-note {{candidate is not settable, but protocol requires it}}{{none}}
 }
+
+// Don't crash or try to fixup get/set mismatches in other modules
+// This protocol requirement must conflict with the one in
+// witness_fix_its_other_module.swift.
+protocol RenameableProtocol {
+  var name: String { get set } // expected-note {{protocol requires property 'name' with type 'String'; do you want to add a stub?}}
+}
+
+extension Linux: RenameableProtocol {} // expected-error {{type 'Linux' does not conform to protocol 'RenameableProtocol'}}
