@@ -158,7 +158,7 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
 }
 
 evaluator::DependencySource SuperclassTypeRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   const auto access = std::get<0>(getStorage())->getFormalAccess();
   return {
     e.getActiveDependencySourceOrNull(),
@@ -1349,7 +1349,7 @@ void CheckRedeclarationRequest::cacheResult(evaluator::SideEffect) const {
 }
 
 evaluator::DependencySource CheckRedeclarationRequest::readDependencySource(
-    const evaluator::DependencyCollector &eval) const {
+    const evaluator::DependencyRecorder &eval) const {
   auto *current = std::get<0>(getStorage());
   auto *currentDC = current->getDeclContext();
   return {
@@ -1384,7 +1384,7 @@ void CheckRedeclarationRequest::writeDependencySink(
 
 evaluator::DependencySource
 LookupAllConformancesInContextRequest::readDependencySource(
-    const evaluator::DependencyCollector &collector) const {
+    const evaluator::DependencyRecorder &collector) const {
   const auto *nominal = std::get<0>(getStorage())
                             ->getAsGenericContext()
                             ->getSelfNominalTypeDecl();
@@ -1427,7 +1427,7 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
 //----------------------------------------------------------------------------//
 
 evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   return {std::get<0>(getStorage()), evaluator::DependencyScope::Cascading};
 }
 
@@ -1451,24 +1451,6 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
     FrontendStatsTracer tracer(Ctx.Stats, "AST verification");
     // Verify the SourceFile.
     swift::verify(*SF);
-
-    // Verify imported modules.
-    //
-    // Skip per-file verification in whole-module mode. Verifying imports
-    // between files could cause the importer to cache declarations without
-    // adding them to the ASTContext. This happens when the importer registers a
-    // declaration without a valid TypeChecker instance, as is the case during
-    // verification. A subsequent file may require that declaration to be fully
-    // imported (e.g. to synthesized a function body), but since it has already
-    // been cached, it will never be added to the ASTContext. The solution is to
-    // skip verification and avoid caching it.
-#ifndef NDEBUG
-    if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
-        SF->Kind != SourceFileKind::SIL &&
-        !Ctx.LangOpts.DebuggerSupport) {
-      Ctx.verifyAllLoadedModules();
-    }
-#endif
   }
 }
 
@@ -1478,7 +1460,7 @@ void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
 
 evaluator::DependencySource
 TypeCheckFunctionBodyUntilRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   // We're going under a function body scope, unconditionally flip the scope
   // to private.
   return {

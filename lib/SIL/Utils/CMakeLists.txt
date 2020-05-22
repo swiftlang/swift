@@ -1,4 +1,4 @@
-sil_register_sources(
+target_sources(swiftSIL PRIVATE
   BasicBlockUtils.cpp
   DebugUtils.cpp
   Dominance.cpp
@@ -13,5 +13,4 @@ sil_register_sources(
   SILInstructionWorklist.cpp
   SILOpenedArchetypesTracker.cpp
   SILRemarkStreamer.cpp
-  ValueUtils.cpp
-)
+  ValueUtils.cpp)

@@ -123,7 +123,7 @@ public:
 public:
   // Incremental dependencies
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &e) const;
+  readDependencySource(const evaluator::DependencyRecorder &e) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            Type t) const;
 };
@@ -893,7 +893,7 @@ public:
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// Request to obtain a list of stored properties in a nominal type.
@@ -2034,7 +2034,7 @@ public:
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// Computes whether the specified type or a super-class/super-protocol has the
@@ -2277,7 +2277,7 @@ private:
 public:
   // Incremental dependencies
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  readDependencySource(const evaluator::DependencyRecorder &eval) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceLookupResult r) const;
 };
@@ -2305,7 +2305,7 @@ public:
 
 public:
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &eval) const;
+  readDependencySource(const evaluator::DependencyRecorder &eval) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            evaluator::SideEffect) const;
 };
@@ -2429,6 +2429,32 @@ private:
 
 void simple_display(llvm::raw_ostream &out, const TypeResolution *resolution);
 SourceLoc extractNearestSourceLoc(const TypeRepr *repr);
+
+/// Checks to see if any of the imports in a module use `@_implementationOnly`
+/// in one file and not in another.
+///
+/// Like redeclaration checking, but for imports.
+///
+/// This is a request purely to ensure that we don't need to perform the same
+/// checking for each file we resolve imports for.
+/// FIXME: Once import resolution operates at module-level, this checking can
+/// integrated into it.
+class CheckInconsistentImplementationOnlyImportsRequest
+    : public SimpleRequest<CheckInconsistentImplementationOnlyImportsRequest,
+                           evaluator::SideEffect(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.

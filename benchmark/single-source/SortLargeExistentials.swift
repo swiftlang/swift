@@ -17,7 +17,7 @@ import TestsUtils
 public let SortLargeExistentials = BenchmarkInfo(
   name: "SortLargeExistentials",
   runFunction: run_SortLargeExistentials,
-  tags: [.validation, .api, .algorithm],
+  tags: [.validation, .api, .algorithm, .cpubench],
   legacyFactor: 100)
 
 protocol LetterKind {

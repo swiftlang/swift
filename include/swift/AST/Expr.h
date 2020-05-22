@@ -4227,9 +4227,7 @@ public:
       DefaultArgsOwner(defaultArgsOwner), ParamIndex(paramIndex), Loc(loc),
       ContextOrCallerSideExpr(dc) { }
 
-  SourceRange getSourceRange() const { return {}; }
-
-  SourceLoc getArgumentListLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
 
   ConcreteDeclRef getDefaultArgsOwner() const {
     return DefaultArgsOwner;

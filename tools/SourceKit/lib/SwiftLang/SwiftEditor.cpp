@@ -1697,13 +1697,13 @@ private:
 
   struct ParamClosureInfo {
     Optional<ClosureInfo> placeholderClosure;
-    bool isNonPlacholderClosure = false;
+    bool isNonPlaceholderClosure = false;
     bool isWrappedWithBraces = false;
   };
 
   /// Scan the given TupleExpr collecting parameter closure information and
   /// returning the index of the given target placeholder (if found).
-  Optional<unsigned> scanTupleExpr(TupleExpr *TE, SourceLoc targetPlacholderLoc,
+  Optional<unsigned> scanTupleExpr(TupleExpr *TE, SourceLoc targetPlaceholderLoc,
                                    std::vector<ParamClosureInfo> &outParams) {
     if (TE->getElements().empty())
       return llvm::None;
@@ -1711,7 +1711,7 @@ private:
     outParams.clear();
     outParams.reserve(TE->getNumElements());
 
-    Optional<unsigned> targetPlacholderIndex;
+    Optional<unsigned> targetPlaceholderIndex;
 
     for (Expr *E : TE->getElements()) {
       outParams.emplace_back();
@@ -1720,8 +1720,8 @@ private:
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         if (CE->hasSingleExpressionBody() &&
             CE->getSingleExpressionBody()->getStartLoc() ==
-                targetPlacholderLoc) {
-          targetPlacholderIndex = outParams.size() - 1;
+                targetPlaceholderLoc) {
+          targetPlaceholderIndex = outParams.size() - 1;
           if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(
                   CE->getSingleExpressionBody())) {
             outParam.isWrappedWithBraces = true;
@@ -1732,7 +1732,7 @@ private:
           }
         }
         // else...
-        outParam.isNonPlacholderClosure = true;
+        outParam.isNonPlaceholderClosure = true;
         continue;
       }
 
@@ -1741,15 +1741,15 @@ private:
         if (scanClosureType(PHE, info))
           outParam.placeholderClosure = info;
       } else if (containClosure(E)) {
-        outParam.isNonPlacholderClosure = true;
+        outParam.isNonPlaceholderClosure = true;
       }
 
-      if (E->getStartLoc() == targetPlacholderLoc) {
-        targetPlacholderIndex = outParams.size() - 1;
+      if (E->getStartLoc() == targetPlaceholderLoc) {
+        targetPlaceholderIndex = outParams.size() - 1;
       }
     }
 
-    return targetPlacholderIndex;
+    return targetPlaceholderIndex;
   }
 
 public:
@@ -1785,21 +1785,21 @@ public:
     // and if the call parens can be removed in that case.
     // We'll first find the enclosing CallExpr, and then do further analysis.
     std::vector<ParamClosureInfo> params;
-    Optional<unsigned> targetPlacholderIndex;
+    Optional<unsigned> targetPlaceholderIndex;
     auto ECE = enclosingCallExprArg(SF, PlaceholderStartLoc);
     Expr *Args = ECE.first;
     if (Args && ECE.second) {
       if (isa<ParenExpr>(Args)) {
         params.emplace_back();
         params.back().placeholderClosure = TargetClosureInfo;
-        targetPlacholderIndex = 0;
+        targetPlaceholderIndex = 0;
       } else if (auto *TE = dyn_cast<TupleExpr>(Args)) {
-        targetPlacholderIndex = scanTupleExpr(TE, PlaceholderStartLoc, params);
+        targetPlaceholderIndex = scanTupleExpr(TE, PlaceholderStartLoc, params);
       }
     }
 
     // If there was no appropriate parent call expression, it's non-trailing.
-    if (!targetPlacholderIndex.hasValue()) {
+    if (!targetPlaceholderIndex.hasValue()) {
       OneClosureCallback(Args, /*useTrailingClosure=*/false,
                          /*isWrappedWithBraces=*/false, TargetClosureInfo);
       return true;
@@ -1811,23 +1811,23 @@ public:
     // Find the first parameter eligible to be trailing.
     while (firstTrailingIndex != 0) {
       unsigned i = firstTrailingIndex - 1;
-      if (params[i].isNonPlacholderClosure ||
+      if (params[i].isNonPlaceholderClosure ||
           !params[i].placeholderClosure.hasValue())
         break;
       firstTrailingIndex = i;
     }
 
-    if (firstTrailingIndex > targetPlacholderIndex) {
+    if (firstTrailingIndex > targetPlaceholderIndex) {
       // Target comes before the eligible trailing closures.
       OneClosureCallback(Args, /*isTrailing=*/false,
-                         params[*targetPlacholderIndex].isWrappedWithBraces,
+                         params[*targetPlaceholderIndex].isWrappedWithBraces,
                          TargetClosureInfo);
       return true;
-    } else if (targetPlacholderIndex == end - 1 &&
+    } else if (targetPlaceholderIndex == end - 1 &&
                firstTrailingIndex == end - 1) {
       // Target is the only eligible trailing closure.
       OneClosureCallback(Args, /*isTrailing=*/true,
-                         params[*targetPlacholderIndex].isWrappedWithBraces,
+                         params[*targetPlaceholderIndex].isWrappedWithBraces,
                          TargetClosureInfo);
       return true;
     }

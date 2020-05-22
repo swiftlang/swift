@@ -8320,9 +8320,8 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     solution.setExprTypes(resultExpr);
     result.setExpr(resultExpr);
 
-    auto &ctx = cs.getASTContext();
     if (cs.isDebugMode()) {
-      auto &log = ctx.TypeCheckerDebug->getStream();
+      auto &log = llvm::errs();
       log << "---Type-checked expression---\n";
       resultExpr->dump(log);
       log << "\n";

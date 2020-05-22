@@ -68,9 +68,9 @@ test(arg1: 1,
 }
 
 let x = [1, 2, 3]
-        .filter {$0 < $1}
-        .filter {$0 < $1}
-        .filter {$0 < $1}
+    .filter {$0 < $1}
+    .filter {$0 < $1}
+    .filter {$0 < $1}
 
 bax(34949494949)
     .foo(a: Int,
@@ -141,11 +141,11 @@ if #available(
 // do the same.
 //
 let _ = []
-        .map {
-            f {
-                print()
-            } ?? 0
-        }
+    .map {
+        f {
+            print()
+        } ?? 0
+    }
 
 basename
     .foo(a: Int,
@@ -234,10 +234,10 @@ let arrayC = [2]
 let arrayD = [3]
 
 let array1 =
-        arrayA +
-        arrayB +
-        arrayC +
-        arrayD
+    arrayA +
+    arrayB +
+    arrayC +
+    arrayD
 
 array1 =
     arrayA +
@@ -254,9 +254,9 @@ arrayC +
 arrayD
 
 let array2 = arrayA +
-        arrayB +
-        arrayC +
-        arrayD
+    arrayB +
+    arrayC +
+    arrayD
 
 
 // Comments should not break exact alignment, and leading comments should be aligned, rather than the label.
@@ -867,7 +867,7 @@ func foo(
 ) {}
 
 var (d, e):
-        (Int, Int) = (1, 3),
+    (Int, Int) = (1, 3),
     (f, g): (
         Int,
         Int
@@ -1015,3 +1015,24 @@ catch MyErr.a(let code, let message),
 {
     print("ahhh!")
 }
+
+// Pattern binding decls should only column-align if no element spans from the first line to beyond it.
+
+public let x = 10,
+           y = 20
+
+private var firstThing = 20,
+            secondThing = item
+                .filter {},
+            thirdThing = 42
+
+public let myVar = itemWithALongName
+    .filter { $0 >= $1 && $0 - $1 < 50}
+
+public let first = 45, second = itemWithALongName
+    .filter { $0 >= $1 && $0 - $1 < 50}
+
+private var secondThing = item
+    .filter {},
+    firstThing = 20,
+    thirdThing = 56

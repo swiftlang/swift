@@ -108,8 +108,7 @@ ConstraintSystem::determineBestBindings() {
     inferTransitiveSupertypeBindings(cache, bindings);
 
     if (isDebugMode()) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
-      bindings.dump(typeVar, log, solverState->depth * 2);
+      bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
     }
 
     // If these are the first bindings, or they are better than what
@@ -1089,12 +1088,22 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
       ConstraintFix *fix = nullptr;
       if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
-        auto path = dstLocator->getPath();
-        // Drop `generic parameter` locator element so that all missing
-        // generic parameters related to the same path can be coalesced later.
-        fix = DefaultGenericArgument::create(
-            cs, GP,
-            cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
+        // If it is represetative for a key path root, let's emit a more
+        // specific diagnostic.
+        auto *keyPathRoot =
+            cs.isRepresentativeFor(TypeVar, ConstraintLocator::KeyPathRoot);
+        if (keyPathRoot) {
+          fix = SpecifyKeyPathRootType::create(
+              cs, keyPathRoot->getImpl().getLocator());
+        } else {
+          auto path = dstLocator->getPath();
+          // Drop `generic parameter` locator element so that all missing
+          // generic parameters related to the same path can be coalesced later.
+          fix = DefaultGenericArgument::create(
+              cs, GP,
+              cs.getConstraintLocator(dstLocator->getAnchor(),
+                                      path.drop_back()));
+        }
       } else if (TypeVar->getImpl().isClosureParameterType()) {
         fix = SpecifyClosureParameterType::create(cs, dstLocator);
       } else if (TypeVar->getImpl().isClosureResultType()) {

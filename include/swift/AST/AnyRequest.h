@@ -66,6 +66,9 @@ struct AnyRequestVTable {
     static SourceLoc getNearestLoc(const void *ptr) {
       return static_cast<const Request *>(ptr)->getNearestLoc();
     }
+    static bool isCached(const void *ptr) {
+      return static_cast<const Request *>(ptr)->isCached();
+    }
   };
 
   const uint64_t typeID;
@@ -78,8 +81,10 @@ struct AnyRequestVTable {
   const std::function<void(const void *, DiagnosticEngine &)> diagnoseCycle;
   const std::function<void(const void *, DiagnosticEngine &)> noteCycleStep;
   const std::function<SourceLoc(const void *)> getNearestLoc;
+  const std::function<bool(const void *)> isCached;
 
-  template <typename Request>
+  template <typename Request,
+            typename std::enable_if<Request::isEverCached>::type * = nullptr>
   static const AnyRequestVTable *get() {
     static const AnyRequestVTable vtable = {
         TypeID<Request>::value,
@@ -92,6 +97,26 @@ struct AnyRequestVTable {
         &Impl<Request>::diagnoseCycle,
         &Impl<Request>::noteCycleStep,
         &Impl<Request>::getNearestLoc,
+        &Impl<Request>::isCached,
+    };
+    return &vtable;
+  }
+
+  template <typename Request,
+            typename std::enable_if<!Request::isEverCached>::type * = nullptr>
+  static const AnyRequestVTable *get() {
+    static const AnyRequestVTable vtable = {
+        TypeID<Request>::value,
+        sizeof(Request),
+        &Impl<Request>::copy,
+        &Impl<Request>::getHash,
+        &Impl<Request>::deleter,
+        &Impl<Request>::isEqual,
+        &Impl<Request>::simpleDisplay,
+        &Impl<Request>::diagnoseCycle,
+        &Impl<Request>::noteCycleStep,
+        &Impl<Request>::getNearestLoc,
+        [](auto){ return false; },
     };
     return &vtable;
   }
@@ -192,6 +217,10 @@ public:
   /// Retrieve the nearest source location to which this request applies.
   SourceLoc getNearestLoc() const {
     return getVTable()->getNearestLoc(getRawStorage());
+  }
+
+  bool isCached() const {
+    return getVTable()->isCached(getRawStorage());
   }
 
   /// Compare two instances for equality.

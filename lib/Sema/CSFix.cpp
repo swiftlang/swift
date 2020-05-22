@@ -119,6 +119,10 @@ bool TreatRValueAsLValue::diagnose(const Solution &solution,
 
 TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
                                    ConstraintLocator *locator) {
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
+    locator = cs.getConstraintLocator(
+        locator, LocatorPathElt::ArgumentAttribute::forInOut());
+
   return new (cs.getAllocator()) TreatRValueAsLValue(cs, locator);
 }
 
@@ -168,6 +172,10 @@ bool MarkExplicitlyEscaping::diagnose(const Solution &solution,
 MarkExplicitlyEscaping *
 MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                ConstraintLocator *locator) {
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
+    locator = cs.getConstraintLocator(
+        locator, LocatorPathElt::ArgumentAttribute::forEscaping());
+
   return new (cs.getAllocator()) MarkExplicitlyEscaping(cs, lhs, rhs, locator);
 }
 
@@ -759,6 +767,11 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
     return failure.diagnose(asNote);
   }
 
+  case RefKind::EnumCase: {
+    InvalidEnumCaseRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+
   case RefKind::MutatingGetter: {
     InvalidMemberWithMutatingGetterInKeyPath failure(solution, Member,
                                                      getLocator());
@@ -782,6 +795,12 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
   if (isa<FuncDecl>(member))
     return AllowInvalidRefInKeyPath::create(cs, RefKind::Method, member,
                                             locator);
+
+  // Referencing enum cases in key path is not currently allowed.
+  if (isa<EnumElementDecl>(member)) {
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::EnumCase, member,
+                                            locator);
+  }
 
   // Referencing initializers in key path is not currently allowed.
   if (isa<ConstructorDecl>(member))

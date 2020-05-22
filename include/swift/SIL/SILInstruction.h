@@ -6624,8 +6624,6 @@ class BeginCOWMutationInst final
   friend SILBuilder;
   friend TrailingObjects;
 
-  bool native;
-
   BeginCOWMutationInst(SILDebugLocation loc, SILValue operand,
                        ArrayRef<SILType> resultTypes,
                        ArrayRef<ValueOwnershipKind> resultOwnerships,
@@ -6669,8 +6667,6 @@ class EndCOWMutationInst
                                   SingleValueInstruction>
 {
   friend SILBuilder;
-
-  bool keepUnique;
 
   EndCOWMutationInst(SILDebugLocation DebugLoc, SILValue Operand,
                      bool keepUnique)

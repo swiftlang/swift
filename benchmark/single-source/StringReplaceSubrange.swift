@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-let tags: [BenchmarkCategory] = [.validation, .api, .String]
+let tags: [BenchmarkCategory] = [.validation, .api, .String, .cpubench]
 
 public let StringReplaceSubrange = [
   BenchmarkInfo(

@@ -722,6 +722,7 @@ namespace {
 /// cleanup to take ownership of the value and thus prevent it form being
 /// written back.
 struct OwnedValueWritebackCleanup final : Cleanup {
+  using Flags = Cleanup::Flags;
 
   /// We store our own loc so that we can ensure that DI ignores our writeback.
   SILLocation loc;
@@ -732,6 +733,11 @@ struct OwnedValueWritebackCleanup final : Cleanup {
   OwnedValueWritebackCleanup(SILLocation loc, SILValue lvalueAddress,
                              SILValue value)
       : loc(loc), lvalueAddress(lvalueAddress), value(value) {}
+
+  bool getWritebackBuffer(function_ref<void(SILValue)> func) override {
+    func(lvalueAddress);
+    return true;
+  }
 
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
     SILValue valueToStore = value;

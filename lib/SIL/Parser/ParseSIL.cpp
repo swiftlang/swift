@@ -46,13 +46,11 @@ using namespace swift::syntax;
 // SILParserState implementation
 //===----------------------------------------------------------------------===//
 
-namespace swift {
-// This has to be in the 'swift' namespace because it's forward-declared for
-// SILParserState.
-class SILParserTUState : public SILParserTUStateBase {
+namespace {
+class SILParserState : public SILParserStateBase {
 public:
-  explicit SILParserTUState(SILModule &M) : M(M) {}
-  ~SILParserTUState();
+  explicit SILParserState(SILModule &M) : M(M) {}
+  ~SILParserState();
 
   SILModule &M;
 
@@ -80,9 +78,9 @@ public:
   bool parseSILProperty(Parser &P) override;
   bool parseSILScope(Parser &P) override;
 };
-} // end namespace swift
+} // end anonymous namespace
 
-SILParserTUState::~SILParserTUState() {
+SILParserState::~SILParserState() {
   if (!ForwardRefFns.empty()) {
     for (auto Entry : ForwardRefFns) {
       if (Entry.second.Loc.isValid()) {
@@ -101,11 +99,6 @@ SILParserTUState::~SILParserTUState() {
     }
 }
 
-SILParserState::SILParserState(SILModule *M)
-    : Impl(M ? std::make_unique<SILParserTUState>(*M) : nullptr) {}
-
-SILParserState::~SILParserState() = default;
-
 std::unique_ptr<SILModule>
 ParseSILModuleRequest::evaluate(Evaluator &evaluator,
                                 SILGenDescriptor desc) const {
@@ -117,8 +110,8 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
 
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts);
-  SILParserState parserState(silMod.get());
-  Parser parser(*bufferID, *SF, parserState.Impl.get());
+  SILParserState parserState(*silMod.get());
+  Parser parser(*bufferID, *SF, &parserState);
   PrettyStackTraceParser StackTrace(parser);
 
   auto hadError = parser.parseTopLevelSIL();
@@ -157,11 +150,11 @@ namespace {
   };
 
   class SILParser {
-    friend SILParserTUState;
+    friend SILParserState;
   public:
     Parser &P;
     SILModule &SILMod;
-    SILParserTUState &TUState;
+    SILParserState &TUState;
     SILFunction *F = nullptr;
     GenericEnvironment *ContextGenericEnv = nullptr;
 
@@ -193,8 +186,8 @@ namespace {
 
   public:
     SILParser(Parser &P)
-        : P(P), SILMod(static_cast<SILParserTUState *>(P.SIL)->M),
-          TUState(*static_cast<SILParserTUState *>(P.SIL)),
+        : P(P), SILMod(static_cast<SILParserState *>(P.SIL)->M),
+          TUState(*static_cast<SILParserState *>(P.SIL)),
           ParsedTypeCallback([](Type ty) {}) {}
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
@@ -5638,7 +5631,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
 ///     'sil' sil-linkage '@' identifier ':' sil-type decl-sil-body?
 ///   decl-sil-body:
 ///     '{' sil-basic-block+ '}'
-bool SILParserTUState::parseDeclSIL(Parser &P) {
+bool SILParserState::parseDeclSIL(Parser &P) {
   // Inform the lexer that we're lexing the body of the SIL declaration.  Do
   // this before we consume the 'sil' token so that all later tokens are
   // properly handled.
@@ -5806,7 +5799,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
 
 ///   decl-sil-stage:   [[only in SIL mode]]
 ///     'sil_stage' ('raw' | 'canonical')
-bool SILParserTUState::parseDeclSILStage(Parser &P) {
+bool SILParserState::parseDeclSILStage(Parser &P) {
   SourceLoc stageLoc = P.consumeToken(tok::kw_sil_stage);
   if (!P.Tok.is(tok::identifier)) {
     P.diagnose(P.Tok, diag::expected_sil_stage_name);
@@ -5887,7 +5880,7 @@ static Optional<VarDecl *> lookupGlobalDecl(Identifier GlobalName,
 
 /// decl-sil-global: [[only in SIL mode]]
 ///   'sil_global' sil-linkage @name : sil-type [external]
-bool SILParserTUState::parseSILGlobal(Parser &P) {
+bool SILParserState::parseSILGlobal(Parser &P) {
   // Inform the lexer that we're lexing the body of the SIL declaration.
   Lexer::SILBodyRAII Tmp(*P.L);
 
@@ -5944,7 +5937,7 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
 /// decl-sil-property: [[only in SIL mode]]
 ///   'sil_property' sil-decl-ref '(' sil-key-path-pattern-component ')'
 
-bool SILParserTUState::parseSILProperty(Parser &P) {
+bool SILParserState::parseSILProperty(Parser &P) {
   Lexer::SILBodyRAII Tmp(*P.L);
 
   auto loc = P.consumeToken(tok::kw_sil_property);
@@ -6017,7 +6010,7 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
 ///   '{' sil-vtable-entry* '}'
 /// sil-vtable-entry:
 ///   SILDeclRef ':' SILFunctionName
-bool SILParserTUState::parseSILVTable(Parser &P) {
+bool SILParserState::parseSILVTable(Parser &P) {
   P.consumeToken(tok::kw_sil_vtable);
   SILParser VTableState(P);
 
@@ -6545,7 +6538,7 @@ static bool parseSILVTableEntry(
 ///   associated_type_protocol (AssocName: ProtocolName):
 ///                              protocol-conformance|dependent
 ///   base_protocol ProtocolName: protocol-conformance
-bool SILParserTUState::parseSILWitnessTable(Parser &P) {
+bool SILParserState::parseSILWitnessTable(Parser &P) {
   P.consumeToken(tok::kw_sil_witness_table);
   SILParser WitnessState(P);
   
@@ -6648,7 +6641,7 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
 /// sil-default-witness-entry:
 ///   sil-witness-entry
 ///   'no_default'
-bool SILParserTUState::parseSILDefaultWitnessTable(Parser &P) {
+bool SILParserState::parseSILDefaultWitnessTable(Parser &P) {
   P.consumeToken(tok::kw_sil_default_witness_table);
   SILParser WitnessState(P);
   
@@ -6715,7 +6708,7 @@ bool SILParserTUState::parseSILDefaultWitnessTable(Parser &P) {
 ///
 /// index-subset ::=
 ///   [0-9]+ (' ' [0-9]+)*
-bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
+bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
   auto loc = P.consumeToken(tok::kw_sil_differentiability_witness);
   auto silLoc = RegularLocation(loc);
   SILParser State(P);
@@ -6865,7 +6858,7 @@ llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
 ///   StartLine ':' StartCol '->' EndLine ':' EndCol
 /// sil-coverage-expr:
 ///   ...
-bool SILParserTUState::parseSILCoverageMap(Parser &P) {
+bool SILParserState::parseSILCoverageMap(Parser &P) {
   P.consumeToken(tok::kw_sil_coverage_map);
   SILParser State(P);
 
@@ -6956,7 +6949,7 @@ bool SILParserTUState::parseSILCoverageMap(Parser &P) {
 /// scope-parent ::= sil-function-name ':' sil-type
 /// scope-parent ::= sil-scope-ref
 /// debug-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
-bool SILParserTUState::parseSILScope(Parser &P) {
+bool SILParserState::parseSILScope(Parser &P) {
   P.consumeToken(tok::kw_sil_scope);
   SILParser ScopeState(P);
 

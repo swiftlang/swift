@@ -35,7 +35,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Confusables.h"
@@ -2223,7 +2222,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
     return nullptr;
 
   if (CS.isDebugMode()) {
-    auto &log = Context.TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
     log << "\n";
@@ -2237,7 +2236,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
 
   auto &solution = viable[0];
   if (CS.isDebugMode()) {
-    auto &log = Context.TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     log << "---Solution---\n";
     solution.dump(log);
   }

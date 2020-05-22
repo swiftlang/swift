@@ -12,6 +12,11 @@ if(POLICY CMP0067)
   cmake_policy(SET CMP0067 NEW)
 endif()
 
+# Convert relative paths to absolute for subdirectory `target_sources`
+if(POLICY CMP0076)
+  cmake_policy(SET CMP0076 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -554,9 +559,6 @@ set(SWIFT_MODULE_CACHE_PATH
 if(XCODE)
   swift_common_xcode_cxx_config()
 endif()
-
-include(SwiftCheckCXXNativeRegex)
-check_cxx_native_regex(SWIFT_HAVE_WORKING_STD_REGEX)
 
 # If SWIFT_HOST_VARIANT_SDK not given, try to detect from the CMAKE_SYSTEM_NAME.
 if(SWIFT_HOST_VARIANT_SDK)

@@ -1001,42 +1001,22 @@ void IRGenModule::setHasFramePointer(llvm::Function *F,
 /// Construct initial function attributes from options.
 void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                                OptimizationMode FuncOptMode) {
+  // Add the default attributes for the Clang configuration.
+  clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
+
   // Add frame pointer attributes.
+  // FIXME: why are we doing this?
   setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
   
-  // Add target-cpu and target-features if they are non-null.
-  auto *Clang = static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
-
-  std::string &CPU = ClangOpts.CPU;
-  if (CPU != "")
-    Attrs.addAttribute("target-cpu", CPU);
-
-  std::vector<std::string> Features;
-  for (auto &F : ClangOpts.Features)
-    if (!shouldRemoveTargetFeature(F))
-        Features.push_back(F);
-
-  if (!Features.empty()) {
-    SmallString<64> allFeatures;
-    // Sort so that the target features string is canonical.
-    std::sort(Features.begin(), Features.end());
-    llvm::interleave(Features, [&](const std::string &s) {
-      allFeatures.append(s);
-    }, [&]{
-      allFeatures.push_back(',');
-    });
-    Attrs.addAttribute("target-features", allFeatures);
-  }
+  // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
-  if (FuncOptMode == OptimizationMode::ForSize)
+  if (FuncOptMode == OptimizationMode::ForSize) {
+    Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
     Attrs.addAttribute(llvm::Attribute::MinSize);
-
-  auto triple = llvm::Triple(ClangOpts.Triple);
-  if (triple.getArchName() == "arm64e") {
-    Attrs.addAttribute("ptrauth-returns");
-    Attrs.addAttribute("ptrauth-calls");
+  } else {
+    Attrs.removeAttribute(llvm::Attribute::MinSize);
+    Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
   }
 }
 

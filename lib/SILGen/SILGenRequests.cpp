@@ -47,7 +47,7 @@ SourceLoc swift::extractNearestSourceLoc(const SILGenDescriptor &desc) {
 }
 
 evaluator::DependencySource SILGenerationRequest::readDependencySource(
-    const evaluator::DependencyCollector &e) const {
+    const evaluator::DependencyRecorder &e) const {
   auto &desc = std::get<0>(getStorage());
 
   // We don't track dependencies in whole-module mode.

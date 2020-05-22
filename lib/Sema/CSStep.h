@@ -232,7 +232,7 @@ protected:
   }
 
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
-    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+    auto &log = llvm::errs();
     return indent ? log.indent(CS.solverState->depth * 2) : log;
   }
 };

@@ -36,61 +36,60 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   CurrentScore.Data[index] += value;
 
   if (isDebugMode() && value > 0) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
     if (solverState)
-      log.indent(solverState->depth * 2);
-    log << "(increasing score due to ";
+      llvm::errs().indent(solverState->depth * 2);
+    llvm::errs() << "(increasing score due to ";
     switch (kind) {
     case SK_Hole:
-      log << "hole in the constraint system";
+      llvm::errs() << "hole in the constraint system";
       break;
 
     case SK_Unavailable:
-      log << "use of an unavailable declaration";
+      llvm::errs() << "use of an unavailable declaration";
       break;
 
     case SK_Fix:
-      log << "attempting to fix the source";
+      llvm::errs() << "attempting to fix the source";
       break;
 
     case SK_DisfavoredOverload:
-      log << "disfavored overload";
+      llvm::errs() << "disfavored overload";
       break;
 
     case SK_ForceUnchecked:
-      log << "force of an implicitly unwrapped optional";
+      llvm::errs() << "force of an implicitly unwrapped optional";
       break;
 
     case SK_UserConversion:
-      log << "user conversion";
+      llvm::errs() << "user conversion";
       break;
 
     case SK_FunctionConversion:
-      log << "function conversion";
+      llvm::errs() << "function conversion";
       break;
 
     case SK_NonDefaultLiteral:
-      log << "non-default literal";
+      llvm::errs() << "non-default literal";
       break;
         
     case SK_CollectionUpcastConversion:
-      log << "collection upcast conversion";
+      llvm::errs() << "collection upcast conversion";
       break;
         
     case SK_ValueToOptional:
-      log << "value to optional";
+      llvm::errs() << "value to optional";
       break;
     case SK_EmptyExistentialConversion:
-      log << "empty-existential conversion";
+      llvm::errs() << "empty-existential conversion";
       break;
     case SK_KeyPathSubscript:
-      log << "key path subscript";
+      llvm::errs() << "key path subscript";
       break;
     case SK_ValueToPointerConversion:
-      log << "value-to-pointer conversion";
+      llvm::errs() << "value-to-pointer conversion";
       break;
     }
-    log << ")\n";
+    llvm::errs() << ")\n";
   }
 }
 
@@ -103,8 +102,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
     return false;
 
   if (isDebugMode()) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log.indent(solverState->depth * 2)
+    llvm::errs().indent(solverState->depth * 2)
       << "(solution is worse than the best solution)\n";
   }
 
@@ -389,21 +387,20 @@ bool CompareDeclSpecializationRequest::evaluate(
   // Construct a constraint system to compare the two declarations.
   ConstraintSystem cs(dc, ConstraintSystemOptions());
   if (cs.isDebugMode()) {
-    auto &log = C.TypeCheckerDebug->getStream();
-    log << "Comparing declarations\n";
-    decl1->print(log); 
-    log << "\nand\n";
-    decl2->print(log);
-    log << "\n(isDynamicOverloadComparison: ";
-    log << isDynamicOverloadComparison;
-    log << ")\n";
+    llvm::errs() << "Comparing declarations\n";
+    decl1->print(llvm::errs());
+    llvm::errs() << "\nand\n";
+    decl2->print(llvm::errs());
+    llvm::errs() << "\n(isDynamicOverloadComparison: ";
+    llvm::errs() << isDynamicOverloadComparison;
+    llvm::errs() << ")\n";
   }
 
-  auto completeResult = [&C, &cs](bool result) {
+  auto completeResult = [&cs](bool result) {
     if (cs.isDebugMode()) {
-      auto &log = C.TypeCheckerDebug->getStream();
-      log << "comparison result: " << (result ? "better" : "not better")
-          << "\n";
+      llvm::errs() << "comparison result: "
+                   << (result ? "better" : "not better")
+                   << "\n";
     }
     return result;
   };
@@ -738,8 +735,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
   if (cs.isDebugMode()) {
-    auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
-    log.indent(cs.solverState->depth * 2)
+    llvm::errs().indent(cs.solverState->depth * 2)
       << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
   }
 
@@ -1262,13 +1258,13 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return 0;
 
   if (isDebugMode()) {
-    auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log.indent(solverState->depth * 2)
+    llvm::errs().indent(solverState->depth * 2)
         << "Comparing " << viable.size() << " viable solutions\n";
 
     for (unsigned i = 0, n = viable.size(); i != n; ++i) {
-      log.indent(solverState->depth * 2) << "--- Solution #" << i << " ---\n";
-      viable[i].dump(log.indent(solverState->depth * 2));
+      llvm::errs().indent(solverState->depth * 2)
+          << "--- Solution #" << i << " ---\n";
+      viable[i].dump(llvm::errs().indent(solverState->depth * 2));
     }
   }
 

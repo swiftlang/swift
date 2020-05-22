@@ -189,7 +189,7 @@ public:
 public:
   // Incremental dependencies
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &e) const;
+  readDependencySource(const evaluator::DependencyRecorder &e) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ArrayRef<ProtocolDecl *> result) const;
 };
@@ -330,7 +330,7 @@ public:
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 class GenericParamListRequest :
@@ -434,7 +434,7 @@ private:
 public:
   // Incremental dependencies
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            LookupResult res) const;
 };
@@ -506,7 +506,7 @@ private:
 public:
   // Incremental dependencies
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            QualifiedLookupResult lookupResult) const;
 };
@@ -533,7 +533,7 @@ private:
 public:
   // Incremental dependencies.
   evaluator::DependencySource
-  readDependencySource(const evaluator::DependencyCollector &) const;
+  readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
 /// The input type for a direct lookup request.

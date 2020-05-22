@@ -813,7 +813,10 @@ public:
   const Decl *getDecl() const;
 
   /// Return 'this' as a \c GenericContext.
-  const GenericContext *getAsGenericContext() const;
+  GenericContext *getAsGenericContext();
+  const GenericContext *getAsGenericContext() const {
+    return const_cast<IterableDeclContext *>(this)->getAsGenericContext();
+  }
 
   /// Get the DeclID this Decl was deserialized from.
   serialization::DeclID getDeclID() const {

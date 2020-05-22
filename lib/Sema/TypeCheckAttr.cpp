@@ -1957,9 +1957,6 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   //     }
   //
   // Of course, this function's body does not type-check.
-  //
-  // FIXME: Stop using the legacy type checker here.  However, it will still be
-  //        necessary to type-check the function at that point.
   file->DelayedFunctions.push_back(func);
 
   // Register the func as the main decl in the module. If there are multiples

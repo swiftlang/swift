@@ -312,7 +312,8 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
-  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal));
+  auto byteOffset = isFixedLayout() ? CurSize : Size(0);
+  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal), byteOffset);
 }
 
 /// Add an element at the fixed offset of the current end of the

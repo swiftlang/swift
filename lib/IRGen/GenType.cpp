@@ -687,15 +687,26 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(
 
   llvm::Value *caseIndexFromValue = zero;
   if (fixedSize > Size(0)) {
-    // Read up to one pointer-sized 'chunk' of the payload.
-    // The size of the chunk does not have to be a power of 2.
-    auto *caseIndexType = llvm::IntegerType::get(Ctx,
-        fixedSize.getValueInBits());
-    auto *caseIndexAddr = Builder.CreateBitCast(valueAddr,
-        caseIndexType->getPointerTo());
-    caseIndexFromValue = Builder.CreateZExtOrTrunc(
-        Builder.CreateLoad(Address(caseIndexAddr, Alignment(1))),
-        IGM.Int32Ty);
+    // llvm only supports integer types upto a certain size (i.e selection dag
+    // will crash).
+    if (fixedSize.getValueInBits() <= llvm::IntegerType::MAX_INT_BITS / 4) {
+      // Read up to one pointer-sized 'chunk' of the payload.
+      // The size of the chunk does not have to be a power of 2.
+      auto *caseIndexType =
+          llvm::IntegerType::get(Ctx, fixedSize.getValueInBits());
+      auto *caseIndexAddr =
+          Builder.CreateBitCast(valueAddr, caseIndexType->getPointerTo());
+      caseIndexFromValue = Builder.CreateZExtOrTrunc(
+          Builder.CreateLoad(Address(caseIndexAddr, Alignment(1))),
+          IGM.Int32Ty);
+    } else {
+      auto *caseIndexType = llvm::IntegerType::get(Ctx, 32);
+      auto *caseIndexAddr =
+          Builder.CreateBitCast(valueAddr, caseIndexType->getPointerTo());
+      caseIndexFromValue = Builder.CreateZExtOrTrunc(
+          Builder.CreateLoad(Address(caseIndexAddr, Alignment(1))),
+          IGM.Int32Ty);
+    }
   }
 
   auto *result1 = Builder.CreateAdd(
@@ -867,11 +878,25 @@ void irgen::storeFixedTypeEnumTagSinglePayload(
   payloadIndex->addIncoming(payloadIndex0, payloadLT4BB);
 
   if (fixedSize > Size(0)) {
-    // Write the value to the payload as a zero extended integer.
-    auto *intType = Builder.getIntNTy(fixedSize.getValueInBits());
-    Builder.CreateStore(
-        Builder.CreateZExtOrTrunc(payloadIndex, intType),
-        Builder.CreateBitCast(valueAddr, intType->getPointerTo()));
+    if (fixedSize.getValueInBits() <= llvm::IntegerType::MAX_INT_BITS / 4) {
+      // Write the value to the payload as a zero extended integer.
+      auto *intType = Builder.getIntNTy(fixedSize.getValueInBits());
+      Builder.CreateStore(
+          Builder.CreateZExtOrTrunc(payloadIndex, intType),
+          Builder.CreateBitCast(valueAddr, intType->getPointerTo()));
+    } else {
+      // Write the value to the payload as a zero extended integer.
+      Size limit = IGM.getPointerSize();
+      auto *intType = Builder.getIntNTy(limit.getValueInBits());
+      Builder.CreateStore(
+          Builder.CreateZExtOrTrunc(payloadIndex, intType),
+          Builder.CreateBitCast(valueAddr, intType->getPointerTo()));
+      // Zero the remainder of the payload.
+      auto zeroAddr = Builder.CreateConstByteArrayGEP(valueAddr, limit);
+      auto zeroSize = Builder.CreateSub(
+          size, llvm::ConstantInt::get(size->getType(), limit.getValue()));
+      Builder.CreateMemSet(zeroAddr, Builder.getInt8(0), zeroSize);
+    }
   }
   // Write to the extra tag bytes, if any.
   emitSetTag(IGF, extraTagBitsAddr, extraTagIndex, numExtraTagBytes);

@@ -146,8 +146,9 @@ std::error_code swift::atomicallyWritingToFile(
     if (!OS.hasValue()) {
       std::error_code error;
       OS.emplace(outputPath, error, fs::F_None);
-      if (error)
+      if (error) {
         return error;
+      }
     }
 
     action(OS.getValue());
@@ -169,8 +170,9 @@ swift::areFilesDifferent(const llvm::Twine &source,
                          bool allowDestinationErrors) {
   namespace fs = llvm::sys::fs;
 
-  if (fs::equivalent(source, destination))
+  if (fs::equivalent(source, destination)) {
     return FileDifference::IdenticalFile;
+  }
 
   OpenFileRAII sourceFile;
   fs::file_status sourceStatus;
@@ -187,8 +189,9 @@ swift::areFilesDifferent(const llvm::Twine &source,
   /// DifferentContents return, depending on `allowDestinationErrors`.
   auto convertDestinationError = [=](std::error_code error) ->
       llvm::ErrorOr<FileDifference> {
-    if (allowDestinationErrors)
+    if (allowDestinationErrors){
       return FileDifference::DifferentContents;
+    }
     return error;
   };
 
@@ -204,12 +207,14 @@ swift::areFilesDifferent(const llvm::Twine &source,
   }
 
   uint64_t size = sourceStatus.getSize();
-  if (size != destStatus.getSize())
+  if (size != destStatus.getSize()) {
     // If the files are different sizes, they must be different.
     return FileDifference::DifferentContents;
-  if (size == 0)
+  }
+  if (size == 0) {
     // If both files are zero size, they must be the same.
     return FileDifference::SameContents;
+  }
 
   // The two files match in size, so we have to compare the bytes to determine
   // if they're the same.
@@ -217,21 +222,24 @@ swift::areFilesDifferent(const llvm::Twine &source,
   fs::mapped_file_region sourceRegion(fs::convertFDToNativeFile(sourceFile.fd),
                                       fs::mapped_file_region::readonly,
                                       size, 0, sourceRegionErr);
-  if (sourceRegionErr)
+  if (sourceRegionErr) {
     return sourceRegionErr;
+  }
 
   std::error_code destRegionErr;
   fs::mapped_file_region destRegion(fs::convertFDToNativeFile(destFile.fd),
                                     fs::mapped_file_region::readonly,
                                     size, 0, destRegionErr);
 
-  if (destRegionErr)
+  if (destRegionErr) {
     return convertDestinationError(destRegionErr);
+  }
 
-  if (0 == memcmp(sourceRegion.const_data(), destRegion.const_data(), size))
-    return FileDifference::SameContents;
+  if (memcmp(sourceRegion.const_data(), destRegion.const_data(), size) != 0) {
+    return FileDifference::DifferentContents;
+  }
 
-  return FileDifference::DifferentContents;
+  return FileDifference::SameContents;
 }
 
 std::error_code swift::moveFileIfDifferent(const llvm::Twine &source,

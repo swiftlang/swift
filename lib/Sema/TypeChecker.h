@@ -915,7 +915,7 @@ ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
 void checkConformance(NormalProtocolConformance *conformance);
 
 /// Check all of the conformances in the given context.
-void checkConformancesInContext(DeclContext *dc, IterableDeclContext *idc);
+void checkConformancesInContext(IterableDeclContext *idc);
 
 /// Check that the type of the given property conforms to NSCopying.
 ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);

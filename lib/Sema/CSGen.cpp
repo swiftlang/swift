@@ -4405,7 +4405,7 @@ bool ConstraintSystem::generateConstraints(
     }
 
     if (isDebugMode()) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      auto &log = llvm::errs();
       log << "---Initial constraints for the given expression---\n";
       print(log, expr);
       log << "\n";

@@ -329,12 +329,12 @@ public:
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type) const;
 
-  /// Return the concrete type that the given dependent type is constrained to,
+  /// Return the concrete type that the given type parameter is constrained to,
   /// or the null Type if it is not the subject of a concrete same-type
   /// constraint.
   Type getConcreteType(Type type) const;
 
-  /// Return the layout constraint that the given dependent type is constrained
+  /// Return the layout constraint that the given type parameter is constrained
   /// to, or the null LayoutConstraint if it is not the subject of layout
   /// constraint.
   LayoutConstraint getLayoutConstraint(Type type) const;
