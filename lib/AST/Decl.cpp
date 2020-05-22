@@ -6557,9 +6557,13 @@ ParamDecl::getDefaultValueStringRepresentation(
           return getASTContext().SourceMgr.extractText(charRange);
         }
 
-        // If there is no parent initializer, we used the default initializer.
-        auto parentInit = original->getParentInitializer();
-        if (!parentInit) {
+        // If there is no initial wrapped value, we used the default initializer.
+        Expr *wrappedValue = nullptr;
+        if (auto *parentInit = original->getParentInitializer())
+          if (auto *placeholder = findWrappedValuePlaceholder(parentInit))
+            wrappedValue = placeholder->getOriginalWrappedValue();
+
+        if (!wrappedValue) {
           if (auto type = original->getPropertyWrapperBackingPropertyType()) {
             if (auto nominal = type->getAnyNominal()) {
               scratch.clear();
@@ -6574,9 +6578,8 @@ ParamDecl::getDefaultValueStringRepresentation(
           return ".init()";
         }
 
-        auto init =
-            findWrappedValuePlaceholder(parentInit)->getOriginalWrappedValue();
-        return extractInlinableText(getASTContext().SourceMgr, init, scratch);
+        auto &sourceMgr = getASTContext().SourceMgr;
+        return extractInlinableText(sourceMgr, wrappedValue, scratch);
       }
     }
 
