@@ -110,7 +110,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
 using namespace swift;
 using namespace swift::syntax;
 
-void SILParserTUStateBase::anchor() { }
+void SILParserStateBase::anchor() { }
 
 void swift::performCodeCompletionSecondPass(
     SourceFile &SF, CodeCompletionCallbacksFactory &Factory) {
@@ -379,14 +379,14 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
   llvm_unreachable("covered switch");
 }
 
-Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
+Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState,
              std::move(SPActions)) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
-               SILParserTUStateBase *SIL,
+               SILParserStateBase *SIL,
                PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions)
     : Parser(
@@ -521,8 +521,7 @@ public:
 } // End of an anonymous namespace.
 
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-               SILParserTUStateBase *SIL,
-               PersistentParserState *PersistentState,
+               SILParserStateBase *SIL, PersistentParserState *PersistentState,
                std::shared_ptr<SyntaxParseActions> SPActions)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
