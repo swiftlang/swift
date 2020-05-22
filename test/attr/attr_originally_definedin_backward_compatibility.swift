@@ -1,5 +1,6 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
+// REQUIRES: rdar63546363
 //
 // RUN: %empty-directory(%t)
 //
