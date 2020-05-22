@@ -2028,18 +2028,18 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // Diagnose the override.
     auto methodDiagInfo = getObjCMethodDiagInfo(method);
     auto overriddenDiagInfo = getObjCMethodDiagInfo(overriddenMethod);
-    Ctx.Diags.diagnose(method, diag::objc_override_other,
-                       methodDiagInfo.first,
-                       methodDiagInfo.second,
-                       overriddenDiagInfo.first,
-                       overriddenDiagInfo.second,
-                       selector,
-                       overriddenMethod->getDeclContext()
-                         ->getDeclaredInterfaceType());
+
+    Ctx.Diags.diagnose(
+        method, diag::objc_override_other, methodDiagInfo.first,
+        methodDiagInfo.second, overriddenDiagInfo.first,
+        overriddenDiagInfo.second, method->getObjCSelector(),
+        overriddenMethod->getDeclContext()->getDeclaredInterfaceType());
+
     const ValueDecl *overriddenDecl = overriddenMethod;
     if (overriddenMethod->isImplicit())
       if (auto accessor = dyn_cast<AccessorDecl>(overriddenMethod))
         overriddenDecl = accessor->getStorage();
+
     Ctx.Diags.diagnose(overriddenDecl, diag::objc_declared_here,
                        overriddenDiagInfo.first, overriddenDiagInfo.second);
 
@@ -2143,12 +2143,9 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
         Ctx.Diags.diagnose(originalDecl, diag::invalid_redecl_prev,
                            originalDecl->getBaseName());
       } else {
-        Ctx.Diags.diagnose(conflictingDecl, diag::objc_redecl,
-                           diagInfo.first,
-                            diagInfo.second,
-                           origDiagInfo.first,
-                           origDiagInfo.second,
-                           selector);
+        Ctx.Diags.diagnose(conflictingDecl, diag::objc_redecl, diagInfo.first,
+                           diagInfo.second, origDiagInfo.first,
+                           origDiagInfo.second, selector);
         Ctx.Diags.diagnose(originalDecl, diag::objc_declared_here,
                            origDiagInfo.first, origDiagInfo.second);
       }
