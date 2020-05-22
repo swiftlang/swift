@@ -1,0 +1,64 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -no-omit-leaf-frame-pointer| %FileCheck %s --check-prefix=CHECK-ALL
+// RUN: %target-swift-frontend -primary-file %s -S | %FileCheck %s  --check-prefix=CHECKASM --check-prefix=CHECKASM-%target-os-%target-cpu
+
+// REQUIRES: CPU=x86_64
+
+sil_stage canonical
+
+import Swift
+
+sil @leaf_function_no_frame_pointer : $@convention(thin) (Int32) -> Int32 {
+entry(%i : $Int32):
+  return %i : $Int32
+}
+
+sil @non_leaf_function_with_frame_pointer : $@convention(thin) (Int32) -> Int32 {
+entry(%i : $Int32):
+  %f = function_ref @leaf_function_no_frame_pointer : $@convention(thin) (Int32) -> Int32
+  %r = apply %f(%i) : $@convention(thin) (Int32) -> Int32
+  return %r : $Int32
+}
+
+// CHECK: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
+// CHECK: entry:
+// CHECK:   ret i32 %0
+// CHECK: }
+
+// CHECK: define{{.*}} swiftcc i32 @non_leaf_function_with_frame_pointer(i32 %0) [[ATTR]] {
+// CHECK: entry:
+// CHECK:   %1 = call swiftcc i32 @leaf_function_no_frame_pointer(i32 %0)
+// CHECK:   ret i32 %1
+// CHECK: }
+
+// CHECK: attributes [[ATTR]] = {{{.*}}"frame-pointer"="all"
+
+// CHECK-ALL: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
+// CHECK-ALL: entry:
+// CHECK-ALL:   ret i32 %0
+// CHECK-ALL: }
+
+// CHECK-ALL: define{{.*}} swiftcc i32 @non_leaf_function_with_frame_pointer(i32 %0) [[ATTR]] {
+// CHECK-ALL: entry:
+// CHECK-ALL:   %1 = call swiftcc i32 @leaf_function_no_frame_pointer(i32 %0)
+// CHECK-ALL:   ret i32 %1
+// CHECK-ALL: }
+
+// CHECK-ALL: attributes [[ATTR]] = {{{.*}}"frame-pointer"="all"
+
+// Silence other os-archs.
+// CHECKASM: {{.*}}
+
+// CHECKASM-macosx-x86_64-LABEL: _leaf_function_no_frame_pointer:
+// CHECKASM-macosx-x86_64: push
+// CHECKASM-macosx-x86_64: movl    %edi, %eax
+// CHECKASM-macosx-x86_64: pop
+// CHECKASM-macosx-x86_64: ret
+
+
+// CHECKASM-macosx-x86_64-LABEL: _non_leaf_function_with_frame_pointer:
+// CHECKASM-macosx-x86_64:   pushq %rbp
+// CHECKASM-macosx-x86_64:   movq %rsp, %rbp
+// CHECKASM-macosx-x86_64:   callq _leaf_function_no_frame_pointer
+// CHECKASM-macosx-x86_64:   popq %rbp
+// CHECKASM-macosx-x86_64:   ret
