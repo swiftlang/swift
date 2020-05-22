@@ -3070,6 +3070,13 @@ public:
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
+  /// Find if the given type variable is representative for a type
+  /// variable which last locator path element is of the specified kind.
+  /// If true returns the type variable which it is the representative for.
+  TypeVariableType *
+  isRepresentativeFor(TypeVariableType *typeVar,
+                      ConstraintLocator::PathElementKind kind) const;
+
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// storage wrapper if the decl has an associated storage wrapper.
   Optional<std::pair<VarDecl *, Type>>

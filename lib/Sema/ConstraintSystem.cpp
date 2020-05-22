@@ -903,6 +903,31 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
   return type;
 }
 
+TypeVariableType *ConstraintSystem::isRepresentativeFor(
+    TypeVariableType *typeVar, ConstraintLocator::PathElementKind kind) const {
+  // We only attempt to look for this if type variable is
+  // a representative.
+  if (getRepresentative(typeVar) != typeVar)
+    return nullptr;
+
+  auto &CG = getConstraintGraph();
+  auto result = CG.lookupNode(typeVar);
+  auto equivalence = result.first.getEquivalenceClass();
+  auto member = llvm::find_if(equivalence, [=](TypeVariableType *eq) {
+    auto *loc = eq->getImpl().getLocator();
+    if (!loc)
+      return false;
+
+    auto path = loc->getPath();
+    return !path.empty() && path.back().getKind() == kind;
+  });
+
+  if (member == equivalence.end())
+    return nullptr;
+
+  return *member;
+}
+
 /// Does a var or subscript produce an l-value?
 ///
 /// \param baseType - the type of the base on which this object
