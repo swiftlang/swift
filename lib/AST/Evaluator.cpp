@@ -381,28 +381,12 @@ void Evaluator::dumpDependenciesGraphviz() const {
 
 void evaluator::DependencyRecorder::realize(
     const DependencyCollector::Reference &ref) {
-  auto *tracker = getActiveDependencyTracker();
-  assert(tracker && "cannot realize dependency without name tracker!");
-
-  using Kind = evaluator::DependencyCollector::Reference::Kind;
-  switch (ref.kind) {
-  case Kind::Empty:
-  case Kind::Tombstone:
-    llvm_unreachable("cannot record empty dependency");
-  case Kind::UsedMember:
-    tracker->addUsedMember({ref.subject, ref.name}, isActiveSourceCascading());
-    break;
-  case Kind::PotentialMember:
-    tracker->addUsedMember({ref.subject, Identifier()},
-                           isActiveSourceCascading());
-    break;
-  case Kind::TopLevel:
-    tracker->addTopLevelName(ref.name, isActiveSourceCascading());
-    break;
-  case Kind::Dynamic:
-    tracker->addDynamicLookupName(ref.name, isActiveSourceCascading());
-    break;
+  auto *source = getActiveDependencySourceOrNull();
+  assert(source && "cannot realize dependency without associated file!");
+  if (!source->hasInterfaceHash()) {
+    return;
   }
+  fileReferences[source].insert(ref);
 }
 
 void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
@@ -449,7 +433,8 @@ void evaluator::DependencyRecorder::record(
     const llvm::SetVector<swift::ActiveRequest> &stack,
     llvm::function_ref<void(DependencyCollector &)> rec) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
-  if (!getActiveDependencyTracker()) {
+  auto *source = getActiveDependencySourceOrNull();
+  if (!source || !source->hasInterfaceHash()) {
     return;
   }
 
@@ -480,7 +465,8 @@ void evaluator::DependencyRecorder::record(
 void evaluator::DependencyRecorder::replay(const swift::ActiveRequest &req) {
   assert(!isRecording && "Probably not a good idea to allow nested recording");
 
-  if (mode == Mode::StatusQuo || !getActiveDependencyTracker()) {
+  auto *source = getActiveDependencySourceOrNull();
+  if (mode == Mode::StatusQuo || !source || !source->hasInterfaceHash()) {
     return;
   }
 
@@ -495,5 +481,28 @@ void evaluator::DependencyRecorder::replay(const swift::ActiveRequest &req) {
 
   for (const auto &ref : entry->second) {
     realize(ref);
+  }
+}
+
+using namespace swift;
+
+void evaluator::DependencyRecorder::enumerateReferencesInFile(
+    const SourceFile *SF, ReferenceEnumerator f) const {
+  auto entry = fileReferences.find(SF);
+  if (entry == fileReferences.end()) {
+    return;
+  }
+
+  for (const auto &ref : entry->getSecond()) {
+    switch (ref.kind) {
+    case DependencyCollector::Reference::Kind::Empty:
+    case DependencyCollector::Reference::Kind::Tombstone:
+      llvm_unreachable("Cannot enumerate dead reference!");
+    case DependencyCollector::Reference::Kind::UsedMember:
+    case DependencyCollector::Reference::Kind::PotentialMember:
+    case DependencyCollector::Reference::Kind::TopLevel:
+    case DependencyCollector::Reference::Kind::Dynamic:
+      f(ref);
+    }
   }
 }

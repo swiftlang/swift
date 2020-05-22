@@ -253,6 +253,8 @@ struct DependencyRecorder {
 private:
   /// A stack of dependency sources in the order they were evaluated.
   llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
+  llvm::DenseMap<SourceFile *, DependencyCollector::ReferenceSet>
+      fileReferences;
   llvm::DenseMap<AnyRequest, DependencyCollector::ReferenceSet>
       requestReferences;
   Mode mode;
@@ -268,6 +270,12 @@ public:
   void replay(const swift::ActiveRequest &req);
   void record(const llvm::SetVector<swift::ActiveRequest> &stack,
               llvm::function_ref<void(DependencyCollector &)> rec);
+
+public:
+  using ReferenceEnumerator =
+      llvm::function_ref<void(const DependencyCollector::Reference &)>;
+  void enumerateReferencesInFile(const SourceFile *SF,
+                                 ReferenceEnumerator f) const ;
 
 public:
   /// Returns the scope of the current active scope.
@@ -329,25 +337,6 @@ private:
     if (dependencySources.empty())
       return nullptr;
     return dependencySources.front().getPointer();
-  }
-
-  /// If there is an active dependency source, returns its
-  /// \c ReferencedNameTracker. Else, returns \c nullptr.
-  ReferencedNameTracker *getActiveDependencyTracker() const {
-    SourceFile *source = nullptr;
-    switch (mode) {
-    case Mode::StatusQuo:
-      source = getActiveDependencySourceOrNull();
-      break;
-    case Mode::ExperimentalPrivateDependencies:
-      source = getFirstDependencySourceOrNull();
-      break;
-    }
-    
-    if (!source)
-      return nullptr;
-
-    return source->getRequestBasedReferencedNameTracker();
   }
 
   /// Returns \c true if the scope of the current active source cascades.
