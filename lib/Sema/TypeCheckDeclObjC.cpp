@@ -2082,37 +2082,6 @@ getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
   return classDecl->lookupDirect(selector, isInstanceMethod);
 }
 
-/// Given a set of conflicting Objective-C methods, remove any methods
-/// that are legitimately overridden in Objective-C, i.e., because
-/// they occur in different modules, one is defined in the class, and
-/// the other is defined in an extension (category) thereof.
-static void removeValidObjCConflictingMethods(
-              MutableArrayRef<AbstractFunctionDecl *> &methods) {
-  // Erase any invalid or stub declarations. We don't want to complain about
-  // them, because we might already have complained about
-  // redeclarations based on Swift matching.
-  auto newEnd = std::remove_if(methods.begin(), methods.end(),
-                               [&](AbstractFunctionDecl *method) {
-                                 if (method->isInvalid())
-                                   return true;
-
-                                 if (auto ad = dyn_cast<AccessorDecl>(method)) {
-                                   return ad->getStorage()->isInvalid();
-                                 } 
-                                 
-                                 if (auto ctor 
-                                       = dyn_cast<ConstructorDecl>(method)) {
-                                   if (ctor->hasStubImplementation())
-                                     return true;
-
-                                   return false;
-                                 }
-
-                                 return false;
-                               });
-  methods = methods.slice(0, newEnd - methods.begin());
-}
-
 bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
   // If there were no conflicts, we're done.
   if (sf.ObjCMethodConflicts.empty())
@@ -2140,8 +2109,23 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
 
     auto methods = getObjCMethodConflictDecls(conflict);
 
-    // Prune out cases where it is acceptable to have a conflict.
-    removeValidObjCConflictingMethods(methods);
+    // Erase any invalid or stub declarations. We don't want to complain about
+    // them, because we might already have complained about redeclarations
+    // based on Swift matching.
+    llvm::erase_if(methods, [](AbstractFunctionDecl *afd) -> bool {
+      if (afd->isInvalid())
+        return true;
+
+      if (auto ad = dyn_cast<AccessorDecl>(afd))
+        return ad->getStorage()->isInvalid();
+
+      if (auto *ctor = dyn_cast<ConstructorDecl>(afd)) {
+        if (ctor->hasStubImplementation())
+          return true;
+      }
+      return false;
+    });
+
     if (methods.size() < 2)
       continue;
 
