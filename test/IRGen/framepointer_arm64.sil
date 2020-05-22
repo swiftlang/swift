@@ -1,8 +1,12 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -no-omit-leaf-frame-pointer| %FileCheck %s --check-prefix=CHECK-ALL
-// RUN: %target-swift-frontend -primary-file %s -S | %FileCheck %s  --check-prefix=CHECKASM --check-prefix=CHECKASM-%target-os-%target-cpu
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -emit-ir -no-omit-leaf-frame-pointer| %FileCheck %s --check-prefix=CHECK-ALL
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -S | %FileCheck %s --check-prefix=CHECKASM
+// RUN: %target-swift-frontend -target arm64-apple-ios8.0 -primary-file %s -S -no-omit-leaf-frame-pointer | %FileCheck %s --check-prefix=CHECKASM-ALL
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: CODEGENERATOR=AArch64
+
+// UNSUPPORTED: OS=linux
+// UNSUPPORTED: OS=windows
 
 sil_stage canonical
 
@@ -31,7 +35,7 @@ entry(%i : $Int32):
 // CHECK:   ret i32 %1
 // CHECK: }
 
-// CHECK: attributes [[ATTR]] = {{{.*}}"frame-pointer"="all"
+// CHECK: attributes [[ATTR]] = {{{.*}}"frame-pointer"="non-leaf"
 
 // CHECK-ALL: define{{.*}} swiftcc i32 @leaf_function_no_frame_pointer(i32 %0) [[ATTR:#.*]] {
 // CHECK-ALL: entry:
@@ -46,19 +50,24 @@ entry(%i : $Int32):
 
 // CHECK-ALL: attributes [[ATTR]] = {{{.*}}"frame-pointer"="all"
 
-// Silence other os-archs.
-// CHECKASM: {{.*}}
+// CHECKASM-LABEL: _leaf_function_no_frame_pointer:
+// CHECKASM-NOT: stp
+// CHECKASM-NOT: ldp
+// CHECKASM: ret
 
-// CHECKASM-macosx-x86_64-LABEL: _leaf_function_no_frame_pointer:
-// CHECKASM-macosx-x86_64: push
-// CHECKASM-macosx-x86_64: movl    %edi, %eax
-// CHECKASM-macosx-x86_64: pop
-// CHECKASM-macosx-x86_64: ret
+// CHECKASM-LABEL: _non_leaf_function_with_frame_pointer:
+// CHECKASM: stp
+// CHECKASM: _leaf_function_no_frame_pointer
+// CHECKASM: ldp
+// CHECKASM: ret
 
+// CHECKASM-ALL-LABEL: _leaf_function_no_frame_pointer:
+// CHECKASM-ALL: stp
+// CHECKASM-ALL: ldp
+// CHECKASM-ALL: ret
 
-// CHECKASM-macosx-x86_64-LABEL: _non_leaf_function_with_frame_pointer:
-// CHECKASM-macosx-x86_64:   pushq %rbp
-// CHECKASM-macosx-x86_64:   movq %rsp, %rbp
-// CHECKASM-macosx-x86_64:   callq _leaf_function_no_frame_pointer
-// CHECKASM-macosx-x86_64:   popq %rbp
-// CHECKASM-macosx-x86_64:   ret
+// CHECKASM-ALL-LABEL: _non_leaf_function_with_frame_pointer:
+// CHECKASM-ALL: stp
+// CHECKASM-ALL: _leaf_function_no_frame_pointer
+// CHECKASM-ALL: ldp
+// CHECKASM-ALL: ret
