@@ -1920,19 +1920,16 @@ namespace {
 } // end anonymous namespace
 
 /// Lookup for an Objective-C method with the given selector in the
-/// given class or any of its superclasses.
-static AbstractFunctionDecl *lookupObjCMethodInClass(
-                               ClassDecl *classDecl,
-                               ObjCSelector selector,
-                               bool isInstanceMethod,
-                               bool isInitializer,
-                               SourceManager &srcMgr,
-                               bool inheritingInits = true) {
-  if (!classDecl)
-    return nullptr;
+/// given class or any of its superclasses. We intentionally don't respect
+/// access control, since everything is visible to the Objective-C runtime.
+static AbstractFunctionDecl *
+lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
+                          bool inheritingInits = true) {
+  assert(classDecl);
 
   // Look for an Objective-C method in this class.
-  auto methods = classDecl->lookupDirect(selector, isInstanceMethod);
+  auto methods = classDecl->lookupDirect(method->getObjCSelector(),
+                                         method->isObjCInstanceMethod());
   if (!methods.empty()) {
     // If we aren't inheriting initializers, remove any initializers from the
     // list.
@@ -1947,19 +1944,19 @@ static AbstractFunctionDecl *lookupObjCMethodInClass(
                              OrderDeclarations());
   }
 
-  // Recurse into the superclass.
+  // If we've reached the bottom of the inheritance heirarchy, we're done.
   if (!classDecl->hasSuperclass())
     return nullptr;
 
   // Determine whether we are (still) inheriting initializers.
-  inheritingInits = inheritingInits &&
-                    classDecl->inheritsSuperclassInitializers();
-  if (isInitializer && !inheritingInits)
+  if (!classDecl->inheritsSuperclassInitializers())
+    inheritingInits = false;
+
+  if (isa<ConstructorDecl>(method) && !inheritingInits)
     return nullptr;
 
-  return lookupObjCMethodInClass(classDecl->getSuperclassDecl(), selector,
-                                 isInstanceMethod, isInitializer, srcMgr,
-                                 inheritingInits);
+  return lookupOverridenObjCMethod(classDecl->getSuperclassDecl(), method,
+                                   inheritingInits);
 }
 
 bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
@@ -2007,18 +2004,13 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     if (!classDecl->hasSuperclass())
       continue;
 
-    // Look for a method that we have overridden in one of our
-    // superclasses.
+    // Look for a method that we have overridden in one of our superclasses by
+    // virtue of having the same selector.
     // Note: This should be treated as a lookup for intra-module dependency
     // purposes, but a subclass already depends on its superclasses and any
     // extensions for many other reasons.
-    auto selector = method->getObjCSelector();
-    AbstractFunctionDecl *overriddenMethod
-      = lookupObjCMethodInClass(classDecl->getSuperclassDecl(),
-                                selector,
-                                method->isObjCInstanceMethod(),
-                                isa<ConstructorDecl>(method),
-                                Ctx.SourceMgr);
+    auto *overriddenMethod =
+        lookupOverridenObjCMethod(classDecl->getSuperclassDecl(), method);
     if (!overriddenMethod)
       continue;
 
