@@ -111,10 +111,9 @@ extension Mirror {
     let subjectType = subjectType ?? _getNormalizedType(subject, type: type(of: subject))
     
     let childCount = _getChildCount(subject, type: subjectType)
-    let children = (0 ..< childCount).lazy.map({
+    self._children = (0 ..< childCount).map {
       getChild(of: subject, type: subjectType, index: $0)
-    })
-    self.children = Children(children)
+    }
     
     self._makeSuperclassMirror = {
       guard let subjectClass = subjectType as? AnyClass,

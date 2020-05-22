@@ -223,7 +223,7 @@ public struct Mirror {
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
-    self.children = Children(children)
+    self._children = Array(children)
     self.displayStyle = displayStyle
     self._defaultDescendantRepresentation
       = subject is CustomLeafReflectable ? .suppressed : .generated
@@ -266,9 +266,7 @@ public struct Mirror {
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
-    let lazyChildren =
-      unlabeledChildren.lazy.map { Child(label: nil, value: $0) }
-    self.children = Children(lazyChildren)
+    self._children = unlabeledChildren.map { Child(label: nil, value: $0) }
 
     self.displayStyle = displayStyle
     self._defaultDescendantRepresentation
@@ -314,8 +312,7 @@ public struct Mirror {
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
-    let lazyChildren = children.lazy.map { Child(label: $0.0, value: $0.1) }
-    self.children = Children(lazyChildren)
+    self._children = children.map { Child(label: $0.0, value: $0.1) }
 
     self.displayStyle = displayStyle
     self._defaultDescendantRepresentation
@@ -328,9 +325,11 @@ public struct Mirror {
   /// is the `superclassMirror` of another mirror.
   public let subjectType: Any.Type
 
+  internal let _children: [Child]
+
   /// A collection of `Child` elements describing the structure of the
   /// reflected subject.
-  public let children: Children
+  public var children: Children { Children(_children) }
 
   /// A suggested display style for the reflected subject.
   public let displayStyle: DisplayStyle?
