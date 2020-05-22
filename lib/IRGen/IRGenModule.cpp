@@ -998,16 +998,13 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
-void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
-                                     bool HasFramePointer) {
-  auto UseFramePointer = IRGen.Opts.DisableFPElimLeaf ? "all" : "non-leaf";
-  Attrs.addAttribute("frame-pointer", HasFramePointer ? UseFramePointer : "none");
+void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
+  Attrs.addAttribute("frame-pointer", "none");
 }
 
-void IRGenModule::setHasFramePointer(llvm::Function *F,
-                                     bool HasFramePointer) {
+void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   llvm::AttrBuilder b;
-  setHasFramePointer(b, HasFramePointer);
+  setHasNoFramePointer(b);
   F->addAttributes(llvm::AttributeList::FunctionIndex, b);
 }
 
@@ -1017,10 +1014,6 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
   // Add the default attributes for the Clang configuration.
   clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
 
-  // Add frame pointer attributes.
-  // FIXME: why are we doing this?
-  setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
-  
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
