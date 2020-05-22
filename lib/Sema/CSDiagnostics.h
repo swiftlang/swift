@@ -1526,6 +1526,25 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference an enum case as a key path component
+/// e.g.
+///
+/// ```swift
+/// enum E {
+///   case foo
+/// }
+///
+/// _ = \E.Type.foo
+/// ```
+class InvalidEnumCaseRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidEnumCaseRefInKeyPath(const Solution &solution, ValueDecl *member,
+                              ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose an attempt to reference a member which has a mutating getter as a
 /// key path component e.g.
 ///

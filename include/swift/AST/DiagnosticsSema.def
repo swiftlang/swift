@@ -552,6 +552,9 @@ ERROR(expr_keypath_mutating_getter,none,
 ERROR(expr_keypath_static_member,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to static member %0",
       (DeclName, bool))
+ERROR(expr_keypath_enum_case,none,
+      "%select{key path|dynamic key path member lookup}1 cannot refer to enum case %0",
+      (DeclName, bool))
 ERROR(expr_keypath_empty,none,
       "empty key path does not refer to a property", ())
 ERROR(expr_unsupported_objc_key_path_component,none,
