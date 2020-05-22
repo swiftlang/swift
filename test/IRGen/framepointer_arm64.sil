@@ -5,7 +5,7 @@
 
 // REQUIRES: CODEGENERATOR=AArch64
 
-// UNSUPPORTED: OS=linux
+// UNSUPPORTED: OS=linux-gnu
 // UNSUPPORTED: OS=windows
 
 sil_stage canonical
