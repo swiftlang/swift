@@ -110,6 +110,8 @@ using DependencySource = llvm::PointerIntPair<SourceFile *, 1, DependencyScope>;
 struct DependencyRecorder;
 
 struct DependencyCollector {
+  friend DependencyRecorder;
+
   struct Reference {
   public:
     enum class Kind {
@@ -177,8 +179,12 @@ struct DependencyCollector {
     };
   };
 
+public:
+  using ReferenceSet = llvm::DenseSet<Reference, Reference::Info>;
+
+private:
   DependencyRecorder &parent;
-  llvm::DenseSet<Reference, Reference::Info> scratch;
+  ReferenceSet scratch;
 
 public:
   explicit DependencyCollector(DependencyRecorder &parent) : parent(parent) {}
@@ -229,11 +235,7 @@ public:
 /// particular \c DependencyScope during the course of request evaluation.
 struct DependencyRecorder {
   friend DependencyCollector;
-private:
-  /// A stack of dependency sources in the order they were evaluated.
-  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
 
-public:
   enum class Mode {
     // Enables the current "status quo" behavior of the dependency collector.
     //
@@ -247,14 +249,17 @@ public:
     // the primary file being acted upon instead of to the destination file.
     ExperimentalPrivateDependencies,
   };
-  Mode mode;
-  llvm::DenseMap<AnyRequest, llvm::DenseSet<DependencyCollector::Reference,
-                                            DependencyCollector::Reference::Info>>
+
+private:
+  /// A stack of dependency sources in the order they were evaluated.
+  llvm::SmallVector<evaluator::DependencySource, 8> dependencySources;
+  llvm::DenseMap<AnyRequest, DependencyCollector::ReferenceSet>
       requestReferences;
+  Mode mode;
   bool isRecording;
 
-  explicit DependencyRecorder(Mode mode)
-      : mode{mode}, requestReferences{}, isRecording{false} {};
+public:
+  explicit DependencyRecorder(Mode mode) : mode{mode}, isRecording{false} {};
 
 private:
   void realize(const DependencyCollector::Reference &ref);
