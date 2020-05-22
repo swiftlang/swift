@@ -180,6 +180,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
 
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
+  inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
