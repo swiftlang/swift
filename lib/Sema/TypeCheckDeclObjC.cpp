@@ -1940,24 +1940,13 @@ static AbstractFunctionDecl *lookupObjCMethodInClass(
   if (!methods.empty()) {
     // If we aren't inheriting initializers, remove any initializers from the
     // list.
-    if (!inheritingInits &&
-        std::find_if(methods.begin(), methods.end(),
-                     [](AbstractFunctionDecl *func) {
-                       return isa<ConstructorDecl>(func);
-                     }) != methods.end()) {
-      SmallVector<AbstractFunctionDecl *, 4> nonInitMethods;
-      std::copy_if(methods.begin(), methods.end(),
-                   std::back_inserter(nonInitMethods),
-                   [&](AbstractFunctionDecl *func) {
-                     return !isa<ConstructorDecl>(func);
-                   });
-      if (nonInitMethods.empty())
+    if (!inheritingInits) {
+      llvm::erase_if(methods, [](AbstractFunctionDecl *afd) {
+        return isa<ConstructorDecl>(afd);
+      });
+      if (methods.empty())
         return nullptr;
-
-      return *std::min_element(nonInitMethods.begin(), nonInitMethods.end(),
-                               OrderDeclarations(srcMgr));
     }
-
     return *std::min_element(methods.begin(), methods.end(),
                              OrderDeclarations(srcMgr));
   }
