@@ -259,6 +259,14 @@ static void emitResilientTagIndex(IRGenModule &IGM,
   auto *global = cast<llvm::GlobalVariable>(
     IGM.getAddrOfEnumCase(Case, ForDefinition).getAddress());
   global->setInitializer(llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
+
+  // Emit an alias for compatibility reasons.
+  auto *globalCompat = cast<llvm::GlobalVariable>(
+      IGM.getAddrOfEnumCase(Case, ForDefinition, /*forCaseCompatibility*/ true)
+          .getAddress());
+  globalCompat->setInitializer(
+      llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
+  IGM.defineAlias(LinkEntity::forEnumCase(Case), globalCompat);
 }
 
 void

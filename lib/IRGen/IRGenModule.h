@@ -1369,7 +1369,8 @@ public:
                                             ForDefinition_t forDefinition);
 
   Address getAddrOfEnumCase(EnumElementDecl *Case,
-                            ForDefinition_t forDefinition);
+                            ForDefinition_t forDefinition,
+                            bool forCaseCompatibility = false);
   Address getAddrOfFieldOffset(VarDecl *D, ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index,
