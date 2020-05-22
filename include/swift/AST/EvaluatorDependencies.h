@@ -135,7 +135,7 @@ struct DependencyCollector {
     }
 
     static Reference tombstone() {
-      return {Kind::Empty,
+      return {Kind::Tombstone,
               llvm::DenseMapInfo<NominalTypeDecl *>::getTombstoneKey(),
               llvm::DenseMapInfo<DeclBaseName>::getTombstoneKey()};
     }
