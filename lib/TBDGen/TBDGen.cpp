@@ -1024,6 +1024,18 @@ void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
 void TBDGenVisitor::visitEnumElementDecl(EnumElementDecl *EED) {
   if (EED->getParentEnum()->isResilient())
     addSymbol(LinkEntity::forEnumCase(EED));
+    // We also need to add the old symbol for compatibility reasons.
+    // Although, we need to make sure we only add it once if the
+    // enum case shares a base name with other cases. Otherwise,
+    // we'd end up adding a duplicate symbol which will trip an
+    // assertion.
+    auto entity = LinkEntity::forEnumCaseCompatibility(EED);
+    auto linkage = LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
+    SmallString<32> mangled;
+    llvm::Mangler::getNameWithPrefix(mangled, linkage.getName(), DataLayout);
+    if (!StringSymbols->count(mangled)) {
+        addSymbol(entity);
+    }
 
   if (auto *PL = EED->getParameterList())
     visitDefaultArguments(EED, PL);
