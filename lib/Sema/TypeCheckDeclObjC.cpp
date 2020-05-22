@@ -2073,7 +2073,7 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
 }
 
 /// Retrieve the source file for the given Objective-C member conflict.
-static MutableArrayRef<AbstractFunctionDecl *>
+static TinyPtrVector<AbstractFunctionDecl *>
 getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
   ClassDecl *classDecl = std::get<0>(conflict);
   ObjCSelector selector = std::get<1>(conflict);
@@ -2150,22 +2150,23 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
 
     // If the first method is in an extension and the second is not, swap them
     // so the primary diagnostic is on the extension method.
+    MutableArrayRef<AbstractFunctionDecl *> methodsRef(methods);
     if (isa<ExtensionDecl>(methods[0]->getDeclContext()) &&
         !isa<ExtensionDecl>(methods[1]->getDeclContext())) {
-      std::swap(methods[0], methods[1]);
+      std::swap(methodsRef[0], methodsRef[1]);
 
     // Within a source file, use our canonical ordering.
     } else if (methods[0]->getParentSourceFile() ==
                methods[1]->getParentSourceFile() &&
               !ordering(methods[0], methods[1])) {
-      std::swap(methods[0], methods[1]);
+      std::swap(methodsRef[0], methodsRef[1]);
     }
 
     // Otherwise, fall back to the order in which the declarations were type
     // checked.
 
     auto originalMethod = methods.front();
-    auto conflictingMethods = methods.slice(1);
+    auto conflictingMethods = methodsRef.slice(1);
 
     auto origDiagInfo = getObjCMethodDiagInfo(originalMethod);
     for (auto conflictingDecl : conflictingMethods) {
