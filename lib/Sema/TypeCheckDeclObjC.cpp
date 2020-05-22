@@ -1886,12 +1886,7 @@ bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *de
 
 namespace {
   /// Produce a deterministic ordering of the given declarations.
-  class OrderDeclarations {
-    SourceManager &SrcMgr;
-
-  public:
-    OrderDeclarations(SourceManager &srcMgr) : SrcMgr(srcMgr) { }
-
+  struct OrderDeclarations {
     bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
       // If the declarations come from different modules, order based on the
       // module.
@@ -1912,6 +1907,7 @@ namespace {
         }
 
         // Prefer the declaration that comes first in the source file.
+        const auto &SrcMgr = lhsSF->getASTContext().SourceMgr;
         return SrcMgr.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
       }
 
@@ -1948,7 +1944,7 @@ static AbstractFunctionDecl *lookupObjCMethodInClass(
         return nullptr;
     }
     return *std::min_element(methods.begin(), methods.end(),
-                             OrderDeclarations(srcMgr));
+                             OrderDeclarations());
   }
 
   // Recurse into the superclass.
@@ -1975,7 +1971,7 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     return false;
 
   // Sort the methods by declaration order.
-  std::sort(methods.begin(), methods.end(), OrderDeclarations(Ctx.SourceMgr));
+  std::sort(methods.begin(), methods.end(), OrderDeclarations());
 
   // For each Objective-C method declared in this file, check whether
   // it overrides something in one of its superclasses. We
@@ -2077,8 +2073,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
     return false;
 
   auto &Ctx = sf.getASTContext();
-
-  OrderDeclarations ordering(Ctx.SourceMgr);
+  OrderDeclarations ordering;
 
   // Sort the set of conflicts so we get a deterministic order for
   // diagnostics. We use the first conflicting declaration in each set to
