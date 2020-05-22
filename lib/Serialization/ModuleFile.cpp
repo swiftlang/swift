@@ -2665,13 +2665,14 @@ void ModuleFile::lookupObjCMethods(
   }
 }
 
-void ModuleFile::lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                                    SmallVectorImpl<Identifier> &spiGroups) const {
+void ModuleFile::lookupImportedSPIGroups(
+                        const ModuleDecl *importedModule,
+                        llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   for (auto &dep : Dependencies) {
     auto depSpis = dep.spiGroups;
     if (dep.Import.second == importedModule &&
         !depSpis.empty()) {
-      spiGroups.append(depSpis.begin(), depSpis.end());
+      spiGroups.insert(depSpis.begin(), depSpis.end());
     }
   }
 }

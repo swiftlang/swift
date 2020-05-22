@@ -365,8 +365,9 @@ public:
   /// Find all SPI names imported from \p importedModule by this file,
   /// collecting the identifiers in \p spiGroups.
   virtual void
-  lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                         SmallVectorImpl<Identifier> &spiGroups) const override;
+  lookupImportedSPIGroups(
+                const ModuleDecl *importedModule,
+                llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
   // Is \p targetDecl accessible as an explictly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;

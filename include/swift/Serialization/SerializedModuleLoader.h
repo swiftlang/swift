@@ -359,8 +359,9 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   virtual void
-  lookupImportedSPIGroups(const ModuleDecl *importedModule,
-                         SmallVectorImpl<Identifier> &spiGroups) const override;
+  lookupImportedSPIGroups(
+                const ModuleDecl *importedModule,
+                llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
 

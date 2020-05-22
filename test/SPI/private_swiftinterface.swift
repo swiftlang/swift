@@ -21,7 +21,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/merged.swiftinterface
 // RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/merged.private.swiftinterface
 
-@_spi(HelperSPI) @_spi(OtherSPI) import SPIHelper
+@_spi(HelperSPI) @_spi(OtherSPI) @_spi(OtherSPI) import SPIHelper
 // CHECK-PUBLIC: import SPIHelper
 // CHECK-PRIVATE: @_spi(OtherSPI) @_spi(HelperSPI) import SPIHelper
 
