@@ -4117,8 +4117,8 @@ public:
   ///
   /// \param isInstance Whether we are looking for an instance method
   /// (vs. a class method).
-  MutableArrayRef<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
-                                                       bool isInstance);
+  TinyPtrVector<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
+                                                     bool isInstance);
 
   /// Record the presence of an @objc method with the given selector.
   void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
