@@ -36,19 +36,11 @@ func findModuleBuildingCommand(_ moduleName: String) -> [String]? {
   return nil
 }
 
-func run(command: String, arguments: [String] = []) -> Int32 {
-  let process = Process()
-  process.launchPath = command
-  process.arguments = arguments
-  let outputPipe = Pipe()
-  process.standardOutput = outputPipe
-  process.launch()
-  process.waitUntilExit()
-  return process.terminationStatus
-}
-
 if let command = findModuleBuildingCommand(moduleName) {
-  exit(run(command: swiftPath, arguments: command))
+  var result = swiftPath
+  command.forEach { result += " \($0)"}
+  print(result)
+  exit(0)
 } else {
   fatalError("cannot find module building commands for \(moduleName)")
 }
