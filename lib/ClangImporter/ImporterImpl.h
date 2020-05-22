@@ -439,12 +439,6 @@ public:
   llvm::DenseMap<const clang::MacroInfo *, std::pair<clang::APValue, Type>>
     ImportedMacroConstants;
 
-  /// Keeps track of active selector-based lookups, so that we don't infinitely
-  /// recurse when checking whether a method with a given selector has already
-  /// been imported.
-  llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
-    ActiveSelectors;
-
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
