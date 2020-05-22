@@ -2338,8 +2338,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
         diags.diagnose(witness, diag::protocol_witness_settable_conflict);
     if (auto VD = dyn_cast<VarDecl>(witness)) {
       if (VD->hasStorage()) {
-        auto PBD = VD->getParentPatternBinding();
-        diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+        if (auto PBD = VD->getParentPatternBinding()) {
+          diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+        }
       }
     }
     break;
