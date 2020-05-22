@@ -7,41 +7,41 @@ protocol DefaultInitializable {
 enum NonTrivialDefaults<T: DefaultInitializable> {
   case empty
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi_SdSSxtcAEmAA20DefaultInitializableRzlFfA_{{.*}}
+  // CHECK-LABEL: il hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi1i_Sd1dSS1sx1ttcAEmAA20DefaultInitializableRzlFfA_{{.*}}
   // CHECK:   [[INT_VAL:%[0-9]+]]  = integer_literal $Builtin.IntLiteral, 17
   // CHECK:   [[META:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK:   [[LIT_FN:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
   // CHECK:   [[LIT_VAL:%[0-9]+]] = apply [[LIT_FN]]([[INT_VAL]], [[META]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
   // CHECK:   return [[LIT_VAL]] : $Int
-  // CHECK: } // end sil function '$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi_SdSSxtcAEmAA20DefaultInitializableRzlFfA_'
+  // CHECK: } // end sil function '$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi1i_Sd1dSS1sx1ttcAEmAA20DefaultInitializableRzlFfA_'
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi_SdSSxtcAEmAA20DefaultInitializableRzlFfA1_{{.*}}
+  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi1i_Sd1dSS1sx1ttcAEmAA20DefaultInitializableRzlFfA1_{{.*}}
   // CHECK:  [[LIT:%[0-9]+]] = string_literal utf8 "Hello"
   // CHECK:  [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
   // CHECK:  [[STRING:%[0-9]+]] = metatype $@thin String.Type
   // CHECK:  [[LIT_FN:%.*]]  = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
   // CHECK:  [[LIT_VAL:%.*]] = apply [[LIT_FN]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]])
   // CHECK:  return [[LIT_VAL]] : $String
-  // CHECK: } // end sil function '$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi_SdSSxtcAEmAA20DefaultInitializableRzlFfA1_'
+  // CHECK: } // end sil function '$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi1i_Sd1dSS1sx1ttcAEmAA20DefaultInitializableRzlFfA1_'
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi_SdSSxtcAEmAA20DefaultInitializableRzlFfA2_{{.*}}
+  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi1i_Sd1dSS1sx1ttcAEmAA20DefaultInitializableRzlFfA2_{{.*}}
   // CHECK: bb0([[OUT:%[0-9]+]] : $*T):
   // CHECK:  [[META:%[0-9]+]] = metatype $@thick T.Type
   // CHECK:  [[DEF_INIT_WITNESS:%[0-9]+]] = witness_method $T, #DefaultInitializable.init!allocator : <Self where Self : DefaultInitializable> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInitializable) <τ_0_0 where τ_0_0 : DefaultInitializable> (@thick τ_0_0.Type) -> @out τ_0_0
   // CHECK:  [[LIT:%[0-9]+]] = apply [[DEF_INIT_WITNESS]]<T>([[OUT]], [[META]]) : $@convention(witness_method: DefaultInitializable) <τ_0_0 where τ_0_0 : DefaultInitializable> (@thick τ_0_0.Type) -> @out τ_0_0
   // CHECK:  [[RET:%[0-9]+]] = tuple ()
   // CHECK:  return [[RET]] : $()
-  // CHECK: } // end sil function '$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi_SdSSxtcAEmAA20DefaultInitializableRzlFfA2_'
+  // CHECK: } // end sil function '$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi1i_Sd1dSS1sx1ttcAEmAA20DefaultInitializableRzlFfA2_'
 
   case defarg1(i: Int = 17, d: Double, s: String = "Hello", t: T = .init())
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO16indirect_defarg1yACyxGAE_AEt_tcAEmAA20DefaultInitializableRzlFfA_
+  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO16indirect_defarg1yACyxGAE_AEt1f_tcAEmAA20DefaultInitializableRzlFfA_
   // CHECK: bb0([[OUT_VAL1:%[0-9]+]] : $*NonTrivialDefaults<T>, [[OUT_VAL2:%[0-9]+]] : $*NonTrivialDefaults<T>):
   // CHECK:   inject_enum_addr [[OUT_VAL1]] : $*NonTrivialDefaults<T>, #NonTrivialDefaults.empty!enumelt
   // CHECK:   inject_enum_addr [[OUT_VAL2]] : $*NonTrivialDefaults<T>, #NonTrivialDefaults.empty!enumelt
   // CHECK:   [[RET:%[0-9]+]] = tuple ()
   // CHECK:   return [[RET]] : $()
-  // CHECK: } // end sil function '$s17default_arguments18NonTrivialDefaultsO16indirect_defarg1yACyxGAE_AEt_tcAEmAA20DefaultInitializableRzlFfA_'
+  // CHECK: } // end sil function '$s17default_arguments18NonTrivialDefaultsO16indirect_defarg1yACyxGAE_AEt1f_tcAEmAA20DefaultInitializableRzlFfA_'
 
   indirect case indirect_defarg1(f: (NonTrivialDefaults, NonTrivialDefaults) = (.empty, .empty))
 
