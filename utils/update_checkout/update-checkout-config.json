@@ -41,7 +41,7 @@
             "platforms": [ "Linux" ]
         },
         "yams": {
-            "remote": { "id": "jpsim/Yams" }
+            "remote": { "id": "asuhan/Yams" }
         },
         "cmake": {
             "remote": { "id": "KitWare/CMake" },
@@ -368,7 +368,7 @@
                 "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2020-05-18-a",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "yams": "3.0.1",
+                "yams": "3.0.1-patched",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2020-05-18-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2020-05-18-a",
                 "PythonKit": "master",
