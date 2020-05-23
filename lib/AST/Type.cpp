@@ -90,13 +90,6 @@ SourceRange TypeLoc::getSourceRange() const {
   return SourceRange();
 }
 
-TypeLoc TypeLoc::clone(ASTContext &ctx) const {
-  if (TyR) {
-    return TypeLoc(TyR->clone(ctx), Ty);
-  }
-  return *this;
-}
-
 SourceLoc TypeLoc::getLoc() const {
   if (TyR) return TyR->getLoc();
   return SourceLoc();
