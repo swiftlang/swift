@@ -11,9 +11,31 @@
 // Check that the JSON parses correctly into the canonical Swift data
 // structures.
 
-// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift -o %t/main
+// RUN: mkdir -p %t/PrintGraph
+// RUN: cp %S/Inputs/PrintGraph.swift %t/main.swift
+// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift %t/main.swift -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/deps.json
+
+// RUN: mkdir -p %t/BuildModules
+// RUN: cp %S/Inputs/BuildModulesFromGraph.swift %t/BuildModules/main.swift
+// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift %t/BuildModules/main.swift -o %t/ModuleBuilder
+// RUN: %target-codesign %t/ModuleBuilder
+
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.pcm | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/A-*.pcm
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path B.pcm | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/B-*.pcm
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path C.pcm | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/C-*.pcm
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path A.swiftmodule | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/A-*.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path E.swiftmodule | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/E-*.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path F.swiftmodule | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/F-*.swiftmodule
+// RUN: %target-run %t/ModuleBuilder %t/deps.json %swift-path G.swiftmodule | %S/Inputs/CommandRunner.py
+// RUN: ls %t/clang-module-cache/G-*.swiftmodule
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -82,7 +104,12 @@ import G
 // CHECK-SAME: "{{.*}}"
 
 // CHECK: "commandLine": [
-// CHECK-NEXT: "-remove-preceeding-explicit-module-build-incompatible-options"
+// CHECK-NEXT: "-frontend"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "-Xclang"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "-cc1"
+// CHECK: "-remove-preceeding-explicit-module-build-incompatible-options"
 
 /// --------Swift module E
 // CHECK: "swift": "E"

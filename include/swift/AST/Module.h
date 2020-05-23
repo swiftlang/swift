@@ -22,7 +22,6 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionSet.h"
@@ -69,7 +68,6 @@ namespace swift {
   class ProtocolConformance;
   class ProtocolDecl;
   struct PrintOptions;
-  class ReferencedNameTracker;
   class Token;
   class TupleType;
   class Type;

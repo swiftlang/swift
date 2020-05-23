@@ -262,6 +262,12 @@ public:
   void registerRequestFunctions(Zone zone,
                                 ArrayRef<AbstractRequestFunction *> functions);
 
+  void enumerateReferencesInFile(
+      const SourceFile *SF,
+      evaluator::DependencyRecorder::ReferenceEnumerator f) const {
+    return recorder.enumerateReferencesInFile(SF, f);
+  }
+
   /// Retrieve the result produced by evaluating a request that can
   /// be cached.
   template<typename Request,

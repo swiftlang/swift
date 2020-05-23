@@ -748,11 +748,13 @@ public:
   /// \param methods The list of @objc methods in this class that have this
   /// selector and are instance/class methods as requested. This list will be
   /// extended with any methods found in subsequent generations.
-  void loadObjCMethods(ClassDecl *classDecl,
-                       ObjCSelector selector,
-                       bool isInstanceMethod,
-                       unsigned previousGeneration,
-                       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+  ///
+  /// \param swiftOnly If true, only loads methods from imported Swift modules,
+  /// skipping the Clang importer.
+  void loadObjCMethods(ClassDecl *classDecl, ObjCSelector selector,
+                       bool isInstanceMethod, unsigned previousGeneration,
+                       llvm::TinyPtrVector<AbstractFunctionDecl *> &methods,
+                       bool swiftOnly = false);
 
   /// Load derivative function configurations for the given
   /// AbstractFunctionDecl.
