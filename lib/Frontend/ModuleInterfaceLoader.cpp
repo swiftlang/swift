@@ -41,22 +41,6 @@
 using namespace swift;
 using FileDependency = SerializationOptions::FileDependency;
 
-/// Extract the specified-or-defaulted -module-cache-path that winds up in
-/// the clang importer, for reuse as the .swiftmodule cache path when
-/// building a ModuleInterfaceLoader.
-std::string
-swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
-  if (!Clang.hasPreprocessor())
-    return "";
-  std::string SpecificModuleCachePath =
-      Clang.getPreprocessor().getHeaderSearchInfo().getModuleCachePath().str();
-
-  // The returned-from-clang module cache path includes a suffix directory
-  // that is specific to the clang version and invocation; we want the
-  // directory above that.
-  return llvm::sys::path::parent_path(SpecificModuleCachePath).str();
-}
-
 #pragma mark - Forwarding Modules
 
 namespace {
@@ -1048,6 +1032,7 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
 void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     const SearchPathOptions &SearchPathOpts,
     const LangOptions &LangOpts) {
+  GenericArgs.push_back("-frontend");
   // Start with a SubInvocation that copies various state from our
   // invoking ASTContext.
   GenericArgs.push_back("-compile-module-from-interface");

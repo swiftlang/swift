@@ -919,15 +919,10 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
   return PCHFilename.getValue();
 }
 
-std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
-                      std::string swiftPCHHash, DependencyTracker *tracker,
-                      DWARFImporterDelegate *dwarfImporterDelegate) {
-  std::unique_ptr<ClangImporter> importer{
-      new ClangImporter(ctx, importerOpts, tracker, dwarfImporterDelegate)};
-
+std::vector<std::string>
+ClangImporter::getClangArguments(ASTContext &ctx,
+                                 const ClangImporterOptions &importerOpts) {
   std::vector<std::string> invocationArgStrs;
-
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
   invocationArgStrs.push_back("clang");
@@ -941,6 +936,49 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
     break;
   }
   addCommonInvocationArguments(invocationArgStrs, ctx, importerOpts);
+  return invocationArgStrs;
+}
+
+std::unique_ptr<clang::CompilerInvocation>
+ClangImporter::createClangInvocation(ClangImporter *importer,
+                                     const ClangImporterOptions &importerOpts,
+                                     ArrayRef<std::string> invocationArgStrs,
+                                     std::vector<std::string> *CC1Args) {
+  std::vector<const char *> invocationArgs;
+  invocationArgs.reserve(invocationArgStrs.size());
+  for (auto &argStr : invocationArgStrs)
+    invocationArgs.push_back(argStr.c_str());
+  // Set up a temporary diagnostic client to report errors from parsing the
+  // command line, which may be important for Swift clients if, for example,
+  // they're using -Xcc options. Unfortunately this diagnostic engine has to
+  // use the default options because the /actual/ options haven't been parsed
+  // yet.
+  //
+  // The long-term client for Clang diagnostics is set up below, after the
+  // clang::CompilerInstance is created.
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
+    new clang::DiagnosticOptions
+  };
+
+  ClangDiagnosticConsumer tempDiagClient{importer->Impl, *tempDiagOpts,
+                                         importerOpts.DumpClangDiagnostics};
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> tempClangDiags =
+      clang::CompilerInstance::createDiagnostics(tempDiagOpts.get(),
+                                                 &tempDiagClient,
+                                                 /*owned*/false);
+
+  return clang::createInvocationFromCommandLine(invocationArgs, tempClangDiags,
+                                                nullptr, false, CC1Args);
+}
+
+std::unique_ptr<ClangImporter>
+ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
+                      std::string swiftPCHHash, DependencyTracker *tracker,
+                      DWARFImporterDelegate *dwarfImporterDelegate) {
+  std::unique_ptr<ClangImporter> importer{
+      new ClangImporter(ctx, importerOpts, tracker, dwarfImporterDelegate)};
+  importer->Impl.ClangArgs = getClangArguments(ctx, importerOpts);
+  ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
 
   if (importerOpts.DumpClangDiagnostics) {
     llvm::errs() << "'";
@@ -950,10 +988,7 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
     llvm::errs() << "'\n";
   }
 
-  std::vector<const char *> invocationArgs;
-  invocationArgs.reserve(invocationArgStrs.size());
-  for (auto &argStr : invocationArgStrs)
-    invocationArgs.push_back(argStr.c_str());
+
 
   if (llvm::sys::path::extension(importerOpts.BridgingHeader)
         .endswith(file_types::getExtension(file_types::TY_PCH))) {
@@ -971,27 +1006,9 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
 
   // Create a new Clang compiler invocation.
   {
-    // Set up a temporary diagnostic client to report errors from parsing the
-    // command line, which may be important for Swift clients if, for example,
-    // they're using -Xcc options. Unfortunately this diagnostic engine has to
-    // use the default options because the /actual/ options haven't been parsed
-    // yet.
-    //
-    // The long-term client for Clang diagnostics is set up below, after the
-    // clang::CompilerInstance is created.
-    llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
-      new clang::DiagnosticOptions
-    };
-
-    ClangDiagnosticConsumer tempDiagClient{importer->Impl, *tempDiagOpts,
-                                           importerOpts.DumpClangDiagnostics};
-    llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> tempClangDiags =
-        clang::CompilerInstance::createDiagnostics(tempDiagOpts.get(),
-                                                   &tempDiagClient,
-                                                   /*owned*/false);
-
-    importer->Impl.Invocation =
-        clang::createInvocationFromCommandLine(invocationArgs, tempClangDiags);
+    importer->Impl.Invocation = createClangInvocation(importer.get(),
+                                                      importerOpts,
+                                                      invocationArgStrs);
     if (!importer->Impl.Invocation)
       return nullptr;
   }
@@ -4020,3 +4037,20 @@ bool ClangImporter::isInOverlayModuleForImportedModule(
   return !clangModule->ExportAsModule.empty() &&
     clangModule->ExportAsModule == overlayModule->getName().str();
 }
+
+/// Extract the specified-or-defaulted -module-cache-path that winds up in
+/// the clang importer, for reuse as the .swiftmodule cache path when
+/// building a ModuleInterfaceLoader.
+std::string
+swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
+  if (!Clang.hasPreprocessor())
+    return "";
+  std::string SpecificModuleCachePath =
+      Clang.getPreprocessor().getHeaderSearchInfo().getModuleCachePath().str();
+
+  // The returned-from-clang module cache path includes a suffix directory
+  // that is specific to the clang version and invocation; we want the
+  // directory above that.
+  return llvm::sys::path::parent_path(SpecificModuleCachePath).str();
+}
+
