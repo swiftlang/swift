@@ -89,11 +89,11 @@ SWIFT_REQUEST(NameLookup, LookupPrefixOperatorRequest,
               PrefixOperatorDecl *(OperatorLookupDescriptor),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, LookupInfixOperatorRequest,
-              InfixOperatorDecl *(OperatorLookupDescriptor),
+              TinyPtrVector<InfixOperatorDecl *>(OperatorLookupDescriptor),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, LookupPostfixOperatorRequest,
               PostfixOperatorDecl *(OperatorLookupDescriptor),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, LookupPrecedenceGroupRequest,
-              PrecedenceGroupDecl *(OperatorLookupDescriptor),
+              TinyPtrVector<PrecedenceGroupDecl *>(OperatorLookupDescriptor),
               Cached, NoLocationInfo)

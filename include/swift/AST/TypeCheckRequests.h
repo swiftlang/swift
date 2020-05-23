@@ -1531,7 +1531,8 @@ void simple_display(llvm::raw_ostream &out, const PrecedenceGroupDescriptor &d);
 
 class ValidatePrecedenceGroupRequest
     : public SimpleRequest<ValidatePrecedenceGroupRequest,
-                           PrecedenceGroupDecl *(PrecedenceGroupDescriptor),
+                           TinyPtrVector<PrecedenceGroupDecl *>(
+                               PrecedenceGroupDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1540,7 +1541,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  PrecedenceGroupDecl *
+  TinyPtrVector<PrecedenceGroupDecl *>
   evaluate(Evaluator &evaluator, PrecedenceGroupDescriptor descriptor) const;
 
 public:
