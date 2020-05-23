@@ -705,7 +705,7 @@ class TypeDecoder {
           if (labels.empty()) labels.append(elements.size(), ' ');
 
           // Add the label and its terminator.
-          labels += element->getChild(0)->getText();
+          labels += element->getChild(nameIdx)->getText();
           labels += ' ';
           typeChildIndex++;
 
