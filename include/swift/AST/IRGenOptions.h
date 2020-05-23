@@ -191,7 +191,6 @@ public:
   unsigned DisableLLVMSLPVectorizer : 1;
 
   /// Disable frame pointer elimination?
-  unsigned DisableFPElimLeaf : 1;
   unsigned DisableFPElim : 1;
   
   /// Special codegen for playgrounds.
@@ -320,7 +319,6 @@ public:
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
-        DisableFPElimLeaf(false),
         DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
         FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         HasValueNamesSetting(false), ValueNames(false),
