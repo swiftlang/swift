@@ -1,3 +1,3 @@
-#include <B.h>
+#include "B.h"
 
 void funcC(void);

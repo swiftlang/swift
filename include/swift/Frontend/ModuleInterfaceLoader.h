@@ -198,12 +198,6 @@ public:
     bool RemarkOnRebuildFromInterface, bool DisableInterfaceFileLock);
 };
 
-/// Extract the specified-or-defaulted -module-cache-path that winds up in
-/// the clang importer, for reuse as the .swiftmodule cache path when
-/// building a ModuleInterfaceLoader.
-std::string
-getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
-
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
 private:
   SourceManager &SM;
