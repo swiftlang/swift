@@ -2,19 +2,19 @@ final public class OpenSubclass: OpenBase {} // expected-provides {{OpenSubclass
 // expected-provides {{OpenBase}}
 // expected-cascading-member {{main.OpenBase.init}}
 // expected-cascading-member {{main.OpenSubclass.init}}
-// expected-cascading-member {{main.OpenSubclass.deinit}}
+// expected-private-member {{main.OpenSubclass.deinit}}
 
 final public class PublicSubclass: PublicBase {} // expected-provides {{PublicSubclass}} expected-cascading-superclass {{main.PublicBase}}
 // expected-provides {{PublicBase}}
 // expected-cascading-member {{main.PublicBase.init}}
 // expected-cascading-member {{main.PublicSubclass.init}}
-// expected-cascading-member {{main.PublicSubclass.deinit}}
+// expected-private-member {{main.PublicSubclass.deinit}}
 
 final internal class InternalSubclass: InternalBase {} // expected-provides {{InternalSubclass}} expected-cascading-superclass {{main.InternalBase}}
 // expected-provides {{InternalBase}}
 // expected-cascading-member {{main.InternalBase.init}}
 // expected-cascading-member {{main.InternalSubclass.init}}
-// expected-cascading-member {{main.InternalSubclass.deinit}}
+// expected-private-member {{main.InternalSubclass.deinit}}
 
 public protocol PublicProtocol: PublicBaseProtocol {}
 // expected-provides {{PublicProtocol}}

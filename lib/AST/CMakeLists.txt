@@ -67,7 +67,6 @@ add_swift_host_library(swiftAST STATIC
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
-  ReferencedNameTracker.cpp
   RequirementEnvironment.cpp
   SyntaxASTMap.cpp
   SILLayout.cpp

@@ -35,7 +35,6 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
@@ -692,11 +691,25 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
-    if (auto *R = SF->getConfiguredReferencedNameTracker()) {
-      C.NumReferencedTopLevelNames += R->getTopLevelNames().size();
-      C.NumReferencedDynamicNames += R->getDynamicLookupNames().size();
-      C.NumReferencedMemberNames += R->getUsedMembers().size();
-    }
+    auto &Ctx = SF->getASTContext();
+    Ctx.evaluator.enumerateReferencesInFile(SF, [&C](const auto &ref) {
+    using NodeKind = evaluator::DependencyCollector::Reference::Kind;
+      switch (ref.kind) {
+      case NodeKind::Empty:
+      case NodeKind::Tombstone:
+        llvm_unreachable("Cannot enumerate dead dependency!");
+      case NodeKind::TopLevel:
+        C.NumReferencedTopLevelNames += 1;
+        return;
+      case NodeKind::Dynamic:
+        C.NumReferencedDynamicNames += 1;
+        return;
+      case NodeKind::PotentialMember:
+      case NodeKind::UsedMember:
+        C.NumReferencedMemberNames += 1;
+        return;
+      }
+    });
   }
 
   if (!Instance.getPrimarySourceFiles().empty()) {
@@ -2169,11 +2182,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (Invocation.getFrontendOptions().EnableIncrementalDependencyVerifier) {
     if (!Instance->getPrimarySourceFiles().empty()) {
       HadError |= swift::verifyDependencies(Instance->getSourceMgr(),
-                                            *Instance->getDependencyTracker(),
                                             Instance->getPrimarySourceFiles());
     } else {
       HadError |= swift::verifyDependencies(
-          Instance->getSourceMgr(), *Instance->getDependencyTracker(),
+          Instance->getSourceMgr(),
           Instance->getMainModule()->getFiles());
     }
   }

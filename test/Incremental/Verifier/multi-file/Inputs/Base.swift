@@ -1,14 +1,14 @@
 open class OpenBase {} // expected-provides {{OpenBase}}
 // expected-cascading-member {{main.OpenBase.init}}
-// expected-cascading-member {{main.OpenBase.deinit}}
+// expected-private-member {{main.OpenBase.deinit}}
 
 public class PublicBase {} // expected-provides {{PublicBase}}
 // expected-cascading-member {{main.PublicBase.init}}
-// expected-cascading-member {{main.PublicBase.deinit}}
+// expected-private-member {{main.PublicBase.deinit}}
 
 internal class InternalBase {} // expected-provides {{InternalBase}}
 // expected-cascading-member {{main.InternalBase.init}}
-// expected-cascading-member {{main.InternalBase.deinit}}
+// expected-private-member {{main.InternalBase.deinit}}
 
 fileprivate class FilePrivateBase {} // expected-provides {{FilePrivateBase}}
 // expected-cascading-member {{main.FilePrivateBase.init}}
