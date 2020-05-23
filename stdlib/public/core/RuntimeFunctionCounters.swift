@@ -79,11 +79,11 @@ internal func _collectAllReferencesInsideObjectImpl(
   }
 
   // Recursively visit the children of the current value.
-  let count = mirror.children.count
-  var currentIndex = mirror.children.startIndex
+  let count = mirror._children.count
+  var currentIndex = mirror._children.startIndex
   for _ in 0..<count {
-    let (_, child) = mirror.children[currentIndex]
-    mirror.children.formIndex(after: &currentIndex)
+    let (_, child) = mirror._children[currentIndex]
+    mirror._children.formIndex(after: &currentIndex)
     _collectAllReferencesInsideObjectImpl(
       child,
       references: &references,

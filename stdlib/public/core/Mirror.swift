@@ -434,17 +434,14 @@ extension Mirror {
   ) -> Any? {
     var result: Any = _Dummy(mirror: self)
     for e in [first] + rest {
-      let children = Mirror(reflecting: result).children
-      let position: Children.Index
-      if case let label as String = e {
+      let children = Mirror(reflecting: result)._children
+      let position: Int
+      switch e {
+      case let label as String:
         position = children.firstIndex { $0.label == label } ?? children.endIndex
-      }
-      else if let offset = e as? Int {
-        position = children.index(children.startIndex,
-          offsetBy: offset,
-          limitedBy: children.endIndex) ?? children.endIndex
-      }
-      else {
+      case let offset as Int:
+        position = offset < children.endIndex ? offset : children.endIndex
+      default:
         _preconditionFailure(
           "Someone added a conformance to MirrorPath; that privilege is reserved to the standard library")
       }
