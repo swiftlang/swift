@@ -893,7 +893,6 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   if (isPrimary) {
     PrimarySourceFiles.push_back(inputFile);
     inputFile->enableInterfaceHash();
-    inputFile->createReferencedNameTracker();
   }
 
   if (bufferID == SourceMgr.getCodeCompletionBufferID()) {

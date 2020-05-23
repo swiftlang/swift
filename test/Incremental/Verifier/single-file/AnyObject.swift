@@ -15,7 +15,8 @@ import Foundation
 
 // expected-provides {{LookupFactory}}
 // expected-provides {{NSObject}}
-// expected-private-superclass {{__C.NSObject}}
+// expected-private-superclass {{ObjectiveC.NSObject}}
+// expected-private-conformance {{ObjectiveC.NSObjectProtocol}}
 // expected-private-conformance {{Foundation._KeyValueCodingAndObserving}}
 // expected-private-conformance {{Foundation._KeyValueCodingAndObservingPublishing}}
 // expected-private-conformance {{Swift.Hashable}}
@@ -30,14 +31,18 @@ import Foundation
   // expected-provides {{IntegerLiteralType}}
   // expected-provides {{FloatLiteralType}}
   // expected-provides {{Int}}
-  // expected-cascading-member {{__C.NSObject.someMember}}
-  // expected-cascading-member {{__C.NSObject.Int}}
+  // expected-cascading-member {{ObjectiveC.NSObject.someMember}}
+  // expected-cascading-member {{ObjectiveC.NSObject.Int}}
+  // expected-cascading-member {{ObjectiveC.NSObjectProtocol.someMember}}
+  // expected-cascading-member {{ObjectiveC.NSObjectProtocol.Int}}
   // expected-cascading-member {{main.LookupFactory.Int}}
   @objc var someMember: Int = 0
-  // expected-cascading-member {{__C.NSObject.someMethod}}
+  // expected-cascading-member {{ObjectiveC.NSObject.someMethod}}
+  // expected-cascading-member {{ObjectiveC.NSObjectProtocol.someMethod}}
   @objc func someMethod() {}
 
-  // expected-cascading-member {{__C.NSObject.init}}
+  // expected-cascading-member {{ObjectiveC.NSObject.init}}
+  // expected-cascading-member {{ObjectiveC.NSObjectProtocol.init}}
   // expected-cascading-member {{main.LookupFactory.init}}
   // expected-private-member {{main.LookupFactory.deinit}}
   // expected-cascading-member {{main.LookupFactory.someMember}}
@@ -47,7 +52,7 @@ import Foundation
 // expected-private-member {{Swift.ExpressibleByNilLiteral.callAsFunction}}
 // expected-private-member {{Swift.CustomReflectable.callAsFunction}}
 // expected-private-member {{Swift._ObjectiveCBridgeable.callAsFunction}}
-// expected-private-member {{Swift.Optional.callAsFunction}}
+// expected-private-member {{Swift.Optional<Wrapped>.callAsFunction}}
 // expected-private-member {{Swift.CustomDebugStringConvertible.callAsFunction}}
 // expected-private-member {{Swift.Equatable.callAsFunction}}
 // expected-private-member {{Swift.Hashable.callAsFunction}}
