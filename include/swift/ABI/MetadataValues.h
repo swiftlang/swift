@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -384,10 +384,14 @@ enum class TypeReferenceKind : unsigned {
   /// unused.
   IndirectObjCClass = 0x03,
 
+  /// The conformance is for a non-nominal type whose metadata kind we recorded;
+  /// getMetadataKind() returns the kind.
+  MetadataKind = 0x04,
+
   // We only reserve three bits for this in the various places we store it.
 
   First_Kind = DirectTypeDescriptor,
-  Last_Kind = IndirectObjCClass,
+  Last_Kind = MetadataKind,
 };
 
 /// Flag that indicates whether an existential type is class-constrained or not.

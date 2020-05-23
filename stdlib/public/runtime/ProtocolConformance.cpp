@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -83,11 +83,14 @@ template<> void ProtocolConformanceDescriptor::dump() const {
   case TypeReferenceKind::IndirectTypeDescriptor:
     printf("unique nominal type descriptor %s", symbolName(getTypeDescriptor()));
     break;
+  case TypeReferenceKind::MetadataKind:
+    printf("metadata kind %i", getMetadataKind());
+    break;
   }
   
   printf(" => ");
   
-  printf("witness table %pattern s\n", symbolName(getWitnessTablePattern()));
+  printf("witness table pattern %p\n", symbolName(getWitnessTablePattern()));
 }
 #endif
 
@@ -113,6 +116,7 @@ const ClassMetadata *TypeReference::getObjCClass(TypeReferenceKind kind) const {
 
   case TypeReferenceKind::DirectTypeDescriptor:
   case TypeReferenceKind::IndirectTypeDescriptor:
+  case TypeReferenceKind::MetadataKind:
     return nullptr;
   }
 
@@ -151,6 +155,9 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
       }
     }
 
+    return nullptr;
+  }
+  case TypeReferenceKind::MetadataKind: {
     return nullptr;
   }
   }
