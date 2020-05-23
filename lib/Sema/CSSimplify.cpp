@@ -5628,7 +5628,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
-    if (conformance.isConcrete()) {
+    if (conformance.isConcrete() &&
+        !isa<BuiltinProtocolConformance>(conformance.getConcrete())) {
       unsigned index = 0;
       for (const auto &req : conformance.getConditionalRequirements()) {
         addConstraint(req,
