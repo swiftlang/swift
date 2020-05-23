@@ -374,7 +374,7 @@ macro(configure_sdk_unix name architectures)
 
     # If the module triple wasn't set explicitly, it's the same as the triple.
     if(NOT SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE)
-      set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE "${SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE}")
+      set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
     endif()
   endforeach()
 
@@ -407,7 +407,7 @@ macro(configure_sdk_windows name environment architectures)
           "${arch}-unknown-windows-${environment}")
     endif()
 
-    set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE "${SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE}")
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
 
     # NOTE: set the path to / to avoid a spurious `--sysroot` from being passed
     # to the driver -- rely on the `INCLUDE` AND `LIB` environment variables
