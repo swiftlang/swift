@@ -272,7 +272,7 @@ FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) 
   // specializing.
   for (auto &Op : PAI->getArgumentOperands()) {
     SILType Ty = Op.get()->getType();
-    appendType(Ty.getASTType());
+    appendType(Ty.getASTType()->mapTypeOutOfContext());
   }
 }
 

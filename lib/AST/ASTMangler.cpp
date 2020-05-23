@@ -1359,7 +1359,7 @@ void ASTMangler::appendFlatGenericArgs(SubstitutionMap subs) {
   for (auto replacement : subs.getReplacementTypes()) {
     if (replacement->hasArchetype())
       replacement = replacement->mapTypeOutOfContext();
-    appendType(replacement);
+    appendType(replacement->getCanonicalType());
   }
 }
 
