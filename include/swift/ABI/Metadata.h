@@ -1012,9 +1012,12 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
 
   constexpr TargetAnyClassMetadata(TargetClassMetadata<Runtime> *superclass)
     : TargetHeapMetadata<Runtime>(MetadataKind::Class),
-      Superclass(superclass),
-      CacheData{nullptr, nullptr},
-      Data(SWIFT_CLASS_IS_SWIFT_MASK) {}
+      Superclass(superclass)
+#if SWIFT_OBJC_INTEROP
+      , CacheData{nullptr, nullptr},
+      Data(SWIFT_CLASS_IS_SWIFT_MASK)
+#endif
+      {}
 
 #if SWIFT_OBJC_INTEROP
   // Allow setting the metadata kind to a class ISA on class metadata.
@@ -1027,8 +1030,7 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> Superclass;
 
-  // TODO: remove the CacheData and Data fields in non-ObjC-interop builds.
-
+#if SWIFT_OBJC_INTEROP
   /// The cache data is used for certain dynamic lookups; it is owned
   /// by the runtime and generally needs to interoperate with
   /// Objective-C's use.
@@ -1043,11 +1045,16 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
   static constexpr StoredPointer offsetToData() {
     return offsetof(TargetAnyClassMetadata, Data);
   }
+#endif
 
   /// Is this object a valid swift type metadata?  That is, can it be
   /// safely downcast to ClassMetadata?
   bool isTypeMetadata() const {
+#if SWIFT_OBJC_INTEROP
     return (Data & SWIFT_CLASS_IS_SWIFT_MASK);
+#else
+    return true;
+#endif
   }
   /// A different perspective on the same bit
   bool isPureObjC() const {
@@ -1270,6 +1277,7 @@ public:
     return bounds;
   }
 
+#if SWIFT_OBJC_INTEROP
   /// Given a statically-emitted metadata template, this sets the correct
   /// "is Swift" bit for the current runtime. Depending on the deployment
   /// target a binary was compiled for, statically emitted metadata templates
@@ -1294,6 +1302,7 @@ public:
     
     assert(isTypeMetadata());
   }
+#endif
 
   bool isCanonicalStaticallySpecializedGenericMetadata() const {
     auto *description = getDescription();

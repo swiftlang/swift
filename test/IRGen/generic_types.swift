@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -enable-objc-interop %s -emit-ir | %FileCheck %s --check-prefixes=CHECK,CHECK-objc
+// RUN: %target-swift-frontend -disable-objc-interop %s -emit-ir | %FileCheck %s --check-prefixes=CHECK,CHECK-native
 
 // REQUIRES: CPU=x86_64
 
@@ -20,13 +21,15 @@
 // -- negative size in words
 // CHECK-SAME:   i32 2,
 // -- positive size in words
-// CHECK-SAME:   i32 17,
+// CHECK-objc-SAME:   i32 17,
+// CHECK-native-SAME:   i32 14,
 // -- num immediate members
 // CHECK-SAME:   i32 7,
 // -- num fields
 // CHECK-SAME:   i32 1,
 // -- field offset vector offset
-// CHECK-SAME:   i32 11,
+// CHECK-objc-SAME:   i32 11,
+// CHECK-native-SAME:   i32 8,
 // -- instantiation cache
 // CHECK-SAME:   @"$s13generic_types1ACMI"
 // -- instantiation pattern

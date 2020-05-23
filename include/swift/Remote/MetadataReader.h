@@ -2623,6 +2623,7 @@ private:
     // WARNING: the following algorithm works on current modern Apple
     // runtimes but is not actually ABI.  But it is pretty reliable.
 
+#if SWIFT_OBJC_INTEROP
     StoredPointer dataPtr;
     if (!Reader->readInteger(RemoteAddress(classAddress +
                                TargetClassMetadata<Runtime>::offsetToData()),
@@ -2665,6 +2666,9 @@ private:
     }
 
     return dataPtr;
+#else
+    return StoredPointer();
+#endif
   }
 
   IsaEncodingKind getIsaEncoding() {
