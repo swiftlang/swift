@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -5697,6 +5697,12 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
     os << "inherit (";
     inherited->getInheritedConformance()->printName(os, PO);
     os << ")";
+    break;
+  }
+  case ProtocolConformanceKind::Builtin: {
+    auto builtin = cast<BuiltinProtocolConformance>(this);
+    os << builtin->getProtocol()->getName()
+       << " type " << builtin->getType();
     break;
   }
   }
