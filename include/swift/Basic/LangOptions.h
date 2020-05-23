@@ -267,6 +267,10 @@ namespace swift {
     /// Build the ASTScope tree lazily
     bool LazyASTScopes = true;
 
+    /// Whether to enable the new operator decl and precedencegroup lookup
+    /// behavior. This is a staging flag, and will be removed in the future.
+    bool EnableNewOperatorLookup = false;
+
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.

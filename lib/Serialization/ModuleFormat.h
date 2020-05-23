@@ -401,6 +401,21 @@ static inline OperatorKind getStableFixity(OperatorFixity fixity) {
   llvm_unreachable("Unhandled case in switch");
 }
 
+/// Translates a stable Serialization fixity back to an AST operator fixity.
+static inline OperatorFixity getASTOperatorFixity(OperatorKind fixity) {
+  switch (fixity) {
+  case Prefix:
+    return OperatorFixity::Prefix;
+  case Postfix:
+    return OperatorFixity::Postfix;
+  case Infix:
+    return OperatorFixity::Infix;
+  case PrecedenceGroup:
+    llvm_unreachable("Not an operator kind");
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum GenericRequirementKind : uint8_t {
