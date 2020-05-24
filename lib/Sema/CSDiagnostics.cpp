@@ -4859,6 +4859,12 @@ bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
   return true;
 }
 
+bool InvalidEnumCaseRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::expr_keypath_enum_case, getName(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
 bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
   emitDiagnostic(diag::expr_keypath_mutating_getter, getName(),
                  isForKeyPathDynamicMemberLookup());

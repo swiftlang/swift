@@ -36,7 +36,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -2636,16 +2635,6 @@ TypeRefinementContext *SourceFile::getTypeRefinementContext() {
 
 void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
   TRC = Root;
-}
-
-void SourceFile::createReferencedNameTracker() {
-  assert(!RequestReferencedNames && "This file already has a name tracker.");
-  RequestReferencedNames.emplace(ReferencedNameTracker());
-}
-
-const ReferencedNameTracker *
-SourceFile::getConfiguredReferencedNameTracker() const {
-  return getRequestBasedReferencedNameTracker();
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {

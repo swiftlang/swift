@@ -424,7 +424,7 @@ EXPR_NODES = [
                    is_optional=True),
              Child('AdditionalTrailingClosures',
                    kind='MultipleTrailingClosureElementList',
-                   collection_element_name='AdditionalTralingClosure',
+                   collection_element_name='AdditionalTrailingClosure',
                    is_optional=True),
          ]),
 
@@ -440,7 +440,7 @@ EXPR_NODES = [
                    is_optional=True),
              Child('AdditionalTrailingClosures',
                    kind='MultipleTrailingClosureElementList',
-                   collection_element_name='AdditionalTralingClosure',
+                   collection_element_name='AdditionalTrailingClosure',
                    is_optional=True),
          ]),
 

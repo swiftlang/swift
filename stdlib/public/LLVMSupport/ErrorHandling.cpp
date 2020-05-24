@@ -44,7 +44,7 @@ void error(const char *fmt, ...) {
 #if defined(__APPLE__)
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", buffer);
 #elif defined(__ANDROID__)
-  __android_log_printf(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", buffer);
+  __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", buffer);
 #elif defined(_WIN32)
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, buffer, strlen(buffer));

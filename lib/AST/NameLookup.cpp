@@ -27,7 +27,6 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceManager.h"
@@ -1309,7 +1308,7 @@ void ClassDecl::createObjCMethodLookup() {
   });
 }
 
-MutableArrayRef<AbstractFunctionDecl *>
+TinyPtrVector<AbstractFunctionDecl *>
 ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   if (!ObjCMethodLookup) {
     createObjCMethodLookup();
@@ -1325,7 +1324,7 @@ ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
     stored.Generation = ctx.getCurrentGeneration();
   }
 
-  return { stored.Methods.begin(), stored.Methods.end() };
+  return stored.Methods;
 }
 
 void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
