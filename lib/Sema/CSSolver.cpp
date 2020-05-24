@@ -991,13 +991,8 @@ void ConstraintSystem::shrink(Expr *expr) {
           auto typeRepr = castTypeLoc.getTypeRepr();
 
           if (typeRepr && isSuitableCollection(typeRepr)) {
-            // Clone representative to avoid modifying in-place,
-            // FIXME: We should try and silently resolve the type here,
-            // instead of cloning representative.
-            auto coercionRepr = typeRepr->clone(CS.getASTContext());
-            // Let's try to resolve coercion type from cloned representative.
             auto resolution = TypeResolution::forContextual(CS.DC, None);
-            auto coercionType = resolution.resolveType(coercionRepr);
+            auto coercionType = resolution.resolveType(typeRepr);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
             if (coercionType->hasError())
