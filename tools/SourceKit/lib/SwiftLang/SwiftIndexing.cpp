@@ -134,6 +134,13 @@ private:
     if (!isRef) {
       uidAttrs = getDeclAttributeUIDs(symbol.decl);
       info.Attrs = uidAttrs;
+      if (auto *VD = dyn_cast<ValueDecl>(symbol.decl)) {
+        if (symbol.symInfo.Kind != SymbolKind::Extension) {
+          AccessScope accessScope = VD->getFormalAccessScope();
+          UIdent AttrUID = SwiftLangSupport::getUIDForFormalAccessScope(accessScope);
+          info.EffectiveAccessLevel = AttrUID;
+        }
+      }
     }
     return func(info);
   }
