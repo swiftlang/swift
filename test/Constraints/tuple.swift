@@ -318,3 +318,13 @@ struct DupLabelSubscript {
 
 let dupLabelSubscriptStruct = DupLabelSubscript()
 let _ = dupLabelSubscriptStruct[foo: 5, foo: 5] // ok
+
+// SR-12869
+
+var dict: [String: (Int, Int)] = [:]
+let bignum: Int64 = 1337
+dict["test"] = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
+// expected-error@-1 {{cannot assign value of type '(Int64, Int)' to subscript of type '(Int, Int)'}}
+
+var tuple: (Int, Int)
+tuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
