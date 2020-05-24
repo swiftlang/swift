@@ -1189,6 +1189,9 @@ WARNING(trailing_closure_after_newlines,none,
 NOTE(trailing_closure_callee_here,none,
      "callee is here", ())
 
+ERROR(double_trailing_closure,none,
+    "double trailing closures", ())
+
 ERROR(string_literal_no_atsign,none,
       "string literals in Swift are not preceded by an '@' sign", ())
 

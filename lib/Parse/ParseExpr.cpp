@@ -1225,7 +1225,33 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (trailingClosures.empty())
         return nullptr;
 
+      // We are creating a call node
+      // with trailing closure
+      // if we are already in a call node with trailing closure we should diagnose
+      // (call_expr
+      //  (call_expr
+      //    (paren_expr trailing-closure))
+      //  (paren_expr trailing-closure))
+      // this catches one problem
+      // let q1 = bar()
+      // {7 * $0}
+      // {5 * $0}
+      // but not the problem where the paren after bar() is
+      //   after the first closure (with 7) instead
+      //  TODO: is there any legitimate case for that parse?
+      
       // Trailing closure implicitly forms a call.
+      
+      if (!trailingClosures.empty()
+          && Result.get()->getKind() == ExprKind::Call) {
+        auto call = static_cast<CallExpr*>(Result.get());
+        if (call->hasTrailingClosure()) {
+          //diagnose and return bad result
+          diagnose(trailingClosures[0].ClosureExpr->getEndLoc(), diag::double_trailing_closure);
+          break;
+        }
+      }
+
       Result = makeParserResult(
           ParserStatus(Result) | trailingResult,
           CallExpr::create(Context, Result.get(), SourceLoc(), {}, {}, {},
@@ -1233,6 +1259,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
                            /*implicit=*/false));
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
 
+      // I think this is intended to handle the double-trailing-closures condition but does not catch it.
       // We only allow a single trailing closure on a call.  This could be
       // generalized in the future, but needs further design.
       if (Tok.is(tok::l_brace))
@@ -1599,6 +1626,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       return makeParserErrorResult(new (Context) ErrorExpr(DotLoc));
     SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
+//     () suffix
     // Check for a () suffix, which indicates a call when constructing
     // this member.  Note that this cannot be the start of a new line.
     if (Tok.isFollowingLParen()) {
@@ -3448,7 +3476,24 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
                                       trailingClosures,
                                       SyntaxKind::TupleExprElementList);
 
+  // check for the pattern:
+  //    let q2 =
+  //      bar {7 * $0} ()
+  //      {5 * $0}
+  //  with the () after the first trailing closure
+  
   // Form the call.
+  
+  if (!trailingClosures.empty()
+        && fn.get()->getKind() == ExprKind::Call) {
+      auto call = static_cast<CallExpr*>(fn.get());
+      if (call->hasTrailingClosure()) {
+        diagnose(trailingClosures[0].ClosureExpr->getEndLoc(), diag::double_trailing_closure);
+        // return nullptr or error here?
+        return nullptr;
+      }
+  }
+  
   return makeParserResult(status | fn,
                           CallExpr::create(Context, fn.get(), lParenLoc, args,
                                            argLabels, argLabelLocs, rParenLoc,
