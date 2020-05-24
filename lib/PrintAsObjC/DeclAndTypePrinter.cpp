@@ -116,7 +116,7 @@ public:
     : os(out), owningPrinter(owner) {}
 
   void print(const Decl *D) {
-    PrettyStackTraceDecl trace("printing", D);
+    PrettyStackTraceDecl trace("printing declaration of", D);
     ASTVisitor::visit(const_cast<Decl *>(D));
   }
 
@@ -1557,9 +1557,31 @@ private:
 
   void visitType(TypeBase *Ty, Optional<OptionalTypeKind> optionalKind) {
     assert(Ty->getDesugaredType() == Ty && "unhandled sugared type");
-    os << "/* ";
-    Ty->print(os);
-    os << " */";
+
+    // If we get here, we are being asked to print a type we don't understand.
+    // This means an invariant has been broken: we should only be trying to
+    // print declarations which `isObjC()`, and `isObjC()` declarations should
+    // only involve types we know how to print, and yet here we are printing a
+    // declaration with a type we don't know how to print.
+
+    llvm::errs() <<
+      "INTERNAL ERROR: Don't know how to print a use of this type in an\n"
+      "Objective-C header: '";
+    Ty->print(llvm::errs());
+
+    llvm::errs() << "'\n\nType dump:\n";
+    Ty->dump(llvm::errs(), /*indent=*/2);
+
+    llvm::errs() << "\n" <<
+      "Please file a bug report against the Swift compiler; include the full\n"
+      "compiler output starting with this message and a copy of your project.\n"
+      "If you can't share your project with us, at least include the\n"
+      "declarations of the members and types (including their extensions)\n"
+      "mentioned in the 'While printing' lines in the stack dump below. You\n"
+      "can replace the bodies of functions, accessors, initializers, and\n"
+      "deinitializers with calls to 'fatalError()'.\n\n";
+
+    abort();
   }
 
   bool isClangPointerType(const clang::TypeDecl *clangTypeDecl) const {
@@ -2022,7 +2044,7 @@ public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind,
              Identifier name = Identifier(),
              IsFunctionParam_t isFuncParam = IsNotFunctionParam) {
-    PrettyStackTraceType trace(getASTContext(), "printing", ty);
+    PrettyStackTraceType trace(getASTContext(), "printing use of", ty);
 
     if (isFuncParam)
       if (auto fnTy = ty->lookThroughAllOptionalTypes()
