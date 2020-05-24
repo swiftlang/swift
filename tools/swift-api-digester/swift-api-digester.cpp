@@ -1216,7 +1216,9 @@ public:
       if (!Ctx.checkingABI()) {
         if (auto *Var = dyn_cast<SDKNodeDeclVar>(Right)) {
           if (Var->getDeclKind() == DeclKind::EnumElement) {
-            Var->emitDiag(Var->getLoc(), diag::enum_case_added);
+            if (Var->getParent()->getAs<SDKNodeDeclType>()->isEnumExhaustive()) {
+              Var->emitDiag(Var->getLoc(), diag::enum_case_added);
+            }
           }
         }
       }
