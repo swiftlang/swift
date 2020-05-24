@@ -3367,8 +3367,7 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(
             IgnoreAssignmentDestinationType::create(*this, lhs, rhs, loc));
       } else {
-        conversionsOrFixes.push_back(
-            TreatRValueAsLValue::create(*this, loc));
+        conversionsOrFixes.push_back(TreatRValueAsLValue::create(*this, loc));
       }
 
       return true;
@@ -8876,11 +8875,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       // tuple mismatch.
       if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
         return true;
-      
+
       if (restriction == ConversionRestrictionKind::ValueToOptional ||
           restriction == ConversionRestrictionKind::OptionalToOptional)
         ++impact;
-      
+
       auto *fix =
           loc->isLastElement<LocatorPathElt::ApplyArgToParam>()
               ? AllowArgumentMismatch::create(*this, fromType, toType, loc)

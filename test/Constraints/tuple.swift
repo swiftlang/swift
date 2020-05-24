@@ -323,8 +323,15 @@ let _ = dupLabelSubscriptStruct[foo: 5, foo: 5] // ok
 
 var dict: [String: (Int, Int)] = [:]
 let bignum: Int64 = 1337
-dict["test"] = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
-// expected-error@-1 {{cannot assign value of type '(Int64, Int)' to subscript of type '(Int, Int)'}}
+dict["test"] = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to subscript of type '(Int, Int)'}}
 
 var tuple: (Int, Int)
 tuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
+
+var optionalTuple: (Int, Int)?
+var optionalTuple2: (Int64, Int)? = (bignum, 1) 
+var optionalTuple3: (UInt64, Int)? = (bignum, 1) // expected-error {{cannot convert value of type '(Int64, Int)' to specified type '(UInt64, Int)?'}}
+
+optionalTuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
+// Optional to Optional
+optionalTuple = optionalTuple2 // expected-error {{cannot assign value of type '(Int64, Int)?' to type '(Int, Int)?'}}
