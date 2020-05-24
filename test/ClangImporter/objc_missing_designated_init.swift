@@ -3,28 +3,66 @@
 import UnimportableMembers
 import UnimportableMembersUser
 
-class IncompleteInitSubclassImplicit : IncompleteDesignatedInitializers { // expected-note 6 {{incorrect labels for candidate}}
+class IncompleteInitSubclassImplicit : IncompleteDesignatedInitializers {
+  // expected-note@-1 {{incorrect label for candidate (have: 'missing:', expected: 'first:')}}
+  // expected-note@-2 {{incorrect label for candidate (have: 'missing:', expected: 'second:')}}
+  // expected-note@-3 {{incorrect label for candidate (have: 'conveniently:', expected: 'first:')}}
+  // expected-note@-4 {{incorrect label for candidate (have: 'conveniently:', expected: 'second:')}}
+  // expected-note@-5 {{incorrect label for candidate (have: 'category:', expected: 'first:')}}
+  // expected-note@-6 {{incorrect label for candidate (have: 'category:', expected: 'second:')}}
   var myOneNewMember = 1
 }
 
 class IncompleteInitSubclass : IncompleteDesignatedInitializers {
-  override init(first: Int) {}  // expected-note 3 {{incorrect labels for candidate}}
-  override init(second: Int) {} // expected-note 3 {{incorrect labels for candidate}}
+  override init(first: Int) {}
+  // expected-note@-1 {{incorrect label for candidate (have: 'missing:', expected: 'first:')}}
+  // expected-note@-2 {{incorrect label for candidate (have: 'conveniently:', expected: 'first:')}}
+  // expected-note@-3 {{incorrect label for candidate (have: 'category:', expected: 'first:')}}
+  override init(second: Int) {}
+  // expected-note@-1 {{incorrect label for candidate (have: 'missing:', expected: 'second:')}}
+  // expected-note@-2 {{incorrect label for candidate (have: 'conveniently:', expected: 'second:')}}
+  // expected-note@-3 {{incorrect label for candidate (have: 'category:', expected: 'second:')}}
 }
 
-class IncompleteConvenienceInitSubclass : IncompleteConvenienceInitializers {} // expected-note 2 {{incorrect labels for candidate}}
+class IncompleteConvenienceInitSubclass : IncompleteConvenienceInitializers {}
+// expected-note@-1 {{incorrect label for candidate (have: 'missing:', expected: 'first:')}}
+// expected-note@-2 {{incorrect label for candidate (have: 'missing:', expected: 'second:')}}
 
-class IncompleteUnknownInitSubclass : IncompleteUnknownInitializers {} // expected-note 4 {{incorrect labels for candidate}}
+class IncompleteUnknownInitSubclass : IncompleteUnknownInitializers {}
+// expected-note@-1 {{incorrect label for candidate (have: 'missing:', expected: 'first:')}}
+// expected-note@-2 {{incorrect label for candidate (have: 'missing:', expected: 'second:')}}
+// expected-note@-3 {{incorrect label for candidate (have: 'missing:', expected: 'conveniently:')}}
+// expected-note@-4 {{incorrect label for candidate (have: 'missing:', expected: 'category:')}}
 
-class IncompleteInitCategorySubclassImplicit : IncompleteDesignatedInitializersWithCategory {} // expected-note 6 {{incorrect labels for candidate}}
+class IncompleteInitCategorySubclassImplicit : IncompleteDesignatedInitializersWithCategory {}
+// expected-note@-1 {{incorrect label for candidate (have: 'missing:', expected: 'first:')}}
+// expected-note@-2 {{incorrect label for candidate (have: 'missing:', expected: 'second:')}}
+// expected-note@-3 {{incorrect label for candidate (have: 'conveniently:', expected: 'first:')}}
+// expected-note@-4 {{incorrect label for candidate (have: 'conveniently:', expected: 'second:')}}
+// expected-note@-5 {{incorrect label for candidate (have: 'category:', expected: 'first:')}}
+// expected-note@-6 {{incorrect label for candidate (have: 'category:', expected: 'second:')}}
 
 class IncompleteInitCategorySubclass : IncompleteDesignatedInitializersWithCategory {
-  override init(first: Int) {}  // expected-note 3 {{incorrect labels for candidate}}
-  override init(second: Int) {} // expected-note 3 {{incorrect labels for candidate}}
+  override init(first: Int) {}
+  // expected-note@-1 {{incorrect label for candidate (have: 'missing:', expected: 'first:')}}
+  // expected-note@-2 {{incorrect label for candidate (have: 'conveniently:', expected: 'first:')}}
+  // expected-note@-3 {{incorrect label for candidate (have: 'category:', expected: 'first:')}}
+  override init(second: Int) {}
+  // expected-note@-1 {{incorrect label for candidate (have: 'missing:', expected: 'second:')}}
+  // expected-note@-2 {{incorrect label for candidate (have: 'conveniently:', expected: 'second:')}}
+  // expected-note@-3 {{incorrect label for candidate (have: 'category:', expected: 'second:')}}
 }
 
-class DesignatedInitializerInAnotherModuleSubclass : DesignatedInitializerInAnotherModule {} // expected-note 9 {{incorrect labels for candidate}}
-
+class DesignatedInitializerInAnotherModuleSubclass : DesignatedInitializerInAnotherModule {}
+// expected-note@-1 {{incorrect label for candidate (have: 'missing:', expected: 'first:')}}
+// expected-note@-2 {{incorrect label for candidate (have: 'missing:', expected: 'second:')}}
+// expected-note@-3 {{incorrect label for candidate (have: 'missing:', expected: 'fromOtherModule:')}}
+// expected-note@-4 {{incorrect label for candidate (have: 'conveniently:', expected: 'first:')}}
+// expected-note@-5 {{incorrect label for candidate (have: 'conveniently:', expected: 'second:')}}
+// expected-note@-6 {{incorrect label for candidate (have: 'conveniently:', expected: 'fromOtherModule:')}}
+// expected-note@-7 {{incorrect label for candidate (have: 'category:', expected: 'first:')}}
+// expected-note@-8 {{incorrect label for candidate (have: 'category:', expected: 'second:')}}
+// expected-note@-9 {{incorrect label for candidate (have: 'category:', expected: 'fromOtherModule:')}}
 
 func testBaseClassesBehaveAsExpected() {
   _ = IncompleteDesignatedInitializers(first: 0) // okay

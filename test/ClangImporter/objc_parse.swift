@@ -200,7 +200,7 @@ func testProtocols(_ b: B, bp: BProto) {
   var bp2 : BProto = b
   var b2 : B = bp // expected-error{{cannot convert value of type 'BProto' to specified type 'B'}}
   bp.method(1, with: 2.5 as Float)
-  bp.method(1, withFoo: 2.5) // expected-error{{incorrect argument label in call (have '_:withFoo:', expected '_:with:')}}
+  bp.method(1, withFoo: 2.5) // expected-error{{incorrect argument label in call (have 'withFoo:', expected 'with:')}}
   bp2 = b.getAsProto()
 
   var c1 : Cat1Proto = b

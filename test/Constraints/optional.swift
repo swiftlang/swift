@@ -10,8 +10,8 @@ class A {
   @objc(do_b_2:) func do_b(_ x: Int) {}
   @objc func do_b(_ x: Float) {}
 
-  @objc func do_c(x: Int) {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
-  @objc func do_c(y: Int) {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(y:)')}}
+  @objc func do_c(x: Int) {} // expected-note {{missing label for candidate parameter 'x:'}}
+  @objc func do_c(y: Int) {} // expected-note {{missing label for candidate parameter 'y:'}}
 }
 
 func test0(_ a: AnyObject) {

@@ -854,8 +854,8 @@ func sr11562() {
   _ = \S1.[5] // expected-error {{missing argument label 'x:' in call}} {{12-12=x: }}
 
   struct S2 {
-    subscript(x x: Int) -> Int { x } // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
-    subscript(y y: Int) -> Int { y } // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(y:)')}}
+    subscript(x x: Int) -> Int { x } // expected-note {{missing label for candidate parameter 'x:'}}
+    subscript(y y: Int) -> Int { y } // expected-note {{missing label for candidate parameter 'y:'}}
   }
 
   _ = \S2.[5] // expected-error {{no exact matches in call to subscript}}

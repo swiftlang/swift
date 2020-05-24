@@ -25,43 +25,43 @@ func test0Fixits() {
 }
 
 func test1Fixits() {
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}}
 
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}} {{15-15=aa: }}
 
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}} {{15-15=xx: }}
 
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}} {{15-18=xx}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}} {{15-15=aa: }} {{15-15=xx: }}
 
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{15-18=aa}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}} {{15-15=xx: }} {{15-15=aa: }}
 
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{none}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}} {{none}}
 
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}} {{none}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}} {{15-15=aa: }} {{none}}
 
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{none}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}} {{15-15=xx: }} {{none}}
 
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=aa}} {{15-18=xx}} {{none}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}} {{15-15=aa: }} {{15-15=xx: }} {{none}}
 
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{15-18=aa}} {{none}}
+  labeledFunc(0, bb: 1) // expected-error {{missing argument label 'aa:' in call}} {{15-15=xx: }} {{15-15=aa: }} {{none}}
 }
 
 func test2Fixits() {
-  labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}}
+  labeledFunc(0, 1) // expected-error {{missing argument labels 'aa:bb:' in call}}
 
-  labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}}
+  labeledFunc(0, 1) // expected-error {{missing argument labels 'aa:bb:' in call}} {{15-15=aa: }}
 
-  labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=xx}}
+  labeledFunc(0, 1) // expected-error {{missing argument labels 'aa:bb:' in call}} {{15-15=xx: }}
 
-  labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=bb}}
+  labeledFunc(0, 1) // expected-error {{missing argument labels 'aa:bb:' in call}} {{15-15=aa: }} {{18-18=bb: }}
 
-  labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=xx}}
+  labeledFunc(0, 1) // expected-error {{missing argument labels 'aa:bb:' in call}} {{15-15=aa: }} {{18-18=xx: }}
 
-  labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{none}}
+  labeledFunc(0, 1) // expected-error {{missing argument labels 'aa:bb:' in call}} {{none}}
 
-  labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{none}}
+  labeledFunc(0, 1) // expected-error {{missing argument labels 'aa:bb:' in call}} {{15-15=aa: }} {{none}}
 
-  labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=bb}} {{none}}
+  labeledFunc(0, 1) // expected-error {{missing argument labels 'aa:bb:' in call}} {{15-15=aa: }} {{18-18=bb: }} {{none}}
 
-  labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=xx}} {{none}}
+  labeledFunc(0, 1) // expected-error {{missing argument labels 'aa:bb:' in call}} {{15-15=aa: }} {{18-18=xx: }} {{none}}
 }

@@ -6,8 +6,8 @@ class A {
   func do_b(_ x: Int) {}
   func do_b(_ x: Float) {}
 
-  func do_c(x: Int) {} // expected-note 2 {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
-  func do_c(y: Int) {} // expected-note 2 {{incorrect labels for candidate (have: '(_:)', expected: '(y:)')}}
+  func do_c(x: Int) {} // expected-note 2 {{missing label for candidate parameter 'x:'}}
+  func do_c(y: Int) {} // expected-note 2 {{missing label for candidate parameter 'y:'}}
 }
 
 func test0(_ a : A!) {

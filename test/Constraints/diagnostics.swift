@@ -398,9 +398,9 @@ enum Color {
 
   static func rainbow() -> Color {}
   
-  static func overload(a : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
+  static func overload(a : Int) -> Color {} // expected-note {{missing label for candidate parameter 'a:'}}
   // expected-note@-1 {{candidate has partially matching parameter list (a: Int)}}
-  static func overload(b : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
+  static func overload(b : Int) -> Color {} // expected-note {{missing label for candidate parameter 'b:'}}
   // expected-note@-1 {{candidate has partially matching parameter list (b: Int)}}
   
   static func frob(_ a : Int, b : inout Int) -> Color {}
