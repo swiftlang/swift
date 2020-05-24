@@ -23,7 +23,7 @@
         "swift-corelibs-xctest": {
             "remote": { "id": "apple/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
-            "remote": { "id": "apple/swift-corelibs-foundation" } },
+            "remote": { "id": "swiftwasm/swift-corelibs-foundation" } },
         "swift-corelibs-libdispatch": {
             "remote": { "id": "apple/swift-corelibs-libdispatch" } },
         "swift-integration-tests": {
@@ -72,7 +72,7 @@
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
                 "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
+                "swift-corelibs-foundation": "swiftwasm",
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
