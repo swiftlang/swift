@@ -3356,13 +3356,19 @@ bool ConstraintSystem::repairFailures(
       // related to immutability, otherwise it's a type mismatch.
       auto result = matchTypes(lhs, rhs, ConstraintKind::Conversion,
                                TMF_ApplyingFix, locator);
-
+      
+      auto *loc = getConstraintLocator(locator);
       if (getType(destExpr)->is<LValueType>() || result.isFailure()) {
-        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
-            *this, lhs, rhs, getConstraintLocator(locator)));
+        // Let this asignment failure be diagnosed by the AllowTupleTypeMismatch
+        // fix already recorded.
+        if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
+          return true;
+
+        conversionsOrFixes.push_back(
+            IgnoreAssignmentDestinationType::create(*this, lhs, rhs, loc));
       } else {
         conversionsOrFixes.push_back(
-            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+            TreatRValueAsLValue::create(*this, loc));
       }
 
       return true;
@@ -8865,11 +8871,16 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                 CoerceToCheckedCast::attempt(*this, fromType, toType, loc))
           return !recordFix(fix, impact);
       }
-
+      
+      // We already have a fix for this locator indicating a
+      // tuple mismatch.
+      if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
+        return true;
+      
       if (restriction == ConversionRestrictionKind::ValueToOptional ||
           restriction == ConversionRestrictionKind::OptionalToOptional)
         ++impact;
-
+      
       auto *fix =
           loc->isLastElement<LocatorPathElt::ApplyArgToParam>()
               ? AllowArgumentMismatch::create(*this, fromType, toType, loc)
