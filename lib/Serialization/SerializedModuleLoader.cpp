@@ -563,7 +563,9 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
             // Apple platforms always use target-specific files within a
             // .swiftmodule directory for the stdlib; non-Apple platforms
             // always use single-architecture swiftmodules.
-            checkTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
+            auto result = findTargetSpecificModuleFiles();
+            if (Ctx.LangOpts.Target.isOSDarwin() || result)
+              return result;
           } else {
             auto modulePath = currPath;
             llvm::sys::path::append(modulePath, genericModuleFileName);
