@@ -41,3 +41,20 @@ public func createHasVirtualBase() -> HasVirtualBase {
   // MICROSOFT_X64: call %struct.HasVirtualBase* @"??0HasVirtualBase@@QEAA@UArgType@@@Z"(%struct.HasVirtualBase* %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 1)
   return HasVirtualBase(ArgType())
 }
+
+public func createImplicitDefaultConstructor() -> ImplicitDefaultConstructor {
+  // ITANIUM_X64: define swiftcc i32 @"$ss32createImplicitDefaultConstructorSo0bcD0VyF"()
+  // ITANIUM_X64-NOT: define
+  // ITANIUM_X64: call void @_ZN26ImplicitDefaultConstructorC1Ev(%struct.ImplicitDefaultConstructor* noalias %{{[0-9]+}})
+  //
+  // ITANIUM_ARM: define protected swiftcc i32 @"$ss32createImplicitDefaultConstructorSo0bcD0VyF"()
+  // ITANIUM_ARM-NOT: define
+  // Note `this` return type.
+  // ITANIUM_ARM: call %struct.ImplicitDefaultConstructor* @_ZN26ImplicitDefaultConstructorC2Ev(%struct.ImplicitDefaultConstructor* %{{[0-9]+}})
+  //
+  // MICROSOFT_X64: define dllexport swiftcc i32 @"$ss32createImplicitDefaultConstructorSo0bcD0VyF"()
+  // MICROSOFT_X64-NOT: define
+  // Note `this` return type but no implicit "most derived" argument.
+  // MICROSOFT_X64: call %struct.ImplicitDefaultConstructor* @"??0ImplicitDefaultConstructor@@QEAA@XZ"(%struct.ImplicitDefaultConstructor* %{{[0-9]+}})
+  return ImplicitDefaultConstructor()
+}
