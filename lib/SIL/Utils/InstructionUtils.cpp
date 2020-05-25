@@ -128,7 +128,8 @@ SILValue swift::stripCastsWithoutMarkDependence(SILValue V) {
 
     auto K = V->getKind();
     if (isRCIdentityPreservingCast(K) ||
-        K == ValueKind::UncheckedTrivialBitCastInst) {
+        K == ValueKind::UncheckedTrivialBitCastInst ||
+        K == ValueKind::EndCOWMutationInst) {
       V = cast<SingleValueInstruction>(V)->getOperand(0);
       continue;
     }
@@ -308,7 +309,8 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
 }
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
-  return isa<IsUniqueInst>(User) || isa<IsEscapingClosureInst>(User);
+  return isa<IsUniqueInst>(User) || isa<IsEscapingClosureInst>(User) ||
+         isa<BeginCOWMutationInst>(User);
 }
 
 bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {

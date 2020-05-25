@@ -2285,6 +2285,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::SelectValueInst:
       analyzeSelectInst(cast<SelectValueInst>(I), ConGraph);
       return;
+    case SILInstructionKind::EndCOWMutationInst:
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
     case SILInstructionKind::EnumInst: {

@@ -699,6 +699,7 @@ static bool isZeroLoadFromEmptyCollection(LoadInst *LI) {
       case ValueKind::UpcastInst:
       case ValueKind::RawPointerToRefInst:
       case ValueKind::AddressToPointerInst:
+      case ValueKind::EndCOWMutationInst:
         addr = cast<SingleValueInstruction>(addr)->getOperand(0);
         break;
       default:
