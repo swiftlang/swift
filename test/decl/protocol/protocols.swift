@@ -590,3 +590,28 @@ struct SR_11412_S0 {
     c0.foo3 = self // expected-error {{cannot assign value of type 'SR_11412_S0' to type 'SR_11412_P4?'}}
   }
 }
+
+// Classes should not use _ObjectiveCBridgeable //
+
+@objc class BridgeableType {}
+
+final class BridgedType: _ObjectiveCBridgeable { // expected-error {{class 'BridgedType' cannot conform to protocol '_ObjectiveCBridgeable': Objective-C classes should be used directly or bridged to a Swift value type, not a class}}
+  public func _bridgeToObjectiveC() -> BridgeableType {
+      return BridgeableType()
+  }
+
+  public static func _forceBridgeFromObjectiveC(_ input: BridgeableType, result: inout BridgedType?) {
+      result = BridgedType()
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(_ input: BridgeableType, result: inout BridgedType?) -> Bool {
+      result = BridgedType()
+      return true
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(_ source: BridgeableType?) -> BridgedType {
+      var result: BridgedType?
+      _forceBridgeFromObjectiveC(source!, result: &result)
+      return result!
+  }
+}

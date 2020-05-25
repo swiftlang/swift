@@ -1742,13 +1742,27 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     return conformance;
   }
 
-  // If the protocol requires a class, non-classes are a non-starter.
-  if (Proto->requiresClass() && !canT->getClassOrBoundGenericClass()) {
-    C.Diags.diagnose(ComplainLoc,
-                     diag::non_class_cannot_conform_to_class_protocol, T,
-                     ProtoType);
-    conformance->setInvalid();
-    return conformance;
+  if (canT->getClassOrBoundGenericClass()) {
+    // As a one-off rule, classes cannot conform to _ObjectiveCBridgeable, since
+    // they already trivially bridge to Objective-C.
+    auto BridgingProto = C.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
+    if (BridgingProto && Proto == BridgingProto) {
+      C.Diags.diagnose(ComplainLoc,
+                       diag::dont_bridge_objc_classes_to_separate_swift_classes,
+                       T, ProtoType);
+      conformance->setInvalid();
+      return conformance;
+    }
+  }
+  else {
+    // If the protocol requires a class, non-classes are a non-starter.
+    if (Proto->requiresClass()) {
+      C.Diags.diagnose(ComplainLoc,
+                       diag::non_class_cannot_conform_to_class_protocol, T,
+                       ProtoType);
+      conformance->setInvalid();
+      return conformance;
+    }
   }
 
   if (Proto->isObjC()) {
