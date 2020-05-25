@@ -207,10 +207,9 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
   // this declaration. If this declaration is a witness to any
   // requirement within one of those protocols that has a function builder
   // attached, use that function builder type.
-  auto idc = cast<IterableDeclContext>(dc->getAsDecl());
   auto conformances = evaluateOrDefault(
       dc->getASTContext().evaluator,
-      LookupAllConformancesInContextRequest{idc}, { });
+      LookupAllConformancesInContextRequest{dc}, { });
 
   // Find all of the potentially inferred function builder types.
   struct Match {
