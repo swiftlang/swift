@@ -515,6 +515,7 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.addLICM();
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
+  P.addLICM();
   P.addLoopUnroll();
 }
 
