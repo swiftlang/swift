@@ -1355,8 +1355,8 @@ bool SKIndexingConsumer::startSourceEntity(const EntityInfo &Info) {
     }
   }
 
-  if (Info.EffectiveAccessLevel)
-    Elem.set(KeyEffectiveAccessLevel, Info.EffectiveAccessLevel.getValue());
+  if (Info.EffectiveAccess)
+    Elem.set(KeyEffectiveAccess, Info.EffectiveAccess.getValue());
 
   EntitiesStack.push_back({ Info.Kind, Elem, ResponseBuilder::Array(),
                             ResponseBuilder::Array()});

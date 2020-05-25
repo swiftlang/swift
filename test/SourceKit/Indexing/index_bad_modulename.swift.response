@@ -61,16 +61,19 @@
           key.usr: "s:4main1vSo8NSObjectCSgvg",
           key.line: 9,
           key.column: 5,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
           key.usr: "s:4main1vSo8NSObjectCSgvs",
           key.line: 9,
           key.column: 5,
-          key.is_implicit: 1
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     },
     {
       key.kind: source.lang.swift.ref.class,

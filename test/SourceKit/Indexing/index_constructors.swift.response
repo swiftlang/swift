@@ -51,7 +51,8 @@
               key.line: 9,
               key.column: 7,
               key.is_dynamic: 1,
-              key.is_implicit: 1
+              key.is_implicit: 1,
+              key.effective_access: source.decl.effective_access.internal
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -59,9 +60,11 @@
               key.line: 9,
               key.column: 7,
               key.is_dynamic: 1,
-              key.is_implicit: 1
+              key.is_implicit: 1,
+              key.effective_access: source.decl.effective_access.internal
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -77,9 +80,11 @@
             {
               key.attribute: source.decl.attribute.objc
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     }
   ]
 }

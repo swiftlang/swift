@@ -1,71 +1,165 @@
-// RUN: %sourcekitd-test -req=index %s -- -Xfrontend -serialize-diagnostics-path -Xfrontend %t.dia %s | %sed_clean > %t.response
+// RUN: %empty-directory(%t)
+// RUN: %swift -emit-module -o %t/Exported.swiftmodule %S/Inputs/explicit-access/Exported.swift
+// RUN: %swift -emit-module -o %t/Module.swiftmodule %S/Inputs/explicit-access/Module.swift -I %t
+
+// RUN: %sourcekitd-test -req=index %s -- -I %t %s | %sed_clean > %t.response
 // RUN: %diff -u %s.response %t.response
 
-public enum PublicEn {
-    case a
-    case b
+public enum PublicEnum {
+    case publicEnumCase
 }
 
-enum InternalEn {
-    case a
-    case b
+enum InternalEnum {
+    case internalEnumCase
 }
 
-fileprivate enum FilePrivateEn {
-    case a
-    case b
+fileprivate enum FilePrivateEnum {
+    case filePrivateEnumCase
 }
 
-private enum PrivateEn {
-    case a
-    case b
+private enum PrivateEnum {
+    case privateEnumCase
 }
 
-extension PublicEn {
-    public func puFoo() {}
+extension PublicEnum {
+    public func publicMethod() {}
 }
 
-public extension PublicEn {
-    func puFooFromPublicExtension() {}
+public extension PublicEnum {
+    func methodFromPublicExtension() {}
 }
 
-extension InternalEn {
-    func foo() {}
+extension InternalEnum {
+    func internalMethod() {}
 }
 
-extension FilePrivateEn {
-    fileprivate func flPrFoo() {}
+extension FilePrivateEnum {
+    fileprivate func filePrivateMethod() {}
 }
 
-fileprivate extension FilePrivateEn {
-    func flPrFooFromFilePrivateExtension() {}
+fileprivate extension FilePrivateEnum {
+    func methodFromFilePrivateExtension() {}
 }
 
-extension PrivateEn {
-    private func prFoo() {}
+extension PrivateEnum {
+    private func privateMethod() {}
 }
 
-private extension PrivateEn {
-    func prFooFromPrivateExtension() {}
+private extension PrivateEnum {
+    func methodFromPrivateExtension() {}
 }
 
 private struct ScopeReducerStruct {
-    public func a() {}
-    func b() {}
-    fileprivate func c() {}
-    private func d() {}
+    public init(publicInitializer: Int) {}
+    init(internalInitializer: Int) {}
+    fileprivate init(filePrivateInitializer: Int) {}
+    private init(privateInitializer: Int) {}
+
+    public let publicProperty: Int = 0
+    let internalProperty: Int = 0
+    fileprivate let filePrivateProperty: Int = 0
+    private let privateProperty: Int = 0
+    public private(set) var publicPropertyWithPrivateSetter: Int = 0
+
+    public subscript(publicSubscript: Int) -> Int { return 0 }
+    subscript(internalSubscript: Int) -> Int { return 0 }
+    fileprivate subscript(filePrivateSubscript: Int) -> Int { return 0 }
+    private subscript(privateSubscript: Int) -> Int { return 0 }
+
+    public func publicMethod() {}
+    func internalMethod() {}
+    fileprivate func filePrivateMethod() {}
+    private func privateMethod() {}
 }
 
 public struct ScopeKeeperStruct {
-    public func a() {}
-    func b() {}
-    fileprivate func c() {}
-    private func d() {}
+    public init(publicInitializer: Int) {}
+    init(internalInitializer: Int) {}
+    fileprivate init(filePrivateInitializer: Int) {}
+    private init(privateInitializer: Int) {}
+
+    public let publicProperty: Int = 0
+    let internalProperty: Int = 0
+    fileprivate let filePrivateProperty: Int = 0
+    private let privateProperty: Int = 0
+    public private(set) var publicPropertyWithPrivateSetter: Int = 0
+
+    public subscript(publicSubscript: Int) -> Int { return 0 }
+    subscript(internalSubscript: Int) -> Int { return 0 }
+    fileprivate subscript(filePrivateSubscript: Int) -> Int { return 0 }
+    private subscript(privateSubscript: Int) -> Int { return 0 }
+
+    public func publicMethod() {}
+    func internalMethod() {}
+    fileprivate func filePrivateMethod() {}
+    private func privateMethod() {}
 }
 
 struct PartialScopeReducerStruct {
-    public func a() {}
-    func b() {}
-    fileprivate func c() {}
-    private func d() {}
+    public init(publicInitializer: Int) {}
+    init(internalInitializer: Int) {}
+    fileprivate init(filePrivateInitializer: Int) {}
+    private init(privateInitializer: Int) {}
+
+    public let publicProperty: Int = 0
+    let internalProperty: Int = 0
+    fileprivate let filePrivateProperty: Int = 0
+    private let privateProperty: Int = 0
+    public private(set) var publicPropertyWithPrivateSetter: Int = 0
+
+    public subscript(publicSubscript: Int) -> Int { return 0 }
+    subscript(internalSubscript: Int) -> Int { return 0 }
+    fileprivate subscript(filePrivateSubscript: Int) -> Int { return 0 }
+    private subscript(privateSubscript: Int) -> Int { return 0 }
+
+    public func publicMethod() {}
+    func internalMethod() {}
+    fileprivate func filePrivateMethod() {}
+    private func privateMethod() {}
+}
+
+private extension PrivateEnum {
+    private func privateMethodFromPrivateExtension() {}
+}
+
+public protocol PublicProtocol {
+    var member: Int { get set }
+    func method()
+}
+
+protocol InternalProtocol {
+    var member: Int { get set }
+    func method()
+}
+
+fileprivate protocol FilePrivateProtocol {
+    var member: Int { get set }
+    func method()
+}
+
+private protocol PrivateProtocol {
+    var member: Int { get set }
+    func method()
+}
+
+fileprivate struct FilePrivateImplementationOfPublicProtocol: PublicProtocol {
+    fileprivate var member: Int = 0
+    fileprivate func method() {}
+}
+
+open class OpenClass {
+    open var openProperty: Int { return 0 }
+    public var publicProperty: Int { return 0 }
+    var internalProperty: Int { return 0 }
+
+    open func openMethod() {}
+    public func publicMethod() {}
+    func internalMethod() {}
+}
+
+import Module
+
+struct InternalStruct {
+    let propertyReferencingPublicClassFromModule: Module.ModuleClass
+    let propertyReferencingPublicClassFromExportedModule: Exported.ExportedClass
 }

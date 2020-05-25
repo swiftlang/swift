@@ -28,7 +28,8 @@
               key.line: 2,
               key.column: 6,
               key.is_dynamic: 1,
-              key.is_implicit: 1
+              key.is_implicit: 1,
+              key.effective_access: source.decl.effective_access.internal
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -36,9 +37,11 @@
               key.line: 2,
               key.column: 6,
               key.is_dynamic: 1,
-              key.is_implicit: 1
+              key.is_implicit: 1,
+              key.effective_access: source.decl.effective_access.internal
             }
-          ]
+          ],
+          key.effective_access: source.decl.effective_access.internal
         },
         {
           key.kind: source.lang.swift.ref.class,
@@ -47,7 +50,8 @@
           key.line: 2,
           key.column: 9
         }
-      ]
+      ],
+      key.effective_access: source.decl.effective_access.internal
     }
   ]
 }

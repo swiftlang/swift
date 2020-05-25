@@ -51,7 +51,7 @@ struct EntityInfo {
   unsigned Line = 0;
   unsigned Column = 0;
   ArrayRef<UIdent> Attrs;
-  Optional<UIdent> EffectiveAccessLevel;
+  Optional<UIdent> EffectiveAccess;
 
   EntityInfo() = default;
 };

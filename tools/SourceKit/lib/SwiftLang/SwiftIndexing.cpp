@@ -138,7 +138,7 @@ private:
         if (symbol.symInfo.Kind != SymbolKind::Extension) {
           AccessScope accessScope = VD->getFormalAccessScope();
           UIdent AttrUID = SwiftLangSupport::getUIDForFormalAccessScope(accessScope);
-          info.EffectiveAccessLevel = AttrUID;
+          info.EffectiveAccess = AttrUID;
         }
       }
     }

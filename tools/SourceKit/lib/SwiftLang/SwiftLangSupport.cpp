@@ -819,8 +819,10 @@ UIdent SwiftLangSupport::getUIDForFormalAccessScope(const swift::AccessScope Sco
     return EffectiveAccess_Internal;
   } else if (Scope.isFileScope()) {
     return EffectiveAccess_FilePrivate;
-  } else {
+  } else if (Scope.isPrivate()) {
     return EffectiveAccess_LessThanFilePrivate;
+  } else {
+    llvm_unreachable("Unsupported access scope");
   }
 }
 
