@@ -1187,6 +1187,7 @@ public:
 
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
+  ManagedValue emitUninitializedArrayFinalization(SILLocation loc, SILValue array);
 
   /// Emit a cleanup for an owned value that should be written back at end of
   /// scope if the value is not forwarded.

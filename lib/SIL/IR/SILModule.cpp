@@ -355,6 +355,7 @@ bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
 
 SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   assert((Linkage == SILLinkage::Public ||
+          Linkage == SILLinkage::SharedExternal ||
           Linkage == SILLinkage::PublicExternal) &&
          "Only a lookup of public functions is supported currently");
 
@@ -405,6 +406,9 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   // compilation, simply convert it into an external declaration,
   // so that a compiled version from the shared library is used.
   if (F->isDefinition() &&
+      // Don't eliminate bodies of _alwaysEmitIntoClient functions
+      // (PublicNonABI linkage is de-serialized as SharedExternal)
+      F->getLinkage() != SILLinkage::SharedExternal &&
       !F->getModule().getOptions().shouldOptimize()) {
     F->convertToDeclaration();
   }
