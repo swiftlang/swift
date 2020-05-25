@@ -412,7 +412,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 
     // Lifetime endpoints that don't allow the address to escape.
     if (isa<RefCountingInst>(User) ||
-        isa<DebugValueInst>(User)) {
+        isa<DebugValueInst>(User) ||
+        isa<FixLifetimeInst>(User)) {
       AllUsers.insert(User);
       continue;
     }

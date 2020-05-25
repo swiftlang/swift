@@ -43,6 +43,7 @@ bb0:
   %12 = struct_extract %11 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
   %f = function_ref @finalize : $@convention(thin) (@owned Array<Int>) -> @owned Array<Int>
   %a = apply %f(%10) : $@convention(thin) (@owned Array<Int>) -> @owned Array<Int>
+  fix_lifetime %a : $Array<Int>
   %13 = struct_extract %a : $Array<Int>, #Array._buffer
   %14 = struct_extract %13 : $_ArrayBuffer<Int>, #_ArrayBuffer._storage
   %15 = struct_extract %14 : $_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
