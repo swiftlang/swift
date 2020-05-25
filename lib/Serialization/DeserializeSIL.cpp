@@ -666,7 +666,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // Mark this function as deserialized. This avoids rerunning diagnostic
   // passes. Certain passes in the madatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
-  if (!MF->IsSIB)
+  if (!MF->isSIB())
     fn->setWasDeserializedCanonical();
 
   fn->setBare(IsBare);
