@@ -24,6 +24,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/TypeID.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
@@ -47,6 +48,21 @@ using llvm::None;
 class DiagnosticEngine;
 class Evaluator;
 class UnifiedStatsReporter;
+
+namespace detail {
+// Remove this when the compiler bumps to C++17.
+template <typename...> using void_t = void;
+
+template<typename T, typename = void_t<>>
+struct TupleHasDenseMapInfo {};
+
+template <typename... Ts>
+struct TupleHasDenseMapInfo<
+    std::tuple<Ts...>,
+    void_t<decltype(llvm::DenseMapInfo<Ts>::getEmptyKey)...>> {
+  using type = void_t<>;
+};
+}
 
 /// An "abstract" request function pointer, which is the storage type
 /// used for each of the
@@ -118,6 +134,215 @@ evaluateOrDefault(
 template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request) { }
+
+namespace {
+template<typename Request, typename = detail::void_t<>>
+class RequestKey {
+  friend struct llvm::DenseMapInfo<RequestKey>;
+  union {
+    char Empty;
+    Request Req;
+  };
+
+  enum class StorageKind : uint8_t {
+    Normal, Empty, Tombstone
+  };
+  StorageKind Kind;
+
+  static RequestKey getEmpty() {
+    return RequestKey(StorageKind::Empty);
+  }
+  static RequestKey getTombstone() {
+    return RequestKey(StorageKind::Tombstone);
+  }
+
+  RequestKey(StorageKind kind) : Empty(), Kind(kind) {
+    assert(kind != StorageKind::Normal);
+  }
+
+public:
+  explicit RequestKey(Request req)
+      : Req(std::move(req)), Kind(StorageKind::Normal) {}
+
+  RequestKey(const RequestKey &other) : Empty(), Kind(other.Kind) {
+    if (Kind == StorageKind::Normal)
+      new (&Req) Request(other.Req);
+  }
+  RequestKey(RequestKey &&other) : Empty(), Kind(other.Kind) {
+    if (Kind == StorageKind::Normal)
+      new (&Req) Request(std::move(other.Req));
+  }
+  RequestKey &operator=(const RequestKey &other) {
+    if (&other != this) {
+      this->~RequestKey();
+      new (this) RequestKey(other);
+    }
+    return *this;
+  }
+  RequestKey &operator=(RequestKey &&other) {
+    if (&other != this) {
+      this->~RequestKey();
+      new (this) RequestKey(std::move(other));
+    }
+    return *this;
+  }
+
+  ~RequestKey() {
+    if (Kind == StorageKind::Normal)
+      Req.~Request();
+  }
+
+  bool isStorageEqual(const Request &req) const {
+    if (Kind != StorageKind::Normal)
+      return false;
+    return Req == req;
+  }
+  friend bool operator==(const RequestKey &lhs, const RequestKey &rhs) {
+    if (lhs.Kind == StorageKind::Normal && rhs.Kind == StorageKind::Normal) {
+      return lhs.Req == rhs.Req;
+    } else {
+      return lhs.Kind == rhs.Kind;
+    }
+  }
+  friend bool operator!=(const RequestKey &lhs, const RequestKey &rhs) {
+    return !(lhs == rhs);
+  }
+  friend llvm::hash_code hash_value(const RequestKey &key) {
+    if (key.Kind != StorageKind::Normal)
+      return 1;
+    return hash_value(key.Req);
+  }
+};
+
+template <typename Request>
+class RequestKey<Request, typename detail::TupleHasDenseMapInfo<
+                              typename Request::Storage>::type> {
+  friend struct llvm::DenseMapInfo<RequestKey>;
+  using Info = llvm::DenseMapInfo<typename Request::Storage>;
+
+  Request Req;
+
+  static RequestKey getEmpty() {
+    return RequestKey(Request(Info::getEmptyKey()));
+  }
+  static RequestKey getTombstone() {
+    return RequestKey(Request(Info::getTombstoneKey()));
+  }
+
+public:
+  explicit RequestKey(Request req) : Req(std::move(req)) {}
+
+  bool isStorageEqual(const Request &req) const {
+    return Req == req;
+  }
+  friend bool operator==(const RequestKey &lhs, const RequestKey &rhs) {
+    return lhs.Req == rhs.Req;
+  }
+  friend bool operator!=(const RequestKey &lhs, const RequestKey &rhs) {
+    return !(lhs == rhs);
+  }
+  friend llvm::hash_code hash_value(const RequestKey &key) {
+    return hash_value(key.Req);
+  }
+};
+
+class PerRequestCache {
+  void *Storage;
+  std::function<void(void *)> Deleter;
+
+  PerRequestCache(void *storage, std::function<void(void *)> deleter)
+      : Storage(storage), Deleter(deleter) {}
+
+public:
+  PerRequestCache() : Storage(nullptr), Deleter([](void *) {}) {}
+
+  PerRequestCache(PerRequestCache &&other)
+      : Storage(other.Storage), Deleter(std::move(other.Deleter)) {
+    other.Storage = nullptr;
+  }
+  PerRequestCache &operator=(PerRequestCache &&other) {
+    if (&other != this) {
+      this->~PerRequestCache();
+      new (this) PerRequestCache(std::move(other));
+    }
+    return *this;
+  }
+
+  PerRequestCache(const PerRequestCache &) = delete;
+  PerRequestCache &operator=(const PerRequestCache &) = delete;
+
+  template <typename Request>
+  static PerRequestCache makeEmpty() {
+    using Map =
+        llvm::DenseMap<RequestKey<Request>, typename Request::OutputType>;
+    return PerRequestCache(new Map(),
+                           [](void *ptr) { delete static_cast<Map *>(ptr); });
+  }
+
+  template <typename Request>
+  llvm::DenseMap<RequestKey<Request>, typename Request::OutputType> *
+  get() const {
+    using Map =
+        llvm::DenseMap<RequestKey<Request>, typename Request::OutputType>;
+    assert(Storage);
+    return static_cast<Map *>(Storage);
+  }
+
+  bool isNull() const { return !Storage; }
+
+  ~PerRequestCache() {
+    if (Storage)
+      Deleter(Storage);
+  }
+};
+
+class RequestCache {
+#define SWIFT_TYPEID_ZONE(Name, Id)                                            \
+  llvm::SmallVector<PerRequestCache, 0> Name##ZoneCache;                       \
+                                                                               \
+  template <                                                                   \
+      typename Request, typename ZoneTypes = TypeIDZoneTypes<Zone::Name>,      \
+      typename std::enable_if<TypeID<Request>::zone == Zone::Name>::type * =   \
+          nullptr>                                                             \
+  llvm::DenseMap<RequestKey<Request>, typename Request::OutputType> *          \
+  getCache() {                                                                 \
+    auto &caches = Name##ZoneCache;                                            \
+    if (caches.empty()) {                                                      \
+      caches.resize(ZoneTypes::Count);                                         \
+    }                                                                          \
+    auto idx = TypeID<Request>::localID;                                       \
+    if (caches[idx].isNull()) {                                                \
+      caches[idx] = PerRequestCache::makeEmpty<Request>();                     \
+    }                                                                          \
+    return caches[idx].template get<Request>();                                \
+  }
+
+#include "swift/Basic/TypeIDZones.def"
+#undef SWIFT_TYPEID_ZONE
+
+public:
+  template <typename Request>
+  Optional<typename Request::OutputType> lookup_as(const Request &req) {
+    auto *cache = getCache<Request>();
+    auto result = cache->find_as(req);
+    if (result == cache->end())
+      return None;
+    return result->second;
+  }
+
+  template <typename Request>
+  void insert(RequestKey<Request> req, typename Request::OutputType val) {
+    auto *cache = getCache<Request>();
+    cache->insert({std::move(req), std::move(val)});
+  }
+
+  void clear() {
+#define SWIFT_TYPEID_ZONE(Name, Id) Name##ZoneCache.clear();
+#include "swift/Basic/TypeIDZones.def"
+#undef SWIFT_TYPEID_ZONE
+  }
+};
+} // end anonymous namespace
 
 /// Evaluation engine that evaluates and caches "requests", checking for cyclic
 /// dependencies along the way.
@@ -212,7 +437,7 @@ class Evaluator {
   llvm::SetVector<ActiveRequest> activeRequests;
 
   /// A cache that stores the results of requests.
-  llvm::DenseMap<AnyRequest, AnyValue> cache;
+  RequestCache cache;
 
   /// Track the dependencies of each request.
   ///
@@ -322,14 +547,16 @@ public:
            typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   void cacheOutput(const Request &request,
                    typename Request::OutputType &&output) {
-    cache.insert({AnyRequest(request), std::move(output)});
+    cache.insert(RequestKey<Request>(request), std::move(output));
   }
 
   /// Clear the cache stored within this evaluator.
   ///
   /// Note that this does not clear the caches of requests that use external
   /// caching.
-  void clearCache() { cache.clear(); }
+  void clearCache() {
+    cache.clear();
+  }
 
   /// Is the given request, or an equivalent, currently being evaluated?
   template <typename Request>
@@ -419,11 +646,9 @@ private:
   llvm::Expected<typename Request::OutputType>
   getResultCached(const Request &request) {
     // If we already have an entry for this request in the cache, return it.
-    auto known = cache.find_as(request);
-    if (known != cache.end()) {
-      auto r = known->second.template castTo<typename Request::OutputType>();
-      reportEvaluatedResult<Request>(request, r);
-      return r;
+    if (auto value = cache.lookup_as(request)) {
+      reportEvaluatedResult<Request>(request, *value);
+      return *value;
     }
 
     // Compute the result.
@@ -432,7 +657,7 @@ private:
       return result;
 
     // Cache the result.
-    cache.insert({AnyRequest(request), *result});
+    cache.insert(RequestKey<Request>(request), *result);
     return result;
   }
 
@@ -497,5 +722,30 @@ void CyclicalRequestError<Request>::log(llvm::raw_ostream &out) const {
 }
 
 } // end namespace evaluator
+
+namespace llvm {
+template <typename Request, typename Info>
+struct DenseMapInfo<swift::RequestKey<Request, Info>> {
+  using RequestKey = swift::RequestKey<Request, Info>;
+  static inline RequestKey getEmptyKey() {
+    return RequestKey::getEmpty();
+  }
+  static inline RequestKey getTombstoneKey() {
+    return RequestKey::getTombstone();
+  }
+  static unsigned getHashValue(const RequestKey &key) {
+    return hash_value(key);
+  }
+  static unsigned getHashValue(const Request &request) {
+    return hash_value(request);
+  }
+  static bool isEqual(const RequestKey &lhs, const RequestKey &rhs) {
+    return lhs == rhs;
+  }
+  static bool isEqual(const Request &lhs, const RequestKey &rhs) {
+    return rhs.isStorageEqual(lhs);
+  }
+};
+} // end namespace llvm
 
 #endif // SWIFT_AST_EVALUATOR_H

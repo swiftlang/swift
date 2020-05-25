@@ -29,7 +29,7 @@ namespace swift {
 //----------------------------------------------------------------------------//
 struct DeclApplicabilityOwner {
   const DeclContext *DC;
-  const Type Ty;
+  Type Ty;
   const Decl *ExtensionOrMember;
 
   DeclApplicabilityOwner(const DeclContext *DC, Type Ty, const ExtensionDecl *ED):

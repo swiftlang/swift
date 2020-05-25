@@ -249,7 +249,11 @@ class SimpleRequest;
 template<typename Derived, RequestFlags Caching, typename Output,
          typename ...Inputs>
 class SimpleRequest<Derived, Output(Inputs...), Caching> {
-  std::tuple<Inputs...> storage;
+public:
+  using Storage = std::tuple<Inputs...>;
+
+private:
+  Storage storage;
 
   Derived &asDerived() {
     return *static_cast<Derived *>(this);
@@ -282,6 +286,9 @@ public:
   
   explicit SimpleRequest(const Inputs& ...inputs)
     : storage(inputs...) { }
+
+  template <typename T = bool>
+  explicit SimpleRequest(Storage storage) : storage(storage) {}
 
   /// Request evaluation function that will be registered with the evaluator.
   static OutputType
