@@ -186,11 +186,18 @@ AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
 /// Attempt to infer the function builder type for a declaration.
 static Type inferFunctionBuilderType(ValueDecl *decl)  {
   auto dc = decl->getDeclContext();
-  if (!dc->isTypeContext())
+  if (!dc->isTypeContext() || isa<ProtocolDecl>(dc))
     return Type();
 
   auto funcDecl = dyn_cast<FuncDecl>(decl);
-  if (!funcDecl)
+  if (!funcDecl || !funcDecl->hasBody() ||
+      !decl->getDeclContext()->getParentSourceFile())
+    return Type();
+
+  // Check whether there are any return statements in the function's body.
+  // If there are, the function builder transform will be disabled,
+  // so don't infer a function builder.
+  if (!TypeChecker::findReturnStatements(funcDecl).empty())
     return Type();
 
   // Only getters can have function builders. When we find one, look at
@@ -246,12 +253,6 @@ static Type inferFunctionBuilderType(ValueDecl *decl)  {
   }
 
   if (matches.size() == 0)
-    return Type();
-
-  // Check whether there are any return statements in the function's body.
-  // If there are, the function builder transform will be disabled,
-  // so don't infer a function builder.
-  if (!TypeChecker::findReturnStatements(funcDecl).empty())
     return Type();
 
   // Determine whether there is more than one actual function builder type.
