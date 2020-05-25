@@ -1435,8 +1435,13 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   if (formalIndirectResult) {
     // If the result is a formal indirect result in SIL, that means that the
     // Clang function has an explicit output parameter (e.g. it's a C++
-    // constructor), which it might capture -- so don't specify "nocapture".
-    addIndirectResultAttributes(IGM, Attrs, 0, claimSRet(), /* nocapture = */ false);
+    // constructor). This means:
+    // - Don't mark it `sret`, as this should only be used for C++ return
+    //   values.
+    // - The Clang function might capture the pointer, so don't specify
+    //   `nocapture`.
+    addIndirectResultAttributes(IGM, Attrs, 0, /* allowSRet = */ false,
+                                /* noCapture = */ false);
   }
 
   if (returnInfo.isIndirect() || returnInfo.isIgnore()) {
