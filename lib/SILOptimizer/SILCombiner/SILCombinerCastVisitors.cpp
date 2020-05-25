@@ -264,6 +264,26 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
   return nullptr;
 }
 
+SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
+
+  // Remove a cast if it's only used by an end_cow_mutation.
+  //
+  // (end_cow_mutation (upcast X)) -> (end_cow_mutation X)
+  // (end_cow_mutation (unchecked_ref_cast X)) -> (end_cow_mutation X)
+  SILValue op = ECM->getOperand();
+  if (!isa<UncheckedRefCastInst>(op) && !isa<UpcastInst>(op))
+    return nullptr;
+  if (!op->hasOneUse())
+    return nullptr;
+
+  SingleValueInstruction *refCast = cast<SingleValueInstruction>(op);
+  auto *newECM = Builder.createEndCOWMutation(ECM->getLoc(),
+                                              refCast->getOperand(0));
+  ECM->replaceAllUsesWith(refCast);
+  refCast->setOperand(0, newECM);
+  refCast->moveAfter(newECM);
+  return eraseInstFromFunction(*ECM);
+}
 
 SILInstruction *
 SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
