@@ -280,7 +280,6 @@ internal func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
 internal func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
 /// Do our best to print a value that cannot be printed directly.
-@_semantics("optimize.sil.specialize.generic.never")
 internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream,
     isDebugPrint: Bool
@@ -375,7 +374,6 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
 }
 
 @usableFromInline
-@_semantics("optimize.sil.specialize.generic.never")
 internal func _print_unlocked<T, TargetStream: TextOutputStream>(
   _ value: T, _ target: inout TargetStream
 ) {
@@ -420,7 +418,6 @@ internal func _print_unlocked<T, TargetStream: TextOutputStream>(
 // `debugPrint`
 //===----------------------------------------------------------------------===//
 
-@_semantics("optimize.sil.specialize.generic.never")
 @inline(never)
 public func _debugPrint_unlocked<T, TargetStream: TextOutputStream>(
     _ value: T, _ target: inout TargetStream
@@ -444,7 +441,6 @@ public func _debugPrint_unlocked<T, TargetStream: TextOutputStream>(
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
 }
 
-@_semantics("optimize.sil.specialize.generic.never")
 internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream
 ) {
