@@ -60,3 +60,10 @@ func lookupOnAnyObject(object: AnyObject) { // expected-provides {{lookupOnAnyOb
   _ = object.someMember // expected-private-dynamic-member {{someMember}}
   object.someMethod() // expected-private-dynamic-member {{someMethod}}
 }
+// expected-private-member {{Swift.Hashable.someMethod}}
+// expected-private-member {{Foundation._KeyValueCodingAndObserving.someMethod}}
+// expected-private-member {{Foundation._KeyValueCodingAndObservingPublishing.someMethod}}
+// expected-private-member {{Swift.Equatable.someMethod}}
+// expected-private-member {{Swift.CVarArg.someMethod}}
+// expected-private-member {{Swift.CustomStringConvertible.someMethod}}
+// expected-private-member {{Swift.CustomDebugStringConvertible.someMethod}}
