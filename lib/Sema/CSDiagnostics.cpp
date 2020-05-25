@@ -2989,14 +2989,7 @@ bool TupleContextualFailure::diagnoseAsError() {
     diagnostic = diag::tuple_types_not_convertible_nelts;
   else if ((purpose == CTP_Initialization) && !getContextualType(getAnchor()))
     diagnostic = diag::tuple_types_not_convertible;
-  else if (purpose == CTP_AssignSource) {
-    auto assignExpr = castToExpr<AssignExpr>(getAnchor());
-    if (isa<SubscriptExpr>(assignExpr->getDest())) {
-      diagnostic = *getDiagnosticFor(CTP_SubscriptAssignSource, getToType());
-    } else {
-      diagnostic = *getDiagnosticFor(purpose, getToType());
-    }
-  } else if (auto diag = getDiagnosticFor(purpose, getToType()))
+  else if (auto diag = getDiagnosticFor(purpose, getToType()))
     diagnostic = *diag;
   else
     return false;
