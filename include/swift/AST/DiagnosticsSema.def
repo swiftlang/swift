@@ -5048,6 +5048,14 @@ NOTE(function_builder_remove_attr, none,
      "remove the attribute to explicitly disable the function builder", ())
 NOTE(function_builder_remove_returns, none,
      "remove 'return' statements to apply the function builder", ())
+ERROR(function_builder_infer_ambig, none,
+      "ambiguous function builder inferred for %0: %1 or %2",
+      (DeclName, Type, Type))
+NOTE(function_builder_infer_add_return, none,
+     "add an explicit 'return' statement to not use a function builder", ())
+NOTE(function_builder_infer_pick_specific, none,
+     "apply function builder %0 (inferred from protocol %1)",
+     (Type, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

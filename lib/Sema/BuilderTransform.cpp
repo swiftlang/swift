@@ -1223,10 +1223,6 @@ BraceStmt *swift::applyFunctionBuilderTransform(
         captured.first, captured.second)));
 }
 
-/// Find the return statements in the given body, which block the application
-/// of a function builder.
-static std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);
-
 Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
     FuncDecl *func, Type builderType) {
   // Pre-check the body: pre-check any expressions in it and look
@@ -1552,7 +1548,7 @@ PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
   return PreCheckFunctionBuilderApplication(fn, false).run();
 }
 
-std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn) {
+std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
   PreCheckFunctionBuilderApplication precheck(fn, true);
   (void)precheck.run();
   return precheck.getReturnStmts();
