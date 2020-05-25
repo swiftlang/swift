@@ -85,6 +85,11 @@ module ucrt [system] {
     }
 
     module POSIX {
+      module direct {
+        header "direct.h"
+        export *
+      }
+
       module fcntl {
         header "fcntl.h"
         export *
