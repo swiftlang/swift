@@ -642,7 +642,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
 
       // Semantic calls are safe.
       ArraySemanticsCall Sem(Inst);
-      if (Sem) {
+      if (Sem && Sem.hasSelf()) {
         auto Kind = Sem.getKind();
         // Safe because they create new arrays.
         if (Kind == ArrayCallKind::kArrayInit ||
