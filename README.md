@@ -151,8 +151,6 @@ with version 2 shipped with Ubuntu.
 
 **Note:** For Ubuntu 20.04, use `libpython2-dev` in place of the libpython-dev package above.
 
-Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md).
-
 ### Getting Sources for Swift and Related Projects
 
 First create a directory for all of the Swift sources:
