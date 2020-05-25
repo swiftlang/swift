@@ -33,12 +33,14 @@ ArrayCallKind swift::getArraySemanticsKind(SILFunction *f) {
             .StartsWith("array.init", ArrayCallKind::kArrayInit)
             .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
             .Case("array.uninitialized_intrinsic", ArrayCallKind::kArrayUninitializedIntrinsic)
+            .Case("array.finalize_intrinsic", ArrayCallKind::kArrayFinalizeIntrinsic)
             .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
             .Case("array.check_index", ArrayCallKind::kCheckIndex)
             .Case("array.get_count", ArrayCallKind::kGetCount)
             .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
             .Case("array.get_element", ArrayCallKind::kGetElement)
             .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
+            .Case("array.end_mutation", ArrayCallKind::kEndMutation)
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
             .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
@@ -342,9 +344,9 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
     return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
   }
 
-  case ArrayCallKind::kMakeMutable: {
+  case ArrayCallKind::kMakeMutable:
+  case ArrayCallKind::kEndMutation:
     return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
-  }
   } // End switch.
 
   return false;
@@ -492,8 +494,8 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
     return Call;
   }
 
-  case ArrayCallKind::kMakeMutable: {
-    assert(!LeaveOriginal && "Copying not yet implemented");
+  case ArrayCallKind::kMakeMutable:
+  case ArrayCallKind::kEndMutation: {
     // Hoist the call.
     auto Call = hoistOrCopyCall(SemanticsCall, InsertBefore, LeaveOriginal, DT);
     return Call;
@@ -569,6 +571,7 @@ bool swift::ArraySemanticsCall::doesNotChangeArray() const {
     case ArrayCallKind::kGetCount:
     case ArrayCallKind::kGetCapacity:
     case ArrayCallKind::kGetElement:
+    case ArrayCallKind::kEndMutation:
       return true;
   }
 }

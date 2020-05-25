@@ -445,13 +445,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       continue;
     }
     // Recursively follow projections.
-    if (auto ProjInst = dyn_cast<SingleValueInstruction>(User)) {
-      ProjectionIndex PI(ProjInst);
+    if (auto *svi = dyn_cast<SingleValueInstruction>(User)) {
+      ProjectionIndex PI(svi);
       if (PI.isValid()) {
         IndexTrieNode *ProjAddrNode = AddressNode;
         bool ProjInteriorAddr = IsInteriorAddress;
-        if (Projection::isAddressProjection(ProjInst)) {
-          if (isa<IndexAddrInst>(ProjInst)) {
+        if (Projection::isAddressProjection(svi)) {
+          if (isa<IndexAddrInst>(svi)) {
             // Don't support indexing within an interior address.
             if (IsInteriorAddress)
               return false;
@@ -466,11 +466,17 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
           // Don't expect to extract values once we've taken an address.
           return false;
         }
-        if (!recursivelyCollectInteriorUses(ProjInst,
+        if (!recursivelyCollectInteriorUses(svi,
                                             ProjAddrNode->getChild(PI.Index),
                                             ProjInteriorAddr)) {
           return false;
         }
+        continue;
+      }
+      ArraySemanticsCall AS(svi);
+      if (AS.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+        if (!recursivelyCollectInteriorUses(svi, AddressNode, IsInteriorAddress))
+          return false;
         continue;
       }
     }
