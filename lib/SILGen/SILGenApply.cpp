@@ -4962,6 +4962,22 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
                               SGFContext());
 }
 
+ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
+                                                      SILValue array) {
+  auto &Ctx = getASTContext();
+  auto finalize = Ctx.getFinalizeUninitializedArray();
+
+  CanType arrayTy = array->getType().getASTType();
+
+  // Invoke the intrinsic.
+  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                   Ctx.getArrayDecl());
+  RValue result = emitApplyOfLibraryIntrinsic(loc, finalize, subMap,
+                              ManagedValue::forUnmanaged(array),
+                              SGFContext());
+  return std::move(result).getScalarValue();
+}
+
 namespace {
   /// A cleanup that deallocates an uninitialized array.
   class DeallocateUninitializedArray: public Cleanup {

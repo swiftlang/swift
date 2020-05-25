@@ -2113,10 +2113,11 @@ ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
   SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
   // Reactivate the result cleanup.
-  auto result = varargs.getArray();
-  if (result.hasCleanup())
-    SGF.Cleanups.setCleanupState(result.getCleanup(), CleanupState::Active);
-  return result;
+  auto array = varargs.getArray();
+  if (array.hasCleanup())
+    SGF.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Active);
+
+  return SGF.emitUninitializedArrayFinalization(loc, array.forward(SGF));
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
