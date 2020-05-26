@@ -7,7 +7,7 @@ protocol DefaultInitializable {
 enum NonTrivialDefaults<T: DefaultInitializable> {
   case empty
 
-  // CHECK-LABEL: il hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi1i_Sd1dSS1sx1ttcAEmAA20DefaultInitializableRzlFfA_{{.*}}
+  // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments18NonTrivialDefaultsO7defarg1yACyxGSi1i_Sd1dSS1sx1ttcAEmAA20DefaultInitializableRzlFfA_{{.*}}
   // CHECK:   [[INT_VAL:%[0-9]+]]  = integer_literal $Builtin.IntLiteral, 17
   // CHECK:   [[META:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK:   [[LIT_FN:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
