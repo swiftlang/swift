@@ -3163,8 +3163,8 @@ static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
         continue;
       
       auto &SM = ctx.SourceMgr;
-      auto prevLineCol = SM.getLineAndColumn(prevLoc);
-      if (SM.getLineNumber(thisLoc) != prevLineCol.first)
+      auto prevLineCol = SM.getPresumedLineAndColumnForLoc(prevLoc);
+      if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
         continue;
 
       ctx.Diags.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
