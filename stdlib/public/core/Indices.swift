@@ -87,14 +87,14 @@ extension DefaultIndices: Collection {
     return _elements.index(i, offsetBy: distance)
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
     return _elements.index(i, offsetBy: distance, limitedBy: limit)
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public func distance(from start: Index, to end: Index) -> Int {
     return _elements.distance(from: start, to: end)
   }
