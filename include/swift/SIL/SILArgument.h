@@ -99,8 +99,7 @@ public:
     Bits.SILArgument.VOKind = static_cast<unsigned>(newKind);
   }
 
-  SILBasicBlock *getParent() { return parentBlock; }
-  const SILBasicBlock *getParent() const { return parentBlock; }
+  SILBasicBlock *getParent() const { return parentBlock; }
 
   SILFunction *getFunction();
   const SILFunction *getFunction() const;

@@ -260,6 +260,8 @@ PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
      "Eliminate dead temporary allocations after diagnostics")
 PASS(RedundantPhiElimination, "redundant-phi-elimination",
      "Redundant Phi Block Argument Elimination")
+PASS(PhiExpansion, "phi-expansion",
+     "Replace Phi arguments by their only used field")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
