@@ -2192,7 +2192,7 @@ public:
 
   struct ArgumentInfo {
     ArrayRef<Identifier> Labels;
-    Optional<unsigned> UnlabeledTrailingClosureIndex;
+    Optional<unsigned> FirstTrailingClosureIndex;
   };
 
   /// A mapping from the constraint locators for references to various
@@ -4922,7 +4922,7 @@ public:
 /// \param args The arguments.
 /// \param params The parameters.
 /// \param paramInfo Declaration-level information about the parameters.
-/// \param unlabeledTrailingClosureIndex The index of an unlabeled trailing closure,
+/// \param firstTrailingClosureIndex The index of the first trailing closure,
 ///   if any.
 /// \param allowFixes Whether to allow fixes when matching arguments.
 ///
@@ -4935,7 +4935,7 @@ public:
 bool matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                         ArrayRef<AnyFunctionType::Param> params,
                         const ParameterListInfo &paramInfo,
-                        Optional<unsigned> unlabeledTrailingClosureIndex,
+                        Optional<unsigned> firstTrailingClosureIndex,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
