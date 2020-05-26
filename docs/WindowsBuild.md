@@ -1,6 +1,6 @@
 # Building Swift on Windows
 
-Visual Studio 2017 or newer is needed to build swift on Windows.
+Visual Studio 2017 or newer is needed to build Swift on Windows. As of this writing, Visual Studio 2019 is the most recent release. The free Community edition is sufficient to build Swift.
 
 The following must take place in the **developer command prompt** (provided by Visual Studio). This shows up as "x64 Native Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu.
 
