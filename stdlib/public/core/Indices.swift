@@ -90,7 +90,7 @@ extension DefaultIndices: Collection {
   @inlinable
   public func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
-    ) -> Index? {
+  ) -> Index? {
     return _elements.index(i, offsetBy: distance, limitedBy: limit)
   }
 
