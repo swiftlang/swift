@@ -538,8 +538,8 @@ static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
   // Avoid passing the individual syntax tokens corresponding to single-line
   // object literal expressions, as they will be reported as a single token.
   return Node.Kind == SyntaxStructureKind::ObjectLiteralExpression &&
-    SM.getLineNumber(Node.Range.getStart()) ==
-    SM.getLineNumber(Node.Range.getEnd());
+         SM.getLineAndColumnInBuffer(Node.Range.getStart()).first ==
+             SM.getLineAndColumnInBuffer(Node.Range.getEnd()).first;
 }
 
 std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {

@@ -36,7 +36,7 @@ using namespace incremental_ranges;
 
 SerializableSourceLocation::SerializableSourceLocation(
     const SourceLoc loc, const SourceManager &SM) {
-  auto lc = SM.getLineAndColumn(loc);
+  auto lc = SM.getPresumedLineAndColumnForLoc(loc);
   line = lc.first;
   column = lc.second;
 }
