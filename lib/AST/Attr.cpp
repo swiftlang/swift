@@ -758,11 +758,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Custom: {
     if (!Options.IsForSwiftInterface)
       break;
-    // For Swift interface, we should only print function builder attribute
-    // on parameter decls. Printing the attribute elsewhere isn't ABI relevant.
+    // For Swift interface, we should print function builder attributes
+    // on parameter decls and on protocol requirements.
+    // Printing the attribute elsewhere isn't ABI relevant.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->getAttachedFunctionBuilder() == this) {
-        if (!isa<ParamDecl>(D))
+        if (!isa<ParamDecl>(D) &&
+            !(isa<VarDecl>(D) && isa<ProtocolDecl>(D->getDeclContext())))
           return false;
       }
     }
