@@ -81,6 +81,23 @@ extension DefaultIndices: Collection {
   public var indices: Indices {
     return self
   }
+  
+  @inlinable
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    return _elements.index(i, offsetBy: distance)
+  }
+
+  @inlinable
+  public func index(
+      _ i: Index, offsetBy distance: Int, limitedBy limit: Index
+    ) -> Index? {
+    return _elements.index(i, offsetBy: distance, limitedBy: limit)
+  }
+
+  @inlinable
+  public func distance(from start: Index, to end: Index) -> Int {
+    return _elements.distance(from: start, to: end)
+  }
 }
 
 extension DefaultIndices: BidirectionalCollection
