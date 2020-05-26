@@ -212,4 +212,7 @@ protocol ProtocolWithAssociatedType {
 
 struct ProtocolWithAssociatedTypeImpl: ProtocolWithAssociatedType {
     typealias T = Int
+    func testLocalContent() {
+        let localVariableShouldntBeIndexed = 0
+    }
 }

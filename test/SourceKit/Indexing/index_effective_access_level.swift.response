@@ -3760,6 +3760,14 @@
           key.effective_access: source.decl.effective_access.internal
         },
         {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "testLocalContent()",
+          key.usr: "s:28index_effective_access_level30ProtocolWithAssociatedTypeImplV16testLocalContentyyF",
+          key.line: 215,
+          key.column: 10,
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: "s:28index_effective_access_level30ProtocolWithAssociatedTypeImplVACycfc",
           key.line: 213,
