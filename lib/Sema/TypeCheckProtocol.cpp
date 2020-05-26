@@ -5102,8 +5102,8 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
 
 std::vector<ProtocolConformance *>
 LookupAllConformancesInContextRequest::evaluate(
-    Evaluator &eval, const IterableDeclContext *IDC) const {
-  auto result = IDC->getLocalConformances(ConformanceLookupKind::All);
+    Evaluator &eval, const DeclContext *DC) const {
+  auto result = DC->getLocalConformances(ConformanceLookupKind::All);
   return std::vector<ProtocolConformance *>(result.begin(), result.end());
 }
 
