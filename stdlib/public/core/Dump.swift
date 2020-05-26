@@ -26,7 +26,6 @@
 ///     contents. The default is `Int.max`.
 /// - Returns: The instance passed as `value`.
 @discardableResult
-@_semantics("optimize.sil.specialize.generic.never")
 public func dump<T, TargetStream: TextOutputStream>(
   _ value: T,
   to target: inout TargetStream,
@@ -64,7 +63,6 @@ public func dump<T, TargetStream: TextOutputStream>(
 ///     contents. The default is `Int.max`.
 /// - Returns: The instance passed as `value`.
 @discardableResult
-@_semantics("optimize.sil.specialize.generic.never")
 public func dump<T>(
   _ value: T,
   name: String? = nil,
@@ -83,7 +81,6 @@ public func dump<T>(
 }
 
 /// Dump an object's contents. User code should use dump().
-@_semantics("optimize.sil.specialize.generic.never")
 internal func _dump_unlocked<TargetStream: TextOutputStream>(
   _ value: Any,
   to target: inout TargetStream,
@@ -182,7 +179,6 @@ internal func _dump_unlocked<TargetStream: TextOutputStream>(
 
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
-@_semantics("optimize.sil.specialize.generic.never")
 internal func _dumpSuperclass_unlocked<TargetStream: TextOutputStream>(
   mirror: Mirror,
   to target: inout TargetStream,

@@ -154,7 +154,6 @@ public struct Mirror {
 
   internal static func _noSuperclassMirror() -> Mirror? { return nil }
 
-  @_semantics("optimize.sil.specialize.generic.never")
   @inline(never)
   internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
