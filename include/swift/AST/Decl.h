@@ -3594,6 +3594,8 @@ public:
   /// initializer.
   bool hasDefaultInitializer() const;
 
+  bool isTypeErasedGenericClass() const;
+
   /// Retrieves the synthesized zero parameter default initializer for this
   /// declaration, or \c nullptr if it doesn't have one.
   ConstructorDecl *getDefaultInitializer() const;
