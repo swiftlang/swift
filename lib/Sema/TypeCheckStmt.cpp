@@ -1871,7 +1871,8 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getFunctionBuilderType(func)) {
       if (auto optBody =
-            TypeChecker::applyFunctionBuilderBodyTransform(func, builderType)) {
+              TypeChecker::applyFunctionBuilderBodyTransform(
+                func, builderType)) {
         if (!*optBody)
           return true;
 

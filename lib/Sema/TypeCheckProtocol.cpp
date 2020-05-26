@@ -5100,10 +5100,11 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
-SmallVector<ProtocolConformance *, 2>
+std::vector<ProtocolConformance *>
 LookupAllConformancesInContextRequest::evaluate(
     Evaluator &eval, const DeclContext *DC) const {
-  return DC->getLocalConformances(ConformanceLookupKind::All);
+  auto result = DC->getLocalConformances(ConformanceLookupKind::All);
+  return std::vector<ProtocolConformance *>(result.begin(), result.end());
 }
 
 void TypeChecker::checkConformancesInContext(DeclContext *dc,

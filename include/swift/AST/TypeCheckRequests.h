@@ -2234,7 +2234,7 @@ public:
   bool isCached() const { return true; }
 };
 
-using ProtocolConformanceLookupResult = SmallVector<ProtocolConformance *, 2>;
+using ProtocolConformanceLookupResult = std::vector<ProtocolConformance *>;
 void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
 
 /// Lookup and expand all conformances in the given context.
@@ -2255,7 +2255,7 @@ void simple_display(llvm::raw_ostream &out, ConformanceLookupKind kind);
 class LookupAllConformancesInContextRequest
     : public SimpleRequest<LookupAllConformancesInContextRequest,
                            ProtocolConformanceLookupResult(const DeclContext *),
-                           RequestFlags::Uncached |
+                           RequestFlags::Cached |
                                RequestFlags::DependencySink |
                                RequestFlags::DependencySource> {
 public:
@@ -2269,6 +2269,8 @@ private:
   evaluate(Evaluator &evaluator, const DeclContext *DC) const;
 
 public:
+  bool isCached() const { return true; }
+
   // Incremental dependencies
   evaluator::DependencySource readDependencySource(Evaluator &eval) const;
   void writeDependencySink(Evaluator &eval, ReferencedNameTracker &tracker,

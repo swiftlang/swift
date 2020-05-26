@@ -51,6 +51,7 @@ struct PropertyWrapperTypeInfo;
 enum class CtorInitializerKind;
 struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
+class ProtocolConformance;
 class ProtocolDecl;
 class Requirement;
 enum class ResilienceExpansion : unsigned;

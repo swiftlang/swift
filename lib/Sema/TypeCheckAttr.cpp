@@ -2941,9 +2941,11 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
         // Module interfaces don't print bodies for all getters, so allow getters
         // that don't have a body if we're compiling a module interface.
+        // Within a protocol definition, there will never be a body.
         SourceFile *parent = storage->getDeclContext()->getParentSourceFile();
         bool isInInterface = parent && parent->Kind == SourceFileKind::Interface;
-        if (!isInInterface && !getter->hasBody())
+        if (!isInInterface && !getter->hasBody() &&
+            !isa<ProtocolDecl>(storage->getDeclContext()))
           return true;
 
         return false;
