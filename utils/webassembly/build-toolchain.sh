@@ -35,6 +35,9 @@ BUNDLE_IDENTIFIER="swiftwasm.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Swift for WebAssembly Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 
+# Make sure Clang headers install dir exists to avoid broken symlinks
+mkdir -p $SOURCE_PATH/install/$TOOLCHAIN_NAME/usr/lib/clang/10.0.0
+
 $SOURCE_PATH/swift/utils/build-script --preset=$PRESET_NAME \
   SOURCE_PATH="$SOURCE_PATH" \
   INSTALLABLE_PACKAGE="$INSTALLABLE_PACKAGE" \
@@ -76,6 +79,8 @@ if [[ "$(uname)" == "Linux" ]]; then
 else
   cp -r $NIGHTLY_TOOLCHAIN/usr/lib/swift/macosx $TMP_DIR/$TOOLCHAIN_NAME/usr/lib/swift
 fi
+
+$UTILS_PATH/build-foundation.sh $TMP_DIR/$TOOLCHAIN_NAME
 
 cd $TMP_DIR
 tar cfz $PACKAGE_ARTIFACT $TOOLCHAIN_NAME
