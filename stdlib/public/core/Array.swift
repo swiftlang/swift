@@ -346,8 +346,7 @@ extension Array {
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _createNewBuffer(bufferIsUnique: false, minimumCapacity: count,
-                       growForAppend: false)
+      _buffer = _buffer._consumeAndCreateNew()
     }
   }
 
@@ -1049,34 +1048,13 @@ extension Array: RangeReplaceableCollection {
   /// If `growForAppend` is true, the new capacity is calculated using
   /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
   @_alwaysEmitIntoClient
-  @inline(never)
   internal mutating func _createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
-    let newCapacity = _growArrayCapacity(oldCapacity: _getCapacity(),
-                                         minimumCapacity: minimumCapacity,
-                                         growForAppend: growForAppend)
-    let count = _getCount()
-    _internalInvariant(newCapacity >= count)
-    
-    let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: count, minimumCapacity: newCapacity)
-
-    if bufferIsUnique {
-      _internalInvariant(_buffer.isUniquelyReferenced())
-
-      // As an optimization, if the original buffer is unique, we can just move
-      // the elements instead of copying.
-      let dest = newBuffer.firstElementAddress
-      dest.moveInitialize(from: _buffer.firstElementAddress,
-                          count: count)
-      _buffer.count = 0
-    } else {
-      _buffer._copyContents(
-        subRange: 0..<count,
-        initializing: newBuffer.firstElementAddress)
-    }
-    _buffer = _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
+    _internalInvariant(!bufferIsUnique || _buffer.isUniquelyReferenced())
+    _buffer = _buffer._consumeAndCreateNew(bufferIsUnique: bufferIsUnique,
+                                           minimumCapacity: minimumCapacity,
+                                           growForAppend: growForAppend)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
