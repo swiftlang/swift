@@ -20,16 +20,14 @@
           key.usr: <usr>,
           key.line: 4,
           key.column: 5,
-          key.is_implicit: 1,
-          key.effective_access: source.decl.effective_access.internal
+          key.is_implicit: 1
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
           key.usr: <usr>,
           key.line: 4,
           key.column: 5,
-          key.is_implicit: 1,
-          key.effective_access: source.decl.effective_access.internal
+          key.is_implicit: 1
         }
       ],
       key.effective_access: source.decl.effective_access.internal
@@ -69,8 +67,7 @@
               key.line: 8,
               key.column: 7,
               key.is_dynamic: 1,
-              key.is_implicit: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_implicit: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -78,8 +75,7 @@
               key.line: 8,
               key.column: 7,
               key.is_dynamic: 1,
-              key.is_implicit: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_implicit: 1
             }
           ],
           key.effective_access: source.decl.effective_access.internal
@@ -500,8 +496,7 @@
               key.usr: <usr>,
               key.line: 52,
               key.column: 18,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             }
           ],
           key.effective_access: source.decl.effective_access.internal
@@ -588,16 +583,14 @@
           key.usr: <usr>,
           key.line: 57,
           key.column: 5,
-          key.is_implicit: 1,
-          key.effective_access: source.decl.effective_access.internal
+          key.is_implicit: 1
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
           key.usr: <usr>,
           key.line: 57,
           key.column: 5,
-          key.is_implicit: 1,
-          key.effective_access: source.decl.effective_access.internal
+          key.is_implicit: 1
         }
       ],
       key.effective_access: source.decl.effective_access.internal
@@ -629,8 +622,7 @@
               key.usr: <usr>,
               key.line: 61,
               key.column: 5,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -638,8 +630,7 @@
               key.usr: <usr>,
               key.line: 65,
               key.column: 5,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             }
           ],
           key.effective_access: source.decl.effective_access.internal
@@ -664,8 +655,7 @@
               key.usr: <usr>,
               key.line: 70,
               key.column: 22,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             }
           ],
           key.effective_access: source.decl.effective_access.internal
@@ -839,8 +829,7 @@
               key.usr: <usr>,
               key.line: 82,
               key.column: 5,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -858,8 +847,7 @@
                   key.column: 8,
                   key.receiver_usr: "s:Si"
                 }
-              ],
-              key.effective_access: source.decl.effective_access.internal
+              ]
             },
             {
               key.kind: source.lang.swift.ref.struct,
@@ -1057,8 +1045,7 @@
               key.line: 107,
               key.column: 12
             }
-          ],
-          key.effective_access: source.decl.effective_access.internal
+          ]
         }
       ],
       key.effective_access: source.decl.effective_access.internal
@@ -1437,8 +1424,7 @@
               key.line: 151,
               key.column: 7,
               key.is_dynamic: 1,
-              key.is_implicit: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_implicit: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -1446,8 +1432,7 @@
               key.line: 151,
               key.column: 7,
               key.is_dynamic: 1,
-              key.is_implicit: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_implicit: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.willset,
@@ -1463,8 +1448,7 @@
                   key.line: 153,
                   key.column: 7
                 }
-              ],
-              key.effective_access: source.decl.effective_access.less_than_fileprivate
+              ]
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.didset,
@@ -1480,8 +1464,7 @@
                   key.line: 156,
                   key.column: 7
                 }
-              ],
-              key.effective_access: source.decl.effective_access.less_than_fileprivate
+              ]
             }
           ],
           key.effective_access: source.decl.effective_access.internal
@@ -1516,8 +1499,7 @@
               key.usr: <usr>,
               key.line: 165,
               key.column: 5,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -1525,16 +1507,14 @@
               key.usr: <usr>,
               key.line: 168,
               key.column: 5,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.didset,
               key.name: "didSet:S1",
               key.usr: <usr>,
               key.line: 170,
-              key.column: 5,
-              key.effective_access: source.decl.effective_access.less_than_fileprivate
+              key.column: 5
             }
           ],
           key.effective_access: source.decl.effective_access.internal
@@ -1577,8 +1557,7 @@
               key.usr: <usr>,
               key.line: 177,
               key.column: 5,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -1586,8 +1565,7 @@
               key.usr: <usr>,
               key.line: 178,
               key.column: 5,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
@@ -1595,8 +1573,7 @@
               key.usr: <usr>,
               key.line: 179,
               key.column: 5,
-              key.is_dynamic: 1,
-              key.effective_access: source.decl.effective_access.internal
+              key.is_dynamic: 1
             }
           ],
           key.effective_access: source.decl.effective_access.internal

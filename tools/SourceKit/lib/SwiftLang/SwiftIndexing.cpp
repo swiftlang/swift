@@ -135,7 +135,7 @@ private:
       uidAttrs = getDeclAttributeUIDs(symbol.decl);
       info.Attrs = uidAttrs;
       if (auto *VD = dyn_cast<ValueDecl>(symbol.decl)) {
-        if (symbol.symInfo.Kind != SymbolKind::Extension) {
+        if (shouldOutputEffectiveAccessOfValueSymbol(symbol.symInfo)) {
           AccessScope accessScope = VD->getFormalAccessScope();
           UIdent AttrUID = SwiftLangSupport::getUIDForFormalAccessScope(accessScope);
           info.EffectiveAccess = AttrUID;
@@ -143,6 +143,29 @@ private:
       }
     }
     return func(info);
+  }
+
+  bool shouldOutputEffectiveAccessOfValueSymbol(SymbolInfo Info) {
+    SymbolKind Kind = Info.Kind;
+    SymbolSubKind SubKind = Info.SubKind;
+    switch (Kind) {
+      case SymbolKind::Extension:
+        return false;
+     default:
+        break;
+    }
+    switch (SubKind) {
+      case SymbolSubKind::AccessorGetter:
+      case SymbolSubKind::AccessorSetter:
+      case SymbolSubKind::SwiftAccessorWillSet:
+      case SymbolSubKind::SwiftAccessorDidSet:
+      case SymbolSubKind::SwiftAccessorAddressor:
+      case SymbolSubKind::SwiftAccessorMutableAddressor:
+        return false;
+      default:
+       break;
+    }
+    return true;
   }
 
   template <typename F>

@@ -49,6 +49,29 @@ private extension PrivateEnum {
     func methodFromPrivateExtension() {}
 }
 
+@propertyWrapper
+public struct PublicPropertyWrapper<T> {
+    public var wrappedValue: T
+    public init(wrappedValue: T) {
+        self.wrappedValue = wrappedValue
+    }
+}
+
+@propertyWrapper
+struct InternalPropertyWrapper<T> {
+    let wrappedValue: T
+}
+
+@propertyWrapper
+fileprivate struct FilePrivatePropertyWrapper<T> {
+    fileprivate let wrappedValue: T
+}
+
+@propertyWrapper
+private struct PrivatePropertyWrapper<T> {
+    private let wrappedValue: T
+}
+
 private struct ScopeReducerStruct {
     public init(publicInitializer: Int) {}
     init(internalInitializer: Int) {}
@@ -60,6 +83,11 @@ private struct ScopeReducerStruct {
     fileprivate let filePrivateProperty: Int = 0
     private let privateProperty: Int = 0
     public private(set) var publicPropertyWithPrivateSetter: Int = 0
+
+    @PublicPropertyWrapper public var publicPropertyWrappedProperty: Int = 0
+    @PublicPropertyWrapper var internalPropertyWrappedProperty: Int = 0
+    @PublicPropertyWrapper fileprivate var filePrivatePropertyWrappedProperty: Int = 0
+    @PublicPropertyWrapper private var privatePropertyWrappedProperty: Int = 0
 
     public subscript(publicSubscript: Int) -> Int { return 0 }
     subscript(internalSubscript: Int) -> Int { return 0 }
@@ -84,6 +112,11 @@ public struct ScopeKeeperStruct {
     private let privateProperty: Int = 0
     public private(set) var publicPropertyWithPrivateSetter: Int = 0
 
+    @PublicPropertyWrapper public var publicPropertyWrappedProperty: Int = 0
+    @PublicPropertyWrapper var internalPropertyWrappedProperty: Int = 0
+    @PublicPropertyWrapper fileprivate var filePrivatePropertyWrappedProperty: Int = 0
+    @PublicPropertyWrapper private var privatePropertyWrappedProperty: Int = 0
+
     public subscript(publicSubscript: Int) -> Int { return 0 }
     subscript(internalSubscript: Int) -> Int { return 0 }
     fileprivate subscript(filePrivateSubscript: Int) -> Int { return 0 }
@@ -106,6 +139,11 @@ struct PartialScopeReducerStruct {
     fileprivate let filePrivateProperty: Int = 0
     private let privateProperty: Int = 0
     public private(set) var publicPropertyWithPrivateSetter: Int = 0
+
+    @PublicPropertyWrapper public var publicPropertyWrappedProperty: Int = 0
+    @PublicPropertyWrapper var internalPropertyWrappedProperty: Int = 0
+    @PublicPropertyWrapper fileprivate var filePrivatePropertyWrappedProperty: Int = 0
+    @PublicPropertyWrapper private var privatePropertyWrappedProperty: Int = 0
 
     public subscript(publicSubscript: Int) -> Int { return 0 }
     subscript(internalSubscript: Int) -> Int { return 0 }
