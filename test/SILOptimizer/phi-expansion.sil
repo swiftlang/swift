@@ -1,0 +1,115 @@
+// RUN: %target-sil-opt %s -phi-expansion | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct Mystruct {
+  @_hasStorage var i: Int { get set }
+  @_hasStorage var j: Int { get set }
+  init(i: Int)
+}
+
+// CHECK-LABEL: sil @test_simple
+// CHECK:   br bb3(%{{[0-9]*}} : $Int)
+// CHECK: bb3(%{{[0-9]*}} : $Int):
+// CHECK: } // end sil function 'test_simple'
+sil @test_simple : $@convention(thin) (Mystruct, Mystruct) -> Int {
+bb0(%0 : $Mystruct, %1 : $Mystruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Mystruct)
+
+bb2:
+  br bb3(%1 : $Mystruct)
+
+
+bb3(%5 : $Mystruct):
+  %6 = struct_extract %5 : $Mystruct, #Mystruct.i
+  return %6 : $Int
+}
+
+// CHECK-LABEL: sil @test_multiple_struct_extracts
+// CHECK:   br bb3(%{{[0-9]*}} : $Int)
+// CHECK: bb3(%{{[0-9]*}} : $Int):
+// CHECK: } // end sil function 'test_multiple_struct_extracts'
+sil @test_multiple_struct_extracts : $@convention(thin) (Mystruct, Mystruct) -> (Int, Int) {
+bb0(%0 : $Mystruct, %1 : $Mystruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Mystruct)
+
+bb2:
+  br bb3(%1 : $Mystruct)
+
+
+bb3(%5 : $Mystruct):
+  %6 = struct_extract %5 : $Mystruct, #Mystruct.i
+  %7 = struct_extract %5 : $Mystruct, #Mystruct.i
+  %8 = tuple (%6 : $Int, %7 : $Int)
+  return %8 : $(Int, Int)
+}
+
+// CHECK-LABEL: sil @dont_transform_multiple_fields
+// CHECK:   br bb3(%{{[0-9]*}} : $Mystruct)
+// CHECK: bb3(%{{[0-9]*}} : $Mystruct):
+// CHECK: } // end sil function 'dont_transform_multiple_fields'
+sil @dont_transform_multiple_fields : $@convention(thin) (Mystruct, Mystruct) -> (Int, Int) {
+bb0(%0 : $Mystruct, %1 : $Mystruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Mystruct)
+
+bb2:
+  br bb3(%1 : $Mystruct)
+
+
+bb3(%5 : $Mystruct):
+  %6 = struct_extract %5 : $Mystruct, #Mystruct.i
+  %7 = struct_extract %5 : $Mystruct, #Mystruct.j
+  %8 = tuple (%6 : $Int, %7 : $Int)
+  return %8 : $(Int, Int)
+}
+
+// CHECK-LABEL: sil @test_loop_with_br
+// CHECK:   br bb1(%{{[0-9]*}} : $Int)
+// CHECK: bb1(%{{[0-9]*}} : $Int):
+// CHECK:   br bb1(%{{[0-9]*}} : $Int)
+// CHECK: } // end sil function 'test_loop_with_br'
+sil @test_loop_with_br : $@convention(thin) (Mystruct) -> Int {
+bb0(%0 : $Mystruct):
+  br bb1(%0 : $Mystruct)
+
+bb1(%2 : $Mystruct):
+  %3 = struct_extract %2 : $Mystruct, #Mystruct.i
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%2 : $Mystruct)
+
+bb3:
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil @test_loop_with_cond_br
+// CHECK:   br bb1(%{{[0-9]*}} : $Int)
+// CHECK: bb1(%{{[0-9]*}} : $Int):
+// CHECK:   cond_br undef, bb1(%{{[0-9]*}} : $Int), bb2
+// CHECK: } // end sil function 'test_loop_with_cond_br'
+sil @test_loop_with_cond_br : $@convention(thin) (Mystruct) -> Int {
+bb0(%0 : $Mystruct):
+  br bb1(%0 : $Mystruct)
+
+bb1(%2 : $Mystruct):
+  %3 = struct_extract %2 : $Mystruct, #Mystruct.i
+  cond_br undef, bb1(%2 : $Mystruct), bb2
+
+bb2:
+  return %3 : $Int
+}
+
