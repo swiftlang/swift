@@ -41,7 +41,8 @@ bb0:
   %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -70,7 +71,8 @@ bb0:
   %19 = integer_literal $Builtin.Word, 1
   %20 = index_addr %15 : $*Int64, %19 : $Builtin.Word
   store %6 to %20 : $*Int64
-  strong_release %7 : $Obj
+  %21 = end_cow_mutation %7 : $Obj
+  strong_release %21 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -90,8 +92,9 @@ bb0:
   %5 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %6 = ref_element_addr %5 : $Obj, #Obj.value
   store %4 to %6 : $*Int64
-  set_deallocating %5 : $Obj
-  dealloc_ref %5 : $Obj
+  %10 = end_cow_mutation %5 : $Obj
+  set_deallocating %10 : $Obj
+  dealloc_ref %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -107,7 +110,8 @@ bb0:
   %7 = alloc_ref $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -125,7 +129,8 @@ bb0:
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
   store %4 to %9 : $*Int64
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -140,7 +145,8 @@ bb0:
   %4 = struct $Int64 (%1 : $Builtin.Int64)
   %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -156,7 +162,8 @@ bb0:
   %7 = alloc_ref [objc] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
-  strong_release %7 : $Obj
+  %10 = end_cow_mutation %7 : $Obj
+  strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -177,7 +184,8 @@ bb0:
   %10 = address_to_pointer %9 : $*Int64 to $Builtin.RawPointer
   %f = function_ref @take_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
   %a = apply %f(%10) : $@convention(thin) (Builtin.RawPointer) -> ()
-  strong_release %7 : $Obj
+  %12 = end_cow_mutation %7 : $Obj
+  strong_release %12 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -215,7 +223,8 @@ bb0:
   store %4 to %9 : $*Int64
   %15 = ref_tail_addr %7 : $Obj, $Int64
   store %5 to %15 : $*Int64
-  strong_release %7 : $Obj
+  %16 = end_cow_mutation %7 : $Obj
+  strong_release %16 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -241,7 +250,8 @@ bb0:
   %19 = integer_literal $Builtin.Word, 1
   %20 = index_addr %15 : $*Int64, %19 : $Builtin.Word
   store %6 to %20 : $*Int64
-  strong_release %7 : $Obj
+  %21 = end_cow_mutation %7 : $Obj
+  strong_release %21 : $Obj
   %r = tuple ()
   return %r : $()
 }

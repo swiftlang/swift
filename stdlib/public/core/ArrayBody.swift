@@ -17,6 +17,20 @@
 
 import SwiftShims
 
+#if INTERNAL_CHECKS_ENABLED
+// An additional flag used to runtime-check the immutability of an array.
+//
+// This is ABI breaking if the stdlib is compiled with INTERNAL_CHECKS_ENABLED.
+// Therefore all this is guarded by availability directives, which only enable
+// the flag and the checks if run with a own built stdlib.
+// It will not work when linking against a swift library in the OS.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@inline(never)
+public var _arrayImmutableFlag: UInt {
+  return UInt(bitPattern:  Int.min)
+}
+#endif
+
 @frozen
 @usableFromInline
 internal struct _ArrayBody {
@@ -61,8 +75,49 @@ internal struct _ArrayBody {
   /// reallocation.
   @inlinable
   internal var capacity: Int {
+#if INTERNAL_CHECKS_ENABLED
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+      return Int((_capacityAndFlags & ~_arrayImmutableFlag) &>> 1)
+    }
     return Int(_capacityAndFlags &>> 1)
+#else
+    return Int(_capacityAndFlags &>> 1)
+#endif
   }
+
+#if INTERNAL_CHECKS_ENABLED
+  @_alwaysEmitIntoClient
+  internal var isImmutable: Bool {
+    get {
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+        return (_capacityAndFlags & _arrayImmutableFlag) != 0 || capacity == 0
+      }
+      return true
+    }
+    set {
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+        if newValue {
+          if capacity > 0 {
+            _internalInvariant(!isImmutable, "re-setting immutable array buffer to immutable")
+            _capacityAndFlags = _capacityAndFlags | _arrayImmutableFlag
+          }
+        } else {
+          _internalInvariant(capacity > 0, "setting empty array buffer to mutable")
+          _internalInvariant(isImmutable, "re-setting mutable array buffer to mutable")
+          _capacityAndFlags = _capacityAndFlags & ~_arrayImmutableFlag
+        }
+      }
+    }
+  }
+  
+  @_alwaysEmitIntoClient
+  internal var isMutable: Bool {
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+      return (_capacityAndFlags & _arrayImmutableFlag) == 0
+    }
+    return true
+  }
+#endif
 
   /// Is the Element type bitwise-compatible with some Objective-C
   /// class?  The answer is---in principle---statically-knowable, but
