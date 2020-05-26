@@ -72,8 +72,7 @@ func _finalizeUninitializedArray<Element>(
   _ array: __owned Array<Element>
 ) -> Array<Element> {
   var mutableArray = array
-// TODO: enable this once Array had an _endMutation function
-//  mutableArray._endMutation()
+  mutableArray._endMutation()
   return mutableArray
 }
 
