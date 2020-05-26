@@ -120,9 +120,9 @@ bool doesRangeableRangeMatch(const T *x, const SourceManager &SM,
   auto const r = getRangeableSourceRange(x);
   if (r.isInvalid())
     return false;
-  if (start && SM.getLineNumber(r.Start) != start)
+  if (start && SM.getLineAndColumnInBuffer(r.Start).first != start)
     return false;
-  if (end && SM.getLineNumber(r.End) != end)
+  if (end && SM.getLineAndColumnInBuffer(r.End).first != end)
     return false;
   if (file.empty())
     return true;
@@ -2122,7 +2122,7 @@ private:
       return;
     auto bufID = SM.findBufferContainingLoc(loc);
     auto f = SM.getIdentifierForBuffer(bufID);
-    auto lin = SM.getLineNumber(loc);
+    auto lin = SM.getLineAndColumnInBuffer(loc).first;
     if (f.endswith(file) && lin == line)
       if (isa<PatternBindingDecl>(D))
         llvm::errs() << "*** catchForDebugging: " << lin << " ***\n";

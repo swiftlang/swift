@@ -594,14 +594,10 @@ public:
   using Storage = llvm::PointerUnion<FileUnit *, ModuleDecl *>;
   Storage fileOrModule;
   Identifier name;
-  bool isCascading;
-  SourceLoc diagLoc;
 
 private:
-  OperatorLookupDescriptor(Storage fileOrModule, Identifier name,
-                           bool isCascading, SourceLoc diagLoc)
-      : fileOrModule(fileOrModule), name(name), isCascading(isCascading),
-        diagLoc(diagLoc) {}
+  OperatorLookupDescriptor(Storage fileOrModule, Identifier name)
+      : fileOrModule(fileOrModule), name(name) {}
 
 public:
   /// Retrieves the files to perform lookup in.
@@ -613,14 +609,20 @@ public:
     return fileOrModule.dyn_cast<ModuleDecl *>();
   }
 
+  /// Retrieve the file or module for the lookup, as a DeclContext.
+  DeclContext *getDC() const {
+    if (auto *module = getModule())
+      return module;
+    return fileOrModule.get<FileUnit *>();
+  }
+
   friend llvm::hash_code hash_value(const OperatorLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.fileOrModule, desc.name, desc.isCascading);
+    return llvm::hash_combine(desc.fileOrModule, desc.name);
   }
 
   friend bool operator==(const OperatorLookupDescriptor &lhs,
                          const OperatorLookupDescriptor &rhs) {
-    return lhs.fileOrModule == rhs.fileOrModule && lhs.name == rhs.name &&
-           lhs.isCascading == rhs.isCascading;
+    return lhs.fileOrModule == rhs.fileOrModule && lhs.name == rhs.name;
   }
 
   friend bool operator!=(const OperatorLookupDescriptor &lhs,
@@ -628,50 +630,21 @@ public:
     return !(lhs == rhs);
   }
 
-  static OperatorLookupDescriptor forFile(FileUnit *file, Identifier name,
-                                          bool isCascading, SourceLoc diagLoc) {
-    return OperatorLookupDescriptor(file, name, isCascading, diagLoc);
+  static OperatorLookupDescriptor forFile(FileUnit *file, Identifier name) {
+    return OperatorLookupDescriptor(file, name);
   }
 
-  static OperatorLookupDescriptor forModule(ModuleDecl *mod, Identifier name,
-                                            bool isCascading,
-                                            SourceLoc diagLoc) {
-    return OperatorLookupDescriptor(mod, name, isCascading, diagLoc);
+  static OperatorLookupDescriptor forModule(ModuleDecl *mod, Identifier name) {
+    return OperatorLookupDescriptor(mod, name);
   }
+
+  static OperatorLookupDescriptor forDC(const DeclContext *DC, Identifier name);
 };
 
 void simple_display(llvm::raw_ostream &out,
                     const OperatorLookupDescriptor &desc);
 
 SourceLoc extractNearestSourceLoc(const OperatorLookupDescriptor &desc);
-
-template <typename OperatorType>
-class LookupOperatorRequest
-    : public SimpleRequest<LookupOperatorRequest<OperatorType>,
-                           OperatorType *(OperatorLookupDescriptor),
-                           RequestFlags::Cached> {
-  using SimpleRequest<LookupOperatorRequest<OperatorType>,
-                      OperatorType *(OperatorLookupDescriptor),
-                      RequestFlags::Cached>::SimpleRequest;
-
-private:
-  friend SimpleRequest<LookupOperatorRequest<OperatorType>,
-                       OperatorType *(OperatorLookupDescriptor),
-                       RequestFlags::Cached>;
-
-  // Evaluation.
-  OperatorType *evaluate(Evaluator &evaluator,
-                         OperatorLookupDescriptor desc) const;
-
-public:
-  // Cached.
-  bool isCached() const { return true; }
-};
-
-using LookupPrefixOperatorRequest = LookupOperatorRequest<PrefixOperatorDecl>;
-using LookupInfixOperatorRequest = LookupOperatorRequest<InfixOperatorDecl>;
-using LookupPostfixOperatorRequest = LookupOperatorRequest<PostfixOperatorDecl>;
-using LookupPrecedenceGroupRequest = LookupOperatorRequest<PrecedenceGroupDecl>;
 
 /// Looks up an operator in a given file or module without looking through
 /// imports.
@@ -768,6 +741,84 @@ public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ProtocolConformanceRef result) const;
+};
+
+/// Look up an 'infix operator' decl by name.
+class LookupInfixOperatorRequest
+    : public SimpleRequest<LookupInfixOperatorRequest,
+                           TinyPtrVector<InfixOperatorDecl *>(
+                               OperatorLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  TinyPtrVector<InfixOperatorDecl *>
+  evaluate(Evaluator &evaluator, OperatorLookupDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Look up an 'prefix operator' decl by name.
+class LookupPrefixOperatorRequest
+    : public SimpleRequest<LookupPrefixOperatorRequest,
+                           PrefixOperatorDecl *(OperatorLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  PrefixOperatorDecl *evaluate(Evaluator &evaluator,
+                               OperatorLookupDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Look up an 'postfix operator' decl by name.
+class LookupPostfixOperatorRequest
+    : public SimpleRequest<LookupPostfixOperatorRequest,
+                           PostfixOperatorDecl *(OperatorLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  PostfixOperatorDecl *evaluate(Evaluator &evaluator,
+                                OperatorLookupDescriptor desc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Look up a precedencegroup decl by name.
+class LookupPrecedenceGroupRequest
+    : public SimpleRequest<LookupPrecedenceGroupRequest,
+                           TinyPtrVector<PrecedenceGroupDecl *>(
+                               OperatorLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  TinyPtrVector<PrecedenceGroupDecl *>
+  evaluate(Evaluator &evaluator, OperatorLookupDescriptor descriptor) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

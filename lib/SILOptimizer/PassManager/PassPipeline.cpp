@@ -351,6 +351,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Jump threading can expose opportunity for SILCombine (enum -> is_enum_tag->
   // cond_br).
   P.addJumpThreadSimplifyCFG();
+  P.addPhiExpansion();
   P.addSILCombine();
   // SILCombine can expose further opportunities for SimplifyCFG.
   P.addSimplifyCFG();

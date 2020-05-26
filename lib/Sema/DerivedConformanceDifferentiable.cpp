@@ -44,9 +44,7 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal, DeclContext *DC,
     if (auto *originalProperty = vd->getOriginalWrappedProperty()) {
       // Skip immutable wrapped properties. `mutating func move(along:)` cannot
       // be synthesized to update these properties.
-      auto mutability = originalProperty->getPropertyWrapperMutability();
-      assert(mutability.hasValue() && "Expected wrapped property mutability");
-      if (mutability->Setter != PropertyWrapperMutability::Value::Mutating)
+      if (!originalProperty->getAccessor(AccessorKind::Set))
         continue;
       // Use the original wrapped property.
       vd = originalProperty;
@@ -713,11 +711,9 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
       // Diagnose wrapped properties whose property wrappers do not define
       // `wrappedValue.set`. `mutating func move(along:)` cannot be synthesized
       // to update these properties.
-      auto *wrapperDecl =
-          vd->getInterfaceType()->getNominalOrBoundGenericNominal();
-      auto mutability = originalProperty->getPropertyWrapperMutability();
-      assert(mutability.hasValue() && "Expected wrapped property mutability");
-      if (mutability->Setter != PropertyWrapperMutability::Value::Mutating) {
+      if (!originalProperty->getAccessor(AccessorKind::Set)) {
+        auto *wrapperDecl =
+            vd->getInterfaceType()->getNominalOrBoundGenericNominal();
         auto loc =
             originalProperty->getAttributeInsertionLoc(/*forModifier*/ false);
         Context.Diags
@@ -725,7 +721,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
                 loc,
                 diag::
                     differentiable_immutable_wrapper_implicit_noderivative_fixit,
-                wrapperDecl->getNameStr(), nominal->getName(),
+                wrapperDecl->getName(), nominal->getName(),
                 nominalCanDeriveAdditiveArithmetic)
             .fixItInsert(loc, "@noDerivative ");
         // Add an implicit `@noDerivative` attribute.

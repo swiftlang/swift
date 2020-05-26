@@ -134,6 +134,16 @@ fun_31849281(a: { !$0 }, c: [nil, 42], b: { (num: Int) -> String in return Strin
 fun_31849281(a: { !$0 }, c: [nil, 42], b: { "\($0)" })
 // expected-error @-1 {{argument 'b' must precede argument 'c'}} {{26-26=b: { "\\($0)" }, }} {{38-54=}}
 
+struct ReorderAndAllLabels {
+  func f(aa: Int, bb: Int, cc: Int, dd: Int) {}
+
+  func test() {
+    f(bb: 1, ccx: 2, ddx: 3, aa: 0) // expected-error {{argument 'aa' must precede argument 'bb'}} {{28-35=}} {{7-7=aa: 0, }} {{none}}
+
+    f(bbx: 1, ccx: 2, ddx: 3, aa: 0) // expected-error {{incorrect argument labels in call (have 'bbx:ccx:ddx:aa:', expected 'aa:bb:cc:dd:')}} {{7-10=aa}} {{15-18=bb}} {{23-26=cc}} {{31-33=dd}} {{none}}
+  }
+}
+
 // -------------------------------------------
 // Default arguments
 // -------------------------------------------
@@ -175,6 +185,16 @@ defargs2(first: 1, last: 4, x: 1) // expected-error{{argument 'x' must precede a
 
 func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
 rdar43525641(1, c: 2, 3) // Ok
+
+func testLabelErrorDefault() {
+  func f(aa: Int, bb: Int, cc: Int = 0) {}
+
+  f(aax: 0, bbx: 1, cc: 2)
+  // expected-error@-1 {{incorrect argument labels in call (have 'aax:bbx:cc:', expected 'aa:bb:cc:')}}
+
+  f(aax: 0, bbx: 1)
+  // expected-error@-1 {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}}
+}
 
 // -------------------------------------------
 // Variadics
@@ -385,6 +405,16 @@ struct Variadics8 {
 
 func var_31849281(_ a: Int, _ b: Int..., c: Int) {}
 var_31849281(1, c: 10, 3, 4, 5, 6, 7, 8, 9) // expected-error {{unnamed argument #3 must precede argument 'c'}} {{17-17=3, 4, 5, 6, 7, 8, 9, }} {{22-43=}}
+
+func testLabelErrorVariadic() {
+  func f(aa: Int, bb: Int, cc: Int...) {}
+
+  f(aax: 0, bbx: 1, cc: 2, 3, 4)
+  // expected-error@-1 {{incorrect argument labels in call (have 'aax:bbx:cc:_:_:', expected 'aa:bb:cc:_:_:')}}
+
+  f(aax: 0, bbx: 1)
+  // expected-error@-1 {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}}
+}
 
 // -------------------------------------------
 // Positions around defaults and variadics 
@@ -653,6 +683,115 @@ struct PositionsAroundDefaultsAndVariadics {
 }
 
 // -------------------------------------------
+// Matching position of unlabeled parameters
+// -------------------------------------------
+
+func testUnlabeledParameterBindingPosition() {
+  do {
+    func f(_ aa: Int) {}
+
+    f(0, 1)
+    // expected-error@-1:10 {{extra argument in call}}
+  }
+
+  do {
+    // expected-note@+1 *{{'f(aa:_:)' declared here}}
+    func f(aa: Int, _ bb: Int) { }
+
+    f(1)
+    // expected-error@-1 {{missing argument for parameter 'aa' in call}}
+
+    f(0, 1)
+    // expected-error@-1:6 {{missing argument label 'aa:' in call}}
+
+    f(0, xx: 1)
+    // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
+    // expected-error@-2:14 {{extra argument 'xx' in call}}
+
+    f(xx: 0, 1)
+    // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
+    // expected-error@-2:14 {{extra argument in call}}
+
+    f(0, 1, 9)
+    // expected-error@-1:13 {{extra argument in call}}
+
+    f(0, 1, xx: 9)
+    // expected-error@-1:17 {{extra argument 'xx' in call}}
+
+    f(xx: 91, 1, 92)
+    // expected-error@-1 {{extra arguments at positions #2, #3 in call}}
+    // expected-error@-2 {{missing argument for parameter 'aa' in call}}
+  }
+
+  do {
+    func f(_ aa: Int, bb: Int, _ cc: Int) { }
+
+    f(bb: 1, 0, 2)
+    // expected-error@-1 {{unnamed argument #3 must precede argument 'bb'}}
+  }
+
+  do {
+    func f(_ aa: Int = 80, bb: Int, _ cc: Int) {}
+
+    f(bb: 1, 2) // ok
+  }
+
+  do {
+    // expected-note@+1 *{{'f(_:bb:_:)' declared here}}
+    func f(_ aa: Int, bb: Int, _ cc: Int...) { }
+
+    f(bb: 1, 2, 3, 4)
+    // expected-error@-1 {{missing argument for parameter #1 in call}}
+  }
+
+  do {
+    func f(_ aa: Int, bb: Int = 81, _ cc: Int...) {}
+
+    f(0, 2, 3) // ok
+  }
+
+  do {
+    // expected-note@+1 *{{'f(aa:_:_:)' declared here}}
+    func f(aa: Int, _ bb: Int, _ cc: Int) {}
+
+    f(0, 1)
+    // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
+  }
+
+  do {
+    // expected-note@+1 *{{'f(aa:_:_:)' declared here}}
+    func f(aa: Int, _ bb: Int = 81, _ cc: Int) {}
+
+    f(0, 1)
+    // expected-error@-1:7 {{missing argument for parameter 'aa' in call}}
+  }
+
+  do {
+    // expected-note@+1 *{{'f(aa:bb:_:)' declared here}}
+    func f(aa: Int, bb: Int, _ cc: Int) {}
+
+    f(0, 2)
+    // expected-error@-1:6 {{missing argument labels 'aa:bb:' in call}}
+    // expected-error@-2:8 {{missing argument for parameter 'bb' in call}}
+
+    f(0, bb: 1, 2)
+    // expected-error@-1:6 {{missing argument label 'aa:' in call}}
+  }
+
+  do {
+    func f(_ aa: Int, _ bb: Int = 81, cc: Int, _ dd: Int) {}
+
+    f(0, cc: 2, 3) // ok
+  }
+
+  do {
+    func f(_ aa: Int, _ bb: Int = 81, cc: Int = 82, _ dd: Int) {}
+
+    f(0, cc: 2, 3) // ok
+  }
+}
+
+// -------------------------------------------
 // Missing arguments
 // -------------------------------------------
 // FIXME: Diagnostics could be improved with all missing names, or
@@ -894,6 +1033,19 @@ mismatchOverloaded1.method1(5, secondArg: nil)
 // Prefer available to unavailable declaration, if it comes up.
 mismatchOverloaded1.method2(5) { $0 }
 
+struct RelabelAndTrailingClosure {
+  func f1(aa: Int, bb: Int, cc: () -> Void = {}) {}
+  func f2(aa: Int, bb: Int, _ cc: () -> Void = {}) {}
+
+  func test() {
+    f1(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:cc:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
+    f2(aax: 1, bbx: 2) {} // expected-error {{incorrect argument labels in call (have 'aax:bbx:_:', expected 'aa:bb:_:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
+
+    f1(aax: 1, bbx: 2) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
+    f2(aax: 1, bbx: 2) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{8-11=aa}} {{16-19=bb}} {{none}}
+  }
+}
+
 // -------------------------------------------
 // Values of function type
 // -------------------------------------------
@@ -1035,3 +1187,65 @@ CurriedClass.m1(2, b: 42)   // expected-error {{instance member 'm1' cannot be u
 
 // <rdar://problem/22108559> QoI: Confusing error message when calling an instance method as a class method
 CurriedClass.m2(12)  // expected-error {{instance member 'm2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
+
+// -------------------------------------------
+// Multiple label errors
+// -------------------------------------------
+
+func testLabelErrorsBasic() {
+  func f(_ aa: Int, _ bb: Int, cc: Int, dd: Int, ee: Int, ff: Int) {}
+
+  // 1 wrong
+  f(0, 1, ccx: 2, dd: 3, ee: 4, ff: 5)
+  // expected-error@-1 {{incorrect argument label in call (have '_:_:ccx:dd:ee:ff:', expected '_:_:cc:dd:ee:ff:')}} {{11-14=cc}} {{none}}
+
+  // 1 missing
+  f(0, 1, 2, dd: 3, ee: 4, ff: 5)
+  // expected-error@-1 {{missing argument label 'cc:' in call}} {{11-11=cc: }} {{none}}
+
+  // 1 extra
+  f(aa: 0, 1, cc: 2, dd: 3, ee: 4, ff: 5)
+  // expected-error@-1 {{extraneous argument label 'aa:' in call}} {{5-9=}} {{none}}
+
+  // 1 ooo
+  f(0, 1, dd: 3, cc: 2, ee: 4, ff: 5)
+  // expected-error@-1 {{argument 'cc' must precede argument 'dd'}} {{16-23=}} {{11-11=cc: 2, }} {{none}}
+
+  // 2 wrong
+  f(0, 1, ccx: 2, ddx: 3, ee: 4, ff: 5)
+  // expected-error@-1 {{incorrect argument labels in call (have '_:_:ccx:ddx:ee:ff:', expected '_:_:cc:dd:ee:ff:')}} {{11-14=cc}} {{19-22=dd}} {{none}}
+
+  // 2 missing
+  f(0, 1, 2, 3, ee: 4, ff: 5)
+  // expected-error@-1 {{missing argument labels 'cc:dd:' in call}} {{11-11=cc: }} {{14-14=dd: }} {{none}}
+
+  // 2 extra
+  f(aa: 0, bb: 1, cc: 2, dd: 3, ee: 4, ff: 5)
+  // expected-error@-1 {{extraneous argument labels 'aa:bb:' in call}} {{5-9=}} {{12-16=}} {{none}}
+
+  // 2 ooo
+  f(0, 1, dd: 3, cc: 2, ff: 5, ee: 4)
+  // expected-error@-1 {{argument 'cc' must precede argument 'dd'}} {{16-23=}} {{11-11=cc: 2, }} {{none}}
+
+  // 1 wrong + 1 missing
+  f(0, 1, ccx: 2, 3, ee: 4, ff: 5)
+  // expected-error@-1 {{incorrect argument labels in call (have '_:_:ccx:_:ee:ff:', expected '_:_:cc:dd:ee:ff:')}} {{11-14=cc}} {{19-19=dd: }} {{none}}
+
+  // 1 wrong + 1 extra
+  f(aa: 0, 1, ccx: 2, dd: 3, ee: 4, ff: 5)
+  // expected-error@-1 {{incorrect argument labels in call (have 'aa:_:ccx:dd:ee:ff:', expected '_:_:cc:dd:ee:ff:')}} {{5-9=}} {{15-18=cc}} {{none}}
+
+  // 1 wrong + 1 ooo
+  f(0, 1, ccx: 2, dd: 3, ff: 5, ee: 4)
+  // expected-error@-1 {{incorrect argument labels in call (have '_:_:ccx:dd:ff:ee:', expected '_:_:cc:dd:ee:ff:')}} {{11-14=cc}} {{26-28=ee}} {{33-35=ff}} {{none}}
+}
+
+struct DiagnoseAllLabels {
+  func f(aa: Int, bb: Int, cc: Int..., dd: Int, ee: Int = 0, ff: Int = 0) {}
+
+  func test() {
+    f(aax: 0, bbx: 1, cc: 21, 22, 23, dd: 3, ff: 5) // expected-error {{incorrect argument labels in call (have 'aax:bbx:cc:_:_:dd:ff:', expected 'aa:bb:cc:_:_:dd:ff:')}} {{7-10=aa}} {{15-18=bb}} {{none}}
+
+    f(aax: 0, bbx: 1, dd: 3, ff: 5) // expected-error {{incorrect argument labels in call (have 'aax:bbx:dd:ff:', expected 'aa:bb:dd:ff:')}} {{7-10=aa}} {{15-18=bb}} {{none}}
+  }
+}

@@ -935,53 +935,13 @@ GenericParamList::clone(DeclContext *dc) const {
       GenericTypeParamDecl::InvalidDepth,
       param->getIndex());
     params.push_back(newParam);
-
-    SmallVector<TypeLoc, 2> inherited;
-    for (auto loc : param->getInherited())
-      inherited.push_back(loc.clone(ctx));
-    newParam->setInherited(ctx.AllocateCopy(inherited));
-  }
-
-  SmallVector<RequirementRepr, 2> requirements;
-  for (auto reqt : getRequirements()) {
-    switch (reqt.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      auto first = reqt.getSubjectLoc();
-      auto second = reqt.getConstraintLoc();
-      reqt = RequirementRepr::getTypeConstraint(
-          first.clone(ctx),
-          reqt.getSeparatorLoc(),
-          second.clone(ctx));
-      break;
-    }
-    case RequirementReprKind::SameType: {
-      auto first = reqt.getFirstTypeLoc();
-      auto second = reqt.getSecondTypeLoc();
-      reqt = RequirementRepr::getSameType(
-          first.clone(ctx),
-          reqt.getSeparatorLoc(),
-          second.clone(ctx));
-      break;
-    }
-    case RequirementReprKind::LayoutConstraint: {
-      auto first = reqt.getSubjectLoc();
-      auto layout = reqt.getLayoutConstraintLoc();
-      reqt = RequirementRepr::getLayoutConstraint(
-          first.clone(ctx),
-          reqt.getSeparatorLoc(),
-          layout);
-      break;
-    }
-    }
-
-    requirements.push_back(reqt);
   }
 
   return GenericParamList::create(ctx,
                                   getLAngleLoc(),
                                   params,
                                   getWhereLoc(),
-                                  requirements,
+                                  /*requirements=*/{},
                                   getRAngleLoc());
 }
 
@@ -6204,8 +6164,6 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
       nullptr, PD->DefaultValueAndFlags.getInt());
   Clone->Bits.ParamDecl.defaultArgumentKind =
       PD->Bits.ParamDecl.defaultArgumentKind;
-  if (auto *repr = PD->getTypeRepr())
-    Clone->setTypeRepr(repr->clone(Ctx));
 
   Clone->setSpecifier(PD->getSpecifier());
   Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());

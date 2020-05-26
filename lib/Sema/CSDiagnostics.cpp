@@ -632,10 +632,31 @@ void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
 
 bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   auto anchor = getAnchor();
-  auto path = getLocator()->getPath();
 
   auto fromType = getFromType();
   auto toType = getToType();
+
+  // This is a situation where right-hand size type is wrapped
+  // into a number of optionals and argument isn't e.g.
+  //
+  // func test(_: UnsafePointer<Int>??) {}
+  //
+  // var value: Float = 0
+  // test(&value)
+  //
+  // `value` has to get implicitly wrapped into 2 optionals
+  // before pointer types could be compared.
+  auto path = getLocator()->getPath();
+  unsigned toDrop = 0;
+  for (const auto &elt : llvm::reverse(path)) {
+    if (!elt.is<LocatorPathElt::OptionalPayload>())
+      break;
+
+    // Disregard optional payload element to look at its source.
+    toDrop++;
+  }
+
+  path = path.drop_back(toDrop);
 
   Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
@@ -683,18 +704,6 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     case ConstraintLocator::ClosureBody:
     case ConstraintLocator::ClosureResult: {
       diagnostic = diag::cannot_convert_closure_result;
-      break;
-    }
-
-    case ConstraintLocator::OptionalPayload: {
-      // If we have an inout expression, this comes from an
-      // InoutToPointer argument mismatch failure.
-      if (isExpr<InOutExpr>(anchor)) {
-        diagnostic = diag::cannot_convert_argument_value;
-        auto applyInfo = getFunctionArgApplyInfo(getLocator());
-        if (applyInfo)
-          toType = applyInfo->getParamType();
-      }
       break;
     }
 
@@ -4428,8 +4437,8 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
   // If this is multi-line closure we'd have to insert new lines
   // in the suggested 'let' to keep the structure of the code intact,
   // otherwise just use ';' to keep everything on the same line.
-  auto inLine = sourceMgr.getLineNumber(inLoc);
-  auto bodyLine = sourceMgr.getLineNumber(bodyLoc);
+  auto inLine = sourceMgr.getLineAndColumnInBuffer(inLoc).first;
+  auto bodyLine = sourceMgr.getLineAndColumnInBuffer(bodyLoc).first;
   auto isMultiLineClosure = bodyLine > inLine;
   auto indent =
       bodyStmts.empty() ? "" : Lexer::getIndentationForLine(sourceMgr, bodyLoc);
