@@ -1406,7 +1406,7 @@ void RequirementSource::print(llvm::raw_ostream &out,
 
     unsigned bufferID = srcMgr->findBufferContainingLoc(loc);
 
-    auto lineAndCol = srcMgr->getLineAndColumn(loc, bufferID);
+    auto lineAndCol = srcMgr->getPresumedLineAndColumnForLoc(loc, bufferID);
     out << " @ " << lineAndCol.first << ':' << lineAndCol.second;
   };
 
